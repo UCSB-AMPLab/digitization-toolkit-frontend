@@ -18,14 +18,3 @@
 <div class="loading">
   <p>Loading...</p>
 </div>
-
-<style>
-  .loading {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    color: #6b7280;
-  }
-</style>
