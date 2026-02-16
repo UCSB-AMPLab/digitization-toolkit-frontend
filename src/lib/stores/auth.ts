@@ -48,7 +48,6 @@ function createAuthStore() {
       try {
         await authApi.login({ 
           username, 
-          email: '', // Backend login only uses username, but schema requires email
           password 
         });
         
