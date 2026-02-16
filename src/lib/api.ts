@@ -94,7 +94,7 @@ export const authApi = {
    * Register a new user
    */
   async register(data: RegisterData): Promise<User> {
-    return apiRequest<User>('/api/auth/register', {
+    return apiRequest<User>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -104,7 +104,7 @@ export const authApi = {
    * Login with username and password
    */
   async login(data: LoginData): Promise<AuthResponse> {
-    const response = await apiRequest<AuthResponse>('/api/auth/login', {
+    const response = await apiRequest<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -123,7 +123,7 @@ export const authApi = {
    * Refresh authentication token
    */
   async refreshToken(): Promise<AuthResponse> {
-    const response = await apiRequest<AuthResponse>('/api/auth/refresh', {
+    const response = await apiRequest<AuthResponse>('/auth/refresh', {
       method: 'POST'
     });
     tokenStore.set(response.access_token);
@@ -134,7 +134,7 @@ export const authApi = {
    * Change user password
    */
   async resetPassword(oldPassword: string, newPassword: string): Promise<void> {
-    await apiRequest('/api/auth/password-reset', {
+    await apiRequest('/auth/password-reset', {
       method: 'POST',
       body: JSON.stringify({
         old_password: oldPassword,
@@ -167,21 +167,21 @@ export const projectsApi = {
    * Get all projects
    */
   async list(): Promise<Project[]> {
-    return apiRequest<Project[]>('/api/projects');
+    return apiRequest<Project[]>('/projects');
   },
 
   /**
    * Get a single project by ID
    */
   async get(id: number): Promise<Project> {
-    return apiRequest<Project>(`/api/projects/${id}`);
+    return apiRequest<Project>(`/projects/${id}`);
   },
 
   /**
    * Create a new project
    */
   async create(data: CreateProjectData): Promise<Project> {
-    return apiRequest<Project>('/api/projects', {
+    return apiRequest<Project>('/projects', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -191,7 +191,7 @@ export const projectsApi = {
    * Delete a project
    */
   async delete(id: number): Promise<void> {
-    await apiRequest(`/api/projects/${id}`, {
+    await apiRequest(`/projects/${id}`, {
       method: 'DELETE'
     });
   }
@@ -221,21 +221,21 @@ export const documentsApi = {
    * Get all documents for a project
    */
   async listByProject(projectId: number): Promise<Document[]> {
-    return apiRequest<Document[]>(`/api/projects/${projectId}/documents`);
+    return apiRequest<Document[]>(`/projects/${projectId}/documents`);
   },
 
   /**
    * Get a single document
    */
   async get(id: number): Promise<Document> {
-    return apiRequest<Document>(`/api/documents/${id}`);
+    return apiRequest<Document>(`/documents/${id}`);
   },
 
   /**
    * Create a new document
    */
   async create(data: CreateDocumentData): Promise<Document> {
-    return apiRequest<Document>('/api/documents', {
+    return apiRequest<Document>('/documents', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -245,7 +245,7 @@ export const documentsApi = {
    * Delete a document
    */
   async delete(id: number): Promise<void> {
-    await apiRequest(`/api/documents/${id}`, {
+    await apiRequest(`/documents/${id}`, {
       method: 'DELETE'
     });
   }
@@ -268,14 +268,14 @@ export const camerasApi = {
    * List available cameras
    */
   async list(): Promise<Camera[]> {
-    return apiRequest<Camera[]>('/api/cameras');
+    return apiRequest<Camera[]>('/cameras');
   },
 
   /**
    * Get camera settings
    */
   async getSettings(index: number): Promise<any> {
-    return apiRequest(`/api/cameras/${index}/settings`);
+    return apiRequest(`/cameras/${index}/settings`);
   },
 
   /**
@@ -283,7 +283,7 @@ export const camerasApi = {
    */
   async capture(index: number, documentId?: number): Promise<any> {
     const params = documentId ? `?document_id=${documentId}` : '';
-    return apiRequest(`/api/cameras/${index}/capture${params}`, {
+    return apiRequest(`/cameras/${index}/capture${params}`, {
       method: 'POST'
     });
   }
