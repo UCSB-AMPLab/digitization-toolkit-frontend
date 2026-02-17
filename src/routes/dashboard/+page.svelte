@@ -51,7 +51,7 @@
         <p class="loading-text">Loading...</p>
       {:else if lastActivity}
         <div class="activity-details">
-          <div class="activity-icon">📁</div>
+          <span class="material-symbols-outlined activity-icon">folder</span>
           <div class="activity-info">
             <p class="activity-type">{lastActivity.type}</p>
             <p class="activity-name">{lastActivity.name}</p>
@@ -87,7 +87,7 @@
         <div class="projects-list">
           {#each recentProjects as project}
             <a href="/dashboard/projects/{project.id}" class="project-item">
-              <span class="project-icon">📁</span>
+              <span class="material-symbols-outlined project-icon">folder</span>
               <div class="project-details">
                 <p class="project-name">{project.name}</p>
                 {#if project.description}

@@ -288,17 +288,21 @@
             <div class="project-header">
               <h3 on:click={() => viewProject(project)}>{project.name}</h3>
               <div class="project-actions">
-                <button class="icon-btn" on:click={() => openEditModal(project)} title="Edit">✏️</button>
-                <button class="icon-btn danger" on:click={() => openDeleteModal(project)} title="Delete">🗑️</button>
+                <button class="icon-btn" on:click={() => openEditModal(project)} title="Edit">
+                  <span class="material-symbols-outlined icon-sm">edit</span>
+                </button>
+                <button class="icon-btn danger" on:click={() => openDeleteModal(project)} title="Delete">
+                  <span class="material-symbols-outlined icon-sm">delete</span>
+                </button>
               </div>
             </div>
             {#if project.description}
               <p class="project-description">{project.description}</p>
             {/if}
             <div class="project-meta">
-              <span class="meta-item">📅 {formatDate(project.created_at)}</span>
+              <span class="meta-item">{formatDate(project.created_at)}</span>
               {#if project.created_by}
-                <span class="meta-item">👤 {project.created_by}</span>
+                <span class="meta-item">by {project.created_by}</span>
               {/if}
             </div>
             <div class="project-card-actions">

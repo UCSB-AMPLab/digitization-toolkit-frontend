@@ -267,17 +267,18 @@
         {/if}
       </div>
       <button class="btn-primary" on:click={() => goto(`/dashboard/capture/${projectId}`)}>
-        📷 Start Capture
+        <span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 0.5rem;">photo_camera</span>
+        Start Capture
       </button>
     </header>
 
     <div class="project-meta-bar">
-      <span>📅 Created: {formatDate(project.created_at)}</span>
+      <span>Created: {formatDate(project.created_at)}</span>
       {#if project.created_by}
-        <span>👤 By: {project.created_by}</span>
+        <span>By: {project.created_by}</span>
       {/if}
-      <span>📁 {totalCollectionCount} Collection(s)</span>
-      <span>📄 {records.length} Record(s)</span>
+      <span>{totalCollectionCount} Collection(s)</span>
+      <span>{records.length} Record(s)</span>
     </div>
 
     <!-- Collections Section -->
@@ -321,7 +322,7 @@
                     <span class="tree-toggle-spacer"></span>
                   {/if}
                   
-                  <div class="collection-icon">📂</div>
+                  
                   <div class="collection-info clickable" on:click={() => viewCollection(collection)} on:keydown={(e) => e.key === 'Enter' && viewCollection(collection)} role="button" tabindex="0">
                     <h4>{collection.name}</h4>
                     {#if collection.description}
@@ -369,7 +370,7 @@
                           <span class="tree-toggle-spacer"></span>
                         {/if}
                         
-                        <div class="collection-icon">📂</div>
+                        
                         <div class="collection-info clickable" on:click={() => viewCollection(child1)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child1)} role="button" tabindex="0">
                           <h4>{child1.name}</h4>
                           {#if child1.description}
@@ -417,7 +418,7 @@
                                 <span class="tree-toggle-spacer"></span>
                               {/if}
                               
-                              <div class="collection-icon">📂</div>
+                              
                               <div class="collection-info clickable" on:click={() => viewCollection(child2)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child2)} role="button" tabindex="0">
                                 <h4>{child2.name}</h4>
                                 {#if child2.description}
@@ -465,7 +466,7 @@
                                       <span class="tree-toggle-spacer"></span>
                                     {/if}
                                     
-                                    <div class="collection-icon">📂</div>
+                                    
                                     <div class="collection-info clickable" on:click={() => viewCollection(child3)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child3)} role="button" tabindex="0">
                                       <h4>{child3.name}</h4>
                                       {#if child3.description}
@@ -492,7 +493,7 @@
                                       <div class="collection-tree-item" data-level="4">
                                         <div class="collection-item">
                                           <span class="tree-toggle-spacer"></span>
-                                          <div class="collection-icon">📄</div>
+                                          
                                           <div class="collection-info clickable" on:click={() => viewCollection(child4)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child4)} role="button" tabindex="0">
                                             <h4>{child4.name}</h4>
                                             {#if child4.description}
@@ -559,7 +560,7 @@
                       loading="lazy"
                     />
                   {:else}
-                    <div class="thumbnail-placeholder">📄</div>
+                    <div class="thumbnail-placeholder">--</div>
                   {/if}
                 </div>
                 <div class="record-info">

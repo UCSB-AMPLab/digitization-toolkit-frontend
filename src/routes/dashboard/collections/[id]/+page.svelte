@@ -102,7 +102,7 @@
     {#if parentCollection}
       <span class="breadcrumb-separator">/</span>
       <button on:click={goToParentCollection} class="breadcrumb-link">
-        📂 {parentCollection.name}
+        {parentCollection.name}
       </button>
     {/if}
   </div>
@@ -114,7 +114,7 @@
   {:else if collection}
     <header class="page-header">
       <div>
-        <h1>📂 {collection.name}</h1>
+        <h1>{collection.name}</h1>
         {#if collection.description}
           <p class="collection-subtitle">{collection.description}</p>
         {/if}
@@ -125,9 +125,9 @@
     </header>
 
     <div class="collection-meta-bar">
-      <span>📅 Created: {formatDate(collection.created_at)}</span>
-      <span>📁 {childCollections.length} Subcollection(s)</span>
-      <span>📄 {records.length} Record(s)</span>
+      <span>Created: {formatDate(collection.created_at)}</span>
+      <span>{childCollections.length} Subcollection(s)</span>
+      <span>{records.length} Record(s)</span>
     </div>
 
     <!-- Subcollections Section -->
@@ -146,7 +146,7 @@
                 role="button"
                 tabindex="0"
               >
-                <div class="collection-card-icon">📂</div>
+                
                 <div class="collection-card-info">
                   <h3>{child.name}</h3>
                   {#if child.description}
@@ -198,7 +198,7 @@
                   </div>
                 {:else}
                   <div class="record-thumbnail record-thumbnail-placeholder">
-                    <span>📄</span>
+                    <span>--</span>
                   </div>
                 {/if}
                 <div class="record-info">
@@ -215,10 +215,10 @@
                   {#if record.author || record.date}
                     <div class="record-details">
                       {#if record.author}
-                        <span class="record-author">✍️ {record.author}</span>
+                        <span class="record-author">{record.author}</span>
                       {/if}
                       {#if record.date}
-                        <span class="record-date">📅 {record.date}</span>
+                        <span class="record-date">{record.date}</span>
                       {/if}
                     </div>
                   {/if}
@@ -294,11 +294,6 @@
     border-color: var(--color-primary, #0066cc);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transform: translateY(-2px);
-  }
-
-  .collection-card-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
   }
 
   .collection-card-info {

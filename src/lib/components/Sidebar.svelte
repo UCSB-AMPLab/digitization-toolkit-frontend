@@ -10,9 +10,9 @@
   }
 
   const menuItems: MenuItem[] = [
-    { label: 'Dashboard', path: '/dashboard', icon: '📊' },
-    { label: 'Projects', path: '/dashboard/projects', icon: '📁' },
-    { label: 'Settings', path: '/dashboard/settings', icon: '⚙️' }
+    { label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
+    { label: 'Projects', path: '/dashboard/projects', icon: 'folder' },
+    { label: 'Settings', path: '/dashboard/settings', icon: 'settings' }
   ];
 
   function isActive(path: string): boolean {
@@ -38,7 +38,7 @@
         class="sidebar-item"
         class:active={isActive(item.path)}
       >
-        <span class="sidebar-icon">{item.icon}</span>
+        <span class="material-symbols-outlined sidebar-icon">{item.icon}</span>
         <span class="sidebar-label">{item.label}</span>
       </a>
     {/each}
@@ -46,7 +46,7 @@
 
   <div class="sidebar-footer">
     <button class="sidebar-logout" on:click={handleLogout}>
-      <span class="sidebar-icon">🚪</span>
+      <span class="material-symbols-outlined sidebar-icon">logout</span>
       <span class="sidebar-label">Logout</span>
     </button>
   </div>
