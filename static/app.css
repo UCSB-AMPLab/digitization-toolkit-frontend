@@ -1193,6 +1193,25 @@ h3 { font-size: 1.25rem; }
   color: var(--text-color);
 }
 
+.record-description {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.8rem;
+  color: var(--text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+}
+
+.record-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
 /* ==================== */
 /* Buttons              */
 /* ==================== */

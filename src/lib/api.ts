@@ -38,9 +38,9 @@ async function apiRequest<T>(
   const base = getApiBase();
   const token = tokenStore.get();
 
-  const headers: Record<string, string> = {
+  const headers: { [key: string]: string } = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>)
+    ...(options.headers as { [key: string]: string })
   };
 
   if (token) {
@@ -211,10 +211,10 @@ export const projectsApi = {
   },
 
   /**
-   * Get all records for a project
+   * Get all records for a project (deprecated - use recordsApi.list with project_id filter)
    */
-  async getRecords(id: number): Promise<any[]> {
-    return apiRequest<any[]>(`/projects/${id}/records`);
+  async getRecords(id: number): Promise<Record[]> {
+    return apiRequest<Record[]>(`/projects/${id}/records`);
   }
 };
 
@@ -232,7 +232,7 @@ export interface Collection {
   created_by?: string;
   created_at: string;
   updated_at?: string;
-  archival_metadata?: Record<string, any>;
+  archival_metadata?: { [key: string]: any };
 }
 
 export interface CollectionWithChildren extends Collection {
@@ -247,7 +247,7 @@ export interface CreateCollectionData {
   project_id?: number;
   parent_collection_id?: number;
   created_by?: string;
-  archival_metadata?: Record<string, any>;
+  archival_metadata?: { [key: string]: any };
 }
 
 export interface UpdateCollectionData {
@@ -255,7 +255,7 @@ export interface UpdateCollectionData {
   description?: string;
   collection_type?: string;
   parent_collection_id?: number;
-  archival_metadata?: Record<string, any>;
+  archival_metadata?: { [key: string]: any };
 }
 
 export const collectionsApi = {
@@ -328,54 +328,62 @@ export const collectionsApi = {
 
 export interface RecordImage {
   id: number;
+  record_id: number;
   filename: string;
-  title?: string;
-  description?: string;
   file_path: string;
   thumbnail_path?: string;
   file_size?: number;
   format: string;
   resolution_width?: number;
   resolution_height?: number;
+  capture_id?: string;
+  pair_id?: string;
+  sequence?: number;
+  role?: string; // "left", "right", "single", "overview"
   uploaded_by?: string;
+  created_at?: string;
+}
+
+export interface Record {
+  id: number;
+  title: string;
+  description?: string;
+  object_typology?: string; // book, dossier, document, map, planimetry, other
+  author?: string;
+  material?: string;
+  date?: string;
+  custom_attributes?: string;
   project_id?: number;
   collection_id?: number;
+  created_by?: string;
+  created_at?: string;
+  modified_at?: string;
+  images: RecordImage[];
+}
+
+export interface CreateRecordData {
+  title: string;
+  description?: string;
   object_typology?: string;
   author?: string;
   material?: string;
   date?: string;
   custom_attributes?: string;
-  created_at?: string;
-  modified_at?: string;
-}
-
-export interface CreateRecordData {
-  filename: string;
-  file_path: string;
-  title?: string;
-  description?: string;
-  file_size?: number;
-  format: string;
-  resolution_width?: number;
-  resolution_height?: number;
   project_id?: number;
   collection_id?: number;
-  object_typology?: string;
-  author?: string;
-  material?: string;
-  date?: string;
+  created_by?: string;
 }
 
 export interface UpdateRecordData {
   title?: string;
   description?: string;
-  project_id?: number;
-  collection_id?: number;
   object_typology?: string;
   author?: string;
   material?: string;
   date?: string;
   custom_attributes?: string;
+  project_id?: number;
+  collection_id?: number;
 }
 
 export const recordsApi = {
@@ -385,31 +393,33 @@ export const recordsApi = {
   async list(params?: {
     collection_id?: number;
     project_id?: number;
+    object_typology?: string;
     skip?: number;
     limit?: number;
-  }): Promise<RecordImage[]> {
+  }): Promise<Record[]> {
     const queryParams = new URLSearchParams();
     if (params?.collection_id !== undefined) queryParams.set('collection_id', params.collection_id.toString());
     if (params?.project_id !== undefined) queryParams.set('project_id', params.project_id.toString());
+    if (params?.object_typology !== undefined) queryParams.set('object_typology', params.object_typology);
     if (params?.skip !== undefined) queryParams.set('skip', params.skip.toString());
     if (params?.limit !== undefined) queryParams.set('limit', params.limit.toString());
     
     const query = queryParams.toString();
-    return apiRequest<RecordImage[]>(`/records${query ? '?' + query : ''}`);
+    return apiRequest<Record[]>(`/records${query ? '?' + query : ''}`);
   },
 
   /**
-   * Get a single record by ID
+   * Get a single record by ID (with all images)
    */
-  async get(id: number): Promise<RecordImage> {
-    return apiRequest<RecordImage>(`/records/${id}`);
+  async get(id: number): Promise<Record> {
+    return apiRequest<Record>(`/records/${id}`);
   },
 
   /**
    * Create a new record
    */
-  async create(data: CreateRecordData): Promise<RecordImage> {
-    return apiRequest<RecordImage>('/records', {
+  async create(data: CreateRecordData): Promise<Record> {
+    return apiRequest<Record>('/records', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -418,15 +428,15 @@ export const recordsApi = {
   /**
    * Update a record
    */
-  async update(id: number, data: UpdateRecordData): Promise<RecordImage> {
-    return apiRequest<RecordImage>(`/records/${id}`, {
+  async update(id: number, data: UpdateRecordData): Promise<Record> {
+    return apiRequest<Record>(`/records/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data)
     });
   },
 
   /**
-   * Delete a record
+   * Delete a record (cascades to all images)
    */
   async delete(id: number): Promise<void> {
     await apiRequest(`/records/${id}`, {
@@ -435,21 +445,28 @@ export const recordsApi = {
   },
 
   /**
-   * Get thumbnail URL for a record
+   * Get all images for a specific record
    */
-  getThumbnailUrl(id: number): string {
-    const base = getApiBase();
-    const token = tokenStore.get();
-    return `${base}/records/${id}/thumbnail${token ? '?token=' + token : ''}`;
+  async getImages(recordId: number): Promise<RecordImage[]> {
+    return apiRequest<RecordImage[]>(`/records/${recordId}/images`);
   },
 
   /**
-   * Get file download URL for a record
+   * Get thumbnail URL for a record image
    */
-  getFileUrl(id: number): string {
+  getImageThumbnailUrl(imageId: number): string {
     const base = getApiBase();
     const token = tokenStore.get();
-    return `${base}/records/${id}/file${token ? '?token=' + token : ''}`;
+    return `${base}/records/images/${imageId}/thumbnail${token ? '?token=' + token : ''}`;
+  },
+
+  /**
+   * Get file download URL for a record image
+   */
+  getImageFileUrl(imageId: number): string {
+    const base = getApiBase();
+    const token = tokenStore.get();
+    return `${base}/records/images/${imageId}/file${token ? '?token=' + token : ''}`;
   }
 };
 

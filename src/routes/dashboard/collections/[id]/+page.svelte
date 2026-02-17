@@ -2,12 +2,12 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { collectionsApi, recordsApi, type Collection, type RecordImage } from '$lib/api';
+  import { collectionsApi, recordsApi, type Collection, type Record } from '$lib/api';
 
   let collection: Collection | null = null;
   let parentCollection: Collection | null = null;
   let childCollections: Collection[] = [];
-  let records: RecordImage[] = [];
+  let records: Record[] = [];
   let loading = true;
   let error: string | null = null;
 
@@ -76,9 +76,21 @@
     goto(`/dashboard/collections/${child.id}`);
   }
 
-  function viewRecord(record: RecordImage) {
+  function viewRecord(record: Record) {
     // TODO: Create record detail page
     console.log('View record:', record);
+  }
+
+  function getRecordThumbnail(record: Record): string | null {
+    // Get the first image's thumbnail if available
+    if (record.images && record.images.length > 0 && record.images[0].thumbnail_path) {
+      return recordsApi.getImageThumbnailUrl(record.images[0].id);
+    }
+    return null;
+  }
+
+  function getRecordImageCount(record: Record): number {
+    return record.images?.length || 0;
   }
 </script>
 
@@ -176,36 +188,38 @@
                 role="button"
                 tabindex="0"
               >
-                {#if record.thumbnail_path}
+                {#if getRecordThumbnail(record)}
                   <div class="record-thumbnail">
                     <img 
-                      src={recordsApi.getThumbnailUrl(record.id)} 
-                      alt={record.title || record.filename}
+                      src={getRecordThumbnail(record)} 
+                      alt={record.title}
                       loading="lazy"
                     />
                   </div>
                 {:else}
                   <div class="record-thumbnail record-thumbnail-placeholder">
-                    <span>🖼️</span>
+                    <span>📄</span>
                   </div>
                 {/if}
                 <div class="record-info">
-                  <h4>{record.title || record.filename}</h4>
+                  <h4>{record.title}</h4>
                   {#if record.description}
                     <p class="record-description">{record.description}</p>
                   {/if}
                   <div class="record-meta">
-                    <span class="badge badge-xs">{record.format?.toUpperCase() || 'N/A'}</span>
-                    {#if record.resolution_width && record.resolution_height}
-                      <span class="record-resolution">
-                        {record.resolution_width}×{record.resolution_height}
-                      </span>
-                    {/if}
-                    <span class="record-size">{formatFileSize(record.file_size)}</span>
-                  </div>
-                  {#if record.object_typology}
-                    <div class="record-typology">
+                    <span class="badge badge-xs">{getRecordImageCount(record)} image(s)</span>
+                    {#if record.object_typology}
                       <span class="badge badge-outline badge-xs">{record.object_typology}</span>
+                    {/if}
+                  </div>
+                  {#if record.author || record.date}
+                    <div class="record-details">
+                      {#if record.author}
+                        <span class="record-author">✍️ {record.author}</span>
+                      {/if}
+                      {#if record.date}
+                        <span class="record-date">📅 {record.date}</span>
+                      {/if}
                     </div>
                   {/if}
                 </div>
@@ -377,6 +391,20 @@
     margin-top: 0.5rem;
     font-size: 0.75rem;
     color: var(--color-text-secondary, #666);
+  }
+
+  .record-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #666);
+  }
+
+  .record-author,
+  .record-date {
+    font-size: 0.75rem;
   }
 
   .record-resolution,

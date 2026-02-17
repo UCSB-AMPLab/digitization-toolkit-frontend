@@ -2,11 +2,11 @@
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { projectsApi, collectionsApi, type Project, type Collection } from '$lib/api';
+  import { projectsApi, collectionsApi, recordsApi, type Project, type Collection, type Record } from '$lib/api';
 
   let project: Project | null = null;
   let collections: Collection[] = [];
-  let records: any[] = [];
+  let records: Record[] = [];
   let loading = true;
   let error: string | null = null;
 
@@ -56,7 +56,7 @@
       console.log('Child collections map:', childCollectionsMap);
       
       // Load records for this project
-      records = await projectsApi.getRecords(projectId);
+      records = await recordsApi.list({ project_id: projectId });
     } catch (e: any) {
       error = e.message || 'Failed to load project data';
     } finally {
@@ -229,6 +229,23 @@
     }
     
     return indent;
+  }
+
+  function getRecordThumbnail(record: Record): string | null {
+    // Get the first image's thumbnail if available
+    if (record.images && record.images.length > 0 && record.images[0].thumbnail_path) {
+      return recordsApi.getImageThumbnailUrl(record.images[0].id);
+    }
+    return null;
+  }
+
+  function getRecordImageCount(record: Record): number {
+    return record.images?.length || 0;
+  }
+
+  function viewRecord(record: Record) {
+    // TODO: Create record detail page
+    console.log('View record:', record);
   }
 </script>
 
@@ -527,17 +544,38 @@
         {:else}
           <div class="records-grid">
             {#each records as record}
-              <div class="record-card">
+              <div 
+                class="record-card"
+                on:click={() => viewRecord(record)}
+                on:keydown={(e) => e.key === 'Enter' && viewRecord(record)}
+                role="button"
+                tabindex="0"
+              >
                 <div class="record-thumbnail">
-                  {#if record.thumbnail_path}
-                    <img src={record.thumbnail_path} alt={record.title || record.filename} />
+                  {#if getRecordThumbnail(record)}
+                    <img 
+                      src={getRecordThumbnail(record)} 
+                      alt={record.title}
+                      loading="lazy"
+                    />
                   {:else}
                     <div class="thumbnail-placeholder">📄</div>
                   {/if}
                 </div>
                 <div class="record-info">
-                  <p class="record-title">{record.title || record.filename}</p>
-                  <p class="record-date">{formatDate(record.created_at)}</p>
+                  <p class="record-title">{record.title}</p>
+                  {#if record.description}
+                    <p class="record-description">{record.description}</p>
+                  {/if}
+                  <div class="record-meta">
+                    <span class="badge badge-xs">{getRecordImageCount(record)} image(s)</span>
+                    {#if record.object_typology}
+                      <span class="badge badge-outline badge-xs">{record.object_typology}</span>
+                    {/if}
+                  </div>
+                  {#if record.created_at}
+                    <p class="record-date">{formatDate(record.created_at)}</p>
+                  {/if}
                 </div>
               </div>
             {/each}
