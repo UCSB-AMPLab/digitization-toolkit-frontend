@@ -1211,6 +1211,105 @@ h3 { font-size: 1.25rem; }
   white-space: nowrap;
 }
 
+.badge-xs {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+}
+
+.badge-sm {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.badge-outline {
+  background: transparent;
+  border: 1px solid currentColor;
+}
+
+/* ==================== */
+/* Collection Detail    */
+/* ==================== */
+
+.collection-subtitle {
+  margin-top: 0.5rem;
+  color: var(--text-color);
+  font-size: 1rem;
+}
+
+.collection-meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.collections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.collection-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  background: white;
+}
+
+.collection-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.collection-card-info {
+  text-align: center;
+  width: 100%;
+}
+
+.collection-card-info h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.collection-card-info p {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--text-color);
+}
+
+.record-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-color);
+}
+
+.record-author {
+  font-size: 0.75rem;
+}
+
+.record-resolution,
+.record-size {
+  font-size: 0.75rem;
+}
+
+.record-typology {
+  margin-top: 0.5rem;
+}
+
 /* ==================== */
 /* Records Grid         */
 /* ==================== */
@@ -1563,9 +1662,15 @@ h3 { font-size: 1.25rem; }
   .stats-grid {
     grid-template-columns: repeat(3, 1fr);
   }
-}
 
-/* For 800x480 screens */
+  .collections-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  .records-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
 @media (max-width: 800px) {
   .sidebar {
     width: 180px;
@@ -1663,6 +1768,19 @@ h3 { font-size: 1.25rem; }
     width: 1.75rem;
     height: 1.75rem;
     font-size: 1.1rem;
+  }
+
+  .collections-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .records-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .collection-meta-bar {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 }
 
