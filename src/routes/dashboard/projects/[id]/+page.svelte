@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { projectsApi, collectionsApi, recordsApi, type Project, type Collection, type Record } from '$lib/api';
+  import CollectionTreeItem from '$lib/components/CollectionTreeItem.svelte';
 
   let project: Project | null = null;
   let collections: Collection[] = [];
@@ -15,11 +16,6 @@
   let childCollectionsMap = new Map<number, Collection[]>();
   let loadingChildren = new Set<number>();
   
-  // Reactive array to force template updates
-  $: expandedIds = Array.from(expandedCollections);
-  $: loadingIds = Array.from(loadingChildren);
-  $: childMapSize = childCollectionsMap.size; // Track map changes
-
   // Modal state
   let showCreateCollectionModal = false;
   let formName = '';
@@ -133,26 +129,19 @@
   }
 
   async function toggleExpand(collectionId: number) {
-    console.log('toggleExpand called for collection:', collectionId);
-    console.log('Current expanded state:', expandedCollections.has(collectionId));
-    console.log('Has children:', hasChildren(collectionId));
-    
     if (expandedCollections.has(collectionId)) {
       // Collapse - create a NEW Set to trigger reactivity
-      console.log('Collapsing collection:', collectionId);
       const newSet = new Set(expandedCollections);
       newSet.delete(collectionId);
       expandedCollections = newSet;
     } else {
       // Expand - load children if not already loaded
       if (!childCollectionsMap.has(collectionId)) {
-        console.log('Loading children for:', collectionId);
         loadingChildren.add(collectionId);
         loadingChildren = loadingChildren;
         
         try {
           const children = await collectionsApi.list({ parent_collection_id: collectionId });
-          console.log('Loaded children:', children);
           // Always set children (even if empty) so we know we've checked
           // Create a new Map to trigger reactivity
           childCollectionsMap = new Map(childCollectionsMap).set(collectionId, children);
@@ -166,35 +155,13 @@
           loadingChildren.delete(collectionId);
           loadingChildren = loadingChildren;
         }
-      } else {
-        console.log('Children already loaded, children count:', childCollectionsMap.get(collectionId)?.length);
       }
       
       // Expand - create a NEW Set to trigger reactivity
-      console.log('Expanding collection:', collectionId);
       const newSet = new Set(expandedCollections);
       newSet.add(collectionId);
       expandedCollections = newSet;
     }
-    console.log('New expanded collections:', expandedCollections);
-  }
-
-  // Helper functions - made reactive by referencing reactive variables
-  function hasChildren(collectionId: number): boolean {
-    // Reference childMapSize to ensure reactivity
-    const _ = childMapSize;
-    const children = childCollectionsMap.get(collectionId);
-    return children ? children.length > 0 : false;
-  }
-
-  function isExpanded(collectionId: number): boolean {
-    // Reference expandedIds to ensure reactivity
-    return expandedIds.includes(collectionId);
-  }
-
-  function isLoadingChildren(collectionId: number): boolean {
-    // Reference loadingIds to ensure reactivity
-    return loadingIds.includes(collectionId);
   }
 
   function viewCollection(collection: Collection) {
@@ -296,236 +263,17 @@
           </div>
         {:else}
           <div class="collections-tree">
-            {#each topLevelCollections as collection (collection.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
-              {@const hasKids = hasChildren(collection.id)}
-              {@const expanded = isExpanded(collection.id)}
-              {@const loadingKids = isLoadingChildren(collection.id)}
-              
-              <!-- Top-level collection -->
-              <div class="collection-tree-item" data-level="0">
-                <div class="collection-item">
-                  {#if hasKids || loadingKids || !childCollectionsMap.has(collection.id)}
-                    <button 
-                      class="tree-toggle" 
-                      on:click={() => toggleExpand(collection.id)}
-                      disabled={loadingKids}
-                    >
-                      {#if loadingKids}
-                        <span class="material-symbols-outlined">more_horiz</span>
-                      {:else if expanded}
-                        <span class="material-symbols-outlined">arrow_menu_close</span>
-                      {:else}
-                        <span class="material-symbols-outlined">arrow_menu_open</span>
-                      {/if}
-                    </button>
-                  {:else}
-                    <span class="tree-toggle-spacer"></span>
-                  {/if}
-                  
-                  
-                  <div class="collection-info clickable" on:click={() => viewCollection(collection)} on:keydown={(e) => e.key === 'Enter' && viewCollection(collection)} role="button" tabindex="0">
-                    <h4>{collection.name}</h4>
-                    {#if collection.description}
-                      <p>{collection.description}</p>
-                    {/if}
-                    {#if collection.collection_type}
-                      <span class="badge">{collection.collection_type}</span>
-                    {/if}
-                  </div>
-                  <div class="collection-actions">
-                    <button 
-                      class="btn-add-collection" 
-                      on:click={() => openCreateCollectionModal(collection.id)}
-                      title="Add subcollection"
-                    >
-                      <span class="material-symbols-outlined">create_new_folder</span>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Nested children (level 1) -->
-                {#if expanded && childCollectionsMap.has(collection.id)}
-                  {#each childCollectionsMap.get(collection.id) || [] as child1 (child1.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
-                    {@const hasKids1 = hasChildren(child1.id)}
-                    {@const expanded1 = isExpanded(child1.id)}
-                    {@const loadingKids1 = isLoadingChildren(child1.id)}
-                    
-                    <div class="collection-tree-item" data-level="1">
-                      <div class="collection-item">
-                        {#if hasKids1 || loadingKids1 || !childCollectionsMap.has(child1.id)}
-                          <button 
-                            class="tree-toggle" 
-                            on:click={() => toggleExpand(child1.id)}
-                            disabled={loadingKids1}
-                          >
-                            {#if loadingKids1}
-                              <span class="material-symbols-outlined">more_horiz</span>
-                            {:else if expanded1}
-                              <span class="material-symbols-outlined">arrow_menu_close</span>
-                            {:else}
-                              <span class="material-symbols-outlined">arrow_menu_open</span>
-                            {/if}
-                          </button>
-                        {:else}
-                          <span class="tree-toggle-spacer"></span>
-                        {/if}
-                        
-                        
-                        <div class="collection-info clickable" on:click={() => viewCollection(child1)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child1)} role="button" tabindex="0">
-                          <h4>{child1.name}</h4>
-                          {#if child1.description}
-                            <p>{child1.description}</p>
-                          {/if}
-                          {#if child1.collection_type}
-                            <span class="badge">{child1.collection_type}</span>
-                          {/if}
-                        </div>
-                        <div class="collection-actions">
-                          <button 
-                            class="btn-add-collection" 
-                            on:click={() => openCreateCollectionModal(child1.id)}
-                            title="Add subcollection"
-                          >
-                            <span class="material-symbols-outlined">create_new_folder</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <!-- Nested children (level 2) -->
-                      {#if expanded1 && childCollectionsMap.has(child1.id)}
-                        {#each childCollectionsMap.get(child1.id) || [] as child2 (child2.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
-                          {@const hasKids2 = hasChildren(child2.id)}
-                          {@const expanded2 = isExpanded(child2.id)}
-                          {@const loadingKids2 = isLoadingChildren(child2.id)}
-                          
-                          <div class="collection-tree-item" data-level="2">
-                            <div class="collection-item">
-                              {#if hasKids2 || loadingKids2 || !childCollectionsMap.has(child2.id)}
-                                <button 
-                                  class="tree-toggle" 
-                                  on:click={() => toggleExpand(child2.id)}
-                                  disabled={loadingKids2}
-                                >
-                                  {#if loadingKids2}
-                                    <span class="material-symbols-outlined">more_horiz</span>
-                                  {:else if expanded2}
-                                    <span class="material-symbols-outlined">arrow_menu_close</span>
-                                  {:else}
-                                    <span class="material-symbols-outlined">arrow_menu_open</span>
-                                  {/if}
-                                </button>
-                              {:else}
-                                <span class="tree-toggle-spacer"></span>
-                              {/if}
-                              
-                              
-                              <div class="collection-info clickable" on:click={() => viewCollection(child2)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child2)} role="button" tabindex="0">
-                                <h4>{child2.name}</h4>
-                                {#if child2.description}
-                                  <p>{child2.description}</p>
-                                {/if}
-                                {#if child2.collection_type}
-                                  <span class="badge">{child2.collection_type}</span>
-                                {/if}
-                              </div>
-                              <div class="collection-actions">
-                                <button 
-                                  class="btn-add-collection" 
-                                  on:click={() => openCreateCollectionModal(child2.id)}
-                                  title="Add subcollection"
-                                >
-                                  <span class="material-symbols-outlined">create_new_folder</span>
-                                </button>
-                              </div>
-                            </div>
-
-                            <!-- Nested children (level 3) -->
-                            {#if expanded2 && childCollectionsMap.has(child2.id)}
-                              {#each childCollectionsMap.get(child2.id) || [] as child3 (child3.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
-                                {@const hasKids3 = hasChildren(child3.id)}
-                                {@const expanded3 = isExpanded(child3.id)}
-                                {@const loadingKids3 = isLoadingChildren(child3.id)}
-                                
-                                <div class="collection-tree-item" data-level="3">
-                                  <div class="collection-item">
-                                    {#if hasKids3 || loadingKids3 || !childCollectionsMap.has(child3.id)}
-                                      <button 
-                                        class="tree-toggle" 
-                                        on:click={() => toggleExpand(child3.id)}
-                                        disabled={loadingKids3}
-                                      >
-                                        {#if loadingKids3}
-                                          <span class="material-symbols-outlined">more_horiz</span>
-                                        {:else if expanded3}
-                                          <span class="material-symbols-outlined">arrow_menu_close</span>
-                                        {:else}
-                                          <span class="material-symbols-outlined">arrow_menu_open</span>
-                                        {/if}
-                                      </button>
-                                    {:else}
-                                      <span class="tree-toggle-spacer"></span>
-                                    {/if}
-                                    
-                                    
-                                    <div class="collection-info clickable" on:click={() => viewCollection(child3)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child3)} role="button" tabindex="0">
-                                      <h4>{child3.name}</h4>
-                                      {#if child3.description}
-                                        <p>{child3.description}</p>
-                                      {/if}
-                                      {#if child3.collection_type}
-                                        <span class="badge">{child3.collection_type}</span>
-                                      {/if}
-                                    </div>
-                                    <div class="collection-actions">
-                                      <button 
-                                        class="btn-add-collection" 
-                                        on:click={() => openCreateCollectionModal(child3.id)}
-                                        title="Add subcollection"
-                                      >
-                                        <span class="material-symbols-outlined">create_new_folder</span>
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  <!-- Level 4+ children indicated with message -->
-                                  {#if expanded3 && childCollectionsMap.has(child3.id)}
-                                    {#each childCollectionsMap.get(child3.id) || [] as child4 (child4.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
-                                      <div class="collection-tree-item" data-level="4">
-                                        <div class="collection-item">
-                                          <span class="tree-toggle-spacer"></span>
-                                          
-                                          <div class="collection-info clickable" on:click={() => viewCollection(child4)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child4)} role="button" tabindex="0">
-                                            <h4>{child4.name}</h4>
-                                            {#if child4.description}
-                                              <p>{child4.description}</p>
-                                            {/if}
-                                            {#if child4.collection_type}
-                                              <span class="badge">{child4.collection_type}</span>
-                                            {/if}
-                                          </div>
-                                          <div class="collection-actions">
-                                            <button 
-                                              class="btn-add-collection" 
-                                              on:click={() => openCreateCollectionModal(child4.id)}
-                                              title="Add subcollection"
-                                            >
-                                              <span class="material-symbols-outlined">create_new_folder</span>
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    {/each}
-                                  {/if}
-                                </div>
-                              {/each}
-                            {/if}
-                          </div>
-                        {/each}
-                      {/if}
-                    </div>
-                  {/each}
-                {/if}
-              </div>
+            {#each topLevelCollections as collection (collection.id)}
+              <CollectionTreeItem
+                {collection}
+                level={0}
+                {expandedCollections}
+                {childCollectionsMap}
+                {loadingChildren}
+                onToggleExpand={toggleExpand}
+                onViewCollection={viewCollection}
+                onAddSubcollection={(parentId) => openCreateCollectionModal(parentId)}
+              />
             {/each}
           </div>
         {/if}
