@@ -83,8 +83,8 @@
   }
 
   function goToProject() {
-    if (collection?.project_id) {
-      goto(`/dashboard/projects/${collection.project_id}`);
+    if (project) {
+      goto(`/dashboard/projects/${project.id}`);
     }
   }
 
