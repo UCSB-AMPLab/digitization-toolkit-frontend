@@ -27,6 +27,9 @@
   
   // Get only top-level collections (those belonging directly to project)
   $: topLevelCollections = collections.filter(c => c.project_id === projectId);
+  
+  // Count all collections including nested ones
+  $: totalCollectionCount = topLevelCollections.length + Array.from(childCollectionsMap.values()).reduce((sum, children) => sum + children.length, 0);
 
   onMount(async () => {
     await loadProjectData();
@@ -39,24 +42,11 @@
       // Load project details
       project = await projectsApi.get(projectId);
       
-      // Load collections for this project
+      // Load all top-level collections for this project
       collections = await collectionsApi.list({ project_id: projectId });
       
-      // Preload first level of children for each top-level collection
-      // This helps show expand arrows without clicking first
-      const topLevel = collections.filter(c => c.project_id === projectId);
-      await Promise.all(
-        topLevel.map(async (col) => {
-          try {
-            const children = await collectionsApi.list({ parent_collection_id: col.id });
-            if (children.length > 0) {
-              childCollectionsMap.set(col.id, children);
-            }
-          } catch (e) {
-            console.error(`Failed to load children for collection ${col.id}:`, e);
-          }
-        })
-      );
+      // Recursively load all descendants to populate the tree
+      await loadAllDescendants(collections);
       childCollectionsMap = childCollectionsMap;
       
       // Load records for this project
@@ -66,6 +56,25 @@
     } finally {
       loading = false;
     }
+  }
+
+  async function loadAllDescendants(parentCollections: Collection[]) {
+    // Recursively load all children for a set of collections
+    await Promise.all(
+      parentCollections.map(async (col) => {
+        try {
+          const children = await collectionsApi.list({ parent_collection_id: col.id });
+          // Always set the children (even if empty) so we know we've checked
+          childCollectionsMap.set(col.id, children);
+          if (children.length > 0) {
+            // Recursively load their children too
+            await loadAllDescendants(children);
+          }
+        } catch (e) {
+          console.error(`Failed to load children for collection ${col.id}:`, e);
+        }
+      })
+    );
   }
 
   function openCreateCollectionModal(parentCollectionId?: number) {
@@ -89,13 +98,19 @@
     }
 
     try {
-      await collectionsApi.create({
+      const newCollection = await collectionsApi.create({
         name: formName.trim(),
         description: formDescription.trim() || undefined,
         collection_type: formType.trim() || undefined,
         project_id: formParentId ? undefined : projectId,
         parent_collection_id: formParentId ? parseInt(formParentId) : undefined
       });
+      
+      // If this is a subcollection, auto-expand its parent
+      if (newCollection.parent_collection_id) {
+        expandedCollections.add(newCollection.parent_collection_id);
+      }
+      
       await loadProjectData();
       closeModals();
     } catch (e: any) {
@@ -121,7 +136,12 @@
         
         try {
           const children = await collectionsApi.list({ parent_collection_id: collectionId });
+          // Always set children (even if empty) so we know we've checked
           childCollectionsMap.set(collectionId, children);
+          if (children.length > 0) {
+            // Recursively load their descendants
+            await loadAllDescendants(children);
+          }
           childCollectionsMap = childCollectionsMap;
         } catch (e: any) {
           console.error('Failed to load children:', e);
@@ -206,7 +226,7 @@
       {#if project.created_by}
         <span>👤 By: {project.created_by}</span>
       {/if}
-      <span>📁 {collections.length} Collection(s)</span>
+      <span>📁 {totalCollectionCount} Collection(s)</span>
       <span>📄 {records.length} Record(s)</span>
     </div>
 
