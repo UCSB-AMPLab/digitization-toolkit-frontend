@@ -11,5 +11,5 @@
 
 {@render children?.()}
 
-<VirtualKeyboard />
+<!-- <VirtualKeyboard /> -->
 

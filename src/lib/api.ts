@@ -38,9 +38,9 @@ async function apiRequest<T>(
   const base = getApiBase();
   const token = tokenStore.get();
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers
+    ...(options.headers as Record<string, string>)
   };
 
   if (token) {
@@ -152,12 +152,17 @@ export interface Project {
   name: string;
   description?: string;
   created_at: string;
-  updated_at?: string;
-  document_count?: number;
+  created_by?: string;
 }
 
 export interface CreateProjectData {
   name: string;
+  description?: string;
+  created_by?: string;
+}
+
+export interface UpdateProjectData {
+  name?: string;
   description?: string;
 }
 
@@ -187,10 +192,131 @@ export const projectsApi = {
   },
 
   /**
+   * Update a project
+   */
+  async update(id: number, data: UpdateProjectData): Promise<Project> {
+    return apiRequest<Project>(`/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
    * Delete a project
    */
   async delete(id: number): Promise<void> {
     await apiRequest(`/projects/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  /**
+   * Get all records for a project
+   */
+  async getRecords(id: number): Promise<any[]> {
+    return apiRequest<any[]>(`/projects/${id}/records`);
+  }
+};
+
+// ============================================================================
+// COLLECTIONS API
+// ============================================================================
+
+export interface Collection {
+  id: number;
+  name: string;
+  description?: string;
+  collection_type?: string;
+  project_id?: number;
+  parent_collection_id?: number;
+  created_by?: string;
+  created_at: string;
+  updated_at?: string;
+  archival_metadata?: Record<string, any>;
+}
+
+export interface CollectionWithChildren extends Collection {
+  child_collections: Collection[];
+  record_count?: number;
+}
+
+export interface CreateCollectionData {
+  name: string;
+  description?: string;
+  collection_type?: string;
+  project_id?: number;
+  parent_collection_id?: number;
+  created_by?: string;
+  archival_metadata?: Record<string, any>;
+}
+
+export interface UpdateCollectionData {
+  name?: string;
+  description?: string;
+  collection_type?: string;
+  parent_collection_id?: number;
+  archival_metadata?: Record<string, any>;
+}
+
+export const collectionsApi = {
+  /**
+   * Get all collections (optionally filtered)
+   */
+  async list(params?: {
+    project_id?: number;
+    parent_collection_id?: number;
+    skip?: number;
+    limit?: number;
+  }): Promise<Collection[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.project_id !== undefined) queryParams.set('project_id', params.project_id.toString());
+    if (params?.parent_collection_id !== undefined) queryParams.set('parent_collection_id', params.parent_collection_id.toString());
+    if (params?.skip !== undefined) queryParams.set('skip', params.skip.toString());
+    if (params?.limit !== undefined) queryParams.set('limit', params.limit.toString());
+    
+    const query = queryParams.toString();
+    return apiRequest<Collection[]>(`/collections${query ? '?' + query : ''}`);
+  },
+
+  /**
+   * Get a single collection by ID
+   */
+  async get(id: number): Promise<Collection> {
+    return apiRequest<Collection>(`/collections/${id}`);
+  },
+
+  /**
+   * Get collection with hierarchy (children, record counts)
+   */
+  async getHierarchy(id: number): Promise<CollectionWithChildren> {
+    return apiRequest<CollectionWithChildren>(`/collections/${id}/hierarchy`);
+  },
+
+  /**
+   * Create a new collection
+   */
+  async create(data: CreateCollectionData): Promise<Collection> {
+    return apiRequest<Collection>('/collections', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * Update a collection
+   */
+  async update(id: number, data: UpdateCollectionData): Promise<Collection> {
+    return apiRequest<Collection>(`/collections/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * Delete a collection
+   */
+  async delete(id: number): Promise<void> {
+    await apiRequest(`/collections/${id}`, {
       method: 'DELETE'
     });
   }
