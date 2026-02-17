@@ -311,11 +311,11 @@
                       disabled={loadingKids}
                     >
                       {#if loadingKids}
-                        ⋯
+                        <span class="material-symbols-outlined">more_horiz</span>
                       {:else if expanded}
-                        ▼
+                        <span class="material-symbols-outlined">arrow_menu_close</span>
                       {:else}
-                        ▶
+                        <span class="material-symbols-outlined">arrow_menu_open</span>
                       {/if}
                     </button>
                   {:else}
@@ -334,11 +334,11 @@
                   </div>
                   <div class="collection-actions">
                     <button 
-                      class="btn-icon" 
+                      class="btn-add-collection" 
                       on:click={() => openCreateCollectionModal(collection.id)}
                       title="Add subcollection"
                     >
-                      +
+                      <span class="material-symbols-outlined">create_new_folder</span>
                     </button>
                   </div>
                 </div>
@@ -359,11 +359,11 @@
                             disabled={loadingKids1}
                           >
                             {#if loadingKids1}
-                              ⋯
+                              <span class="material-symbols-outlined">more_horiz</span>
                             {:else if expanded1}
-                              ▼
+                              <span class="material-symbols-outlined">arrow_menu_close</span>
                             {:else}
-                              ▶
+                              <span class="material-symbols-outlined">arrow_menu_open</span>
                             {/if}
                           </button>
                         {:else}
@@ -382,11 +382,11 @@
                         </div>
                         <div class="collection-actions">
                           <button 
-                            class="btn-icon" 
+                            class="btn-add-collection" 
                             on:click={() => openCreateCollectionModal(child1.id)}
                             title="Add subcollection"
                           >
-                            +
+                            <span class="material-symbols-outlined">create_new_folder</span>
                           </button>
                         </div>
                       </div>
@@ -407,11 +407,11 @@
                                   disabled={loadingKids2}
                                 >
                                   {#if loadingKids2}
-                                    ⋯
+                                    <span class="material-symbols-outlined">more_horiz</span>
                                   {:else if expanded2}
-                                    ▼
+                                    <span class="material-symbols-outlined">arrow_menu_close</span>
                                   {:else}
-                                    ▶
+                                    <span class="material-symbols-outlined">arrow_menu_open</span>
                                   {/if}
                                 </button>
                               {:else}
@@ -430,11 +430,11 @@
                               </div>
                               <div class="collection-actions">
                                 <button 
-                                  class="btn-icon" 
+                                  class="btn-add-collection" 
                                   on:click={() => openCreateCollectionModal(child2.id)}
                                   title="Add subcollection"
                                 >
-                                  +
+                                  <span class="material-symbols-outlined">create_new_folder</span>
                                 </button>
                               </div>
                             </div>
@@ -455,11 +455,11 @@
                                         disabled={loadingKids3}
                                       >
                                         {#if loadingKids3}
-                                          ⋯
+                                          <span class="material-symbols-outlined">more_horiz</span>
                                         {:else if expanded3}
-                                          ▼
+                                          <span class="material-symbols-outlined">arrow_menu_close</span>
                                         {:else}
-                                          ▶
+                                          <span class="material-symbols-outlined">arrow_menu_open</span>
                                         {/if}
                                       </button>
                                     {:else}
@@ -478,11 +478,11 @@
                                     </div>
                                     <div class="collection-actions">
                                       <button 
-                                        class="btn-icon" 
+                                        class="btn-add-collection" 
                                         on:click={() => openCreateCollectionModal(child3.id)}
                                         title="Add subcollection"
                                       >
-                                        +
+                                        <span class="material-symbols-outlined">create_new_folder</span>
                                       </button>
                                     </div>
                                   </div>
@@ -505,11 +505,11 @@
                                           </div>
                                           <div class="collection-actions">
                                             <button 
-                                              class="btn-icon" 
+                                              class="btn-add-collection" 
                                               on:click={() => openCreateCollectionModal(child4.id)}
                                               title="Add subcollection"
                                             >
-                                              +
+                                              <span class="material-symbols-outlined">create_new_folder</span>
                                             </button>
                                           </div>
                                         </div>
