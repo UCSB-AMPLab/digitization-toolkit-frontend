@@ -199,10 +199,7 @@
 
   function viewCollection(collection: Collection) {
     // Navigate to collection detail view
-    // For now, just expand/collapse as a placeholder
-    // TODO: Create a dedicated collection detail page
-    console.log('View collection:', collection);
-    toggleExpand(collection.id);
+    goto(`/dashboard/collections/${collection.id}`);
   }
 
   function getAllCollections(): Collection[] {

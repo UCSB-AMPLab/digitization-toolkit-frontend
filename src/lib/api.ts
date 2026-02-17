@@ -323,6 +323,137 @@ export const collectionsApi = {
 };
 
 // ============================================================================
+// RECORDS API
+// ============================================================================
+
+export interface RecordImage {
+  id: number;
+  filename: string;
+  title?: string;
+  description?: string;
+  file_path: string;
+  thumbnail_path?: string;
+  file_size?: number;
+  format: string;
+  resolution_width?: number;
+  resolution_height?: number;
+  uploaded_by?: string;
+  project_id?: number;
+  collection_id?: number;
+  object_typology?: string;
+  author?: string;
+  material?: string;
+  date?: string;
+  custom_attributes?: string;
+  created_at?: string;
+  modified_at?: string;
+}
+
+export interface CreateRecordData {
+  filename: string;
+  file_path: string;
+  title?: string;
+  description?: string;
+  file_size?: number;
+  format: string;
+  resolution_width?: number;
+  resolution_height?: number;
+  project_id?: number;
+  collection_id?: number;
+  object_typology?: string;
+  author?: string;
+  material?: string;
+  date?: string;
+}
+
+export interface UpdateRecordData {
+  title?: string;
+  description?: string;
+  project_id?: number;
+  collection_id?: number;
+  object_typology?: string;
+  author?: string;
+  material?: string;
+  date?: string;
+  custom_attributes?: string;
+}
+
+export const recordsApi = {
+  /**
+   * Get all records (optionally filtered)
+   */
+  async list(params?: {
+    collection_id?: number;
+    project_id?: number;
+    skip?: number;
+    limit?: number;
+  }): Promise<RecordImage[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.collection_id !== undefined) queryParams.set('collection_id', params.collection_id.toString());
+    if (params?.project_id !== undefined) queryParams.set('project_id', params.project_id.toString());
+    if (params?.skip !== undefined) queryParams.set('skip', params.skip.toString());
+    if (params?.limit !== undefined) queryParams.set('limit', params.limit.toString());
+    
+    const query = queryParams.toString();
+    return apiRequest<RecordImage[]>(`/records${query ? '?' + query : ''}`);
+  },
+
+  /**
+   * Get a single record by ID
+   */
+  async get(id: number): Promise<RecordImage> {
+    return apiRequest<RecordImage>(`/records/${id}`);
+  },
+
+  /**
+   * Create a new record
+   */
+  async create(data: CreateRecordData): Promise<RecordImage> {
+    return apiRequest<RecordImage>('/records', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * Update a record
+   */
+  async update(id: number, data: UpdateRecordData): Promise<RecordImage> {
+    return apiRequest<RecordImage>(`/records/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * Delete a record
+   */
+  async delete(id: number): Promise<void> {
+    await apiRequest(`/records/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  /**
+   * Get thumbnail URL for a record
+   */
+  getThumbnailUrl(id: number): string {
+    const base = getApiBase();
+    const token = tokenStore.get();
+    return `${base}/records/${id}/thumbnail${token ? '?token=' + token : ''}`;
+  },
+
+  /**
+   * Get file download URL for a record
+   */
+  getFileUrl(id: number): string {
+    const base = getApiBase();
+    const token = tokenStore.get();
+    return `${base}/records/${id}/file${token ? '?token=' + token : ''}`;
+  }
+};
+
+// ============================================================================
 // DOCUMENTS API
 // ============================================================================
 
