@@ -14,6 +14,11 @@
   let expandedCollections = new Set<number>();
   let childCollectionsMap = new Map<number, Collection[]>();
   let loadingChildren = new Set<number>();
+  
+  // Reactive array to force template updates
+  $: expandedIds = Array.from(expandedCollections);
+  $: loadingIds = Array.from(loadingChildren);
+  $: childMapSize = childCollectionsMap.size; // Track map changes
 
   // Modal state
   let showCreateCollectionModal = false;
@@ -44,10 +49,11 @@
       
       // Load all top-level collections for this project
       collections = await collectionsApi.list({ project_id: projectId });
+      console.log('Loaded top-level collections:', collections);
       
       // Recursively load all descendants to populate the tree
       await loadAllDescendants(collections);
-      childCollectionsMap = childCollectionsMap;
+      console.log('Child collections map:', childCollectionsMap);
       
       // Load records for this project
       records = await projectsApi.getRecords(projectId);
@@ -65,7 +71,8 @@
         try {
           const children = await collectionsApi.list({ parent_collection_id: col.id });
           // Always set the children (even if empty) so we know we've checked
-          childCollectionsMap.set(col.id, children);
+          // Create a new Map to trigger reactivity
+          childCollectionsMap = new Map(childCollectionsMap).set(col.id, children);
           if (children.length > 0) {
             // Recursively load their children too
             await loadAllDescendants(children);
@@ -108,7 +115,9 @@
       
       // If this is a subcollection, auto-expand its parent
       if (newCollection.parent_collection_id) {
-        expandedCollections.add(newCollection.parent_collection_id);
+        const newSet = new Set(expandedCollections);
+        newSet.add(newCollection.parent_collection_id);
+        expandedCollections = newSet;
       }
       
       await loadProjectData();
@@ -124,49 +133,76 @@
   }
 
   async function toggleExpand(collectionId: number) {
+    console.log('toggleExpand called for collection:', collectionId);
+    console.log('Current expanded state:', expandedCollections.has(collectionId));
+    console.log('Has children:', hasChildren(collectionId));
+    
     if (expandedCollections.has(collectionId)) {
-      // Collapse
-      expandedCollections.delete(collectionId);
-      expandedCollections = expandedCollections;
+      // Collapse - create a NEW Set to trigger reactivity
+      console.log('Collapsing collection:', collectionId);
+      const newSet = new Set(expandedCollections);
+      newSet.delete(collectionId);
+      expandedCollections = newSet;
     } else {
       // Expand - load children if not already loaded
       if (!childCollectionsMap.has(collectionId)) {
+        console.log('Loading children for:', collectionId);
         loadingChildren.add(collectionId);
         loadingChildren = loadingChildren;
         
         try {
           const children = await collectionsApi.list({ parent_collection_id: collectionId });
+          console.log('Loaded children:', children);
           // Always set children (even if empty) so we know we've checked
-          childCollectionsMap.set(collectionId, children);
+          // Create a new Map to trigger reactivity
+          childCollectionsMap = new Map(childCollectionsMap).set(collectionId, children);
           if (children.length > 0) {
             // Recursively load their descendants
             await loadAllDescendants(children);
           }
-          childCollectionsMap = childCollectionsMap;
         } catch (e: any) {
           console.error('Failed to load children:', e);
         } finally {
           loadingChildren.delete(collectionId);
           loadingChildren = loadingChildren;
         }
+      } else {
+        console.log('Children already loaded, children count:', childCollectionsMap.get(collectionId)?.length);
       }
       
-      expandedCollections.add(collectionId);
-      expandedCollections = expandedCollections;
+      // Expand - create a NEW Set to trigger reactivity
+      console.log('Expanding collection:', collectionId);
+      const newSet = new Set(expandedCollections);
+      newSet.add(collectionId);
+      expandedCollections = newSet;
     }
+    console.log('New expanded collections:', expandedCollections);
   }
 
+  // Helper functions - made reactive by referencing reactive variables
   function hasChildren(collectionId: number): boolean {
+    // Reference childMapSize to ensure reactivity
+    const _ = childMapSize;
     const children = childCollectionsMap.get(collectionId);
     return children ? children.length > 0 : false;
   }
 
   function isExpanded(collectionId: number): boolean {
-    return expandedCollections.has(collectionId);
+    // Reference expandedIds to ensure reactivity
+    return expandedIds.includes(collectionId);
   }
 
   function isLoadingChildren(collectionId: number): boolean {
-    return loadingChildren.has(collectionId);
+    // Reference loadingIds to ensure reactivity
+    return loadingIds.includes(collectionId);
+  }
+
+  function viewCollection(collection: Collection) {
+    // Navigate to collection detail view
+    // For now, just expand/collapse as a placeholder
+    // TODO: Create a dedicated collection detail page
+    console.log('View collection:', collection);
+    toggleExpand(collection.id);
   }
 
   function getAllCollections(): Collection[] {
@@ -245,7 +281,7 @@
           </div>
         {:else}
           <div class="collections-tree">
-            {#each topLevelCollections as collection}
+            {#each topLevelCollections as collection (collection.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
               {@const hasKids = hasChildren(collection.id)}
               {@const expanded = isExpanded(collection.id)}
               {@const loadingKids = isLoadingChildren(collection.id)}
@@ -272,7 +308,7 @@
                   {/if}
                   
                   <div class="collection-icon">📂</div>
-                  <div class="collection-info">
+                  <div class="collection-info clickable" on:click={() => viewCollection(collection)} on:keydown={(e) => e.key === 'Enter' && viewCollection(collection)} role="button" tabindex="0">
                     <h4>{collection.name}</h4>
                     {#if collection.description}
                       <p>{collection.description}</p>
@@ -294,7 +330,7 @@
 
                 <!-- Nested children (level 1) -->
                 {#if expanded && childCollectionsMap.has(collection.id)}
-                  {#each childCollectionsMap.get(collection.id) || [] as child1}
+                  {#each childCollectionsMap.get(collection.id) || [] as child1 (child1.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
                     {@const hasKids1 = hasChildren(child1.id)}
                     {@const expanded1 = isExpanded(child1.id)}
                     {@const loadingKids1 = isLoadingChildren(child1.id)}
@@ -320,7 +356,7 @@
                         {/if}
                         
                         <div class="collection-icon">📂</div>
-                        <div class="collection-info">
+                        <div class="collection-info clickable" on:click={() => viewCollection(child1)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child1)} role="button" tabindex="0">
                           <h4>{child1.name}</h4>
                           {#if child1.description}
                             <p>{child1.description}</p>
@@ -342,7 +378,7 @@
 
                       <!-- Nested children (level 2) -->
                       {#if expanded1 && childCollectionsMap.has(child1.id)}
-                        {#each childCollectionsMap.get(child1.id) || [] as child2}
+                        {#each childCollectionsMap.get(child1.id) || [] as child2 (child2.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
                           {@const hasKids2 = hasChildren(child2.id)}
                           {@const expanded2 = isExpanded(child2.id)}
                           {@const loadingKids2 = isLoadingChildren(child2.id)}
@@ -368,7 +404,7 @@
                               {/if}
                               
                               <div class="collection-icon">📂</div>
-                              <div class="collection-info">
+                              <div class="collection-info clickable" on:click={() => viewCollection(child2)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child2)} role="button" tabindex="0">
                                 <h4>{child2.name}</h4>
                                 {#if child2.description}
                                   <p>{child2.description}</p>
@@ -390,7 +426,7 @@
 
                             <!-- Nested children (level 3) -->
                             {#if expanded2 && childCollectionsMap.has(child2.id)}
-                              {#each childCollectionsMap.get(child2.id) || [] as child3}
+                              {#each childCollectionsMap.get(child2.id) || [] as child3 (child3.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
                                 {@const hasKids3 = hasChildren(child3.id)}
                                 {@const expanded3 = isExpanded(child3.id)}
                                 {@const loadingKids3 = isLoadingChildren(child3.id)}
@@ -416,7 +452,7 @@
                                     {/if}
                                     
                                     <div class="collection-icon">📂</div>
-                                    <div class="collection-info">
+                                    <div class="collection-info clickable" on:click={() => viewCollection(child3)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child3)} role="button" tabindex="0">
                                       <h4>{child3.name}</h4>
                                       {#if child3.description}
                                         <p>{child3.description}</p>
@@ -438,12 +474,12 @@
 
                                   <!-- Level 4+ children indicated with message -->
                                   {#if expanded3 && childCollectionsMap.has(child3.id)}
-                                    {#each childCollectionsMap.get(child3.id) || [] as child4}
+                                    {#each childCollectionsMap.get(child3.id) || [] as child4 (child4.id + '-' + expandedIds.join(',') + '-' + childMapSize)}
                                       <div class="collection-tree-item" data-level="4">
                                         <div class="collection-item">
                                           <span class="tree-toggle-spacer"></span>
                                           <div class="collection-icon">📄</div>
-                                          <div class="collection-info">
+                                          <div class="collection-info clickable" on:click={() => viewCollection(child4)} on:keydown={(e) => e.key === 'Enter' && viewCollection(child4)} role="button" tabindex="0">
                                             <h4>{child4.name}</h4>
                                             {#if child4.description}
                                               <p>{child4.description}</p>
