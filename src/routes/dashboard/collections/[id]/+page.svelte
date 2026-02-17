@@ -93,8 +93,7 @@
   }
 
   function viewRecord(record: Record) {
-    // TODO: Create record detail page
-    console.log('View record:', record);
+    goto(`/dashboard/records/${record.id}`);
   }
 
   function getRecordThumbnail(record: Record): string | null {
@@ -189,7 +188,7 @@
         <h2>Records</h2>
         {#if collection?.project_id}
           <button class="btn-secondary btn-sm" on:click={() => collection && goto(`/dashboard/capture/${collection.project_id}?collection_id=${collectionId}`)}>
-            + Add Record
+            + Add Record <span class="material-symbols-outlined">auto_stories</span>
           </button>
         {/if}
       </div>

@@ -211,8 +211,7 @@
   }
 
   function viewRecord(record: Record) {
-    // TODO: Create record detail page
-    console.log('View record:', record);
+    goto(`/dashboard/records/${record.id}`);
   }
 </script>
 

@@ -528,36 +528,127 @@ export const documentsApi = {
 // CAMERAS API
 // ============================================================================
 
-export interface Camera {
-  index: number;
-  model: string;
+export interface CameraDevice {
   hardware_id: string;
+  model: string;
+  index: number;
+  location?: string;
+  machine_id?: string;
   label?: string;
-  role?: string;
+  calibrated: boolean;
 }
+
+export interface CaptureRequest {
+  project_name: string;
+  camera_index?: number;
+  resolution?: string;
+  include_resolution_in_filename?: boolean;
+  record_id?: number;
+  record_title?: string;
+}
+
+export interface DualCaptureRequest {
+  project_name: string;
+  resolution?: string;
+  include_resolution_in_filename?: boolean;
+  stagger_ms?: number;
+  record_id?: number;
+  record_title?: string;
+  sequence?: number;
+}
+
+export interface CaptureResponse {
+  success: boolean;
+  file_path?: string;
+  file_paths?: string[];
+  record_id?: number;
+  image_ids?: number[];
+  timing?: any;
+  error?: string;
+}
+
+export interface CalibrationRequest {
+  camera_index?: number;
+  resolution?: string;
+}
+
+export interface CalibrationResponse {
+  success: boolean;
+  lens_position?: number;
+  distance_meters?: number;
+  af_time?: number;
+  error?: string;
+}
+
+export interface WhiteBalanceCalibrationRequest {
+  camera_index?: number;
+  resolution?: string;
+  stabilization_frames?: number;
+}
+
+export interface WhiteBalanceCalibrationResponse {
+  success: boolean;
+  awb_gains?: number[];
+  colour_temperature?: number;
+  converged?: boolean;
+  error?: string;
+}
+
+// Keep legacy Camera alias
+export type Camera = CameraDevice;
 
 export const camerasApi = {
   /**
-   * List available cameras
+   * List available camera devices
    */
-  async list(): Promise<Camera[]> {
-    return apiRequest<Camera[]>('/cameras');
+  async listDevices(): Promise<CameraDevice[]> {
+    return apiRequest<CameraDevice[]>('/cameras/devices');
   },
 
   /**
-   * Get camera settings
+   * Legacy alias
    */
-  async getSettings(index: number): Promise<any> {
-    return apiRequest(`/cameras/${index}/settings`);
+  async list(): Promise<CameraDevice[]> {
+    return this.listDevices();
   },
 
   /**
-   * Capture image from camera
+   * Single camera capture
    */
-  async capture(index: number, documentId?: number): Promise<any> {
-    const params = documentId ? `?document_id=${documentId}` : '';
-    return apiRequest(`/cameras/${index}/capture${params}`, {
-      method: 'POST'
+  async capture(data: CaptureRequest): Promise<CaptureResponse> {
+    return apiRequest<CaptureResponse>('/cameras/capture', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * Dual camera capture (left + right)
+   */
+  async captureDual(data: DualCaptureRequest): Promise<CaptureResponse> {
+    return apiRequest<CaptureResponse>('/cameras/capture/dual', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * Autofocus calibration
+   */
+  async calibrate(data: CalibrationRequest = {}): Promise<CalibrationResponse> {
+    return apiRequest<CalibrationResponse>('/cameras/calibrate', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * White balance calibration
+   */
+  async calibrateWhiteBalance(data: WhiteBalanceCalibrationRequest = {}): Promise<WhiteBalanceCalibrationResponse> {
+    return apiRequest<WhiteBalanceCalibrationResponse>('/cameras/calibrate/white-balance', {
+      method: 'POST',
+      body: JSON.stringify(data)
     });
   }
 };

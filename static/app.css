@@ -1449,6 +1449,391 @@ h3 { font-size: 1.25rem; }
 }
 
 /* ==================== */
+/* Record Detail        */
+/* ==================== */
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.metadata-grid-compact {
+  gap: 0.5rem;
+}
+
+.metadata-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.metadata-item-full {
+  grid-column: 1 / -1;
+}
+
+.metadata-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.metadata-value {
+  font-size: 0.9rem;
+  color: var(--text-dark);
+}
+
+.record-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* ==================== */
+/* Images Grid          */
+/* ==================== */
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.image-card {
+  background: var(--bg-gray);
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.image-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.image-card-preview {
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.image-card-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-card-info {
+  padding: 0.5rem;
+}
+
+.image-card-name {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-card-meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* ==================== */
+/* Image Viewer Modal   */
+/* ==================== */
+
+.image-viewer-modal {
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.image-viewer-body {
+  display: flex;
+  gap: 1.5rem;
+  overflow: auto;
+}
+
+.image-viewer-preview {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+.image-viewer-preview img {
+  max-width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+}
+
+.image-viewer-details {
+  width: 250px;
+  flex-shrink: 0;
+}
+
+.image-viewer-details h3 {
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+  color: var(--text-dark);
+}
+
+/* ==================== */
+/* Camera Cards         */
+/* ==================== */
+
+.camera-cards {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.camera-card {
+  flex: 1;
+  min-width: 200px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 0.75rem;
+  background: var(--bg-gray);
+}
+
+.camera-card-calibrated {
+  border-color: #a5d6a7;
+}
+
+.camera-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.camera-card-header .material-symbols-outlined {
+  font-size: 1.25rem;
+  color: var(--accent-primary);
+}
+
+.camera-card-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  flex: 1;
+}
+
+.camera-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.camera-card-detail {
+  font-size: 0.8rem;
+  color: var(--text-color);
+}
+
+.camera-card-hwid {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+/* ==================== */
+/* Calibration          */
+/* ==================== */
+
+.calibration-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg-gray);
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.calibration-panel h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.75rem;
+  color: var(--text-dark);
+}
+
+.calibration-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.calibration-message {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  padding: 0.5rem;
+  background: white;
+  border-radius: 4px;
+}
+
+/* ==================== */
+/* Capture Controls     */
+/* ==================== */
+
+.capture-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.capture-settings {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.capture-info {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  align-items: center;
+  padding-bottom: 0.25rem;
+}
+
+.capture-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 160px;
+  height: 60px;
+  border-radius: 50px;
+  border: none;
+  background: var(--accent-primary);
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-body);
+}
+
+.capture-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: scale(1.05);
+}
+
+.capture-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.capture-button-icon {
+  font-size: 1.5rem;
+}
+
+.capture-message {
+  font-size: 0.9rem;
+  color: #2e7d32;
+  margin: 0;
+  padding: 0.5rem 1rem;
+  background: #e8f5e9;
+  border-radius: 4px;
+}
+
+.capture-message-error {
+  color: #c00;
+  background: #fee;
+}
+
+/* ==================== */
+/* Captured Images Grid */
+/* ==================== */
+
+.captured-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.captured-image-item {
+  background: var(--bg-gray);
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.captured-image-preview {
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.captured-image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.captured-image-info {
+  padding: 0.4rem 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.captured-image-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.captured-image-size {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+/* ==================== */
 /* Modals               */
 /* ==================== */
 
@@ -1781,6 +2166,40 @@ h3 { font-size: 1.25rem; }
   .collection-meta-bar {
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .metadata-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .record-form .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .images-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+
+  .image-viewer-body {
+    flex-direction: column;
+  }
+
+  .image-viewer-details {
+    width: 100%;
+  }
+
+  .camera-cards {
+    flex-direction: column;
+  }
+
+  .capture-settings {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .captured-images-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   }
 }
 
