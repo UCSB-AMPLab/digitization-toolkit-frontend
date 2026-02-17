@@ -585,6 +585,7 @@ h3 { font-size: 1.25rem; }
 .sidebar-footer {
   padding: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 1rem;
 }
 
 .sidebar-logout {
@@ -2247,4 +2248,78 @@ h3 { font-size: 1.25rem; }
     margin-bottom: 1rem;
     padding-bottom: 0.75rem;
   }
+}
+
+/* ==================== */
+/* Status Bar           */
+/* ==================== */
+
+.status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: var(--footer-bg);
+  color: var(--footer-text);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0.5rem;
+  z-index: 1000;
+  font-size: 0.72rem;
+  user-select: none;
+}
+
+.status-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.4rem;
+  height: 100%;
+  border-radius: 2px;
+}
+
+.status-bar-item .material-symbols-outlined {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.status-bar-temp {
+  font-family: var(--font-mono, 'Courier New', monospace);
+  font-size: 0.72rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.status-bar-label {
+  font-size: 0.7rem;
+  opacity: 0.9;
+  margin-left: 0.15rem;
+}
+
+/* Temperature state colors */
+.status-bar-item.temp-normal {
+  color: var(--footer-text);
+}
+
+.status-bar-item.temp-warning {
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+}
+
+.status-bar-item.temp-danger {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.15);
+  animation: temp-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes temp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+/* Ensure dashboard main content doesn't hide behind the status bar */
+.dashboard-main {
+  padding-bottom: 28px;
 }

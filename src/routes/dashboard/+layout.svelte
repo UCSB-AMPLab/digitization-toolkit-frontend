@@ -1,5 +1,6 @@
 <script lang="ts">
   import Sidebar from '$lib/components/Sidebar.svelte';
+  import StatusBar from '$lib/components/StatusBar.svelte';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { isAuthenticated } from '$lib/stores/auth';
@@ -24,4 +25,5 @@
       <slot />
     </main>
   </div>
+  <StatusBar />
 {/if}
