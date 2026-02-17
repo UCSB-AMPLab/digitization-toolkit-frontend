@@ -126,6 +126,8 @@
 
     try {
       formError = '';
+      // Record belongs to either a collection OR a project, not both
+      const collectionId = queryCollectionId ? parseInt(queryCollectionId) : undefined;
       const newRecord = await recordsApi.create({
         title: formTitle.trim(),
         description: formDescription.trim() || undefined,
@@ -133,8 +135,8 @@
         author: formAuthor.trim() || undefined,
         material: formMaterial.trim() || undefined,
         date: formDate.trim() || undefined,
-        project_id: projectId,
-        collection_id: queryCollectionId ? parseInt(queryCollectionId) : undefined
+        project_id: collectionId ? undefined : projectId,
+        collection_id: collectionId
       });
 
       record = newRecord;
