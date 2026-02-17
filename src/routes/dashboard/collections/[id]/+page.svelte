@@ -186,8 +186,8 @@
     <section class="card">
       <div class="card-header">
         <h2>Records</h2>
-        {#if collection?.project_id}
-          <button class="btn-secondary btn-sm" on:click={() => collection && goto(`/dashboard/capture/${collection.project_id}?collection_id=${collectionId}`)}>
+        {#if project?.id}
+          <button class="btn-secondary btn-sm" on:click={() => goto(`/dashboard/capture/${project?.id}?collection_id=${collectionId}`)}>
             + Add Record <span class="material-symbols-outlined">auto_stories</span>
           </button>
         {/if}
