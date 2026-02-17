@@ -51,10 +51,15 @@
           collection = await collectionsApi.get(record.collection_id);
         } catch { collection = null; }
       }
-      if (record.project_id) {
+
+      // Resolve project: directly from record, or via collection
+      const resolvedProjectId = record.project_id || collection?.project_id;
+      if (resolvedProjectId) {
         try {
-          project = await projectsApi.get(record.project_id);
+          project = await projectsApi.get(resolvedProjectId);
         } catch { project = null; }
+      } else {
+        project = null;
       }
     } catch (e: any) {
       error = e.message || 'Failed to load record';
@@ -123,8 +128,10 @@
   }
 
   function openCapture() {
-    if (!record || !project) return;
-    goto(`/dashboard/capture/${project.id}?record_id=${record.id}&collection_id=${record.collection_id || ''}`);
+    if (!record) return;
+    const pid = project?.id || collection?.project_id;
+    if (!pid) return;
+    goto(`/dashboard/capture/${pid}?record_id=${record.id}&collection_id=${record.collection_id || ''}`);
   }
 
   function viewImage(image: RecordImage) {
@@ -214,9 +221,6 @@
         {/if}
         <button class="btn-primary btn-sm" on:click={openCapture}>
           <span class="material-symbols-outlined icon-sm">photo_camera</span> Capture
-        </button>
-        <button class="btn-danger btn-sm" on:click={deleteRecord}>
-          <span class="material-symbols-outlined icon-sm">delete</span>
         </button>
       </div>
     </header>
@@ -341,6 +345,11 @@
             {/if}
           </div>
         {/if}
+      </div>
+      <div class="card-footer-danger">
+        <button class="btn-text-danger" on:click={deleteRecord}>
+          <span class="material-symbols-outlined icon-sm">delete</span> Delete this record
+        </button>
       </div>
     </section>
 
