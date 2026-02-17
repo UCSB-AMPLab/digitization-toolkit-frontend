@@ -286,7 +286,7 @@
       <div class="card-header">
         <h2>Collections</h2>
         <button class="btn-secondary btn-sm" on:click={() => openCreateCollectionModal()}>
-          + New Collection
+          New Collection <span class="material-symbols-outlined">create_new_folder</span>
         </button>
       </div>
       <div class="card-body">
