@@ -1,7 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
   import { collectionsApi, recordsApi, type Collection, type Record } from '$lib/api';
 
   let collection: Collection | null = null;
@@ -13,9 +12,10 @@
 
   $: collectionId = parseInt($page.params.id);
 
-  onMount(async () => {
-    await loadCollectionData();
-  });
+  // Re-load data whenever collectionId changes (same-route navigation reuses the component)
+  $: if (collectionId) {
+    loadCollectionData();
+  }
 
   async function loadCollectionData() {
     try {
