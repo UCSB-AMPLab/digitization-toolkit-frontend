@@ -218,7 +218,11 @@
 
 <div class="page-container">
   <div class="breadcrumb">
-    <a href="/dashboard/projects">← Back to Projects</a>
+    <a href="/dashboard/projects" class="breadcrumb-link">Projects</a>
+    {#if project}
+      <span class="breadcrumb-separator">/</span>
+      <span class="breadcrumb-current">{project.name}</span>
+    {/if}
   </div>
 
   {#if loading}

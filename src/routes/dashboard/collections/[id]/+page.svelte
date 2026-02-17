@@ -1,10 +1,11 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { collectionsApi, recordsApi, type Collection, type Record } from '$lib/api';
+  import { projectsApi, collectionsApi, recordsApi, type Project, type Collection, type Record } from '$lib/api';
 
   let collection: Collection | null = null;
-  let parentCollection: Collection | null = null;
+  let project: Project | null = null;
+  let ancestorChain: Collection[] = []; // ordered from root ancestor to immediate parent
   let childCollections: Collection[] = [];
   let records: Record[] = [];
   let loading = true;
@@ -25,13 +26,34 @@
       // Load collection details
       collection = await collectionsApi.get(collectionId);
 
-      // Load parent collection if exists
-      if (collection.parent_collection_id) {
+      // Build full ancestor chain (walk up parent_collection_id)
+      const ancestors: Collection[] = [];
+      let currentParentId = collection.parent_collection_id;
+      while (currentParentId) {
         try {
-          parentCollection = await collectionsApi.get(collection.parent_collection_id);
+          const ancestor = await collectionsApi.get(currentParentId);
+          ancestors.unshift(ancestor); // prepend so order is root-first
+          currentParentId = ancestor.parent_collection_id;
         } catch (e) {
-          console.error('Failed to load parent collection:', e);
+          console.error('Failed to load ancestor collection:', e);
+          break;
         }
+      }
+      ancestorChain = ancestors; // single assignment triggers Svelte reactivity
+
+      // Load project — subcollections don't have project_id directly,
+      // so get it from the root ancestor (which is a top-level collection)
+      const rootProjectId = collection.project_id
+        ?? (ancestors.length > 0 ? ancestors[0].project_id : null);
+      if (rootProjectId) {
+        try {
+          project = await projectsApi.get(rootProjectId);
+        } catch (e) {
+          console.error('Failed to load project:', e);
+          project = null;
+        }
+      } else {
+        project = null;
       }
 
       // Load child collections
@@ -66,12 +88,6 @@
     }
   }
 
-  function goToParentCollection() {
-    if (parentCollection) {
-      goto(`/dashboard/collections/${parentCollection.id}`);
-    }
-  }
-
   function viewChildCollection(child: Collection) {
     goto(`/dashboard/collections/${child.id}`);
   }
@@ -96,14 +112,18 @@
 
 <div class="page-container">
   <div class="breadcrumb">
-    {#if collection?.project_id}
-      <button on:click={goToProject} class="breadcrumb-link">← Back to Project</button>
-    {/if}
-    {#if parentCollection}
+    <a href="/dashboard/projects" class="breadcrumb-link">Projects</a>
+    {#if project}
       <span class="breadcrumb-separator">/</span>
-      <button on:click={goToParentCollection} class="breadcrumb-link">
-        {parentCollection.name}
-      </button>
+      <button on:click={goToProject} class="breadcrumb-link">{project.name}</button>
+    {/if}
+    {#each ancestorChain as ancestor}
+      <span class="breadcrumb-separator">/</span>
+      <a href="/dashboard/collections/{ancestor.id}" class="breadcrumb-link">{ancestor.name}</a>
+    {/each}
+    {#if collection}
+      <span class="breadcrumb-separator">/</span>
+      <span class="breadcrumb-current">{collection.name}</span>
     {/if}
   </div>
 
