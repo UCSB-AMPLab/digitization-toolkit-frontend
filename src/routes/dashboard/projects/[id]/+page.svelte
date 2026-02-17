@@ -15,6 +15,7 @@
   let formName = '';
   let formDescription = '';
   let formType = '';
+  let formParentId = '';
   let formError = '';
 
   $: projectId = parseInt($page.params.id);
@@ -42,10 +43,11 @@
     }
   }
 
-  function openCreateCollectionModal() {
+  function openCreateCollectionModal(parentCollectionId?: number) {
     formName = '';
     formDescription = '';
     formType = '';
+    formParentId = parentCollectionId ? parentCollectionId.toString() : '';
     formError = '';
     showCreateCollectionModal = true;
   }
@@ -66,7 +68,8 @@
         name: formName.trim(),
         description: formDescription.trim() || undefined,
         collection_type: formType.trim() || undefined,
-        project_id: projectId
+        project_id: formParentId ? undefined : projectId,
+        parent_collection_id: formParentId ? parseInt(formParentId) : undefined
       });
       await loadProjectData();
       closeModals();
@@ -116,7 +119,7 @@
     <section class="card">
       <div class="card-header">
         <h2>Collections</h2>
-        <button class="btn-secondary btn-sm" on:click={openCreateCollectionModal}>
+        <button class="btn-secondary btn-sm" on:click={() => openCreateCollectionModal()}>
           + New Collection
         </button>
       </div>
@@ -139,7 +142,16 @@
                     <span class="badge">{collection.collection_type}</span>
                   {/if}
                 </div>
-                <button class="btn-secondary btn-sm">View</button>
+                <div class="collection-actions">
+                  <button 
+                    class="btn-icon" 
+                    on:click={() => openCreateCollectionModal(collection.id)}
+                    title="Add subcollection"
+                  >
+                    +
+                  </button>
+                  <button class="btn-secondary btn-sm">View</button>
+                </div>
               </div>
             {/each}
           </div>
@@ -202,6 +214,20 @@
             placeholder="e.g., Box 42, Series A, Folder 1"
             class="form-input"
           />
+        </div>
+        <div class="form-group">
+          <label for="collection-parent">Parent Collection (optional)</label>
+          <select id="collection-parent" bind:value={formParentId} class="form-select">
+            <option value="">None (top-level collection)</option>
+            {#each collections.filter(c => c.project_id === projectId) as collection}
+              <option value={collection.id}>
+                {collection.name}
+                {#if collection.collection_type}
+                  ({collection.collection_type})
+                {/if}
+              </option>
+            {/each}
+          </select>
         </div>
         <div class="form-group">
           <label for="collection-type">Type</label>
