@@ -38,19 +38,7 @@
       childCollections = await collectionsApi.list({ parent_collection_id: collectionId });
 
       // Load records in this collection
-      // Note: Backend might not support collection_id filter yet, so we may need to filter client-side
-      try {
-        const allRecords = await recordsApi.list({ collection_id: collectionId });
-        records = allRecords;
-      } catch (e: any) {
-        // If backend doesn't support filtering by collection_id, fetch all and filter
-        if (e.message.includes('422') || e.message.includes('400')) {
-          const allRecords = await recordsApi.list();
-          records = allRecords.filter(r => r.collection_id === collectionId);
-        } else {
-          throw e;
-        }
-      }
+      records = await recordsApi.list({ collection_id: collectionId });
 
     } catch (e: any) {
       console.error('Failed to load collection data:', e);
