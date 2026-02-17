@@ -45,15 +45,26 @@
       error = null;
       record = await recordsApi.get(recordId);
 
-      // Load parent collection and project for breadcrumb
+      // Load parent collection
       if (record.collection_id) {
         try {
           collection = await collectionsApi.get(record.collection_id);
         } catch { collection = null; }
       }
 
-      // Resolve project: directly from record, or via collection
-      const resolvedProjectId = record.project_id || collection?.project_id;
+      // Resolve project: directly from record, from collection, or walk up hierarchy
+      let resolvedProjectId = record.project_id || collection?.project_id;
+      if (!resolvedProjectId && collection?.parent_collection_id) {
+        // Walk up the collection hierarchy to find the root with project_id
+        let parentId: number | undefined | null = collection.parent_collection_id;
+        while (parentId && !resolvedProjectId) {
+          try {
+            const parent = await collectionsApi.get(parentId);
+            resolvedProjectId = parent.project_id;
+            parentId = parent.parent_collection_id;
+          } catch { break; }
+        }
+      }
       if (resolvedProjectId) {
         try {
           project = await projectsApi.get(resolvedProjectId);
