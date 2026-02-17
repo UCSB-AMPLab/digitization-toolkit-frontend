@@ -307,14 +307,14 @@
             </div>
             <div class="project-card-actions">
               <button class="btn-secondary" on:click={() => viewProject(project)}>
-                View Details
+                <span class="material-symbols-outlined">pageview</span>
               </button>
               <button 
                 class="btn-add-collection" 
                 on:click|stopPropagation={() => openCreateCollectionModal(project)}
                 title="Add collection to this project"
               >
-                + Collection
+                <span class="material-symbols-outlined">create_new_folder</span>
               </button>
             </div>
           </div>
