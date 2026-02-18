@@ -810,7 +810,228 @@ h3 { font-size: 1.25rem; }
 }
 
 /* ==================== */
-/* Project Lists        */
+/* Dashboard Redesign   */
+/* ==================== */
+
+.db-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Last Recording card */
+.db-last-recording .card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.db-last-recording .card-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.card-header-icon {
+  font-size: 1.2rem;
+  color: var(--accent-primary);
+}
+
+.last-rec-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.last-rec-icon {
+  font-size: 2.5rem;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.last-rec-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e0e0e0;
+}
+
+.last-rec-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.last-rec-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.last-rec-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.last-rec-time {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-color);
+}
+
+.last-rec-resume {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.last-rec-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.last-rec-empty-icon {
+  font-size: 2.5rem;
+  color: #ccc;
+}
+
+.last-rec-empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Stats row */
+.db-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.db-stats .stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.1rem 0.75rem;
+}
+
+.stat-icon {
+  font-size: 1.5rem;
+  color: var(--accent-primary);
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  line-height: 1.1;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--text-color);
+}
+
+/* Action cards */
+.db-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  text-decoration: none;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s, border-color 0.2s, transform 0.1s;
+  cursor: pointer;
+}
+
+.action-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border-color: var(--accent-primary);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.action-card:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.action-card--primary {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+.action-card--primary:hover {
+  background: rgba(41, 98, 255, 0.9);
+  border-color: rgba(41, 98, 255, 0.9);
+}
+
+.action-card--primary .action-icon,
+.action-card--primary .action-label,
+.action-card--primary .action-desc {
+  color: white;
+}
+
+.action-icon {
+  font-size: 2rem;
+  color: var(--accent-primary);
+}
+
+.action-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.action-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* Sidebar version tag */
+.sidebar-version {
+  margin: 0.5rem 0 0;
+  text-align: center;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+
 /* ==================== */
 
 .projects-list {

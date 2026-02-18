@@ -49,5 +49,6 @@
       <span class="material-symbols-outlined sidebar-icon">logout</span>
       <span class="sidebar-label">Logout</span>
     </button>
+    <p class="sidebar-version">v0.1.0-alpha</p>
   </div>
 </aside>
