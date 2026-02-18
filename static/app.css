@@ -2314,6 +2314,22 @@ h3 { font-size: 1.25rem; }
   animation: temp-pulse 1.2s ease-in-out infinite;
 }
 
+/* Camera state colors */
+.status-bar-item.cam-ok {
+  color: #a8e6a3;
+}
+
+.status-bar-item.cam-warning {
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+}
+
+.status-bar-item.cam-danger {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.15);
+  animation: temp-pulse 1.2s ease-in-out infinite;
+}
+
 @keyframes temp-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.65; }
