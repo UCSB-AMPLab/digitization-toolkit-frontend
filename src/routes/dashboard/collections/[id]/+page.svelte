@@ -188,7 +188,7 @@
         <h2>Records</h2>
         {#if project?.id}
           <button class="btn-secondary btn-sm" on:click={() => goto(`/dashboard/capture/${project?.id}?collection_id=${collectionId}`)}>
-            + Add Record <span class="material-symbols-outlined">auto_stories</span>
+            Add Record <span class="material-symbols-outlined">auto_stories</span>
           </button>
         {/if}
       </div>

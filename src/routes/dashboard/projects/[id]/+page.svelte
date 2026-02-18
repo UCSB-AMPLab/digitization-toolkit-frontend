@@ -236,10 +236,6 @@
           <p class="project-subtitle">{project.description}</p>
         {/if}
       </div>
-      <button class="btn-primary" on:click={() => goto(`/dashboard/capture/${projectId}`)}>
-        <span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 0.5rem;">photo_camera</span>
-        Start Capture
-      </button>
     </header>
 
     <div class="project-meta-bar">
@@ -287,6 +283,11 @@
     <section class="card">
       <div class="card-header">
         <h2>Records</h2>
+        {#if project?.id}
+          <button class="btn-secondary btn-sm" on:click={() => goto(`/dashboard/capture/${projectId}`)}>
+            Add Record <span class="material-symbols-outlined">auto_stories</span>
+          </button>
+        {/if}
       </div>
       <div class="card-body">
         {#if records.length === 0}
