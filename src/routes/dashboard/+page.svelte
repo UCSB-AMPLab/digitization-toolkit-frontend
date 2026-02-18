@@ -13,6 +13,7 @@
   let lastRecord: Record | null = null;
   let lastRecordProject: Project | null = null;
   let lastRecordThumbnailUrl: string | null = null;
+  let orphanCount = 0;
   let loading = true;
 
   onMount(async () => {
@@ -23,16 +24,19 @@
         recordsApi.list({ limit: 1 })
       ]);
 
+      // Fetch total counts and orphans in parallel
+      const [allRecords, orphans] = await Promise.all([
+        recordsApi.list(),
+        recordsApi.list({ orphaned: true })
+      ]);
+      orphanCount = orphans.length;
       stats = {
         projectCount: projects.length,
         collectionCount: collections.length,
-        recordCount: 0
+        recordCount: allRecords.length
       };
 
-      // Get total record count by fetching without limit
       try {
-        const allRecords = await recordsApi.list();
-        stats.recordCount = allRecords.length;
         if (allRecords.length > 0) {
           // Most recent record (sorted by created_at desc)
           const sorted = [...allRecords].sort((a, b) =>
@@ -55,7 +59,7 @@
           }
         }
       } catch {
-        // records API may be empty — not an error
+        // records API issue — not critical
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -161,4 +165,41 @@
     </div>
 
   </div>
+
+  <!-- Orphan warning -->
+  {#if !loading && orphanCount > 0}
+    <a href="/dashboard/records" class="orphan-banner">
+      <span class="material-symbols-outlined">warning</span>
+      <span>
+        <strong>{orphanCount} orphaned record{orphanCount !== 1 ? 's' : ''}</strong>
+        — not linked to any project or collection.
+      </span>
+      <span class="orphan-banner-cta">Review &rsaquo;</span>
+    </a>
+  {/if}
+
 </div>
+
+<style>
+  .orphan-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding: 0.85rem 1.25rem;
+    background: var(--color-warning-bg, #fff8e1);
+    border: 1px solid var(--color-warning, #f9a825);
+    border-radius: var(--radius, 8px);
+    color: var(--color-warning-text, #5d4037);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: opacity 0.15s;
+  }
+  .orphan-banner:hover {
+    opacity: 0.85;
+  }
+  .orphan-banner-cta {
+    margin-left: auto;
+    font-weight: 600;
+  }
+</style>

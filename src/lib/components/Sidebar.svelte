@@ -12,6 +12,7 @@
   const menuItems: MenuItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
     { label: 'Projects', path: '/dashboard/projects', icon: 'folder' },
+    { label: 'Records', path: '/dashboard/records', icon: 'inbox' },
     { label: 'Settings', path: '/dashboard/settings', icon: 'settings' }
   ];
 

@@ -386,8 +386,8 @@ export interface UpdateRecordData {
   material?: string;
   date?: string;
   custom_attributes?: string;
-  project_id?: number;
-  collection_id?: number;
+  project_id?: number | null;
+  collection_id?: number | null;
 }
 
 export const recordsApi = {
@@ -398,6 +398,7 @@ export const recordsApi = {
     collection_id?: number;
     project_id?: number;
     object_typology?: string;
+    orphaned?: boolean;
     skip?: number;
     limit?: number;
   }): Promise<Record[]> {
@@ -405,6 +406,7 @@ export const recordsApi = {
     if (params?.collection_id !== undefined) queryParams.set('collection_id', params.collection_id.toString());
     if (params?.project_id !== undefined) queryParams.set('project_id', params.project_id.toString());
     if (params?.object_typology !== undefined) queryParams.set('object_typology', params.object_typology);
+    if (params?.orphaned !== undefined) queryParams.set('orphaned', params.orphaned.toString());
     if (params?.skip !== undefined) queryParams.set('skip', params.skip.toString());
     if (params?.limit !== undefined) queryParams.set('limit', params.limit.toString());
     
