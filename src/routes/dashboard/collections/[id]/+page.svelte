@@ -11,6 +11,14 @@
   let loading = true;
   let error: string | null = null;
 
+  // Modal state
+  let showEditModal = false;
+  let showDeleteModal = false;
+  let formName = '';
+  let formDescription = '';
+  let formType = '';
+  let formError = '';
+
   $: collectionId = parseInt($page.params.id);
 
   // Re-load data whenever collectionId changes (same-route navigation reuses the component)
@@ -88,6 +96,59 @@
     }
   }
 
+  function openEditModal() {
+    if (!collection) return;
+    formName = collection.name;
+    formDescription = collection.description || '';
+    formType = collection.collection_type || '';
+    formError = '';
+    showEditModal = true;
+  }
+
+  function openDeleteModal() {
+    showDeleteModal = true;
+  }
+
+  function closeModals() {
+    showEditModal = false;
+    showDeleteModal = false;
+    formError = '';
+  }
+
+  async function handleEdit() {
+    if (!collection) return;
+    if (!formName.trim()) {
+      formError = 'Collection name is required';
+      return;
+    }
+    try {
+      await collectionsApi.update(collection.id, {
+        name: formName.trim(),
+        description: formDescription.trim() || undefined,
+        collection_type: formType.trim() || undefined
+      });
+      await loadCollectionData();
+      closeModals();
+    } catch (e: any) {
+      formError = e.message || 'Failed to update collection';
+    }
+  }
+
+  async function handleDelete() {
+    if (!collection) return;
+    try {
+      // Navigate away before deleting
+      const destination = project
+        ? `/dashboard/projects/${project.id}`
+        : '/dashboard/projects';
+      await collectionsApi.delete(collection.id);
+      goto(destination);
+    } catch (e: any) {
+      error = e.message || 'Failed to delete collection';
+      closeModals();
+    }
+  }
+
   function viewChildCollection(child: Collection) {
     goto(`/dashboard/collections/${child.id}`);
   }
@@ -140,6 +201,16 @@
         {#if collection.collection_type}
           <span class="badge badge-primary">{collection.collection_type}</span>
         {/if}
+      </div>
+      <div class="header-actions">
+        <button class="btn-secondary" on:click={openEditModal}>
+          <span class="material-symbols-outlined icon-sm">edit</span>
+          Edit
+        </button>
+        <button class="btn-danger" on:click={openDeleteModal}>
+          <span class="material-symbols-outlined icon-sm">delete</span>
+          Delete
+        </button>
       </div>
     </header>
 
@@ -253,3 +324,75 @@
     <div class="alert alert-warning">Collection not found</div>
   {/if}
 </div>
+
+<!-- Edit Collection Modal -->
+{#if showEditModal && collection}
+  <div class="modal-overlay" on:click={closeModals}>
+    <div class="modal" on:click|stopPropagation>
+      <div class="modal-header">
+        <h2>Edit Collection</h2>
+        <button class="close-btn" on:click={closeModals}>×</button>
+      </div>
+      <div class="modal-body">
+        {#if formError}
+          <div class="alert alert-error">{formError}</div>
+        {/if}
+        <div class="form-group">
+          <label for="edit-name">Collection Name *</label>
+          <input
+            id="edit-name"
+            type="text"
+            bind:value={formName}
+            placeholder="e.g., Box 42, Series A, Folder 1"
+            class="form-input"
+          />
+        </div>
+        <div class="form-group">
+          <label for="edit-type">Type</label>
+          <select id="edit-type" bind:value={formType} class="form-select">
+            <option value="">Select type (optional)</option>
+            <option value="fonds">Fonds</option>
+            <option value="series">Series</option>
+            <option value="box">Box</option>
+            <option value="folder">Folder</option>
+            <option value="volume">Volume</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="edit-description">Description</label>
+          <textarea
+            id="edit-description"
+            bind:value={formDescription}
+            placeholder="Enter collection description (optional)"
+            class="form-textarea"
+            rows="3"
+          />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" on:click={closeModals}>Cancel</button>
+        <button class="btn-primary" on:click={handleEdit}>Save Changes</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Delete Collection Confirmation Modal -->
+{#if showDeleteModal && collection}
+  <div class="modal-overlay" on:click={closeModals}>
+    <div class="modal modal-small" on:click|stopPropagation>
+      <div class="modal-header">
+        <h2>Delete Collection</h2>
+        <button class="close-btn" on:click={closeModals}>×</button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete <strong>{collection.name}</strong>?</p>
+        <p class="warning-text">This will also delete all subcollections. Records will be unlinked but not deleted.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" on:click={closeModals}>Cancel</button>
+        <button class="btn-danger" on:click={handleDelete}>Delete Collection</button>
+      </div>
+    </div>
+  </div>
+{/if}

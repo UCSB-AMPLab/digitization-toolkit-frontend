@@ -11,6 +11,8 @@
   export let onToggleExpand: (id: number) => void;
   export let onViewCollection: (collection: Collection) => void;
   export let onAddSubcollection: (parentId: number) => void;
+  export let onEditCollection: (collection: Collection) => void = () => {};
+  export let onDeleteCollection: (collection: Collection) => void = () => {};
 
   // Reactive helpers derived from props
   $: children = childCollectionsMap.get(collection.id) || [];
@@ -57,6 +59,20 @@
     </div>
     <div class="collection-actions">
       <button
+        class="icon-btn"
+        on:click|stopPropagation={() => onEditCollection(collection)}
+        title="Edit collection"
+      >
+        <span class="material-symbols-outlined icon-sm">edit</span>
+      </button>
+      <button
+        class="icon-btn danger"
+        on:click|stopPropagation={() => onDeleteCollection(collection)}
+        title="Delete collection"
+      >
+        <span class="material-symbols-outlined icon-sm">delete</span>
+      </button>
+      <button
         class="btn-add-collection"
         on:click={() => onAddSubcollection(collection.id)}
         title="Add subcollection"
@@ -77,6 +93,8 @@
         {onToggleExpand}
         {onViewCollection}
         {onAddSubcollection}
+        {onEditCollection}
+        {onDeleteCollection}
       />
     {/each}
   {/if}
