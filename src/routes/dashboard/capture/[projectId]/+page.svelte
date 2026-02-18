@@ -489,6 +489,11 @@
               {#each capturedImages as img}
                 <div class="captured-image-item">
                   <div class="captured-image-preview">
+                    {#if img.role === 'left' || img.role === 'right'}
+                      <span class="image-role-badge image-role-badge--{img.role}">
+                        {img.role === 'left' ? 'L' : 'R'}
+                      </span>
+                    {/if}
                     {#if img.thumbnail_path}
                       <img src={recordsApi.getImageThumbnailUrl(img.id)} alt={img.filename} loading="lazy" />
                     {:else}
@@ -497,9 +502,6 @@
                   </div>
                   <div class="captured-image-info">
                     <span class="captured-image-name">{img.filename}</span>
-                    {#if img.role}
-                      <span class="badge badge-xs">{img.role}</span>
-                    {/if}
                     {#if img.file_size}
                       <span class="captured-image-size">{formatFileSize(img.file_size)}</span>
                     {/if}

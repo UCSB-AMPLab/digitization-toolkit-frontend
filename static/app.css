@@ -1764,6 +1764,14 @@ h3 { font-size: 1.25rem; }
   gap: 0.75rem;
 }
 
+.image-card--right .image-card-info {
+  text-align: right;
+}
+
+.image-card--right .image-card-meta {
+  justify-content: flex-end;
+}
+
 .image-card {
   background: var(--bg-gray);
   border: 1px solid #e0e0e0;
@@ -1779,6 +1787,7 @@ h3 { font-size: 1.25rem; }
 }
 
 .image-card-preview {
+  position: relative;
   width: 100%;
   aspect-ratio: 4/3;
   background: #ddd;
@@ -1787,6 +1796,24 @@ h3 { font-size: 1.25rem; }
   justify-content: center;
   overflow: hidden;
 }
+
+.image-role-badge {
+  position: absolute;
+  top: 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.2rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  letter-spacing: 0.5px;
+  z-index: 1;
+  user-select: none;
+}
+
+.image-role-badge--left  { left:  0.3rem; }
+.image-role-badge--right { right: 0.3rem; }
 
 .image-card-preview img {
   width: 100%;
@@ -2042,6 +2069,7 @@ h3 { font-size: 1.25rem; }
 }
 
 .captured-image-preview {
+  position: relative;
   width: 100%;
   aspect-ratio: 4/3;
   background: #ddd;

@@ -386,12 +386,19 @@
             {#each record.images as image}
               <div
                 class="image-card"
+                class:image-card--left={image.role !== 'right'}
+                class:image-card--right={image.role === 'right'}
                 on:click={() => viewImage(image)}
                 on:keydown={(e) => e.key === 'Enter' && viewImage(image)}
                 role="button"
                 tabindex="0"
               >
                 <div class="image-card-preview">
+                  {#if image.role === 'left' || image.role === 'right'}
+                    <span class="image-role-badge image-role-badge--{image.role}">
+                      {image.role === 'left' ? 'L' : 'R'}
+                    </span>
+                  {/if}
                   {#if image.thumbnail_path}
                     <img src={recordsApi.getImageThumbnailUrl(image.id)} alt={image.filename} loading="lazy" />
                   {:else}
@@ -401,9 +408,6 @@
                 <div class="image-card-info">
                   <span class="image-card-name">{image.filename}</span>
                   <div class="image-card-meta">
-                    {#if image.role}
-                      <span class="badge badge-xs">{image.role}</span>
-                    {/if}
                     {#if image.file_size}
                       <span>{formatFileSize(image.file_size)}</span>
                     {/if}
