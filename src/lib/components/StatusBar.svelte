@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import { PUBLIC_API_BASE } from '$env/static/public';
+  import { env } from '$env/dynamic/public';
   import { tokenStore } from '$lib/api';
 
   let temperature: number | null = null;
@@ -10,13 +10,14 @@
   let camerasFetched = false;
   let interval: ReturnType<typeof setInterval>;
 
+  const API_BASE = env.PUBLIC_API_BASE || 'http://localhost:8000';
   const WARN_THRESHOLD = 70;
   const DANGER_THRESHOLD = 80;
 
   async function fetchTemperature() {
     try {
       const token = tokenStore.get();
-      const response = await fetch(`${PUBLIC_API_BASE}/system/temperature`, {
+      const response = await fetch(`${API_BASE}/system/temperature`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (response.ok) {
@@ -32,7 +33,7 @@
   async function fetchCameras() {
     try {
       const token = tokenStore.get();
-      const response = await fetch(`${PUBLIC_API_BASE}/cameras/devices`, {
+      const response = await fetch(`${API_BASE}/cameras/devices`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (response.ok) {

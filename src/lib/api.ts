@@ -1,5 +1,4 @@
 import { browser } from '$app/environment';
-import { PUBLIC_API_BASE } from '$env/static/public';
 import { env } from '$env/dynamic/public';
 
 /**
@@ -8,8 +7,13 @@ import { env } from '$env/dynamic/public';
  */
 
 // Get appropriate API base URL (browser vs SSR)
+// Uses dynamic env vars so the same Docker image works regardless of hostname/IP.
+// Set PUBLIC_API_BASE and PUBLIC_API_BASE_SSR in docker-compose environment.
 function getApiBase(): string {
-  return browser ? PUBLIC_API_BASE : (env.PUBLIC_API_BASE_SSR || PUBLIC_API_BASE);
+  const fallback = 'http://localhost:8000';
+  return browser
+    ? (env.PUBLIC_API_BASE || fallback)
+    : (env.PUBLIC_API_BASE_SSR || env.PUBLIC_API_BASE || fallback);
 }
 
 // Token management
