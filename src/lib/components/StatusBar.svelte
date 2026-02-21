@@ -3,11 +3,11 @@
   import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
   import { tokenStore } from '$lib/api';
+  import { cameraStatus } from '$lib/stores/cameras';
 
   let temperature: number | null = null;
   let tempAvailable = false;
   let cameraCount: number = 0;
-  let operationalCount: number = 0;
   let camerasFetched = false;
   let interval: ReturnType<typeof setInterval>;
 
@@ -40,7 +40,6 @@
       if (response.ok) {
         const data = await response.json();
         cameraCount = Array.isArray(data) ? data.length : 0;
-        operationalCount = Array.isArray(data) ? data.filter((d: { operational: boolean }) => d.operational).length : 0;
         camerasFetched = true;
       }
     } catch {
@@ -59,9 +58,10 @@
     return 'temp-normal';
   }
 
-  function cameraClass(detected: number, operational: number): string {
-    if (detected === 0 || operational === 0) return 'cam-danger';
-    if (operational === 1) return 'cam-warning';
+  function cameraClass(count: number, captureError: boolean): string {
+    if (count === 0) return 'cam-danger';
+    if (captureError) return 'cam-danger';
+    if (count === 1) return 'cam-warning';
     return 'cam-ok';
   }
 
@@ -80,18 +80,12 @@
 <div class="status-bar">
   {#if camerasFetched}
     <div
-      class="status-bar-item {cameraClass(cameraCount, operationalCount)}"
-      title="{operationalCount} camera(s) available"
+      class="status-bar-item {cameraClass(cameraCount, $cameraStatus.captureError)}"
+      title="{$cameraStatus.captureError ? ($cameraStatus.errorMessage ?? 'Last capture failed') : `${cameraCount} camera(s) detected`}"
     >
-      <span class="material-symbols-outlined icon-sm">{operationalCount === 0 ? 'no_photography' : 'photo_camera'}</span>
+      <span class="material-symbols-outlined icon-sm">{cameraCount === 0 ? 'no_photography' : 'photo_camera'}</span>
       <span class="status-bar-label">
-        {#if operationalCount === 0}
-          No cameras
-        {:else if operationalCount === 1}
-          1 camera
-        {:else}
-          {operationalCount} cameras
-        {/if}
+        {#if cameraCount === 0}No cameras{:else if cameraCount === 1}1 camera{:else}{cameraCount} cameras{/if}
       </span>
     </div>
   {/if}

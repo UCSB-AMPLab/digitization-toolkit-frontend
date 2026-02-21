@@ -13,6 +13,7 @@
     type CaptureResponse,
     type RecordImage
   } from '$lib/api';
+  import { cameraStatus } from '$lib/stores/cameras';
 
   // Route params & query
   $: projectId = parseInt($page.params.projectId);
@@ -180,6 +181,7 @@
       captureResult = result;
 
       if (result.success) {
+        cameraStatus.reportSuccess();
         captureMessage = cameras.length >= 2
           ? `Dual capture successful (${result.image_ids?.length || 0} images)`
           : 'Capture successful';
@@ -190,10 +192,14 @@
         record = updatedRecord;
         capturedImages = updatedRecord.images || [];
       } else {
-        captureMessage = result.error || 'Capture failed';
+        const msg = result.error || 'Capture failed';
+        cameraStatus.reportFailure(msg);
+        captureMessage = msg;
       }
     } catch (e: any) {
-      captureMessage = e.message || 'Capture failed';
+      const msg = e.message || 'Capture failed';
+      cameraStatus.reportFailure(msg);
+      captureMessage = msg;
     } finally {
       capturing = false;
     }
