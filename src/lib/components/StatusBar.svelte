@@ -60,8 +60,7 @@
   }
 
   function cameraClass(detected: number, operational: number): string {
-    if (detected === 0) return 'cam-danger';
-    if (operational < detected) return 'cam-danger';
+    if (detected === 0 || operational === 0) return 'cam-danger';
     if (operational === 1) return 'cam-warning';
     return 'cam-ok';
   }
@@ -82,16 +81,16 @@
   {#if camerasFetched}
     <div
       class="status-bar-item {cameraClass(cameraCount, operationalCount)}"
-      title="{cameraCount} detected, {operationalCount} operational"
+      title="{operationalCount} camera(s) available"
     >
       <span class="material-symbols-outlined icon-sm">{operationalCount === 0 ? 'no_photography' : 'photo_camera'}</span>
       <span class="status-bar-label">
-        {#if cameraCount === 0}
+        {#if operationalCount === 0}
           No cameras
-        {:else if operationalCount === cameraCount}
-          {cameraCount === 1 ? '1 camera' : `${cameraCount} cameras`}
+        {:else if operationalCount === 1}
+          1 camera
         {:else}
-          {operationalCount}/{cameraCount} cameras
+          {operationalCount} cameras
         {/if}
       </span>
     </div>
