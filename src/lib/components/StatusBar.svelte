@@ -7,6 +7,7 @@
   let temperature: number | null = null;
   let tempAvailable = false;
   let cameraCount: number = 0;
+  let operationalCount: number = 0;
   let camerasFetched = false;
   let interval: ReturnType<typeof setInterval>;
 
@@ -39,6 +40,7 @@
       if (response.ok) {
         const data = await response.json();
         cameraCount = Array.isArray(data) ? data.length : 0;
+        operationalCount = Array.isArray(data) ? data.filter((d: { operational: boolean }) => d.operational).length : 0;
         camerasFetched = true;
       }
     } catch {
@@ -57,9 +59,10 @@
     return 'temp-normal';
   }
 
-  function cameraClass(count: number): string {
-    if (count === 0) return 'cam-danger';
-    if (count === 1) return 'cam-warning';
+  function cameraClass(detected: number, operational: number): string {
+    if (detected === 0) return 'cam-danger';
+    if (operational < detected) return 'cam-danger';
+    if (operational === 1) return 'cam-warning';
     return 'cam-ok';
   }
 
@@ -77,10 +80,19 @@
 
 <div class="status-bar">
   {#if camerasFetched}
-    <div class="status-bar-item {cameraClass(cameraCount)}" title="{cameraCount} camera(s) detected">
-      <span class="material-symbols-outlined icon-sm">{cameraCount === 0 ? 'no_photography' : 'photo_camera'}</span>
+    <div
+      class="status-bar-item {cameraClass(cameraCount, operationalCount)}"
+      title="{cameraCount} detected, {operationalCount} operational"
+    >
+      <span class="material-symbols-outlined icon-sm">{operationalCount === 0 ? 'no_photography' : 'photo_camera'}</span>
       <span class="status-bar-label">
-        {#if cameraCount === 0}No cameras{:else if cameraCount === 1}1 camera{:else}{cameraCount} cameras{/if}
+        {#if cameraCount === 0}
+          No cameras
+        {:else if operationalCount === cameraCount}
+          {cameraCount === 1 ? '1 camera' : `${cameraCount} cameras`}
+        {:else}
+          {operationalCount}/{cameraCount} cameras
+        {/if}
       </span>
     </div>
   {/if}
