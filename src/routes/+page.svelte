@@ -1,6 +1,20 @@
 <script lang="ts">
-  export let data: { api: { status: string } };
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { isAuthenticated } from '$lib/stores/auth';
+
+  onMount(() => {
+    const unsubscribe = isAuthenticated.subscribe(authenticated => {
+      if (authenticated) {
+        goto('/dashboard');
+      } else {
+        goto('/welcome');
+      }
+    });
+    return unsubscribe;
+  });
 </script>
 
-<h1>Digitization Toolkit</h1>
-<p>API says: {data.api.status}</p>
+<div class="loading">
+  <p>Loading...</p>
+</div>
