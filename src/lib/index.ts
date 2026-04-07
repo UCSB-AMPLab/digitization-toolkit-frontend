@@ -1,1 +1,6 @@
-// place files you want to import through the `$lib` alias in this folder.
+// Re-export API client
+export * from './api';
+
+// Re-export stores
+export * from './stores/auth';
+
