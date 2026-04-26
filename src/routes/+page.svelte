@@ -8,7 +8,7 @@
       if (authenticated) {
         goto('/dashboard');
       } else {
-        goto('/welcome');
+        goto('/login');
       }
     });
     return unsubscribe;
