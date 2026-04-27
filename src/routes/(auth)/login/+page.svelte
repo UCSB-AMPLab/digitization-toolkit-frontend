@@ -391,10 +391,10 @@
       </button>
 
       <!-- ── CREDENCIALES DEMO ───────────────────────────────────────────────
-           Solo visible cuando isDemoMode = true.
+           Solo visible cuando isDemoMode = true. Se pueden descomentar para que se sean visibles en la el prototipo de desarrollo, pero se recomienda eliminar o comentar este bloque en producción para no revelar credenciales.
            Para ocultar en producción, cambia isDemoMode a false arriba.
            ─────────────────────────────────────────────────────────────────── -->
-      {#if isDemoMode}
+      <!--{#if isDemoMode}
         <div class="demo-credentials">
           <p class="demo-title">Credenciales Demo:</p>
           <p class="demo-text">
@@ -404,7 +404,7 @@
           </p>
           <p class="demo-text">(Cualquier contraseña)</p>
         </div>
-      {/if}
+      {/if} -->
 
     </div><!-- /form-area -->
 
