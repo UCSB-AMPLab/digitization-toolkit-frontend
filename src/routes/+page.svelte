@@ -22,36 +22,45 @@
 
   // Controla si se muestra el splash o si todavía está verificando la sesión.
   // Empieza en false para evitar flash de contenido antes de verificar el token.
-  let showSplash = $state(false);
+  let showSplash = $state(true);
 
   // ---------------------------------------------------------------------------
   // AL MONTAR EL COMPONENTE
   // Verifica si hay sesión guardada y redirige al dashboard correspondiente.
   // ---------------------------------------------------------------------------
+  
   onMount(() => {
-    const token = authStore.getToken();
+  let currentToken: string | null = null;
+  let currentUser: any = null;
 
-    if (token) {
-      // ── Hay token guardado ─────────────────────────────────────────────────
+  const unsub = authStore.subscribe((s) => {
+    currentToken = s.token;
+    currentUser = s.user;
+  });
+  unsub();
+
+  if (currentToken && currentUser) {
+    // ── Sesión completa → ir al dashboard ─────────────────────────────────
+    goto(getRoleDashboardPath(currentUser.role));
+
+  } else if (currentToken && !currentUser) {
+    // ── Token guardado pero sin datos del usuario (ej: recarga de página) ──
+    // Limpia el token silenciosamente y QUEDA en el splash.
+    // NO hacer goto('/login') aquí — el usuario decide cuándo continuar.
+    authStore.clearSession();
+  }
+
+  // Sin token → showSplash ya es true desde el inicio → no hacer nada
+});
+
+// ── Hay token guardado ─────────────────────────────────────────────────
       // Nota: el token existe pero no se verificó con el backend todavía.
       // El guard del dashboard (+layout.svelte) hará esa verificación.
       // Por ahora, intenta navegar al dashboard del usuario.
-      const user = $derived.by(() => {
-        let u = null;
-        authStore.subscribe(s => { u = s.user; })();
-        return u;
-      });
-
-      // Si tenemos datos del usuario en el store, ir a su dashboard
+            // Si tenemos datos del usuario en el store, ir a su dashboard
       // (esto pasa si el usuario recargó la página pero la sesión sigue en memoria)
       // Si no, ir a /login para que vuelva a autenticarse de forma segura
       // ── PARA CAMBIAR EL COMPORTAMIENTO POST-RELOAD, modifica este bloque ──
-      goto('/login');
-    } else {
-      // ── No hay token → mostrar pantalla de bienvenida ─────────────────────
-      showSplash = true;
-    }
-  });
 
   // ---------------------------------------------------------------------------
   // ACCIÓN: Botón "Comenzar"
