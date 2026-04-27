@@ -1,18 +1,53 @@
-import { writable, derived } from 'svelte/store';
-import { browser } from '$app/environment';
-import { authApi, type User } from '../api';
+// ============================================================================
+// STORE: auth.ts
+// Maneja el estado de autenticación global de la aplicación.
+// Guarda el token, los datos del usuario y el rol.
+// Se importa desde cualquier componente que necesite saber si hay sesión activa.
+// ============================================================================
 
-interface AuthState {
-  user: User | null;
-  loading: boolean;
-  error: string | null;
+import { writable, derived, get } from 'svelte/store';
+import { browser } from '$app/environment';
+
+// ----------------------------------------------------------------------------
+// TIPOS
+// ----------------------------------------------------------------------------
+
+// Roles disponibles en el sistema
+// Si el backend agrega roles nuevos, agregarlos aquí
+export type UserRole = 'admin' | 'operator' | 'reviewer';
+
+// Datos del usuario autenticado
+export interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+  role: UserRole;       // rol que determina a qué dashboard se redirige
+  is_active: boolean;
 }
 
+// Estado completo del store de autenticación
+interface AuthState {
+  user: AuthUser | null;  // null = no hay sesión
+  token: string | null;   // JWT token de acceso
+  isLoading: boolean;     // true mientras verifica sesión al cargar la app
+}
+
+// ----------------------------------------------------------------------------
+// ESTADO INICIAL
+// ----------------------------------------------------------------------------
+
+// Al iniciar, intenta recuperar el token guardado en localStorage
+// Si existe, la app asume que hay sesión (se verificará con el backend)
 const initialState: AuthState = {
   user: null,
-  loading: false,
-  error: null
+  // Solo accede a localStorage en el browser (no en SSR)
+  token: browser ? localStorage.getItem('access_token') : null,
+  isLoading: false,
 };
+
+// ----------------------------------------------------------------------------
+// STORE PRINCIPAL
+// ----------------------------------------------------------------------------
 
 function createAuthStore() {
   const { subscribe, set, update } = writable<AuthState>(initialState);
@@ -20,100 +55,85 @@ function createAuthStore() {
   return {
     subscribe,
 
-    /**
-     * Register a new user
-     */
-    async register(username: string, email: string, password: string) {
-      update(state => ({ ...state, loading: true, error: null }));
-      
-      try {
-        const user = await authApi.register({ username, email, password });
-        // Auto-login after registration
-        await authApi.login({ username, email, password });
-        update(state => ({ ...state, user, loading: false }));
-        return user;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Registration failed';
-        update(state => ({ ...state, loading: false, error: message }));
-        throw error;
+    // ── Guarda el token y los datos del usuario tras login exitoso ─────────
+    setSession(token: string, user: AuthUser) {
+      // Persiste el token en localStorage para que sobreviva recargas
+      if (browser) {
+        localStorage.setItem('access_token', token);
       }
+      update(state => ({
+        ...state,
+        token,
+        user,
+        isLoading: false,
+      }));
     },
 
-    /**
-     * Login with username and password
-     */
-    async login(username: string, password: string) {
-      update(state => ({ ...state, loading: true, error: null }));
-      
-      try {
-        await authApi.login({ 
-          username, 
-          password 
-        });
-        
-        // After successful login, we should fetch user info
-        // For now, create a minimal user object
-        const user: User = {
-          id: 0, // Will be populated from token or API call
-          username,
-          email: '',
-          is_active: true
-        };
-        
-        update(state => ({ ...state, user, loading: false }));
-        return user;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Login failed';
-        update(state => ({ ...state, loading: false, error: message }));
-        throw error;
+    // ── Limpia la sesión al hacer logout ──────────────────────────────────
+    clearSession() {
+      if (browser) {
+        localStorage.removeItem('access_token');
       }
+      set({
+        user: null,
+        token: null,
+        isLoading: false,
+      });
     },
 
-    /**
-     * Logout
-     */
-    logout() {
-      authApi.logout();
-      set(initialState);
+    // ── Activa el spinner de carga (ej: mientras verifica token al inicio) ─
+    setLoading(loading: boolean) {
+      update(state => ({ ...state, isLoading: loading }));
     },
 
-    /**
-     * Clear error message
-     */
-    clearError() {
-      update(state => ({ ...state, error: null }));
+    // ── Obtiene el token actual (útil fuera de componentes Svelte) ─────────
+    getToken(): string | null {
+      return get({ subscribe }).token;
     },
 
-    /**
-     * Check if user is authenticated (has token)
-     */
-    checkAuth() {
-      if (!browser) return;
-      
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        // Token exists, set a placeholder user
-        // In production, you'd validate/decode the token or fetch user info
-        update(state => ({
-          ...state,
-          user: {
-            id: 0,
-            username: 'User',
-            email: '',
-            is_active: true
-          }
-        }));
-      }
-    }
+    // ── Verifica si hay sesión activa ──────────────────────────────────────
+    isAuthenticated(): boolean {
+      return get({ subscribe }).token !== null;
+    },
   };
 }
 
-export const auth = createAuthStore();
+export const authStore = createAuthStore();
 
-// Derived store for authentication status
-export const isAuthenticated = derived(auth, $auth => $auth.user !== null);
+// ----------------------------------------------------------------------------
+// DERIVADOS (computed values)
+// Estos son reactivos: se actualizan automáticamente cuando cambia authStore
+// ----------------------------------------------------------------------------
 
-// Check authentication on page load
-if (browser) {
-  auth.checkAuth();
+// true si hay sesión activa
+export const isAuthenticated = derived(
+  authStore,
+  $auth => $auth.token !== null
+);
+
+// El usuario actual (null si no hay sesión)
+export const currentUser = derived(
+  authStore,
+  $auth => $auth.user
+);
+
+// El rol del usuario actual (null si no hay sesión)
+export const userRole = derived(
+  authStore,
+  $auth => $auth.user?.role ?? null
+);
+
+// ----------------------------------------------------------------------------
+// HELPER: getRoleDashboardPath
+// Devuelve la ruta del dashboard según el rol del usuario.
+// Si el backend cambia los nombres de los roles, actualizar aquí.
+// ----------------------------------------------------------------------------
+export function getRoleDashboardPath(role: UserRole): string {
+  const paths: Record<UserRole, string> = {
+    admin:    '/admin',      // → src/routes/(dashboard)/admin/
+    operator: '/operator',   // → src/routes/(dashboard)/operator/
+    reviewer: '/reviewer',   // → src/routes/(dashboard)/reviewer/
+  };
+  // Si el rol no existe en el mapa, manda al operador por defecto
+  return paths[role] ?? '/operator';
 }
