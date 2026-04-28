@@ -14,12 +14,18 @@
 
   let {
     activeTab = 'gallery',
+    showFinalize = false,
+    isFinalized  = false,
     onTabChange,
     onBack,
+    onFinalizeClick,
   }: {
     activeTab: 'live' | 'gallery';
+    showFinalize: boolean;
+    isFinalized: boolean;
     onTabChange: (tab: 'live' | 'gallery') => void;
     onBack: () => void;
+    onFinalizeClick: () => void;
   } = $props();
 
   // Iniciales del usuario para el avatar
@@ -57,6 +63,43 @@
   <div class="topbar-right">
     <div class="status-badge">In review</div>
     <div class="user-avatar">{userInitials()}</div>
+  </div>
+
+  <!-- Derecha: Finalizar (opcional) + Badge de estado + Avatar -->
+  <div class="topbar-right">
+
+    <!--
+      Botón "Finalizar"
+      Solo visible cuando showFinalize = true, es decir:
+        - vista grid activa
+        - hay al menos una imagen
+        - el proyecto no está finalizado aún
+    -->
+    {#if showFinalize}
+      <button class="btn-finalizar" onclick={onFinalizeClick}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <span>Finalizar</span>
+      </button>
+    {/if}
+
+    <!--
+      Badge de estado del proyecto
+      - Sin finalizar → "In review" (fondo sand/naranja, --color-highlight)
+      - Finalizado    → "Terminado" (fondo rojo, --color-error)
+      Para cambiar los textos, edita los strings aquí.
+    -->
+    <div class="status-badge" class:finalized={isFinalized}>
+      {isFinalized ? 'Terminado' : 'In review'}
+    </div>
+
+    <!-- Avatar circular con iniciales del usuario -->
+    <div class="user-avatar" aria-label="Usuario actual">
+      {userInitials()}
+    </div>
+
   </div>
 
 </div>
@@ -140,6 +183,40 @@
     font-size: 13px;
     font-weight: var(--fw-bold);
     white-space: nowrap;
+  }
+
+  /* ── Botón Finalizar ── */
+  /* Verde, aparece justo a la izquierda del badge de estado */
+  .btn-finalizar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--color-primary);
+    color: white;
+    font-family: var(--font-family);
+    font-size: var(--text-base);
+    font-weight: var(--fw-bold);
+    border: none;
+    border-radius: var(--radius-full);  /* pill shape igual que el badge */
+    padding: 8px 18px;
+    min-height: var(--touch-target-min);
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(90,140,98,0.3);
+    transition: all var(--transition-base);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .btn-finalizar:hover { background-color: var(--color-primary-hover); }
+  .btn-finalizar:active { transform: scale(0.97); }
+
+  /* ── Badge de estado ── */
+  /* Forma pill idéntica al botón Finalizar para coherencia visual */
+
+
+  /* Finalizado: fondo rojo */
+  .status-badge.finalized {
+    background-color: var(--color-error);
   }
 
   .user-avatar {

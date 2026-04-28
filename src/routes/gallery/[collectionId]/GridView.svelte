@@ -3,18 +3,38 @@
   // COMPONENTE: GridView
   // Archivo: src/routes/gallery/[collectionId]/GridView.svelte
   //
-  // Vista de cuadrícula de todos los registros de la colección.
-  // Funcionalidades:
-  //   - 4 columnas de imágenes con status (Approved/Rejected/Pending/Processing)
-  //   - Barra superior: Filtros | Renombrar | Reordenar (toggle) | Finalizar
-  //   - Filtros por tipo de error (se agregan desde las anotaciones)
-  //   - Renombrar todos los archivos con patrón ID_colección_XXX
-  //   - Reordenar por drag (actualmente visual — sin DnD implementado por limitaciones)
-  //   - Modal de confirmación "Finalizar proyecto"
+  // Vista de cuadrícula. El botón "Finalizar" NO está aquí —
+  // vive en el TopBar y +page.svelte lo controla.
   //
-  // DRAG & DROP: El reordenamiento real con DnD requiere una librería como
-  // @neodrag/svelte o svelte-dnd-action. Por ahora muestra el modo visual.
-  // Para implementarlo: npm install @neodrag/svelte y usar la directiva use:draggable.
+  // Este componente recibe `triggerFinalizeModal` como prop:
+  //   - Cuando se pone true (TopBar pulsó Finalizar), abre el modal
+  //   - Cuando el usuario confirma → llama onFinalized()
+  //   - Cuando cancela → llama onFinalizeModalClosed()
+  //
+  // TOOLBAR:
+  //   [Filtros | Renombrar]      [🖐 Reordenar / Listo]  [slider ──●──]
+  //
+  // SLIDER: controla el número de columnas del grid
+  //   izquierda (2) = cards grandes | derecha (6) = cards pequeñas
+  //
+  // TOOLBAR SUPERIOR:
+  //   Filtros | Renombrar           [Reordenar 🖐 ──●── ] [Finalizar]
+  //
+  //   - Filtros     → panel de filtros por estado
+  //   - Renombrar   → modal de renombrado masivo
+  //   - Reordenar   → botón que activa el modo drag-and-drop
+  //                   cuando está activo el texto cambia a "Listo"
+  //   - Slider      → controla el número de columnas del grid
+  //                   izquierda = menos columnas (cards más grandes)
+  //                   derecha   = más columnas (cards más pequeñas)
+  //   - Finalizar   → botón en el TopBar (pasado como prop desde +page.svelte)
+  //
+  // REORDENAMIENTO:
+  //   Actualmente es visual (las tarjetas muestran el ícono de mano).
+  //   Para implementar drag-and-drop real usar @neodrag/svelte:
+  //     npm install @neodrag/svelte
+  //     import { draggable, droppable } from '@neodrag/svelte'
+  //   Ver comentario TODO en el template.
   // ============================================================================
 
   import { recordsApi, type Record } from '$lib/api';
@@ -25,58 +45,59 @@
   let {
     records,
     collectionId,
+    triggerFinalizeModal,   // true = abrir modal de finalizar
     onRecordsUpdate,
+    onFinalized,             // callback cuando el usuario confirma
+    onFinalizeModalClosed,   // callback cuando el modal se cierra
   }: {
     records: Record[];
     collectionId: number;
+    triggerFinalizeModal: boolean;
     onRecordsUpdate: () => void;
+    onFinalized: () => void;
+    onFinalizeModalClosed: () => void;
   } = $props();
 
   // ---------------------------------------------------------------------------
   // ESTADO LOCAL
   // ---------------------------------------------------------------------------
 
-  // true = modo reordenamiento activo (toggle visual)
+  // Número de columnas del grid (slider: 2 = grande, 6 = pequeño)
+  let columns = $state(4);
+
+  // Modo reordenamiento
   let isReorderMode = $state(false);
 
-  // Filtros activos por estado de imagen
-  // Para agregar filtros, modificar statusFilters
-  let activeStatusFilter = $state<string | null>(null); // null = todos
+  // Filtros
+  let showFilterPanel   = $state(false);
+  let activeStatusFilter = $state<string | null>(null);
 
   // Modal de Renombrar
-  let showRenameModal = $state(false);
+  let showRenameModal    = $state(false);
   let renameCollectionId = $state(`coleccion_${collectionId}`);
 
-  // Modal de Finalizar
-  let showFinalizeModal = $state(false);
-  let isFinalized = $state(false);
+  // Modal de Finalizar (controlado por el prop triggerFinalizeModal)
   let isFinalizing = $state(false);
 
-  // Filtro de status panel
-  let showFilterPanel = $state(false);
+  // ---------------------------------------------------------------------------
+  // REACTIVIDAD: el prop triggerFinalizeModal abre el modal cuando se pone true
+  // ---------------------------------------------------------------------------
+  $effect(() => {
+    // No hay nada que hacer aquí porque el modal se controla directamente
+    // con la expresión {#if triggerFinalizeModal} en el template
+  });
 
   // ---------------------------------------------------------------------------
   // DERIVADOS
   // ---------------------------------------------------------------------------
 
-  // Registros filtrados según el filtro activo
-  let filteredRecords = $derived(() => {
-    // TODO: cuando el backend devuelva status en los registros, filtrar por él
-    // Por ahora devuelve todos
-    return records;
-  });
-
-  // Status simulados para visualización (en producción vendrán del backend)
-  // Mapa de record.id → status
-  // Para conectar con el backend, reemplazar por datos reales del registro
-  const statusMock: Record<number, 'approved' | 'rejected' | 'pending' | 'processing'> = {};
-
-  function getStatus(record: Record): 'approved' | 'rejected' | 'pending' | 'processing' {
-    // TODO: cuando el backend devuelva status, usar record.status
-    return statusMock[record.id] ?? 'pending';
+  // Status simulado — conectar con backend cuando esté disponible
+  function getStatus(_record: Record, index: number): 'approved' | 'rejected' | 'pending' | 'processing' {
+    const s: Array<'approved' | 'rejected' | 'pending' | 'processing'> =
+      ['approved', 'rejected', 'pending', 'processing'];
+    return s[index % 4];
   }
 
-  // URL de thumbnail del primer imagen del registro
   function getThumbnailUrl(record: Record): string | null {
     if (!record.images || record.images.length === 0) return null;
     return recordsApi.getImageThumbnailUrl(record.images[0].id);
@@ -86,28 +107,27 @@
   // ACCIONES
   // ---------------------------------------------------------------------------
 
-  // Confirmar renombrado
-  // Para conectar con backend: llamar a collectionsApi.renameImages(collectionId, renameCollectionId)
+  function toggleReorderMode() { isReorderMode = !isReorderMode; }
+
   async function handleConfirmRename() {
-    // TODO: implementar endpoint de renombrado masivo en el backend
-    // Por ahora cierra el modal
+    // TODO: await collectionsApi.renameImages(collectionId, renameCollectionId);
     showRenameModal = false;
   }
 
-  // Confirmar finalización del proyecto
-  // Para conectar con backend: llamar a collectionsApi.finalize(collectionId)
   async function handleConfirmFinalize() {
     isFinalizing = true;
     try {
-      // TODO: implementar endpoint de finalización
-      // await collectionsApi.finalize(collectionId);
-      isFinalized = true;
-      showFinalizeModal = false;
-    } catch (error) {
-      console.error('[GridView] Error finalizando:', error);
+      // TODO: await collectionsApi.finalize(collectionId);
+      onFinalized();  // notifica al padre (+page.svelte)
+    } catch (err) {
+      console.error('[GridView] Error finalizando:', err);
     } finally {
       isFinalizing = false;
     }
+  }
+
+  function handleCancelFinalize() {
+    onFinalizeModalClosed();  // notifica al padre para resetear el trigger
   }
 </script>
 
@@ -116,13 +136,13 @@
      ============================================================ -->
 <div class="grid-view">
 
-  <!-- ── Barra de herramientas superior ── -->
+  <!-- ── TOOLBAR ── -->
   <div class="grid-toolbar">
 
+    <!-- Izquierda: Filtros + Renombrar -->
     <div class="toolbar-left">
-      <!-- Filtros -->
       <button class="toolbar-btn" onclick={() => showFilterPanel = !showFilterPanel}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
         </svg>
         <span>Filtros</span>
@@ -130,85 +150,111 @@
 
       <div class="toolbar-divider"></div>
 
-      <!-- Renombrar -->
       <button class="toolbar-btn" onclick={() => showRenameModal = true}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="4 7 4 4 20 4 20 7"/>
+          <line x1="9" y1="20" x2="15" y2="20"/>
+          <line x1="12" y1="4" x2="12" y2="20"/>
         </svg>
         <span>Renombrar</span>
       </button>
     </div>
 
+    <!-- Derecha: Reordenar + Slider de columnas -->
     <div class="toolbar-right">
-      <!-- Reordenar toggle -->
-      <div class="reorder-toggle">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <!-- Ícono de mano / arrastrar -->
-          <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/>
+      <div class="reorder-group">
+
+        <!-- Ícono mano -->
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          style="color: {isReorderMode ? 'var(--color-primary)' : 'var(--color-light-grey)'}; flex-shrink:0">
+          <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
           <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
         </svg>
-        <span>Reordenar</span>
-        <!-- Toggle switch -->
+
+        <!-- Botón Reordenar / Listo -->
         <button
-          class="toggle-switch"
-          class:on={isReorderMode}
-          onclick={() => isReorderMode = !isReorderMode}
-          aria-label="Activar modo reordenar"
+          class="reorder-btn"
+          class:active={isReorderMode}
+          onclick={toggleReorderMode}
         >
-          <div class="toggle-knob" class:on={isReorderMode}></div>
+          {isReorderMode ? 'Listo' : 'Reordenar'}
         </button>
+
+        <!-- Slider de columnas -->
+        <!--
+          Izquierda (2) = menos columnas = thumbnails más grandes (como screenshot 3)
+          Derecha   (6) = más columnas   = thumbnails más pequeños (como screenshot 2)
+          Para cambiar el rango, modifica min y max
+        -->
+        <input
+          type="range"
+          min="2"
+          max="6"
+          step="1"
+          bind:value={columns}
+          class="columns-slider"
+          title="Tamaño de thumbnails"
+          aria-label="Número de columnas"
+        />
+
       </div>
     </div>
+
   </div>
 
-  <!-- Panel de filtros (desplegable) -->
+  <!-- Panel de filtros -->
   {#if showFilterPanel}
     <div class="filter-panel">
       <span class="filter-title">Filtrar por estado:</span>
       <div class="filter-chips">
-        {#each ['approved', 'rejected', 'pending', 'processing'] as status}
+        {#each [
+          { id: 'approved',   label: 'Aprobado' },
+          { id: 'rejected',   label: 'Rechazado' },
+          { id: 'pending',    label: 'Pendiente' },
+          { id: 'processing', label: 'Procesando' },
+        ] as f}
           <button
             class="filter-chip"
-            class:active={activeStatusFilter === status}
-            onclick={() => activeStatusFilter = activeStatusFilter === status ? null : status}
+            class:active={activeStatusFilter === f.id}
+            onclick={() => activeStatusFilter = activeStatusFilter === f.id ? null : f.id}
           >
-            {status === 'approved' ? 'Aprobado' : status === 'rejected' ? 'Rechazado' : status === 'pending' ? 'Pendiente' : 'Procesando'}
+            {f.label}
           </button>
         {/each}
         {#if activeStatusFilter}
-          <button class="filter-chip clear" onclick={() => activeStatusFilter = null}>
-            Limpiar filtro
-          </button>
+          <button class="filter-chip clear" onclick={() => activeStatusFilter = null}>× Limpiar</button>
         {/if}
       </div>
     </div>
   {/if}
 
-  <!-- ── Cuadrícula de imágenes ── -->
-  <div class="image-grid" class:reorder-mode={isReorderMode}>
-    {#each filteredRecords() as record, i}
-      {@const status = getStatus(record)}
+  <!-- ── CUADRÍCULA ── -->
+  <div
+    class="image-grid"
+    class:reorder-mode={isReorderMode}
+    style="grid-template-columns: repeat({columns}, 1fr)"
+  >
+    {#each records as record, i}
+      {@const status = getStatus(record, i)}
       {@const thumbUrl = getThumbnailUrl(record)}
 
-      <div class="grid-card" class:reorder-active={isReorderMode}>
+      <div class="grid-card" class:draggable={isReorderMode}>
 
-        <!-- Indicador de reordenamiento -->
         {#if isReorderMode}
-          <div class="reorder-indicator">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-              <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/>
+          <div class="reorder-handle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8">
+              <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
               <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
             </svg>
           </div>
         {/if}
 
-        <!-- Imagen -->
-        <div class="card-image-wrapper">
+        <div class="card-image-wrapper" class:reorder={isReorderMode}>
           {#if thumbUrl}
             <img src={thumbUrl} alt={record.title} class="card-image" draggable="false" />
           {:else}
             <div class="card-placeholder">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
                 <polyline points="21 15 16 10 5 21"/>
@@ -216,7 +262,6 @@
             </div>
           {/if}
 
-          <!-- Indicador de status sobre la imagen -->
           {#if status === 'approved'}
             <div class="status-badge approved">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
@@ -228,22 +273,21 @@
           {/if}
         </div>
 
-        <!-- Metadata debajo de la imagen -->
         <div class="card-meta">
           <span class="card-name" title={record.title}>{record.title || `Imagen ${i + 1}`}</span>
           <div class="card-status">
             {#if status === 'approved'}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <span style="color: var(--color-success)">Approved</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span style="color:var(--color-success)">Approved</span>
             {:else if status === 'rejected'}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              <span style="color: var(--color-error)">Rejected</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <span style="color:var(--color-error)">Rejected</span>
             {:else if status === 'processing'}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-light)" stroke-width="2" class="spin"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-light)" stroke-width="2" class="spin"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 0 .57-8.38"/></svg>
               <span>Processing</span>
             {:else}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-light-grey)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span style="color: var(--color-light-grey)">Pending</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-light-grey)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span style="color:var(--color-light-grey)">Pending</span>
             {/if}
           </div>
         </div>
@@ -251,24 +295,6 @@
       </div>
     {/each}
   </div>
-
-  <!-- Botón Finalizar (flotante abajo derecha cuando hay registros) -->
-  {#if records.length > 0 && !isFinalized}
-    <button class="btn-finalizar" onclick={() => showFinalizeModal = true}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-        <polyline points="22 4 12 14.01 9 11.01"/>
-      </svg>
-      <span>Finalizar</span>
-    </button>
-  {/if}
-
-  {#if isFinalized}
-    <div class="finalized-badge">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-      Proyecto finalizado
-    </div>
-  {/if}
 
 </div>
 
@@ -283,7 +309,7 @@
       <h3 class="modal-title">Renombrar imágenes</h3>
       <p class="modal-subtitle">
         Todas las imágenes se renombrarán usando el patrón:
-        <code>{renameCollectionId}_001</code>, <code>{renameCollectionId}_002</code>, etc.
+        <code class="code-inline">{renameCollectionId}_001</code>...
       </p>
       <div class="modal-field">
         <label class="modal-label">ID de colección</label>
@@ -298,29 +324,33 @@
 {/if}
 
 <!-- ============================================================
-     MODAL: Finalizar
+     MODAL: Finalizar proyecto
+     Se abre cuando triggerFinalizeModal = true (desde el TopBar via +page.svelte)
      ============================================================ -->
-{#if showFinalizeModal}
+{#if triggerFinalizeModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) showFinalizeModal = false; }}>
+  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) handleCancelFinalize(); }}>
     <div class="modal-card">
-      <div class="finalize-icon-row">
+      <div class="finalize-header">
         <div class="finalize-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
           </svg>
         </div>
         <div>
           <h3 class="modal-title">¿Finalizar Proyecto?</h3>
-          <p class="modal-subtitle-small">Esta acción marcará el proyecto como terminado</p>
+          <p class="modal-subtitle-sm">Esta acción marcará el proyecto como terminado</p>
         </div>
       </div>
       <p class="modal-desc">
         Al finalizar el proyecto se asume que <strong>todas las correcciones y revisiones fueron completadas</strong>. Las imágenes se guardarán automáticamente en la tarjeta de memoria.
       </p>
       <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => showFinalizeModal = false} disabled={isFinalizing}>Cancelar</button>
+        <button class="modal-btn cancel" onclick={handleCancelFinalize} disabled={isFinalizing}>
+          Cancelar
+        </button>
         <button class="modal-btn confirm" onclick={handleConfirmFinalize} disabled={isFinalizing}>
           {isFinalizing ? 'Finalizando...' : 'Sí, Finalizar'}
         </button>
@@ -335,10 +365,10 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    position: relative;
+    background-color: var(--color-bg);
   }
 
-  /* ── Toolbar ── */
+  /* ── TOOLBAR ── */
   .grid-toolbar {
     display: flex;
     align-items: center;
@@ -348,21 +378,18 @@
     flex-shrink: 0;
     border-bottom: 1px solid var(--border-color);
     background-color: var(--color-surface-alt);
+    gap: 16px;
   }
 
-  .toolbar-left, .toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+  .toolbar-left { display: flex; align-items: center; gap: 4px; }
+  .toolbar-right { display: flex; align-items: center; gap: 12px; }
 
   .toolbar-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 14px;
-    background: none;
-    border: none;
+    gap: 7px;
+    padding: 6px 12px;
+    background: none; border: none;
     font-family: var(--font-family);
     font-size: var(--text-sm);
     font-weight: var(--fw-semibold);
@@ -371,47 +398,56 @@
     border-radius: var(--radius-md);
     min-height: var(--touch-target-min);
     transition: all var(--transition-fast);
+    white-space: nowrap;
   }
 
   .toolbar-btn:hover { color: var(--color-light); background-color: rgba(255,255,255,0.05); }
 
-  .toolbar-divider { width: 1px; height: 20px; background-color: var(--border-color); }
+  .toolbar-divider { width: 1px; height: 18px; background-color: var(--border-color); margin: 0 4px; }
 
-  .reorder-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  /* Reordenar group */
+  .reorder-group { display: flex; align-items: center; gap: 10px; }
+
+  .reorder-btn {
+    font-family: var(--font-family);
     font-size: var(--text-sm);
     font-weight: var(--fw-semibold);
     color: var(--color-light-grey);
+    background: none; border: none;
+    cursor: pointer; padding: 4px 0;
+    transition: color var(--transition-fast);
+    white-space: nowrap; min-height: 0;
   }
 
-  /* Toggle switch */
-  .toggle-switch {
-    width: 40px; height: 22px;
+  .reorder-btn:hover { color: var(--color-light); }
+  .reorder-btn.active { color: var(--color-primary); }
+
+  /* Slider de columnas */
+  .columns-slider {
+    width: 120px; height: 4px;
+    -webkit-appearance: none;
+    background-color: var(--border-color);
     border-radius: var(--radius-full);
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    position: relative;
-    transition: background-color var(--transition-base);
-    flex-shrink: 0;
+    cursor: pointer; outline: none;
+    transition: background-color var(--transition-fast);
   }
 
-  .toggle-switch.on { background-color: var(--color-primary); border-color: var(--color-primary); }
+  .columns-slider:hover { background-color: rgba(171,183,183,0.3); }
 
-  .toggle-knob {
-    position: absolute;
-    top: 1px; left: 1px;
-    width: 18px; height: 18px;
+  .columns-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
     border-radius: 50%;
-    background-color: var(--color-light-grey);
-    transition: transform var(--transition-base), background-color var(--transition-base);
+    background-color: var(--color-light);
+    border: 2px solid rgba(0,0,0,0.2);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    transition: transform var(--transition-fast);
   }
 
-  .toggle-knob.on { transform: translateX(18px); background-color: white; }
+  .columns-slider::-webkit-slider-thumb:active { transform: scale(1.2); }
 
-  /* Panel de filtros */
+  /* Filtros */
   .filter-panel {
     display: flex;
     align-items: center;
@@ -420,10 +456,10 @@
     background-color: rgba(255,255,255,0.02);
     border-bottom: 1px solid var(--border-color);
     flex-shrink: 0;
+    flex-wrap: wrap;
   }
 
   .filter-title { font-size: var(--text-sm); color: var(--color-light-grey); white-space: nowrap; }
-
   .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 
   .filter-chip {
@@ -437,31 +473,30 @@
     color: var(--color-light-grey);
     cursor: pointer;
     transition: all var(--transition-fast);
-    min-height: 30px;
+    min-height: 28px;
+    display: flex; align-items: center;
   }
 
-  .filter-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+  .filter-chip:hover  { border-color: var(--color-primary); color: var(--color-primary); }
   .filter-chip.active { background-color: var(--color-primary); border-color: var(--color-primary); color: white; }
-  .filter-chip.clear { border-color: var(--color-error); color: var(--color-error); }
+  .filter-chip.clear  { border-color: var(--color-error); color: var(--color-error); }
 
-  /* ── Cuadrícula ── */
+  /* ── Grid ── */
   .image-grid {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
+    padding: 16px 20px;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
+    gap: 16px;
     align-content: start;
   }
 
   .image-grid::-webkit-scrollbar { width: 4px; }
   .image-grid::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 999px; }
 
-  /* En modo reordenamiento, añadir cursor grab */
   .image-grid.reorder-mode { cursor: grab; }
+  .image-grid.reorder-mode:active { cursor: grabbing; }
 
-  /* Card de imagen */
   .grid-card {
     position: relative;
     display: flex;
@@ -471,30 +506,23 @@
     cursor: pointer;
   }
 
-  .grid-card:hover:not(.reorder-active) {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-md);
-  }
+  .grid-card:not(.draggable):hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+  .grid-card.draggable { transform: scale(1.01); cursor: grab; }
+  .grid-card.draggable:hover { transform: scale(1.02); }
 
-  .grid-card.reorder-active { transform: scale(1.02); }
-
-  /* Indicador de reordenamiento */
-  .reorder-indicator {
+  .reorder-handle {
     position: absolute;
-    top: -12px;
-    left: 50%;
+    top: -12px; left: 50%;
     transform: translateX(-50%);
+    width: 28px; height: 28px;
     background-color: var(--color-primary);
     border-radius: 50%;
-    width: 28px; height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     z-index: 5;
     box-shadow: 0 2px 8px rgba(90,140,98,0.4);
+    pointer-events: none;
   }
 
-  /* Wrapper de imagen */
   .card-image-wrapper {
     position: relative;
     aspect-ratio: 3/4;
@@ -505,196 +533,55 @@
     transition: border-color var(--transition-fast);
   }
 
-  .grid-card:hover .card-image-wrapper { border-color: var(--color-surface); }
+  .card-image-wrapper.reorder { border-color: rgba(90,140,98,0.4); }
+  .grid-card:not(.draggable):hover .card-image-wrapper { border-color: rgba(255,255,255,0.1); }
 
-  .card-image {
-    width: 100%; height: 100%;
-    object-fit: cover;
-    transition: transform 0.5s ease;
-    display: block;
-  }
+  .card-image { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; display: block; }
+  .grid-card:not(.draggable):hover .card-image { transform: scale(1.04); }
 
-  .grid-card:hover .card-image { transform: scale(1.05); }
+  .card-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--color-light-grey); opacity: 0.3; }
 
-  .card-placeholder {
-    width: 100%; height: 100%;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey);
-    opacity: 0.3;
-  }
+  .status-badge { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 3; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  .status-badge.approved { background-color: var(--color-success); }
+  .status-badge.rejected { background-color: var(--color-error); }
 
-  /* Badges de status sobre la imagen */
-  .status-badge {
-    position: absolute;
-    top: 8px; right: 8px;
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-  }
+  .card-meta { padding: 7px 2px 2px; }
 
-  .status-badge.approved  { background-color: var(--color-success); }
-  .status-badge.rejected  { background-color: var(--color-error); }
-
-  /* Metadata */
-  .card-meta { padding: 8px 2px 4px; }
-
-  .card-name {
-    font-size: 11px;
-    font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-bottom: 4px;
-    transition: color var(--transition-fast);
-  }
-
+  .card-name { font-size: 11px; font-weight: var(--fw-bold); color: var(--color-light-grey); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; transition: color var(--transition-fast); }
   .grid-card:hover .card-name { color: var(--color-light); }
 
-  .card-status {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 10px;
-    color: var(--color-light-grey);
-    text-transform: capitalize;
-  }
+  .card-status { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--color-light-grey); }
 
   .spin { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Botón Finalizar ── */
-  .btn-finalizar {
-    position: absolute;
-    top: 0;
-    right: 80px; /* deja espacio para la toolbar derecha */
-    transform: none;
-    display: none; /* lo muestra el TopBar cuando viewMode es grid */
-    /* En realidad lo mostramos aquí como botón flotante */
-  }
-
-  /* Mostrar el botón Finalizar en la toolbar ya que el grid ocupa toda la pantalla */
-  /* Rediseñado como botón en la toolbar superior */
-  .btn-finalizar {
-    display: flex;
-    position: fixed;
-    top: 16px;
-    right: 100px;
-    z-index: 30;
-    align-items: center;
-    gap: 8px;
-    background-color: var(--color-primary);
-    color: white;
-    font-family: var(--font-family);
-    font-size: var(--text-base);
-    font-weight: var(--fw-bold);
-    border: none;
-    border-radius: var(--radius-lg);
-    padding: 10px 20px;
-    min-height: var(--touch-target-min);
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(90,140,98,0.3);
-    transition: all var(--transition-base);
-  }
-
-  .btn-finalizar:hover { background-color: var(--color-primary-hover); box-shadow: 0 4px 16px rgba(90,140,98,0.4); }
-
-  .finalized-badge {
-    position: fixed;
-    top: 20px;
-    right: 100px;
-    z-index: 30;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background-color: var(--color-error);
-    color: white;
-    border-radius: var(--radius-full);
-    font-size: 13px;
-    font-weight: var(--fw-bold);
-  }
-
   /* ── Modales ── */
-  .modal-backdrop {
-    position: fixed; inset: 0;
-    background-color: rgba(0,0,0,0.65);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 24px;
-  }
+  .modal-backdrop { position: fixed; inset: 0; background-color: rgba(0,0,0,0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 24px; }
 
-  .modal-card {
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 28px;
-    width: 100%;
-    max-width: 460px;
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
+  .modal-card { background-color: var(--color-surface-alt); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 28px; width: 100%; max-width: 460px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 14px; }
 
-  .modal-title { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0; }
-  .modal-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
-  .modal-subtitle-small { font-size: var(--text-xs); color: var(--color-light-grey); margin: 0; }
-  .modal-desc { font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.6; margin: 0; }
-
+  .modal-title     { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0; }
+  .modal-subtitle  { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; line-height: 1.5; }
+  .modal-subtitle-sm { font-size: var(--text-xs); color: var(--color-light-grey); margin: 0; }
+  .modal-desc      { font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.6; margin: 0; }
   .modal-desc strong { color: var(--color-light); }
 
-  .finalize-icon-row { display: flex; align-items: center; gap: 12px; }
+  .code-inline { font-family: monospace; font-size: var(--text-sm); background-color: var(--color-surface); padding: 1px 6px; border-radius: var(--radius-sm); color: var(--color-primary); }
 
-  .finalize-icon {
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    background-color: var(--color-highlight);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
+  .finalize-header { display: flex; align-items: center; gap: 12px; }
+  .finalize-icon { width: 44px; height: 44px; border-radius: 50%; background-color: var(--color-highlight); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
   .modal-field { display: flex; flex-direction: column; gap: 6px; }
   .modal-label { font-size: var(--text-sm); font-weight: var(--fw-semibold); color: var(--color-light); }
 
-  .modal-input {
-    font-family: var(--font-family);
-    font-size: var(--text-base);
-    color: var(--color-light);
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 10px 14px;
-    outline: none;
-    transition: border-color var(--transition-base);
-    min-height: var(--touch-target-min);
-  }
-
+  .modal-input { font-family: var(--font-family); font-size: var(--text-base); color: var(--color-light); background-color: var(--color-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 14px; outline: none; transition: border-color var(--transition-base); min-height: var(--touch-target-min); }
   .modal-input:focus { border-color: var(--color-primary); }
 
   .modal-actions { display: flex; gap: 12px; }
 
-  .modal-btn {
-    flex: 1; height: 44px;
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
-    cursor: pointer;
-    transition: all var(--transition-base);
-    border: 1px solid var(--border-color);
-  }
-
-  .modal-btn.cancel { background-color: var(--color-surface); color: var(--color-light-grey); }
-  .modal-btn.cancel:hover { color: var(--color-light); }
+  .modal-btn { flex: 1; height: 44px; border-radius: var(--radius-md); font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold); cursor: pointer; transition: all var(--transition-base); border: 1px solid var(--border-color); }
+  .modal-btn.cancel  { background-color: var(--color-surface); color: var(--color-light-grey); }
+  .modal-btn.cancel:hover  { color: var(--color-light); }
   .modal-btn.confirm { background-color: var(--color-primary); color: white; border-color: var(--color-primary); }
   .modal-btn.confirm:hover { background-color: var(--color-primary-hover); }
   .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }

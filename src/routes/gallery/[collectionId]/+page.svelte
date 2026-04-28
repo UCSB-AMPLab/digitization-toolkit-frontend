@@ -1,8 +1,16 @@
 <script lang="ts">
   // ============================================================================
-  // PÁGINA: Gallery
-  // Ruta: /gallery/[collectionId]
+  // PÁGINA: Gallery — Ruta: /gallery/[collectionId]
   //
+  // Orquestador principal. Aquí vive el estado de `isFinalized` porque
+  // afecta tanto al TopBar (badge de estado) como al GridView (modal).
+  //
+  // Regla de visibilidad del botón "Finalizar" en el TopBar:
+  //   ✅ viewMode === 'grid'
+  //   ✅ records.length > 0
+  //   ✅ !isFinalized
+
+    //
   // Orquestador principal de la vista de galería.
   // Maneja tres vistas:
   //   'single' → una imagen centrada con panel lateral de info/edición/anotaciones
@@ -33,35 +41,28 @@
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
-  // collectionId viene de /gallery/[collectionId]
   // ---------------------------------------------------------------------------
   let collectionId = $derived(Number($page.params.collectionId) || 0);
 
   // ---------------------------------------------------------------------------
   // ESTADO GLOBAL
   // ---------------------------------------------------------------------------
-
-  // Vista activa
-  // 'single' → imagen individual | 'spread' → libro abierto | 'grid' → cuadrícula
-  let viewMode = $state<'single' | 'spread' | 'grid'>('single');
-
-  // Registro seleccionado actualmente
+  let viewMode      = $state<'single' | 'spread' | 'grid'>('single');
   let selectedRecordId = $state<number | null>(null);
+  let records       = $state<Record[]>([]);
+  let zoom          = $state(1);
+  let rotation      = $state(0);
+  let isLoading     = $state(true);
 
-  // Lista completa de registros de la colección
-  let records = $state<Record[]>([]);
+  // Estado de finalización — vive aquí porque afecta TopBar Y GridView
+  let isFinalized   = $state(false);
 
-  // Zoom del visor (solo en single)
-  let zoom = $state(1);
-
-  // Rotación de la imagen seleccionada en grados (0, 90, 180, 270)
-  let rotation = $state(0);
-
-  // Estado de carga
-  let isLoading = $state(true);
+  // Trigger para abrir el modal de finalización dentro de GridView
+  // TopBar lo activa → GridView abre el modal → lo desactiva al cerrar
+  let triggerFinalizeModal = $state(false);
 
   // ---------------------------------------------------------------------------
-  // AL MONTAR: verifica auth y carga registros
+  // AL MONTAR
   // ---------------------------------------------------------------------------
   onMount(async () => {
     if (!authStore.isAuthenticated()) {
@@ -71,86 +72,83 @@
     await loadRecords();
   });
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: Carga los registros de la colección
-  // ---------------------------------------------------------------------------
   async function loadRecords() {
     try {
       isLoading = true;
       const data = await recordsApi.list({ collection_id: collectionId });
       records = data;
-      if (data.length > 0) {
-        selectedRecordId = data[0].id;
-      }
-    } catch (error) {
-      console.error('[Gallery] Error cargando registros:', error);
+      if (data.length > 0) selectedRecordId = data[0].id;
+    } catch (err) {
+      console.error('[Gallery] Error:', err);
     } finally {
       isLoading = false;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // HANDLERS DE NAVEGACIÓN
+  // DERIVADO: cuándo mostrar el botón "Finalizar"
+  // Se pasa al TopBar para que lo muestre en la posición correcta
+  // ---------------------------------------------------------------------------
+  let showFinalize = $derived(
+    viewMode === 'grid' && records.length > 0 && !isFinalized
+  );
+
+  // ---------------------------------------------------------------------------
+  // HANDLERS
   // ---------------------------------------------------------------------------
 
-  // Navegar a registro anterior
   function handlePrev() {
     const idx = records.findIndex(r => r.id === selectedRecordId);
     if (idx > 0) selectedRecordId = records[idx - 1].id;
   }
 
-  // Navegar a registro siguiente
   function handleNext() {
     const idx = records.findIndex(r => r.id === selectedRecordId);
     if (idx < records.length - 1) selectedRecordId = records[idx + 1].id;
   }
 
-  // Cambiar registro desde la tira de miniaturas
-  function handleSelect(id: number) {
-    selectedRecordId = id;
-  }
+  function handleSelect(id: number) { selectedRecordId = id; }
 
-  // ---------------------------------------------------------------------------
-  // HANDLERS DE VISTA
-  // ---------------------------------------------------------------------------
-
-  // Al cambiar de vista, resetear zoom y rotación
   function handleViewModeChange(mode: 'single' | 'spread' | 'grid') {
     viewMode = mode;
     zoom = 1;
     rotation = 0;
   }
 
-  // Rotación de imagen (en grados)
   function handleRotateLeft()  { rotation = ((rotation - 90) % 360 + 360) % 360; }
   function handleRotateRight() { rotation = (rotation + 90) % 360; }
 
-  // ---------------------------------------------------------------------------
-  // HANDLER: Cambio de tab (ir a Live Scan)
-  // ---------------------------------------------------------------------------
   function handleTabChange(tab: 'live' | 'gallery') {
     if (tab === 'live') {
-      // Redirige al live preview de la misma colección
-      // El projectId se obtendría del record — por ahora usamos 0
       const projectId = records[0]?.project_id ?? 0;
       goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`);
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // HANDLER: Volver al dashboard
-  // ---------------------------------------------------------------------------
-  function handleBack() {
-    goto('/');
+  function handleBack() { goto('/'); }
+
+  // Botón "Finalizar" en el TopBar fue pulsado:
+  // activa el trigger para que GridView abra su modal de confirmación
+  function handleFinalizeClick() {
+    triggerFinalizeModal = true;
+  }
+
+  // GridView confirmó la finalización
+  function handleFinalized() {
+    isFinalized = true;
+    triggerFinalizeModal = false;
+  }
+
+  // GridView canceló o cerró el modal sin finalizar
+  function handleFinalizeModalClosed() {
+    triggerFinalizeModal = false;
   }
 
   // ---------------------------------------------------------------------------
   // DERIVADOS
   // ---------------------------------------------------------------------------
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
-
-  // Índice del registro seleccionado (para mostrar "3/100")
-  let selectedIndex = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
+  let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
 </script>
 
 <!-- ============================================================
@@ -158,18 +156,24 @@
      ============================================================ -->
 <div class="gallery-wrapper">
 
-  <!-- Barra superior -->
+  <!--
+    TopBar:
+    - showFinalize  → muestra/oculta el botón "Finalizar"
+    - isFinalized   → cambia badge "In review" → "Terminado"
+    - onFinalizeClick → abre el modal de confirmación en GridView
+  -->
   <TopBar
     activeTab="gallery"
+    {showFinalize}
+    {isFinalized}
     onTabChange={handleTabChange}
     onBack={handleBack}
+    onFinalizeClick={handleFinalizeClick}
   />
 
-  <!-- Área de contenido -->
   <div class="content-area">
 
-    <!-- ── Panel izquierdo: strip de íconos + paneles ── -->
-    <!-- Solo visible en vista single — colapsado en spread y oculto en grid -->
+    <!-- Panel lateral: solo en single y spread -->
     {#if viewMode !== 'grid'}
       <LeftSidebar
         {viewMode}
@@ -181,26 +185,31 @@
       />
     {/if}
 
-    <!-- ── Área central ── -->
     <div class="center-column">
 
       {#if isLoading}
-        <!-- Estado de carga -->
         <div class="loading-state">
           <div class="spinner"></div>
           <span>Cargando imágenes...</span>
         </div>
 
       {:else if viewMode === 'grid'}
-        <!-- Vista cuadrícula -->
+        <!--
+          GridView recibe:
+          - triggerFinalizeModal → cuando true, abre el modal de confirmación
+          - onFinalized          → cuando el usuario confirma, notifica al padre
+          - onFinalizeModalClosed → cuando el modal se cierra (cancel o confirm)
+        -->
         <GridView
           {records}
-          collectionId={collectionId}
+          {collectionId}
+          {triggerFinalizeModal}
           onRecordsUpdate={loadRecords}
+          onFinalized={handleFinalized}
+          onFinalizeModalClosed={handleFinalizeModalClosed}
         />
 
       {:else}
-        <!-- Vista single o spread -->
         <ImageViewer
           {viewMode}
           {records}
@@ -211,8 +220,6 @@
           onNext={handleNext}
           onZoomChange={(z) => zoom = z}
         />
-
-        <!-- Tira de miniaturas inferior -->
         <div class="thumbnail-area">
           <ThumbnailStrip
             {records}
@@ -225,7 +232,6 @@
 
     </div>
 
-    <!-- ── Toolbar flotante derecha ── -->
     <RightToolbar
       {viewMode}
       {zoom}
@@ -264,12 +270,8 @@
     min-width: 0;
   }
 
-  .thumbnail-area {
-    height: 140px;
-    flex-shrink: 0;
-  }
+  .thumbnail-area { height: 140px; flex-shrink: 0; }
 
-  /* Estado de carga */
   .loading-state {
     flex: 1;
     display: flex;
@@ -282,8 +284,7 @@
   }
 
   .spinner {
-    width: 40px;
-    height: 40px;
+    width: 40px; height: 40px;
     border: 3px solid var(--border-color);
     border-top-color: var(--color-primary);
     border-radius: 50%;
@@ -292,3 +293,4 @@
 
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+
