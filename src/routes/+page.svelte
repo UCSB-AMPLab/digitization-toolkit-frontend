@@ -86,7 +86,7 @@
         <img src={favicon} alt="Logo Sistema de Digitalización" class="logo-icon" />
       </div>
       <!-- Nombre del sistema — para cambiar el nombre, edita este texto -->
-      <p class="system-name">Sistema de Digitalización</p>
+      <p class="system-name">Preservia - DigiToolkit</p>
     </div>
 
     <!-- ── Mensaje principal ── -->

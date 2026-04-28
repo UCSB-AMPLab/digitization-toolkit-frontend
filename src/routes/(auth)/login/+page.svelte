@@ -275,7 +275,7 @@
         <img src={favicon} alt="Logo" class="logo-icon" />
       </div>
       <!-- Para cambiar el nombre del sistema, edita este texto -->
-      <p class="system-name">Sistema de Digitalización</p>
+      <p class="system-name">Preservia</p>
     </div>
 
     <!-- Formulario -->
@@ -592,7 +592,7 @@
   .input-wrapper .input {
     padding-left: 40px;
     background-color: var(--color-surface-alt);
-    border-color: transparent;
+    border-color: #323A31;
   }
 
   .input-wrapper .input:focus {

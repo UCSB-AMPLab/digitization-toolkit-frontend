@@ -16,8 +16,8 @@
 :root {
   /* --- Colors: Default --- */
   --color-bg:           #131110;   /* Dark Background — base canvas */
-  --color-surface:      #242C23;   /* Dark Green — panels, cards, sidebar */
-  --color-surface-alt:  #1C211C;   /* Slightly lighter surface for nested elements */
+  --color-surface:      #1A1C1B;   /* Dark Green #242C23 — panels, cards, sidebar */
+  --color-surface-alt:  #1A1C1B;   /* Slightly lighter or coulde be #1C211C surface for nested elements */
   --color-light:        #EDE8DC;   /* Light — primary text, light elements */
   --color-light-grey:   #ABB7B7;   /* Light Grey — secondary text, placeholders */
 
