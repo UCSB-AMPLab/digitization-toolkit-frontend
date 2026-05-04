@@ -57,6 +57,27 @@
   let isLoadingStats  = $state(true);
 
   // ---------------------------------------------------------------------------
+  // ESTADO: Almacenamiento
+  // Se muestra una alerta en el resumen cuando el uso supera el 85%.
+  // TODO: backend — reemplazar con llamada a systemApi.getStorageInfo()
+  // ---------------------------------------------------------------------------
+  const STORAGE_ALERT_THRESHOLD = 85;  // porcentaje
+
+  let storageUsedGB  = $state(2457.6);   // placeholder — conectar con backend
+  let storageTotalGB = $state(10240);
+
+  let storagePercent = $derived(
+    Math.min(100, Math.round((storageUsedGB / storageTotalGB) * 100))
+  );
+
+  let storageAlert = $derived(storagePercent >= STORAGE_ALERT_THRESHOLD);
+
+  function formatStorage(gb: number): string {
+    if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
+    return `${gb.toFixed(0)} GB`;
+  }
+
+  // ---------------------------------------------------------------------------
   // ESTADO: Cámaras
   // expandedCamera: null | 'left' | 'right'
   // Click en botón → expande el panel de esa cámara con preview
@@ -212,6 +233,24 @@
       {/if}
     </p>
   </div>
+
+  <!-- ── ALERTA DE ALMACENAMIENTO ── -->
+  <!-- Visible solo cuando el almacenamiento supera el STORAGE_ALERT_THRESHOLD -->
+  <!-- La misma lógica está en la página de Configuración -->
+  {#if storageAlert}
+    <div class="storage-alert-banner">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <span>
+        El almacenamiento está al <strong>{storagePercent}%</strong>
+        ({formatStorage(storageUsedGB)} / {formatStorage(storageTotalGB)}).
+        Revisa la <a href="/dashboard/config" class="alert-link">Configuración</a> para liberar espacio.
+      </span>
+    </div>
+  {/if}
 
   <!-- ── KPI CARDS ── -->
   <!-- Visibles para todos los roles -->
@@ -409,6 +448,29 @@
   .page-header { margin-bottom: 28px; }
   .greeting { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
+
+  /* Alerta de almacenamiento */
+  .storage-alert-banner {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 14px 18px;
+    background-color: rgba(214,103,74,0.08);
+    border: 1px solid rgba(214,103,74,0.3);
+    border-radius: var(--radius-md);
+    color: var(--color-error);
+    font-size: var(--text-sm); line-height: 1.5;
+    margin-bottom: 24px;
+  }
+
+  .storage-alert-banner strong { font-weight: var(--fw-bold); }
+
+  .alert-link {
+    color: var(--color-error);
+    font-weight: var(--fw-semibold);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .alert-link:hover { opacity: 0.8; }
 
   /* KPIs */
   .kpi-grid {

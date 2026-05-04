@@ -829,7 +829,7 @@
   .modal-range {
     flex: 1; height: 8px;
     -webkit-appearance: none;
-    background-color: var(--color-surface);
+    background-color: var(--color-surface-alt-2);
     border-radius: var(--radius-full);
     cursor: pointer;
   }
@@ -844,7 +844,7 @@
 
   .range-value {
     width: 40px; height: 40px;
-    background-color: var(--color-surface);
+    background-color: var(--color-surface-alt-2);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     display: flex; align-items: center; justify-content: center;
