@@ -749,27 +749,21 @@
       showDeleteModal = false;
     }
   }}>
-    <div class="modal-card modal-sm">
+    <!-- Modal de confirmación — mismo estilo que el popup "Retomar la foto" de Gallery -->
+    <div class="modal-card modal-confirm">
 
-      <!-- Ícono de advertencia -->
-      <div class="delete-icon">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-      </div>
+      <!-- Título alineado a la izquierda -->
+      <h3 class="confirm-title">¿Eliminar usuario?</h3>
 
-      <h3 class="modal-title">¿Eliminar usuario?</h3>
-
-      <!-- Mensaje de advertencia con el nombre del usuario a eliminar -->
-      <p class="delete-msg">
+      <!-- Descripción con el nombre del usuario destacado -->
+      <p class="confirm-desc">
         ¿Estás seguro que quieres eliminar a
         <strong>{deletingUser.firstName} {deletingUser.lastName}</strong>
         ({deletingUser.username})?
         Esta acción no se puede deshacer.
       </p>
 
+      <!-- Botones: Cancelar (ghost) + Sí, eliminar (rojo) -->
       <div class="modal-actions">
         <button class="btn-ghost" onclick={() => showDeleteModal = false} disabled={isDeleting}>
           Cancelar
@@ -1019,8 +1013,11 @@
   .modal-card::-webkit-scrollbar { width: 3px; }
   .modal-card::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 999px; }
 
-  /* Modal pequeño (delete) */
-  .modal-sm { max-width: 400px; align-items: center; text-align: center; }
+  /* Modal de confirmación — mismo estilo que popup "Retomar la foto" */
+  .modal-confirm {
+    max-width: 440px;
+    gap: 12px;
+  }
 
   .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .modal-title  { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0 0 4px; }
@@ -1152,21 +1149,23 @@
   .btn-crear:hover    { background-color: var(--color-primary-hover); }
   .btn-crear:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Ícono de advertencia (modal eliminar) */
-  .delete-icon {
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    background-color: var(--color-error);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; box-shadow: 0 4px 16px rgba(214,103,74,0.3);
+  /* Título del modal de confirmación */
+  .confirm-title {
+    font-size: var(--text-h3);
+    font-weight: var(--fw-bold);
+    color: var(--color-light);
+    margin: 0;
   }
 
-  .delete-msg {
-    font-size: var(--text-sm); color: var(--color-light-grey);
-    line-height: 1.6; margin: 0;
+  /* Descripción del modal de confirmación */
+  .confirm-desc {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    line-height: 1.6;
+    margin: 0;
   }
 
-  .delete-msg strong { color: var(--color-light); }
+  .confirm-desc strong { color: var(--color-light); }
 
   /* Botón eliminar — rojo */
   .btn-delete {
