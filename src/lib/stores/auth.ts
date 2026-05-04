@@ -131,12 +131,9 @@ export const userRole = derived(
 // Devuelve la ruta del dashboard según el rol del usuario.
 // Si el backend cambia los nombres de los roles, actualizar aquí.
 // ----------------------------------------------------------------------------
-export function getRoleDashboardPath(role: UserRole): string {
-  const paths: Record<UserRole, string> = {
-    admin:    '/admin',      // → src/routes/(dashboard)/admin/
-    operator: '/operator',   // → src/routes/(dashboard)/operator/
-    reviewer: '/reviewer',   // → src/routes/(dashboard)/reviewer/
-  };
+export function getRoleDashboardPath(_role: UserRole): string {
+  return '/dashboard';
+};
   // Si el rol no existe en el mapa, manda al operador por defecto
   return paths[role] ?? '/operator';
 }
