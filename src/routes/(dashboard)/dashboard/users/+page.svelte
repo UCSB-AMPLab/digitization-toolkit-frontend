@@ -86,6 +86,10 @@
   // ---------------------------------------------------------------------------
   let openMenuId = $state<number | null>(null);
 
+  // Posición del dropdown en coordenadas de la ventana (position: fixed)
+  // Se recalcula cada vez que se abre el menú para evitar que se corte
+  let dropdownPos = $state({ top: 0, right: 0 });
+
   // Cierra el menú al hacer click fuera
   function handleOutsideClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
@@ -487,7 +491,25 @@
                     class="btn-actions"
                     onclick={(e) => {
                       e.stopPropagation();
-                      openMenuId = openMenuId === user.id ? null : user.id;
+                      if (openMenuId === user.id) {
+                        openMenuId = null;
+                      } else {
+                        // Calcular posición del botón para anclar el dropdown con position:fixed
+                        // Esto evita que se corte cuando el botón está cerca del borde inferior
+                        const btn = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                        const viewportHeight = window.innerHeight;
+                        const dropdownHeight = 90; // altura estimada del dropdown
+                        const spaceBelow = viewportHeight - btn.bottom;
+
+                        if (spaceBelow < dropdownHeight) {
+                          // No hay espacio abajo → abrir hacia arriba
+                          dropdownPos = { top: btn.top - dropdownHeight - 4, right: window.innerWidth - btn.right };
+                        } else {
+                          // Hay espacio abajo → abrir hacia abajo (comportamiento normal)
+                          dropdownPos = { top: btn.bottom + 4, right: window.innerWidth - btn.right };
+                        }
+                        openMenuId = user.id;
+                      }
                     }}
                     aria-label="Acciones"
                   >
@@ -500,7 +522,9 @@
 
                   <!-- Dropdown del menú -->
                   {#if openMenuId === user.id}
-                    <div class="actions-dropdown">
+                    <!-- Dropdown con position:fixed para no cortarse por el borde del contenedor -->
+                    <div class="actions-dropdown"
+                      style="top: {dropdownPos.top}px; right: {dropdownPos.right}px;">
                       <!-- Editar: abre el modal con datos pre-cargados -->
                       <button class="dropdown-item" onclick={() => openEditModal(user)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -944,16 +968,16 @@
 
   /* Dropdown del menú */
   .actions-dropdown {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
+    /* position:fixed para no cortarse con el borde del contenedor */
+    /* Las coordenadas top/right se calculan dinámicamente en el onclick */
+    position: fixed;
     background-color: var(--color-surface-alt);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 4px;
     min-width: 140px;
     box-shadow: var(--shadow-md);
-    z-index: 50;
+    z-index: 200;
   }
 
   .dropdown-item {
