@@ -231,6 +231,7 @@ export const projectsApi = {
 // ============================================================================
 
 export interface Collection {
+  record_count?: number;  // número de registros — devuelto por el backend en algunos endpoints
   id: number;
   name: string;
   description?: string;
