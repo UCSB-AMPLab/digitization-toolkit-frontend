@@ -134,6 +134,3 @@ export const userRole = derived(
 export function getRoleDashboardPath(_role: UserRole): string {
   return '/dashboard';
 };
-  // Si el rol no existe en el mapa, manda al operador por defecto
-  return paths[role] ?? '/operator';
-}
