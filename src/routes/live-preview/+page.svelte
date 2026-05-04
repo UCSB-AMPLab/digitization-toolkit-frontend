@@ -11,6 +11,7 @@
   //   CameraControls.svelte → panel izquierdo con ajustes de cámara
   //   LiveViewport.svelte   → área central con la vista de cámara en vivo
   //   ThumbnailStrip.svelte → tira de miniaturas inferior
+  //   Para acceder temporalmente hacer inicio de sesion y luego entrar a http://localhost:5173/live-preview?projectId=1&collectionId=1
   // ============================================================================
 
   import { onMount } from 'svelte';

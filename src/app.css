@@ -306,6 +306,7 @@ p {
   outline: none;
   transition: border-color var(--transition-base), background-color var(--transition-base);
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .input::placeholder {
@@ -704,3 +705,10 @@ input[type="range"]:disabled {
 .status-dot.success { background-color: var(--color-success); }
 .status-dot.error   { background-color: var(--color-error); }
 .status-dot.warning { background-color: var(--color-warning); }
+
+
+/*para evitar que el navegador de la tablet intente "emular" un ratón (lo que a veces causa un retraso de 300ms al tocar)*/
+canvas, button, a, div {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}

@@ -700,7 +700,7 @@
   .btn-login:active:not(:disabled) { transform: scale(0.98); }
   .btn-login:disabled { opacity: 0.6; cursor: not-allowed; letter-spacing: 0.08em; }
 
-  /* Credenciales demo */
+  /* Credenciales demo 
   .demo-credentials {
     background-color: rgba(255,255,255,0.04);
     border: 1px solid var(--border-color);
@@ -720,7 +720,7 @@
     font-size: var(--text-sm);
     color: var(--color-light-grey);
     margin: 0;
-  }
+  }*/
 
   /* Footer del card */
   .card-footer {
