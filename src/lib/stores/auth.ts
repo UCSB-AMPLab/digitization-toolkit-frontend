@@ -42,6 +42,7 @@ const initialState: AuthState = {
   user: null,
   // Solo accede a localStorage en el browser (no en SSR)
   token: browser ? localStorage.getItem('access_token') : null,
+  user: browser ? (() => { try { const u = localStorage.getItem('auth_user'); return u ? JSON.parse(u) : null; } catch { return null; } })() : null,
   isLoading: false,
 };
 
@@ -60,6 +61,7 @@ function createAuthStore() {
       // Persiste el token en localStorage para que sobreviva recargas
       if (browser) {
         localStorage.setItem('access_token', token);
+      localStorage.setItem('auth_user', JSON.stringify(user));
       }
       update(state => ({
         ...state,
@@ -73,6 +75,7 @@ function createAuthStore() {
     clearSession() {
       if (browser) {
         localStorage.removeItem('access_token');
+      localStorage.removeItem('auth_user');
       }
       set({
         user: null,
