@@ -1,8 +1,8 @@
 <script lang="ts">
   // ============================================================================
   // PÁGINA: Detalle de Proyecto (Inside Proyecto)
-  // Ruta: /dashboard/projects/[projectId]
-  // Archivo: src/routes/(dashboard)/dashboard/projects/[projectId]/+page.svelte
+  // Ruta: /shared/projects/[projectId]
+  // Archivo: src/routes/(dashboard)/shared/projects/[projectId]/+page.svelte
   //
   // Muestra:
   //   - Nombre del proyecto + subtítulo
@@ -54,6 +54,7 @@
   let colDesc         = $state('');
   let colQuantity     = $state(0);
   let isCreating      = $state(false);
+  let createError     = $state('');
 
   // ---------------------------------------------------------------------------
   // AL MONTAR
@@ -85,20 +86,48 @@
   // ---------------------------------------------------------------------------
   // CREAR COLECCIÓN
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // CREAR COLECCIÓN
+  // Modo demo (token = demo-token): simula localmente sin llamar al backend.
+  // Modo real: llama a collectionsApi.create() y recarga la lista.
+  // ---------------------------------------------------------------------------
   async function handleCreateCollection() {
     if (!colName.trim()) return;
     isCreating = true;
+    createError = '';
+
     try {
-      await collectionsApi.create({
-        name: colName.trim(),
-        description: colDesc.trim() || undefined,
-        project_id: projectId,
-        created_by: $authStore.user?.username,
-      });
+      const isDemoToken = $authStore.token === 'demo-token';
+
+      if (isDemoToken) {
+        // Simular creación localmente sin backend
+        const mockCollection = {
+          id: Date.now(),
+          name: colName.trim(),
+          description: colDesc.trim() || undefined,
+          project_id: projectId,
+          created_at: new Date().toISOString(),
+          created_by: $authStore.user?.username,
+          record_count: 0,
+        } as any;
+        collections = [...collections, mockCollection];
+      } else {
+        // Modo real: llamada al backend
+        await collectionsApi.create({
+          name: colName.trim(),
+          description: colDesc.trim() || undefined,
+          project_id: projectId,
+          created_by: $authStore.user?.username,
+        });
+        await loadCollections();
+      }
+
       showCreateModal = false;
       colName = ''; colDesc = ''; colQuantity = 0;
-      await loadCollections();
+
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      createError = `No se pudo crear la colección: ${msg}`;
       console.error('[ProjectDetail] Error creando colección:', err);
     } finally {
       isCreating = false;
@@ -107,6 +136,7 @@
 
   function closeModal() {
     showCreateModal = false;
+    createError = '';
     colName = ''; colDesc = ''; colQuantity = 0;
   }
 
@@ -157,7 +187,7 @@
   </div>
 
   <!-- Botón volver -->
-  <button class="btn-back" onclick={() => goto('/dashboard/projects')}>
+  <button class="btn-back" onclick={() => goto('/shared/projects')}>
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M2.5 12H21M2.5 12l5-5M2.5 12l5 5"/>
     </svg>
@@ -389,6 +419,17 @@
           <input class="field-input" type="number" bind:value={colQuantity} min="0" />
         </div>
       </div>
+
+      <!-- Error al crear colección -->
+      {#if createError}
+        <div class="create-error">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+          {createError}
+        </div>
+      {/if}
 
       <div class="modal-actions">
         <button class="btn-ghost" onclick={closeModal}>Cancelar</button>
@@ -721,6 +762,19 @@
   .field-textarea { min-height: 80px; resize: vertical; }
   .field-input:focus, .field-textarea:focus { border-color: var(--color-primary); }
   .field-input::placeholder, .field-textarea::placeholder { color: var(--color-light-grey); opacity: 0.5; }
+
+  .create-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background-color: var(--color-error-bg);
+    border: 1px solid var(--color-error);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    color: var(--color-error);
+    line-height: 1.4;
+  }
 
   .modal-actions {
     display: flex;
