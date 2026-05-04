@@ -1,19 +1,19 @@
 <script lang="ts">
   // ============================================================================
-  // LAYOUT: Dashboard
+  // LAYOUT: Dashboard unificado
   // Archivo: src/routes/(dashboard)/+layout.svelte
   //
-  // Layout base para todas las rutas del dashboard.
-  // Sidebar colapsable con navegación por rol.
+  // Un solo layout para todos los roles (admin, operator, reviewer).
+  // La visibilidad de secciones se controla por el rol del usuario:
   //
-  // Estados de la sidebar:
-  //   expanded (220px) → ícono + texto + secciones
-  //   collapsed (72px) → solo íconos
-  //
-  // Navegación según rol:
   //   admin    → Resumen, Proyectos, Usuarios, Configuración
   //   operator → Resumen, Proyectos
   //   reviewer → Resumen, Proyectos
+  //
+  // Para agregar una sección nueva:
+  //   1. Crear la ruta en src/routes/(dashboard)/nueva-seccion/+page.svelte
+  //   2. Agregar el item en NAV_ITEMS con los roles que pueden verlo
+  //   3. Crear la ruta en SvelteKit
   // ============================================================================
 
   import { onMount } from 'svelte';
@@ -24,30 +24,23 @@
   let { children } = $props();
 
   // ---------------------------------------------------------------------------
-  // SIDEBAR STATE
+  // ESTADO DE LA SIDEBAR
   // ---------------------------------------------------------------------------
   let expanded = $state(true);
 
-  // Ruta activa
   let currentPath = $derived($page.url.pathname);
 
   // ---------------------------------------------------------------------------
-  // AUTH GUARD
-  // ---------------------------------------------------------------------------
-  onMount(() => {
-    const unsub = authStore.subscribe(s => {
-      if (!s.token) goto('/login');
-    });
-    return unsub;
-  });
-
-  // ---------------------------------------------------------------------------
-  // DATOS DEL USUARIO ACTUAL
+  // USUARIO ACTUAL
   // ---------------------------------------------------------------------------
   let currentUser = $state<any>(null);
 
   onMount(() => {
-    const unsub = authStore.subscribe(s => { currentUser = s.user; });
+    // Auth guard: si no hay token, redirigir al login
+    const unsub = authStore.subscribe(s => {
+      currentUser = s.user;
+      if (!s.token) goto('/login');
+    });
     return unsub;
   });
 
@@ -56,52 +49,87 @@
   );
 
   // ---------------------------------------------------------------------------
-  // NAVEGACIÓN POR ROL
-  // Para agregar secciones, añadirlas aquí y crear las rutas SvelteKit
+  // DEFINICIÓN DE NAVEGACIÓN
+  //
+  // Cada item tiene:
+  //   label   → texto visible en la sidebar expandida
+  //   icon    → clave del ícono SVG a renderizar
+  //   path    → ruta SvelteKit
+  //   roles   → array de roles que pueden ver este item
+  //             si roles está vacío → visible para todos los roles
+  //
+  // Para restringir a solo admin: roles: ['admin']
+  // Para todos: roles: ['admin', 'operator', 'reviewer']
   // ---------------------------------------------------------------------------
-  const navByRole: Record<string, Array<{section: string, items: Array<{id:string, label:string, icon:string, path:string, badge?:number}>}>> = {
-    admin: [
-      {
-        section: 'PRINCIPAL',
-        items: [
-          { id: 'dashboard', label: 'Resumen',       icon: 'grid',    path: '/admin' },
-          { id: 'projects',  label: 'Proyectos',     icon: 'folder',  path: '/shared/projects', badge: 4 },
-          { id: 'users',     label: 'Usuarios',      icon: 'users',   path: '/admin/users' },
-        ]
-      },
-      {
-        section: 'SISTEMA',
-        items: [
-          { id: 'config', label: 'Configuración', icon: 'settings', path: '/admin/config' },
-        ]
-      }
-    ],
-    operator: [
-      {
-        section: 'PRINCIPAL',
-        items: [
-          { id: 'dashboard', label: 'Resumen',   icon: 'grid',   path: '/operator' },
-          { id: 'projects',  label: 'Proyectos', icon: 'folder', path: '/shared/projects' },
-        ]
-      }
-    ],
-    reviewer: [
-      {
-        section: 'PRINCIPAL',
-        items: [
-          { id: 'dashboard', label: 'Resumen',   icon: 'grid',   path: '/reviewer' },
-          { id: 'projects',  label: 'Proyectos', icon: 'folder', path: '/shared/projects' },
-        ]
-      }
-    ],
-  };
-
-  let navSections = $derived(navByRole[currentUser?.role ?? 'admin'] ?? navByRole.admin);
-
-  function isActive(path: string): boolean {
-    if (path === '/admin' || path === '/operator' || path === '/reviewer') {
-      return currentPath === path;
+  const NAV_ITEMS = [
+    {
+      section: 'PRINCIPAL',
+      items: [
+        {
+          id: 'dashboard',
+          label: 'Resumen',
+          icon: 'grid',
+          path: '/dashboard',
+          // Visible para todos los roles
+          roles: ['admin', 'operator', 'reviewer'],
+        },
+        {
+          id: 'projects',
+          label: 'Proyectos',
+          icon: 'folder',
+          path: '/dashboard/projects',
+          // Visible para todos los roles
+          roles: ['admin', 'operator', 'reviewer'],
+          // El badge se muestra solo si el usuario tiene proyectos asignados
+          // TODO: conectar con conteo real desde el backend
+          badge: null as number | null,
+        },
+        {
+          id: 'users',
+          label: 'Usuarios',
+          icon: 'users',
+          path: '/dashboard/users',
+          // Solo admin puede ver y gestionar usuarios
+          roles: ['admin'],
+        },
+      ]
+    },
+    {
+      section: 'SISTEMA',
+      items: [
+        {
+          id: 'config',
+          label: 'Configuración',
+          icon: 'settings',
+          path: '/dashboard/config',
+          // Solo admin puede acceder a la configuración del sistema
+          roles: ['admin'],
+        },
+      ]
     }
+  ];
+
+  // Filtra los items de navegación según el rol del usuario actual
+  // Si el usuario no tiene rol reconocido, no se muestra ningún item restringido
+  let visibleNav = $derived(
+    NAV_ITEMS.map(section => ({
+      ...section,
+      items: section.items.filter(item =>
+        item.roles.length === 0 ||
+        item.roles.includes(currentUser?.role ?? '')
+      )
+    })).filter(section => section.items.length > 0)
+  );
+
+  // ---------------------------------------------------------------------------
+  // HELPERS
+  // ---------------------------------------------------------------------------
+
+  // Determina si una ruta está activa
+  // Para /dashboard exacto usamos igualdad estricta para evitar que
+  // /dashboard/projects también active el item "Resumen"
+  function isActive(path: string): boolean {
+    if (path === '/dashboard') return currentPath === '/dashboard';
     return currentPath.startsWith(path);
   }
 
@@ -111,16 +139,19 @@
   }
 </script>
 
+<!-- ============================================================
+     SHELL: sidebar + contenido
+     ============================================================ -->
 <div class="shell">
 
   <!-- ══════════════════════ SIDEBAR ══════════════════════ -->
   <aside class="sidebar" class:expanded>
 
-    <!-- Header: logo + collapse button -->
+    <!-- Header: logo + botón colapsar -->
     <div class="s-header">
       <div class="logo-wrap">
+        <!-- Círculo verde con asterisco/estrella — logo del sistema -->
         <div class="logo-circle">
-          <!-- Asterisco / estrella de 8 puntas -->
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
             <line x1="12" y1="2" x2="12" y2="22"/>
             <line x1="2" y1="12" x2="22" y2="12"/>
@@ -129,9 +160,11 @@
           </svg>
         </div>
         {#if expanded}
-          <div>
+          <div class="logo-text">
+            <!-- Nombre del sistema — para cambiarlo, edita este texto -->
             <p class="logo-name">SISDIG</p>
-            <p class="logo-subt">{currentUser?.role ?? 'Admin'}</p>
+            <!-- Rol del usuario en minúsculas con capitalize por CSS -->
+            <p class="logo-role">{currentUser?.role ?? '—'}</p>
           </div>
         {/if}
       </div>
@@ -140,18 +173,26 @@
       <button
         class="collapse-btn"
         onclick={() => expanded = !expanded}
-        aria-label={expanded ? 'Colapsar' : 'Expandir'}
+        aria-label={expanded ? 'Colapsar sidebar' : 'Expandir sidebar'}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          style="transform: rotate({expanded ? 0 : 180}deg); transition: transform 0.3s ease">
+        <svg
+          width="14" height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          style="transform: rotate({expanded ? 0 : 180}deg); transition: transform 0.3s ease"
+        >
           <polyline points="15 18 9 12 15 6"/>
         </svg>
       </button>
     </div>
 
-    <!-- Navegación -->
+    <!-- Navegación: se renderizan solo los items visibles para el rol actual -->
     <nav class="s-nav">
-      {#each navSections as section}
+      {#each visibleNav as section}
+
+        <!-- Título de sección (solo en modo expandido) -->
         {#if expanded}
           <p class="s-section-title">{section.section}</p>
         {:else}
@@ -165,17 +206,19 @@
             class:active={isActive(item.path)}
             title={!expanded ? item.label : undefined}
           >
-            <!-- Indicador activo -->
+            <!-- Barra indicadora de ruta activa -->
             {#if isActive(item.path)}
               <div class="active-bar"></div>
             {/if}
 
-            <!-- Íconos SVG inline para evitar dependencias -->
+            <!-- Ícono del item -->
             <span class="s-icon" class:active-icon={isActive(item.path)}>
               {#if item.icon === 'grid'}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                  <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                  <rect x="3" y="3" width="7" height="7"/>
+                  <rect x="14" y="3" width="7" height="7"/>
+                  <rect x="14" y="14" width="7" height="7"/>
+                  <rect x="3" y="14" width="7" height="7"/>
                 </svg>
               {:else if item.icon === 'folder'}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -196,20 +239,23 @@
               {/if}
             </span>
 
+            <!-- Label y badge (solo en modo expandido) -->
             {#if expanded}
               <span class="s-label">{item.label}</span>
               {#if item.badge}
                 <span class="s-badge">{item.badge}</span>
               {/if}
             {:else if item.badge}
+              <!-- Punto de notificación en modo colapsado -->
               <span class="s-badge-dot"></span>
             {/if}
           </a>
         {/each}
+
       {/each}
     </nav>
 
-    <!-- Footer: avatar + logout -->
+    <!-- Footer: avatar del usuario + botón salir -->
     <div class="s-footer">
       {#if expanded}
         <div class="user-row">
@@ -223,6 +269,7 @@
         <div class="user-av-sm">{userInitials}</div>
       {/if}
 
+      <!-- Botón salir: siempre visible, ícono en colapsado + texto en expandido -->
       <button class="logout-btn" onclick={handleLogout} title="Salir">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -253,7 +300,7 @@
 
   /* ── Sidebar ── */
   .sidebar {
-    width: 72px;
+    width: 72px;                    /* colapsado por defecto */
     flex-shrink: 0;
     background-color: var(--color-surface);
     display: flex;
@@ -264,7 +311,6 @@
     margin: 10px 0 10px 10px;
     height: calc(100vh - 20px);
     box-shadow: var(--shadow-md);
-    position: relative;
     z-index: 20;
   }
 
@@ -299,21 +345,9 @@
     box-shadow: 0 4px 12px rgba(90,140,98,0.3);
   }
 
-  .logo-name {
-    font-size: var(--text-base);
-    font-weight: var(--fw-black);
-    color: var(--color-light);
-    margin: 0;
-    white-space: nowrap;
-  }
-
-  .logo-subt {
-    font-size: 11px;
-    color: var(--color-light-grey);
-    margin: 0;
-    text-transform: capitalize;
-    white-space: nowrap;
-  }
+  .logo-text { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .logo-name { font-size: var(--text-base); font-weight: var(--fw-black); color: var(--color-light); margin: 0; white-space: nowrap; }
+  .logo-role { font-size: 11px; color: var(--color-light-grey); margin: 0; text-transform: capitalize; white-space: nowrap; }
 
   .collapse-btn {
     width: 26px; height: 26px;
@@ -372,6 +406,7 @@
   .s-item:hover { color: var(--color-light); background-color: rgba(255,255,255,0.04); }
   .s-item.active { color: var(--color-light); background-color: rgba(90,140,98,0.15); }
 
+  /* Barra verde izquierda cuando el item está activo */
   .active-bar {
     position: absolute;
     left: 0; top: 50%;
@@ -481,7 +516,7 @@
 
   .logout-btn:hover { background-color: rgba(214,103,74,0.2); }
 
-  /* Contenido */
+  /* Contenido principal */
   .content {
     flex: 1;
     overflow-y: auto;
