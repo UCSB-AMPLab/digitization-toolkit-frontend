@@ -1,8 +1,8 @@
 <script lang="ts">
   // ============================================================================
   // PÁGINA: Detalle de Proyecto (Inside Proyecto)
-  // Ruta: /shared/projects/[projectId]
-  // Archivo: src/routes/(dashboard)/shared/projects/[projectId]/+page.svelte
+  // Ruta: /dashboard/projects/[projectId]
+  // Archivo: src/routes/(dashboard)/dashboard/projects/[projectId]/+page.svelte
   //
   // Muestra:
   //   - Nombre del proyecto + subtítulo
@@ -114,7 +114,7 @@
   // NAVEGAR A LA COLECCIÓN
   // ---------------------------------------------------------------------------
   function handleCollectionClick(collectionId: number) {
-    goto(`/shared/projects/${projectId}/collections/${collectionId}`);
+    goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@
   </div>
 
   <!-- Botón volver -->
-  <button class="btn-back" onclick={() => goto('/shared/projects')}>
+  <button class="btn-back" onclick={() => goto('/dashboard/projects')}>
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M2.5 12H21M2.5 12l5-5M2.5 12l5 5"/>
     </svg>

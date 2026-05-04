@@ -1,14 +1,14 @@
 <script lang="ts">
   // ============================================================================
   // PÁGINA: Proyectos
-  // Ruta: /shared/projects → src/routes/(dashboard)/shared/projects/+page.svelte
+  // Ruta: /dashboard/projects → src/routes/(dashboard)/dashboard/projects/+page.svelte
   //
   // Tabla de proyectos con:
   //   - Búsqueda por nombre/código
   //   - Filtros (dropdown)
   //   - Botón "+ Nuevo Proyecto" → abre el modal wizard de 3 pasos
   //   - Tabla: Proyecto, Estado, Progreso, Equipo, Fecha Inicio, Acciones
-  //   - Click en fila → navega a /shared/projects/{id}
+  //   - Click en fila → navega a /dashboard/projects/{id}
   //
   // Modal "Crear Nuevo Proyecto" — 3 pasos:
   //   Paso 1: Información (nombre, descripción, ubicación, cant. estimada, fecha, prioridad)
@@ -65,7 +65,9 @@
   let formOperator  = $state('');
   let formReviewer  = $state('');
 
-  let isCreating    = $state(false);
+  let isCreating  = $state(false);
+  // Mensaje de error visible en el modal (vacio = sin error)
+  let createError = $state('');
 
   // ---------------------------------------------------------------------------
   // AL MONTAR: carga proyectos
@@ -87,21 +89,45 @@
   }
 
   // ---------------------------------------------------------------------------
-  // CREAR PROYECTO (paso 3 → Finalizar)
+  // CREAR PROYECTO
+  // En modo demo (token = demo-token): simula localmente sin llamar al backend
+  // En produccion: llama a projectsApi.create()
+  // Si hay error: lo muestra al usuario en el modal
   // ---------------------------------------------------------------------------
   async function handleCreateProject() {
     if (!formName.trim()) return;
     isCreating = true;
+    createError = '';
+
     try {
-      await projectsApi.create({
-        name: formName.trim(),
-        description: formDesc.trim() || undefined,
-        created_by: $authStore.user?.username,
-      });
+      const isDemoToken = $authStore.token === 'demo-token';
+
+      if (isDemoToken) {
+        // Modo demo: agregar localmente sin backend
+        const mockProject = {
+          id: Date.now(),
+          name: formName.trim(),
+          description: formDesc.trim() || undefined,
+          created_at: new Date().toISOString(),
+          created_by: $authStore.user?.username,
+        } as any;
+        projects = [...projects, mockProject];
+      } else {
+        // Modo real: llamada al backend
+        await projectsApi.create({
+          name: formName.trim(),
+          description: formDesc.trim() || undefined,
+          created_by: $authStore.user?.username,
+        });
+        await loadProjects();
+      }
+
       showCreateModal = false;
       resetForm();
-      await loadProjects();
+
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      createError = `No se pudo crear el proyecto: ${msg}`;
       console.error('[Projects] Error creando:', err);
     } finally {
       isCreating = false;
@@ -118,6 +144,7 @@
 
   function closeModal() {
     showCreateModal = false;
+    createError = '';
     resetForm();
   }
 
@@ -125,7 +152,7 @@
   // NAVEGAR AL PROYECTO
   // ---------------------------------------------------------------------------
   function handleProjectClick(id: number) {
-    goto(`/shared/projects/${id}`);
+    goto(`/dashboard/projects/${id}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -327,26 +354,39 @@
       </div>
 
       <!-- Indicador de pasos -->
+      <!--
+        Layout correcto (imagen 2):
+        - Cada paso: ícono centrado arriba + label centrado abajo (flex-direction: column)
+        - Líneas conectoras entre pasos, alineadas al centro del ícono
+        Las líneas se ponen ENTRE los divs de paso, no dentro de ellos
+      -->
       <div class="wizard-steps">
         {#each [
-          { step: 1, icon: 'doc',    label: 'Información' },
-          { step: 2, icon: 'gear',   label: 'Configuración' },
-          { step: 3, icon: 'users',  label: 'Equipo' },
-        ] as s}
+          { step: 1, icon: 'doc',   label: 'Información' },
+          { step: 2, icon: 'gear',  label: 'Configuración' },
+          { step: 3, icon: 'users', label: 'Equipo' },
+        ] as s, i}
+
+          <!-- Línea conectora: aparece ANTES de cada paso excepto el primero -->
+          {#if i > 0}
+            <div class="step-connector" class:done={wizardStep > i}></div>
+          {/if}
+
+          <!-- Paso: ícono + label en columna -->
           <div class="wizard-step" class:active={wizardStep === s.step} class:done={wizardStep > s.step}>
             <div class="step-icon-wrap">
               {#if s.icon === 'doc'}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                   <polyline points="14 2 14 8 20 8"/>
                 </svg>
               {:else if s.icon === 'gear'}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="3"/>
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               {:else}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                   <circle cx="9" cy="7" r="4"/>
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
@@ -355,10 +395,8 @@
               {/if}
             </div>
             <span class="step-label">{s.label}</span>
-            {#if s.step < 3}
-              <div class="step-line" class:done={wizardStep > s.step}></div>
-            {/if}
           </div>
+
         {/each}
       </div>
 
@@ -497,6 +535,17 @@
 
       </div>
 
+      <!-- Mensaje de error visible al usuario cuando createProject falla -->
+      {#if createError}
+        <div class="create-error">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+          {createError}
+        </div>
+      {/if}
+
       <!-- Footer del wizard: Cancel + dots + Siguiente / Finalizar -->
       <div class="wizard-footer">
         <button class="btn-ghost" onclick={closeModal}>Cancelar</button>
@@ -624,6 +673,20 @@
   }
 
   .btn-icon:hover { background-color: rgba(255,255,255,0.05); color: var(--color-light); }
+
+  /* Error en modal */
+  .create-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background-color: var(--color-error-bg);
+    border: 1px solid var(--color-error);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    color: var(--color-error);
+    line-height: 1.4;
+  }
 
   /* Loading / empty */
   .loading, .empty-state {
@@ -805,22 +868,45 @@
 
   .modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
 
-  /* Wizard steps indicator */
+  /* ── Wizard steps indicator ─────────────────────────────────────────────
+     Layout (imagen de referencia):
+       [línea] [ícono]    [línea] [ícono]    [línea] [ícono]
+                [label]            [label]            [label]
+
+     Los conectores (.step-connector) están entre los pasos en el flex row.
+     Cada .wizard-step es columna: ícono encima, label debajo.
+  ── */
   .wizard-steps {
     display: flex;
-    align-items: center;
+    align-items: flex-start;   /* alinear por la parte superior (ícono) */
+    justify-content: center;
     gap: 0;
-    padding: 0 8px;
+    padding: 8px 0;
   }
 
+  /* Cada paso: columna centrada */
   .wizard-step {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    position: relative;
+    gap: 8px;
+    min-width: 80px;
   }
 
+  /* Línea conectora entre pasos */
+  /* margin-top centra la línea con el ícono (18px = mitad del círculo de 36px) */
+  .step-connector {
+    width: 48px;
+    height: 2px;
+    background-color: var(--border-color);
+    margin-top: 18px;       /* alinea con el centro del ícono */
+    flex-shrink: 0;
+    transition: background-color var(--transition-base);
+  }
+
+  .step-connector.done { background-color: var(--color-primary); }
+
+  /* Círculo del paso */
   .step-icon-wrap {
     width: 36px; height: 36px;
     border-radius: 50%;
@@ -829,6 +915,7 @@
     display: flex; align-items: center; justify-content: center;
     color: var(--color-light-grey);
     transition: all var(--transition-base);
+    flex-shrink: 0;
   }
 
   .wizard-step.active .step-icon-wrap {
@@ -843,26 +930,17 @@
     color: white;
   }
 
+  /* Label debajo del ícono */
   .step-label {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--color-light-grey);
     white-space: nowrap;
+    text-align: center;
+    line-height: 1;
   }
 
-  .wizard-step.active .step-label { color: var(--color-primary); }
+  .wizard-step.active .step-label { color: var(--color-primary); font-weight: var(--fw-semibold); }
   .wizard-step.done .step-label   { color: var(--color-light); }
-
-  .step-line {
-    position: absolute;
-    top: 18px;
-    left: 100%;
-    width: 80px;
-    height: 2px;
-    background-color: var(--border-color);
-    transition: background-color var(--transition-base);
-  }
-
-  .step-line.done { background-color: var(--color-primary); }
 
   /* Formularios del wizard */
   .wizard-body { min-height: 200px; }
