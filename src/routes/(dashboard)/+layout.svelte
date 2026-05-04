@@ -1,7 +1,6 @@
 <script lang="ts">
   // ============================================================================
   // LAYOUT: Dashboard unificado
-  // Archivo: src/routes/(dashboard)/+layout.svelte
   //
   // Un solo layout para todos los roles (admin, operator, reviewer).
   // La visibilidad de secciones se controla por el rol del usuario:
