@@ -152,7 +152,7 @@
   // NAVEGAR AL PROYECTO
   // ---------------------------------------------------------------------------
   function handleProjectClick(id: number) {
-    goto(`/shared/projects/${id}`);
+    goto(`/dashboard/projects/${id}`);
   }
 
   // ---------------------------------------------------------------------------

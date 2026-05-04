@@ -188,7 +188,7 @@
   </div>
 
   <!-- Botón volver -->
-  <button class="btn-back" onclick={() => goto('/shared/projects')}>
+  <button class="btn-back" onclick={() => goto('/dashboard/projects')}>
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M2.5 12H21M2.5 12l5-5M2.5 12l5 5"/>
     </svg>
