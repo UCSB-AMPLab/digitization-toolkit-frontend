@@ -131,12 +131,11 @@
   // ---------------------------------------------------------------------------
   // AL MONTAR: carga usuarios
   // ---------------------------------------------------------------------------
-  onMount(async () => {
-    // Listener para cerrar el menú de acciones al hacer click fuera
-    document.addEventListener('click', handleOutsideClick);
-    await loadUsers();
-    return () => document.removeEventListener('click', handleOutsideClick);
-  });
+  onMount(() => {
+  document.addEventListener('click', handleOutsideClick);
+  loadUsers(); // sin await — no bloquea
+  return () => document.removeEventListener('click', handleOutsideClick);
+});
 
   // ---------------------------------------------------------------------------
   // FUNCIÓN: cargar usuarios
