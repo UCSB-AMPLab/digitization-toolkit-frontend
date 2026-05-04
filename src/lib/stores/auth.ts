@@ -42,7 +42,7 @@ const initialState: AuthState = {
   user: null,
   // Solo accede a localStorage en el browser (no en SSR)
   token: browser ? localStorage.getItem('access_token') : null,
-  user: browser ? (() => { try { const u = localStorage.getItem('auth_user'); return u ? JSON.parse(u) : null; } catch { return null; } })() : null,
+  // user: browser ? (() => { try { const u = localStorage.getItem('auth_user'); return u ? JSON.parse(u) : null; } catch { return null; } })() : null,
   isLoading: false,
 };
 
