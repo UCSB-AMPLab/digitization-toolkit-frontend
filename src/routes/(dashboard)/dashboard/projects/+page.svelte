@@ -1,14 +1,14 @@
 <script lang="ts">
   // ============================================================================
   // PÁGINA: Proyectos
-  // Ruta: /dashboard/projects → src/routes/(dashboard)/dashboard/projects/+page.svelte
+  // Ruta: /shared/projects → src/routes/(dashboard)/shared/projects/+page.svelte
   //
   // Tabla de proyectos con:
   //   - Búsqueda por nombre/código
   //   - Filtros (dropdown)
   //   - Botón "+ Nuevo Proyecto" → abre el modal wizard de 3 pasos
   //   - Tabla: Proyecto, Estado, Progreso, Equipo, Fecha Inicio, Acciones
-  //   - Click en fila → navega a /dashboard/projects/{id}
+  //   - Click en fila → navega a /shared/projects/{id}
   //
   // Modal "Crear Nuevo Proyecto" — 3 pasos:
   //   Paso 1: Información (nombre, descripción, ubicación, cant. estimada, fecha, prioridad)
@@ -152,7 +152,7 @@
   // NAVEGAR AL PROYECTO
   // ---------------------------------------------------------------------------
   function handleProjectClick(id: number) {
-    goto(`/dashboard/projects/${id}`);
+    goto(`/shared/projects/${id}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -190,7 +190,8 @@
       <h1 class="page-title">Gestión de Proyectos</h1>
       <p class="page-subtitle">Administra los expedientes y asignaciones</p>
     </div>
-    {#if canCreate}
+    <!-- Botón "Nuevo Proyecto" solo visible cuando ya hay proyectos -->
+    {#if canCreate && projects.length > 0}
       <button class="btn-primary" onclick={() => showCreateModal = true}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
