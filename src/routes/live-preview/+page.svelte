@@ -125,7 +125,7 @@
   function handleBack() {
     // Navegar de regreso a la colección en el dashboard
     if (projectId && collectionId) {
-      goto(`/shared/projects/${projectId}/collections/${collectionId}`);
+      goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
     } else {
       goto('/');
     }
