@@ -253,37 +253,22 @@
   {/if}
 
   <!-- ── KPI CARDS ── -->
-  <!-- Visibles para todos los roles -->
   <div class="kpi-grid">
 
     <div class="kpi-card">
-      <div class="kpi-icon" style="background: rgba(107,87,230,0.15)">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-        </svg>
-      </div>
+      <div class="kpi-line" style="background: var(--color-primary)"></div>
       <div class="kpi-number">{isLoadingStats ? '—' : projectCount}</div>
       <div class="kpi-label">Proyectos activos</div>
     </div>
 
     <div class="kpi-card">
-      <div class="kpi-icon" style="background: rgba(90,140,98,0.15)">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2">
-          <path d="M3 6l4-4h10l4 4"/><rect x="1" y="6" width="22" height="14" rx="2"/>
-          <path d="M16 14a4 4 0 0 1-8 0"/>
-        </svg>
-      </div>
+      <div class="kpi-line" style="background: var(--color-secondary)"></div>
       <div class="kpi-number">{isLoadingStats ? '—' : collectionCount}</div>
       <div class="kpi-label">Colecciones</div>
     </div>
 
     <div class="kpi-card">
-      <div class="kpi-icon" style="background: rgba(188,130,60,0.15)">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning)" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-        </svg>
-      </div>
+      <div class="kpi-line" style="background: var(--color-warning)"></div>
       <div class="kpi-number">{isLoadingStats ? '—' : recordCount.toLocaleString()}</div>
       <div class="kpi-label">Total registros</div>
     </div>
@@ -484,16 +469,23 @@
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-xl);
-    padding: 22px 20px;
+    padding: 20px 20px 18px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     transition: transform var(--transition-base);
   }
 
   .kpi-card:hover { transform: translateY(-3px); }
 
-  .kpi-icon { width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; }
+  /* Rayita de color en la parte superior izquierda */
+  .kpi-line {
+    width: 32px;
+    height: 3px;
+    border-radius: var(--radius-full);
+    margin-bottom: 4px;
+  }
+
   .kpi-number { font-size: var(--text-h1); font-weight: var(--fw-extrabold); color: var(--color-light); line-height: 1; margin: 0; }
   .kpi-label  { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
 
