@@ -125,7 +125,14 @@
     }
   }
 
-  function handleBack() { goto('/'); }
+  function handleBack() {
+    const projectId = records[0]?.project_id ?? 0;
+    if (projectId && collectionId) {
+      goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
+    } else {
+      goto('/dashboard/projects');
+    }
+  }
 
   // Botón "Finalizar" en el TopBar fue pulsado:
   // activa el trigger para que GridView abra su modal de confirmación
