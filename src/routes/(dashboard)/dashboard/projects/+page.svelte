@@ -48,6 +48,7 @@
   let showCreateModal = $state(false);
   let wizardStep      = $state(1); // 1, 2 o 3
 
+
   // Datos del formulario — paso 1: información
   let formName      = $state('');
   let formDesc      = $state('');
@@ -315,12 +316,18 @@
                 </div>
               </td>
 
-              <!-- Acciones -->
+              <!-- Acciones: botón Ver que navega al detalle del proyecto -->
               <td class="text-right">
-                <button class="btn-icon" onclick={(e) => { e.stopPropagation(); }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+                <button
+                  class="btn-ver"
+                  onclick={(e) => { e.stopPropagation(); handleProjectClick(project.id); }}
+                  title="Ver proyecto"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
                   </svg>
+                  Ver
                 </button>
               </td>
             </tr>
@@ -661,6 +668,27 @@
   }
 
   .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
+
+  /* Botón Ver en la tabla de proyectos */
+  .btn-ver {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+    color: var(--color-light-grey);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    min-height: 0;
+  }
+
+  .btn-ver:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
   .btn-icon {
     width: 32px; height: 32px;

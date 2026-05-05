@@ -163,7 +163,7 @@
 				{#if expanded}
 					<div class="logo-text">
 						<!-- Nombre del sistema — para cambiarlo, edita este texto -->
-						<p class="logo-name">SISDIG</p>
+						<p class="logo-name">Preservia</p>
 						<!-- Rol del usuario en minúsculas con capitalize por CSS -->
 						<p class="logo-role">{currentUser?.role ?? '—'}</p>
 					</div>
