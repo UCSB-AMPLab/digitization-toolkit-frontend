@@ -3,14 +3,27 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-	preprocess: vitePreprocess(),
+    preprocess: vitePreprocess(),
 
-	kit: {
-		// adapter-node produces a Node.js server (node build/index.js).
-		// This enables fully offline Docker deployment: build once with internet,
-		// run forever without it. See frontend/Dockerfile for the multi-stage build.
-		adapter: adapter()
-	}
+    kit: {
+        // Tu adaptador de Node para el despliegue
+        adapter: adapter()
+    },
+
+    // Filtramos las alertas de accesibilidad (porque no es para escritorio sino tablet)
+    onwarn: (warning, handler) => {
+        const ignoreRules = [
+            'a11y-click-events-have-key-events',
+            'a11y-no-static-element-interactions',
+            'a11y-no-noninteractive-element-interactions',
+            'a11y-mouse-events-have-key-events',
+            'a11y-no-noninteractive-tabindex',
+            'a11y-label-has-associated-control'
+        ];
+
+        if (ignoreRules.includes(warning.code)) return;
+        handler(warning);
+    }
 };
 
 export default config;
