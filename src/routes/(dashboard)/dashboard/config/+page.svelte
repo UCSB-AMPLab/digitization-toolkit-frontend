@@ -13,7 +13,7 @@
   //      - Alerta automática cuando el uso supera el 85%
   //
   //   2. Seguridad & Acceso
-  //      - Audit log (toggle): registra todas las acciones del sistema
+
   //
   // MODO DEMO: los valores son locales — no se envían al backend.
   // Para conectar con el backend cuando esté disponible, busca los
@@ -79,9 +79,6 @@
   // ESTADO: Seguridad & Acceso
   // ---------------------------------------------------------------------------
 
-  // Audit log: registra todas las acciones del sistema (crear, editar, eliminar)
-  // TODO: backend — persistir con systemApi.updateConfig({ auditLog })
-  let auditLogEnabled = $state(true);
 
   // ---------------------------------------------------------------------------
   // CICLO DE VIDA
@@ -219,24 +216,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // GUARDAR CONFIGURACIÓN
-  // Por ahora solo muestra confirmación visual.
-  // TODO: backend — llamar a systemApi.updateConfig({ auditLog, storagePrimaryPath })
-  // ---------------------------------------------------------------------------
-  let saveSuccess = $state(false);
-  let isSaving    = $state(false);
-
-  async function handleSave() {
-    isSaving = true;
-    // Simular delay de guardado
-    await new Promise(r => setTimeout(r, 600));
-    // TODO: await systemApi.updateConfig({ auditLog: auditLogEnabled });
-    isSaving    = false;
-    saveSuccess = true;
-    // Ocultar el mensaje de éxito después de 3 segundos
-    setTimeout(() => { saveSuccess = false; }, 3000);
-  }
 </script>
 
 <!-- ============================================================
@@ -250,31 +229,7 @@
       <h1 class="page-title">Configuración</h1>
       <p class="page-subtitle">Parámetros del sistema de digitalización</p>
     </div>
-    <!-- Botón guardar cambios -->
-    <button class="btn-save" onclick={handleSave} disabled={isSaving}>
-      {#if isSaving}
-        <div class="spinner-sm"></div>
-        Guardando...
-      {:else}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-          <polyline points="17 21 17 13 7 13 7 21"/>
-          <polyline points="7 3 7 8 15 8"/>
-        </svg>
-        Guardar cambios
-      {/if}
-    </button>
   </div>
-
-  <!-- Toast de éxito al guardar -->
-  {#if saveSuccess}
-    <div class="toast-success">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="20 6 9 17 4 12"/>
-      </svg>
-      Configuración guardada correctamente
-    </div>
-  {/if}
 
   <!-- ══════════════════════════════════════════════════════════
        SECCIÓN 1: ALMACENAMIENTO
@@ -344,8 +299,8 @@
       <!-- ── Selector de unidad externa (expandible) ── -->
       <button class="config-row logs-expand-row" onclick={toggleDevices}>
         <div class="row-info">
-          <span class="row-label">Unidad de almacenamiento</span>
-          <span class="row-desc">Conectar un disco USB o tarjeta SD como almacenamiento principal</span>
+          <span class="row-label">Unidad de almacenamiento <span class="badge-experimental">experimental</span></span>
+          <span class="row-desc">Conectar un disco USB o tarjeta SD como almacenamiento adicional</span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           style="transform: rotate({devicesExpanded ? 180 : 0}deg); transition: transform 0.3s ease; flex-shrink:0; color: var(--color-light-grey)">
@@ -369,6 +324,16 @@
               </button>
             </div>
           {/if}
+
+          <!-- Aviso experimental -->
+          <div class="devices-notice devices-notice-warning">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span><strong>Función experimental.</strong> La compatibilidad depende del formato del dispositivo (exFAT, ext4). Discos formateados para Windows (NTFS) o macOS (APFS) pueden no funcionar correctamente. No usar como única copia de seguridad.</span>
+          </div>
 
           <!-- Alerta de advertencia sobre proyectos existentes -->
           <div class="devices-notice">
@@ -457,30 +422,6 @@
        SECCIÓN 2: SEGURIDAD & ACCESO
        Configuraciones de seguridad relevantes para uso offline.
        ══════════════════════════════════════════════════════════ -->
-  <div class="config-section">
-    <h2 class="section-title">Seguridad y acceso</h2>
-    <div class="config-card">
-
-      <!-- Audit log -->
-      <!-- Registra todas las acciones: logins, creaciones, ediciones, eliminaciones -->
-      <!-- Útil para trazabilidad en proyectos de patrimonio cultural -->
-      <div class="config-row toggle-row">
-        <div class="row-info">
-          <span class="row-label">Audit log</span>
-          <span class="row-desc">Registro de todas las acciones del sistema</span>
-        </div>
-        <button
-          class="toggle"
-          class:on={auditLogEnabled}
-          onclick={() => auditLogEnabled = !auditLogEnabled}
-          aria-label="Toggle audit log"
-        >
-          <div class="toggle-knob" class:on={auditLogEnabled}></div>
-        </button>
-      </div>
-
-    </div>
-  </div>
 
   <!-- ══════════════════════════════════════════════════════════
        SECCIÓN 3: DIAGNÓSTICO DEL SISTEMA
@@ -734,6 +675,28 @@
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 10px 12px; line-height: 1.5;
+  }
+  .devices-notice-warning {
+    color: #c9a04a;
+    background-color: rgba(201,160,74,0.06);
+    border-color: rgba(201,160,74,0.25);
+  }
+  .devices-notice-warning strong { font-weight: var(--fw-semibold); }
+
+  .badge-experimental {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #c9a04a;
+    background-color: rgba(201,160,74,0.12);
+    border: 1px solid rgba(201,160,74,0.3);
+    border-radius: 4px;
+    padding: 1px 5px;
+    vertical-align: middle;
+    margin-left: 6px;
+    line-height: 1.6;
   }
 
   .storage-override-banner {
