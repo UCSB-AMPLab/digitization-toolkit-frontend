@@ -20,7 +20,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
-  import { projectsApi, collectionsApi, type Project, type Collection } from '$lib/api';
+  import { projectsApi, collectionsApi, recordsApi, type Project, type Collection } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -34,6 +34,7 @@
   let collections = $state<Collection[]>([]);
   let isLoading   = $state(true);
   let searchQuery = $state('');
+  let recordCount = $state<number | null>(null);
 
   let canCreate = $derived($authStore.user?.role === 'admin');
 
@@ -60,7 +61,7 @@
   // AL MONTAR
   // ---------------------------------------------------------------------------
   onMount(async () => {
-    await Promise.all([loadProject(), loadCollections()]);
+    await Promise.all([loadProject(), loadCollections(), loadRecordCount()]);
   });
 
   async function loadProject() {
@@ -68,6 +69,14 @@
       project = await projectsApi.get(projectId);
     } catch (err) {
       console.error('[ProjectDetail] Error cargando proyecto:', err);
+    }
+  }
+
+  async function loadRecordCount() {
+    try {
+      recordCount = await recordsApi.count({ project_id: projectId });
+    } catch (err) {
+      console.error('[ProjectDetail] Error cargando conteo de registros:', err);
     }
   }
 
@@ -205,7 +214,7 @@
 
     <div class="kpi-card">
       <div class="kpi-line" style="background: var(--color-secondary)"></div>
-      <div class="kpi-num">1288</div>
+      <div class="kpi-num">{recordCount ?? '—'}</div>
       <div class="kpi-lbl">Total imágenes</div>
     </div>
 
@@ -294,7 +303,7 @@
                     <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
                     <polyline points="21 15 16 10 5 21"/>
                   </svg>
-                  {col.record_count ?? (i * 89 + 45)}
+                  {col.record_count ?? 0}
                 </div>
               </td>
 

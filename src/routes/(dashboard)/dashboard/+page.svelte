@@ -53,7 +53,7 @@
   // ---------------------------------------------------------------------------
   let projectCount    = $state(0);
   let collectionCount = $state(0);
-  let recordCount     = $state(1245); // placeholder hasta que el backend tenga /count
+  let recordCount     = $state(0);
   let isLoadingStats  = $state(true);
 
   // ---------------------------------------------------------------------------
@@ -125,12 +125,14 @@
   async function loadStats() {
     try {
       isLoadingStats = true;
-      const [projects, collections] = await Promise.all([
+      const [projects, collections, count] = await Promise.all([
         projectsApi.list(),
         collectionsApi.list(),
+        recordsApi.count(),
       ]);
       projectCount    = projects.length;
       collectionCount = collections.length;
+      recordCount     = count;
     } catch (err) {
       console.error('[Dashboard] Stats error:', err);
     } finally {

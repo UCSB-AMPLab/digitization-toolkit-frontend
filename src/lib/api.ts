@@ -460,6 +460,21 @@ export interface UpdateRecordData {
 
 export const recordsApi = {
   /**
+   * Get the count of records matching the given filters.
+   */
+  async count(params?: {
+    project_id?: number;
+    collection_id?: number;
+  }): Promise<number> {
+    const queryParams = new URLSearchParams();
+    if (params?.project_id !== undefined) queryParams.set('project_id', params.project_id.toString());
+    if (params?.collection_id !== undefined) queryParams.set('collection_id', params.collection_id.toString());
+    const query = queryParams.toString();
+    const result = await apiRequest<{ count: number }>(`/records/count${query ? '?' + query : ''}`);
+    return result.count;
+  },
+
+  /**
    * Get all records (optionally filtered)
    */
   async list(params?: {
