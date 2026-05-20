@@ -28,7 +28,7 @@
     } else {
       // Sin sesión (o sesión incompleta) → splash screen
       if (token && !user) authStore.clearSession();
-      goto('/welcome');
+      goto('/login');
     }
   }
 </script>

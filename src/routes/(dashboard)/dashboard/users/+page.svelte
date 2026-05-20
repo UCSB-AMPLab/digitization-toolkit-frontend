@@ -47,7 +47,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // DATOS MOCK (demo)
+  // TODO
   // Se usan cuando no hay conexión con el backend.
   // Para conectar con el backend, reemplazar MOCK_USERS con usersApi.list()
   // ---------------------------------------------------------------------------

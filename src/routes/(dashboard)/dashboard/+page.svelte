@@ -94,7 +94,7 @@
   const PREVIEW_INTERVAL_MS = 2500;
 
   // ---------------------------------------------------------------------------
-  // ESTADO: Logs del sistema (mock — conectar con backend)
+  // TODO: Logs del sistema (mock — conectar con backend)
   // ---------------------------------------------------------------------------
   const logs = [
     { time: '14:45:22', level: 'INFO',  msg: 'Usuario ', bold: 'maria_garcia', suffix: ' inició sesión exitosamente.' },
