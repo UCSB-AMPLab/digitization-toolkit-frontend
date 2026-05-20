@@ -63,14 +63,6 @@
   // Defaults to false (real login) when the variable is absent.
   const isDemoMode = env.PUBLIC_DEMO_MODE === 'true';
 
-  // Usuarios demo disponibles.
-  // Los roles deben coincidir con UserRole en auth.ts ('admin'|'operator'|'reviewer')
-  const demoUsers: Record<string, { password: string; role: UserRole }> = {
-    'm.garcia': { password: 'demo', role: 'operator' },   // Operario
-    'j.lopez':  { password: 'demo', role: 'reviewer' },   // Revisor
-    'admin':    { password: 'demo', role: 'admin' },       // Admin
-  };
-
   // ---------------------------------------------------------------------------
   // AL MONTAR: verifica si ya hay sesión y chequea conexión al backend
   // ---------------------------------------------------------------------------
