@@ -59,7 +59,9 @@
   // Para desactivar el modo demo en producción, cambia isDemoMode a false
   // o elimina el bloque completo de credenciales demo del HTML.
   // ---------------------------------------------------------------------------
-  const isDemoMode = true; // ← cambiar a false en producción
+  // Controlled by PUBLIC_DEMO_MODE env var (set in docker-compose.yml).
+  // Defaults to false (real login) when the variable is absent.
+  const isDemoMode = env.PUBLIC_DEMO_MODE === 'true';
 
   // Usuarios demo disponibles.
   // Los roles deben coincidir con UserRole en auth.ts ('admin'|'operator'|'reviewer')
