@@ -767,6 +767,26 @@ export interface SystemLogEntry {
   detail:     string | null;
 }
 
+export interface StorageInfo {
+  projects_path: string;
+  is_override:   boolean;
+  total_bytes:   number;
+  used_bytes:    number;
+  free_bytes:    number;
+  available:     boolean;
+}
+
+export interface StorageDevice {
+  name:       string;
+  path:       string;   // e.g. /dev/sda2
+  size:       string;   // human-readable e.g. "29G"
+  fstype:     string | null;
+  mountpoint: string | null;
+  label:      string | null;
+  removable:  boolean;
+  type:       string;
+}
+
 export const systemApi = {
   async getLogs(params?: { limit?: number; category?: string; level?: string }): Promise<SystemLogEntry[]> {
     const q = new URLSearchParams();
@@ -775,5 +795,33 @@ export const systemApi = {
     if (params?.level)                  q.set('level',    params.level);
     const qs = q.toString();
     return apiRequest<SystemLogEntry[]>(`/system/logs${qs ? '?' + qs : ''}`);
-  }
+  },
+
+  async getStorage(): Promise<StorageInfo> {
+    return apiRequest<StorageInfo>('/system/storage');
+  },
+
+  async getStorageDevices(): Promise<StorageDevice[]> {
+    return apiRequest<StorageDevice[]>('/system/storage/devices');
+  },
+
+  async mountDevice(device: string): Promise<{ mountpoint: string | null; message: string }> {
+    return apiRequest('/system/storage/mount', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ device }),
+    });
+  },
+
+  async activateStorage(path: string): Promise<{ projects_path: string; message: string }> {
+    return apiRequest('/system/storage/activate', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ path }),
+    });
+  },
+
+  async resetStorage(): Promise<{ projects_path: string; message: string }> {
+    return apiRequest('/system/storage/activate', { method: 'DELETE' });
+  },
 };
