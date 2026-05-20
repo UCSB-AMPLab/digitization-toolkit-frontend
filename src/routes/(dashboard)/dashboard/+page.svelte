@@ -6,9 +6,9 @@
   // Una sola página de resumen para todos los roles.
   // El contenido se adapta según el rol:
   //
-  //   admin    → KPIs + cámaras expandibles + logs del sistema
-  //   operator → KPIs + cámaras expandibles (sin logs)
-  //   reviewer → KPIs (sin cámaras ni logs)
+  //   admin    → KPIs + cámaras expandibles
+  //   operator → KPIs + cámaras expandibles
+  //   reviewer → KPIs
   //
   // Para mostrar/ocultar secciones por rol, busca los comentarios
   // "Solo admin", "Admin + Operator", etc. en el template.
@@ -39,7 +39,6 @@
   let isOperator = $derived(userRole === 'operator');
   let isReviewer = $derived(userRole === 'reviewer');
   let canSeeCameras = $derived(isAdmin || isOperator);
-  let canSeeLogs    = $derived(isAdmin);
 
   // Nombre del usuario para el saludo
   let userName = $derived(
@@ -92,16 +91,6 @@
 
   // Frecuencia del polling (ms) — para cambiar, modifica este valor
   const PREVIEW_INTERVAL_MS = 2500;
-
-  // ---------------------------------------------------------------------------
-  // TODO: Logs del sistema (mock — conectar con backend)
-  // ---------------------------------------------------------------------------
-  const logs = [
-    { time: '14:45:22', level: 'INFO',  msg: 'Usuario ', bold: 'maria_garcia', suffix: ' inició sesión exitosamente.' },
-    { time: '14:42:10', level: 'WARN',  msg: 'Intento de acceso fallido desde IP 192.168.1.45.', bold: '', suffix: '' },
-    { time: '14:38:05', level: 'INFO',  msg: 'Proyecto ', bold: 'Fondo Colonial', suffix: ' actualizado: +50 imágenes.' },
-    { time: '14:35:12', level: 'INFO',  msg: 'Cámara ', bold: 'Left Scanner Camera', suffix: ' calibrada exitosamente.' },
-  ];
 
   // ---------------------------------------------------------------------------
   // AL MONTAR
@@ -213,11 +202,6 @@
     try { await camerasApi.capture({ project_name: '_test', camera_index: side === 'left' ? 0 : 1 }); } catch {}
   }
 
-  function levelColor(level: string): string {
-    if (level === 'WARN') return 'var(--color-warning)';
-    if (level === 'ERR')  return 'var(--color-error)';
-    return 'var(--color-success)';
-  }
 </script>
 
 <!-- ============================================================
@@ -377,40 +361,6 @@
 
           </div>
         {/each}
-      </div>
-    </div>
-  {/if}
-
-  <!-- ══════════════════════════════════════════════════════
-       SECCIÓN: LOGS DEL SISTEMA
-       Solo visible para admin (canSeeLogs)
-       ══════════════════════════════════════════════════════ -->
-  {#if canSeeLogs}
-    <div class="section">
-      <h2 class="section-title">
-        Logs del Sistema
-        <span class="section-sub">(Última hora)</span>
-      </h2>
-      <div class="logs-box">
-        {#each logs as log}
-          <div class="log-row">
-            <span class="log-time">{log.time}</span>
-            <span class="log-level" style="color:{levelColor(log.level)}">[{log.level}]</span>
-            <span class="log-msg">
-              {log.msg}
-              {#if log.bold}<strong>{log.bold}</strong>{/if}
-              {log.suffix}
-            </span>
-          </div>
-        {/each}
-        <div class="logs-footer">
-          <button class="btn-ver-todos">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/>
-            </svg>
-            Ver todos
-          </button>
-        </div>
       </div>
     </div>
   {/if}
@@ -596,42 +546,6 @@
   }
 
   .btn-secondary:hover { border-color: var(--color-primary); color: var(--color-light); }
-
-  /* Logs */
-  .logs-box {
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 16px 20px;
-    display: flex; flex-direction: column; gap: 12px;
-  }
-
-  .log-row {
-    display: flex; align-items: flex-start; gap: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-color);
-    font-size: var(--text-sm);
-  }
-
-  .log-row:last-of-type { padding-bottom: 0; border-bottom: none; }
-
-  .log-time  { font-family: monospace; font-size: var(--text-xs); color: var(--color-light-grey); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
-  .log-level { font-size: var(--text-xs); font-weight: var(--fw-bold); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
-  .log-msg   { color: var(--color-light-grey); flex: 1; line-height: 1.5; }
-  .log-msg strong { color: var(--color-light); font-weight: var(--fw-semibold); }
-
-  .logs-footer { display: flex; justify-content: flex-end; padding-top: 4px; }
-
-  .btn-ver-todos {
-    display: flex; align-items: center; gap: 7px;
-    padding: 7px 14px;
-    background: none; border: 1px solid var(--border-color); border-radius: var(--radius-full);
-    font-family: var(--font-family); font-size: var(--text-sm);
-    color: var(--color-light-grey); cursor: pointer;
-    transition: all var(--transition-fast); min-height: 0;
-  }
-
-  .btn-ver-todos:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
 
   /* Badge flotante de cámaras */
   .cameras-badge {

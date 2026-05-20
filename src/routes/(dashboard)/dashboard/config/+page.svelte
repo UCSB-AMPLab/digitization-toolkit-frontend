@@ -72,6 +72,25 @@
   let auditLogEnabled = $state(true);
 
   // ---------------------------------------------------------------------------
+  // ESTADO: Diagnóstico — logs del sistema
+  // ---------------------------------------------------------------------------
+  let logsExpanded = $state(false);
+
+  // TODO: backend — reemplazar con llamada a systemApi.getSystemLogs()
+  const logs = [
+    { time: '14:45:22', level: 'INFO',  msg: 'Usuario ', bold: 'maria_garcia', suffix: ' inició sesión exitosamente.' },
+    { time: '14:42:10', level: 'WARN',  msg: 'Intento de acceso fallido desde IP 192.168.1.45.', bold: '', suffix: '' },
+    { time: '14:38:05', level: 'INFO',  msg: 'Proyecto ', bold: 'Fondo Colonial', suffix: ' actualizado: +50 imágenes.' },
+    { time: '14:35:12', level: 'INFO',  msg: 'Cámara ', bold: 'Left Scanner Camera', suffix: ' calibrada exitosamente.' },
+  ];
+
+  function levelColor(level: string): string {
+    if (level === 'WARN') return 'var(--color-warning)';
+    if (level === 'ERR')  return 'var(--color-error)';
+    return 'var(--color-success)';
+  }
+
+  // ---------------------------------------------------------------------------
   // GUARDAR CONFIGURACIÓN
   // Por ahora solo muestra confirmación visual.
   // TODO: backend — llamar a systemApi.updateConfig({ auditLog, storagePrimaryPath })
@@ -210,6 +229,47 @@
           <div class="toggle-knob" class:on={auditLogEnabled}></div>
         </button>
       </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       SECCIÓN 3: DIAGNÓSTICO DEL SISTEMA
+       Logs de actividad reciente. Ocultos por defecto, expandibles.
+       Solo administradores (el layout controla el acceso a esta página).
+       ══════════════════════════════════════════════════════════ -->
+  <div class="config-section">
+    <h2 class="section-title">Diagnóstico</h2>
+    <div class="config-card">
+
+      <!-- Fila expandible: click para mostrar/ocultar logs -->
+      <button class="config-row logs-expand-row" onclick={() => logsExpanded = !logsExpanded}>
+        <div class="row-info">
+          <span class="row-label">Logs del sistema</span>
+          <span class="row-desc">Actividad reciente — última hora</span>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          style="transform: rotate({logsExpanded ? 180 : 0}deg); transition: transform 0.3s ease; flex-shrink:0; color: var(--color-light-grey)">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
+      {#if logsExpanded}
+        <div class="section-divider"></div>
+        <div class="logs-panel-body">
+          {#each logs as log}
+            <div class="log-row">
+              <span class="log-time">{log.time}</span>
+              <span class="log-level" style="color:{levelColor(log.level)}">[{log.level}]</span>
+              <span class="log-msg">
+                {log.msg}
+                {#if log.bold}<strong>{log.bold}</strong>{/if}
+                {log.suffix}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
 
     </div>
   </div>
@@ -376,4 +436,27 @@
     font-size: var(--text-sm); color: var(--color-light-grey);
     opacity: 0.6; margin-top: 8px;
   }
+
+  /* Logs expandibles (sección Diagnóstico) */
+  .logs-expand-row {
+    width: 100%; background: none; border: none; cursor: pointer;
+    text-align: left; font-family: var(--font-family);
+    transition: background-color var(--transition-fast);
+  }
+  .logs-expand-row:hover { background-color: rgba(255,255,255,0.03); }
+
+  .logs-panel-body { padding: 0 20px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  .log-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: var(--text-sm);
+  }
+  .log-row:last-of-type { padding-bottom: 0; border-bottom: none; }
+
+  .log-time  { font-family: monospace; font-size: var(--text-xs); color: var(--color-light-grey); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
+  .log-level { font-size: var(--text-xs); font-weight: var(--fw-bold); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
+  .log-msg   { color: var(--color-light-grey); flex: 1; line-height: 1.5; }
+  .log-msg strong { color: var(--color-light); font-weight: var(--fw-semibold); }
 </style>
