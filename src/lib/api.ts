@@ -824,4 +824,12 @@ export const systemApi = {
   async resetStorage(): Promise<{ projects_path: string; message: string }> {
     return apiRequest('/system/storage/activate', { method: 'DELETE' });
   },
+
+  async unmountDevice(mountpoint: string): Promise<{ message: string; override_cleared: boolean }> {
+    return apiRequest('/system/storage/mount', {
+      method:  'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ mountpoint }),
+    });
+  },
 };

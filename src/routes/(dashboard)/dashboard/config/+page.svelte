@@ -42,6 +42,7 @@
   let devicesLoading   = $state(false);
   let devicesError     = $state<string | null>(null);
   let mountingDevice   = $state<string | null>(null);  // device path being mounted
+  let unmountingDevice = $state<string | null>(null);  // mountpoint being unmounted
   let activatingPath   = $state<string | null>(null);  // mountpoint being activated
   let storageOpError   = $state<string | null>(null);
   let storageOpSuccess = $state<string | null>(null);
@@ -146,8 +147,24 @@
     }
   }
 
-  async function resetStorage() {
-    resettingStorage = true;
+  async function unmountDevice(mountpoint: string) {
+    unmountingDevice = mountpoint;
+    storageOpError   = null;
+    storageOpSuccess = null;
+    try {
+      const result = await systemApi.unmountDevice(mountpoint);
+      storageOpSuccess = result.message;
+      storageInfo = await systemApi.getStorage();
+      await refreshDevices();
+      setTimeout(() => { storageOpSuccess = null; }, 6000);
+    } catch (e: unknown) {
+      storageOpError = (e instanceof Error ? e.message : null) || 'Error al desmontar el dispositivo.';
+    } finally {
+      unmountingDevice = null;
+    }
+  }
+
+  async function resetStorage() {    resettingStorage = true;
     storageOpError   = null;
     storageOpSuccess = null;
     try {
@@ -382,13 +399,21 @@
                       <button
                         class="btn-device btn-activate"
                         onclick={() => activateStorage(device.mountpoint!)}
-                        disabled={activatingPath === device.mountpoint}
+                        disabled={activatingPath === device.mountpoint || unmountingDevice === device.mountpoint}
                       >
                         {activatingPath === device.mountpoint ? 'Activando…' : 'Activar'}
                       </button>
                     {:else}
                       <span class="device-active-label">✓ En uso</span>
                     {/if}
+                    <button
+                      class="btn-device btn-unmount"
+                      onclick={() => unmountDevice(device.mountpoint!)}
+                      disabled={unmountingDevice === device.mountpoint || activatingPath === device.mountpoint}
+                      title="Desmontar de forma segura antes de desconectar"
+                    >
+                      {unmountingDevice === device.mountpoint ? 'Desmontando…' : 'Desmontar'}
+                    </button>
                   {:else}
                     <button
                       class="btn-device btn-mount"
@@ -746,7 +771,7 @@
   .device-meta { font-size: var(--text-xs); color: var(--color-light-grey); }
   .device-mountpoint { font-family: monospace; }
 
-  .device-actions { flex-shrink: 0; }
+  .device-actions { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
   .device-active-label { font-size: var(--text-xs); color: var(--color-primary); font-weight: var(--fw-semibold); }
 
   .btn-device {
@@ -770,6 +795,13 @@
     color: white;
   }
   .btn-activate:hover:not(:disabled) { background-color: var(--color-primary-hover); }
+
+  .btn-unmount {
+    background-color: transparent;
+    color: var(--color-light-grey);
+    border: 1px solid var(--border-color);
+  }
+  .btn-unmount:hover:not(:disabled) { color: var(--color-error); border-color: rgba(214,103,74,0.5); background-color: rgba(214,103,74,0.06); }
 
   .devices-op-msg {
     font-size: var(--text-sm); padding: 8px 12px;
