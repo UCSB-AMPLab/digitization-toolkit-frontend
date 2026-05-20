@@ -21,6 +21,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
+  import { systemApi, type SystemLogEntry } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Almacenamiento
@@ -75,19 +76,54 @@
   // ESTADO: Diagnóstico — logs del sistema
   // ---------------------------------------------------------------------------
   let logsExpanded = $state(false);
+  let logs         = $state<SystemLogEntry[]>([]);
+  let logsLoading  = $state(false);
+  let logsError    = $state<string | null>(null);
 
-  // TODO: backend — reemplazar con llamada a systemApi.getSystemLogs()
-  const logs = [
-    { time: '14:45:22', level: 'INFO',  msg: 'Usuario ', bold: 'maria_garcia', suffix: ' inició sesión exitosamente.' },
-    { time: '14:42:10', level: 'WARN',  msg: 'Intento de acceso fallido desde IP 192.168.1.45.', bold: '', suffix: '' },
-    { time: '14:38:05', level: 'INFO',  msg: 'Proyecto ', bold: 'Fondo Colonial', suffix: ' actualizado: +50 imágenes.' },
-    { time: '14:35:12', level: 'INFO',  msg: 'Cámara ', bold: 'Left Scanner Camera', suffix: ' calibrada exitosamente.' },
-  ];
+  async function loadLogs() {
+    logsLoading = true;
+    logsError   = null;
+    try {
+      logs = await systemApi.getLogs({ limit: 50 });
+    } catch {
+      logsError = 'No se pudieron cargar los logs del sistema.';
+    } finally {
+      logsLoading = false;
+    }
+  }
+
+  function toggleLogs() {
+    logsExpanded = !logsExpanded;
+    // Lazy-load on first open
+    if (logsExpanded && logs.length === 0 && !logsLoading) loadLogs();
+  }
 
   function levelColor(level: string): string {
     if (level === 'WARN') return 'var(--color-warning)';
     if (level === 'ERR')  return 'var(--color-error)';
     return 'var(--color-success)';
+  }
+
+  function formatLogTime(iso: string): string {
+    try {
+      return new Date(iso).toLocaleTimeString('es', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
+    } catch { return iso; }
+  }
+
+  function formatLogMessage(log: SystemLogEntry): { before: string; bold: string; after: string } {
+    const subject = log.subject ?? '';
+    const actor   = log.actor   ?? 'sistema';
+    switch (log.action) {
+      case 'login_success':      return { before: 'Usuario ',    bold: actor,   after: ' inició sesión exitosamente.' };
+      case 'login_failed':       return { before: 'Acceso fallido. Usuario: ', bold: actor, after: log.detail ? ` (${log.detail}).` : '.' };
+      case 'user_created':       return { before: 'Usuario ',    bold: subject, after: ` creado por ${actor}.` };
+      case 'project_created':    return { before: 'Proyecto ',   bold: subject, after: ` creado por ${actor}.` };
+      case 'project_deleted':    return { before: 'Proyecto ',   bold: subject, after: ` eliminado por ${actor}.` };
+      case 'collection_created': return { before: 'Colección ',  bold: subject, after: ` creada por ${actor}.` };
+      default: return { before: log.action.replace(/_/g, ' '), bold: subject, after: log.detail ? ` — ${log.detail}` : '' };
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -243,7 +279,7 @@
     <div class="config-card">
 
       <!-- Fila expandible: click para mostrar/ocultar logs -->
-      <button class="config-row logs-expand-row" onclick={() => logsExpanded = !logsExpanded}>
+      <button class="config-row logs-expand-row" onclick={toggleLogs}>
         <div class="row-info">
           <span class="row-label">Logs del sistema</span>
           <span class="row-desc">Actividad reciente — última hora</span>
@@ -257,17 +293,26 @@
       {#if logsExpanded}
         <div class="section-divider"></div>
         <div class="logs-panel-body">
-          {#each logs as log}
-            <div class="log-row">
-              <span class="log-time">{log.time}</span>
-              <span class="log-level" style="color:{levelColor(log.level)}">[{log.level}]</span>
-              <span class="log-msg">
-                {log.msg}
-                {#if log.bold}<strong>{log.bold}</strong>{/if}
-                {log.suffix}
-              </span>
-            </div>
-          {/each}
+          {#if logsLoading}
+            <p class="logs-status">Cargando actividad reciente…</p>
+          {:else if logsError}
+            <p class="logs-status logs-status-error">{logsError}</p>
+          {:else if logs.length === 0}
+            <p class="logs-status">Sin actividad registrada todavía.</p>
+          {:else}
+            {#each logs as log}
+              {@const parts = formatLogMessage(log)}
+              <div class="log-row">
+                <span class="log-time">{formatLogTime(log.created_at)}</span>
+                <span class="log-level" style="color:{levelColor(log.level)}">[{log.level}]</span>
+                <span class="log-msg">
+                  {parts.before}
+                  {#if parts.bold}<strong>{parts.bold}</strong>{/if}
+                  {parts.after}
+                </span>
+              </div>
+            {/each}
+          {/if}
         </div>
       {/if}
 
@@ -446,6 +491,9 @@
   .logs-expand-row:hover { background-color: rgba(255,255,255,0.03); }
 
   .logs-panel-body { padding: 0 20px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  .logs-status { font-size: var(--text-sm); color: var(--color-light-grey); margin: 4px 0; }
+  .logs-status-error { color: var(--color-error); }
 
   .log-row {
     display: flex; align-items: flex-start; gap: 12px;

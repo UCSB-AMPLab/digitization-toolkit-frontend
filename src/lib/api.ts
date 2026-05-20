@@ -751,3 +751,29 @@ export const healthApi = {
     return apiRequest<{ status: string }>('/health');
   }
 };
+
+// =============================================================================
+// System API
+// =============================================================================
+
+export interface SystemLogEntry {
+  id:         number;
+  created_at: string;   // ISO 8601 datetime
+  level:      string;   // INFO | WARN | ERR
+  category:   string;   // access | activity | capture | system
+  actor:      string | null;
+  action:     string;
+  subject:    string | null;
+  detail:     string | null;
+}
+
+export const systemApi = {
+  async getLogs(params?: { limit?: number; category?: string; level?: string }): Promise<SystemLogEntry[]> {
+    const q = new URLSearchParams();
+    if (params?.limit    !== undefined) q.set('limit',    params.limit.toString());
+    if (params?.category)               q.set('category', params.category);
+    if (params?.level)                  q.set('level',    params.level);
+    const qs = q.toString();
+    return apiRequest<SystemLogEntry[]>(`/system/logs${qs ? '?' + qs : ''}`);
+  }
+};
