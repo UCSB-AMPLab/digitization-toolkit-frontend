@@ -7,90 +7,52 @@
   // Solo visible para administradores (el layout ya controla el acceso).
   //
   // Funcionalidades:
-  //   - Tabla de usuarios: avatar, nombre, username, rol, estado, última
-  //     conexión, rendimiento, acciones (···)
-  //   - Búsqueda por nombre o username
+  //   - Tabla de usuarios: avatar, username, email, rol, estado, registrado, acciones
+  //   - Búsqueda por username o email
   //   - Filtro por Rol y por Estado
   //   - Menú de acciones (···) con opciones: Editar | Eliminar
-  //   - Modal "Crear nuevo usuario" con campos: nombre, apellido, username,
-  //     contraseña, confirmar contraseña, asignar rol (radio)
-  //   - Modal "Editar usuario" — mismo formulario con datos pre-cargados
+  //   - Modal "Crear nuevo usuario": username, email, contraseña, rol
+  //   - Modal "Editar usuario": cambiar rol y estado activo
   //   - Modal "Eliminar" — confirmación antes de borrar
-  //
-  // MODO DEMO (token = 'demo-token'):
-  //   Crea/edita/elimina localmente sin llamar al backend.
-  //
-  // Para conectar con el backend, busca los comentarios "TODO: backend"
-  // y reemplaza con las llamadas a usersApi cuando esté disponible.
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { authStore } from '$lib/stores/auth';
+  import { usersApi, type UserRead } from '$lib/api';
 
   // ---------------------------------------------------------------------------
-  // TIPOS
+  // TIPOS LOCALES
   // ---------------------------------------------------------------------------
-
-  type UserRole = 'operator' | 'reviewer' | 'admin';
-  type UserStatus = 'active' | 'inactive';
-
-  interface User {
-    id: number;
-    firstName: string;
-    lastName: string;
-    username: string;
-    email?: string;
-    role: UserRole;
-    status: UserStatus;
-    lastSeen: string;       // texto relativo: "Hace 5 min", "Ahora", etc.
-    performance?: number;   // porcentaje 0-100 | undefined = sin dato
-  }
-
-  // ---------------------------------------------------------------------------
-  // TODO
-  // Se usan cuando no hay conexión con el backend.
-  // Para conectar con el backend, reemplazar MOCK_USERS con usersApi.list()
-  // ---------------------------------------------------------------------------
-  const MOCK_USERS: User[] = [
-    { id: 1, firstName: 'María',  lastName: 'García', username: 'maria_garcia', role: 'operator', status: 'active',   lastSeen: 'Hace 5 min',  performance: 93 },
-    { id: 2, firstName: 'Juan',   lastName: 'López',  username: 'juan_lopez',   role: 'reviewer', status: 'active',   lastSeen: 'Hace 15 min', performance: undefined },
-    { id: 3, firstName: 'Pedro',  lastName: 'Mora',   username: 'pedro_mora',   role: 'operator', status: 'inactive', lastSeen: 'Hace 2 días', performance: 82 },
-    { id: 4, firstName: 'Ana',    lastName: 'Ruiz',   username: 'ana_ruiz',     role: 'operator', status: 'active',   lastSeen: 'Hace 1 hora', performance: 91 },
-    { id: 5, firstName: 'Admin',  lastName: 'Sistema',username: 'admin',        role: 'admin',    status: 'active',   lastSeen: 'Ahora',       performance: undefined },
-  ];
+  type UserRole   = 'operator' | 'reviewer' | 'admin';
+  type UserStatus = 'active'   | 'inactive';
 
   // ---------------------------------------------------------------------------
   // ESTADO: lista de usuarios
   // ---------------------------------------------------------------------------
-  let users       = $state<User[]>([]);
+  let users       = $state<UserRead[]>([]);
   let isLoading   = $state(true);
+  let loadError   = $state('');
 
   // Filtros
-  let searchQuery   = $state('');
-  let filterRole    = $state<UserRole | ''>('');
-  let filterStatus  = $state<UserStatus | ''>('');
+  let searchQuery  = $state('');
+  let filterRole   = $state<UserRole | ''>('');
+  let filterStatus = $state<UserStatus | ''>('');
 
-  // Usuarios filtrados según búsqueda + filtros activos
   let filteredUsers = $derived(users.filter(u => {
     const matchSearch = !searchQuery ||
-      `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.username.toLowerCase().includes(searchQuery.toLowerCase());
+      u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchRole   = !filterRole   || u.role === filterRole;
-    const matchStatus = !filterStatus || u.status === filterStatus;
+    const matchStatus = !filterStatus ||
+      (filterStatus === 'active' ? u.is_active : !u.is_active);
     return matchSearch && matchRole && matchStatus;
   }));
 
   // ---------------------------------------------------------------------------
   // ESTADO: menú de acciones (···)
-  // openMenuId = id del usuario cuyo menú está abierto | null = cerrado
   // ---------------------------------------------------------------------------
-  let openMenuId = $state<number | null>(null);
-
-  // Posición del dropdown en coordenadas de la ventana (position: fixed)
-  // Se recalcula cada vez que se abre el menú para evitar que se corte
+  let openMenuId  = $state<number | null>(null);
   let dropdownPos = $state({ top: 0, right: 0 });
 
-  // Cierra el menú al hacer click fuera
   function handleOutsideClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
     if (!target.closest('.actions-menu-wrapper')) {
@@ -102,184 +64,144 @@
   // ESTADO: Modal de crear/editar usuario
   // ---------------------------------------------------------------------------
   let showUserModal = $state(false);
-  let isEditMode    = $state(false);   // false = crear | true = editar
+  let isEditMode    = $state(false);
   let editingUserId = $state<number | null>(null);
 
   // Campos del formulario
-  let formFirstName  = $state('');
-  let formLastName   = $state('');
-  let formUsername   = $state('');
-  let formPassword   = $state('');
-  let formConfirm    = $state('');
-  let formRole       = $state<UserRole>('operator');
+  let formUsername  = $state('');
+  let formEmail     = $state('');
+  let formPassword  = $state('');
+  let formConfirm   = $state('');
+  let formRole      = $state<UserRole>('reviewer');
+  let formIsActive  = $state(true);
 
-  // Visibilidad de las contraseñas
-  let showPassword   = $state(false);
-  let showConfirm    = $state(false);
+  // Visibilidad de contraseñas
+  let showPassword  = $state(false);
+  let showConfirm   = $state(false);
 
-  // Error de formulario
-  let formError      = $state('');
-  let isSaving       = $state(false);
+  // Estado del formulario
+  let formError     = $state('');
+  let isSaving      = $state(false);
 
   // ---------------------------------------------------------------------------
   // ESTADO: Modal de eliminar usuario
   // ---------------------------------------------------------------------------
-  let showDeleteModal  = $state(false);
-  let deletingUser     = $state<User | null>(null);
-  let isDeleting       = $state(false);
+  let showDeleteModal = $state(false);
+  let deletingUser    = $state<UserRead | null>(null);
+  let isDeleting      = $state(false);
 
   // ---------------------------------------------------------------------------
-  // AL MONTAR: carga usuarios
+  // AL MONTAR
   // ---------------------------------------------------------------------------
   onMount(() => {
-  document.addEventListener('click', handleOutsideClick);
-  loadUsers(); // sin await — no bloquea
-  return () => document.removeEventListener('click', handleOutsideClick);
-});
+    document.addEventListener('click', handleOutsideClick);
+    loadUsers();
+    return () => document.removeEventListener('click', handleOutsideClick);
+  });
 
   // ---------------------------------------------------------------------------
-  // FUNCIÓN: cargar usuarios
-  // TODO: backend — reemplazar MOCK_USERS por:
-  //   users = await usersApi.list();
+  // FUNCIONES
   // ---------------------------------------------------------------------------
+
   async function loadUsers() {
     try {
       isLoading = true;
-      // Simular delay de red
-      await new Promise(r => setTimeout(r, 300));
-      users = [...MOCK_USERS];
+      loadError = '';
+      users = await usersApi.list();
     } catch (err) {
+      loadError = err instanceof Error ? err.message : 'Error al cargar usuarios';
       console.error('[Users] Error cargando:', err);
     } finally {
       isLoading = false;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // ABRIR MODAL: Crear nuevo usuario
-  // ---------------------------------------------------------------------------
   function openCreateModal() {
     isEditMode    = false;
     editingUserId = null;
-    formFirstName = '';
-    formLastName  = '';
     formUsername  = '';
+    formEmail     = '';
     formPassword  = '';
     formConfirm   = '';
-    formRole      = 'operator';
+    formRole      = 'reviewer';
+    formIsActive  = true;
     formError     = '';
     showUserModal = true;
   }
 
-  // ---------------------------------------------------------------------------
-  // ABRIR MODAL: Editar usuario existente
-  // Pre-carga los datos del usuario en el formulario
-  // ---------------------------------------------------------------------------
-  function openEditModal(user: User) {
+  function openEditModal(user: UserRead) {
     openMenuId    = null;
     isEditMode    = true;
     editingUserId = user.id;
-    formFirstName = user.firstName;
-    formLastName  = user.lastName;
     formUsername  = user.username;
-    formPassword  = '';        // nunca pre-carga la contraseña por seguridad
+    formEmail     = user.email;
+    formPassword  = '';
     formConfirm   = '';
-    formRole      = user.role;
+    formRole      = user.role as UserRole;
+    formIsActive  = user.is_active;
     formError     = '';
     showUserModal = true;
   }
 
-  // ---------------------------------------------------------------------------
-  // GUARDAR: Crear o editar usuario
-  // Modo demo: modifica el array local.
-  // TODO: backend — llamar a usersApi.create() o usersApi.update()
-  // ---------------------------------------------------------------------------
   async function handleSaveUser() {
-    // Validaciones básicas
-    if (!formFirstName.trim() || !formLastName.trim() || !formUsername.trim()) {
-      formError = 'Nombre, apellido y nombre de usuario son obligatorios.';
-      return;
-    }
-    if (!isEditMode && !formPassword.trim()) {
-      formError = 'La contraseña es obligatoria para nuevos usuarios.';
-      return;
-    }
-    if (formPassword && formPassword !== formConfirm) {
-      formError = 'Las contraseñas no coinciden.';
-      return;
-    }
-
-    isSaving  = true;
     formError = '';
 
-    try {
-      const isDemoToken = $authStore.token === 'demo-token';
-
-      if (isDemoToken || true) {
-        // Modo demo / sin backend: modificar array local
-        if (isEditMode && editingUserId !== null) {
-          // Editar usuario existente
-          users = users.map(u =>
-            u.id === editingUserId
-              ? { ...u, firstName: formFirstName.trim(), lastName: formLastName.trim(),
-                  username: formUsername.trim(), role: formRole }
-              : u
-          );
-        } else {
-          // Crear nuevo usuario
-          const newUser: User = {
-            id:          Date.now(),
-            firstName:   formFirstName.trim(),
-            lastName:    formLastName.trim(),
-            username:    formUsername.trim(),
-            role:        formRole,
-            status:      'active',
-            lastSeen:    'Ahora',
-            performance: undefined,
-          };
-          users = [...users, newUser];
+    if (isEditMode) {
+      // Edit: only role and active status can change
+      if (!editingUserId) return;
+      isSaving = true;
+      try {
+        const original = users.find(u => u.id === editingUserId)!;
+        if (formRole !== original.role) {
+          await usersApi.updateRole(editingUserId, formRole);
         }
+        if (formIsActive !== original.is_active) {
+          await usersApi.setActive(editingUserId, formIsActive);
+        }
+        await loadUsers();
+        showUserModal = false;
+      } catch (err) {
+        formError = err instanceof Error ? err.message : 'Error al guardar';
+      } finally {
+        isSaving = false;
       }
-      // TODO: backend
-      // else if (isEditMode) {
-      //   await usersApi.update(editingUserId, { firstName, lastName, username, role, password });
-      //   await loadUsers();
-      // } else {
-      //   await usersApi.create({ firstName, lastName, username, password, role });
-      //   await loadUsers();
-      // }
+    } else {
+      // Create: validate then call API
+      if (!formUsername.trim()) { formError = 'El nombre de usuario es obligatorio.'; return; }
+      if (!formEmail.trim())    { formError = 'El email es obligatorio.'; return; }
+      if (!formPassword.trim()) { formError = 'La contraseña es obligatoria.'; return; }
+      if (formPassword !== formConfirm) { formError = 'Las contraseñas no coinciden.'; return; }
 
-      showUserModal = false;
-
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      formError = `Error al guardar: ${msg}`;
-    } finally {
-      isSaving = false;
+      isSaving = true;
+      try {
+        await usersApi.create({
+          username: formUsername.trim(),
+          email:    formEmail.trim(),
+          password: formPassword,
+          role:     formRole,
+        });
+        await loadUsers();
+        showUserModal = false;
+      } catch (err) {
+        formError = err instanceof Error ? err.message : 'Error al crear usuario';
+      } finally {
+        isSaving = false;
+      }
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // ABRIR MODAL: Eliminar usuario
-  // ---------------------------------------------------------------------------
-  function openDeleteModal(user: User) {
-    openMenuId    = null;
-    deletingUser  = user;
+  function openDeleteModal(user: UserRead) {
+    openMenuId      = null;
+    deletingUser    = user;
     showDeleteModal = true;
   }
 
-  // ---------------------------------------------------------------------------
-  // CONFIRMAR: Eliminar usuario
-  // Modo demo: elimina del array local.
-  // TODO: backend — llamar a usersApi.delete(id)
-  // ---------------------------------------------------------------------------
   async function handleConfirmDelete() {
     if (!deletingUser) return;
     isDeleting = true;
-
     try {
-      // TODO: backend — await usersApi.delete(deletingUser.id);
-      users = users.filter(u => u.id !== deletingUser!.id);
+      await usersApi.delete(deletingUser.id);
+      await loadUsers();
       showDeleteModal = false;
       deletingUser    = null;
     } catch (err) {
@@ -293,9 +215,8 @@
   // HELPERS DE UI
   // ---------------------------------------------------------------------------
 
-  // Etiqueta y color del rol
-  function roleLabel(role: UserRole): string {
-    const map: Record<UserRole, string> = {
+  function roleLabel(role: string): string {
+    const map: Record<string, string> = {
       operator: 'Operario',
       reviewer: 'Revisor',
       admin:    'Administrador',
@@ -303,8 +224,8 @@
     return map[role] ?? role;
   }
 
-  function roleBadgeStyle(role: UserRole): string {
-    const styles: Record<UserRole, string> = {
+  function roleBadgeStyle(role: string): string {
+    const styles: Record<string, string> = {
       operator: 'color: var(--color-primary); background: rgba(90,140,98,0.15); border-color: rgba(90,140,98,0.3)',
       reviewer: 'color: var(--color-warning); background: rgba(208,154,68,0.15); border-color: rgba(208,154,68,0.3)',
       admin:    'color: var(--color-secondary); background: rgba(150,177,240,0.15); border-color: rgba(150,177,240,0.3)',
@@ -312,14 +233,12 @@
     return styles[role] ?? '';
   }
 
-  // Iniciales del avatar
-  function getInitials(u: User): string {
-    return `${u.firstName[0]}${u.lastName[0]}`.toUpperCase();
+  function getInitials(u: UserRead): string {
+    return u.username.slice(0, 2).toUpperCase();
   }
 
-  // Color del avatar (basado en el rol)
-  function avatarBg(role: UserRole): string {
-    const colors: Record<UserRole, string> = {
+  function avatarBg(role: string): string {
+    const colors: Record<string, string> = {
       operator: 'rgba(90,140,98,0.4)',
       reviewer: 'rgba(188,130,60,0.4)',
       admin:    'rgba(150,177,240,0.3)',
@@ -327,18 +246,15 @@
     return colors[role] ?? 'rgba(171,183,183,0.2)';
   }
 
-  // Color del rendimiento: verde ≥90, amarillo ≥70, rojo <70
-  function performanceColor(p: number): string {
-    if (p >= 90) return 'var(--color-success)';
-    if (p >= 70) return 'var(--color-warning)';
-    return 'var(--color-error)';
+  function formatDate(iso?: string): string {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  // Roles disponibles para el selector del formulario
-  const ROLES: { value: UserRole; label: string; desc: string; icon: string }[] = [
-    { value: 'operator', label: 'Operario',       desc: 'Digitalización de documentos', icon: 'user' },
-    { value: 'reviewer', label: 'Revisor',         desc: 'Control de calidad',           icon: 'shield' },
-    { value: 'admin',    label: 'Administrador',   desc: 'Gestión completa del sistema', icon: 'shield-filled' },
+  const ROLES: { value: UserRole; label: string; desc: string }[] = [
+    { value: 'reviewer', label: 'Revisor',       desc: 'Control de calidad' },
+    { value: 'operator', label: 'Operario',       desc: 'Digitalización de documentos' },
+    { value: 'admin',    label: 'Administrador',  desc: 'Gestión completa del sistema' },
   ];
 </script>
 
@@ -410,6 +326,17 @@
       <span>Cargando usuarios...</span>
     </div>
 
+  {:else if loadError}
+    <div class="load-error">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      {loadError}
+      <button class="btn-ghost" onclick={loadUsers}>Reintentar</button>
+    </div>
+
   {:else if filteredUsers.length === 0}
     <div class="empty-state">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -429,8 +356,7 @@
             <th>Usuario</th>
             <th>Rol</th>
             <th>Estado</th>
-            <th>Última Conexión</th>
-            <th>Rendimiento</th>
+            <th>Registrado</th>
             <th class="col-actions">Acciones</th>
           </tr>
         </thead>
@@ -438,15 +364,15 @@
           {#each filteredUsers as user}
             <tr class="table-row">
 
-              <!-- Avatar + nombre + username -->
+              <!-- Avatar + username + email -->
               <td>
                 <div class="user-cell">
                   <div class="avatar" style="background: {avatarBg(user.role)}">
                     {getInitials(user)}
                   </div>
                   <div class="user-info">
-                    <span class="user-fullname">{user.firstName} {user.lastName}</span>
-                    <span class="user-username">{user.username}</span>
+                    <span class="user-fullname">{user.username}</span>
+                    <span class="user-username">{user.email}</span>
                   </div>
                 </div>
               </td>
@@ -461,26 +387,15 @@
               <!-- Estado: punto de color + texto -->
               <td>
                 <div class="status-cell">
-                  <div class="status-dot" class:active={user.status === 'active'}></div>
-                  <span class:inactive={user.status === 'inactive'}>
-                    {user.status === 'active' ? 'Activo' : 'Inactivo'}
+                  <div class="status-dot" class:active={user.is_active}></div>
+                  <span class:inactive={!user.is_active}>
+                    {user.is_active ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
               </td>
 
-              <!-- Última conexión -->
-              <td class="meta-cell">{user.lastSeen}</td>
-
-              <!-- Rendimiento -->
-              <td>
-                {#if user.performance !== undefined}
-                  <span class="performance" style="color: {performanceColor(user.performance)}">
-                    {user.performance}%
-                  </span>
-                {:else}
-                  <span class="meta-cell">—</span>
-                {/if}
-              </td>
+              <!-- Fecha de registro -->
+              <td class="meta-cell">{formatDate(user.created_at)}</td>
 
               <!-- Menú de acciones (···) -->
               <td class="col-actions">
@@ -593,77 +508,101 @@
       <!-- Campos del formulario -->
       <div class="modal-body">
 
-        <!-- Nombre + Apellido en dos columnas -->
-        <div class="form-row">
-          <div class="form-field">
-            <label class="field-label">Nombre</label>
-            <input class="field-input" type="text" placeholder="Ej: María" bind:value={formFirstName} />
-          </div>
-          <div class="form-field">
-            <label class="field-label">Apellido</label>
-            <input class="field-input" type="text" placeholder="Ej: García" bind:value={formLastName} />
-          </div>
-        </div>
-
-        <!-- Nombre de usuario -->
+        <!-- Nombre de usuario (readonly en edit) -->
         <div class="form-field">
           <label class="field-label">Nombre de usuario</label>
-          <input class="field-input" type="text" placeholder="Ej: maria.garcia" bind:value={formUsername} />
+          <input
+            class="field-input"
+            type="text"
+            placeholder="Ej: maria.garcia"
+            bind:value={formUsername}
+            readonly={isEditMode}
+            class:field-readonly={isEditMode}
+          />
         </div>
 
-        <!-- Contraseña -->
+        <!-- Email (readonly en edit) -->
         <div class="form-field">
-          <label class="field-label">
-            {isEditMode ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña'}
-          </label>
-          <div class="password-wrapper">
-            <input
-              class="field-input"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Ingrese contraseña"
-              bind:value={formPassword}
-            />
-            <button class="eye-btn" onclick={() => showPassword = !showPassword} aria-label="Toggle contraseña">
-              {#if showPassword}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                </svg>
-              {:else}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-              {/if}
-            </button>
-          </div>
+          <label class="field-label">Correo electrónico</label>
+          <input
+            class="field-input"
+            type="email"
+            placeholder="Ej: maria@archivo.org"
+            bind:value={formEmail}
+            readonly={isEditMode}
+            class:field-readonly={isEditMode}
+          />
         </div>
 
-        <!-- Confirmar contraseña -->
-        <div class="form-field">
-          <label class="field-label">Confirmar contraseña</label>
-          <div class="password-wrapper">
-            <input
-              class="field-input"
-              type={showConfirm ? 'text' : 'password'}
-              placeholder="Confirme contraseña"
-              bind:value={formConfirm}
-            />
-            <button class="eye-btn" onclick={() => showConfirm = !showConfirm} aria-label="Toggle confirmar">
-              {#if showConfirm}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                </svg>
-              {:else}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-              {/if}
+        <!-- Contraseña (solo en create) -->
+        {#if !isEditMode}
+          <div class="form-field">
+            <label class="field-label">Contraseña</label>
+            <div class="password-wrapper">
+              <input
+                class="field-input"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Ingrese contraseña"
+                bind:value={formPassword}
+              />
+              <button class="eye-btn" onclick={() => showPassword = !showPassword} aria-label="Toggle contraseña">
+                {#if showPassword}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                {:else}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                {/if}
+              </button>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">Confirmar contraseña</label>
+            <div class="password-wrapper">
+              <input
+                class="field-input"
+                type={showConfirm ? 'text' : 'password'}
+                placeholder="Confirme contraseña"
+                bind:value={formConfirm}
+              />
+              <button class="eye-btn" onclick={() => showConfirm = !showConfirm} aria-label="Toggle confirmar">
+                {#if showConfirm}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                {:else}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                {/if}
+              </button>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Estado activo (solo en edit) -->
+        {#if isEditMode}
+          <div class="form-field">
+            <label class="field-label">Estado de la cuenta</label>
+            <button
+              class="active-toggle"
+              class:active={formIsActive}
+              onclick={() => formIsActive = !formIsActive}
+            >
+              <div class="toggle-track">
+                <div class="toggle-thumb"></div>
+              </div>
+              <span>{formIsActive ? 'Activo' : 'Inactivo'}</span>
             </button>
           </div>
-        </div>
+        {/if}
 
         <!-- Asignar rol — radio buttons estilizados como cards -->
         <div class="form-field">
@@ -681,7 +620,7 @@
                 onclick={() => formRole = roleOpt.value}
               >
                 <div class="role-option-icon">
-                  {#if roleOpt.icon === 'user'}
+                  {#if roleOpt.value === 'operator'}
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                       <circle cx="12" cy="7" r="4"/>
@@ -757,8 +696,8 @@
       <!-- Descripción con el nombre del usuario destacado -->
       <p class="confirm-desc">
         ¿Estás seguro que quieres eliminar a
-        <strong>{deletingUser.firstName} {deletingUser.lastName}</strong>
-        ({deletingUser.username})?
+        <strong>{deletingUser.username}</strong>
+        ({deletingUser.email})?
         Esta acción no se puede deshacer.
       </p>
 
@@ -1177,4 +1116,52 @@
 
   .btn-delete:hover    { opacity: 0.85; }
   .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Campo readonly en edit mode */
+  .field-readonly {
+    opacity: 0.6;
+    cursor: default;
+    background-color: var(--color-surface-alt, rgba(255,255,255,0.03));
+  }
+
+  /* Toggle activo/inactivo */
+  .active-toggle {
+    display: flex; align-items: center; gap: 10px;
+    background: none; border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 9px 14px; cursor: pointer;
+    font-family: var(--font-family); font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    transition: all var(--transition-fast); min-height: var(--touch-target-min);
+  }
+
+  .active-toggle.active { border-color: var(--color-primary); color: var(--color-primary); }
+
+  .toggle-track {
+    width: 36px; height: 20px;
+    background-color: var(--border-color);
+    border-radius: 10px; position: relative;
+    transition: background-color var(--transition-fast); flex-shrink: 0;
+  }
+
+  .active-toggle.active .toggle-track { background-color: var(--color-primary); }
+
+  .toggle-thumb {
+    width: 14px; height: 14px;
+    background-color: white; border-radius: 50%;
+    position: absolute; top: 3px; left: 3px;
+    transition: transform var(--transition-fast);
+  }
+
+  .active-toggle.active .toggle-thumb { transform: translateX(16px); }
+
+  /* Error de carga */
+  .load-error {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px;
+    background-color: rgba(214,103,74,0.08);
+    border: 1px solid var(--color-error);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm); color: var(--color-error);
+  }
 </style>

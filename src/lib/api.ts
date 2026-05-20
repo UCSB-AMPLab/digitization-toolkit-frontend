@@ -87,9 +87,13 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  role: 'admin' | 'operator' | 'reviewer';
   is_active: boolean;
   created_at?: string;
 }
+
+// Alias used by usersApi — same shape as what /auth/users returns
+export type UserRead = User;
 
 export interface AuthResponse {
   access_token: string;
@@ -149,6 +153,65 @@ export const authApi = {
       })
     });
   }
+};
+
+// ============================================================================
+// USERS API  (admin only)
+// ============================================================================
+
+export interface CreateUserData {
+  username: string;
+  email: string;
+  password: string;
+  role: 'admin' | 'operator' | 'reviewer';
+}
+
+export const usersApi = {
+  /** List all users. Requires admin token. */
+  async list(): Promise<UserRead[]> {
+    return apiRequest<UserRead[]>('/auth/users');
+  },
+
+  /** Get a single user by ID. Requires admin token. */
+  async getById(id: number): Promise<UserRead> {
+    return apiRequest<UserRead>(`/auth/users/${id}`);
+  },
+
+  /**
+   * Create a new user.
+   * /auth/register always creates as 'reviewer'; we immediately patch the
+   * role if the requested role is different.
+   */
+  async create(data: CreateUserData): Promise<UserRead> {
+    const user = await apiRequest<UserRead>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (data.role !== 'reviewer') {
+      return usersApi.updateRole(user.id, data.role);
+    }
+    return user;
+  },
+
+  /** Change a user's role. Requires admin token. */
+  async updateRole(id: number, role: 'admin' | 'operator' | 'reviewer'): Promise<UserRead> {
+    return apiRequest<UserRead>(`/auth/users/${id}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+  },
+
+  /** Activate or deactivate a user account. Requires admin token. */
+  async setActive(id: number, isActive: boolean): Promise<UserRead> {
+    return apiRequest<UserRead>(`/auth/users/${id}/active?is_active=${isActive}`, {
+      method: 'PATCH',
+    });
+  },
+
+  /** Delete a user permanently. Requires admin token. */
+  async delete(id: number): Promise<void> {
+    await apiRequest(`/auth/${id}`, { method: 'DELETE' });
+  },
 };
 
 // ============================================================================
