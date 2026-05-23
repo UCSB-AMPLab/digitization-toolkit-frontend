@@ -220,7 +220,7 @@
 
     <div class="kpi-card">
       <div class="kpi-line" style="background: var(--color-warning)"></div>
-      <div class="kpi-num">2</div>
+      <div class="kpi-num">—</div>
       <div class="kpi-lbl">Colaboradores</div>
     </div>
   </div>
@@ -481,23 +481,23 @@
   .kpi-card {
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 20px 20px 16px;
+    border-radius: var(--radius-lg);
+    padding: 12px 16px 10px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
   }
 
   /* Rayita de color en la parte superior */
   .kpi-line {
-    width: 32px;
-    height: 3px;
+    width: 24px;
+    height: 2px;
     border-radius: var(--radius-full);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
 
-  .kpi-num  { font-size: var(--text-h2); font-weight: var(--fw-extrabold); color: var(--color-light); margin: 0; line-height: 1; }
-  .kpi-lbl  { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
+  .kpi-num  { font-size: var(--text-h3); font-weight: var(--fw-extrabold); color: var(--color-light); margin: 0; line-height: 1; }
+  .kpi-lbl  { font-size: var(--text-xs); color: var(--color-light-grey); margin: 0; text-transform: uppercase; letter-spacing: 0.04em; }
 
   /* Toolbar */
   .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
