@@ -7,7 +7,7 @@
   //   - Búsqueda por nombre/código
   //   - Filtros (dropdown)
   //   - Botón "+ Nuevo Proyecto" → abre el modal de creación
-  //   - Tabla: Proyecto, Estado, Progreso, Equipo, Fecha Inicio, Acciones
+  //   - Tabla: Proyecto, Progreso, Equipo, Fecha Inicio, Acciones
   //   - Click en fila → navega a /shared/projects/{id}
   //
   // Modal "Crear Nuevo Proyecto" — 3 pasos:

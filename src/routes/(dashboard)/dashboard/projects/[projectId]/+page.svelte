@@ -57,9 +57,43 @@
   let showCreateModal = $state(false);
   let colName         = $state('');
   let colDesc         = $state('');
-  let colQuantity     = $state(0);
+  let colDateStart    = $state('');
+  let colDateEnd      = $state('');
+  let colCreator      = $state('');
+  let colSignatura    = $state('');
   let isCreating      = $state(false);
   let createError     = $state('');
+
+  /** Validates a partial ISO 8601 date: YYYY, YYYY-MM, or YYYY-MM-DD. */
+  function isValidISODate(s: string): boolean {
+    // Full date: YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [y, m, d] = s.split('-').map(Number);
+      if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+      const daysInMonth = new Date(y, m, 0).getDate();
+      return d <= daysInMonth;
+    }
+    // Year + month: YYYY-MM
+    if (/^\d{4}-\d{2}$/.test(s)) {
+      const m = Number(s.slice(5));
+      return m >= 1 && m <= 12;
+    }
+    // Year only: YYYY
+    if (/^\d{4}$/.test(s)) {
+      return Number(s) >= 1;
+    }
+    return false;
+  }
+
+  let dateError = $derived(
+    (colDateStart && !isValidISODate(colDateStart))
+      ? 'Fecha de inicio inválida. Acepta año (AAAA), año-mes (AAAA-MM) o fecha completa (AAAA-MM-DD).'
+      : (colDateEnd && !isValidISODate(colDateEnd))
+      ? 'Fecha de fin inválida. Acepta año (AAAA), año-mes (AAAA-MM) o fecha completa (AAAA-MM-DD).'
+      : (colDateStart && colDateEnd && colDateEnd < colDateStart)
+      ? 'La fecha de fin no puede ser anterior a la fecha de inicio.'
+      : ''
+  );
 
   // ---------------------------------------------------------------------------
   // AL MONTAR
@@ -178,6 +212,13 @@
     try {
       const isDemoToken = $authStore.token === 'demo-token';
 
+      const archMeta: Record<string, string> = {};
+      if (colDateStart)        archMeta.date_start = colDateStart;
+      if (colDateEnd)          archMeta.date_end   = colDateEnd;
+      if (colCreator.trim())   archMeta.creator    = colCreator.trim();
+      if (colSignatura.trim()) archMeta.signatura  = colSignatura.trim();
+      const archivalMetadata = Object.keys(archMeta).length > 0 ? archMeta : undefined;
+
       if (isDemoToken) {
         // Simular creación localmente sin backend
         const mockCollection = {
@@ -188,6 +229,7 @@
           created_at: new Date().toISOString(),
           created_by: $authStore.user?.username,
           record_count: 0,
+          archival_metadata: archivalMetadata,
         } as any;
         collections = [...collections, mockCollection];
       } else {
@@ -197,12 +239,15 @@
           description: colDesc.trim() || undefined,
           project_id: projectId,
           created_by: $authStore.user?.username,
+          archival_metadata: archivalMetadata,
         });
         await loadCollections();
       }
 
       showCreateModal = false;
-      colName = ''; colDesc = ''; colQuantity = 0;
+      colName = ''; colDesc = '';
+      colDateStart = ''; colDateEnd = '';
+      colCreator = ''; colSignatura = '';
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -216,7 +261,9 @@
   function closeModal() {
     showCreateModal = false;
     createError = '';
-    colName = ''; colDesc = ''; colQuantity = 0;
+    colName = ''; colDesc = '';
+    colDateStart = ''; colDateEnd = '';
+    colCreator = ''; colSignatura = '';
   }
 
   // ---------------------------------------------------------------------------
@@ -230,11 +277,6 @@
   // HELPERS DE UI (mock — conectar con backend)
   // ---------------------------------------------------------------------------
   const mockStatuses = ['Activa', 'Activa', 'Pausado', 'Activa', 'Completada'];
-  const mockManagers = [
-    { initials: 'MG', name: 'María García' },
-    { initials: 'PM', name: 'Pedro Mora' },
-    { initials: 'AR', name: 'Ana Ruiz' },
-  ];
 
   function getStatusStyle(status: string): string {
     if (status === 'Activa')     return 'color: var(--color-primary); background: rgba(90,140,98,0.15)';
@@ -339,7 +381,7 @@
             <th>Colección</th>
             <th>Estado</th>
             <th>Núm. Imágenes</th>
-            <th>Responsable</th>
+            <th>Creador</th>
             <th>Fecha</th>
             <th class="text-right">Acciones</th>
           </tr>
@@ -347,7 +389,6 @@
         <tbody>
           {#each filteredCollections as col, i}
             {@const status  = mockStatuses[i % mockStatuses.length]}
-            {@const manager = mockManagers[i % mockManagers.length]}
 
             <tr class="table-row" onclick={() => handleCollectionClick(col.id)}>
               <!-- Colección -->
@@ -360,7 +401,7 @@
                   </div>
                   <div>
                     <p class="col-name">{col.name}</p>
-                    <p class="col-code">COL-{String(i+1).padStart(3,'0')}</p>
+                    <p class="col-code">{col.archival_metadata?.signatura ?? (project?.signatura ? `${project.signatura}-${String(i+1).padStart(3,'0')}` : String(i+1).padStart(3,'0'))}</p>
                   </div>
                 </div>
               </td>
@@ -381,12 +422,9 @@
                 </div>
               </td>
 
-              <!-- Responsable -->
-              <td>
-                <div class="manager-cell">
-                  <div class="manager-av">{manager.initials}</div>
-                  <span>{manager.name}</span>
-                </div>
+              <!-- Creador -->
+              <td class="creator-td">
+                {col.archival_metadata?.creator ?? '—'}
               </td>
 
               <!-- Fecha -->
@@ -441,14 +479,9 @@
       </div>
 
       <div class="modal-body">
-        <!-- Nombre -->
+        <!-- Título -->
         <div class="form-field">
-          <label class="field-label">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            </svg>
-            NOMBRE DE LA COLECCIÓN
-          </label>
+          <label class="field-label">TÍTULO <span class="field-required">*</span></label>
           <input
             class="field-input"
             type="text"
@@ -458,32 +491,67 @@
           />
         </div>
 
-        <!-- Descripción -->
+        <!-- Signatura -->
         <div class="form-field">
-          <label class="field-label">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-            DESCRIPCIÓN
-          </label>
-          <textarea
-            class="field-textarea"
-            placeholder="Descripción breve de la colección..."
-            bind:value={colDesc}
-          ></textarea>
+          <label class="field-label">SIGNATURA</label>
+          <input
+            class="field-input"
+            type="text"
+            placeholder="Ej: CO.AGN.SAA-I.1.1.2"
+            bind:value={colSignatura}
+          />
         </div>
 
-        <!-- Cantidad estimada -->
+        <!-- Nombre del creador -->
         <div class="form-field">
-          <label class="field-label">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-            CANTIDAD ESTIMADA DE IMÁGENES
-          </label>
-          <input class="field-input" type="number" bind:value={colQuantity} min="0" />
+          <label class="field-label">NOMBRE DEL CREADOR</label>
+          <input
+            class="field-input"
+            type="text"
+            placeholder="Persona o institución que creó los documentos"
+            bind:value={colCreator}
+          />
+        </div>
+
+        <!-- Fechas de creación -->
+        <div class="form-field">
+          <label class="field-label">FECHAS DE CREACIÓN</label>
+          <div class="date-range-row">
+            <div class="date-field">
+              <span class="date-sub-label">DESDE</span>
+              <input
+                class="field-input"
+                class:field-input--error={colDateStart !== '' && !isValidISODate(colDateStart)}
+                type="text"
+                placeholder="Ej: 1987, 1987-04 o 1987-04-15"
+                bind:value={colDateStart}
+              />
+            </div>
+            <span class="date-sep">—</span>
+            <div class="date-field">
+              <span class="date-sub-label">HASTA (opcional)</span>
+              <input
+                class="field-input"
+                class:field-input--error={colDateEnd !== '' && !isValidISODate(colDateEnd)}
+                type="text"
+                placeholder="Ej: 1990, 1990-12 o 1990-12-31"
+                bind:value={colDateEnd}
+              />
+            </div>
+          </div>
+          {#if dateError}
+            <p class="date-error">{dateError}</p>
+          {/if}
+        </div>
+
+        <!-- Notas / Descripción -->
+        <div class="form-field">
+          <label class="field-label">NOTAS / DESCRIPCIÓN</label>
+          <textarea
+            class="field-textarea"
+            placeholder="Descripción breve u observaciones..."
+            bind:value={colDesc}
+          ></textarea>
         </div>
       </div>
 
@@ -503,7 +571,7 @@
         <button
           class="btn-crear"
           onclick={handleCreateCollection}
-          disabled={isCreating || !colName.trim()}
+          disabled={isCreating || !colName.trim() || dateError !== ''}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -1107,4 +1175,57 @@
 
   .add-member-select { flex: 1; min-width: 160px; }
   .add-role-select   { width: 120px; flex-shrink: 0; }
+
+  /* ── Archival date range ─────────────────────────────────── */
+  .date-range-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
+  .date-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .date-sub-label {
+    font-size: 10px;
+    font-weight: var(--fw-bold);
+    color: var(--color-light-grey);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .date-sep {
+    color: var(--color-light-grey);
+    padding-bottom: 10px;
+    flex-shrink: 0;
+    font-size: var(--text-base);
+  }
+
+  .date-error {
+    font-size: 12px;
+    color: var(--color-error);
+    margin: 2px 0 0;
+    line-height: 1.4;
+  }
+
+  .field-input--error {
+    border-color: var(--color-error) !important;
+  }
+
+  .field-required { color: var(--color-error); margin-left: 2px; }
+
+  /* Creator column in table */
+  .creator-td {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }
 </style>
