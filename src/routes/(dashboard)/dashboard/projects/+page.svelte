@@ -63,6 +63,21 @@
   // Lista de usuarios para el selector de operario
   let operatorUsers = $state<UserRead[]>([]);
 
+  // Proyecto siendo editado (null = modo creación)
+  let editingProject = $state<Project | null>(null);
+
+  // Menú de acciones abierto (id del proyecto)
+  let openMenuId = $state<number | null>(null);
+
+  // Cierra el menú al hacer click fuera
+  $effect(() => {
+    if (openMenuId !== null) {
+      const close = () => { openMenuId = null; };
+      document.addEventListener('click', close, { once: true });
+      return () => document.removeEventListener('click', close);
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // AL MONTAR: carga proyectos y usuarios operarios
   // ---------------------------------------------------------------------------
@@ -97,14 +112,24 @@
     createError = '';
 
     try {
-      await projectsApi.create({
-        name: formName.trim(),
-        description: formDesc.trim() || undefined,
-        fondo: formFondo.trim() || undefined,
-        serie: formSerie.trim() || undefined,
-        signatura: formSignatura.trim() || undefined,
-        created_by: $authStore.user?.username,
-      });
+      if (editingProject) {
+        await projectsApi.update(editingProject.id, {
+          name: formName.trim(),
+          description: formDesc.trim() || undefined,
+          fondo: formFondo.trim() || undefined,
+          serie: formSerie.trim() || undefined,
+          signatura: formSignatura.trim() || undefined,
+        });
+      } else {
+        await projectsApi.create({
+          name: formName.trim(),
+          description: formDesc.trim() || undefined,
+          fondo: formFondo.trim() || undefined,
+          serie: formSerie.trim() || undefined,
+          signatura: formSignatura.trim() || undefined,
+          created_by: $authStore.user?.username,
+        });
+      }
       await loadProjects();
       showCreateModal = false;
       resetForm();
@@ -120,7 +145,7 @@
     formName = ''; formDesc = '';
     formFondo = ''; formSerie = ''; formSignatura = '';
     formResolution = 'medium'; formOperator = '';
-    createError = '';
+    createError = ''; editingProject = null;
   }
 
   function closeModal() {
@@ -133,6 +158,40 @@
   // ---------------------------------------------------------------------------
   function handleProjectClick(id: number) {
     goto(`/dashboard/projects/${id}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // ACCIONES DE FILA
+  // ---------------------------------------------------------------------------
+  function openMenu(e: MouseEvent, id: number) {
+    e.stopPropagation();
+    openMenuId = openMenuId === id ? null : id;
+  }
+
+  function startEdit(e: MouseEvent, project: Project) {
+    e.stopPropagation();
+    openMenuId = null;
+    editingProject = project;
+    formName       = project.name;
+    formDesc       = project.description ?? '';
+    formFondo      = project.fondo ?? '';
+    formSerie      = project.serie ?? '';
+    formSignatura  = project.signatura ?? '';
+    formResolution = 'medium';
+    formOperator   = '';
+    showCreateModal = true;
+  }
+
+  async function confirmDelete(e: MouseEvent, project: Project) {
+    e.stopPropagation();
+    openMenuId = null;
+    if (!confirm(`¿Eliminar el proyecto "${project.name}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      await projectsApi.delete(project.id);
+      await loadProjects();
+    } catch (err) {
+      console.error('[Projects] Error eliminando:', err);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -275,19 +334,29 @@
                 </div>
               </td>
 
-              <!-- Acciones: botón Ver que navega al detalle del proyecto -->
+              <!-- Acciones -->
               <td class="text-right">
-                <button
-                  class="btn-ver"
-                  onclick={(e) => { e.stopPropagation(); handleProjectClick(project.id); }}
-                  title="Ver proyecto"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                  Ver
-                </button>
+                <div class="action-menu-wrap">
+                  <button
+                    class="btn-menu"
+                    onclick={(e) => openMenu(e, project.id)}
+                    title="Acciones"
+                  >
+                    <span class="material-symbols-outlined icon-sm">more_vert</span>
+                  </button>
+                  {#if openMenuId === project.id}
+                    <div class="action-menu">
+                      <button class="action-item" onclick={(e) => startEdit(e, project)}>
+                        <span class="material-symbols-outlined icon-sm">edit</span>
+                        Editar
+                      </button>
+                      <button class="action-item action-item-danger" onclick={(e) => confirmDelete(e, project)}>
+                        <span class="material-symbols-outlined icon-sm">delete</span>
+                        Eliminar
+                      </button>
+                    </div>
+                  {/if}
+                </div>
               </td>
             </tr>
           {/each}
@@ -310,7 +379,7 @@
       <!-- Cabecera -->
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">Nuevo Proyecto</h3>
+          <h3 class="modal-title">{editingProject ? 'Editar Proyecto' : 'Nuevo Proyecto'}</h3>
         </div>
         <button class="modal-close" onclick={closeModal}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -403,12 +472,12 @@
         >
           {#if isCreating}
             <div class="spinner-sm"></div>
-            Creando…
+            {editingProject ? 'Guardando…' : 'Creando…'}
           {:else}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            Crear proyecto
+            {editingProject ? 'Guardar cambios' : 'Crear proyecto'}
           {/if}
         </button>
       </div>
@@ -496,39 +565,48 @@
 
   .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
 
-  /* Botón Ver en la tabla de proyectos */
-  .btn-ver {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    background: none;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-semibold);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    white-space: nowrap;
-    min-height: 0;
-  }
+  /* Dropdown de acciones por fila */
+  .action-menu-wrap { position: relative; display: inline-flex; justify-content: flex-end; }
 
-  .btn-ver:hover { border-color: var(--color-primary); color: var(--color-primary); }
-
-  .btn-icon {
+  .btn-menu {
     width: 32px; height: 32px;
-    background: none; border: none;
+    background: none; border: 1px solid transparent;
+    border-radius: var(--radius-sm);
     display: flex; align-items: center; justify-content: center;
     color: var(--color-light-grey);
     cursor: pointer;
-    border-radius: var(--radius-sm);
     transition: all var(--transition-fast);
-    min-height: 0;
   }
 
-  .btn-icon:hover { background-color: rgba(255,255,255,0.05); color: var(--color-light); }
+  .btn-menu:hover { background-color: var(--color-surface-alt); border-color: var(--border-color); color: var(--color-light); }
+
+  .action-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 140px;
+    z-index: 50;
+    overflow: hidden;
+  }
+
+  .action-item {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 9px 14px;
+    background: none; border: none;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color var(--transition-fast);
+  }
+
+  .action-item:hover { background-color: var(--color-surface); color: var(--color-light); }
+  .action-item-danger:hover { color: var(--color-error); }
 
   /* Error en modal */
   .create-error {
