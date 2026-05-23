@@ -649,8 +649,14 @@
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-xl);
-    overflow: hidden;
+    overflow: visible;
   }
+
+  /* Round table corners without overflow:hidden */
+  .projects-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-xl); }
+  .projects-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-xl); }
+  .projects-table tbody tr:last-child td:first-child  { border-bottom-left-radius: var(--radius-xl); }
+  .projects-table tbody tr:last-child td:last-child   { border-bottom-right-radius: var(--radius-xl); }
 
   .projects-table {
     width: 100%;
