@@ -19,7 +19,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { projectsApi, type Project } from '$lib/api';
+  import { projectsApi, collectionsApi, recordsApi, type Project } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Lista de proyectos
@@ -63,6 +63,18 @@
 
   // Menú de acciones abierto (id del proyecto)
   let openMenuId = $state<number | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // ESTADO: Modal de eliminación con opción de mover colecciones
+  // ---------------------------------------------------------------------------
+  let showDeleteModal      = $state(false);
+  let deletingProject      = $state<Project | null>(null);
+  let deleteCollectionCount = $state(0);
+  let deleteImageCount     = $state(0);
+  let deleteMoveTarget     = $state<number | ''>('');
+  let isDeleting           = $state(false);
+  let deleteError          = $state('');
+  let isLoadingDeleteInfo  = $state(false);
 
   // Cierra el menú al hacer click fuera
   $effect(() => {
@@ -165,20 +177,56 @@
     formFondo      = project.fondo ?? '';
     formSerie      = project.serie ?? '';
     formSignatura  = project.signatura ?? '';
-    formResolution = 'medium';
-    formOperator   = '';
     showCreateModal = true;
   }
 
-  async function confirmDelete(e: MouseEvent, project: Project) {
+  async function openDeleteModal(e: MouseEvent, project: Project) {
     e.stopPropagation();
     openMenuId = null;
-    if (!confirm(`¿Eliminar el proyecto "${project.name}"? Esta acción no se puede deshacer.`)) return;
+    deletingProject = project;
+    deleteMoveTarget = '';
+    deleteError = '';
+    deleteCollectionCount = 0;
+    deleteImageCount = 0;
+    showDeleteModal = true;
+    isLoadingDeleteInfo = true;
     try {
-      await projectsApi.delete(project.id);
-      await loadProjects();
+      const [cols, imgs] = await Promise.all([
+        collectionsApi.list({ project_id: project.id }),
+        recordsApi.count({ project_id: project.id }),
+      ]);
+      deleteCollectionCount = cols.length;
+      deleteImageCount = imgs;
     } catch (err) {
-      console.error('[Projects] Error eliminando:', err);
+      console.error('[Projects] Error obteniendo info del proyecto:', err);
+    } finally {
+      isLoadingDeleteInfo = false;
+    }
+  }
+
+  function closeDeleteModal() {
+    showDeleteModal = false;
+    deletingProject = null;
+    deleteMoveTarget = '';
+    deleteError = '';
+    isDeleting = false;
+  }
+
+  async function executeDelete() {
+    if (!deletingProject) return;
+    isDeleting = true;
+    deleteError = '';
+    try {
+      if (deleteMoveTarget !== '') {
+        await projectsApi.moveCollections(deletingProject.id, deleteMoveTarget as number);
+      }
+      await projectsApi.delete(deletingProject.id);
+      await loadProjects();
+      closeDeleteModal();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      deleteError = `No se pudo eliminar el proyecto: ${msg}`;
+      isDeleting = false;
     }
   }
 
@@ -338,7 +386,7 @@
                         <span class="material-symbols-outlined icon-sm">edit</span>
                         Editar
                       </button>
-                      <button class="action-item action-item-danger" onclick={(e) => confirmDelete(e, project)}>
+                      <button class="action-item action-item-danger" onclick={(e) => openDeleteModal(e, project)}>
                         <span class="material-symbols-outlined icon-sm">delete</span>
                         Eliminar
                       </button>
@@ -447,6 +495,115 @@
             {editingProject ? 'Guardar cambios' : 'Crear proyecto'}
           {/if}
         </button>
+      </div>
+
+    </div>
+  </div>
+{/if}
+
+<!-- ============================================================
+     MODAL: Eliminar Proyecto
+     ============================================================ -->
+{#if showDeleteModal && deletingProject}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeDeleteModal(); }}>
+    <div class="modal-card delete-modal-card">
+
+      <!-- Cabecera -->
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Eliminar proyecto</h3>
+          <p class="modal-subtitle">"{deletingProject.name}"</p>
+        </div>
+        <button class="modal-close" onclick={closeDeleteModal}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      {#if isLoadingDeleteInfo}
+        <div class="delete-loading">
+          <div class="spinner"></div>
+          <span>Verificando contenido...</span>
+        </div>
+      {:else if deleteCollectionCount > 0}
+        <!-- Proyecto NO vacío — aviso + opción de mover -->
+        <div class="delete-warning">
+          <div class="delete-warning-icon">
+            <span class="material-symbols-outlined icon-md">warning</span>
+          </div>
+          <div>
+            <p class="delete-warning-title">Este proyecto no está vacío</p>
+            <p class="delete-warning-body">
+              Contiene <strong>{deleteCollectionCount} {deleteCollectionCount === 1 ? 'colección' : 'colecciones'}</strong>
+              {#if deleteImageCount > 0}
+                con <strong>{deleteImageCount} {deleteImageCount === 1 ? 'imagen' : 'imágenes'}</strong>
+              {/if}.
+              Si lo eliminas sin mover, todo el contenido se perderá de forma permanente.
+            </p>
+          </div>
+        </div>
+
+        <div class="delete-move-section">
+          <label class="field-label">MOVER COLECCIONES A OTRO PROYECTO (OPCIONAL)</label>
+          <select class="field-input" bind:value={deleteMoveTarget}>
+            <option value="">— Eliminar sin mover —</option>
+            {#each projects.filter(p => p.id !== deletingProject!.id) as p}
+              <option value={p.id}>{p.name}</option>
+            {/each}
+          </select>
+          {#if deleteMoveTarget !== ''}
+            <p class="delete-move-hint">
+              Las {deleteCollectionCount} {deleteCollectionCount === 1 ? 'colección' : 'colecciones'} se moverán antes de eliminar el proyecto.
+            </p>
+          {/if}
+        </div>
+
+      {:else}
+        <!-- Proyecto vacío — confirmación simple -->
+        <p class="delete-confirm-text">
+          ¿Estás seguro de que deseas eliminar <strong>"{deletingProject.name}"</strong>?
+          Esta acción no se puede deshacer.
+        </p>
+      {/if}
+
+      <!-- Error -->
+      {#if deleteError}
+        <div class="create-error">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+          {deleteError}
+        </div>
+      {/if}
+
+      <!-- Footer -->
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick={closeDeleteModal} disabled={isDeleting}>Cancelar</button>
+        {#if deleteCollectionCount > 0 && deleteMoveTarget !== ''}
+          <button class="btn-danger" onclick={executeDelete} disabled={isDeleting}>
+            {#if isDeleting}
+              <div class="spinner-sm"></div>
+              Moviendo y eliminando…
+            {:else}
+              <span class="material-symbols-outlined icon-sm">drive_file_move</span>
+              Mover y eliminar
+            {/if}
+          </button>
+        {:else}
+          <button class="btn-danger" onclick={executeDelete} disabled={isDeleting || isLoadingDeleteInfo}>
+            {#if isDeleting}
+              <div class="spinner-sm"></div>
+              Eliminando…
+            {:else}
+              <span class="material-symbols-outlined icon-sm">delete</span>
+              {deleteCollectionCount > 0 ? 'Eliminar sin mover' : 'Eliminar proyecto'}
+            {/if}
+          </button>
+        {/if}
       </div>
 
     </div>
@@ -809,4 +966,79 @@
   }
 
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Delete modal ──────────────────────────────────────── */
+  .delete-modal-card { max-width: 480px; }
+
+  .delete-loading {
+    display: flex; align-items: center; gap: 12px;
+    color: var(--color-light-grey);
+    font-size: var(--text-sm);
+    padding: 8px 0;
+  }
+
+  .delete-warning {
+    display: flex; gap: 14px; align-items: flex-start;
+    background-color: rgba(208,100,60,0.1);
+    border: 1px solid rgba(208,100,60,0.35);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+  }
+
+  .delete-warning-icon {
+    color: var(--color-error);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .delete-warning-title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-bold);
+    color: var(--color-error);
+    margin: 0 0 4px;
+  }
+
+  .delete-warning-body {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .delete-move-section {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  .delete-move-hint {
+    font-size: 12px;
+    color: var(--color-primary);
+    margin: 0;
+    padding-left: 2px;
+  }
+
+  .delete-confirm-text {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .btn-danger {
+    display: flex; align-items: center; gap: 8px;
+    background-color: var(--color-error);
+    color: white;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-bold);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 9px 18px;
+    min-height: var(--touch-target-min);
+    cursor: pointer;
+    transition: background-color var(--transition-base);
+    white-space: nowrap;
+  }
+
+  .btn-danger:hover { filter: brightness(1.15); }
+  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
