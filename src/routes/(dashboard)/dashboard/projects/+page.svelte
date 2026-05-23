@@ -51,7 +51,9 @@
   // Campos del formulario
   let formName       = $state('');
   let formDesc       = $state('');
-  let formLocation   = $state('');
+  let formFondo      = $state('');
+  let formSerie      = $state('');
+  let formSignatura  = $state('');
   let formResolution = $state<'low' | 'medium' | 'high'>('medium');
   let formOperator   = $state('');
 
@@ -98,6 +100,9 @@
       await projectsApi.create({
         name: formName.trim(),
         description: formDesc.trim() || undefined,
+        fondo: formFondo.trim() || undefined,
+        serie: formSerie.trim() || undefined,
+        signatura: formSignatura.trim() || undefined,
         created_by: $authStore.user?.username,
       });
       await loadProjects();
@@ -112,7 +117,8 @@
   }
 
   function resetForm() {
-    formName = ''; formDesc = ''; formLocation = '';
+    formName = ''; formDesc = '';
+    formFondo = ''; formSerie = ''; formSignatura = '';
     formResolution = 'medium'; formOperator = '';
     createError = '';
   }
@@ -144,10 +150,7 @@
   }
 
   // Progreso simulado (conectar con backend cuando esté disponible)
-  const mockProgress = [45, 12, 89, 60, 100];
   const mockStatuses = ['En Progreso', 'Iniciado', 'Revisión', 'Pausado', 'Completado'];
-  const mockTeams = [['MG','JL'], ['PM'], ['AR','JL'], ['MG','PM'], ['AR']];
-
 </script>
 
 <!-- ============================================================
@@ -159,7 +162,7 @@
   <div class="page-header">
     <div>
       <h1 class="page-title">Gestión de Proyectos</h1>
-      <p class="page-subtitle">Administra los expedientes y asignaciones</p>
+      <p class="page-subtitle">Fondos, series, secciones</p>
     </div>
     <!-- Botón "Nuevo Proyecto" solo visible cuando ya hay proyectos -->
     {#if canCreate && projects.length > 0}
@@ -215,18 +218,15 @@
         <thead>
           <tr>
             <th>Proyecto</th>
+            <th>Referencia</th>
             <th>Estado</th>
-            <th>Progreso</th>
-            <th>Equipo</th>
             <th>Fecha Inicio</th>
             <th class="text-right">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {#each filteredProjects as project, i}
-            {@const progress = mockProgress[i % mockProgress.length]}
-            {@const status   = mockStatuses[i % mockStatuses.length]}
-            {@const team     = mockTeams[i % mockTeams.length]}
+            {@const status = mockStatuses[i % mockStatuses.length]}
 
             <tr onclick={() => handleProjectClick(project.id)} class="table-row">
               <!-- Proyecto -->
@@ -239,40 +239,29 @@
                   </div>
                   <div>
                     <p class="project-name">{project.name}</p>
-                    <p class="project-code">{project.description?.slice(0, 20) ?? '—'}</p>
+                    <p class="project-code">{project.description?.slice(0, 30) ?? '—'}</p>
                   </div>
                 </div>
+              </td>
+
+              <!-- Referencia archivística -->
+              <td>
+                {#if project.signatura}
+                  <span class="signatura-badge">{project.signatura}</span>
+                {:else if project.fondo || project.serie}
+                  <div class="breadcrumb-cell">
+                    {#if project.fondo}<span class="breadcrumb-part">{project.fondo}</span>{/if}
+                    {#if project.fondo && project.serie}<span class="breadcrumb-sep">›</span>{/if}
+                    {#if project.serie}<span class="breadcrumb-part">{project.serie}</span>{/if}
+                  </div>
+                {:else}
+                  <span class="text-muted">—</span>
+                {/if}
               </td>
 
               <!-- Estado -->
               <td>
                 <span class="status-badge" style={getStatusStyle(status)}>{status}</span>
-              </td>
-
-              <!-- Progreso -->
-              <td>
-                <div class="progress-cell">
-                  <span class="progress-pct">{progress}%</span>
-                  <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" style="width:{progress}%"></div>
-                  </div>
-                </div>
-              </td>
-
-              <!-- Equipo -->
-              <td>
-                <div class="team-cell">
-                  {#each team as member}
-                    <div class="team-avatar">{member}</div>
-                  {/each}
-                  {#if canCreate}
-                    <div class="team-add">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                      </svg>
-                    </div>
-                  {/if}
-                </div>
               </td>
 
               <!-- Fecha -->
@@ -322,7 +311,6 @@
       <div class="modal-header">
         <div>
           <h3 class="modal-title">Nuevo Proyecto</h3>
-          <p class="modal-subtitle">Completa los datos para crear el proyecto</p>
         </div>
         <button class="modal-close" onclick={closeModal}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -355,14 +343,20 @@
           />
         </div>
 
+        <div class="form-row">
+          <div class="form-field">
+            <label class="field-label">FONDO</label>
+            <input class="field-input" type="text" placeholder="Ej: Archivo Anexo: Grupo I" bind:value={formFondo} />
+          </div>
+          <div class="form-field">
+            <label class="field-label">SERIE / SECCIÓN</label>
+            <input class="field-input" type="text" placeholder="Ej: Aduanas" bind:value={formSerie} />
+          </div>
+        </div>
+
         <div class="form-field">
-          <label class="field-label">UBICACIÓN FÍSICA</label>
-          <input
-            class="field-input"
-            type="text"
-            placeholder="Ej: Estante 4, Caja 12"
-            bind:value={formLocation}
-          />
+          <label class="field-label">SIGNATURA ARCHIVÍSTICA</label>
+          <input class="field-input" type="text" placeholder="Ej: CO.AGN.SAA-I.1.1.1" bind:value={formSignatura} />
         </div>
 
         <div class="form-row">
@@ -630,6 +624,23 @@
   .project-name { font-weight: var(--fw-semibold); color: var(--color-light); margin: 0 0 2px; }
   .project-code { font-size: 11px; color: var(--color-light-grey); margin: 0; }
 
+  /* Archival reference column */
+  .signatura-badge {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    color: var(--color-secondary);
+    background-color: rgba(150,177,240,0.1);
+    border: 1px solid rgba(150,177,240,0.25);
+    border-radius: var(--radius-sm);
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+
+  .breadcrumb-cell { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; max-width: 240px; }
+  .breadcrumb-part { font-size: 12px; color: var(--color-light-grey); }
+  .breadcrumb-sep { font-size: 12px; color: var(--color-light-grey); opacity: 0.4; }
+  .text-muted { font-size: var(--text-sm); color: var(--color-light-grey); opacity: 0.4; }
+
   .status-badge {
     display: inline-block;
     padding: 3px 10px;
@@ -638,51 +649,6 @@
     font-weight: var(--fw-semibold);
     white-space: nowrap;
   }
-
-  .progress-cell { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
-  .progress-pct  { font-size: 11px; color: var(--color-light-grey); }
-
-  .progress-bar-bg {
-    height: 4px;
-    background-color: var(--color-surface-alt);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-  }
-
-  .progress-bar-fill {
-    height: 100%;
-    background-color: var(--color-primary);
-    border-radius: var(--radius-full);
-    transition: width var(--transition-slow);
-  }
-
-  .team-cell { display: flex; align-items: center; gap: -4px; }
-
-  .team-avatar {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background-color: rgba(188,130,60,0.2);
-    border: 2px solid var(--color-surface);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: var(--fw-bold);
-    color: var(--color-warning);
-    margin-right: -4px;
-    flex-shrink: 0;
-  }
-
-  .team-add {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background-color: var(--color-surface-alt);
-    border: 2px solid var(--color-surface);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey);
-    cursor: pointer;
-    margin-right: -4px;
-    transition: all var(--transition-fast);
-  }
-
-  .team-add:hover { background-color: var(--color-primary); color: white; }
 
   .date-cell { display: flex; align-items: center; gap: 7px; color: var(--color-light-grey); font-size: var(--text-sm); white-space: nowrap; }
 

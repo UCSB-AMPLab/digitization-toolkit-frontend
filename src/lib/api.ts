@@ -222,6 +222,9 @@ export interface Project {
   id: number;
   name: string;
   description?: string;
+  fondo?: string;
+  serie?: string;
+  signatura?: string;
   created_at: string;
   created_by?: string;
 }
@@ -229,12 +232,18 @@ export interface Project {
 export interface CreateProjectData {
   name: string;
   description?: string;
+  fondo?: string;
+  serie?: string;
+  signatura?: string;
   created_by?: string;
 }
 
 export interface UpdateProjectData {
   name?: string;
   description?: string;
+  fondo?: string;
+  serie?: string;
+  signatura?: string;
 }
 
 export const projectsApi = {
