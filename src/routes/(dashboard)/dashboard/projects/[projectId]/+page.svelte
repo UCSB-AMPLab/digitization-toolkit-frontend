@@ -274,6 +274,35 @@
   }
 
   // ---------------------------------------------------------------------------
+  // MENÚ DE ACCIONES POR COLECCIÓN
+  // ---------------------------------------------------------------------------
+  let openColMenuId = $state<number | null>(null);
+
+  $effect(() => {
+    if (openColMenuId !== null) {
+      const close = () => { openColMenuId = null; };
+      document.addEventListener('click', close, { once: true });
+      return () => document.removeEventListener('click', close);
+    }
+  });
+
+  function openColMenu(e: MouseEvent, id: number) {
+    e.stopPropagation();
+    openColMenuId = openColMenuId === id ? null : id;
+  }
+
+  async function deleteCollection(e: MouseEvent, colId: number) {
+    e.stopPropagation();
+    openColMenuId = null;
+    try {
+      await collectionsApi.delete(colId);
+      await loadCollections();
+    } catch (err) {
+      console.error('[ProjectDetail] Error eliminando colección:', err);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // HELPERS DE UI (mock — conectar con backend)
   // ---------------------------------------------------------------------------
   const mockStatuses = ['Activa', 'Activa', 'Pausado', 'Activa', 'Completada'];
@@ -381,7 +410,6 @@
             <th>Colección</th>
             <th>Estado</th>
             <th>Núm. Imágenes</th>
-            <th>Creador</th>
             <th>Fecha</th>
             <th class="text-right">Acciones</th>
           </tr>
@@ -422,11 +450,6 @@
                 </div>
               </td>
 
-              <!-- Creador -->
-              <td class="creator-td">
-                {col.archival_metadata?.creator ?? '—'}
-              </td>
-
               <!-- Fecha -->
               <td>
                 <div class="date-cell">
@@ -438,15 +461,29 @@
                 </div>
               </td>
 
-              <!-- Acciones: botón Ver -->
+              <!-- Acciones -->
               <td class="text-right">
-                <button class="btn-ver" onclick={(e) => { e.stopPropagation(); handleCollectionClick(col.id); }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                  Ver
-                </button>
+                <div class="action-menu-wrap">
+                  <button
+                    class="btn-menu"
+                    onclick={(e) => openColMenu(e, col.id)}
+                    title="Acciones"
+                  >
+                    <span class="material-symbols-outlined icon-sm">more_vert</span>
+                  </button>
+                  {#if openColMenuId === col.id}
+                    <div class="action-menu">
+                      <button class="action-item" onclick={(e) => { e.stopPropagation(); handleCollectionClick(col.id); }}>
+                        <span class="material-symbols-outlined icon-sm">folder_open</span>
+                        Abrir
+                      </button>
+                      <button class="action-item action-item-danger" onclick={(e) => deleteCollection(e, col.id)}>
+                        <span class="material-symbols-outlined icon-sm">delete</span>
+                        Eliminar
+                      </button>
+                    </div>
+                  {/if}
+                </div>
               </td>
             </tr>
           {/each}
@@ -905,23 +942,47 @@
 
   .date-cell { display: flex; align-items: center; gap: 7px; color: var(--color-light-grey); white-space: nowrap; }
 
-  .btn-ver {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 14px;
-    background: none;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
+  .action-menu-wrap { position: relative; display: inline-flex; justify-content: flex-end; }
+
+  .btn-menu {
+    width: 32px; height: 32px;
+    background: none; border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
     color: var(--color-light-grey);
     cursor: pointer;
     transition: all var(--transition-fast);
-    min-height: 0;
-    white-space: nowrap;
   }
 
-  .btn-ver:hover { border-color: var(--color-primary); color: var(--color-primary); }
+  .btn-menu:hover { background-color: var(--color-surface-alt); border-color: var(--border-color); color: var(--color-light); }
+
+  .action-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 140px;
+    z-index: 50;
+    overflow: hidden;
+  }
+
+  .action-item {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 9px 14px;
+    background: none; border: none;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color var(--transition-fast);
+  }
+
+  .action-item:hover { background-color: var(--color-surface); color: var(--color-light); }
+  .action-item-danger:hover { color: var(--color-error); }
 
   /* ── Modal ── */
   .modal-backdrop {
@@ -1219,13 +1280,5 @@
 
   .field-required { color: var(--color-error); margin-left: 2px; }
 
-  /* Creator column in table */
-  .creator-td {
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 160px;
-  }
+
 </style>
