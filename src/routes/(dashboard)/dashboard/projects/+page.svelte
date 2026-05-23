@@ -6,7 +6,7 @@
   // Tabla de proyectos con:
   //   - Búsqueda por nombre/código
   //   - Filtros (dropdown)
-  //   - Botón "+ Nuevo Proyecto" → abre el modal wizard de 3 pasos
+  //   - Botón "+ Nuevo Proyecto" → abre el modal de creación
   //   - Tabla: Proyecto, Estado, Progreso, Equipo, Fecha Inicio, Acciones
   //   - Click en fila → navega a /shared/projects/{id}
   //
@@ -19,7 +19,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { projectsApi, type Project } from '$lib/api';
+  import { projectsApi, usersApi, type Project, type UserRead } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Lista de proyectos
@@ -38,43 +38,40 @@
       : projects
   );
 
-  // ¿El usuario puede crear proyectos?
-  // Solo admin puede crear proyectos
-  let canCreate = $derived($authStore.user?.role === 'admin');
+  // ¿El usuario puede crear proyectos? (admin y operator)
+  let canCreate = $derived(
+    $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
+  );
 
   // ---------------------------------------------------------------------------
-  // ESTADO: Modal de crear proyecto (wizard 3 pasos)
+  // ESTADO: Modal de crear proyecto (formulario simplificado)
   // ---------------------------------------------------------------------------
   let showCreateModal = $state(false);
-  let wizardStep      = $state(1); // 1, 2 o 3
 
-
-  // Datos del formulario — paso 1: información
-  let formName      = $state('');
-  let formDesc      = $state('');
-  let formLocation  = $state('');
-  let formQuantity  = $state(0);
-  let formDate      = $state('');
-  let formPriority  = $state('');
-
-  // Datos del formulario — paso 2: configuración
-  let formDpi       = $state<300 | 600 | 1200>(300);
-  let formFormat    = $state<'TIFF' | 'JPEG' | 'PNG'>('TIFF');
-  let formColorMode = $state('');
-
-  // Datos del formulario — paso 3: equipo
-  let formOperator  = $state('');
-  let formReviewer  = $state('');
+  // Campos del formulario
+  let formName       = $state('');
+  let formDesc       = $state('');
+  let formLocation   = $state('');
+  let formResolution = $state<'low' | 'medium' | 'high'>('medium');
+  let formOperator   = $state('');
 
   let isCreating  = $state(false);
-  // Mensaje de error visible en el modal (vacio = sin error)
   let createError = $state('');
 
+  // Lista de usuarios para el selector de operario
+  let operatorUsers = $state<UserRead[]>([]);
+
   // ---------------------------------------------------------------------------
-  // AL MONTAR: carga proyectos
+  // AL MONTAR: carga proyectos y usuarios operarios
   // ---------------------------------------------------------------------------
   onMount(async () => {
     await loadProjects();
+    try {
+      const allUsers = await usersApi.list();
+      operatorUsers = allUsers.filter(u => u.is_active && (u.role === 'operator' || u.role === 'admin'));
+    } catch {
+      // no-op: selector queda vacío si falla
+    }
   });
 
   async function loadProjects() {
@@ -91,9 +88,6 @@
 
   // ---------------------------------------------------------------------------
   // CREAR PROYECTO
-  // En modo demo (token = demo-token): simula localmente sin llamar al backend
-  // En produccion: llama a projectsApi.create()
-  // Si hay error: lo muestra al usuario en el modal
   // ---------------------------------------------------------------------------
   async function handleCreateProject() {
     if (!formName.trim()) return;
@@ -101,35 +95,17 @@
     createError = '';
 
     try {
-      const isDemoToken = $authStore.token === 'demo-token';
-
-      if (isDemoToken) {
-        // Modo demo: agregar localmente sin backend
-        const mockProject = {
-          id: Date.now(),
-          name: formName.trim(),
-          description: formDesc.trim() || undefined,
-          created_at: new Date().toISOString(),
-          created_by: $authStore.user?.username,
-        } as any;
-        projects = [...projects, mockProject];
-      } else {
-        // Modo real: llamada al backend
-        await projectsApi.create({
-          name: formName.trim(),
-          description: formDesc.trim() || undefined,
-          created_by: $authStore.user?.username,
-        });
-        await loadProjects();
-      }
-
+      await projectsApi.create({
+        name: formName.trim(),
+        description: formDesc.trim() || undefined,
+        created_by: $authStore.user?.username,
+      });
+      await loadProjects();
       showCreateModal = false;
       resetForm();
-
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       createError = `No se pudo crear el proyecto: ${msg}`;
-      console.error('[Projects] Error creando:', err);
     } finally {
       isCreating = false;
     }
@@ -137,15 +113,12 @@
 
   function resetForm() {
     formName = ''; formDesc = ''; formLocation = '';
-    formQuantity = 0; formDate = ''; formPriority = '';
-    formDpi = 300; formFormat = 'TIFF'; formColorMode = '';
-    formOperator = ''; formReviewer = '';
-    wizardStep = 1;
+    formResolution = 'medium'; formOperator = '';
+    createError = '';
   }
 
   function closeModal() {
     showCreateModal = false;
-    createError = '';
     resetForm();
   }
 
@@ -175,9 +148,6 @@
   const mockStatuses = ['En Progreso', 'Iniciado', 'Revisión', 'Pausado', 'Completado'];
   const mockTeams = [['MG','JL'], ['PM'], ['AR','JL'], ['MG','PM'], ['AR']];
 
-  // Avanzar / retroceder wizard
-  function nextStep() { if (wizardStep < 3) wizardStep++; }
-  function prevStep() { if (wizardStep > 1) wizardStep--; }
 </script>
 
 <!-- ============================================================
@@ -340,7 +310,7 @@
 </div>
 
 <!-- ============================================================
-     MODAL: Crear Nuevo Proyecto (wizard 3 pasos)
+     MODAL: Crear Nuevo Proyecto
      ============================================================ -->
 {#if showCreateModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -348,11 +318,11 @@
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal(); }}>
     <div class="modal-card">
 
-      <!-- Cabecera del modal -->
+      <!-- Cabecera -->
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">Crear Nuevo Proyecto</h3>
-          <p class="modal-subtitle">Asistente de configuración de proyecto</p>
+          <h3 class="modal-title">Nuevo Proyecto</h3>
+          <p class="modal-subtitle">Completa los datos para crear el proyecto</p>
         </div>
         <button class="modal-close" onclick={closeModal}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -361,189 +331,64 @@
         </button>
       </div>
 
-      <!-- Indicador de pasos -->
-      <!--
-        Layout correcto (imagen 2):
-        - Cada paso: ícono centrado arriba + label centrado abajo (flex-direction: column)
-        - Líneas conectoras entre pasos, alineadas al centro del ícono
-        Las líneas se ponen ENTRE los divs de paso, no dentro de ellos
-      -->
-      <div class="wizard-steps">
-        {#each [
-          { step: 1, icon: 'doc',   label: 'Información' },
-          { step: 2, icon: 'gear',  label: 'Configuración' },
-          { step: 3, icon: 'users', label: 'Equipo' },
-        ] as s, i}
+      <!-- Formulario -->
+      <div class="form-section">
 
-          <!-- Línea conectora: aparece ANTES de cada paso excepto el primero -->
-          {#if i > 0}
-            <div class="step-connector" class:done={wizardStep > i}></div>
-          {/if}
+        <div class="form-field">
+          <label class="field-label">NOMBRE DEL PROYECTO <span class="field-required">*</span></label>
+          <input
+            class="field-input"
+            type="text"
+            placeholder="Ej: Fondo Colonial 2024"
+            bind:value={formName}
+            autofocus
+          />
+        </div>
 
-          <!-- Paso: ícono + label en columna -->
-          <div class="wizard-step" class:active={wizardStep === s.step} class:done={wizardStep > s.step}>
-            <div class="step-icon-wrap">
-              {#if s.icon === 'doc'}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-              {:else if s.icon === 'gear'}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="3"/>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-              {:else}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-              {/if}
-            </div>
-            <span class="step-label">{s.label}</span>
+        <div class="form-field">
+          <label class="field-label">DESCRIPCIÓN</label>
+          <input
+            class="field-input"
+            type="text"
+            placeholder="Breve descripción del contenido"
+            bind:value={formDesc}
+          />
+        </div>
+
+        <div class="form-field">
+          <label class="field-label">UBICACIÓN FÍSICA</label>
+          <input
+            class="field-input"
+            type="text"
+            placeholder="Ej: Estante 4, Caja 12"
+            bind:value={formLocation}
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label class="field-label">RESOLUCIÓN DE CAPTURA</label>
+            <select class="field-input" bind:value={formResolution}>
+              <option value="low">Baja (300 DPI)</option>
+              <option value="medium">Media (600 DPI)</option>
+              <option value="high">Alta (1200 DPI)</option>
+            </select>
           </div>
 
-        {/each}
-      </div>
-
-      <!-- Contenido por paso -->
-      <div class="wizard-body">
-
-        <!-- PASO 1: Información -->
-        {#if wizardStep === 1}
-          <div class="form-grid">
-            <div class="form-field full">
-              <label class="field-label">NOMBRE DEL PROYECTO</label>
-              <input class="field-input" type="text" placeholder="Ej: Fondo Colonial 2023" bind:value={formName} />
-            </div>
-            <div class="form-field full">
-              <label class="field-label">DESCRIPCIÓN</label>
-              <input class="field-input" type="text" placeholder="Descripción breve del contenido..." bind:value={formDesc} />
-            </div>
-            <div class="form-field">
-              <label class="field-label">UBICACIÓN FÍSICA</label>
-              <input class="field-input" type="text" placeholder="Ej: Estante 4, Caja 12" bind:value={formLocation} />
-            </div>
-            <div class="form-field">
-              <label class="field-label">CANTIDAD EST.</label>
-              <input class="field-input" type="number" bind:value={formQuantity} />
-            </div>
-            <div class="form-field">
-              <label class="field-label">FECHA LÍMITE</label>
-              <input class="field-input" type="date" bind:value={formDate} />
-            </div>
-            <div class="form-field">
-              <label class="field-label">PRIORIDAD</label>
-              <input class="field-input" type="text" placeholder="Alta / Media / Baja" bind:value={formPriority} />
-            </div>
+          <div class="form-field">
+            <label class="field-label">OPERARIO ASIGNADO</label>
+            <select class="field-input" bind:value={formOperator}>
+              <option value="">Sin asignar</option>
+              {#each operatorUsers as user}
+                <option value={user.username}>{user.username}</option>
+              {/each}
+            </select>
           </div>
-
-        <!-- PASO 2: Configuración -->
-        {:else if wizardStep === 2}
-          <div class="form-section">
-            <div class="form-field full">
-              <label class="field-label">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-                RESOLUCIÓN DE CAPTURA
-              </label>
-              <div class="btn-group">
-                {#each [300, 600, 1200] as dpi}
-                  <button
-                    class="btn-group-item"
-                    class:selected={formDpi === dpi}
-                    onclick={() => formDpi = dpi as 300|600|1200}
-                  >
-                    {dpi} DPI
-                  </button>
-                {/each}
-              </div>
-            </div>
-            <div class="form-field full">
-              <label class="field-label">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-                FORMATO DE SALIDA
-              </label>
-              <div class="btn-group">
-                {#each ['TIFF', 'JPEG', 'PNG'] as fmt}
-                  <button
-                    class="btn-group-item"
-                    class:selected={formFormat === fmt}
-                    onclick={() => formFormat = fmt as 'TIFF'|'JPEG'|'PNG'}
-                  >
-                    {fmt}
-                  </button>
-                {/each}
-              </div>
-            </div>
-            <div class="form-field full">
-              <label class="field-label">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <circle cx="12" cy="10" r="3"/>
-                </svg>
-                MODO DE COLOR
-              </label>
-              <select class="field-input" bind:value={formColorMode}>
-                <option value="">Select option...</option>
-                <option value="RGB">RGB</option>
-                <option value="CMYK">CMYK</option>
-                <option value="Grayscale">Escala de grises</option>
-                <option value="BW">Blanco y Negro</option>
-              </select>
-            </div>
-          </div>
-
-        <!-- PASO 3: Equipo -->
-        {:else}
-          <div class="form-section">
-            <!-- Resumen -->
-            {#if formName}
-              <div class="summary-box">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                Resumen: Proyecto "<strong>{formName}</strong>" con configuración {formDpi} DPI - {formFormat}.
-              </div>
-            {/if}
-
-            <div class="form-field full">
-              <div class="team-label-row">
-                <label class="field-label">ASIGNAR OPERARIO</label>
-                <span class="role-badge">Responsable</span>
-              </div>
-              <select class="field-input" bind:value={formOperator}>
-                <option value="">Select option...</option>
-                <option value="m.garcia">María García</option>
-                <option value="p.mora">Pedro Mora</option>
-                <option value="a.ruiz">Ana Ruiz</option>
-              </select>
-            </div>
-
-            <div class="form-field full">
-              <div class="team-label-row">
-                <label class="field-label">ASIGNAR REVISOR</label>
-                <span class="role-badge">Control de Calidad</span>
-              </div>
-              <select class="field-input" bind:value={formReviewer}>
-                <option value="">Select option...</option>
-                <option value="j.lopez">Juan López</option>
-                <option value="r.torres">Rosa Torres</option>
-              </select>
-            </div>
-          </div>
-        {/if}
+        </div>
 
       </div>
 
-      <!-- Mensaje de error visible al usuario cuando createProject falla -->
+      <!-- Error -->
       {#if createError}
         <div class="create-error">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -554,36 +399,24 @@
         </div>
       {/if}
 
-      <!-- Footer del wizard: Cancel + dots + Siguiente / Finalizar -->
-      <div class="wizard-footer">
+      <!-- Footer -->
+      <div class="modal-footer">
         <button class="btn-ghost" onclick={closeModal}>Cancelar</button>
-
-        <!-- Dots de progreso -->
-        <div class="wizard-dots">
-          {#each [1,2,3] as s}
-            <div class="dot" class:active={wizardStep === s}></div>
-          {/each}
-        </div>
-
-        {#if wizardStep < 3}
-          <button class="btn-primary" onclick={nextStep}>
-            Siguiente
+        <button
+          class="btn-primary"
+          onclick={handleCreateProject}
+          disabled={isCreating || !formName.trim()}
+        >
+          {#if isCreating}
+            <div class="spinner-sm"></div>
+            Creando…
+          {:else}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polyline points="9 18 15 12 9 6"/>
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-          </button>
-        {:else}
-          <button
-            class="btn-primary"
-            onclick={handleCreateProject}
-            disabled={isCreating || !formName.trim()}
-          >
-            {isCreating ? 'Creando...' : 'Finalizar'}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </button>
-        {/if}
+            Crear proyecto
+          {/if}
+        </button>
       </div>
 
     </div>
@@ -853,7 +686,7 @@
 
   .date-cell { display: flex; align-items: center; gap: 7px; color: var(--color-light-grey); font-size: var(--text-sm); white-space: nowrap; }
 
-  /* ══ MODAL WIZARD ══ */
+  /* ══ MODAL ══ */
   .modal-backdrop {
     position: fixed; inset: 0;
     background-color: rgba(0,0,0,0.65);
@@ -868,7 +701,7 @@
     border-radius: var(--radius-xl);
     padding: 28px;
     width: 100%;
-    max-width: 420px;
+    max-width: 440px;
     box-shadow: var(--shadow-lg);
     display: flex;
     flex-direction: column;
@@ -897,93 +730,16 @@
 
   .modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
 
-  /* ── Wizard steps indicator ─────────────────────────────────────────────
-     Layout (imagen de referencia):
-       [línea] [ícono]    [línea] [ícono]    [línea] [ícono]
-                [label]            [label]            [label]
+  /* Form layout */
+  .form-section { display: flex; flex-direction: column; gap: 14px; }
 
-     Los conectores (.step-connector) están entre los pasos en el flex row.
-     Cada .wizard-step es columna: ícono encima, label debajo.
-  ── */
-  .wizard-steps {
-    display: flex;
-    align-items: flex-start;   /* alinear por la parte superior (ícono) */
-    justify-content: center;
-    gap: 0;
-    padding: 8px 0;
-  }
-
-  /* Cada paso: columna centrada */
-  .wizard-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    min-width: 80px;
-  }
-
-  /* Línea conectora entre pasos */
-  /* margin-top centra la línea con el ícono (18px = mitad del círculo de 36px) */
-  .step-connector {
-    width: 48px;
-    height: 2px;
-    background-color: var(--border-color);
-    margin-top: 18px;       /* alinea con el centro del ícono */
-    flex-shrink: 0;
-    transition: background-color var(--transition-base);
-  }
-
-  .step-connector.done { background-color: var(--color-primary); }
-
-  /* Círculo del paso */
-  .step-icon-wrap {
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    background-color: var(--color-surface);
-    border: 2px solid var(--border-color);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey);
-    transition: all var(--transition-base);
-    flex-shrink: 0;
-  }
-
-  .wizard-step.active .step-icon-wrap {
-    background-color: rgba(90,140,98,0.2);
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-  }
-
-  .wizard-step.done .step-icon-wrap {
-    background-color: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
-  }
-
-  /* Label debajo del ícono */
-  .step-label {
-    font-size: 12px;
-    color: var(--color-light-grey);
-    white-space: nowrap;
-    text-align: center;
-    line-height: 1;
-  }
-
-  .wizard-step.active .step-label { color: var(--color-primary); font-weight: var(--fw-semibold); }
-  .wizard-step.done .step-label   { color: var(--color-light); }
-
-  /* Formularios del wizard */
-  .wizard-body { min-height: 200px; }
-
-  .form-grid {
+  .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
   }
 
-  .form-section { display: flex; flex-direction: column; gap: 14px; }
-
   .form-field { display: flex; flex-direction: column; gap: 6px; }
-  .form-field.full { grid-column: 1 / -1; }
 
   .field-label {
     display: flex;
@@ -995,6 +751,8 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
+
+  .field-required { color: var(--color-error); }
 
   .field-input {
     font-family: var(--font-family);
@@ -1013,80 +771,25 @@
   .field-input:focus { border-color: var(--color-primary); }
   .field-input::placeholder { color: var(--color-light-grey); opacity: 0.5; }
 
-  /* Button group (DPI / format selector) */
-  .btn-group {
-    display: flex;
-    gap: 8px;
-  }
-
-  .btn-group-item {
-    flex: 1;
-    height: 40px;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-semibold);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .btn-group-item:hover { border-color: var(--color-primary); color: var(--color-light); }
-  .btn-group-item.selected { background-color: rgba(90,140,98,0.15); border-color: var(--color-primary); color: var(--color-primary); }
-
-  /* Team label row */
-  .team-label-row { display: flex; align-items: center; justify-content: space-between; }
-
-  .role-badge {
-    font-size: 11px;
-    color: var(--color-secondary);
-    background-color: rgba(150,177,240,0.1);
-    border: 1px solid rgba(150,177,240,0.3);
-    border-radius: var(--radius-full);
-    padding: 2px 8px;
-  }
-
-  /* Resumen en paso 3 */
-  .summary-box {
+  /* Modal footer */
+  .modal-footer {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 10px;
-    padding: 12px 14px;
-    background-color: rgba(90,140,98,0.1);
-    border: 1px solid rgba(90,140,98,0.3);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    line-height: 1.5;
-  }
-
-  .summary-box strong { color: var(--color-light); }
-
-  /* Footer wizard */
-  .wizard-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
     padding-top: 4px;
     border-top: 1px solid var(--border-color);
   }
 
-  .wizard-dots {
-    display: flex;
-    gap: 6px;
-    flex: 1;
-    justify-content: center;
-  }
-
-  .dot {
-    width: 8px; height: 8px;
+  /* Spinner for loading state */
+  .spinner-sm {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
     border-radius: 50%;
-    background-color: var(--border-color);
-    transition: background-color var(--transition-base);
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
   }
 
-  .dot.active { background-color: var(--color-primary); }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
