@@ -61,8 +61,9 @@
   let colDateEnd      = $state('');
   let colCreator      = $state('');
   let colSignatura    = $state('');
-  let isCreating      = $state(false);
-  let createError     = $state('');
+  let isCreating        = $state(false);
+  let createError       = $state('');
+  let editingCollection = $state<Collection | null>(null);
 
   /** Validates a partial ISO 8601 date: YYYY, YYYY-MM, or YYYY-MM-DD. */
   function isValidISODate(s: string): boolean {
@@ -210,8 +211,6 @@
     createError = '';
 
     try {
-      const isDemoToken = $authStore.token === 'demo-token';
-
       const archMeta: Record<string, string> = {};
       if (colDateStart)        archMeta.date_start = colDateStart;
       if (colDateEnd)          archMeta.date_end   = colDateEnd;
@@ -219,7 +218,15 @@
       if (colSignatura.trim()) archMeta.signatura  = colSignatura.trim();
       const archivalMetadata = Object.keys(archMeta).length > 0 ? archMeta : undefined;
 
-      if (isDemoToken) {
+      if (editingCollection) {
+        // Modo edición: actualizar colección existente
+        await collectionsApi.update(editingCollection.id, {
+          name: colName.trim(),
+          description: colDesc.trim() || undefined,
+          archival_metadata: archivalMetadata,
+        });
+        await loadCollections();
+      } else if ($authStore.token === 'demo-token') {
         // Simular creación localmente sin backend
         const mockCollection = {
           id: Date.now(),
@@ -245,6 +252,7 @@
       }
 
       showCreateModal = false;
+      editingCollection = null;
       colName = ''; colDesc = '';
       colDateStart = ''; colDateEnd = '';
       colCreator = ''; colSignatura = '';
@@ -261,6 +269,7 @@
   function closeModal() {
     showCreateModal = false;
     createError = '';
+    editingCollection = null;
     colName = ''; colDesc = '';
     colDateStart = ''; colDateEnd = '';
     colCreator = ''; colSignatura = '';
@@ -278,6 +287,15 @@
   // ---------------------------------------------------------------------------
   let openColMenuId = $state<number | null>(null);
 
+  // Delete collection modal state
+  let showDeleteColModal     = $state(false);
+  let deletingCol            = $state<Collection | null>(null);
+  let deleteColRecordCount   = $state(0);
+  let deleteMoveColTarget    = $state<number | ''>('');
+  let isDeletingCol          = $state(false);
+  let deleteColError         = $state('');
+  let isLoadingDeleteColInfo = $state(false);
+
   $effect(() => {
     if (openColMenuId !== null) {
       const close = () => { openColMenuId = null; };
@@ -291,14 +309,60 @@
     openColMenuId = openColMenuId === id ? null : id;
   }
 
-  async function deleteCollection(e: MouseEvent, colId: number) {
+  function startEditCollection(e: MouseEvent, col: Collection) {
     e.stopPropagation();
     openColMenuId = null;
+    editingCollection = col;
+    colName      = col.name;
+    colDesc      = col.description ?? '';
+    colSignatura = col.archival_metadata?.signatura ?? '';
+    colCreator   = col.archival_metadata?.creator ?? '';
+    colDateStart = col.archival_metadata?.date_start ?? '';
+    colDateEnd   = col.archival_metadata?.date_end ?? '';
+    showCreateModal = true;
+  }
+
+  async function openDeleteColModal(e: MouseEvent, col: Collection) {
+    e.stopPropagation();
+    openColMenuId = null;
+    deletingCol = col;
+    deleteMoveColTarget = '';
+    deleteColError = '';
+    deleteColRecordCount = 0;
+    showDeleteColModal = true;
+    isLoadingDeleteColInfo = true;
     try {
-      await collectionsApi.delete(colId);
-      await loadCollections();
+      deleteColRecordCount = await recordsApi.count({ collection_id: col.id });
     } catch (err) {
-      console.error('[ProjectDetail] Error eliminando colección:', err);
+      console.error('[ProjectDetail] Error obteniendo info de colección:', err);
+    } finally {
+      isLoadingDeleteColInfo = false;
+    }
+  }
+
+  function closeDeleteColModal() {
+    showDeleteColModal = false;
+    deletingCol = null;
+    deleteMoveColTarget = '';
+    deleteColError = '';
+    isDeletingCol = false;
+  }
+
+  async function executeDeleteCol() {
+    if (!deletingCol) return;
+    isDeletingCol = true;
+    deleteColError = '';
+    try {
+      if (deleteMoveColTarget !== '') {
+        await collectionsApi.moveRecords(deletingCol.id, Number(deleteMoveColTarget));
+      }
+      await collectionsApi.delete(deletingCol.id);
+      await loadCollections();
+      closeDeleteColModal();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      deleteColError = `No se pudo eliminar la colección: ${msg}`;
+      isDeletingCol = false;
     }
   }
 
@@ -473,11 +537,11 @@
                   </button>
                   {#if openColMenuId === col.id}
                     <div class="action-menu">
-                      <button class="action-item" onclick={(e) => { e.stopPropagation(); handleCollectionClick(col.id); }}>
-                        <span class="material-symbols-outlined icon-sm">folder_open</span>
-                        Abrir
+                      <button class="action-item" onclick={(e) => startEditCollection(e, col)}>
+                        <span class="material-symbols-outlined icon-sm">edit</span>
+                        Editar
                       </button>
-                      <button class="action-item action-item-danger" onclick={(e) => deleteCollection(e, col.id)}>
+                      <button class="action-item action-item-danger" onclick={(e) => openDeleteColModal(e, col)}>
                         <span class="material-symbols-outlined icon-sm">delete</span>
                         Eliminar
                       </button>
@@ -505,7 +569,7 @@
 
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">Nueva Colección</h3>
+          <h3 class="modal-title">{editingCollection ? 'Editar Colección' : 'Nueva Colección'}</h3>
           <p class="modal-subtitle">Proyecto: {project?.name ?? '—'}</p>
         </div>
         <button class="modal-close" onclick={closeModal}>
@@ -613,7 +677,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>
-          {isCreating ? 'Creando...' : 'Crear Colección'}
+          {isCreating ? (editingCollection ? 'Guardando...' : 'Creando...') : (editingCollection ? 'Guardar cambios' : 'Crear Colección')}
         </button>
       </div>
 
@@ -707,6 +771,91 @@
 
       <div class="modal-actions">
         <button class="btn-ghost" onclick={() => showMembersModal = false}>Cerrar</button>
+      </div>
+
+    </div>
+  </div>
+{/if}
+
+<!-- ============================================================
+     MODAL: Eliminar Colección
+     ============================================================ -->
+{#if showDeleteColModal && deletingCol}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeDeleteColModal(); }}>
+    <div class="modal-card delete-modal-card">
+
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Eliminar colección</h3>
+          <p class="modal-subtitle">{deletingCol.name}</p>
+        </div>
+        <button class="modal-close" onclick={closeDeleteColModal}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      {#if isLoadingDeleteColInfo}
+        <div class="delete-loading">
+          <div class="spinner"></div>
+          Cargando información...
+        </div>
+      {:else if deleteColRecordCount > 0}
+        <div class="delete-warning">
+          <div class="delete-warning-icon">
+            <span class="material-symbols-outlined icon-md">warning</span>
+          </div>
+          <div>
+            <p class="delete-warning-title">Esta colección no está vacía</p>
+            <p class="delete-warning-body">
+              Contiene <strong>{deleteColRecordCount} {deleteColRecordCount === 1 ? 'registro' : 'registros'}</strong>.
+              Las imágenes asociadas se eliminarán permanentemente si no se mueven.
+            </p>
+          </div>
+        </div>
+
+        <div class="delete-move-section">
+          <label class="field-label">MOVER REGISTROS ANTES DE ELIMINAR (OPCIONAL)</label>
+          <select class="field-input" bind:value={deleteMoveColTarget}>
+            <option value="">— Eliminar registros definitivamente —</option>
+            {#each collections.filter(c => c.id !== deletingCol!.id) as c}
+              <option value={c.id}>{c.name}</option>
+            {/each}
+          </select>
+          {#if deleteMoveColTarget === ''}
+            <p class="delete-move-hint">Los registros e imágenes se perderán permanentemente.</p>
+          {:else}
+            <p class="delete-move-hint">Los registros se moverán a la colección seleccionada antes de eliminar.</p>
+          {/if}
+        </div>
+      {:else}
+        <p class="delete-confirm-text">
+          ¿Estás seguro de que quieres eliminar la colección <strong>"{deletingCol.name}"</strong>? Esta acción no se puede deshacer.
+        </p>
+      {/if}
+
+      {#if deleteColError}
+        <div class="create-error">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+            <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+          {deleteColError}
+        </div>
+      {/if}
+
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick={closeDeleteColModal} disabled={isDeletingCol}>Cancelar</button>
+        <button
+          class="btn-danger"
+          onclick={executeDeleteCol}
+          disabled={isDeletingCol || isLoadingDeleteColInfo}
+        >
+          <span class="material-symbols-outlined icon-sm">delete</span>
+          {isDeletingCol ? 'Eliminando...' : (deleteMoveColTarget !== '' ? 'Mover y eliminar' : 'Eliminar colección')}
+        </button>
       </div>
 
     </div>
@@ -863,8 +1012,14 @@
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-xl);
-    overflow: hidden;
+    overflow: visible;
   }
+
+  /* Round table corners without overflow:hidden */
+  .collections-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-xl); }
+  .collections-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-xl); }
+  .collections-table tbody tr:last-child td:first-child  { border-bottom-left-radius: var(--radius-xl); }
+  .collections-table tbody tr:last-child td:last-child   { border-bottom-right-radius: var(--radius-xl); }
 
   .collections-table {
     width: 100%;
@@ -1279,6 +1434,90 @@
   }
 
   .field-required { color: var(--color-error); margin-left: 2px; }
+
+  /* ── Delete collection modal ─────────────────────────────── */
+  .delete-modal-card { max-width: 460px; }
+
+  .delete-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 0;
+    color: var(--color-light-grey);
+    font-size: var(--text-sm);
+  }
+
+  .delete-warning {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: rgba(220, 80, 60, 0.08);
+    border: 1px solid rgba(220, 80, 60, 0.25);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+  }
+
+  .delete-warning-icon {
+    color: var(--color-error);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding-top: 1px;
+  }
+
+  .delete-warning-title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-bold);
+    color: var(--color-error);
+    margin: 0 0 4px;
+  }
+
+  .delete-warning-body {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .delete-move-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .delete-move-hint {
+    font-size: 12px;
+    color: var(--color-light-grey);
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .delete-confirm-text {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background-color: var(--color-error);
+    color: white;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-bold);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 9px 18px;
+    min-height: var(--touch-target-min);
+    cursor: pointer;
+    transition: filter var(--transition-base);
+  }
+
+  .btn-danger:hover:not(:disabled) { filter: brightness(1.15); }
+  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
 
 </style>

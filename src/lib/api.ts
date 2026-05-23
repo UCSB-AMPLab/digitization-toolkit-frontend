@@ -404,6 +404,16 @@ export const collectionsApi = {
   },
 
   /**
+   * Move all records from one collection to another.
+   * Call before delete() to preserve contents.
+   */
+  async moveRecords(fromId: number, toId: number): Promise<{ moved: number; target_collection_id: number }> {
+    return apiRequest(`/collections/${fromId}/move-records?target_collection_id=${toId}`, {
+      method: 'POST'
+    });
+  },
+
+  /**
    * Delete a collection
    */
   async delete(id: number): Promise<void> {
