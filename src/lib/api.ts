@@ -842,3 +842,40 @@ export const systemApi = {
     });
   },
 };
+
+// ============================================================================
+// PROJECT MEMBERS
+// ============================================================================
+
+export interface ProjectMember {
+  project_id: number;
+  user_id:    number;
+  role:       'operator' | 'reviewer';
+  added_at:   string;
+  added_by?:  string;
+  username:   string;
+  email:      string;
+}
+
+export interface AddProjectMemberData {
+  user_id: number;
+  role:    'operator' | 'reviewer';
+}
+
+export const projectMembersApi = {
+  async list(projectId: number): Promise<ProjectMember[]> {
+    return apiRequest<ProjectMember[]>(`/projects/${projectId}/members`);
+  },
+
+  async add(projectId: number, data: AddProjectMemberData): Promise<ProjectMember> {
+    return apiRequest<ProjectMember>(`/projects/${projectId}/members`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data),
+    });
+  },
+
+  async remove(projectId: number, userId: number): Promise<void> {
+    await apiRequest(`/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
+  },
+};

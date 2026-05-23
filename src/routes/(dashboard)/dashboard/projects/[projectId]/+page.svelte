@@ -20,7 +20,8 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
-  import { projectsApi, collectionsApi, recordsApi, type Project, type Collection } from '$lib/api';
+  import { projectsApi, collectionsApi, recordsApi, projectMembersApi,
+           type Project, type Collection, type ProjectMember, type UserRead } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -37,6 +38,9 @@
   let recordCount = $state<number | null>(null);
 
   let canCreate = $derived($authStore.user?.role === 'admin');
+  let canManageMembers = $derived(
+    $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
+  );
 
   // Colecciones filtradas
   let filteredCollections = $derived(
@@ -61,7 +65,7 @@
   // AL MONTAR
   // ---------------------------------------------------------------------------
   onMount(async () => {
-    await Promise.all([loadProject(), loadCollections(), loadRecordCount()]);
+    await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
   });
 
   async function loadProject() {
@@ -77,6 +81,71 @@
       recordCount = await recordsApi.count({ project_id: projectId });
     } catch (err) {
       console.error('[ProjectDetail] Error cargando conteo de registros:', err);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // COLABORADORES
+  // ---------------------------------------------------------------------------
+  let members            = $state<ProjectMember[]>([]);
+  let showMembersModal   = $state(false);
+  let memberSearchQuery  = $state('');
+  let allUsers           = $state<UserRead[]>([]);
+  let addUserId          = $state<number | null>(null);
+  let addRole            = $state<'operator' | 'reviewer'>('reviewer');
+  let isAddingMember     = $state(false);
+  let memberError        = $state('');
+
+  let filteredUsers = $derived(
+    allUsers.filter(u =>
+      !members.some(m => m.user_id === u.id) &&
+      u.id !== $authStore.user?.id
+    )
+  );
+
+  async function loadMembers() {
+    try {
+      members = await projectMembersApi.list(projectId);
+    } catch (err) {
+      console.error('[ProjectDetail] Error cargando colaboradores:', err);
+    }
+  }
+
+  async function openMembersModal() {
+    showMembersModal = true;
+    memberError = '';
+    if (canManageMembers && allUsers.length === 0) {
+      try {
+        const { usersApi } = await import('$lib/api');
+        allUsers = await usersApi.list();
+      } catch (err) {
+        console.error('[ProjectDetail] Error cargando usuarios:', err);
+      }
+    }
+  }
+
+  async function handleAddMember() {
+    if (!addUserId) return;
+    isAddingMember = true;
+    memberError = '';
+    try {
+      await projectMembersApi.add(projectId, { user_id: addUserId, role: addRole });
+      await loadMembers();
+      addUserId = null;
+      addRole = 'reviewer';
+    } catch (err) {
+      memberError = err instanceof Error ? err.message : 'Error al añadir colaborador';
+    } finally {
+      isAddingMember = false;
+    }
+  }
+
+  async function handleRemoveMember(userId: number) {
+    try {
+      await projectMembersApi.remove(projectId, userId);
+      await loadMembers();
+    } catch (err) {
+      memberError = err instanceof Error ? err.message : 'Error al eliminar colaborador';
     }
   }
 
@@ -204,25 +273,29 @@
     Volver a Proyectos
   </button>
 
-  <!-- KPI Cards -->
-  <div class="kpi-row">
-    <div class="kpi-card">
-      <div class="kpi-line" style="background: var(--color-primary)"></div>
-      <div class="kpi-num">{collections.length}</div>
-      <div class="kpi-lbl">Colecciones</div>
+  <!-- KPI Cards + Colaboradores button -->
+  <div class="kpi-bar">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-line" style="background: var(--color-primary)"></div>
+        <div class="kpi-num">{collections.length}</div>
+        <div class="kpi-lbl">Colecciones</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-line" style="background: var(--color-secondary)"></div>
+        <div class="kpi-num">{recordCount ?? '—'}</div>
+        <div class="kpi-lbl">Total imágenes</div>
+      </div>
     </div>
 
-    <div class="kpi-card">
-      <div class="kpi-line" style="background: var(--color-secondary)"></div>
-      <div class="kpi-num">{recordCount ?? '—'}</div>
-      <div class="kpi-lbl">Total imágenes</div>
-    </div>
-
-    <div class="kpi-card">
-      <div class="kpi-line" style="background: var(--color-warning)"></div>
-      <div class="kpi-num">—</div>
-      <div class="kpi-lbl">Colaboradores</div>
-    </div>
+    <button class="btn-collaborators" onclick={openMembersModal}>
+      <span class="material-symbols-outlined icon-sm">group</span>
+      <span>Colaboradores</span>
+      {#if members.length > 0}
+        <span class="member-badge">{members.length}</span>
+      {/if}
+    </button>
   </div>
 
   <!-- Búsqueda + Filtros -->
@@ -436,6 +509,98 @@
           </svg>
           {isCreating ? 'Creando...' : 'Crear Colección'}
         </button>
+      </div>
+
+    </div>
+  </div>
+{/if}
+
+<!-- ============================================================
+     MODAL: Colaboradores
+     ============================================================ -->
+{#if showMembersModal}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) { showMembersModal = false; } }}>
+    <div class="modal-card modal-card--wide">
+
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Colaboradores</h3>
+          <p class="modal-subtitle">Proyecto: {project?.name ?? '—'}</p>
+        </div>
+        <button class="modal-close" onclick={() => showMembersModal = false}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- Current members list -->
+        {#if members.length === 0}
+          <p class="members-empty">No hay colaboradores asociados a este proyecto.</p>
+        {:else}
+          <ul class="members-list">
+            {#each members as m}
+              <li class="member-row">
+                <div class="member-av">{m.username.slice(0,2).toUpperCase()}</div>
+                <div class="member-info">
+                  <span class="member-name">{m.username}</span>
+                  <span class="member-email">{m.email}</span>
+                </div>
+                <span class="role-badge role-badge--{m.role}">{m.role}</span>
+                {#if canManageMembers}
+                  <button class="btn-remove-member" onclick={() => handleRemoveMember(m.user_id)} title="Eliminar colaborador">
+                    <span class="material-symbols-outlined icon-sm">person_remove</span>
+                  </button>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+
+        <!-- Add member — only for admin/operator -->
+        {#if canManageMembers}
+          <div class="add-member-section">
+            <p class="add-member-title">Añadir colaborador</p>
+            <div class="add-member-row">
+              <select class="field-input add-member-select" bind:value={addUserId}>
+                <option value={null}>— Seleccionar usuario —</option>
+                {#each filteredUsers as u}
+                  <option value={u.id}>{u.username} ({u.email})</option>
+                {/each}
+              </select>
+              <select class="field-input add-role-select" bind:value={addRole}>
+                <option value="reviewer">Revisor</option>
+                <option value="operator">Operador</option>
+              </select>
+              <button
+                class="btn-crear"
+                onclick={handleAddMember}
+                disabled={!addUserId || isAddingMember}
+              >
+                <span class="material-symbols-outlined icon-sm">person_add</span>
+                {isAddingMember ? 'Añadiendo...' : 'Añadir'}
+              </button>
+            </div>
+          </div>
+        {/if}
+
+        {#if memberError}
+          <div class="create-error">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+              <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+            </svg>
+            {memberError}
+          </div>
+        {/if}
+
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick={() => showMembersModal = false}>Cerrar</button>
       </div>
 
     </div>
@@ -796,4 +961,137 @@
 
   .btn-crear:hover { background-color: var(--color-primary-hover); }
   .btn-crear:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* KPI bar — cards + collaborators button side by side */
+  .kpi-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+
+  .btn-collaborators {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    min-height: var(--touch-target-min);
+    white-space: nowrap;
+    margin-left: auto;
+  }
+
+  .btn-collaborators:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
+
+  .member-badge {
+    background: var(--color-primary);
+    color: white;
+    font-size: 11px;
+    font-weight: var(--fw-bold);
+    border-radius: 99px;
+    padding: 1px 7px;
+    line-height: 1.6;
+  }
+
+  /* Wide modal variant */
+  .modal-card--wide { max-width: 540px; width: 100%; }
+
+  /* Members list */
+  .members-list {
+    list-style: none;
+    margin: 0 0 20px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .members-empty {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    margin: 0 0 20px;
+  }
+
+  .member-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt);
+  }
+
+  .member-av {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(90,140,98,0.2);
+    color: var(--color-primary);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-bold);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .member-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .member-name { font-size: var(--text-sm); color: var(--color-light); font-weight: var(--fw-semibold); }
+  .member-email { font-size: var(--text-xs); color: var(--color-light-grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .role-badge {
+    font-size: 11px;
+    font-weight: var(--fw-bold);
+    padding: 2px 8px;
+    border-radius: 99px;
+    text-transform: capitalize;
+    white-space: nowrap;
+  }
+
+  .role-badge--operator { background: rgba(150,177,240,0.15); color: var(--color-secondary); }
+  .role-badge--reviewer  { background: rgba(171,183,183,0.12); color: var(--color-light-grey); }
+
+  .btn-remove-member {
+    background: none;
+    border: none;
+    color: var(--color-light-grey);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center;
+    transition: color var(--transition-fast);
+    flex-shrink: 0;
+  }
+
+  .btn-remove-member:hover { color: var(--color-error); }
+
+  /* Add member section */
+  .add-member-section {
+    border-top: 1px solid var(--border-color);
+    padding-top: 16px;
+  }
+
+  .add-member-title {
+    font-size: var(--text-xs);
+    font-weight: var(--fw-bold);
+    color: var(--color-light-grey);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 10px;
+  }
+
+  .add-member-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .add-member-select { flex: 1; min-width: 160px; }
+  .add-role-select   { width: 120px; flex-shrink: 0; }
 </style>
