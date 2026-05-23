@@ -98,8 +98,9 @@
 
   let filteredUsers = $derived(
     allUsers.filter(u =>
-      !members.some(m => m.user_id === u.id) &&
-      u.id !== $authStore.user?.id
+      u.role !== 'admin' &&                          // admins are always implicit
+      !members.some(m => m.user_id === u.id) &&      // not already a member
+      u.id !== $authStore.user?.id                   // not yourself
     )
   );
 
@@ -539,27 +540,27 @@
       <div class="modal-body">
 
         <!-- Current members list -->
-        {#if members.length === 0}
-          <p class="members-empty">No hay colaboradores asociados a este proyecto.</p>
-        {:else}
-          <ul class="members-list">
-            {#each members as m}
-              <li class="member-row">
-                <div class="member-av">{m.username.slice(0,2).toUpperCase()}</div>
-                <div class="member-info">
-                  <span class="member-name">{m.username}</span>
-                  <span class="member-email">{m.email}</span>
-                </div>
-                <span class="role-badge role-badge--{m.role}">{m.role}</span>
-                {#if canManageMembers}
-                  <button class="btn-remove-member" onclick={() => handleRemoveMember(m.user_id)} title="Eliminar colaborador">
-                    <span class="material-symbols-outlined icon-sm">person_remove</span>
-                  </button>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
+        <ul class="members-list">
+          {#each members as m}
+            <li class="member-row" class:member-row--implicit={m.is_implicit}>
+              <div class="member-av">{m.username.slice(0,2).toUpperCase()}</div>
+              <div class="member-info">
+                <span class="member-name">{m.username}</span>
+                <span class="member-email">{m.email}</span>
+              </div>
+              <span class="role-badge role-badge--{m.role}">{m.role}</span>
+              {#if m.is_implicit}
+                <span class="member-implicit-icon" title="Acceso implícito (no se puede eliminar)">
+                  <span class="material-symbols-outlined icon-sm">lock</span>
+                </span>
+              {:else if canManageMembers}
+                <button class="btn-remove-member" onclick={() => handleRemoveMember(m.user_id)} title="Eliminar colaborador">
+                  <span class="material-symbols-outlined icon-sm">person_remove</span>
+                </button>
+              {/if}
+            </li>
+          {/each}
+        </ul>
 
         <!-- Add member — only for admin/operator -->
         {#if canManageMembers}
@@ -1055,6 +1056,18 @@
 
   .role-badge--operator { background: rgba(150,177,240,0.15); color: var(--color-secondary); }
   .role-badge--reviewer  { background: rgba(171,183,183,0.12); color: var(--color-light-grey); }
+  .role-badge--admin     { background: rgba(225,183,120,0.15); color: var(--color-highlight); }
+
+  /* Implicit (admin) members — slightly muted row */
+  .member-row--implicit { opacity: 0.75; }
+
+  .member-implicit-icon {
+    color: var(--color-light-grey);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 4px;
+  }
 
   .btn-remove-member {
     background: none;

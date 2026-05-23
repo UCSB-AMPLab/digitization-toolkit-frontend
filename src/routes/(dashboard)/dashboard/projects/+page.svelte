@@ -19,7 +19,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { projectsApi, usersApi, type Project, type UserRead } from '$lib/api';
+  import { projectsApi, type Project } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Lista de proyectos
@@ -54,14 +54,9 @@
   let formFondo      = $state('');
   let formSerie      = $state('');
   let formSignatura  = $state('');
-  let formResolution = $state<'low' | 'medium' | 'high'>('medium');
-  let formOperator   = $state('');
 
   let isCreating  = $state(false);
   let createError = $state('');
-
-  // Lista de usuarios para el selector de operario
-  let operatorUsers = $state<UserRead[]>([]);
 
   // Proyecto siendo editado (null = modo creación)
   let editingProject = $state<Project | null>(null);
@@ -83,12 +78,6 @@
   // ---------------------------------------------------------------------------
   onMount(async () => {
     await loadProjects();
-    try {
-      const allUsers = await usersApi.list();
-      operatorUsers = allUsers.filter(u => u.is_active && (u.role === 'operator' || u.role === 'admin'));
-    } catch {
-      // no-op: selector queda vacío si falla
-    }
   });
 
   async function loadProjects() {
@@ -144,7 +133,6 @@
   function resetForm() {
     formName = ''; formDesc = '';
     formFondo = ''; formSerie = ''; formSignatura = '';
-    formResolution = 'medium'; formOperator = '';
     createError = ''; editingProject = null;
   }
 
@@ -426,27 +414,6 @@
         <div class="form-field">
           <label class="field-label">SIGNATURA ARCHIVÍSTICA</label>
           <input class="field-input" type="text" placeholder="Ej: CO.AGN.SAA-I.1.1.1" bind:value={formSignatura} />
-        </div>
-
-        <div class="form-row">
-          <div class="form-field">
-            <label class="field-label">RESOLUCIÓN DE CAPTURA</label>
-            <select class="field-input" bind:value={formResolution}>
-              <option value="low">Baja (300 DPI)</option>
-              <option value="medium">Media (600 DPI)</option>
-              <option value="high">Alta (1200 DPI)</option>
-            </select>
-          </div>
-
-          <div class="form-field">
-            <label class="field-label">OPERARIO ASIGNADO</label>
-            <select class="field-input" bind:value={formOperator}>
-              <option value="">Sin asignar</option>
-              {#each operatorUsers as user}
-                <option value={user.username}>{user.username}</option>
-              {/each}
-            </select>
-          </div>
         </div>
 
       </div>

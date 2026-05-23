@@ -291,6 +291,16 @@ export const projectsApi = {
   },
 
   /**
+   * Move all top-level collections from this project to another project.
+   */
+  async moveCollections(fromId: number, toId: number): Promise<{ moved: number; target_project_id: number }> {
+    return apiRequest(`/projects/${fromId}/move-collections`, {
+      method: 'POST',
+      body: JSON.stringify({ target_project_id: toId })
+    });
+  },
+
+  /**
    * Get all records for a project (deprecated - use recordsApi.list with project_id filter)
    */
   async getRecords(id: number): Promise<Record[]> {
@@ -848,13 +858,14 @@ export const systemApi = {
 // ============================================================================
 
 export interface ProjectMember {
-  project_id: number;
-  user_id:    number;
-  role:       'operator' | 'reviewer';
-  added_at:   string;
-  added_by?:  string;
-  username:   string;
-  email:      string;
+  project_id:   number;
+  user_id:      number;
+  role:         'operator' | 'reviewer' | 'admin';
+  added_at:     string;
+  added_by?:    string;
+  username:     string;
+  email:        string;
+  is_implicit:  boolean;
 }
 
 export interface AddProjectMemberData {
