@@ -585,6 +585,13 @@ export const recordsApi = {
     const base = getApiBase();
     const token = tokenStore.get();
     return `${base}/records/images/${imageId}/file${token ? '?token=' + token : ''}`;
+  },
+
+  /**
+   * Delete a specific image (file + thumbnail + DB row)
+   */
+  async deleteImage(imageId: number): Promise<void> {
+    await apiRequest(`/records/images/${imageId}`, { method: 'DELETE' });
   }
 };
 
@@ -792,8 +799,28 @@ export const camerasApi = {
       method: 'POST',
       body: JSON.stringify({ lens_position: lensPosition })
     });
+  },
+
+  /**
+   * Apply live camera controls (exposure, white balance, gain, etc.)
+   */
+  async setCameraControls(cameraIndex: number, controls: CameraControlsRequest): Promise<void> {
+    await apiRequest(`/cameras/settings/${cameraIndex}`, {
+      method: 'POST',
+      body: JSON.stringify(controls)
+    });
   }
 };
+
+// Camera controls request interface (all fields optional)
+export interface CameraControlsRequest {
+  ae_enable?: boolean;          // Auto-exposure on/off
+  awb_enable?: boolean;         // Auto white-balance on/off
+  exposure_value?: number;      // EV compensation (ae_enable must be true)
+  exposure_time_us?: number;    // Manual shutter in microseconds
+  analogue_gain?: number;       // Manual gain (ISO 100 ≈ 1.0)
+  colour_gains?: [number, number]; // Manual WB as [red_gain, blue_gain]
+}
 
 // ============================================================================
 // HEALTH CHECK

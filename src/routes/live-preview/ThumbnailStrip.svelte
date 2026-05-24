@@ -31,7 +31,7 @@
     records: Record[];
     selectedRecordId: number | null;
     cameraMode: 'single' | 'double';
-    onSelect: (id: number) => void;
+    onSelect: (record: Record) => void;
   } = $props();
 
   // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@
         <button
           class="thumbnail-item"
           class:selected={isSelected}
-          onclick={() => onSelect(record.id)}
+          onclick={() => onSelect(record)}
         >
 
           <!-- Contenedor de imagen -->

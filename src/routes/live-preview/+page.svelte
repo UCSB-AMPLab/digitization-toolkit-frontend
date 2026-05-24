@@ -25,6 +25,7 @@
   import CameraControls from './CameraControls.svelte';
   import LiveViewport from './LiveViewport.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
+  import ImageViewerModal from './ImageViewerModal.svelte';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE URL
@@ -59,6 +60,9 @@
   // Lista de registros/imágenes capturadas en esta colección
   let records = $state<Record[]>([]);
   let selectedRecordId = $state<number | null>(null);
+
+  // Registro inspeccionado en el modal de imagen (null = modal cerrado)
+  let inspectedRecord = $state<Record | null>(null);
 
   // Estado de carga general (al iniciar, al capturar, etc.)
   let isLoading = $state(false);
@@ -145,6 +149,43 @@
       goto('/');
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // HANDLER: Retoma de un registro desde el modal de imagen
+  // Elimina las imágenes existentes y vuelve a capturar para el mismo registro.
+  // ---------------------------------------------------------------------------
+  async function handleRetake(record: Record) {
+    // Cerrar modal y limpiar selección
+    inspectedRecord = null;
+
+    try {
+      // Eliminar las imágenes actuales del registro
+      for (const img of record.images ?? []) {
+        await recordsApi.deleteImage(img.id);
+      }
+
+      // Volver a capturar
+      if (cameraMode === 'double') {
+        await camerasApi.captureDual({
+          project_name: projectName,
+          collection_id: collectionId ?? undefined,
+          record_id: record.id,
+        });
+      } else {
+        await camerasApi.capture({
+          project_name: projectName,
+          camera_index: 0,
+          collection_id: collectionId ?? undefined,
+          record_id: record.id,
+        });
+      }
+    } catch (err) {
+      console.error('[LivePreview] Error en retoma:', err);
+    } finally {
+      // Actualizar lista de registros independientemente del resultado
+      await loadRecords();
+    }
+  }
 </script>
 
 <!-- ============================================================
@@ -198,7 +239,7 @@
           {records}
           {selectedRecordId}
           {cameraMode}
-          onSelect={(id) => selectedRecordId = id}
+          onSelect={(record) => { selectedRecordId = record.id; inspectedRecord = record; }}
         />
       </div>
 
@@ -207,6 +248,16 @@
   </div>
 
 </div>
+
+<!-- ── Modal de inspección de imagen ── -->
+{#if inspectedRecord}
+  <ImageViewerModal
+    record={inspectedRecord}
+    {cameraMode}
+    onClose={() => inspectedRecord = null}
+    onRetake={handleRetake}
+  />
+{/if}
 
 <style>
   /* Pantalla completa, sin overflow, sin sidebar del dashboard */

@@ -22,7 +22,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { camerasApi, type CameraDevice } from '$lib/api';
+  import { camerasApi, type CameraDevice, type CameraControlsRequest } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
 
   // ---------------------------------------------------------------------------
@@ -217,6 +217,48 @@
   }
 
   // ---------------------------------------------------------------------------
+  // HELPERS: Settings sliders → camera controls
+  // ---------------------------------------------------------------------------
+
+  /** Parse shutter-speed string "1/8000s" or "1.6s" → microseconds integer */
+  function parseShutterUs(s: string): number {
+    const frac = s.match(/^([\d.]+)\/([\d.]+)s$/);
+    if (frac) return Math.round(parseFloat(frac[1]) / parseFloat(frac[2]) * 1_000_000);
+    return Math.round(parseFloat(s) * 1_000_000);
+  }
+
+  // Debounce timer for live-slider settings
+  let settingsDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  /** Send camera controls to the backend (debounced by default 200ms) */
+  function applySettings(controls: CameraControlsRequest, debounceMs = 200) {
+    if (settingsDebounce) clearTimeout(settingsDebounce);
+    settingsDebounce = setTimeout(async () => {
+      try {
+        await camerasApi.setCameraControls(selectedCameraIndex, controls);
+      } catch {
+        // Fallo silencioso — la cámara puede no estar disponible
+      }
+    }, debounceMs);
+  }
+
+  /** Base AWB gains from calibration (fallback to neutral [2.0, 1.5]) */
+  const baseGains = $derived<[number, number]>(
+    (selectedDevice?.awb_gains && selectedDevice.awb_gains.length >= 2)
+      ? [selectedDevice.awb_gains[0], selectedDevice.awb_gains[1]]
+      : [2.0, 1.5]
+  );
+
+  /** Compute colour_gains from temperature/tint sliders */
+  function computeColourGains(temp: number, t: number): [number, number] {
+    const tempF = temp * 0.004;   // ±0.4 range over ±100
+    const tintF = t   * 0.003;   // ±0.3 range over ±100
+    const red  = Math.max(0.1, Math.min(8.0, baseGains[0] * (1 + tempF - tintF)));
+    const blue = Math.max(0.1, Math.min(8.0, baseGains[1] * (1 - tempF + tintF)));
+    return [red, blue];
+  }
+
+  // ---------------------------------------------------------------------------
   // Cargar dispositivos reales al montar
   // ---------------------------------------------------------------------------
   onMount(() => {
@@ -378,8 +420,16 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div class="fixed-backdrop" onclick={() => showModeDropdown = false}></div>
             <div class="mode-dropdown">
-              <button onclick={() => { onControlModeChange('manual'); showModeDropdown = false; }}>Manual</button>
-              <button onclick={() => { onControlModeChange('automatic'); showModeDropdown = false; }}>Automatic</button>
+              <button onclick={() => {
+                onControlModeChange('manual');
+                applySettings({ ae_enable: false }, 0);
+                showModeDropdown = false;
+              }}>Manual</button>
+              <button onclick={() => {
+                onControlModeChange('automatic');
+                applySettings({ ae_enable: true }, 0);
+                showModeDropdown = false;
+              }}>Automatic</button>
             </div>
           {/if}
         </div>
@@ -447,7 +497,8 @@
             </button>
           </div>
 
-          <!-- Fila: Aperture -->
+          <!-- Fila: Aperture (solo si la cámara lo soporta) -->
+          {#if selectedDevice?.has_aperture_control}
           <div class="control-row">
             <span class="control-label">Aperture</span>
             <button
@@ -463,6 +514,7 @@
               </svg>
             </button>
           </div>
+          {/if}
 
         </div>
       {/if}
@@ -575,6 +627,10 @@
                   max="100"
                   bind:value={temperature}
                   class="styled-range"
+                  oninput={() => applySettings({
+                    awb_enable: false,
+                    colour_gains: computeColourGains(temperature, tint)
+                  })}
                 />
               </div>
               <div class="slider-val">{temperature}</div>
@@ -592,6 +648,10 @@
                   max="100"
                   bind:value={tint}
                   class="styled-range"
+                  oninput={() => applySettings({
+                    awb_enable: false,
+                    colour_gains: computeColourGains(temperature, tint)
+                  })}
                 />
               </div>
               <div class="slider-val">{tint}</div>
@@ -611,6 +671,7 @@
               step="1"
               bind:value={exposure}
               class="styled-range exposure-range"
+              oninput={() => applySettings({ ae_enable: true, exposure_value: exposure })}
             />
             <!-- Marcas debajo del slider -->
             <div class="exposure-marks">
@@ -690,14 +751,22 @@
       {#each shutterOptions as opt}
         <button
           class:selected={opt === shutterSpeed}
-          onclick={() => { onShutterSpeedChange(opt); openDropdown = null; }}
+          onclick={() => {
+            onShutterSpeedChange(opt);
+            applySettings({ ae_enable: false, exposure_time_us: parseShutterUs(opt) }, 0);
+            openDropdown = null;
+          }}
         >{opt}</button>
       {/each}
     {:else if openDropdown === 'iso'}
       {#each isoOptions as opt}
         <button
           class:selected={opt === iso}
-          onclick={() => { onIsoChange(opt); openDropdown = null; }}
+          onclick={() => {
+            onIsoChange(opt);
+            applySettings({ analogue_gain: parseInt(opt) / 100 }, 0);
+            openDropdown = null;
+          }}
         >{opt}</button>
       {/each}
     {:else if openDropdown === 'aperture'}
