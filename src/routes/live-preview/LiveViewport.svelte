@@ -71,8 +71,8 @@
   let dragging = $state<'v' | 'h' | null>(null);
 
   // Configuración de la grilla
-  let gridRows = $state(3);
-  let gridCols = $state(3);
+  let gridRows = 3;
+  let gridCols = 3;
   let showGrid = $state(false);
   let showGuides = $state(true);
   let showGridModal = $state(false);
@@ -307,7 +307,6 @@
   // ---------------------------------------------------------------------------
   // MODAL DE GRILLA
   // ---------------------------------------------------------------------------
-  function applyGrid() { showGridModal = false; }
 </script>
 
 <!-- ============================================================
@@ -514,27 +513,13 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) showGridModal = false; }}>
     <div class="modal-card">
-      <h3 class="modal-title">Configuración de Cuadrícula</h3>
-      <p class="modal-subtitle">Ajusta el grid de captura y las líneas de guía.</p>
+      <h3 class="modal-title">Cuadrícula y Guías</h3>
+      <p class="modal-subtitle">Activa las ayudas visuales de encuadre.</p>
       <div class="modal-body">
-        <div class="modal-field">
-          <label class="modal-label">Filas</label>
-          <div class="slider-with-value">
-            <input type="range" min="1" max="6" bind:value={gridRows} class="modal-range" />
-            <div class="range-value">{gridRows}</div>
-          </div>
-        </div>
-        <div class="modal-field">
-          <label class="modal-label">Columnas</label>
-          <div class="slider-with-value">
-            <input type="range" min="1" max="6" bind:value={gridCols} class="modal-range" />
-            <div class="range-value">{gridCols}</div>
-          </div>
-        </div>
         <div class="modal-toggle-row">
           <div>
             <p class="modal-toggle-title">Cuadrícula</p>
-            <p class="modal-toggle-sub">Mostrar grid de captura</p>
+            <p class="modal-toggle-sub">Mostrar grid 3×3 de captura</p>
           </div>
           <button class="toggle-btn" class:on={showGrid} onclick={() => showGrid = !showGrid}>
             <div class="toggle-thumb" class:on={showGrid}></div>
@@ -551,8 +536,7 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => showGridModal = false}>Cancelar</button>
-        <button class="modal-btn confirm" onclick={applyGrid}>Aplicar</button>
+        <button class="modal-btn confirm" onclick={() => showGridModal = false}>Cerrar</button>
       </div>
     </div>
   </div>
@@ -796,10 +780,9 @@
   /* ── Botón de captura ── */
   .capture-btn-wrapper {
     position: absolute;
-    right: 22px;
-    top: 50%;
-    transform: translateY(-50%);
-    margin-top: 80px;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 50;
   }
 
