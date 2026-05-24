@@ -190,51 +190,5 @@
 </div>
 
 <style>
-  .gallery-wrapper {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-    background-color: var(--color-bg);
-  }
-
-  .content-area {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-    position: relative;
-  }
-
-  .center-column {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 0;
-  }
-
-  .thumbnail-area { height: 140px; flex-shrink: 0; }
-
-  .loading-state {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    color: var(--color-light-grey);
-    font-size: var(--text-base);
-  }
-
-  .spinner {
-    width: 40px; height: 40px;
-    border: 3px solid var(--border-color);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
