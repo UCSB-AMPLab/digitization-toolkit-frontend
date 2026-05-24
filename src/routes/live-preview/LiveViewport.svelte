@@ -286,10 +286,15 @@
         record_title: `Captura ${new Date().toISOString().slice(0,19)}`,
       };
 
+      let result;
       if (cameraMode === 'double') {
-        await camerasApi.captureDual(payload);
+        result = await camerasApi.captureDual(payload);
       } else {
-        await camerasApi.capture({ ...payload, camera_index: 0 });
+        result = await camerasApi.capture({ ...payload, camera_index: 0 });
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Capture failed');
       }
 
       cameraStatus.reportSuccess();
