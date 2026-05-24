@@ -73,6 +73,12 @@
   let focusResultOk: boolean = $state(true);
   let focusResultTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // WB calibration state
+  let isWbCalibrating = $state(false);
+  let wbResultMsg: string | null = $state(null);
+  let wbResultOk: boolean = $state(true);
+  let wbResultTimer: ReturnType<typeof setTimeout> | null = null;
+
   // Cámara actualmente seleccionada (derivado)
   const selectedDevice = $derived(devices.find(d => d.index === selectedCameraIndex));
   const cameraDisplayName = $derived(
@@ -181,6 +187,56 @@
       showFocusResult(false, msg);
     } finally {
       isFocusing = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // FUNCIÓN: Calibración white balance
+  // Llama al backend, actualiza los gains y refresca la lista de dispositivos.
+  // ---------------------------------------------------------------------------
+  function showWbResult(ok: boolean, msg: string) {
+    wbResultOk = ok;
+    wbResultMsg = msg;
+    if (wbResultTimer) clearTimeout(wbResultTimer);
+    wbResultTimer = setTimeout(() => { wbResultMsg = null; }, 5000);
+  }
+
+  async function handleWbCalibration() {
+    const idx = selectedCameraIndex;
+    try {
+      isWbCalibrating = true;
+      const result = await camerasApi.calibrateWhiteBalance({ camera_index: idx });
+      if (result.success) {
+        // Refresh device list so selectedDevice.awb_gains picks up new values
+        try {
+          devices = await camerasApi.listDevices();
+        } catch { /* ignore — gains will apply on next mount */ }
+        // Reset sliders to neutral; the new baseGains already encodes the calibrated WB
+        temperature = 0;
+        tint = 0;
+        // Apply the calibrated gains immediately
+        if (result.awb_gains && result.awb_gains.length >= 2) {
+          try {
+            await camerasApi.setCameraControls(idx, {
+              awb_enable: false,
+              colour_gains: [result.awb_gains[0], result.awb_gains[1]]
+            });
+          } catch { /* ignore */ }
+        }
+        const tempLabel = result.colour_temperature ? ` (~${result.colour_temperature}K)` : '';
+        cameraStatus.reportSuccess();
+        showWbResult(true, `WB calibrado${tempLabel}`);
+      } else {
+        const msg = result.error ?? 'Calibración WB falló';
+        cameraStatus.reportFailure(msg);
+        showWbResult(false, msg);
+      }
+    } catch {
+      const msg = 'Error calibrando WB';
+      cameraStatus.reportFailure(msg);
+      showWbResult(false, msg);
+    } finally {
+      isWbCalibrating = false;
     }
   }
 
@@ -622,12 +678,24 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <!-- Pipette: calibrar white balance automáticamente -->
-              <button class="wb-pipette" onclick={async () => { try { await camerasApi.calibrateWhiteBalance(); } catch(e) {} }} aria-label="Calibrar white balance">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z"/>
-                </svg>
+              <button
+                class="wb-pipette"
+                onclick={handleWbCalibration}
+                disabled={isWbCalibrating}
+                aria-label="Calibrar white balance"
+              >
+                {#if isWbCalibrating}
+                  <span class="material-symbols-outlined icon-sm">sync</span>
+                {:else}
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z"/>
+                  </svg>
+                {/if}
               </button>
             </div>
+            {#if wbResultMsg}
+              <p class:text-success={wbResultOk} class:text-error={!wbResultOk} class="focus-result-msg">{wbResultMsg}</p>
+            {/if}
           </div>
 
           <!-- Slider Temperatura: azul → arena (col design system) -->
