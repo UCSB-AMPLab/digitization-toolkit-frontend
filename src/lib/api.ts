@@ -775,6 +775,23 @@ export const camerasApi = {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  },
+
+  /**
+   * Get current focus (lens position in dioptres)
+   */
+  async getFocus(cameraIndex: number): Promise<{ camera_index: number; lens_position: number }> {
+    return apiRequest<{ camera_index: number; lens_position: number }>(`/cameras/focus/${cameraIndex}`);
+  },
+
+  /**
+   * Set manual focus (lens position in dioptres; 0 = infinity, 10 ≈ 10 cm)
+   */
+  async setFocus(cameraIndex: number, lensPosition: number): Promise<{ camera_index: number; lens_position: number }> {
+    return apiRequest<{ camera_index: number; lens_position: number }>(`/cameras/focus/${cameraIndex}`, {
+      method: 'POST',
+      body: JSON.stringify({ lens_position: lensPosition })
+    });
   }
 };
 

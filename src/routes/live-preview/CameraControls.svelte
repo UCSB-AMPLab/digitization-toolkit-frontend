@@ -22,7 +22,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { camerasApi } from '$lib/api';
+  import { camerasApi, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
 
   // ---------------------------------------------------------------------------
@@ -56,9 +56,27 @@
   // ESTADO LOCAL
   // ---------------------------------------------------------------------------
 
-  // Cámara seleccionada actualmente en el selector (solo relevante en double)
-  // 'left' = índice 0, 'right' = índice 1 en la API
-  let selectedCamera = $state<'left' | 'right'>('left');
+  // Cámara seleccionada actualmente (0 = izquierda, 1 = derecha)
+  let selectedCameraIndex = $state(0);
+
+  // Lista de dispositivos reales cargados desde la API
+  let devices = $state<CameraDevice[]>([]);
+
+  // Estado del sidebar: colapsado por defecto (optimizado para pantalla de 7")
+  let sidebarOpen = $state(false);
+
+  // Posición actual del foco (dioptrias: 0 = infinito, 10 = 10cm)
+  let lensPosition = $state(0);
+  let isFocusing = $state(false);
+  let focusDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  // Cámara actualmente seleccionada (derivado)
+  const selectedDevice = $derived(devices.find(d => d.index === selectedCameraIndex));
+  const cameraDisplayName = $derived(
+    selectedDevice
+      ? (selectedDevice.label || selectedDevice.model || `Camera ${selectedCameraIndex}`)
+      : `Camera ${selectedCameraIndex}`
+  );
 
   // Secciones abiertas del acordeón
   let openSections = $state(['basic', 'focus', 'settings', 'histogram']);
@@ -134,14 +152,40 @@
   // Llama al backend con el índice de la cámara seleccionada.
   // left = index 0, right = index 1
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // FUNCIÓN: Autofocus
+  // Llama al backend y actualiza el slider de foco con el resultado.
+  // ---------------------------------------------------------------------------
   async function handleAutoFocus() {
-    const idx = selectedCamera === 'left' ? 0 : 1;
+    const idx = selectedCameraIndex;
     try {
-      await camerasApi.calibrate({ camera_index: idx });
+      isFocusing = true;
+      const result = await camerasApi.calibrate({ camera_index: idx });
+      if (result.lens_position !== undefined) {
+        lensPosition = result.lens_position;
+      }
       cameraStatus.reportSuccess();
     } catch (error) {
       cameraStatus.reportFailure('Error en autofocus');
+    } finally {
+      isFocusing = false;
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // FUNCIÓN: Ajuste manual de foco (slider vertical)
+  // Envía el valor al backend con debounce de 150ms.
+  // ---------------------------------------------------------------------------
+  function handleFocusSlider(value: number) {
+    lensPosition = value;
+    if (focusDebounce) clearTimeout(focusDebounce);
+    focusDebounce = setTimeout(async () => {
+      try {
+        await camerasApi.setFocus(selectedCameraIndex, value);
+      } catch {
+        // fallo silencioso — el preview mostrará el foco actual
+      }
+    }, 150);
   }
 
   // ---------------------------------------------------------------------------
@@ -149,7 +193,17 @@
   // ---------------------------------------------------------------------------
   $effect(() => {
     if (cameraMode === 'single') {
-      selectedCamera = 'left';
+      selectedCameraIndex = 0;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Al cambiar de cámara, actualizar lensPosition desde calibración si disponible
+  // ---------------------------------------------------------------------------
+  $effect(() => {
+    const dev = devices.find(d => d.index === selectedCameraIndex);
+    if (dev?.lens_position !== undefined) {
+      lensPosition = dev.lens_position;
     }
   });
 
@@ -161,7 +215,56 @@
     showCameraDropdown = false;
     showModeDropdown = false;
   }
-</script>
+
+  // ---------------------------------------------------------------------------
+  // Cargar dispositivos reales al montar
+  // ---------------------------------------------------------------------------
+  onMount(() => {
+    camerasApi.listDevices()
+      .then(d => {
+        devices = d;
+      })
+      .catch(() => { /* fallo silencioso — el selector mostrará Camera 0/1 */ });
+  });
+
+
+<!-- ============================================================
+     SIDEBAR WRAPPER — colapsado por defecto en pantallas de 7"
+     ============================================================ -->
+<div class="sidebar-wrapper">
+
+  {#if !sidebarOpen}
+    <!-- ── TIRA DE ICONOS (sidebar colapsado) ── -->
+    <div class="icon-strip">
+      <!-- Botón para expandir -->
+      <button class="strip-btn toggle" onclick={() => sidebarOpen = true} aria-label="Abrir controles">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </button>
+      <!-- Cámara -->
+      <button class="strip-btn" onclick={() => sidebarOpen = true} aria-label="Controles de cámara">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
+      <!-- Ajustes -->
+      <button class="strip-btn" onclick={() => sidebarOpen = true} aria-label="Ajustes">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+        </svg>
+      </button>
+      <!-- Foco -->
+      <button class="strip-btn" onclick={() => sidebarOpen = true} aria-label="Foco">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </button>
+    </div>
+
+  {:else}
+    <!-- ── PANEL COMPLETO (sidebar expandido) ── -->
 
 <!-- ============================================================
      PANEL DE CONTROLES
@@ -170,6 +273,12 @@
 
   <div class="panel-header">
     <h2 class="panel-title">Camera Controls</h2>
+    <!-- Botón para colapsar -->
+    <button class="collapse-btn" onclick={() => sidebarOpen = false} aria-label="Colapsar panel">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
   </div>
 
   <div class="panel-body">
@@ -194,8 +303,8 @@
     </div>
 
     <!-- ── SELECTOR DE CÁMARA ── -->
-    <!-- En modo single: muestra solo "Arducam — Left", no clickeable -->
-    <!-- En modo double: dropdown con Left y Right para seleccionar cuál controlar -->
+    <!-- En modo single: no clickeable (siempre cámara 0)     -->
+    <!-- En modo double: dropdown para seleccionar cuál controlar -->
     <div class="relative">
       <button
         class="camera-selector"
@@ -207,12 +316,11 @@
           <circle cx="12" cy="13" r="4"/>
         </svg>
         <span class="camera-name">
-          {#if cameraMode === 'single'}
-            Arducam — Left
-          {:else}
-            Arducam — {selectedCamera === 'left' ? 'Left' : 'Right'}
-          {/if}
+          {cameraDisplayName}
         </span>
+        {#if selectedDevice?.calibrated}
+          <span class="cal-dot" title="Calibrada">✓</span>
+        {/if}
         {#if cameraMode === 'double'}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 12 15 18 9"/>
@@ -226,28 +334,25 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="fixed-backdrop" onclick={() => showCameraDropdown = false}></div>
         <div class="camera-dropdown">
-          <button
-            class="camera-option"
-            class:selected={selectedCamera === 'left'}
-            onclick={() => { selectedCamera = 'left'; showCameraDropdown = false; }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            Arducam — Left
-          </button>
-          <button
-            class="camera-option"
-            class:selected={selectedCamera === 'right'}
-            onclick={() => { selectedCamera = 'right'; showCameraDropdown = false; }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            Arducam — Right
-          </button>
+          {#each devices as device}
+            <button
+              class="camera-option"
+              class:selected={selectedCameraIndex === device.index}
+              onclick={() => { selectedCameraIndex = device.index; showCameraDropdown = false; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              {device.label || device.model || `Camera ${device.index}`}
+              {#if device.calibrated}
+                <span class="cal-dot" title="Calibrada">✓</span>
+              {/if}
+            </button>
+          {/each}
+          {#if devices.length === 0}
+            <div class="camera-option" style="opacity:0.5; cursor:default">Sin cámaras detectadas</div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -281,10 +386,6 @@
       </div>
     </div>
 
-    <!-- ── AUTOFOCUS ── -->
-    <button class="btn-autofocus" onclick={handleAutoFocus}>
-      Auto Focus
-    </button>
 
     <!-- ══════════════════════════════════════════
          ACORDEÓN: BASIC
@@ -386,27 +487,35 @@
 
       {#if openSections.includes('focus')}
         <div class="accordion-content">
-          <!-- Botones de ajuste fino de foco: <<< << ● >> >>> -->
-          <!-- Para conectar con backend: camerasApi.calibrate({ camera_index, step }) -->
-          <div class="focus-row">
-            <button class="focus-btn" aria-label="Foco <<<">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-5px"><polyline points="15 18 9 12 15 6"/></svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-5px"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <button class="focus-btn" aria-label="Foco <<">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
-            </button>
-            <!-- Punto central verde = posición neutral -->
-            <button class="focus-btn center" aria-label="Foco neutro"></button>
-            <button class="focus-btn" aria-label="Foco >>">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
-            </button>
-            <button class="focus-btn" aria-label="Foco >>>">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-5px"><polyline points="9 18 15 12 9 6"/></svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-5px"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
+          <!-- Autofocus -->
+          <button class="btn-autofocus" onclick={handleAutoFocus} disabled={isFocusing}>
+            {#if isFocusing}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin-icon">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+              Enfocando…
+            {:else}
+              Enfocar auto
+            {/if}
+          </button>
+
+          <!-- Slider vertical de foco manual -->
+          <div class="focus-slider-wrap">
+            <span class="focus-label-top" title="Macro (cerca)">↑ Cerca</span>
+            <div class="focus-slider-track">
+              <input
+                type="range"
+                class="focus-slider"
+                min="0"
+                max="10"
+                step="0.1"
+                value={lensPosition}
+                oninput={(e) => handleFocusSlider(Number((e.target as HTMLInputElement).value))}
+                aria-label="Posición de foco (dioptrias)"
+              />
+            </div>
+            <span class="focus-label-bot" title="Infinito (lejos)">↓ Lejos</span>
+            <span class="focus-value">{lensPosition.toFixed(1)} dpt</span>
           </div>
         </div>
       {/if}
@@ -558,7 +667,9 @@
     </div>
 
   </div><!-- /panel-body -->
-</div>
+</div><!-- /controls-panel -->
+  {/if}<!-- /sidebarOpen -->
+</div><!-- /sidebar-wrapper -->
 
 <!-- ══════════════════════════════════════════════════════════════
      DROPDOWNS DE BASIC (fuera del panel para escapar overflow:hidden)
@@ -601,6 +712,134 @@
 {/if}
 
 <style>
+  /* ── Sidebar wrapper ── */
+  .sidebar-wrapper {
+    height: 100%;
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  /* ── Tira de iconos (sidebar colapsado) ── */
+  .icon-strip {
+    width: 48px;
+    height: 100%;
+    background-color: var(--color-surface-alt);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .strip-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    color: var(--color-light-grey);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .strip-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--color-light);
+  }
+
+  .strip-btn.toggle {
+    color: var(--color-primary);
+  }
+
+  /* ── Botón de colapsar (dentro del panel) ── */
+  .collapse-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: var(--color-light-grey);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+  }
+
+  .collapse-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--color-light);
+  }
+
+  /* ── Slider vertical de foco ── */
+  .focus-slider-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 0;
+  }
+
+  .focus-label-top,
+  .focus-label-bot {
+    font-size: 10px;
+    color: var(--color-light-grey);
+    user-select: none;
+  }
+
+  .focus-slider-track {
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .focus-slider {
+    -webkit-appearance: slider-vertical;
+    appearance: slider-vertical;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 28px;
+    height: 140px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+  }
+
+  .focus-value {
+    font-size: 11px;
+    color: var(--color-light);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Icono giratorio (autofocus en curso) ── */
+  .spin-icon {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* ── Badge de calibración ── */
+  .cal-dot {
+    font-size: 10px;
+    color: var(--color-success, #4ade80);
+    line-height: 1;
+  }
+
   /* ── Panel principal ── */
   .controls-panel {
     width: 280px;
@@ -623,6 +862,7 @@
     border-bottom: 1px solid var(--border-color);
     flex-shrink: 0;
     text-align: center;
+    position: relative;
   }
 
   .panel-title {
@@ -850,6 +1090,8 @@
   }
 
   .btn-autofocus:hover { background-color: var(--color-primary-hover); }
+  .btn-autofocus:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-autofocus:disabled:hover { background-color: var(--color-primary); }
 
   /* ── Acordeón ── */
   .accordion-block {
