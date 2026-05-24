@@ -25,6 +25,7 @@
   import { camerasApi, type CameraDevice, type CameraControlsRequest } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
+  import { histogramStore } from '$lib/stores/histogram';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -136,9 +137,6 @@
   // ISO options: keep low for archival quality (IMX519 analogue gain max ≈ 16× = ISO 1600)
   const isoOptions     = ['100','200','400','800','1600'];
   const apertureOptions = ['1.4','2.0','2.8','4.0','5.6','8.0','11.0','13.0','16.0','22.0'];
-
-  // Datos del histograma (simulados — en producción vendrán del stream de cámara)
-  const histogramBars = [12,15,20,28,35,45,58,72,85,95,100,98,92,82,70,55,42,30,22,16,12,10,8,6,5,4,3,2,2,1];
 
   // ---------------------------------------------------------------------------
   // FUNCIÓN: abrir un dropdown de Basic y calcular su posición en viewport
@@ -953,11 +951,12 @@
       {#if openSections.includes('histogram')}
         <div class="accordion-content">
           <div class="histogram">
-            {#each histogramBars as h}
+            {#each { length: 30 } as _, i}
+              {@const hist = $histogramStore[selectedCameraIndex] ?? { r: [], g: [], b: [] }}
               <div class="bar-group">
-                <div class="bar red"   style="height:{h*0.9}%"></div>
-                <div class="bar green" style="height:{h*0.95}%"></div>
-                <div class="bar blue"  style="height:{h}%"></div>
+                <div class="bar red"   style="height:{hist.r[i] ?? 0}%"></div>
+                <div class="bar green" style="height:{hist.g[i] ?? 0}%"></div>
+                <div class="bar blue"  style="height:{hist.b[i] ?? 0}%"></div>
               </div>
             {/each}
           </div>

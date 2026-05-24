@@ -36,6 +36,7 @@
   import { camerasApi } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
+  import { histogramStore, computeHistogram } from '$lib/stores/histogram';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -433,6 +434,7 @@
               src={previewUrls[0]}
               alt="Camera izquierda"
               class="feed-img"
+              onload={() => { if (imgEl0) histogramStore.update(s => ({ ...s, 0: computeHistogram(imgEl0!) })); }}
             />
             <!-- WB sampling overlay: visible only when picker is active for this camera -->
             {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === 0}
@@ -469,6 +471,7 @@
                 src={previewUrls[1]}
                 alt="Camera derecha"
                 class="feed-img"
+                onload={() => { if (imgEl1) histogramStore.update(s => ({ ...s, 1: computeHistogram(imgEl1!) })); }}
               />
               {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === 1}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
