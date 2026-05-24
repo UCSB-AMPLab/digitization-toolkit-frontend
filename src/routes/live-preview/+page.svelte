@@ -47,7 +47,7 @@
   let cameraMode = $state<'single' | 'double'>('double');
 
   // Modo de control: 'manual' = ajustes manuales | 'automatic' = automático
-  let controlMode = $state<'manual' | 'automatic'>('manual');
+  let controlMode = $state<'manual' | 'automatic'>('automatic');
 
   // Ajustes de cámara (solo activos en modo manual)
   let shutterSpeed = $state('1.6s');
