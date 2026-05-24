@@ -66,7 +66,7 @@
   // ESTADO LOCAL: Viewport
   // ---------------------------------------------------------------------------
 
-  let zoom = $state(1);          // Zoom del viewport (1 = 100%)
+  let zoom = $state(1);          // Zoom del viewport CSS (1 = 100%)
   let guideV = $state(50);       // Guía vertical (% desde izquierda)
   let guideH = $state(50);       // Guía horizontal (% desde arriba)
   let dragging = $state<'v' | 'h' | null>(null);
@@ -297,7 +297,8 @@
   // ===========================================================================
 
   // ---------------------------------------------------------------------------
-  // ZOOM
+  // ZOOM (CSS transform del wrapper — ajuste visual del viewport, no afecta la cámara)
+  // Para zoom de cámara (ScalerCrop) usa el slider de Zoom en CameraControls.
   // ---------------------------------------------------------------------------
   function zoomIn()    { zoom = Math.min(zoom + 0.2, 3); }
   function zoomOut()   { zoom = Math.max(zoom - 0.2, 0.5); }

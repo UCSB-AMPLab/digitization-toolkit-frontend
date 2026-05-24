@@ -74,6 +74,10 @@
   let focusResultOk: boolean = $state(true);
   let focusResultTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Zoom per-camera (1.0 = full sensor, 4.0 = 4× ScalerCrop)
+  let cameraZoom = $state<Record<number, number>>({ 0: 1, 1: 1 });
+  let zoomDebounce: ReturnType<typeof setTimeout> | null = null;
+
   // WB calibration state
   let isWbCalibrating = $state(false);
   let wbResultMsg: string | null = $state(null);
@@ -327,6 +331,21 @@
         await camerasApi.setFocus(selectedCameraIndex, value);
       } catch {
         // fallo silencioso — el preview mostrará el foco actual
+      }
+    }, 150);
+  }
+
+  // ---------------------------------------------------------------------------
+  // FUNCIÓN: Zoom de cámara (ScalerCrop via API) por índice de cámara
+  // ---------------------------------------------------------------------------
+  function handleZoomSlider(value: number) {
+    cameraZoom = { ...cameraZoom, [selectedCameraIndex]: value };
+    if (zoomDebounce) clearTimeout(zoomDebounce);
+    zoomDebounce = setTimeout(async () => {
+      try {
+        await camerasApi.setCameraControls(selectedCameraIndex, { zoom_factor: value });
+      } catch {
+        // fallo silencioso
       }
     }, 150);
   }
@@ -697,7 +716,38 @@
             <p class:text-success={focusResultOk} class:text-error={!focusResultOk} class="focus-result-msg">{focusResultMsg}</p>
           {/if}
 
-          <!-- Slider vertical de foco manual -->
+          <!-- Zoom de cámara (ScalerCrop por cámara) -->
+          <div class="zoom-row">
+            <div class="zoom-header">
+              <span class="zoom-row-label">Zoom</span>
+              <span class="zoom-value">
+                {(cameraZoom[selectedCameraIndex] ?? 1).toFixed(1)}×
+                {#if (cameraZoom[selectedCameraIndex] ?? 1) > 1}
+                  <button
+                    class="zoom-reset-btn"
+                    onclick={() => handleZoomSlider(1)}
+                    aria-label="Restablecer zoom a 1×"
+                  >reset</button>
+                {/if}
+              </span>
+            </div>
+            <input
+              type="range"
+              class="zoom-slider"
+              min="1"
+              max="4"
+              step="0.5"
+              value={cameraZoom[selectedCameraIndex] ?? 1}
+              oninput={(e) => handleZoomSlider(Number((e.target as HTMLInputElement).value))}
+              aria-label="Zoom de cámara (ScalerCrop)"
+            />
+            <div class="zoom-ticks">
+              <span>1×</span>
+              <span>2×</span>
+              <span>3×</span>
+              <span>4×</span>
+            </div>
+          </div>
           <div class="focus-slider-wrap">
             <span class="focus-label-top" title="Macro (cerca)">↑ Cerca</span>
             <div class="focus-slider-track">
@@ -1072,6 +1122,62 @@
   @keyframes spin {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
+  }
+
+  /* ── Zoom slider (horizontal, per-camera ScalerCrop) ── */
+  .zoom-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 0 2px;
+  }
+
+  .zoom-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .zoom-row-label {
+    font-size: 11px;
+    color: var(--color-light-grey);
+    user-select: none;
+  }
+
+  .zoom-value {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-light);
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .zoom-reset-btn {
+    font-size: 9px;
+    font-family: var(--font-family);
+    color: var(--color-light-grey);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .zoom-reset-btn:hover { color: var(--color-primary); }
+
+  .zoom-slider {
+    width: 100%;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+  }
+
+  .zoom-ticks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--color-light-grey);
+    padding: 0 2px;
+    user-select: none;
   }
 
   /* ── Badge de calibración ── */

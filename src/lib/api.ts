@@ -674,6 +674,7 @@ export interface CameraDevice {
   awb_gains?: [number, number];
   // Capabilities
   has_aperture_control?: boolean;
+  supports_zoom?: boolean;
 }
 
 export interface CaptureRequest {
@@ -849,6 +850,7 @@ export interface CameraControlsRequest {
   exposure_time_us?: number;    // Manual shutter in microseconds
   analogue_gain?: number;       // Manual gain (ISO 100 ≈ 1.0)
   colour_gains?: [number, number]; // Manual WB as [red_gain, blue_gain]
+  zoom_factor?: number;         // ScalerCrop digital zoom (1.0 = full sensor, no zoom)
 }
 
 // ============================================================================
