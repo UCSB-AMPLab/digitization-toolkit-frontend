@@ -161,7 +161,7 @@
     try {
       isFocusing = true;
       const result = await camerasApi.calibrate({ camera_index: idx });
-      if (result.lens_position !== undefined) {
+      if (result.lens_position != null) {
         lensPosition = result.lens_position;
       }
       cameraStatus.reportSuccess();
@@ -567,7 +567,7 @@
               />
             </div>
             <span class="focus-label-bot" title="Infinito (lejos)">↓ Lejos</span>
-            <span class="focus-value">{lensPosition.toFixed(1)} dpt</span>
+            <span class="focus-value">{(lensPosition ?? 0).toFixed(1)} dpt</span>
           </div>
         </div>
       {/if}
