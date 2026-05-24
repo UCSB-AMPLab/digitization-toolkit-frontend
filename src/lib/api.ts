@@ -817,6 +817,16 @@ export const camerasApi = {
       method: 'POST',
       body: JSON.stringify(controls)
     });
+  },
+
+  /**
+   * Delete stale preview temp files from /tmp (dtk_preview_c*.jpg).
+   * Safe to call at any time — active previews recreate the file on the next poll.
+   */
+  async flushPreviewTmp(): Promise<{ deleted: number; detail: string }> {
+    return apiRequest<{ deleted: number; detail: string }>('/cameras/preview/tmp', {
+      method: 'DELETE'
+    });
   }
 };
 

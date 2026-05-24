@@ -21,7 +21,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { systemApi, type SystemLogEntry, type StorageInfo, type StorageDevice } from '$lib/api';
+  import { systemApi, camerasApi, type SystemLogEntry, type StorageInfo, type StorageDevice } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Almacenamiento — info del disco actual
@@ -75,6 +75,31 @@
         ? 'var(--color-warning)'
         : 'var(--color-primary)'
   );
+
+  // ---------------------------------------------------------------------------
+  // ESTADO: Mantenimiento — limpieza de archivos temporales
+  // ---------------------------------------------------------------------------
+  let flushingPreview    = $state(false);
+  let flushPreviewResult = $state<string | null>(null);
+  let flushPreviewError  = $state<string | null>(null);
+
+  async function flushPreviewTmp() {
+    flushingPreview    = true;
+    flushPreviewResult = null;
+    flushPreviewError  = null;
+    try {
+      const result = await camerasApi.flushPreviewTmp();
+      const n = result.deleted;
+      flushPreviewResult = n === 0
+        ? 'No había archivos temporales pendientes.'
+        : `${n} archivo${n !== 1 ? 's' : ''} eliminado${n !== 1 ? 's' : ''} correctamente.`;
+      setTimeout(() => { flushPreviewResult = null; }, 5000);
+    } catch (e: unknown) {
+      flushPreviewError = (e instanceof Error ? e.message : null) || 'Error al limpiar los archivos.';
+    } finally {
+      flushingPreview = false;
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // ESTADO: Seguridad & Acceso
@@ -444,12 +469,7 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 2: SEGURIDAD & ACCESO
-       Configuraciones de seguridad relevantes para uso offline.
-       ══════════════════════════════════════════════════════════ -->
-
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 3: DIAGNÓSTICO DEL SISTEMA
+       SECCIÓN 2: DIAGNÓSTICO DEL SISTEMA
        Logs de actividad reciente. Ocultos por defecto, expandibles.
        Solo administradores (el layout controla el acceso a esta página).
        ══════════════════════════════════════════════════════════ -->
@@ -491,6 +511,47 @@
                 </span>
               </div>
             {/each}
+          {/if}
+        </div>
+      {/if}
+
+    </div>
+  </div>
+
+
+
+  <!-- ══════════════════════════════════════════════════════════
+       SECCIÓN 3: MANTENIMIENTO
+       ══════════════════════════════════════════════════════════ -->
+  <div class="config-section">
+    <h2 class="section-title">Mantenimiento</h2>
+    <div class="config-card">
+
+      <!-- Fila: Limpiar archivos temporales de previsualización -->
+      <div class="config-row">
+        <div class="row-info">
+          <span class="row-label">Archivos temporales de previsualización</span>
+          <span class="row-desc">
+            Elimina los archivos <code class="inline-code">dtk_preview_c*.jpg</code> de <code class="inline-code">/tmp</code>
+            que pueden quedar si el servidor se reinicia inesperadamente
+          </span>
+        </div>
+        <button
+          class="btn-flush"
+          onclick={flushPreviewTmp}
+          disabled={flushingPreview}
+        >
+          {flushingPreview ? 'Limpiando…' : 'Limpiar /tmp'}
+        </button>
+      </div>
+
+      {#if flushPreviewResult || flushPreviewError}
+        <div class="section-divider"></div>
+        <div class="flush-result-row">
+          {#if flushPreviewResult}
+            <span class="flush-msg flush-msg-ok">{flushPreviewResult}</span>
+          {:else if flushPreviewError}
+            <span class="flush-msg flush-msg-err">{flushPreviewError}</span>
           {/if}
         </div>
       {/if}
@@ -820,4 +881,39 @@
   }
   .btn-refresh-devices:hover:not(:disabled) { color: var(--color-light); }
   .btn-refresh-devices:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Mantenimiento ──────────────────────────────────────── */
+  .btn-flush {
+    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-semibold);
+    color: var(--color-light-grey);
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 8px 16px; min-height: var(--touch-target-min);
+    cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+  }
+  .btn-flush:hover:not(:disabled) {
+    color: var(--color-light);
+    border-color: rgba(255,255,255,0.2);
+    background-color: rgba(255,255,255,0.04);
+  }
+  .btn-flush:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .flush-result-row {
+    padding: 10px 20px 14px;
+  }
+  .flush-msg {
+    font-size: var(--text-sm);
+  }
+  .flush-msg-ok  { color: var(--color-primary); }
+  .flush-msg-err { color: var(--color-error); }
+
+  .inline-code {
+    font-family: monospace;
+    font-size: 0.88em;
+    background-color: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
 </style>
