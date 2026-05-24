@@ -716,6 +716,29 @@
             <p class:text-success={focusResultOk} class:text-error={!focusResultOk} class="focus-result-msg">{focusResultMsg}</p>
           {/if}
 
+          <!-- Foco manual (horizontal) -->
+          <div class="zoom-row">
+            <div class="zoom-header">
+              <span class="zoom-row-label">Foco manual</span>
+              <span class="zoom-value">{(lensPosition ?? 0).toFixed(1)} dpt</span>
+            </div>
+            <input
+              type="range"
+              class="zoom-slider"
+              min="0"
+              max="10"
+              step="0.1"
+              value={lensPosition}
+              oninput={(e) => handleFocusSlider(Number((e.target as HTMLInputElement).value))}
+              aria-label="Posición de foco (dioptrias)"
+            />
+            <div class="zoom-ticks">
+              <span title="Infinito (lejos)">∞</span>
+              <span>5 dpt</span>
+              <span title="Macro (10 cm)">10cm</span>
+            </div>
+          </div>
+
           <!-- Zoom de cámara (ScalerCrop por cámara) -->
           <div class="zoom-row">
             <div class="zoom-header">
@@ -747,23 +770,6 @@
               <span>3×</span>
               <span>4×</span>
             </div>
-          </div>
-          <div class="focus-slider-wrap">
-            <span class="focus-label-top" title="Macro (cerca)">↑ Cerca</span>
-            <div class="focus-slider-track">
-              <input
-                type="range"
-                class="focus-slider"
-                min="0"
-                max="10"
-                step="0.1"
-                value={lensPosition}
-                oninput={(e) => handleFocusSlider(Number((e.target as HTMLInputElement).value))}
-                aria-label="Posición de foco (dioptrias)"
-              />
-            </div>
-            <span class="focus-label-bot" title="Infinito (lejos)">↓ Lejos</span>
-            <span class="focus-value">{(lensPosition ?? 0).toFixed(1)} dpt</span>
           </div>
         </div>
       {/if}
@@ -1072,46 +1078,6 @@
   .collapse-btn:hover {
     background: rgba(255,255,255,0.08);
     color: var(--color-light);
-  }
-
-  /* ── Slider vertical de foco ── */
-  .focus-slider-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 0;
-  }
-
-  .focus-label-top,
-  .focus-label-bot {
-    font-size: 10px;
-    color: var(--color-light-grey);
-    user-select: none;
-  }
-
-  .focus-slider-track {
-    height: 140px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .focus-slider {
-    -webkit-appearance: slider-vertical;
-    appearance: slider-vertical;
-    writing-mode: vertical-lr;
-    direction: rtl;
-    width: 28px;
-    height: 140px;
-    accent-color: var(--color-primary);
-    cursor: pointer;
-  }
-
-  .focus-value {
-    font-size: 11px;
-    color: var(--color-light);
-    font-variant-numeric: tabular-nums;
   }
 
   /* ── Icono giratorio (autofocus en curso) ── */
