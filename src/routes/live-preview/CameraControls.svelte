@@ -69,6 +69,9 @@
   let lensPosition = $state(0);
   let isFocusing = $state(false);
   let focusDebounce: ReturnType<typeof setTimeout> | null = null;
+  let focusResultMsg: string | null = $state(null);
+  let focusResultOk: boolean = $state(true);
+  let focusResultTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Cámara actualmente seleccionada (derivado)
   const selectedDevice = $derived(devices.find(d => d.index === selectedCameraIndex));
@@ -149,24 +152,33 @@
 
   // ---------------------------------------------------------------------------
   // FUNCIÓN: Autofocus
-  // Llama al backend con el índice de la cámara seleccionada.
-  // left = index 0, right = index 1
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: Autofocus
   // Llama al backend y actualiza el slider de foco con el resultado.
   // ---------------------------------------------------------------------------
+  function showFocusResult(ok: boolean, msg: string) {
+    focusResultOk = ok;
+    focusResultMsg = msg;
+    if (focusResultTimer) clearTimeout(focusResultTimer);
+    focusResultTimer = setTimeout(() => { focusResultMsg = null; }, 5000);
+  }
+
   async function handleAutoFocus() {
     const idx = selectedCameraIndex;
     try {
       isFocusing = true;
       const result = await camerasApi.calibrate({ camera_index: idx });
-      if (result.lens_position != null) {
+      if (result.success && result.lens_position != null) {
         lensPosition = result.lens_position;
+        cameraStatus.reportSuccess();
+        showFocusResult(true, `Foco: ${result.lens_position.toFixed(2)} dpt`);
+      } else {
+        const msg = result.error ?? 'Autofocus falló';
+        cameraStatus.reportFailure(msg);
+        showFocusResult(false, msg);
       }
-      cameraStatus.reportSuccess();
     } catch (error) {
-      cameraStatus.reportFailure('Error en autofocus');
+      const msg = 'Error en autofocus';
+      cameraStatus.reportFailure(msg);
+      showFocusResult(false, msg);
     } finally {
       isFocusing = false;
     }
@@ -550,6 +562,9 @@
               Enfocar auto
             {/if}
           </button>
+          {#if focusResultMsg}
+            <p class:text-success={focusResultOk} class:text-error={!focusResultOk} class="focus-result-msg">{focusResultMsg}</p>
+          {/if}
 
           <!-- Slider vertical de foco manual -->
           <div class="focus-slider-wrap">

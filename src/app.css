@@ -1090,3 +1090,14 @@ canvas, button, a, div {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ============================================================================
+   FOCUS CALIBRATION RESULT
+   ============================================================================ */
+
+.focus-result-msg {
+  font-size: var(--text-sm);
+  text-align: center;
+  margin-top: 6px;
+}
+}
