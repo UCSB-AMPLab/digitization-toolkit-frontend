@@ -62,27 +62,6 @@
     </button>
   </div>
 
-  <!-- ── Centro: tabs Live Scan / Gallery ── -->
-  <!-- Para agregar más tabs, añadirlos aquí y en el type del prop activeTab -->
-  <div class="tabs-container">
-    <div class="tabs-pill">
-      <button
-        class="tab-btn"
-        class:active={activeTab === 'live'}
-        onclick={() => onTabChange('live')}
-      >
-        Live Scan
-      </button>
-      <button
-        class="tab-btn"
-        class:active={activeTab === 'gallery'}
-        onclick={() => onTabChange('gallery')}
-      >
-        Gallery
-      </button>
-    </div>
-  </div>
-
   <!-- ── Lado derecho: badge de estado + avatar ── -->
   <div class="topbar-right">
     <!-- Badge "In Review" — estilo sand/naranja del design system -->
