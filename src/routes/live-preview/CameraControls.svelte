@@ -756,13 +756,11 @@
 
     <!-- ══════════════════════════════════════════
          ACORDEÓN: SETTINGS
-         Deshabilitado en modo 'automatic'
          ══════════════════════════════════════════ -->
-    <div class="accordion-block" class:disabled={controlMode === 'automatic'}>
+    <div class="accordion-block">
       <button
         class="accordion-trigger"
-        onclick={() => controlMode === 'manual' && toggleSection('settings')}
-        disabled={controlMode === 'automatic'}
+        onclick={() => toggleSection('settings')}
       >
         <div class="acc-left">
           <span>Settings</span>
@@ -771,12 +769,12 @@
           </svg>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          class="chevron" class:rotated={openSections.includes('settings') && controlMode === 'manual'}>
+          class="chevron" class:rotated={openSections.includes('settings')}>
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
 
-      {#if openSections.includes('settings') && controlMode === 'manual'}
+      {#if openSections.includes('settings')}
         <div class="accordion-content settings-content">
 
           <!-- White Balance -->
