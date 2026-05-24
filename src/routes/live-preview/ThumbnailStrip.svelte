@@ -63,7 +63,7 @@
   // ---------------------------------------------------------------------------
   let thumbItems = $derived(
     cameraMode === 'double'
-      ? records.flatMap((record): ThumbItem[] => {
+      ? [...records].reverse().flatMap((record): ThumbItem[] => {
           if (!record.images || record.images.length === 0) {
             return [{ record, image: null, role: null, thumbnailUrl: null }];
           }
@@ -79,7 +79,7 @@
             thumbnailUrl: thumbnailUrl(img),
           }));
         })
-      : records.map((record): ThumbItem => {
+      : [...records].reverse().map((record): ThumbItem => {
           const img = record.images?.[0] ?? null;
           return { record, image: img, role: imageRole(img), thumbnailUrl: thumbnailUrl(img) };
         })
