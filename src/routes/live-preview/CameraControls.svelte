@@ -24,6 +24,7 @@
   import { onMount } from 'svelte';
   import { camerasApi, type CameraDevice, type CameraControlsRequest } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
+  import { wbSamplingStore } from '$lib/stores/wbSampling';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -78,6 +79,16 @@
   let wbResultMsg: string | null = $state(null);
   let wbResultOk: boolean = $state(true);
   let wbResultTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // WB picker (click-to-neutralize) state
+  let isWbPickerActive = $state(false);
+
+  // Deactivate picker if the store is cleared externally (e.g. Escape)
+  $effect(() => {
+    if (!$wbSamplingStore.active) {
+      isWbPickerActive = false;
+    }
+  });
 
   // Cámara actualmente seleccionada (derivado)
   const selectedDevice = $derived(devices.find(d => d.index === selectedCameraIndex));
@@ -235,6 +246,70 @@
       const msg = 'Error calibrando WB';
       cameraStatus.reportFailure(msg);
       showWbResult(false, msg);
+    } finally {
+      isWbCalibrating = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // FUNCIÓN: WB picker — click-to-neutralize
+  // Activa el modo de muestreo en LiveViewport. Cuando el usuario hace clic
+  // sobre un área blanca/neutra, se calcula la corrección de ganancias y se
+  // guarda en el registro de la cámara.
+  //
+  // Fórmula: neutral_gray = (R+G+B)/3
+  //   new_red_gain  = baseGains[0] * (gray / R)
+  //   new_blue_gain = baseGains[1] * (gray / B)
+  // Esto corrige la diferencia entre el color observado y el gris neutro,
+  // relativo a las ganancias de calibración almacenadas.
+  // ---------------------------------------------------------------------------
+  function handleWbPicker() {
+    if (isWbPickerActive) {
+      // Toggle off — cancel sampling
+      wbSamplingStore.set({ active: false, cameraIndex: 0, onSample: null });
+      isWbPickerActive = false;
+      return;
+    }
+    isWbPickerActive = true;
+    wbSamplingStore.set({
+      active: true,
+      cameraIndex: selectedCameraIndex,
+      onSample: (r: number, g: number, b: number) => applyPickedWb(r, g, b),
+    });
+  }
+
+  async function applyPickedWb(r: number, g: number, b: number) {
+    isWbPickerActive = false;
+    const idx = selectedCameraIndex;
+
+    if (r === 0 && b === 0) {
+      showWbResult(false, 'Pixel inválido — elige un área con luz');
+      return;
+    }
+    const gray = (r + g + b) / 3;
+    const safeR = Math.max(r, 1);
+    const safeB = Math.max(b, 1);
+    const newRed  = Math.max(0.1, Math.min(8.0, baseGains[0] * (gray / safeR)));
+    const newBlue = Math.max(0.1, Math.min(8.0, baseGains[1] * (gray / safeB)));
+    const gains: [number, number] = [newRed, newBlue];
+
+    try {
+      isWbCalibrating = true;
+      // Apply to camera immediately so preview updates
+      await camerasApi.setCameraControls(idx, { awb_enable: false, colour_gains: gains });
+      // Persist to registry
+      const result = await camerasApi.commitWhiteBalance(idx, gains);
+      if (result.success) {
+        try { devices = await camerasApi.listDevices(); } catch { /* ignore */ }
+        temperature = 0;
+        tint = 0;
+        cameraStatus.reportSuccess();
+        showWbResult(true, `WB muestrado (R=${newRed.toFixed(2)}, B=${newBlue.toFixed(2)})`);
+      } else {
+        showWbResult(false, result.error ?? 'Error al guardar WB');
+      }
+    } catch {
+      showWbResult(false, 'Error aplicando WB');
     } finally {
       isWbCalibrating = false;
     }
@@ -677,20 +752,29 @@
                 <span>Shot</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
-              <!-- Pipette: calibrar white balance automáticamente -->
+              <!-- wb_auto: auto white balance calibration -->
               <button
                 class="wb-pipette"
                 onclick={handleWbCalibration}
                 disabled={isWbCalibrating}
-                aria-label="Calibrar white balance"
+                aria-label="Calibrar white balance automáticamente"
               >
                 {#if isWbCalibrating}
                   <span class="material-symbols-outlined icon-sm">sync</span>
                 {:else}
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z"/>
-                  </svg>
+                  <span class="material-symbols-outlined icon-sm">wb_auto</span>
                 {/if}
+              </button>
+              <!-- colorize: click a neutral area in the preview to set WB -->
+              <button
+                class="wb-pipette"
+                class:wb-picker-active={isWbPickerActive}
+                onclick={handleWbPicker}
+                disabled={isWbCalibrating}
+                aria-label="Muestrear color blanco del preview"
+                title={isWbPickerActive ? 'Haz clic en un área blanca/neutra en el preview — clic aquí para cancelar' : 'Clic en el preview para muestrear WB'}
+              >
+                <span class="material-symbols-outlined icon-sm">colorize</span>
               </button>
             </div>
             {#if wbResultMsg}

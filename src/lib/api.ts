@@ -793,6 +793,17 @@ export const camerasApi = {
   },
 
   /**
+   * Commit manually-sampled AWB gains to the registry.
+   * Called after the user clicks a neutral area in the live preview.
+   */
+  async commitWhiteBalance(cameraIndex: number, awbGains: [number, number]): Promise<WhiteBalanceCalibrationResponse> {
+    return apiRequest<WhiteBalanceCalibrationResponse>('/cameras/calibrate/white-balance/manual', {
+      method: 'POST',
+      body: JSON.stringify({ camera_index: cameraIndex, awb_gains: awbGains })
+    });
+  },
+
+  /**
    * Get current focus (lens position in dioptres)
    */
   async getFocus(cameraIndex: number): Promise<{ camera_index: number; lens_position: number }> {

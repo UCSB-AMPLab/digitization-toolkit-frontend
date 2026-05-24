@@ -1100,3 +1100,25 @@ canvas, button, a, div {
   text-align: center;
   margin-top: 6px;
 }
+
+/* ============================================================================
+   WB CLICK-TO-NEUTRALIZE OVERLAY
+   ============================================================================ */
+
+/* Transparent overlay that catches the click on the preview image */
+.wb-sample-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px dashed rgba(255, 255, 255, 0.6);
+  box-sizing: border-box;
+}
+
+/* Picker button active state — highlighted so the user knows sampling is pending */
+.wb-picker-active {
+  background-color: var(--accent-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 2px var(--accent-primary);
+}

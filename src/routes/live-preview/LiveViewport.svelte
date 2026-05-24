@@ -35,6 +35,7 @@
   import { env } from '$env/dynamic/public';
   import { camerasApi } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
+  import { wbSamplingStore } from '$lib/stores/wbSampling';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -107,6 +108,55 @@
   // Key = índice de cámara (0 = izquierda, 1 = derecha).
   // Se actualizan con cada ciclo de polling.
   let previewUrls = $state<Record<number, string>>({});
+
+  // References to the live preview <img> elements for pixel sampling.
+  let imgEl0: HTMLImageElement | null = $state(null);
+  let imgEl1: HTMLImageElement | null = $state(null);
+
+  // ---------------------------------------------------------------------------
+  // WB SAMPLING — click-to-neutralize
+  // Reads a 3×3 pixel block from the blob-URL preview image via an offscreen
+  // canvas (same-origin: no CORS issue with blob URLs).
+  // ---------------------------------------------------------------------------
+  function samplePixel(imgEl: HTMLImageElement, event: MouseEvent): [number, number, number] | null {
+    if (!imgEl || !imgEl.naturalWidth) return null;
+    const rect = imgEl.getBoundingClientRect();
+    const cx = Math.round(((event.clientX - rect.left) / rect.width) * imgEl.naturalWidth);
+    const cy = Math.round(((event.clientY - rect.top) / rect.height) * imgEl.naturalHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = imgEl.naturalWidth;
+    canvas.height = imgEl.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(imgEl, 0, 0);
+    // Average a 3×3 block for robustness against noise
+    const x0 = Math.max(0, cx - 1);
+    const y0 = Math.max(0, cy - 1);
+    const w = Math.min(3, imgEl.naturalWidth - x0);
+    const h = Math.min(3, imgEl.naturalHeight - y0);
+    const data = ctx.getImageData(x0, y0, w, h).data;
+    let r = 0, g = 0, b = 0;
+    const count = w * h;
+    for (let i = 0; i < count; i++) {
+      r += data[i * 4];
+      g += data[i * 4 + 1];
+      b += data[i * 4 + 2];
+    }
+    return [Math.round(r / count), Math.round(g / count), Math.round(b / count)];
+  }
+
+  function handleWbSampleClick(cameraIndex: number, event: MouseEvent) {
+    const sampling = $wbSamplingStore;
+    if (!sampling.active || sampling.cameraIndex !== cameraIndex) return;
+    const imgEl = cameraIndex === 0 ? imgEl0 : imgEl1;
+    if (!imgEl) return;
+    const pixel = samplePixel(imgEl, event);
+    if (pixel) {
+      sampling.onSample?.(pixel[0], pixel[1], pixel[2]);
+    }
+    // Deactivate regardless so we don't get stuck
+    wbSamplingStore.set({ active: false, cameraIndex: 0, onSample: null });
+  }
 
   // Handle del intervalo de polling (null cuando está pausado)
   let previewInterval: ReturnType<typeof setInterval> | null = null;
@@ -378,10 +428,21 @@
           {#if previewUrls[0]}
             <!-- Frame en vivo del polling — se actualiza cada PREVIEW_INTERVAL_MS -->
             <img
+              bind:this={imgEl0}
               src={previewUrls[0]}
               alt="Camera izquierda"
               class="feed-img"
             />
+            <!-- WB sampling overlay: visible only when picker is active for this camera -->
+            {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === 0}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="wb-sample-overlay"
+                onclick={(e) => handleWbSampleClick(0, e)}
+                title="Haz clic en un área blanca o gris neutro"
+              ></div>
+            {/if}
           {:else}
             <!-- Placeholder: sin señal o esperando primer frame -->
             <div class="no-stream">
@@ -403,10 +464,20 @@
             {#if previewUrls[1]}
               <!-- Frame en vivo del polling -->
               <img
+                bind:this={imgEl1}
                 src={previewUrls[1]}
                 alt="Camera derecha"
                 class="feed-img"
               />
+              {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === 1}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  class="wb-sample-overlay"
+                  onclick={(e) => handleWbSampleClick(1, e)}
+                  title="Haz clic en un área blanca o gris neutro"
+                ></div>
+              {/if}
             {:else}
               <!-- Placeholder: sin señal o esperando primer frame -->
               <div class="no-stream">
