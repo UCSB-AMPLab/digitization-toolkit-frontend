@@ -33,7 +33,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
-  import { camerasApi, type DualCaptureRequest } from '$lib/api';
+  import { camerasApi } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
 
   // ---------------------------------------------------------------------------
@@ -46,6 +46,7 @@
     iso,
     aperture,
     projectId,
+    projectName,
     collectionId,
     onCaptureDone,
   }: {
@@ -55,6 +56,7 @@
     iso: string;
     aperture: string;
     projectId: number;
+    projectName: string;
     collectionId: number;
     onCaptureDone: () => void;
   } = $props();
@@ -71,7 +73,7 @@
   // Configuración de la grilla
   let gridRows = $state(3);
   let gridCols = $state(3);
-  let showGrid = $state(true);
+  let showGrid = $state(false);
   let showGuides = $state(true);
   let showGridModal = $state(false);
 
@@ -116,6 +118,10 @@
   // Indica si ya hay un fetch en curso para evitar requests solapados
   let fetchingPreview: Record<number, boolean> = { 0: false, 1: false };
 
+  // Contador de errores consecutivos de preview — muestra banner tras 3 fallos
+  let previewErrorCount = $state(0);
+  let previewConnectError = $derived(previewErrorCount >= 3);
+
   // ── Helper: URL base de la API ─────────────────────────────────────────────
   function getApiBase(): string {
     if (!browser) return 'http://localhost:8000';
@@ -154,10 +160,15 @@
         }
 
         previewUrls = { ...previewUrls, [cameraIndex]: newUrl };
+        previewErrorCount = 0;  // reset on success
+      } else if (response.status !== 404) {
+        // 404 = cámara no conectada → falla silencioso
+        // Otros errores (500, etc.) cuentan para el banner
+        previewErrorCount += 1;
       }
-      // Si response no es ok (ej: 404 = cámara no conectada), falla silencioso
     } catch {
-      // Error de red — falla silencioso, el placeholder "Sin señal" permanece
+      // Error de red — cuenta para el banner de reconexión
+      previewErrorCount += 1;
     } finally {
       fetchingPreview[cameraIndex] = false;
     }
@@ -201,7 +212,10 @@
 
   // ── Ciclo de vida ──────────────────────────────────────────────────────────
   onMount(() => {
-    startPreviewPolling();
+    // Solo registrar el listener de visibilidad aquí.
+    // startPreviewPolling() se llama desde el $effect de abajo,
+    // que ya corre en el montaje inicial. Tenerlo en ambos lanzaba
+    // dos ciclos de polling al montar el componente.
     if (browser) {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
@@ -266,8 +280,9 @@
     setTimeout(() => { captureFlash = false; }, 150);
 
     try {
-      const payload: DualCaptureRequest = {
-        project_name: `project_${projectId}`,
+      const payload = {
+        project_name: projectName || `project_${projectId}`,
+        collection_id: collectionId || undefined,
         record_title: `Captura ${new Date().toISOString().slice(0,19)}`,
       };
 
@@ -313,6 +328,16 @@
       onmouseup={stopDrag}
       onmouseleave={stopDrag}
     >
+
+      <!-- Banner: reconectando tras errores consecutivos de preview -->
+      {#if previewConnectError}
+        <div class="reconnect-banner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+          Reconectando con la cámara…
+        </div>
+      {/if}
 
       <!-- ══════════════════════════════════════════════════════
            STREAM DE CÁMARA
@@ -555,6 +580,31 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-sm);
+  }
+
+  /* Banner de reconexión */
+  .reconnect-banner {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: rgba(220, 80, 60, 0.88);
+    color: #fff;
+    font-size: 0.75rem;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    animation: pulse-opacity 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-opacity {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.6; }
   }
 
   /* ── Viewport negro interno ── */

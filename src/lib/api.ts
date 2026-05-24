@@ -654,6 +654,11 @@ export interface CameraDevice {
   machine_id?: string;
   label?: string;
   calibrated: boolean;
+  // Calibration data
+  lens_position?: number;
+  awb_gains?: [number, number];
+  // Capabilities
+  has_aperture_control?: boolean;
 }
 
 export interface CaptureRequest {
@@ -663,6 +668,7 @@ export interface CaptureRequest {
   include_resolution_in_filename?: boolean;
   record_id?: number;
   record_title?: string;
+  collection_id?: number;
 }
 
 export interface DualCaptureRequest {
@@ -673,6 +679,7 @@ export interface DualCaptureRequest {
   record_id?: number;
   record_title?: string;
   sequence?: number;
+  collection_id?: number;
 }
 
 export interface CaptureResponse {

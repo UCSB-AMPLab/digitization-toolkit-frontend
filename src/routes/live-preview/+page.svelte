@@ -18,7 +18,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, recordsApi, type Record } from '$lib/api';
+  import { camerasApi, recordsApi, projectsApi, type Record } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
 
   import TopBar from './TopBar.svelte';
@@ -53,6 +53,9 @@
   let iso = $state('200');
   let aperture = $state('13.0');
 
+  // Nombre real del proyecto (cargado desde la API al montar)
+  let projectName = $state<string>('');
+
   // Lista de registros/imágenes capturadas en esta colección
   let records = $state<Record[]>([]);
   let selectedRecordId = $state<number | null>(null);
@@ -70,10 +73,22 @@
       return;
     }
 
-    // Cargar registros existentes de la colección
-    if (collectionId) {
-      await loadRecords();
+    // Cargar nombre del proyecto y registros en paralelo
+    const tasks: Promise<void>[] = [];
+
+    if (projectId) {
+      tasks.push(
+        projectsApi.get(projectId)
+          .then(p => { projectName = p.name; })
+          .catch(e => console.error('[LivePreview] Error cargando proyecto:', e))
+      );
     }
+
+    if (collectionId) {
+      tasks.push(loadRecords());
+    }
+
+    await Promise.all(tasks);
   });
 
   // ---------------------------------------------------------------------------
@@ -172,6 +187,7 @@
         {iso}
         {aperture}
         {projectId}
+        {projectName}
         {collectionId}
         onCaptureDone={handleCaptureDone}
       />
