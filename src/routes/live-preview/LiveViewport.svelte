@@ -70,6 +70,11 @@
   let guideH = $state(50);       // Guía horizontal (% desde arriba)
   let dragging = $state<'v' | 'h' | null>(null);
 
+  // Orientación de cámaras: swapped=true → cámara 1 a la izquierda, 0 a la derecha
+  let swapped = $state(false);
+  let leftIdx  = $derived(swapped ? 1 : 0);
+  let rightIdx = $derived(swapped ? 0 : 1);
+
   // Configuración de la grilla
   let gridRows = 3;
   let gridCols = 3;
@@ -338,7 +343,7 @@
 
       let result;
       if (cameraMode === 'double') {
-        result = await camerasApi.captureDual(payload);
+        result = await camerasApi.captureDual({ ...payload, left_camera_index: leftIdx });
       } else {
         result = await camerasApi.capture({ ...payload, camera_index: 0 });
       }
@@ -423,24 +428,24 @@
            ══════════════════════════════════════════════════════ -->
       <div class="camera-feeds-wrapper" style="transform: scale({zoom * 0.85})">
 
-        <!-- Cámara izquierda (index 0) — siempre visible -->
+        <!-- Cámara izquierda (leftIdx) — siempre visible -->
         <div class="camera-feed">
-          {#if previewUrls[0]}
+          {#if previewUrls[leftIdx]}
             <!-- Frame en vivo del polling — se actualiza cada PREVIEW_INTERVAL_MS -->
             <img
               bind:this={imgEl0}
-              src={previewUrls[0]}
+              src={previewUrls[leftIdx]}
               alt="Camera izquierda"
               class="feed-img"
-              onload={() => { if (imgEl0) histogramStore.update(s => ({ ...s, 0: computeHistogram(imgEl0!) })); }}
+              onload={() => { if (imgEl0) histogramStore.update(s => ({ ...s, [leftIdx]: computeHistogram(imgEl0!) })); }}
             />
             <!-- WB sampling overlay: visible only when picker is active for this camera -->
-            {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === 0}
+            {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === leftIdx}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 class="wb-sample-overlay"
-                onclick={(e) => handleWbSampleClick(0, e)}
+                onclick={(e) => handleWbSampleClick(leftIdx, e)}
                 title="Haz clic en un área blanca o gris neutro"
               ></div>
             {/if}
@@ -459,24 +464,24 @@
           <div class="feed-label">L</div>
         </div>
 
-        <!-- Cámara derecha (index 1) — solo en modo double -->
+        <!-- Cámara derecha (rightIdx) — solo en modo double -->
         {#if cameraMode === 'double'}
           <div class="camera-feed">
-            {#if previewUrls[1]}
+            {#if previewUrls[rightIdx]}
               <!-- Frame en vivo del polling -->
               <img
                 bind:this={imgEl1}
-                src={previewUrls[1]}
+                src={previewUrls[rightIdx]}
                 alt="Camera derecha"
                 class="feed-img"
-                onload={() => { if (imgEl1) histogramStore.update(s => ({ ...s, 1: computeHistogram(imgEl1!) })); }}
+                onload={() => { if (imgEl1) histogramStore.update(s => ({ ...s, [rightIdx]: computeHistogram(imgEl1!) })); }}
               />
-              {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === 1}
+              {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === rightIdx}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                   class="wb-sample-overlay"
-                  onclick={(e) => handleWbSampleClick(1, e)}
+                  onclick={(e) => handleWbSampleClick(rightIdx, e)}
                   title="Haz clic en un área blanca o gris neutro"
                 ></div>
               {/if}
@@ -559,6 +564,18 @@
           <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
         </svg>
       </button>
+      {#if cameraMode === 'double'}
+        <div class="float-divider"></div>
+        <button
+          class="float-btn"
+          class:float-btn-active={swapped}
+          onclick={() => swapped = !swapped}
+          aria-label="Cambiar orientación de cámaras"
+          title={swapped ? 'Orientación invertida (camára 1 = izquierda)' : 'Orientación normal (cámara 0 = izquierda)'}
+        >
+          <span class="material-symbols-outlined" style="font-size:18px">sync</span>
+        </button>
+      {/if}
     </div>
 
     <!-- ── BOTÓN DE CAPTURA ── -->
@@ -848,6 +865,8 @@
   }
 
   .float-btn:hover { color: var(--color-primary); background-color: rgba(255,255,255,0.05); }
+  .float-btn-active { color: var(--color-primary); }
+  .float-btn-active:hover { color: var(--color-primary); }
 
   .float-divider { width: 32px; height: 1px; background-color: var(--border-color); }
 

@@ -696,6 +696,7 @@ export interface DualCaptureRequest {
   record_title?: string;
   sequence?: number;
   collection_id?: number;
+  left_camera_index?: number;
 }
 
 export interface CaptureResponse {
