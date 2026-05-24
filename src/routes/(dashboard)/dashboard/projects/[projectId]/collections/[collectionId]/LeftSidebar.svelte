@@ -46,9 +46,18 @@
   // Tab activo del strip
   let activeTab = $state<'info' | 'edit' | 'comments'>('info');
 
-  // Si es false, el panel no expande (solo el strip)
-  // Solo aplica para viewMode !== 'single'
-  let isExpanded = $derived(viewMode === 'single');
+  // Panel oculto por defecto; el usuario lo abre pulsando un ícono del strip
+  let isExpanded = $state(false);
+
+  // Abre el panel en el tab indicado, o lo colapsa si ya estaba en ese tab
+  function toggleTab(tab: 'info' | 'edit' | 'comments') {
+    if (isExpanded && activeTab === tab) {
+      isExpanded = false;
+    } else {
+      activeTab = tab;
+      isExpanded = true;
+    }
+  }
 
   // Valores de sliders de Preview Controls (-100 a 100)
   let brightness = $state(0);
@@ -168,7 +177,7 @@
     <button
       class="strip-btn"
       class:active={activeTab === 'info' && isExpanded}
-      onclick={() => { activeTab = 'info'; }}
+      onclick={() => toggleTab('info')}
       aria-label="Image info"
       title="Image info"
     >
@@ -181,7 +190,7 @@
     <button
       class="strip-btn"
       class:active={activeTab === 'edit' && isExpanded}
-      onclick={() => { activeTab = 'edit'; }}
+      onclick={() => toggleTab('edit')}
       aria-label="Preview controls"
       title="Preview Controls"
     >
@@ -195,7 +204,7 @@
     <button
       class="strip-btn"
       class:active={activeTab === 'comments' && isExpanded}
-      onclick={() => { activeTab = 'comments'; }}
+      onclick={() => toggleTab('comments')}
       aria-label="Anotaciones"
       title="Anotaciones"
     >
