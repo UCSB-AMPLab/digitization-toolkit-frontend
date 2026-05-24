@@ -268,7 +268,7 @@
       })
       .catch(() => { /* fallo silencioso — el selector mostrará Camera 0/1 */ });
   });
-
+</script>
 
 <!-- ============================================================
      SIDEBAR WRAPPER — colapsado por defecto en pantallas de 7"
