@@ -1122,3 +1122,54 @@ canvas, button, a, div {
   color: #fff !important;
   box-shadow: 0 0 0 2px var(--accent-primary);
 }
+
+/* Wrapper: relative so the exp badge can be positioned */
+.wb-picker-btn {
+  position: relative;
+}
+
+/* Small "exp" badge in the corner of the colorize button */
+.wb-exp-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background-color: var(--color-warning, #b8860b);
+  color: #fff;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+/* In-page instruction shown when picker is active — replaces tooltip (touch-friendly) */
+.wb-picker-hint {
+  font-size: var(--text-xs, 11px);
+  color: var(--color-light-grey);
+  margin-top: 6px;
+  line-height: 1.4;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Inline cancel button inside the hint */
+.wb-picker-cancel {
+  font-size: inherit;
+  font-family: var(--font-family);
+  color: var(--accent-primary);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  flex-shrink: 0;
+  /* Touch target — invisible padding so it's easy to tap on 7" screen */
+  min-height: var(--touch-target-min, 44px);
+  display: inline-flex;
+  align-items: center;
+}

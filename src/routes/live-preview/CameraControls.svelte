@@ -746,18 +746,16 @@
 
           <!-- White Balance -->
           <div class="settings-block">
-            <span class="settings-label">White Balance</span>
+            <span class="settings-label">
+              White Balance
+            </span>
             <div class="wb-row">
-              <button class="wb-btn">
-                <span>Shot</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
               <!-- wb_auto: auto white balance calibration -->
               <button
                 class="wb-pipette"
                 onclick={handleWbCalibration}
                 disabled={isWbCalibrating}
-                aria-label="Calibrar white balance automáticamente"
+                aria-label="Calibrar white balance automáticamente (AWB convergencia)"
               >
                 {#if isWbCalibrating}
                   <span class="material-symbols-outlined icon-sm">sync</span>
@@ -765,18 +763,25 @@
                   <span class="material-symbols-outlined icon-sm">wb_auto</span>
                 {/if}
               </button>
-              <!-- colorize: click a neutral area in the preview to set WB -->
+              <!-- colorize: click-to-neutralize (experimental) -->
               <button
-                class="wb-pipette"
+                class="wb-pipette wb-picker-btn"
                 class:wb-picker-active={isWbPickerActive}
                 onclick={handleWbPicker}
                 disabled={isWbCalibrating}
-                aria-label="Muestrear color blanco del preview"
-                title={isWbPickerActive ? 'Haz clic en un área blanca/neutra en el preview — clic aquí para cancelar' : 'Clic en el preview para muestrear WB'}
+                aria-label={isWbPickerActive ? 'Cancelar muestreo de white balance' : 'Muestrear white balance: toca un área blanca en el preview (experimental)'}
+                aria-pressed={isWbPickerActive}
               >
                 <span class="material-symbols-outlined icon-sm">colorize</span>
+                <span class="wb-exp-badge">exp</span>
               </button>
             </div>
+            {#if isWbPickerActive}
+              <p class="wb-picker-hint">
+                Toca un área blanca o gris neutro en el preview.
+                <button class="wb-picker-cancel" onclick={handleWbPicker}>Cancelar</button>
+              </p>
+            {/if}
             {#if wbResultMsg}
               <p class:text-success={wbResultOk} class:text-error={!wbResultOk} class="focus-result-msg">{wbResultMsg}</p>
             {/if}
