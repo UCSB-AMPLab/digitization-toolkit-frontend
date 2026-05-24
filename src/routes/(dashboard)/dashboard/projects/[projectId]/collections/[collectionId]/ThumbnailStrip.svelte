@@ -1,18 +1,16 @@
 <script lang="ts">
   // ============================================================================
   // COMPONENTE: ThumbnailStrip (Gallery)
-  // Archivo: src/routes/gallery/[collectionId]/ThumbnailStrip.svelte
   //
   // Tira horizontal de miniaturas en la parte inferior de la galería.
-  // Similar al ThumbnailStrip del live-preview, con estas diferencias:
-  //   - En vista 'spread': los dos thumbnails del par activo se destacan
-  //   - Los estados son: approved, rejected, pending, processing
-  //   - No hay badges L/R (se muestran siempre todas las imágenes)
+  // Muestra una miniatura por cada imagen del registro — si un registro tiene
+  // imagen izquierda Y derecha (captura doble), ambas aparecen como items
+  // independientes con badge L/R, igual que en el live-preview.
   //
-  // Para compartir con live-preview en el futuro, mover a src/lib/components/.
+  // En vista 'spread': los dos items del par activo se resaltan.
   // ============================================================================
 
-  import { recordsApi, type Record } from '$lib/api';
+  import { recordsApi, type Record, type RecordImage } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -30,31 +28,54 @@
   } = $props();
 
   // ---------------------------------------------------------------------------
-  // DERIVADOS
+  // TIPO: item individual de la tira
   // ---------------------------------------------------------------------------
-  let selectedIndex = $derived(records.findIndex(r => r.id === selectedRecordId));
-
-  // En spread, los dos del par están activos
-  function isSelected(i: number): boolean {
-    if (viewMode === 'spread') {
-      const leftIdx = selectedIndex % 2 === 0 ? selectedIndex : selectedIndex - 1;
-      return i === leftIdx || i === leftIdx + 1;
-    }
-    return records[i]?.id === selectedRecordId;
+  interface ThumbItem {
+    record: Record;
+    image: RecordImage | null;
+    role: 'L' | 'R' | null;
+    thumbnailUrl: string | null;
   }
 
-  // URL de thumbnail
-  function getThumbnailUrl(record: Record): string | null {
-    if (!record.images || record.images.length === 0) return null;
-    return recordsApi.getImageThumbnailUrl(record.images[0].id);
-  }
-
-  // Rol (L/R) de la primera imagen
-  function getRole(record: Record): 'L' | 'R' | null {
-    const role = record.images?.[0]?.role;
-    if (role === 'left')  return 'L';
-    if (role === 'right') return 'R';
+  function imageRole(img: RecordImage | null): 'L' | 'R' | null {
+    if (!img) return null;
+    if (img.role === 'left')  return 'L';
+    if (img.role === 'right') return 'R';
     return null;
+  }
+
+  function imageThumbnailUrl(img: RecordImage | null): string | null {
+    if (!img) return null;
+    return recordsApi.getImageThumbnailUrl(img.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // DERIVADO: lista plana — un item por imagen dentro de cada registro
+  // Los registros con captura doble producen dos items (L + R).
+  // ---------------------------------------------------------------------------
+  let thumbItems = $derived(
+    records.flatMap((record): ThumbItem[] => {
+      if (!record.images || record.images.length === 0) {
+        return [{ record, image: null, role: null, thumbnailUrl: null }];
+      }
+      // Ordenar: left primero, luego right, luego sin rol (por id como desempate)
+      const sorted = [...record.images].sort((a, b) => {
+        const order = (r?: string) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
+        return order(a.role) - order(b.role) || a.id - b.id;
+      });
+      return sorted.map((img): ThumbItem => ({
+        record,
+        image: img,
+        role: imageRole(img),
+        thumbnailUrl: imageThumbnailUrl(img),
+      }));
+    })
+  );
+
+  // En vista 'spread': resalta el par de items del registro activo
+  function isSelected(item: ThumbItem): boolean {
+    if (viewMode === 'spread') return item.record.id === selectedRecordId;
+    return item.record.id === selectedRecordId;
   }
 
   // Status de imagen (en producción vendrá del backend)
@@ -69,7 +90,7 @@
 <div class="thumbnail-strip">
   <div class="strip-scroll">
 
-    {#if records.length === 0}
+    {#if thumbItems.length === 0}
       <div class="empty-state">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -79,22 +100,20 @@
         <span>Sin imágenes en esta colección</span>
       </div>
     {:else}
-      {#each records as record, i}
-        {@const selected = isSelected(i)}
-        {@const thumbUrl = getThumbnailUrl(record)}
-        {@const role = getRole(record)}
-        {@const status = getStatus(record)}
+      {#each thumbItems as item, i}
+        {@const selected = isSelected(item)}
+        {@const status = getStatus(item.record)}
 
         <button
           class="thumb-item"
           class:selected
-          onclick={() => onSelect(record.id)}
+          onclick={() => onSelect(item.record.id)}
         >
 
           <!-- Imagen -->
           <div class="thumb-img-wrapper" class:selected class:alt={i % 2 !== 0}>
-            {#if thumbUrl}
-              <img src={thumbUrl} alt={record.title} class="thumb-img" />
+            {#if item.thumbnailUrl}
+              <img src={item.thumbnailUrl} alt={item.record.title} class="thumb-img" />
             {:else}
               <div class="thumb-placeholder">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -105,14 +124,14 @@
             {/if}
 
             <!-- Badge L/R -->
-            {#if role}
-              <div class="role-badge" class:right={role === 'R'}>{role}</div>
+            {#if item.role}
+              <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
             {/if}
           </div>
 
           <!-- Nombre + status -->
           <div class="thumb-info">
-            <span class="thumb-name" title={record.title}>{record.title || `Img ${i+1}`}</span>
+            <span class="thumb-name" title={item.record.title}>{item.record.title || `Img ${i+1}`}</span>
             <div class="thumb-status">
               {#if status === 'approved'}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
