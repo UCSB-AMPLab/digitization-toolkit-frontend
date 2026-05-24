@@ -102,6 +102,14 @@ export interface AuthResponse {
 
 export const authApi = {
   /**
+   * Check whether initial setup is needed (no users exist yet).
+   * Safe to call without authentication.
+   */
+  async setupStatus(): Promise<{ needs_setup: boolean }> {
+    return apiRequest<{ needs_setup: boolean }>('/auth/setup/status');
+  },
+
+  /**
    * Register a new user
    */
   async register(data: RegisterData): Promise<User> {
