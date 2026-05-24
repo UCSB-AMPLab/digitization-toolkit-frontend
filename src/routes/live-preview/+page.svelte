@@ -121,7 +121,7 @@
   function handleTabChange(tab: 'live' | 'gallery') {
     activeTab = tab;
     if (tab === 'gallery') {
-      goto(`/gallery/${collectionId}`);
+      goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
     }
   }
 
