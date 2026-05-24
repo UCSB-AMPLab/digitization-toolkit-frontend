@@ -78,6 +78,10 @@
   let cameraZoom = $state<Record<number, number>>({ 0: 1, 1: 1 });
   let zoomDebounce: ReturnType<typeof setTimeout> | null = null;
 
+  // Shutter speed and ISO per-camera (manual mode only)
+  let cameraShutter = $state<Record<number, string>>({ 0: '1/125s', 1: '1/125s' });
+  let cameraIso     = $state<Record<number, string>>({ 0: '100',    1: '100'    });
+
   // WB calibration state
   let isWbCalibrating = $state(false);
   let wbResultMsg: string | null = $state(null);
@@ -127,8 +131,10 @@
   let exposure = $state(0);      // Exposición (-3 a +3)
 
   // Opciones de los dropdowns de Basic
-  const shutterOptions = ['1/8000s','1/4000s','1/2000s','1/1000s','1/500s','1/250s','1/125s','1/60s','1/30s','1/15s','1/8s','1/4s','1/2s','1s','1.6s','2s','3.2s','4s','5s','8s'];
-  const isoOptions     = ['100','200','400','800','1600','3200','6400','12800','25600'];
+  // Shutter speed options useful for scanning (fixed lighting, no motion)
+  const shutterOptions = ['1/1000s','1/500s','1/250s','1/125s','1/60s','1/30s','1/15s','1/8s','1/4s','1/2s','1s','1.6s','2s','3.2s','4s'];
+  // ISO options: keep low for archival quality (IMX519 analogue gain max ≈ 16× = ISO 1600)
+  const isoOptions     = ['100','200','400','800','1600'];
   const apertureOptions = ['1.4','2.0','2.8','4.0','5.6','8.0','11.0','13.0','16.0','22.0'];
 
   // Datos del histograma (simulados — en producción vendrán del stream de cámara)
@@ -357,6 +363,15 @@
     if (cameraMode === 'single') {
       selectedCameraIndex = 0;
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Sync parent display values when the selected camera changes
+  // so LiveViewport metadata bar stays up to date.
+  // ---------------------------------------------------------------------------
+  $effect(() => {
+    onShutterSpeedChange(cameraShutter[selectedCameraIndex] ?? '1/125s');
+    onIsoChange(cameraIso[selectedCameraIndex] ?? '100');
   });
 
   // ---------------------------------------------------------------------------
@@ -634,7 +649,7 @@
               class:open={openDropdown === 'shutter'}
               onclick={() => openBasicDropdown('shutter')}
             >
-              <span>{shutterSpeed}</span>
+              <span>{cameraShutter[selectedCameraIndex] ?? '1/125s'}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 style="transform: rotate({openDropdown === 'shutter' ? 180 : 0}deg); transition: transform 0.2s">
                 <polyline points="6 9 12 15 18 9"/>
@@ -651,7 +666,7 @@
               class:open={openDropdown === 'iso'}
               onclick={() => openBasicDropdown('iso')}
             >
-              <span>{iso}</span>
+              <span>{cameraIso[selectedCameraIndex] ?? '100'}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 style="transform: rotate({openDropdown === 'iso' ? 180 : 0}deg); transition: transform 0.2s">
                 <polyline points="6 9 12 15 18 9"/>
@@ -978,8 +993,9 @@
     {#if openDropdown === 'shutter'}
       {#each shutterOptions as opt}
         <button
-          class:selected={opt === shutterSpeed}
+          class:selected={opt === (cameraShutter[selectedCameraIndex] ?? '1/125s')}
           onclick={() => {
+            cameraShutter = { ...cameraShutter, [selectedCameraIndex]: opt };
             onShutterSpeedChange(opt);
             applySettings({ ae_enable: false, exposure_time_us: parseShutterUs(opt) }, 0);
             openDropdown = null;
@@ -989,10 +1005,11 @@
     {:else if openDropdown === 'iso'}
       {#each isoOptions as opt}
         <button
-          class:selected={opt === iso}
+          class:selected={opt === (cameraIso[selectedCameraIndex] ?? '100')}
           onclick={() => {
+            cameraIso = { ...cameraIso, [selectedCameraIndex]: opt };
             onIsoChange(opt);
-            applySettings({ analogue_gain: parseInt(opt) / 100 }, 0);
+            applySettings({ ae_enable: false, analogue_gain: parseInt(opt) / 100 }, 0);
             openDropdown = null;
           }}
         >{opt}</button>
