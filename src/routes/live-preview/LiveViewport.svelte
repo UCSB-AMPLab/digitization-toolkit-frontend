@@ -33,7 +33,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
-  import { camerasApi } from '$lib/api';
+  import { camerasApi, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
@@ -50,6 +50,7 @@
     projectName,
     collectionId,
     onCaptureDone,
+    devices = [],
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -59,6 +60,7 @@
     projectName: string;
     collectionId: number;
     onCaptureDone: () => void;
+    devices?: CameraDevice[];
   } = $props();
 
   // ---------------------------------------------------------------------------
@@ -367,6 +369,14 @@
   // ---------------------------------------------------------------------------
   // MODAL DE GRILLA
   // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // HELPER: etiqueta de cámara con índice
+  // ---------------------------------------------------------------------------
+  function cameraLabel(idx: number): string {
+    const dev = devices.find(d => d.index === idx);
+    return `${dev?.label || dev?.model || 'Camera'} [${idx}]`;
+  }
 </script>
 
 <!-- ============================================================
@@ -461,7 +471,7 @@
             </div>
           {/if}
           <!-- Badge identificador de cámara -->
-          <div class="feed-label">L</div>
+          <div class="feed-label">{cameraLabel(leftIdx)}</div>
         </div>
 
         <!-- Cámara derecha (rightIdx) — solo en modo double -->
@@ -497,7 +507,7 @@
               </div>
             {/if}
             <!-- Badge identificador de cámara -->
-            <div class="feed-label right">R</div>
+            <div class="feed-label right">{cameraLabel(rightIdx)}</div>
           </div>
         {/if}
 
@@ -838,7 +848,7 @@
   /* ── Panel flotante ── */
   .floating-controls {
     position: absolute;
-    top: 24px; right: 24px;
+    top: 75px; right: 1px;
     z-index: 40;
     background-color: rgba(26,24,21,0.9);
     backdrop-filter: blur(4px);

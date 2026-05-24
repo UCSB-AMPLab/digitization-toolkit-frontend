@@ -18,7 +18,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, recordsApi, projectsApi, type Record } from '$lib/api';
+  import { camerasApi, recordsApi, projectsApi, type Record, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
 
   import TopBar from './TopBar.svelte';
@@ -45,6 +45,9 @@
 
   // Modo de cámara: 'single' = una cámara | 'double' = dos cámaras (izq + der)
   let cameraMode = $state<'single' | 'double'>('double');
+
+  // Dispositivos de cámara detectados (actualizados por CameraControls al montar)
+  let devices = $state<CameraDevice[]>([]);
 
 
   // Ajustes de cámara (solo activos en modo manual)
@@ -211,6 +214,7 @@
       onShutterSpeedChange={(v) => shutterSpeed = v}
       onIsoChange={(v) => iso = v}
       onApertureChange={(v) => aperture = v}
+      onDevicesChange={(d) => devices = d}
     />
 
     <!-- Área central: viewport + tira de miniaturas -->
@@ -225,6 +229,7 @@
         {projectId}
         {projectName}
         {collectionId}
+        {devices}
         onCaptureDone={handleCaptureDone}
       />
 

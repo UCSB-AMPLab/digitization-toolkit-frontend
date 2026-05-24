@@ -39,6 +39,7 @@
     onShutterSpeedChange,
     onIsoChange,
     onApertureChange,
+    onDevicesChange,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -48,6 +49,7 @@
     onShutterSpeedChange: (value: string) => void;
     onIsoChange: (value: string) => void;
     onApertureChange: (value: string) => void;
+    onDevicesChange?: (devices: CameraDevice[]) => void;
   } = $props();
 
   // ---------------------------------------------------------------------------
@@ -99,7 +101,7 @@
   const selectedDevice = $derived(devices.find(d => d.index === selectedCameraIndex));
   const cameraDisplayName = $derived(
     selectedDevice
-      ? (selectedDevice.label || selectedDevice.model || `Camera ${selectedCameraIndex}`)
+      ? `${selectedDevice.label || selectedDevice.model || 'Camera'} [${selectedCameraIndex}]`
       : `Camera ${selectedCameraIndex}`
   );
 
@@ -435,6 +437,7 @@
     camerasApi.listDevices()
       .then(d => {
         devices = d;
+        onDevicesChange?.(d);
       })
       .catch(() => { /* fallo silencioso — el selector mostrará Camera 0/1 */ });
   });
@@ -556,7 +559,7 @@
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
-              {device.label || device.model || `Camera ${device.index}`}
+              {`${device.label || device.model || 'Camera'} [${device.index}]`}
               {#if device.calibrated}
                 <span class="cal-dot" title="Calibrada">✓</span>
               {/if}
