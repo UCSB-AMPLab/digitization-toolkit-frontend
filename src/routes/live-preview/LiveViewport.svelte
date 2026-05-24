@@ -43,7 +43,6 @@
   // ---------------------------------------------------------------------------
   let {
     cameraMode,
-    controlMode,
     shutterSpeed,
     iso,
     aperture,
@@ -53,7 +52,6 @@
     onCaptureDone,
   }: {
     cameraMode: 'single' | 'double';
-    controlMode: 'manual' | 'automatic';
     shutterSpeed: string;
     iso: string;
     aperture: string;
@@ -525,16 +523,12 @@
 
       <!-- ── BARRA DE METADATOS ── -->
       <div class="metadata-bar">
-        {#if controlMode === 'manual'}
-          <div class="metadata-values">
-            <span>ISO {iso}</span>
-            <span>{shutterSpeed}</span>
-            <span>f/{aperture}</span>
-            <span>50mm</span>
-          </div>
-        {:else}
-          <span class="metadata-auto">AUTO</span>
-        {/if}
+        <div class="metadata-values">
+          <span>ISO {iso}</span>
+          <span>{shutterSpeed}</span>
+          <span>f/{aperture}</span>
+          <span>50mm</span>
+        </div>
       </div>
 
     </div><!-- /camera-viewport -->

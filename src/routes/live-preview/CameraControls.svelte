@@ -32,23 +32,19 @@
   // ---------------------------------------------------------------------------
   let {
     cameraMode,
-    controlMode,
     shutterSpeed,
     iso,
     aperture,
     onCameraModeChange,
-    onControlModeChange,
     onShutterSpeedChange,
     onIsoChange,
     onApertureChange,
   }: {
     cameraMode: 'single' | 'double';
-    controlMode: 'manual' | 'automatic';
     shutterSpeed: string;
     iso: string;
     aperture: string;
     onCameraModeChange: (mode: 'single' | 'double') => void;
-    onControlModeChange: (mode: 'manual' | 'automatic') => void;
     onShutterSpeedChange: (value: string) => void;
     onIsoChange: (value: string) => void;
     onApertureChange: (value: string) => void;
@@ -112,7 +108,6 @@
 
   // Dropdowns abiertos
   let showCameraDropdown = $state(false);
-  let showModeDropdown = $state(false);
 
   // Dropdown activo de Basic (shutter/iso/aperture) — solo uno a la vez
   let openDropdown = $state<'shutter' | 'iso' | 'aperture' | null>(null);
@@ -574,53 +569,24 @@
       {/if}
     </div>
 
-    <!-- ── ESTADO + MODO ── -->
-    <div class="status-mode-row">
-      <div class="camera-on">
-        <span class="on-dot"></span>
-        <span class="on-label">On</span>
-      </div>
-
-      <div class="mode-wrapper">
-        <span class="mode-label-text">Mode</span>
-        <div class="relative" style="width: 100%">
-          <button class="mode-btn" style="width:100%" onclick={() => showModeDropdown = !showModeDropdown}>
-            <span class="capitalize">{controlMode}</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-          {#if showModeDropdown}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="fixed-backdrop" onclick={() => showModeDropdown = false}></div>
-            <div class="mode-dropdown">
-              <button onclick={() => {
-                onControlModeChange('manual');
-                applySettings({ ae_enable: false }, 0);
-                showModeDropdown = false;
-              }}>Manual</button>
-              <button onclick={() => {
-                onControlModeChange('automatic');
-                applySettings({ ae_enable: true }, 0);
-                showModeDropdown = false;
-              }}>Automatic</button>
-            </div>
-          {/if}
-        </div>
-      </div>
+    <!-- ── ESTADO DE CÁMARA ── -->
+    <div class="camera-status-row">
+      <span class="status-dot" class:dot-connected={selectedDevice !== undefined} class:dot-disconnected={selectedDevice === undefined}></span>
+      {#if selectedDevice !== undefined}
+        <span class="status-label">Conectada</span>
+      {:else}
+        <span class="status-label status-warn">No detectada</span>
+      {/if}
     </div>
 
 
     <!-- ══════════════════════════════════════════
          ACORDEÓN: BASIC
-         Deshabilitado en modo 'automatic'
          ══════════════════════════════════════════ -->
-    <div class="accordion-block" class:disabled={controlMode === 'automatic'}>
+    <div class="accordion-block">
       <button
         class="accordion-trigger"
-        onclick={() => controlMode === 'manual' && toggleSection('basic')}
-        disabled={controlMode === 'automatic'}
+        onclick={() => toggleSection('basic')}
       >
         <div class="acc-left">
           <span>Basic</span>
@@ -629,12 +595,12 @@
           </svg>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          class="chevron" class:rotated={openSections.includes('basic') && controlMode === 'manual'}>
+          class="chevron" class:rotated={openSections.includes('basic')}>
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
 
-      {#if openSections.includes('basic') && controlMode === 'manual'}
+      {#if openSections.includes('basic')}
         <div class="accordion-content">
 
           <!-- Fila: Shutter Speed -->
@@ -1311,96 +1277,38 @@
   .camera-option.selected { background-color: var(--color-primary); color: white; }
 
   /* ── Fila Estado + Modo ── */
-  .status-mode-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .camera-on {
+  .camera-status-row {
     display: flex;
     align-items: center;
     gap: 7px;
   }
 
-  .on-dot {
+  .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: var(--color-primary);
-    box-shadow: 0 0 8px rgba(90,140,98,0.5);
     flex-shrink: 0;
   }
 
-  .on-label {
+  .dot-connected {
+    background-color: #5a8c62;
+    box-shadow: 0 0 8px rgba(90,140,98,0.5);
+  }
+
+  .dot-disconnected {
+    background-color: #e07830;
+    box-shadow: 0 0 8px rgba(224,120,48,0.4);
+  }
+
+  .status-label {
     font-size: 12px;
     font-weight: var(--fw-bold);
     color: var(--color-light);
   }
 
-  .mode-wrapper {
-    flex: 1;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .status-warn {
+    color: #e07830;
   }
-
-  .mode-label-text {
-    font-size: 11px;
-    color: var(--color-light-grey);
-    white-space: nowrap;
-  }
-
-  .mode-btn {
-    flex: 1;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 0 10px;
-    height: 38px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-family: var(--font-family);
-    font-size: 12px;
-    color: var(--color-light);
-    cursor: pointer;
-    transition: border-color var(--transition-base);
-  }
-
-  .mode-btn:hover { border-color: rgba(255,255,255,0.2); }
-
-  .mode-dropdown {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    z-index: 30;
-    box-shadow: var(--shadow-md);
-  }
-
-  .mode-dropdown button {
-    width: 100%;
-    padding: 10px 12px;
-    text-align: left;
-    font-family: var(--font-family);
-    font-size: 12px;
-    color: var(--color-light);
-    background: none;
-    border: none;
-    cursor: pointer;
-    min-height: var(--touch-target-min);
-    display: flex;
-    align-items: center;
-    transition: background-color var(--transition-fast);
-  }
-
-  .mode-dropdown button:hover { background-color: var(--color-primary); color: white; }
 
   /* ── Auto Focus ── */
   .btn-autofocus {

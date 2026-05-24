@@ -46,8 +46,6 @@
   // Modo de cámara: 'single' = una cámara | 'double' = dos cámaras (izq + der)
   let cameraMode = $state<'single' | 'double'>('double');
 
-  // Modo de control: 'manual' = ajustes manuales | 'automatic' = automático
-  let controlMode = $state<'manual' | 'automatic'>('automatic');
 
   // Ajustes de cámara (solo activos en modo manual)
   let shutterSpeed = $state('1.6s');
@@ -206,12 +204,10 @@
     <!-- Panel izquierdo: controles de cámara -->
     <CameraControls
       {cameraMode}
-      {controlMode}
       {shutterSpeed}
       {iso}
       {aperture}
       onCameraModeChange={(m) => cameraMode = m}
-      onControlModeChange={(m) => controlMode = m}
       onShutterSpeedChange={(v) => shutterSpeed = v}
       onIsoChange={(v) => iso = v}
       onApertureChange={(v) => aperture = v}
@@ -223,7 +219,6 @@
       <!-- Vista de cámara en vivo -->
       <LiveViewport
         {cameraMode}
-        {controlMode}
         {shutterSpeed}
         {iso}
         {aperture}
