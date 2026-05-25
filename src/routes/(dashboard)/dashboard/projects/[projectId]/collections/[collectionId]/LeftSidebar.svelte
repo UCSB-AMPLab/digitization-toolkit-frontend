@@ -31,7 +31,7 @@
     onRotateLeft,
     onRotateRight,
   }: {
-    viewMode: 'single' | 'spread' | 'grid';
+    viewMode: 'list' | 'spread' | 'grid';
     currentRecord: Record | null;
     currentIndex: number;
     totalRecords: number;

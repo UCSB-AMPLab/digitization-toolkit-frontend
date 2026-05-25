@@ -1,24 +1,14 @@
 <script lang="ts">
   // ============================================================================
   // COMPONENTE: ImageViewer
-  // Archivo: src/routes/gallery/[collectionId]/ImageViewer.svelte
   //
-  // Muestra la imagen seleccionada en dos modos:
+  // Vista spread: muestra las dos páginas (izq + der) del registro seleccionado
+  // lado a lado, como un libro abierto.
   //
-  //   'single' → una imagen centrada con navegación prev/next y zoom aplicado
-  //   'spread' → dos páginas lado a lado (izq + der) con labels de nombre
-  //
-  // La imagen se muestra usando la URL del thumbnail (para performance)
-  // o la URL completa si el thumbnail no existe.
-  //
-  // Para mostrar la imagen a resolución completa, reemplaza getImageUrl()
-  // por recordsApi.getImageFileUrl(imageId).
-  //
-  // El filtro CSS (brightness/contrast/saturation) NO está implementado aquí —
-  // se puede agregar pasando los valores como prop si se desea.
+  // La imagen se muestra usando el thumbnail (si existe) o la URL completa.
   // ============================================================================
 
-  import { recordsApi, type Record } from '$lib/api';
+  import { recordsApi, type Record, type RecordImage } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -33,7 +23,7 @@
     onNext,
     onZoomChange,
   }: {
-    viewMode: 'single' | 'spread';
+    viewMode: 'spread';
     records: Record[];
     selectedRecordId: number | null;
     zoom: number;
@@ -49,32 +39,23 @@
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId));
 
-  // En spread: el par es el record contiguo (siguiente si es izq, anterior si es der)
-  // Los pares se identifican por índice par/impar
-  let spreadLeft  = $derived(() => {
-    // Imagen izquierda: índice par más cercano
-    const idx = selectedIndex;
-    const leftIdx = idx % 2 === 0 ? idx : idx - 1;
-    return records[leftIdx] ?? null;
-  });
-
-  let spreadRight = $derived(() => {
-    const idx = selectedIndex;
-    const leftIdx = idx % 2 === 0 ? idx : idx - 1;
-    return records[leftIdx + 1] ?? null;
-  });
+  // Spread: busca L y R dentro del propio record seleccionado (captura doble).
+  // Fallback: si no hay roles asignados, usa la primera imagen como izquierda.
+  let spreadLeftImage  = $derived(
+    selectedRecord?.images?.find(img => img.role === 'left')
+    ?? selectedRecord?.images?.[0]
+    ?? null
+  );
+  let spreadRightImage = $derived(
+    selectedRecord?.images?.find(img => img.role === 'right') ?? null
+  );
 
   // ---------------------------------------------------------------------------
-  // HELPER: obtener URL de imagen
-  // Usa thumbnail si existe, sino la URL del archivo completo
-  // Para resolución máxima, usar getImageFileUrl
+  // HELPER: URL de una imagen concreta
   // ---------------------------------------------------------------------------
-  function getImageUrl(record: Record | null): string | null {
-    if (!record || !record.images || record.images.length === 0) return null;
-    const img = record.images[0];
-    if (img.thumbnail_path) {
-      return recordsApi.getImageThumbnailUrl(img.id);
-    }
+  function getImageUrl(img: RecordImage | null): string | null {
+    if (!img) return null;
+    if (img.thumbnail_path) return recordsApi.getImageThumbnailUrl(img.id);
     return recordsApi.getImageFileUrl(img.id);
   }
 
@@ -89,65 +70,14 @@
      ============================================================ -->
 <div class="viewer-area">
 
-  {#if viewMode === 'single'}
-    <!-- ══════════════════════════════════════════════════════
-         VISTA SINGLE: imagen centrada con zoom y rotación
-         ══════════════════════════════════════════════════════ -->
+  <!-- ══════════════════════════════════════════════════════
+       VISTA SPREAD: dos páginas lado a lado (libro abierto)
+       ══════════════════════════════════════════════════════ -->
 
-    <!-- Chip con nombre + posición (esquina superior) -->
-    {#if selectedRecord}
-      <div class="image-chip">
-        <span class="chip-name">{getRecordName(selectedRecord)}</span>
-        <span class="chip-index">{selectedIndex + 1}/{records.length}</span>
-      </div>
-    {/if}
-
-    <!-- Botón anterior -->
-    <button class="nav-btn left" onclick={onPrev} disabled={selectedIndex <= 0} aria-label="Anterior">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </button>
-
-    <!-- Imagen -->
-    <div class="single-image-wrapper">
-      {#if getImageUrl(selectedRecord)}
-        <img
-          src={getImageUrl(selectedRecord)}
-          alt={getRecordName(selectedRecord)}
-          class="main-image"
-          style="transform: scale({zoom}) rotate({rotation}deg); transform-origin: center center;"
-          draggable="false"
-        />
-      {:else}
-        <div class="no-image">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-            <polyline points="21 15 16 10 5 21"/>
-          </svg>
-          <span>Sin imagen</span>
-        </div>
-      {/if}
-    </div>
-
-    <!-- Botón siguiente -->
-    <button class="nav-btn right" onclick={onNext} disabled={selectedIndex >= records.length - 1} aria-label="Siguiente">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <polyline points="9 18 15 12 9 6"/>
-      </svg>
-    </button>
-
-  {:else}
-    <!-- ══════════════════════════════════════════════════════
-         VISTA SPREAD: dos páginas lado a lado (libro abierto)
-         Sin panel lateral, imagen ocupa todo el ancho disponible
-         ══════════════════════════════════════════════════════ -->
-
-    <!-- Botón anterior (par anterior) -->
-    <button class="nav-btn left" onclick={onPrev} disabled={selectedIndex <= 0} aria-label="Anterior">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <polyline points="15 18 9 12 15 6"/>
+  <!-- Botón anterior (par anterior) -->
+  <button class="nav-btn left" onclick={onPrev} disabled={selectedIndex <= 0} aria-label="Anterior">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <polyline points="15 18 9 12 15 6"/>
       </svg>
     </button>
 
@@ -156,15 +86,14 @@
 
       <!-- Página izquierda -->
       <div class="spread-page">
-        <!-- Label con nombre + "Página izq." -->
-        {#if spreadLeft()}
+        {#if selectedRecord}
           <div class="spread-label">
-            <span class="spread-name">{getRecordName(spreadLeft())}</span>
+            <span class="spread-name">{getRecordName(selectedRecord)}</span>
             <span class="spread-side">Página izq.</span>
           </div>
         {/if}
-        {#if getImageUrl(spreadLeft())}
-          <img src={getImageUrl(spreadLeft())} alt="Página izquierda" class="spread-image left" draggable="false" />
+        {#if getImageUrl(spreadLeftImage)}
+          <img src={getImageUrl(spreadLeftImage)} alt="Página izquierda" class="spread-image left" draggable="false" />
         {:else}
           <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
         {/if}
@@ -175,14 +104,14 @@
 
       <!-- Página derecha -->
       <div class="spread-page">
-        {#if spreadRight()}
+        {#if spreadRightImage}
           <div class="spread-label right">
-            <span class="spread-name">{getRecordName(spreadRight())}</span>
+            <span class="spread-name">{getRecordName(selectedRecord)}</span>
             <span class="spread-side">Página der.</span>
           </div>
         {/if}
-        {#if getImageUrl(spreadRight())}
-          <img src={getImageUrl(spreadRight())} alt="Página derecha" class="spread-image right" draggable="false" />
+        {#if getImageUrl(spreadRightImage)}
+          <img src={getImageUrl(spreadRightImage)} alt="Página derecha" class="spread-image right" draggable="false" />
         {:else}
           <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
         {/if}
@@ -191,13 +120,11 @@
     </div>
 
     <!-- Botón siguiente (par siguiente) -->
-    <button class="nav-btn right" onclick={onNext} disabled={selectedIndex >= records.length - 1} aria-label="Siguiente">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <polyline points="9 18 15 12 9 6"/>
-      </svg>
-    </button>
-
-  {/if}
+  <button class="nav-btn right" onclick={onNext} disabled={selectedIndex >= records.length - 1} aria-label="Siguiente">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  </button>
 
 </div>
 
@@ -212,23 +139,6 @@
     overflow: hidden;
     min-height: 0;
   }
-
-  /* ── Chip de nombre (single) ── */
-  .image-chip {
-    position: absolute;
-    top: 16px;
-    right: 90px; /* deja espacio para la toolbar derecha */
-    background-color: var(--color-surface-alt);
-    border-radius: var(--radius-full);
-    padding: 6px 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    z-index: 10;
-  }
-
-  .chip-name { font-size: var(--text-base); font-weight: var(--fw-bold); color: var(--color-light); }
-  .chip-index { font-size: var(--text-sm); color: var(--color-light-grey); }
 
   /* ── Botones de navegación ── */
   .nav-btn {
@@ -253,25 +163,6 @@
   .nav-btn.right { right: 90px; } /* espacio para toolbar */
   .nav-btn:hover { background-color: rgba(90,140,98,0.3); }
   .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-  /* ── Vista single ── */
-  .single-image-wrapper {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-
-  .main-image {
-    max-width: 80%;
-    max-height: 90%;
-    object-fit: contain;
-    transition: transform var(--transition-slow);
-    user-select: none;
-    display: block;
-  }
 
   /* ── Vista spread ── */
   .spread-wrapper {

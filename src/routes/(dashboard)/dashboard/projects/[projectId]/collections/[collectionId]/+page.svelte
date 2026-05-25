@@ -7,11 +7,13 @@
   // La navegación superior (breadcrumb, botón cámara) vive en +layout@.svelte.
   //
   // Componentes hijos:
-  //   LeftSidebar.svelte    → strip de íconos + paneles (solo en single/spread)
-  //   ImageViewer.svelte    → visor de imagen (single y spread)
-  //   GridView.svelte       → vista cuadrícula (con Filtros/Renombrar/Finalizar)
-  //   RightToolbar.svelte   → toolbar flotante derecha
-  //   ThumbnailStrip.svelte → tira de miniaturas inferior
+  //   LeftSidebar.svelte      → strip de íconos + paneles (solo en spread)
+  //   ListView.svelte         → vista de lista de registros
+  //   ImageViewer.svelte      → visor en modo spread
+  //   ImageViewerModal.svelte → modal de inspección (desde ListView)
+  //   GridView.svelte         → vista cuadrícula (con Filtros/Renombrar/Finalizar)
+  //   RightToolbar.svelte     → toolbar flotante derecha
+  //   ThumbnailStrip.svelte   → tira de miniaturas inferior (solo en spread)
   // ============================================================================
 
   import { onMount } from 'svelte';
@@ -21,7 +23,9 @@
   import { recordsApi, type Record } from '$lib/api';
 
   import LeftSidebar from './LeftSidebar.svelte';
+  import ListView from './ListView.svelte';
   import ImageViewer from './ImageViewer.svelte';
+  import ImageViewerModal from './ImageViewerModal.svelte';
   import GridView from './GridView.svelte';
   import RightToolbar from './RightToolbar.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
@@ -35,12 +39,15 @@
   // ---------------------------------------------------------------------------
   // ESTADO GLOBAL
   // ---------------------------------------------------------------------------
-  let viewMode         = $state<'single' | 'spread' | 'grid'>('single');
+  let viewMode         = $state<'list' | 'spread' | 'grid'>('list');
   let selectedRecordId = $state<number | null>(null);
   let records          = $state<Record[]>([]);
   let zoom             = $state(1);
   let rotation         = $state(0);
   let isLoading        = $state(true);
+
+  // Registro inspeccionado en el modal (desde ListView)
+  let inspectedRecord = $state<Record | null>(null);
 
   // Estado de finalización
   let isFinalized = $state(false);
@@ -88,7 +95,7 @@
 
   function handleSelect(id: number) { selectedRecordId = id; }
 
-  function handleViewModeChange(mode: 'single' | 'spread' | 'grid') {
+  function handleViewModeChange(mode: 'list' | 'spread' | 'grid') {
     viewMode = mode;
     zoom = 1;
     rotation = 0;
@@ -96,6 +103,24 @@
 
   function handleRotateLeft()  { rotation = ((rotation - 90) % 360 + 360) % 360; }
   function handleRotateRight() { rotation = (rotation + 90) % 360; }
+
+  // Retomar: navega a live-preview con el mismo proyecto/colección
+  function handleRetake(record: Record) {
+    inspectedRecord = null;
+    goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`);
+  }
+
+  // Eliminar registro completo y refrescar lista
+  async function handleDeleteRecord(record: Record) {
+    try {
+      await recordsApi.delete(record.id);
+      await loadRecords();
+    } catch (err) {
+      console.error('[Gallery] Error eliminando registro:', err);
+    } finally {
+      inspectedRecord = null;
+    }
+  }
 
   // GridView confirmó la finalización
   function handleFinalized() {
@@ -123,8 +148,8 @@
 
   <div class="content-area">
 
-    <!-- Panel lateral: solo en single y spread -->
-    {#if viewMode !== 'grid'}
+    <!-- Panel lateral: solo en spread -->
+    {#if viewMode === 'spread'}
       <LeftSidebar
         {viewMode}
         currentRecord={selectedRecord}
@@ -153,7 +178,13 @@
           onFinalizeModalClosed={handleFinalizeModalClosed}
         />
 
-      {:else}
+      {:else if viewMode === 'list'}
+        <ListView
+          {records}
+          onRecordClick={(r) => inspectedRecord = r}
+        />
+
+      {:else if viewMode === 'spread'}
         <ImageViewer
           {viewMode}
           {records}
@@ -188,6 +219,16 @@
   </div>
 
 </div>
+
+<!-- Modal de inspección (desde ListView) -->
+{#if inspectedRecord}
+  <ImageViewerModal
+    record={inspectedRecord}
+    onClose={() => inspectedRecord = null}
+    onRetake={handleRetake}
+    onDelete={handleDeleteRecord}
+  />
+{/if}
 
 <style>
   @keyframes spin { to { transform: rotate(360deg); } }

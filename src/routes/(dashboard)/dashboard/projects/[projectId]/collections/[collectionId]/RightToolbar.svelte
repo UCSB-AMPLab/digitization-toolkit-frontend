@@ -7,20 +7,15 @@
   // Siempre visible independientemente de la vista activa.
   //
   // Controles:
-  //   - Vista single (ícono imagen)
+  //   - Vista lista  (ícono lista)
   //   - Vista spread (ícono libro)
   //   - Vista grid   (ícono cuadrícula)
-  //   [separador — solo en single]
+  //   [separador — solo en spread]
   //   - Zoom in / Zoom out / Fit to screen
-  //   [separador — solo en single]
-  //   - Retomar foto (navega de vuelta al live preview)
   //   - Más opciones (placeholder)
   //
   // El ícono activo tiene un marcador verde a la izquierda + fondo oscuro.
   // ============================================================================
-
-  import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -33,20 +28,13 @@
     onRotateLeft,
     onRotateRight,
   }: {
-    viewMode: 'single' | 'spread' | 'grid';
+    viewMode: 'list' | 'spread' | 'grid';
     zoom: number;
-    onViewModeChange: (mode: 'single' | 'spread' | 'grid') => void;
+    onViewModeChange: (mode: 'list' | 'spread' | 'grid') => void;
     onZoomChange: (zoom: number) => void;
     onRotateLeft: () => void;
     onRotateRight: () => void;
   } = $props();
-
-  // ---------------------------------------------------------------------------
-  // ESTADO LOCAL
-  // ---------------------------------------------------------------------------
-
-  // Modal de confirmación "Retomar foto"
-  let showRetakeModal = $state(false);
 
   // ---------------------------------------------------------------------------
   // ACCIONES
@@ -55,13 +43,6 @@
   function handleZoomIn()    { onZoomChange(Math.min(zoom + 0.2, 3)); }
   function handleZoomOut()   { onZoomChange(Math.max(zoom - 0.2, 0.5)); }
   function handleFitScreen() { onZoomChange(1); }
-
-  // Navega de vuelta al live preview de la misma colección
-  function handleRetakeConfirm() {
-    const collectionId = $page.params.collectionId;
-    goto(`/live-preview?collectionId=${collectionId}`);
-    showRetakeModal = false;
-  }
 </script>
 
 <!-- ============================================================
@@ -72,23 +53,18 @@
 
   <!-- ── Íconos de vista ── -->
 
-  <!-- Vista single -->
+  <!-- Vista lista -->
   <button
     class="tool-btn"
-    class:active={viewMode === 'single'}
-    onclick={() => onViewModeChange('single')}
-    title="Vista individual"
-    aria-label="Vista individual"
+    class:active={viewMode === 'list'}
+    onclick={() => onViewModeChange('list')}
+    title="Vista lista"
+    aria-label="Vista lista"
   >
-    {#if viewMode === 'single'}
+    {#if viewMode === 'list'}
       <div class="active-indicator"></div>
     {/if}
-    <!-- Ícono imagen -->
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <rect x="3" y="3" width="18" height="18" rx="2"/>
-      <circle cx="8.5" cy="8.5" r="1.5"/>
-      <polyline points="21 15 16 10 5 21"/>
-    </svg>
+    <span class="material-symbols-outlined icon-md">view_list</span>
   </button>
 
   <!-- Vista spread -->
@@ -129,8 +105,8 @@
     </svg>
   </button>
 
-  <!-- Separador + controles de zoom (solo en vista single) -->
-  {#if viewMode === 'single'}
+  <!-- Separador + controles de zoom (solo en vista spread) -->
+  {#if viewMode === 'spread'}
     <div class="divider"></div>
 
     <!-- Zoom in -->
@@ -158,55 +134,9 @@
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
       </svg>
     </button>
-
-    <div class="divider"></div>
-
-    <!-- Retomar foto: vuelve al live preview -->
-    <button
-      class="tool-btn retake"
-      onclick={() => showRetakeModal = true}
-      title="Retomar foto"
-      aria-label="Retomar foto"
-    >
-      <!-- Ícono refresh/retake -->
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="23 4 23 10 17 10"/>
-        <polyline points="1 20 1 14 7 14"/>
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-      </svg>
-    </button>
-
-    <div class="divider"></div>
-
-    <!-- Más opciones (placeholder para futuras herramientas) -->
-    <button class="tool-btn" title="Más opciones" aria-label="Más opciones">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
-      </svg>
-    </button>
   {/if}
 
 </div>
-
-<!-- ============================================================
-     MODAL: Confirmar retomar foto
-     ============================================================ -->
-{#if showRetakeModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) showRetakeModal = false; }}>
-    <div class="modal-card">
-      <h3 class="modal-title">¿Retomar la foto?</h3>
-      <p class="modal-desc">
-        Esto te llevará de vuelta a la interfaz de captura. La imagen actual no se borrará.
-      </p>
-      <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => showRetakeModal = false}>Cancelar</button>
-        <button class="modal-btn confirm" onclick={handleRetakeConfirm}>Aceptar</button>
-      </div>
-    </div>
-  </div>
-{/if}
 
 <style>
   /* Toolbar fija a la derecha */

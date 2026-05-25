@@ -23,7 +23,7 @@
   }: {
     records: Record[];
     selectedRecordId: number | null;
-    viewMode: 'single' | 'spread' | 'grid';
+    viewMode: 'list' | 'spread' | 'grid';
     onSelect: (id: number) => void;
   } = $props();
 
