@@ -7,7 +7,7 @@
   // La navegación superior (breadcrumb, botón cámara) vive en +layout@.svelte.
   //
   // Componentes hijos:
-  //   LeftSidebar.svelte      → strip de íconos + paneles (solo en spread)
+  //   LeftSidebar.svelte      → strip de íconos + paneles (en list y spread)
   //   ListView.svelte         → vista de lista de registros
   //   ImageViewer.svelte      → visor en modo spread
   //   ImageViewerModal.svelte → modal de inspección (desde ListView)
@@ -148,8 +148,8 @@
 
   <div class="content-area">
 
-    <!-- Panel lateral: solo en spread -->
-    {#if viewMode === 'spread'}
+    <!-- Panel lateral: en list y spread -->
+    {#if viewMode !== 'grid'}
       <LeftSidebar
         {viewMode}
         currentRecord={selectedRecord}
@@ -181,7 +181,7 @@
       {:else if viewMode === 'list'}
         <ListView
           {records}
-          onRecordClick={(r) => inspectedRecord = r}
+          onRecordClick={(r) => { selectedRecordId = r.id; inspectedRecord = r; }}
         />
 
       {:else if viewMode === 'spread'}
