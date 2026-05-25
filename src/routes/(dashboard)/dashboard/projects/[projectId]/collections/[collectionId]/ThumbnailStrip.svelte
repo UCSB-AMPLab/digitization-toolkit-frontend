@@ -11,6 +11,7 @@
   // ============================================================================
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
+  import StatusBadge from '$lib/components/StatusBadge.svelte';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -78,11 +79,11 @@
     return item.record.id === selectedRecordId;
   }
 
-  // Status de imagen (en producción vendrá del backend)
-  function getStatus(_record: Record): 'approved' | 'rejected' | 'pending' | 'processing' {
-    return 'pending'; // TODO: conectar con backend
+  // En vista 'spread': resalta el par de items del registro activo
+  function isSelected(item: ThumbItem): boolean {
+    if (viewMode === 'spread') return item.record.id === selectedRecordId;
+    return item.record.id === selectedRecordId;
   }
-</script>
 
 <!-- ============================================================
      TIRA DE MINIATURAS
@@ -102,7 +103,6 @@
     {:else}
       {#each thumbItems as item, i}
         {@const selected = isSelected(item)}
-        {@const status = getStatus(item.record)}
 
         <button
           class="thumb-item"
@@ -133,15 +133,7 @@
           <div class="thumb-info">
             <span class="thumb-name" title={item.record.title}>{item.record.title || `Img ${i+1}`}</span>
             <div class="thumb-status">
-              {#if status === 'approved'}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              {:else if status === 'rejected'}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              {:else if status === 'processing'}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-light)" stroke-width="2" class="spin"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 0 .57-8.38"/></svg>
-              {:else}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-light-grey)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              {/if}
+              <StatusBadge status={item.record.status} />
             </div>
           </div>
 

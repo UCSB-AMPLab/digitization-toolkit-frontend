@@ -13,6 +13,7 @@
   // ============================================================================
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
+  import StatusBadge from '$lib/components/StatusBadge.svelte';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -22,12 +23,20 @@
     onClose,
     onRetake,
     onDelete,
+    userRole = null,
+    onStatusChange,
   }: {
     record: Record;
     onClose: () => void;
     onRetake: (record: Record) => void;
     onDelete: (record: Record) => void;
+    userRole?: string | null;
+    onStatusChange?: (id: number, status: Record['status']) => void;
   } = $props();
+
+  // Lock: in_review and approved block retake/delete for non-admins
+  let isLocked = $derived(record.status === 'in_review' || record.status === 'approved');
+  let canReview = $derived(userRole === 'reviewer' || userRole === 'admin');
 
   // ---------------------------------------------------------------------------
   // ESTADO LOCAL
@@ -66,9 +75,12 @@
 
     <!-- ── Cabecera ── -->
     <div class="img-viewer-header">
-      <span class="img-viewer-title">
-        {record.title || `Registro #${record.id}`}
-      </span>
+      <div class="img-viewer-header-title-group">
+        <span class="img-viewer-title">
+          {record.title || `Registro #${record.id}`}
+        </span>
+        <StatusBadge status={record.status} />
+      </div>
       <button class="img-viewer-close-btn" onclick={onClose} aria-label="Cerrar">
         <span class="material-symbols-outlined icon-md">close</span>
       </button>
@@ -112,14 +124,28 @@
           Cerrar
         </button>
         <div style="display:flex; gap:8px;">
-          <button class="btn btn-warning" onclick={() => confirmAction = 'retake'}>
-            <span class="material-symbols-outlined icon-sm">refresh</span>
-            Retomar
-          </button>
-          <button class="btn btn-danger" onclick={() => confirmAction = 'delete'}>
-            <span class="material-symbols-outlined icon-sm">delete</span>
-            Eliminar
-          </button>
+          {#if isLocked && userRole !== 'admin'}
+            <span class="img-viewer-locked-msg">
+              <span class="material-symbols-outlined icon-sm">lock</span>
+              Registro bloqueado ({record.status === 'in_review' ? 'en revisión' : 'aprobado'})
+            </span>
+          {:else}
+            <button class="btn btn-warning" onclick={() => confirmAction = 'retake'}>
+              <span class="material-symbols-outlined icon-sm">refresh</span>
+              Retomar
+            </button>
+            <button class="btn btn-danger" onclick={() => confirmAction = 'delete'}>
+              <span class="material-symbols-outlined icon-sm">delete</span>
+              Eliminar
+            </button>
+          {/if}
+
+          {#if record.status === 'approved' && canReview && onStatusChange}
+            <button class="btn btn-warning" onclick={() => onStatusChange!(record.id, 'rejected')}>
+              <span class="material-symbols-outlined icon-sm">flag</span>
+              Marcar para revisión
+            </button>
+          {/if}
         </div>
 
       {:else if confirmAction === 'retake'}

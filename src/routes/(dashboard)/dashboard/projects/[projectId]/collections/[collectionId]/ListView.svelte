@@ -8,18 +8,50 @@
   // Al hacer click en una fila se abre el ImageViewerModal del registro.
   // ============================================================================
 
-  import { recordsApi, type Record, type RecordImage } from '$lib/api';
+  import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
+  import StatusBadge from '$lib/components/StatusBadge.svelte';
+  // @ts-ignore — installed in Docker, not locally
+  import { dndzone } from 'svelte-dnd-action';
 
   // ---------------------------------------------------------------------------
   // PROPS
   // ---------------------------------------------------------------------------
   let {
     records,
+    collectionId = 0,
+    selectedIds = new Set<number>(),
     onRecordClick,
+    onToggleSelect,
+    onRecordsUpdate,
   }: {
     records: Record[];
+    collectionId?: number;
+    selectedIds?: Set<number>;
     onRecordClick: (record: Record) => void;
+    onToggleSelect?: (id: number) => void;
+    onRecordsUpdate?: () => void;
   } = $props();
+
+  let isSelectMode = $derived(selectedIds.size > 0);
+
+  // Local copy for DnD
+  let localRecords = $state<Record[]>([]);
+  $effect(() => { localRecords = [...records]; });
+
+  function handleDndConsider(e: CustomEvent) { localRecords = e.detail.items; }
+
+  async function handleDndFinalize(e: CustomEvent) {
+    localRecords = e.detail.items;
+    if (collectionId && onRecordsUpdate) {
+      try {
+        await collectionsApi.reorderRecords(collectionId, localRecords.map(r => r.id));
+        onRecordsUpdate();
+      } catch (err) {
+        console.error('[ListView] Error reordenando:', err);
+        onRecordsUpdate();
+      }
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // HELPERS
@@ -67,12 +99,18 @@
     <div class="list-header">
       <span class="col-thumb">Imágenes</span>
       <span class="col-title">Título</span>
+      <span class="col-status">Estado</span>
       <span class="col-count">Capturas</span>
       <span class="col-date">Fecha</span>
     </div>
 
-    <!-- Filas -->
-    {#each records as record, i}
+    <!-- Filas con DnD -->
+    <div
+      use:dndzone={{ items: localRecords, dragDisabled: isSelectMode }}
+      onconsider={handleDndConsider}
+      onfinalize={handleDndFinalize}
+    >
+    {#each localRecords as record, i (record.id)}
       {@const imgs = sortedImages(record)}
 
       <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -80,7 +118,15 @@
       <div
         class="list-row"
         class:alt={i % 2 !== 0}
-        onclick={() => onRecordClick(record)}
+        class:selected={selectedIds.has(record.id)}
+        onclick={(e) => {
+          if (isSelectMode && onToggleSelect) {
+            e.stopPropagation();
+            onToggleSelect(record.id);
+          } else {
+            onRecordClick(record);
+          }
+        }}
         role="button"
         tabindex="0"
       >
@@ -111,7 +157,29 @@
         </div>
 
         <!-- Título -->
-        <span class="col-title row-title">{record.title || `Registro #${record.id}`}</span>
+        <span class="col-title row-title">
+          {#if onToggleSelect}
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <span
+              class="selectable-check"
+              onclick={(e) => { e.stopPropagation(); onToggleSelect!(record.id); }}
+              title="Seleccionar"
+            >
+              {#if selectedIds.has(record.id)}
+                <span class="material-symbols-outlined icon-sm">check_box</span>
+              {:else}
+                <span class="material-symbols-outlined icon-sm">check_box_outline_blank</span>
+              {/if}
+            </span>
+          {/if}
+          {record.title || `Registro #${record.id}`}
+        </span>
+
+        <!-- Estado QA -->
+        <span class="col-status">
+          <StatusBadge status={record.status} />
+        </span>
 
         <!-- Número de imágenes -->
         <span class="col-count row-count">{imgs.length}</span>
@@ -121,6 +189,7 @@
 
       </div>
     {/each}
+    </div>
   {/if}
 
 </div>
@@ -153,7 +222,7 @@
   /* Cabecera */
   .list-header {
     display: grid;
-    grid-template-columns: 160px 1fr 80px 110px;
+    grid-template-columns: 160px 1fr 140px 80px 110px;
     padding: 10px 12px;
     border-bottom: 1px solid var(--border-color);
     font-size: var(--text-xs);
@@ -170,7 +239,7 @@
   /* Fila */
   .list-row {
     display: grid;
-    grid-template-columns: 160px 1fr 80px 110px;
+    grid-template-columns: 160px 1fr 140px 80px 110px;
     align-items: center;
     padding: 8px 12px;
     border-radius: var(--radius-sm);

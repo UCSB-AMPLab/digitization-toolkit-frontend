@@ -428,6 +428,39 @@ export const collectionsApi = {
     await apiRequest(`/collections/${id}`, {
       method: 'DELETE'
     });
+  },
+
+  /**
+   * Set display order of records in a collection.
+   * ordered_ids: record IDs in the desired order (0-based sequence assigned automatically).
+   */
+  async reorderRecords(collectionId: number, ordered_ids: number[]): Promise<{ reordered: number }> {
+    return apiRequest(`/collections/${collectionId}/records/reorder`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ordered_ids })
+    });
+  },
+
+  /**
+   * Trigger a BagIt export for the collection (all records must be approved).
+   * Returns metadata about the generated zip including a download_url.
+   */
+  async exportBagit(collectionId: number): Promise<{
+    bag_name: string;
+    zip_filename: string;
+    size_bytes: number;
+    download_url: string;
+  }> {
+    return apiRequest(`/collections/${collectionId}/export`, { method: 'POST' });
+  },
+
+  /**
+   * Returns the URL to download the most recent BagIt export zip.
+   */
+  getExportDownloadUrl(collectionId: number): string {
+    const base = getApiBase();
+    const token = tokenStore.get();
+    return `${base}/collections/${collectionId}/export/download${token ? '?token=' + token : ''}`;
   }
 };
 
@@ -468,6 +501,10 @@ export interface Record {
   created_at?: string;
   modified_at?: string;
   images: RecordImage[];
+  // QA workflow
+  status: 'captured' | 'in_review' | 'rejected' | 'approved';
+  sequence?: number;
+  rejection_note?: string;
 }
 
 export interface CreateRecordData {
@@ -600,6 +637,35 @@ export const recordsApi = {
    */
   async deleteImage(imageId: number): Promise<void> {
     await apiRequest(`/records/images/${imageId}`, { method: 'DELETE' });
+  },
+
+  /**
+   * Change the QA status of a single record.
+   */
+  async updateStatus(
+    id: number,
+    status: 'captured' | 'in_review' | 'rejected' | 'approved',
+    rejection_note?: string
+  ): Promise<Record> {
+    return apiRequest<Record>(`/records/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, rejection_note })
+    });
+  },
+
+  /**
+   * Change the QA status of multiple records at once.
+   * Returns successfully updated records (skipped records are omitted).
+   */
+  async bulkUpdateStatus(
+    record_ids: number[],
+    status: 'captured' | 'in_review' | 'rejected' | 'approved',
+    rejection_note?: string
+  ): Promise<Record[]> {
+    return apiRequest<Record[]>('/records/bulk-status', {
+      method: 'POST',
+      body: JSON.stringify({ record_ids, status, rejection_note })
+    });
   }
 };
 

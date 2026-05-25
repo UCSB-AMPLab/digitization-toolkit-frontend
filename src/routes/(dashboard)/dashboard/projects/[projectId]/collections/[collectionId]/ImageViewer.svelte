@@ -93,7 +93,13 @@
           </div>
         {/if}
         {#if getImageUrl(spreadLeftImage)}
-          <img src={getImageUrl(spreadLeftImage)} alt="Página izquierda" class="spread-image left" draggable="false" />
+          <img
+            src={getImageUrl(spreadLeftImage)}
+            alt="Página izquierda"
+            class="spread-image left"
+            draggable="false"
+            style="transform: scale({zoom}) rotate({rotation}deg); transition: transform 0.15s ease;"
+          />
         {:else}
           <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
         {/if}
@@ -111,7 +117,13 @@
           </div>
         {/if}
         {#if getImageUrl(spreadRightImage)}
-          <img src={getImageUrl(spreadRightImage)} alt="Página derecha" class="spread-image right" draggable="false" />
+          <img
+            src={getImageUrl(spreadRightImage)}
+            alt="Página derecha"
+            class="spread-image right"
+            draggable="false"
+            style="transform: scale({zoom}) rotate({rotation}deg); transition: transform 0.15s ease;"
+          />
         {:else}
           <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
         {/if}

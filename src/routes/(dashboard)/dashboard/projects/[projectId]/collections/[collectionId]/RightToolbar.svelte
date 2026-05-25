@@ -23,17 +23,21 @@
   let {
     viewMode,
     zoom,
+    canExport = false,
     onViewModeChange,
     onZoomChange,
     onRotateLeft,
     onRotateRight,
+    onExport,
   }: {
     viewMode: 'list' | 'spread' | 'grid';
     zoom: number;
+    canExport?: boolean;
     onViewModeChange: (mode: 'list' | 'spread' | 'grid') => void;
     onZoomChange: (zoom: number) => void;
     onRotateLeft: () => void;
     onRotateRight: () => void;
+    onExport?: () => void;
   } = $props();
 
   // ---------------------------------------------------------------------------
@@ -133,6 +137,21 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
       </svg>
+    </button>
+  {/if}
+
+  <!-- Separador + Exportar BagIt -->
+  {#if onExport}
+    <div class="divider"></div>
+    <button
+      class="tool-btn"
+      class:export-ready={canExport}
+      onclick={onExport}
+      title={canExport ? 'Exportar BagIt (todos aprobados)' : 'Exportar BagIt (requiere todos aprobados)'}
+      aria-label="Exportar BagIt"
+      disabled={!canExport}
+    >
+      <span class="material-symbols-outlined icon-md">archive</span>
     </button>
   {/if}
 

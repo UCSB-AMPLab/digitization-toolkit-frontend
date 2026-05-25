@@ -37,7 +37,10 @@
   //   Ver comentario TODO en el template.
   // ============================================================================
 
-  import { recordsApi, type Record } from '$lib/api';
+  import { recordsApi, collectionsApi, type Record } from '$lib/api';
+  import StatusBadge from '$lib/components/StatusBadge.svelte';
+  // @ts-ignore — installed in Docker, not locally
+  import { dndzone } from 'svelte-dnd-action';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -45,18 +48,32 @@
   let {
     records,
     collectionId,
-    triggerFinalizeModal,   // true = abrir modal de finalizar
+    selectedIds = new Set<number>(),
+    triggerFinalizeModal,
     onRecordsUpdate,
-    onFinalized,             // callback cuando el usuario confirma
-    onFinalizeModalClosed,   // callback cuando el modal se cierra
+    onFinalized,
+    onFinalizeModalClosed,
+    onToggleSelect,
   }: {
     records: Record[];
     collectionId: number;
+    selectedIds?: Set<number>;
     triggerFinalizeModal: boolean;
     onRecordsUpdate: () => void;
     onFinalized: () => void;
     onFinalizeModalClosed: () => void;
+    onToggleSelect?: (id: number) => void;
   } = $props();
+
+  let isSelectMode = $derived(selectedIds.size > 0);
+
+  // Local copy of records for DnD reordering
+  let localRecords = $state<Record[]>([]);
+
+  // Sync localRecords when records prop changes
+  $effect(() => {
+    localRecords = [...records];
+  });
 
   // ---------------------------------------------------------------------------
   // ESTADO LOCAL
@@ -91,12 +108,7 @@
   // DERIVADOS
   // ---------------------------------------------------------------------------
 
-  // Status simulado — conectar con backend cuando esté disponible
-  function getStatus(_record: Record, index: number): 'approved' | 'rejected' | 'pending' | 'processing' {
-    const s: Array<'approved' | 'rejected' | 'pending' | 'processing'> =
-      ['approved', 'rejected', 'pending', 'processing'];
-    return s[index % 4];
-  }
+  // Status simulado — ELIMINADO: usar record.status real
 
   function getThumbnailUrl(record: Record): string | null {
     if (!record.images || record.images.length === 0) return null;
@@ -108,6 +120,21 @@
   // ---------------------------------------------------------------------------
 
   function toggleReorderMode() { isReorderMode = !isReorderMode; }
+
+  function handleDndConsider(e: CustomEvent) {
+    localRecords = e.detail.items;
+  }
+
+  async function handleDndFinalize(e: CustomEvent) {
+    localRecords = e.detail.items;
+    try {
+      await collectionsApi.reorderRecords(collectionId, localRecords.map(r => r.id));
+      onRecordsUpdate();
+    } catch (err) {
+      console.error('[GridView] Error reordenando:', err);
+      onRecordsUpdate(); // restore from server
+    }
+  }
 
   async function handleConfirmRename() {
     // TODO: await collectionsApi.renameImages(collectionId, renameCollectionId);
@@ -210,10 +237,10 @@
         {#each [
           { id: 'approved',   label: 'Aprobado' },
           { id: 'rejected',   label: 'Rechazado' },
-          { id: 'pending',    label: 'Pendiente' },
-          { id: 'processing', label: 'Procesando' },
+          { id: 'in_review',  label: 'En revisión' },
+          { id: 'captured',   label: 'Capturado' },
         ] as f}
-          <button
+      <button
             class="filter-chip"
             class:active={activeStatusFilter === f.id}
             onclick={() => activeStatusFilter = activeStatusFilter === f.id ? null : f.id}
@@ -229,16 +256,53 @@
   {/if}
 
   <!-- ── CUADRÍCULA ── -->
+  {#if isReorderMode}
+    <div
+      class="image-grid reorder-mode"
+      style="--grid-cols: {columns}"
+      use:dndzone={{ items: localRecords, dragDisabled: false }}
+      onconsider={handleDndConsider}
+      onfinalize={handleDndFinalize}
+    >
+      {#each localRecords.filter(r => !activeStatusFilter || r.status === activeStatusFilter) as record, i (record.id)}
+        {@const thumbUrl = getThumbnailUrl(record)}
+        <div class="grid-card draggable" id="record-{record.id}">
+          <div class="drag-handle visible">
+            <span class="material-symbols-outlined icon-sm">drag_indicator</span>
+          </div>
+          <div class="card-image-wrapper reorder">
+            {#if thumbUrl}
+              <img src={thumbUrl} alt={record.title} class="card-image" draggable="false" />
+            {:else}
+              <div class="card-placeholder">
+                <span class="material-symbols-outlined icon-md">image</span>
+              </div>
+            {/if}
+          </div>
+          <div class="card-meta">
+            <span class="card-name" title={record.title}>{record.title || `Imagen ${i + 1}`}</span>
+            <div class="card-status-row"><StatusBadge status={record.status} /></div>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {:else}
   <div
     class="image-grid"
     class:reorder-mode={isReorderMode}
-    style="grid-template-columns: repeat({columns}, 1fr)"
+    style="--grid-cols: {columns}"
   >
-    {#each records as record, i}
-      {@const status = getStatus(record, i)}
+    {#each records.filter(r => !activeStatusFilter || r.status === activeStatusFilter) as record, i}
       {@const thumbUrl = getThumbnailUrl(record)}
 
-      <div class="grid-card" class:draggable={isReorderMode}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="grid-card"
+        class:draggable={isReorderMode}
+        class:selected={selectedIds.has(record.id)}
+        onclick={() => { if (isSelectMode && onToggleSelect) onToggleSelect(record.id); }}
+      >
 
         {#if isReorderMode}
           <div class="reorder-handle">
@@ -262,39 +326,33 @@
             </div>
           {/if}
 
-          {#if status === 'approved'}
-            <div class="status-badge approved">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-          {:else if status === 'rejected'}
-            <div class="status-badge rejected">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <!-- Multi-select overlay -->
+          {#if onToggleSelect}
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="selectable-overlay"
+              class:selected={selectedIds.has(record.id)}
+              onclick={(e) => { e.stopPropagation(); onToggleSelect!(record.id); }}
+            >
+              {#if selectedIds.has(record.id)}
+                <span class="material-symbols-outlined">check</span>
+              {/if}
             </div>
           {/if}
         </div>
 
         <div class="card-meta">
           <span class="card-name" title={record.title}>{record.title || `Imagen ${i + 1}`}</span>
-          <div class="card-status">
-            {#if status === 'approved'}
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <span style="color:var(--color-success)">Approved</span>
-            {:else if status === 'rejected'}
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              <span style="color:var(--color-error)">Rejected</span>
-            {:else if status === 'processing'}
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-light)" stroke-width="2" class="spin"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 0 .57-8.38"/></svg>
-              <span>Processing</span>
-            {:else}
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-light-grey)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span style="color:var(--color-light-grey)">Pending</span>
-            {/if}
+          <div class="card-status-row">
+            <StatusBadge status={record.status} />
           </div>
         </div>
 
       </div>
     {/each}
   </div>
+  {/if}
 
 </div>
 
