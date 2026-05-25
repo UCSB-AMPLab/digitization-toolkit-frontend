@@ -1238,7 +1238,6 @@ canvas, button, a, div {
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
-}
 
 .drag-handle.visible { opacity: 1; }
 

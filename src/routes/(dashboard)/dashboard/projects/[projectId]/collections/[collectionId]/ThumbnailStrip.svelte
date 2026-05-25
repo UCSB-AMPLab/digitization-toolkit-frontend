@@ -78,12 +78,7 @@
     if (viewMode === 'spread') return item.record.id === selectedRecordId;
     return item.record.id === selectedRecordId;
   }
-
-  // En vista 'spread': resalta el par de items del registro activo
-  function isSelected(item: ThumbItem): boolean {
-    if (viewMode === 'spread') return item.record.id === selectedRecordId;
-    return item.record.id === selectedRecordId;
-  }
+</script>
 
 <!-- ============================================================
      TIRA DE MINIATURAS
