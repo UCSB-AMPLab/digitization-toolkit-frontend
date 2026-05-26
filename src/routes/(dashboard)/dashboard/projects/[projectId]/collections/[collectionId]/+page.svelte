@@ -1,26 +1,36 @@
 <script lang="ts">
   // ============================================================================
-  // PÁGINA: Detalle de Colección (Inside Collection)
-  // Ruta: /shared/projects/[projectId]/collections/[collectionId]
-  // Archivo: src/routes/(dashboard)/shared/projects/[projectId]/collections/[collectionId]/+page.svelte
+  // PÁGINA: Galería de colección
+  // Ruta: /dashboard/projects/[projectId]/collections/[collectionId]
   //
-  // SOLO VISTA LISTA (no hay toggles de grid/lista como en el Figma Make original).
-  // Muestra:
-  //   - Breadcrumb: Nombre Proyecto / Nombre Colección
-  //   - Botón "Volver a {proyecto}"
-  //   - Barra: Seleccionar todo | Ninguna seleccionada | Filtros
-  //   - Botón "Continuar digitalización" → /live-preview
-  //   - LISTA de registros (tabla): nombre, tamaño, formato, DPI, fecha, acciones
+  // Reemplaza la antigua vista de lista de registros con la galería completa.
+  // La navegación superior (breadcrumb, botón cámara) vive en +layout@.svelte.
   //
-  // Para el Revisor: en vez de "Continuar digitalización" aparece "Revisar"
-  // que redirige a /gallery/{collectionId}
+  // Componentes hijos:
+  //   LeftSidebar.svelte      → strip de íconos + paneles (en list y spread)
+  //   ListView.svelte         → vista de lista de registros
+  //   ImageViewer.svelte      → visor en modo spread
+  //   ImageViewerModal.svelte → modal de inspección (desde ListView)
+  //   GridView.svelte         → vista cuadrícula (con Filtros/Renombrar/Finalizar)
+  //   RightToolbar.svelte     → toolbar flotante derecha
+  //   ThumbnailStrip.svelte   → tira de miniaturas inferior (solo en spread)
   // ============================================================================
 
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { authStore } from '$lib/stores/auth';
-  import { projectsApi, collectionsApi, recordsApi, type Project, type Collection, type Record } from '$lib/api';
+  import { authStore, userRole } from '$lib/stores/auth';
+  import { recordsApi, collectionsApi, type Record } from '$lib/api';
+
+  import LeftSidebar from './LeftSidebar.svelte';
+  import ListView from './ListView.svelte';
+  import ImageViewer from './ImageViewer.svelte';
+  import ImageViewerModal from './ImageViewerModal.svelte';
+  import GridView from './GridView.svelte';
+  import RightToolbar from './RightToolbar.svelte';
+  import ThumbnailStrip from './ThumbnailStrip.svelte';
+  import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
+  import ActionBar from './ActionBar.svelte';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -29,619 +39,306 @@
   let collectionId = $derived(Number($page.params.collectionId) || 0);
 
   // ---------------------------------------------------------------------------
-  // ESTADO
+  // ESTADO GLOBAL
   // ---------------------------------------------------------------------------
-  let project    = $state<Project | null>(null);
-  let collection = $state<Collection | null>(null);
-  let records    = $state<Record[]>([]);
-  let isLoading  = $state(true);
+  let viewMode         = $state<'list' | 'spread' | 'grid'>('list');
+  let selectedRecordId = $state<number | null>(null);
+  let records          = $state<Record[]>([]);
+  let zoom             = $state(1);
+  let rotation         = $state(0);
+  let isLoading        = $state(true);
 
-  let selectedIds = $state<Set<number>>(new Set());
+  // Multi-select state
+  let selectedIds   = $state<Set<number>>(new Set());
+  let isSelectMode  = $state(false);
 
-  let userRole = $derived($authStore.user?.role ?? 'operator');
+  // Registro inspeccionado en el modal (desde ListView)
+  let inspectedRecord = $state<Record | null>(null);
 
-  // Filtrado
-  let searchQuery = $state('');
+  // Estado de finalización
+  let isFinalized = $state(false);
 
-  let filteredRecords = $derived(
-    searchQuery.trim()
-      ? records.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase()))
-      : records
-  );
-
-  // Selección
-  let allSelected = $derived(
-    filteredRecords.length > 0 && filteredRecords.every(r => selectedIds.has(r.id))
-  );
-
-  let selectionLabel = $derived(
-    selectedIds.size === 0
-      ? 'Ninguna seleccionada'
-      : `${selectedIds.size} seleccionada${selectedIds.size > 1 ? 's' : ''}`
-  );
+  // Trigger para abrir el modal de finalización dentro de GridView
+  let triggerFinalizeModal = $state(false);
 
   // ---------------------------------------------------------------------------
   // AL MONTAR
   // ---------------------------------------------------------------------------
   onMount(async () => {
-    await Promise.all([loadProject(), loadCollection(), loadRecords()]);
+    if (!authStore.isAuthenticated()) {
+      goto('/login');
+      return;
+    }
+    await loadRecords();
   });
-
-  async function loadProject() {
-    try { project = await projectsApi.get(projectId); } catch {}
-  }
-
-  async function loadCollection() {
-    try { collection = await collectionsApi.get(collectionId); } catch {}
-  }
 
   async function loadRecords() {
     try {
       isLoading = true;
-      records = await recordsApi.list({ collection_id: collectionId });
+      const data = await recordsApi.list({ collection_id: collectionId });
+      // Sort by sequence (nulls last), then by id
+      records = data.sort((a, b) => {
+        if (a.sequence == null && b.sequence == null) return a.id - b.id;
+        if (a.sequence == null) return 1;
+        if (b.sequence == null) return -1;
+        return a.sequence - b.sequence;
+      });
+      if (records.length > 0) selectedRecordId = records[0].id;
     } catch (err) {
-      console.error('[CollectionDetail] Error:', err);
+      console.error('[Gallery] Error cargando registros:', err);
     } finally {
       isLoading = false;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // SELECCIÓN
+  // HANDLERS
   // ---------------------------------------------------------------------------
-  function toggleSelect(id: number) {
-    const s = new Set(selectedIds);
-    if (s.has(id)) s.delete(id); else s.add(id);
-    selectedIds = s;
+
+  function handlePrev() {
+    const idx = records.findIndex(r => r.id === selectedRecordId);
+    if (idx > 0) selectedRecordId = records[idx - 1].id;
   }
 
-  function toggleSelectAll() {
-    if (allSelected) {
-      selectedIds = new Set();
-    } else {
-      selectedIds = new Set(filteredRecords.map(r => r.id));
+  function handleNext() {
+    const idx = records.findIndex(r => r.id === selectedRecordId);
+    if (idx < records.length - 1) selectedRecordId = records[idx + 1].id;
+  }
+
+  function handleSelect(id: number) { selectedRecordId = id; }
+
+  function handleViewModeChange(mode: 'list' | 'spread' | 'grid') {
+    viewMode = mode;
+    zoom = 1;
+    rotation = 0;
+  }
+
+  function handleRotateLeft()  { rotation = ((rotation - 90) % 360 + 360) % 360; }
+  function handleRotateRight() { rotation = (rotation + 90) % 360; }
+
+  // Retomar: navega a live-preview con el mismo proyecto/colección
+  function handleRetake(record: Record) {
+    inspectedRecord = null;
+    goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`);
+  }
+
+  // Eliminar registro completo y refrescar lista
+  async function handleDeleteRecord(record: Record) {
+    try {
+      await recordsApi.delete(record.id);
+      await loadRecords();
+    } catch (err) {
+      console.error('[Gallery] Error eliminando registro:', err);
+    } finally {
+      inspectedRecord = null;
+    }
+  }
+
+  // GridView confirmó la finalización
+  function handleFinalized() {
+    isFinalized = true;
+    triggerFinalizeModal = false;
+  }
+
+  // GridView canceló o cerró el modal sin finalizar
+  function handleFinalizeModalClosed() {
+    triggerFinalizeModal = false;
+  }
+
+  // Multi-select handlers
+  function handleToggleSelect(id: number) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    selectedIds = next;
+    isSelectMode = next.size > 0;
+  }
+
+  function handleDeselectAll() {
+    selectedIds = new Set();
+    isSelectMode = false;
+  }
+
+  async function handleBulkStatusChange(status: Record['status'], rejectionNote?: string) {
+    try {
+      await recordsApi.bulkUpdateStatus(Array.from(selectedIds), status, rejectionNote);
+      await loadRecords();
+      handleDeselectAll();
+    } catch (err) {
+      console.error('[Gallery] Error actualizando estado:', err);
+    }
+  }
+
+  // BagIt export
+  let showExportModal = $state(false);
+  let isExporting     = $state(false);
+  let exportResult    = $state<{ bag_name: string; zip_filename: string; size_bytes: number; download_url: string } | null>(null);
+  let exportError     = $state<string | null>(null);
+
+  async function handleExport() {
+    showExportModal = true;
+    isExporting = true;
+    exportResult = null;
+    exportError = null;
+    try {
+      const result = await collectionsApi.exportBagit(collectionId);
+      exportResult = result;
+    } catch (err: any) {
+      exportError = err?.message ?? 'Error al exportar';
+    } finally {
+      isExporting = false;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // ACCIONES PRINCIPALES
+  // DERIVADOS
   // ---------------------------------------------------------------------------
-
-  // Operador/Admin → Live Preview
-  function handleDigitize() {
-    goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`);
-  }
-
-  // Revisor → Gallery
-  function handleReview() {
-    goto(`/gallery/${collectionId}`);
-  }
-
-  // ---------------------------------------------------------------------------
-  // HELPERS
-  // ---------------------------------------------------------------------------
-  function formatFileSize(bytes?: number): string {
-    if (!bytes) return '—';
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  }
-
-  // Función para obtener URL de imagen real
-  function getImageUrl(record: Record): string | null {
-    if (!record.images || record.images.length === 0) return null;
-    return recordsApi.getImageThumbnailUrl(record.images[0].id);
-  }
+  let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
+  let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
+  let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved'));
 </script>
 
 <!-- ============================================================
-     PÁGINA DE COLECCIÓN (vista lista)
+     LAYOUT DE GALERÍA
+     (la barra superior vive en +layout@.svelte)
      ============================================================ -->
-<div class="page">
+<div class="gallery-wrapper">
 
-  <!-- Breadcrumb + botón continuar -->
-  <div class="page-header">
-    <div>
-      <h1 class="page-title">
-        {project?.name ?? '—'}
-        {#if collection}
-          <span class="breadcrumb-sep">/</span>
-          <strong>{collection.name}</strong>
-        {/if}
-      </h1>
-      <p class="page-subtitle">Colección</p>
-    </div>
+  <RecordStatusBar {records} />
 
-    <!-- Botón principal según rol y estado de la colección
-         - Sin imágenes: solo botón central (ver empty state abajo), header vacío
-         - Con imágenes:  "Continuar digitalización" (operario/admin) o "Revisar" (reviewer)
-    -->
-    {#if records.length > 0}
-      {#if userRole === 'reviewer'}
-        <button class="btn-digitize" onclick={handleReview}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-          Revisar
-        </button>
-      {:else}
-        <button class="btn-digitize" onclick={handleDigitize}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
-          Continuar digitalización
-        </button>
-      {/if}
+  <div class="content-area">
+
+    <!-- Panel lateral: en list y spread -->
+    {#if viewMode !== 'grid'}
+      <LeftSidebar
+        {viewMode}
+        currentRecord={selectedRecord}
+        currentIndex={selectedIndex}
+        totalRecords={records.length}
+        onRotateLeft={handleRotateLeft}
+        onRotateRight={handleRotateRight}
+      />
     {/if}
-  </div>
 
-  <!-- Botón volver al proyecto -->
-  <button class="btn-back" onclick={() => goto(`/dashboard/projects/${projectId}`)}>
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M2.5 12H21M2.5 12l5-5M2.5 12l5 5"/>
-    </svg>
-    Volver a {project?.name ?? 'Proyecto'}
-  </button>
+    <div class="center-column">
 
-  <!-- Barra de selección + filtros -->
-  <div class="toolbar">
-    <!-- Seleccionar todo -->
-    <button class="select-all-btn" onclick={toggleSelectAll}>
-      <div class="checkbox" class:checked={allSelected}>
-        {#if allSelected}
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        {/if}
-      </div>
-      <span>Seleccionar todo</span>
-    </button>
+      {#if isLoading}
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <span>Cargando imágenes...</span>
+        </div>
 
-    <!-- Separador + label de selección -->
-    <div class="selection-info">
-      <span class="sep-line">|</span>
-      <span class="selection-label">{selectionLabel}</span>
-    </div>
+      {:else if viewMode === 'grid'}
+        <GridView
+          {records}
+          {collectionId}
+          {selectedIds}
+          {triggerFinalizeModal}
+          onRecordsUpdate={loadRecords}
+          onFinalized={handleFinalized}
+          onFinalizeModalClosed={handleFinalizeModalClosed}
+          onToggleSelect={handleToggleSelect}
+        />
 
-    <!-- Búsqueda -->
-    <div class="search-wrapper">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input type="text" placeholder="Buscar..." bind:value={searchQuery} class="search-input" />
-    </div>
+      {:else if viewMode === 'list'}
+        <ListView
+          {records}
+          {collectionId}
+          {selectedIds}
+          onRecordClick={(r) => { selectedRecordId = r.id; inspectedRecord = r; }}
+          onToggleSelect={handleToggleSelect}
+          onRecordsUpdate={loadRecords}
+        />
 
-    <!-- Filtros -->
-    <button class="btn-ghost-sm">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-      </svg>
-      Filtros
-    </button>
-
-    <div style="flex:1"></div>
-    <!-- Nota: solo hay vista lista, sin toggle de grid -->
-  </div>
-
-  <!-- Lista de registros -->
-  {#if isLoading}
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <span>Cargando imágenes...</span>
-    </div>
-
-  {:else if filteredRecords.length === 0}
-    <div class="empty-state">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <circle cx="8.5" cy="8.5" r="1.5"/>
-        <polyline points="21 15 16 10 5 21"/>
-      </svg>
-      <span>
-        {searchQuery
-          ? 'Sin resultados para tu búsqueda'
-          : 'Sin imágenes — inicia la digitalización para capturar'}
-      </span>
-      {#if !searchQuery && userRole !== 'reviewer'}
-        <button class="btn-digitize" onclick={handleDigitize}>Iniciar digitalización</button>
+      {:else if viewMode === 'spread'}
+        <ImageViewer
+          {viewMode}
+          {records}
+          {selectedRecordId}
+          {zoom}
+          {rotation}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onZoomChange={(z) => zoom = z}
+        />
+        <div class="thumbnail-area">
+          <ThumbnailStrip
+            {records}
+            {selectedRecordId}
+            {viewMode}
+            onSelect={handleSelect}
+          />
+        </div>
       {/if}
+
     </div>
 
-  {:else}
-    <!-- VISTA LISTA: tabla de registros -->
-    <div class="list-table-wrapper">
-      <table class="list-table">
-        <thead>
-          <tr>
-            <th class="col-check"></th>
-            <th>Imagen</th>
-            <th>Nombre</th>
-            <th>Tamaño</th>
-            <th>Formato</th>
-            <th>Resolución</th>
-            <th>Fecha</th>
-            <th class="text-right">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each filteredRecords as record, i}
-            {@const thumbUrl = getImageUrl(record)}
-            {@const isSelected = selectedIds.has(record.id)}
+    <RightToolbar
+      {viewMode}
+      {zoom}
+      {canExport}
+      onViewModeChange={handleViewModeChange}
+      onZoomChange={(z) => zoom = z}
+      onRotateLeft={handleRotateLeft}
+      onRotateRight={handleRotateRight}
+      onExport={handleExport}
+    />
 
-            <tr class="list-row" class:selected={isSelected}>
-              <!-- Checkbox -->
-              <td class="col-check">
-                <button class="checkbox-btn" onclick={() => toggleSelect(record.id)}>
-                  <div class="checkbox" class:checked={isSelected}>
-                    {#if isSelected}
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                    {/if}
-                  </div>
-                </button>
-              </td>
-
-              <!-- Miniatura -->
-              <td class="col-thumb">
-                <div class="thumb">
-                  {#if thumbUrl}
-                    <img src={thumbUrl} alt={record.title} class="thumb-img" />
-                  {:else}
-                    <div class="thumb-placeholder">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <circle cx="8.5" cy="8.5" r="1.5"/>
-                        <polyline points="21 15 16 10 5 21"/>
-                      </svg>
-                    </div>
-                  {/if}
-                </div>
-              </td>
-
-              <!-- Nombre -->
-              <td>
-                <span class="record-name">{record.title || `IMG_${String(i+1).padStart(3,'0')}.tiff`}</span>
-              </td>
-
-              <!-- Tamaño -->
-              <td class="meta-cell">
-                {formatFileSize(record.images?.[0]?.file_size)}
-              </td>
-
-              <!-- Formato -->
-              <td class="meta-cell">
-                {record.images?.[0]?.format?.toUpperCase() ?? 'TIFF'}
-              </td>
-
-              <!-- Resolución/DPI -->
-              <td class="meta-cell">
-                {#if record.images?.[0]?.resolution_width}
-                  {record.images[0].resolution_width}×{record.images[0].resolution_height}
-                {:else}
-                  300 DPI
-                {/if}
-              </td>
-
-              <!-- Fecha -->
-              <td class="meta-cell date-cell">
-                {record.created_at
-                  ? new Date(record.created_at).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' })
-                  : '—'}
-              </td>
-
-              <!-- Acciones -->
-              <td class="text-right">
-                <div class="row-actions">
-                  <!-- Descargar -->
-                  <button class="action-icon" title="Descargar">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="7 10 12 15 17 10"/>
-                      <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                  </button>
-                  <!-- Ver -->
-                  <button class="action-icon" title="Ver imagen">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                      <circle cx="12" cy="12" r="3"/>
-                    </svg>
-                  </button>
-                  <!-- Más opciones -->
-                  <button class="action-icon" title="Más opciones">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
+  </div>
 
 </div>
 
+<!-- Modal de inspección (desde ListView) -->
+{#if inspectedRecord}
+  <ImageViewerModal
+    record={inspectedRecord}
+    userRole={$userRole}
+    onClose={() => inspectedRecord = null}
+    onRetake={handleRetake}
+    onDelete={handleDeleteRecord}
+    onStatusChange={async (id, status) => { await recordsApi.updateStatus(id, status); await loadRecords(); inspectedRecord = null; }}
+  />
+{/if}
+
+<!-- Barra de acciones multi-selección -->
+<ActionBar
+  selectedCount={selectedIds.size}
+  userRole={$userRole}
+  onBulkStatusChange={handleBulkStatusChange}
+  onDeselect={handleDeselectAll}
+/>
+
+<!-- Modal de exportación BagIt -->
+{#if showExportModal}
+  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="export-modal-card">
+      {#if isExporting}
+        <div class="spinner"></div>
+        <h3 class="export-modal-title">Generando BagIt...</h3>
+        <p class="export-modal-subtitle">Copiando imágenes y calculando checksums</p>
+      {:else if exportResult}
+        <span class="material-symbols-outlined icon-lg export-success-icon">check_circle</span>
+        <h3 class="export-modal-title">Exportación completada</h3>
+        <p class="export-modal-subtitle">{exportResult.zip_filename}</p>
+        <p class="export-modal-subtitle">{(exportResult.size_bytes / 1024 / 1024).toFixed(1)} MB</p>
+        <div class="export-modal-actions">
+          <a href={collectionsApi.getExportDownloadUrl(collectionId)} download class="btn-primary">
+            <span class="material-symbols-outlined icon-sm">download</span>
+            Descargar ZIP
+          </a>
+          <button class="btn-secondary" onclick={() => showExportModal = false}>Cerrar</button>
+        </div>
+      {:else if exportError}
+        <span class="material-symbols-outlined icon-lg export-error-icon">error</span>
+        <h3 class="export-modal-title">Error al exportar</h3>
+        <p class="export-modal-subtitle">{exportError}</p>
+        <div class="export-modal-actions">
+          <button class="btn-secondary" onclick={() => showExportModal = false}>Cerrar</button>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
+
 <style>
-  .page { padding: 28px 32px; max-width: 1200px; }
-
-  /* Header */
-  .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-
-  .page-title {
-    font-size: var(--text-h3);
-    font-weight: var(--fw-semibold);
-    color: var(--color-light-grey);
-    margin: 0 0 4px;
-  }
-
-  .page-title strong { color: var(--color-light); font-weight: var(--fw-extrabold); }
-
-  .breadcrumb-sep { margin: 0 8px; opacity: 0.5; }
-
-  .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
-
-  /* Botón digitalizar / revisar */
-  .btn-digitize {
-    display: inline-flex; align-items: center; gap: 8px;
-    background-color: var(--color-primary);
-    color: white;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
-    border: none;
-    border-radius: var(--radius-md);
-    padding: 9px 18px;
-    min-height: var(--touch-target-min);
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(90,140,98,0.25);
-    transition: background-color var(--transition-base);
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .btn-digitize:hover { background-color: var(--color-primary-hover); }
-
-  /* Botón volver */
-  .btn-back {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 7px 14px;
-    background: none;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    margin-bottom: 20px;
-    min-height: var(--touch-target-min);
-  }
-
-  .btn-back:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
-
-  /* Toolbar */
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-  }
-
-  .select-all-btn {
-    display: flex; align-items: center; gap: 8px;
-    background: none; border: none;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    padding: 4px 0;
-    transition: color var(--transition-fast);
-    white-space: nowrap;
-    min-height: 0;
-  }
-
-  .select-all-btn:hover { color: var(--color-light); }
-
-  /* Checkbox visual */
-  .checkbox {
-    width: 16px; height: 16px;
-    border-radius: 3px;
-    border: 1.5px solid var(--color-light-grey);
-    background-color: transparent;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    transition: all var(--transition-fast);
-  }
-
-  .checkbox.checked { background-color: var(--color-primary); border-color: var(--color-primary); }
-
-  .checkbox-btn {
-    background: none; border: none;
-    cursor: pointer; padding: 4px;
-    display: flex; align-items: center; justify-content: center;
-    min-height: 0;
-  }
-
-  .selection-info {
-    display: flex; align-items: center; gap: 10px;
-  }
-
-  .sep-line { color: var(--border-color); }
-  .selection-label { font-size: var(--text-sm); color: var(--color-light-grey); white-space: nowrap; }
-
-  /* Search */
-  .search-wrapper { position: relative; }
-
-  .search-icon {
-    position: absolute;
-    left: 10px; top: 50%;
-    transform: translateY(-50%);
-    color: var(--color-light-grey);
-    pointer-events: none;
-  }
-
-  .search-input {
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 7px 12px 7px 30px;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light);
-    outline: none;
-    transition: border-color var(--transition-base);
-    width: 200px;
-    min-height: var(--touch-target-min);
-  }
-
-  .search-input:focus { border-color: var(--color-primary); }
-  .search-input::placeholder { color: var(--color-light-grey); opacity: 0.5; }
-
-  .btn-ghost-sm {
-    display: flex; align-items: center; gap: 6px;
-    background: none;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 7px 12px;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    min-height: var(--touch-target-min);
-    white-space: nowrap;
-  }
-
-  .btn-ghost-sm:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
-
-  /* Loading / empty */
-  .loading-state, .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 60px 20px;
-    color: var(--color-light-grey);
-    font-size: var(--text-base);
-  }
-
-  .spinner {
-    width: 30px; height: 30px;
-    border: 3px solid var(--border-color);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── TABLA DE LISTA ── */
-  .list-table-wrapper {
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-  }
-
-  .list-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--text-sm);
-    text-align: left;
-  }
-
-  .list-table thead tr {
-    background-color: var(--color-surface-alt);
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  .list-table th {
-    padding: 11px 16px;
-    font-size: 11px;
-    font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-  }
-
-  .list-table th.text-right { text-align: right; }
-  .list-table th.col-check  { width: 40px; padding: 11px 8px; }
-
-  .list-table td {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-color);
-    vertical-align: middle;
-  }
-
-  .list-table td.col-check  { padding: 12px 8px; }
-  .list-table td.col-thumb  { padding: 8px 16px; width: 60px; }
-  .list-table tbody tr:last-child td { border-bottom: none; }
-
-  .list-row { transition: background-color var(--transition-fast); }
-  .list-row:hover { background-color: rgba(255,255,255,0.02); }
-  .list-row.selected { background-color: rgba(90,140,98,0.06); }
-
-  /* Thumbnail */
-  .thumb {
-    width: 48px; height: 48px;
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    background-color: var(--color-surface-alt);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .thumb-img { width: 100%; height: 100%; object-fit: cover; }
-  .thumb-placeholder { color: var(--color-light-grey); opacity: 0.3; }
-
-  /* Nombre */
-  .record-name {
-    font-weight: var(--fw-semibold);
-    color: var(--color-light);
-    font-size: var(--text-sm);
-  }
-
-  /* Meta celdas */
-  .meta-cell {
-    color: var(--color-light-grey);
-    font-size: 12px;
-    white-space: nowrap;
-  }
-
-  .date-cell {
-    white-space: nowrap;
-  }
-
-  .text-right { text-align: right; }
-
-  /* Acciones por fila */
-  .row-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 4px;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-  }
-
-  .list-row:hover .row-actions { opacity: 1; }
-
-  .action-icon {
-    width: 28px; height: 28px;
-    border-radius: var(--radius-sm);
-    background: none; border: none;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    min-height: 0;
-  }
-
-  .action-icon:hover { background-color: rgba(255,255,255,0.06); color: var(--color-light); }
 </style>

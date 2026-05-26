@@ -18,7 +18,7 @@
   // a un endpoint de notas cuando esté disponible.
   // ============================================================================
 
-  import type { Record } from '$lib/api';
+  import type { Record, RecordImage } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -31,7 +31,7 @@
     onRotateLeft,
     onRotateRight,
   }: {
-    viewMode: 'single' | 'spread' | 'grid';
+    viewMode: 'list' | 'spread' | 'grid';
     currentRecord: Record | null;
     currentIndex: number;
     totalRecords: number;
@@ -46,9 +46,18 @@
   // Tab activo del strip
   let activeTab = $state<'info' | 'edit' | 'comments'>('info');
 
-  // Si es false, el panel no expande (solo el strip)
-  // Solo aplica para viewMode !== 'single'
-  let isExpanded = $derived(viewMode === 'single');
+  // Panel oculto por defecto; el usuario lo abre pulsando un ícono del strip
+  let isExpanded = $state(false);
+
+  // Abre el panel en el tab indicado, o lo colapsa si ya estaba en ese tab
+  function toggleTab(tab: 'info' | 'edit' | 'comments') {
+    if (isExpanded && activeTab === tab) {
+      isExpanded = false;
+    } else {
+      activeTab = tab;
+      isExpanded = true;
+    }
+  }
 
   // Valores de sliders de Preview Controls (-100 a 100)
   let brightness = $state(0);
@@ -140,19 +149,42 @@
     return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   }
 
-  // Información de la imagen actual (mock — conectar con datos reales del record)
-  // Para mostrar datos reales, el backend debe devolver EXIF en RecordImage
-  let imageInfo = $derived(currentRecord ? {
-    name:       currentRecord.title || 'Sin nombre',
-    format:     currentRecord.images?.[0]?.format?.toUpperCase() || '—',
-    metadata:   `${currentRecord.images?.[0]?.resolution_width ?? '—'}×${currentRecord.images?.[0]?.resolution_height ?? '—'}`,
-    dimensions: currentRecord.images?.[0]?.resolution_width
-      ? `${currentRecord.images[0].resolution_width} × ${currentRecord.images[0].resolution_height}`
-      : '—',
-    size: currentRecord.images?.[0]?.file_size
-      ? `${(currentRecord.images[0].file_size / 1024 / 1024).toFixed(1)} MB`
-      : '—',
-  } : null);
+  // Formatea tamaño de archivo
+  function formatFileSize(bytes: number): string {
+    if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${bytes} B`;
+  }
+
+  // Formatea fecha/hora de captura
+  function formatDateTime(dateStr: string): string {
+    const d = new Date(dateStr);
+    return d.toLocaleString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  // Imágenes del registro ordenadas: left primero, right después
+  let sortedImages = $derived(
+    [...(currentRecord?.images ?? [])].sort((a, b) => {
+      const order = (r?: string | null) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
+      return order(a.role) - order(b.role) || a.id - b.id;
+    })
+  );
+
+  function roleLabel(img: RecordImage): string {
+    if (img.role === 'left')  return 'L';
+    if (img.role === 'right') return 'R';
+    return '·';
+  }
+
+  function roleName(img: RecordImage, i: number): string {
+    if (img.role === 'left')  return 'Imagen izquierda';
+    if (img.role === 'right') return 'Imagen derecha';
+    if (img.role === 'overview') return 'Vista general';
+    return `Imagen ${i + 1}`;
+  }
 </script>
 
 <!-- ============================================================
@@ -168,7 +200,7 @@
     <button
       class="strip-btn"
       class:active={activeTab === 'info' && isExpanded}
-      onclick={() => { activeTab = 'info'; }}
+      onclick={() => toggleTab('info')}
       aria-label="Image info"
       title="Image info"
     >
@@ -181,7 +213,7 @@
     <button
       class="strip-btn"
       class:active={activeTab === 'edit' && isExpanded}
-      onclick={() => { activeTab = 'edit'; }}
+      onclick={() => toggleTab('edit')}
       aria-label="Preview controls"
       title="Preview Controls"
     >
@@ -195,7 +227,7 @@
     <button
       class="strip-btn"
       class:active={activeTab === 'comments' && isExpanded}
-      onclick={() => { activeTab = 'comments'; }}
+      onclick={() => toggleTab('comments')}
       aria-label="Anotaciones"
       title="Anotaciones"
     >
@@ -214,29 +246,89 @@
         <div class="panel-section">
           <h3 class="panel-title">Image info</h3>
 
-          {#if imageInfo}
-            <div class="info-rows">
-              <div class="info-row"><span class="info-label">Name</span><span class="info-value">{imageInfo.name}</span></div>
-              <div class="info-row"><span class="info-label">Format</span><span class="info-value">{imageInfo.format}</span></div>
-              <div class="info-row"><span class="info-label">Metadata</span><span class="info-value">{imageInfo.metadata}</span></div>
-              <div class="info-row"><span class="info-label">Dimensions</span><span class="info-value">{imageInfo.dimensions}</span></div>
-              <div class="info-row"><span class="info-label">Size</span><span class="info-value">{imageInfo.size}</span></div>
-            </div>
-            <!-- Contador de posición -->
-            <div class="info-footer">
-              <span>{imageInfo.name}</span>
-              <span>{currentIndex}/{totalRecords}</span>
-            </div>
-          {:else}
-            <p class="empty-text">Selecciona una imagen</p>
-          {/if}
-        </div>
+            {#if currentRecord}
 
-      <!-- ══ TAB: PREVIEW CONTROLS ══ -->
-      {:else if activeTab === 'edit'}
-        <div class="panel-section">
-          <div class="preview-card">
-            <h3 class="panel-title">Preview Controls</h3>
+              <!-- Encabezado del registro -->
+              <div class="record-overview">
+                <span class="overview-name">{currentRecord.title || '—'}</span>
+                <span class="overview-pos">{currentIndex} / {totalRecords}</span>
+              </div>
+
+              {#if sortedImages.length === 0}
+                <p class="empty-text">Sin imágenes</p>
+
+              {:else}
+                {#each sortedImages as img, i}
+                  <div class="img-section" class:first={i === 0}>
+
+                    <!-- Cabecera de imagen -->
+                    <div class="img-section-header">
+                      <span class="role-pill" class:role-right={img.role === 'right'} class:role-single={img.role !== 'left' && img.role !== 'right'}>
+                        {roleLabel(img)}
+                      </span>
+                      <span class="img-section-title">{roleName(img, i)}</span>
+                    </div>
+
+                    <!-- Filas de datos -->
+                    <div class="info-rows">
+
+                      {#if img.format}
+                        <div class="info-row">
+                          <span class="info-label">Formato</span>
+                          <span class="info-value">{img.format.toUpperCase()}</span>
+                        </div>
+                      {/if}
+
+                      {#if img.resolution_width && img.resolution_height}
+                        <div class="info-row">
+                          <span class="info-label">Dimensiones</span>
+                          <span class="info-value">{img.resolution_width} × {img.resolution_height}</span>
+                        </div>
+                      {/if}
+
+                      {#if img.file_size}
+                        <div class="info-row">
+                          <span class="info-label">Tamaño</span>
+                          <span class="info-value">{formatFileSize(img.file_size)}</span>
+                        </div>
+                      {/if}
+
+                      {#if img.sequence != null}
+                        <div class="info-row">
+                          <span class="info-label">Secuencia</span>
+                          <span class="info-value">{img.sequence}</span>
+                        </div>
+                      {/if}
+
+                      {#if img.filename}
+                        <div class="info-row">
+                          <span class="info-label">Archivo</span>
+                          <span class="info-value filename-val" title={img.filename}>{img.filename}</span>
+                        </div>
+                      {/if}
+
+                      {#if img.created_at}
+                        <div class="info-row">
+                          <span class="info-label">Capturada</span>
+                          <span class="info-value">{formatDateTime(img.created_at)}</span>
+                        </div>
+                      {/if}
+
+                    </div>
+                  </div>
+                {/each}
+              {/if}
+
+            {:else}
+              <p class="empty-text">Selecciona un registro</p>
+            {/if}
+          </div>
+
+        <!-- ══ TAB: PREVIEW CONTROLS ══ -->
+        {:else if activeTab === 'edit'}
+          <div class="panel-section">
+            <div class="preview-card">
+              <h3 class="panel-title">Preview Controls</h3>
 
             <!-- Rotar -->
             <div class="control-group">
@@ -536,23 +628,97 @@
   .info-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
+    align-items: baseline;
+    padding: 7px 0;
     border-bottom: 1px solid var(--border-color);
+    gap: 8px;
   }
 
-  .info-label { font-size: 13px; color: var(--color-light-grey); }
-  .info-value { font-size: 13px; color: var(--color-light-grey); font-weight: var(--fw-medium); text-align: right; }
+  .info-label { font-size: 12px; color: var(--color-light-grey); flex-shrink: 0; }
+  .info-value { font-size: 12px; color: var(--color-light); font-weight: var(--fw-medium); text-align: right; }
 
-  .info-footer {
+  .filename-val {
+    word-break: break-all;
+    white-space: normal;
+    font-size: 11px;
+    max-width: 140px;
+  }
+
+  /* Record overview */
+  .record-overview {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    margin-top: 20px;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 8px;
   }
 
-  .info-footer span { font-size: var(--text-xs); color: var(--color-light-grey); opacity: 0.6; }
+  .overview-name {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-bold);
+    color: var(--color-light);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .overview-pos {
+    font-size: var(--text-xs);
+    color: var(--color-light-grey);
+    flex-shrink: 0;
+  }
+
+  /* Per-image section */
+  .img-section {
+    margin-bottom: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .img-section.first { border-top: none; padding-top: 0; }
+
+  .img-section-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 8px;
+  }
+
+  .img-section-title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-light-grey);
+  }
+
+  .role-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: var(--fw-bold);
+    flex-shrink: 0;
+    background: rgba(90, 140, 98, 0.2);
+    color: var(--color-primary);
+    border: 1px solid rgba(90, 140, 98, 0.35);
+  }
+
+  .role-pill.role-right {
+    background: rgba(192, 132, 252, 0.15);
+    color: #c084fc;
+    border-color: rgba(192, 132, 252, 0.3);
+  }
+
+  .role-pill.role-single {
+    background: rgba(147, 197, 253, 0.15);
+    color: #93c5fd;
+    border-color: rgba(147, 197, 253, 0.3);
+  }
 
   /* Preview card (edit + comments) */
   .preview-card {

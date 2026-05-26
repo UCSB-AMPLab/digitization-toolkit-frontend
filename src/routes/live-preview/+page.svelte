@@ -18,13 +18,14 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, recordsApi, type Record } from '$lib/api';
+  import { camerasApi, recordsApi, projectsApi, type Record, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
 
   import TopBar from './TopBar.svelte';
   import CameraControls from './CameraControls.svelte';
   import LiveViewport from './LiveViewport.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
+  import ImageViewerModal from './ImageViewerModal.svelte';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE URL
@@ -45,17 +46,24 @@
   // Modo de cámara: 'single' = una cámara | 'double' = dos cámaras (izq + der)
   let cameraMode = $state<'single' | 'double'>('double');
 
-  // Modo de control: 'manual' = ajustes manuales | 'automatic' = automático
-  let controlMode = $state<'manual' | 'automatic'>('manual');
+  // Dispositivos de cámara detectados (actualizados por CameraControls al montar)
+  let devices = $state<CameraDevice[]>([]);
+
 
   // Ajustes de cámara (solo activos en modo manual)
   let shutterSpeed = $state('1.6s');
   let iso = $state('200');
   let aperture = $state('13.0');
 
+  // Nombre real del proyecto (cargado desde la API al montar)
+  let projectName = $state<string>('');
+
   // Lista de registros/imágenes capturadas en esta colección
   let records = $state<Record[]>([]);
   let selectedRecordId = $state<number | null>(null);
+
+  // Registro inspeccionado en el modal de imagen (null = modal cerrado)
+  let inspectedRecord = $state<Record | null>(null);
 
   // Estado de carga general (al iniciar, al capturar, etc.)
   let isLoading = $state(false);
@@ -70,10 +78,22 @@
       return;
     }
 
-    // Cargar registros existentes de la colección
-    if (collectionId) {
-      await loadRecords();
+    // Cargar nombre del proyecto y registros en paralelo
+    const tasks: Promise<void>[] = [];
+
+    if (projectId) {
+      tasks.push(
+        projectsApi.get(projectId)
+          .then(p => { projectName = p.name; })
+          .catch(e => console.error('[LivePreview] Error cargando proyecto:', e))
+      );
     }
+
+    if (collectionId) {
+      tasks.push(loadRecords());
+    }
+
+    await Promise.all(tasks);
   });
 
   // ---------------------------------------------------------------------------
@@ -104,7 +124,7 @@
   function handleTabChange(tab: 'live' | 'gallery') {
     activeTab = tab;
     if (tab === 'gallery') {
-      goto(`/gallery/${collectionId}`);
+      goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
     }
   }
 
@@ -130,6 +150,43 @@
       goto('/');
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // HANDLER: Retoma de un registro desde el modal de imagen
+  // Elimina las imágenes existentes y vuelve a capturar para el mismo registro.
+  // ---------------------------------------------------------------------------
+  async function handleRetake(record: Record) {
+    // Cerrar modal y limpiar selección
+    inspectedRecord = null;
+
+    try {
+      // Eliminar las imágenes actuales del registro
+      for (const img of record.images ?? []) {
+        await recordsApi.deleteImage(img.id);
+      }
+
+      // Volver a capturar
+      if (cameraMode === 'double') {
+        await camerasApi.captureDual({
+          project_name: projectName,
+          collection_id: collectionId ?? undefined,
+          record_id: record.id,
+        });
+      } else {
+        await camerasApi.capture({
+          project_name: projectName,
+          camera_index: 0,
+          collection_id: collectionId ?? undefined,
+          record_id: record.id,
+        });
+      }
+    } catch (err) {
+      console.error('[LivePreview] Error en retoma:', err);
+    } finally {
+      // Actualizar lista de registros independientemente del resultado
+      await loadRecords();
+    }
+  }
 </script>
 
 <!-- ============================================================
@@ -150,15 +207,14 @@
     <!-- Panel izquierdo: controles de cámara -->
     <CameraControls
       {cameraMode}
-      {controlMode}
       {shutterSpeed}
       {iso}
       {aperture}
       onCameraModeChange={(m) => cameraMode = m}
-      onControlModeChange={(m) => controlMode = m}
       onShutterSpeedChange={(v) => shutterSpeed = v}
       onIsoChange={(v) => iso = v}
       onApertureChange={(v) => aperture = v}
+      onDevicesChange={(d) => devices = d}
     />
 
     <!-- Área central: viewport + tira de miniaturas -->
@@ -167,12 +223,13 @@
       <!-- Vista de cámara en vivo -->
       <LiveViewport
         {cameraMode}
-        {controlMode}
         {shutterSpeed}
         {iso}
         {aperture}
         {projectId}
+        {projectName}
         {collectionId}
+        {devices}
         onCaptureDone={handleCaptureDone}
       />
 
@@ -182,7 +239,7 @@
           {records}
           {selectedRecordId}
           {cameraMode}
-          onSelect={(id) => selectedRecordId = id}
+          onSelect={(record) => { selectedRecordId = record.id; inspectedRecord = record; }}
         />
       </div>
 
@@ -192,40 +249,12 @@
 
 </div>
 
-<style>
-  /* Pantalla completa, sin overflow, sin sidebar del dashboard */
-  .live-preview-wrapper {
-    display: flex;
-    flex-direction: column;
-    width: 100vw;
-    height: 100vh;
-    background-color: var(--color-bg);
-    overflow: hidden;
-    /* Sin scroll — la interfaz debe caber exactamente en la pantalla */
-  }
-
-  /* Fila horizontal: panel izquierdo + columna central */
-  .content-area {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-    position: relative;
-  }
-
-  /* Columna central: viewport (flex: 1) + tira fija de 140px */
-  .center-column {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 0;
-    background-color: var(--color-bg);
-  }
-
-  /* Área de miniaturas: altura fija para la tira */
-  .thumbnail-area {
-    height: 140px;
-    flex-shrink: 0;
-  }
-</style>
+<!-- ── Modal de inspección de imagen ── -->
+{#if inspectedRecord}
+  <ImageViewerModal
+    record={inspectedRecord}
+    {cameraMode}
+    onClose={() => inspectedRecord = null}
+    onRetake={handleRetake}
+  />
+{/if}

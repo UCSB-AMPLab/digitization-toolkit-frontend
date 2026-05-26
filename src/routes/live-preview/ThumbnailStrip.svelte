@@ -17,7 +17,7 @@
   //   pending    → reloj (por defecto)
   // ============================================================================
 
-  import { recordsApi, type Record } from '$lib/api';
+  import { recordsApi, type Record, type RecordImage } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -31,38 +31,58 @@
     records: Record[];
     selectedRecordId: number | null;
     cameraMode: 'single' | 'double';
-    onSelect: (id: number) => void;
+    onSelect: (record: Record) => void;
   } = $props();
 
   // ---------------------------------------------------------------------------
-  // FUNCIÓN: obtener URL del thumbnail de la primera imagen del registro
-  // Si el registro no tiene imágenes, devuelve null
+  // TIPO: item individual de la tira
+  // En modo 'single' → un item por registro (primera imagen)
+  // En modo 'double' → un item por imagen dentro de cada registro
   // ---------------------------------------------------------------------------
-  function getThumbnailUrl(record: Record): string | null {
-    if (!record.images || record.images.length === 0) return null;
-    return recordsApi.getImageThumbnailUrl(record.images[0].id);
+  interface ThumbItem {
+    record: Record;
+    image: RecordImage | null;
+    role: 'L' | 'R' | null;
+    thumbnailUrl: string | null;
   }
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: obtener el rol (L/R) de la primera imagen de un registro
-  // Basado en el campo 'role' de la imagen: 'left' | 'right' | 'single'
-  // ---------------------------------------------------------------------------
-  function getImageRole(record: Record): 'L' | 'R' | null {
-    if (!record.images || record.images.length === 0) return null;
-    const role = record.images[0].role;
-    if (role === 'left') return 'L';
-    if (role === 'right') return 'R';
+  function imageRole(img: RecordImage | null): 'L' | 'R' | null {
+    if (!img) return null;
+    if (img.role === 'left')  return 'L';
+    if (img.role === 'right') return 'R';
     return null;
   }
 
+  function thumbnailUrl(img: RecordImage | null): string | null {
+    if (!img) return null;
+    return recordsApi.getImageThumbnailUrl(img.id);
+  }
+
   // ---------------------------------------------------------------------------
-  // DERIVADO: registros filtrados según cameraMode
-  // En modo 'single' solo se muestran los registros de la cámara izquierda
+  // DERIVADO: lista plana de items para la tira
   // ---------------------------------------------------------------------------
-  let visibleRecords = $derived(
-    cameraMode === 'single'
-      ? records.filter((_, i) => i % 2 === 0)
-      : records
+  let thumbItems = $derived(
+    cameraMode === 'double'
+      ? [...records].reverse().flatMap((record): ThumbItem[] => {
+          if (!record.images || record.images.length === 0) {
+            return [{ record, image: null, role: null, thumbnailUrl: null }];
+          }
+          // Sort: left before right, then by id for stability
+          const sorted = [...record.images].sort((a, b) => {
+            const order = (r?: string) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
+            return order(a.role) - order(b.role) || a.id - b.id;
+          });
+          return sorted.map((img): ThumbItem => ({
+            record,
+            image: img,
+            role: imageRole(img),
+            thumbnailUrl: thumbnailUrl(img),
+          }));
+        })
+      : [...records].reverse().map((record): ThumbItem => {
+          const img = record.images?.[0] ?? null;
+          return { record, image: img, role: imageRole(img), thumbnailUrl: thumbnailUrl(img) };
+        })
   );
 </script>
 
@@ -72,7 +92,7 @@
 <div class="thumbnail-strip">
   <div class="strip-scroll">
 
-    {#if visibleRecords.length === 0}
+    {#if thumbItems.length === 0}
       <!-- Estado vacío: no hay capturas aún -->
       <div class="empty-state">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -83,15 +103,13 @@
       </div>
     {:else}
       <!-- Lista de miniaturas -->
-      {#each visibleRecords as record, i}
-        {@const thumbnailUrl = getThumbnailUrl(record)}
-        {@const role = getImageRole(record)}
-        {@const isSelected = record.id === selectedRecordId}
+      {#each thumbItems as item, i}
+        {@const isSelected = item.record.id === selectedRecordId}
 
         <button
           class="thumbnail-item"
           class:selected={isSelected}
-          onclick={() => onSelect(record.id)}
+          onclick={() => onSelect(item.record)}
         >
 
           <!-- Contenedor de imagen -->
@@ -100,11 +118,11 @@
             class:selected={isSelected}
             class:alt-bg={i % 2 !== 0}
           >
-            {#if thumbnailUrl}
+            {#if item.thumbnailUrl}
               <!-- Imagen real del registro -->
               <img
-                src={thumbnailUrl}
-                alt={record.title}
+                src={item.thumbnailUrl}
+                alt={item.record.title}
                 class="thumb-img"
                 onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
@@ -118,17 +136,17 @@
             {/if}
 
             <!-- Badge L/R en modo doble cámara -->
-            {#if cameraMode === 'double' && role}
-              <div class="thumb-badge" class:right={role === 'R'}>
-                {role}
+            {#if cameraMode === 'double' && item.role}
+              <div class="thumb-badge" class:right={item.role === 'R'}>
+                {item.role}
               </div>
             {/if}
           </div><!-- /thumb-image-wrapper -->
 
           <!-- Info del registro: nombre + estado -->
           <div class="thumb-info">
-            <span class="thumb-name" title={record.title}>
-              {record.title || `Cap. ${String(i + 1).padStart(3, '0')}`}
+            <span class="thumb-name" title={item.record.title}>
+              {item.record.title || `Cap. ${String(i + 1).padStart(3, '0')}`}
             </span>
             <!-- Estado de la imagen (siempre pending para capturas nuevas) -->
             <!-- Para actualizar el estado, el backend debe devolver un campo status -->
