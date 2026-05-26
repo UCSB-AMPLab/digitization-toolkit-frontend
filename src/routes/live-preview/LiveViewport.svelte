@@ -33,45 +33,54 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
-  import { camerasApi, type DualCaptureRequest } from '$lib/api';
+  import { camerasApi, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
+  import { wbSamplingStore } from '$lib/stores/wbSampling';
+  import { histogramStore, computeHistogram } from '$lib/stores/histogram';
 
   // ---------------------------------------------------------------------------
   // PROPS
   // ---------------------------------------------------------------------------
   let {
     cameraMode,
-    controlMode,
     shutterSpeed,
     iso,
     aperture,
     projectId,
+    projectName,
     collectionId,
     onCaptureDone,
+    devices = [],
   }: {
     cameraMode: 'single' | 'double';
-    controlMode: 'manual' | 'automatic';
     shutterSpeed: string;
     iso: string;
     aperture: string;
     projectId: number;
+    projectName: string;
     collectionId: number;
     onCaptureDone: () => void;
+    devices?: CameraDevice[];
   } = $props();
 
   // ---------------------------------------------------------------------------
   // ESTADO LOCAL: Viewport
   // ---------------------------------------------------------------------------
 
-  let zoom = $state(1);          // Zoom del viewport (1 = 100%)
+  let zoom = $state(1);          // Zoom del viewport CSS (1 = 100%)
   let guideV = $state(50);       // Guía vertical (% desde izquierda)
   let guideH = $state(50);       // Guía horizontal (% desde arriba)
   let dragging = $state<'v' | 'h' | null>(null);
 
+  // Orientación de cámaras: swapped=true → cámara 1 a la izquierda, 0 a la derecha
+  let swapped = $state(false);
+  let leftIdx  = $derived(swapped ? 1 : 0);
+  let rightIdx = $derived(swapped ? 0 : 1);
+
   // Configuración de la grilla
-  let gridRows = $state(3);
-  let gridCols = $state(3);
-  let showGrid = $state(true);
+  let gridRows = 3;
+  let gridCols = 3;
+  let showGrid = $state(false);
   let showGuides = $state(true);
   let showGridModal = $state(false);
 
@@ -106,6 +115,55 @@
   // Se actualizan con cada ciclo de polling.
   let previewUrls = $state<Record<number, string>>({});
 
+  // References to the live preview <img> elements for pixel sampling.
+  let imgEl0: HTMLImageElement | null = $state(null);
+  let imgEl1: HTMLImageElement | null = $state(null);
+
+  // ---------------------------------------------------------------------------
+  // WB SAMPLING — click-to-neutralize
+  // Reads a 3×3 pixel block from the blob-URL preview image via an offscreen
+  // canvas (same-origin: no CORS issue with blob URLs).
+  // ---------------------------------------------------------------------------
+  function samplePixel(imgEl: HTMLImageElement, event: MouseEvent): [number, number, number] | null {
+    if (!imgEl || !imgEl.naturalWidth) return null;
+    const rect = imgEl.getBoundingClientRect();
+    const cx = Math.round(((event.clientX - rect.left) / rect.width) * imgEl.naturalWidth);
+    const cy = Math.round(((event.clientY - rect.top) / rect.height) * imgEl.naturalHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = imgEl.naturalWidth;
+    canvas.height = imgEl.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(imgEl, 0, 0);
+    // Average a 3×3 block for robustness against noise
+    const x0 = Math.max(0, cx - 1);
+    const y0 = Math.max(0, cy - 1);
+    const w = Math.min(3, imgEl.naturalWidth - x0);
+    const h = Math.min(3, imgEl.naturalHeight - y0);
+    const data = ctx.getImageData(x0, y0, w, h).data;
+    let r = 0, g = 0, b = 0;
+    const count = w * h;
+    for (let i = 0; i < count; i++) {
+      r += data[i * 4];
+      g += data[i * 4 + 1];
+      b += data[i * 4 + 2];
+    }
+    return [Math.round(r / count), Math.round(g / count), Math.round(b / count)];
+  }
+
+  function handleWbSampleClick(cameraIndex: number, event: MouseEvent) {
+    const sampling = $wbSamplingStore;
+    if (!sampling.active || sampling.cameraIndex !== cameraIndex) return;
+    const imgEl = cameraIndex === 0 ? imgEl0 : imgEl1;
+    if (!imgEl) return;
+    const pixel = samplePixel(imgEl, event);
+    if (pixel) {
+      sampling.onSample?.(pixel[0], pixel[1], pixel[2]);
+    }
+    // Deactivate regardless so we don't get stuck
+    wbSamplingStore.set({ active: false, cameraIndex: 0, onSample: null });
+  }
+
   // Handle del intervalo de polling (null cuando está pausado)
   let previewInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -115,6 +173,10 @@
 
   // Indica si ya hay un fetch en curso para evitar requests solapados
   let fetchingPreview: Record<number, boolean> = { 0: false, 1: false };
+
+  // Contador de errores consecutivos de preview — muestra banner tras 3 fallos
+  let previewErrorCount = $state(0);
+  let previewConnectError = $derived(previewErrorCount >= 3);
 
   // ── Helper: URL base de la API ─────────────────────────────────────────────
   function getApiBase(): string {
@@ -154,10 +216,15 @@
         }
 
         previewUrls = { ...previewUrls, [cameraIndex]: newUrl };
+        previewErrorCount = 0;  // reset on success
+      } else if (response.status !== 404) {
+        // 404 = cámara no conectada → falla silencioso
+        // Otros errores (500, etc.) cuentan para el banner
+        previewErrorCount += 1;
       }
-      // Si response no es ok (ej: 404 = cámara no conectada), falla silencioso
     } catch {
-      // Error de red — falla silencioso, el placeholder "Sin señal" permanece
+      // Error de red — cuenta para el banner de reconexión
+      previewErrorCount += 1;
     } finally {
       fetchingPreview[cameraIndex] = false;
     }
@@ -201,7 +268,10 @@
 
   // ── Ciclo de vida ──────────────────────────────────────────────────────────
   onMount(() => {
-    startPreviewPolling();
+    // Solo registrar el listener de visibilidad aquí.
+    // startPreviewPolling() se llama desde el $effect de abajo,
+    // que ya corre en el montaje inicial. Tenerlo en ambos lanzaba
+    // dos ciclos de polling al montar el componente.
     if (browser) {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
@@ -233,7 +303,8 @@
   // ===========================================================================
 
   // ---------------------------------------------------------------------------
-  // ZOOM
+  // ZOOM (CSS transform del wrapper — ajuste visual del viewport, no afecta la cámara)
+  // Para zoom de cámara (ScalerCrop) usa el slider de Zoom en CameraControls.
   // ---------------------------------------------------------------------------
   function zoomIn()    { zoom = Math.min(zoom + 0.2, 3); }
   function zoomOut()   { zoom = Math.max(zoom - 0.2, 0.5); }
@@ -266,15 +337,21 @@
     setTimeout(() => { captureFlash = false; }, 150);
 
     try {
-      const payload: DualCaptureRequest = {
-        project_name: `project_${projectId}`,
+      const payload = {
+        project_name: projectName || `project_${projectId}`,
+        collection_id: collectionId || undefined,
         record_title: `Captura ${new Date().toISOString().slice(0,19)}`,
       };
 
+      let result;
       if (cameraMode === 'double') {
-        await camerasApi.captureDual(payload);
+        result = await camerasApi.captureDual({ ...payload, left_camera_index: leftIdx });
       } else {
-        await camerasApi.capture({ ...payload, camera_index: 0 });
+        result = await camerasApi.capture({ ...payload, camera_index: 0 });
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Capture failed');
       }
 
       cameraStatus.reportSuccess();
@@ -292,7 +369,14 @@
   // ---------------------------------------------------------------------------
   // MODAL DE GRILLA
   // ---------------------------------------------------------------------------
-  function applyGrid() { showGridModal = false; }
+
+  // ---------------------------------------------------------------------------
+  // HELPER: etiqueta de cámara con índice
+  // ---------------------------------------------------------------------------
+  function cameraLabel(idx: number): string {
+    const dev = devices.find(d => d.index === idx);
+    return `${dev?.label || dev?.model || 'Camera'} [${idx}]`;
+  }
 </script>
 
 <!-- ============================================================
@@ -313,6 +397,16 @@
       onmouseup={stopDrag}
       onmouseleave={stopDrag}
     >
+
+      <!-- Banner: reconectando tras errores consecutivos de preview -->
+      {#if previewConnectError}
+        <div class="reconnect-banner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+          Reconectando con la cámara…
+        </div>
+      {/if}
 
       <!-- ══════════════════════════════════════════════════════
            STREAM DE CÁMARA
@@ -344,15 +438,27 @@
            ══════════════════════════════════════════════════════ -->
       <div class="camera-feeds-wrapper" style="transform: scale({zoom * 0.85})">
 
-        <!-- Cámara izquierda (index 0) — siempre visible -->
+        <!-- Cámara izquierda (leftIdx) — siempre visible -->
         <div class="camera-feed">
-          {#if previewUrls[0]}
+          {#if previewUrls[leftIdx]}
             <!-- Frame en vivo del polling — se actualiza cada PREVIEW_INTERVAL_MS -->
             <img
-              src={previewUrls[0]}
+              bind:this={imgEl0}
+              src={previewUrls[leftIdx]}
               alt="Camera izquierda"
               class="feed-img"
+              onload={() => { if (imgEl0) histogramStore.update(s => ({ ...s, [leftIdx]: computeHistogram(imgEl0!) })); }}
             />
+            <!-- WB sampling overlay: visible only when picker is active for this camera -->
+            {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === leftIdx}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="wb-sample-overlay"
+                onclick={(e) => handleWbSampleClick(leftIdx, e)}
+                title="Haz clic en un área blanca o gris neutro"
+              ></div>
+            {/if}
           {:else}
             <!-- Placeholder: sin señal o esperando primer frame -->
             <div class="no-stream">
@@ -365,19 +471,30 @@
             </div>
           {/if}
           <!-- Badge identificador de cámara -->
-          <div class="feed-label">L</div>
+          <div class="feed-label">{cameraLabel(leftIdx)}</div>
         </div>
 
-        <!-- Cámara derecha (index 1) — solo en modo double -->
+        <!-- Cámara derecha (rightIdx) — solo en modo double -->
         {#if cameraMode === 'double'}
           <div class="camera-feed">
-            {#if previewUrls[1]}
+            {#if previewUrls[rightIdx]}
               <!-- Frame en vivo del polling -->
               <img
-                src={previewUrls[1]}
+                bind:this={imgEl1}
+                src={previewUrls[rightIdx]}
                 alt="Camera derecha"
                 class="feed-img"
+                onload={() => { if (imgEl1) histogramStore.update(s => ({ ...s, [rightIdx]: computeHistogram(imgEl1!) })); }}
               />
+              {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === rightIdx}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  class="wb-sample-overlay"
+                  onclick={(e) => handleWbSampleClick(rightIdx, e)}
+                  title="Haz clic en un área blanca o gris neutro"
+                ></div>
+              {/if}
             {:else}
               <!-- Placeholder: sin señal o esperando primer frame -->
               <div class="no-stream">
@@ -390,7 +507,7 @@
               </div>
             {/if}
             <!-- Badge identificador de cámara -->
-            <div class="feed-label right">R</div>
+            <div class="feed-label right">{cameraLabel(rightIdx)}</div>
           </div>
         {/if}
 
@@ -421,16 +538,12 @@
 
       <!-- ── BARRA DE METADATOS ── -->
       <div class="metadata-bar">
-        {#if controlMode === 'manual'}
-          <div class="metadata-values">
-            <span>ISO {iso}</span>
-            <span>{shutterSpeed}</span>
-            <span>f/{aperture}</span>
-            <span>50mm</span>
-          </div>
-        {:else}
-          <span class="metadata-auto">AUTO</span>
-        {/if}
+        <div class="metadata-values">
+          <span>ISO {iso}</span>
+          <span>{shutterSpeed}</span>
+          <span>f/{aperture}</span>
+          <span>50mm</span>
+        </div>
       </div>
 
     </div><!-- /camera-viewport -->
@@ -461,6 +574,18 @@
           <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
         </svg>
       </button>
+      {#if cameraMode === 'double'}
+        <div class="float-divider"></div>
+        <button
+          class="float-btn"
+          class:float-btn-active={swapped}
+          onclick={() => swapped = !swapped}
+          aria-label="Cambiar orientación de cámaras"
+          title={swapped ? 'Orientación invertida (camára 1 = izquierda)' : 'Orientación normal (cámara 0 = izquierda)'}
+        >
+          <span class="material-symbols-outlined" style="font-size:18px">sync</span>
+        </button>
+      {/if}
     </div>
 
     <!-- ── BOTÓN DE CAPTURA ── -->
@@ -489,27 +614,13 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) showGridModal = false; }}>
     <div class="modal-card">
-      <h3 class="modal-title">Configuración de Cuadrícula</h3>
-      <p class="modal-subtitle">Ajusta el grid de captura y las líneas de guía.</p>
+      <h3 class="modal-title">Cuadrícula y Guías</h3>
+      <p class="modal-subtitle">Activa las ayudas visuales de encuadre.</p>
       <div class="modal-body">
-        <div class="modal-field">
-          <label class="modal-label">Filas</label>
-          <div class="slider-with-value">
-            <input type="range" min="1" max="6" bind:value={gridRows} class="modal-range" />
-            <div class="range-value">{gridRows}</div>
-          </div>
-        </div>
-        <div class="modal-field">
-          <label class="modal-label">Columnas</label>
-          <div class="slider-with-value">
-            <input type="range" min="1" max="6" bind:value={gridCols} class="modal-range" />
-            <div class="range-value">{gridCols}</div>
-          </div>
-        </div>
         <div class="modal-toggle-row">
           <div>
             <p class="modal-toggle-title">Cuadrícula</p>
-            <p class="modal-toggle-sub">Mostrar grid de captura</p>
+            <p class="modal-toggle-sub">Mostrar grid 3×3 de captura</p>
           </div>
           <button class="toggle-btn" class:on={showGrid} onclick={() => showGrid = !showGrid}>
             <div class="toggle-thumb" class:on={showGrid}></div>
@@ -526,8 +637,7 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => showGridModal = false}>Cancelar</button>
-        <button class="modal-btn confirm" onclick={applyGrid}>Aplicar</button>
+        <button class="modal-btn confirm" onclick={() => showGridModal = false}>Cerrar</button>
       </div>
     </div>
   </div>
@@ -555,6 +665,31 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-sm);
+  }
+
+  /* Banner de reconexión */
+  .reconnect-banner {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: rgba(220, 80, 60, 0.88);
+    color: #fff;
+    font-size: 0.75rem;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    animation: pulse-opacity 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-opacity {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.6; }
   }
 
   /* ── Viewport negro interno ── */
@@ -713,7 +848,7 @@
   /* ── Panel flotante ── */
   .floating-controls {
     position: absolute;
-    top: 24px; right: 24px;
+    top: 75px; right: 1px;
     z-index: 40;
     background-color: rgba(26,24,21,0.9);
     backdrop-filter: blur(4px);
@@ -740,16 +875,17 @@
   }
 
   .float-btn:hover { color: var(--color-primary); background-color: rgba(255,255,255,0.05); }
+  .float-btn-active { color: var(--color-primary); }
+  .float-btn-active:hover { color: var(--color-primary); }
 
   .float-divider { width: 32px; height: 1px; background-color: var(--border-color); }
 
   /* ── Botón de captura ── */
   .capture-btn-wrapper {
     position: absolute;
-    right: 22px;
-    top: 50%;
-    transform: translateY(-50%);
-    margin-top: 80px;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 50;
   }
 

@@ -6,8 +6,8 @@
   // Tabla de proyectos con:
   //   - Búsqueda por nombre/código
   //   - Filtros (dropdown)
-  //   - Botón "+ Nuevo Proyecto" → abre el modal wizard de 3 pasos
-  //   - Tabla: Proyecto, Estado, Progreso, Equipo, Fecha Inicio, Acciones
+  //   - Botón "+ Nuevo Proyecto" → abre el modal de creación
+  //   - Tabla: Proyecto, Progreso, Equipo, Fecha Inicio, Acciones
   //   - Click en fila → navega a /shared/projects/{id}
   //
   // Modal "Crear Nuevo Proyecto" — 3 pasos:
@@ -19,7 +19,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { projectsApi, type Project } from '$lib/api';
+  import { projectsApi, collectionsApi, recordsApi, type Project } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Lista de proyectos
@@ -38,40 +38,55 @@
       : projects
   );
 
-  // ¿El usuario puede crear proyectos?
-  // Solo admin puede crear proyectos
-  let canCreate = $derived($authStore.user?.role === 'admin');
+  // ¿El usuario puede crear proyectos? (admin y operator)
+  let canCreate = $derived(
+    $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
+  );
 
   // ---------------------------------------------------------------------------
-  // ESTADO: Modal de crear proyecto (wizard 3 pasos)
+  // ESTADO: Modal de crear proyecto (formulario simplificado)
   // ---------------------------------------------------------------------------
   let showCreateModal = $state(false);
-  let wizardStep      = $state(1); // 1, 2 o 3
 
-
-  // Datos del formulario — paso 1: información
-  let formName      = $state('');
-  let formDesc      = $state('');
-  let formLocation  = $state('');
-  let formQuantity  = $state(0);
-  let formDate      = $state('');
-  let formPriority  = $state('');
-
-  // Datos del formulario — paso 2: configuración
-  let formDpi       = $state<300 | 600 | 1200>(300);
-  let formFormat    = $state<'TIFF' | 'JPEG' | 'PNG'>('TIFF');
-  let formColorMode = $state('');
-
-  // Datos del formulario — paso 3: equipo
-  let formOperator  = $state('');
-  let formReviewer  = $state('');
+  // Campos del formulario
+  let formName       = $state('');
+  let formDesc       = $state('');
+  let formFondo      = $state('');
+  let formSerie      = $state('');
+  let formSignatura  = $state('');
 
   let isCreating  = $state(false);
-  // Mensaje de error visible en el modal (vacio = sin error)
   let createError = $state('');
 
+  // Proyecto siendo editado (null = modo creación)
+  let editingProject = $state<Project | null>(null);
+
+  // Menú de acciones abierto (id del proyecto)
+  let openMenuId = $state<number | null>(null);
+
   // ---------------------------------------------------------------------------
-  // AL MONTAR: carga proyectos
+  // ESTADO: Modal de eliminación con opción de mover colecciones
+  // ---------------------------------------------------------------------------
+  let showDeleteModal      = $state(false);
+  let deletingProject      = $state<Project | null>(null);
+  let deleteCollectionCount = $state(0);
+  let deleteImageCount     = $state(0);
+  let deleteMoveTarget     = $state<number | ''>('');
+  let isDeleting           = $state(false);
+  let deleteError          = $state('');
+  let isLoadingDeleteInfo  = $state(false);
+
+  // Cierra el menú al hacer click fuera
+  $effect(() => {
+    if (openMenuId !== null) {
+      const close = () => { openMenuId = null; };
+      document.addEventListener('click', close, { once: true });
+      return () => document.removeEventListener('click', close);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // AL MONTAR: carga proyectos y usuarios operarios
   // ---------------------------------------------------------------------------
   onMount(async () => {
     await loadProjects();
@@ -91,9 +106,6 @@
 
   // ---------------------------------------------------------------------------
   // CREAR PROYECTO
-  // En modo demo (token = demo-token): simula localmente sin llamar al backend
-  // En produccion: llama a projectsApi.create()
-  // Si hay error: lo muestra al usuario en el modal
   // ---------------------------------------------------------------------------
   async function handleCreateProject() {
     if (!formName.trim()) return;
@@ -101,51 +113,43 @@
     createError = '';
 
     try {
-      const isDemoToken = $authStore.token === 'demo-token';
-
-      if (isDemoToken) {
-        // Modo demo: agregar localmente sin backend
-        const mockProject = {
-          id: Date.now(),
+      if (editingProject) {
+        await projectsApi.update(editingProject.id, {
           name: formName.trim(),
           description: formDesc.trim() || undefined,
-          created_at: new Date().toISOString(),
-          created_by: $authStore.user?.username,
-        } as any;
-        projects = [...projects, mockProject];
+          fondo: formFondo.trim() || undefined,
+          serie: formSerie.trim() || undefined,
+          signatura: formSignatura.trim() || undefined,
+        });
       } else {
-        // Modo real: llamada al backend
         await projectsApi.create({
           name: formName.trim(),
           description: formDesc.trim() || undefined,
+          fondo: formFondo.trim() || undefined,
+          serie: formSerie.trim() || undefined,
+          signatura: formSignatura.trim() || undefined,
           created_by: $authStore.user?.username,
         });
-        await loadProjects();
       }
-
+      await loadProjects();
       showCreateModal = false;
       resetForm();
-
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       createError = `No se pudo crear el proyecto: ${msg}`;
-      console.error('[Projects] Error creando:', err);
     } finally {
       isCreating = false;
     }
   }
 
   function resetForm() {
-    formName = ''; formDesc = ''; formLocation = '';
-    formQuantity = 0; formDate = ''; formPriority = '';
-    formDpi = 300; formFormat = 'TIFF'; formColorMode = '';
-    formOperator = ''; formReviewer = '';
-    wizardStep = 1;
+    formName = ''; formDesc = '';
+    formFondo = ''; formSerie = ''; formSignatura = '';
+    createError = ''; editingProject = null;
   }
 
   function closeModal() {
     showCreateModal = false;
-    createError = '';
     resetForm();
   }
 
@@ -154,6 +158,76 @@
   // ---------------------------------------------------------------------------
   function handleProjectClick(id: number) {
     goto(`/dashboard/projects/${id}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // ACCIONES DE FILA
+  // ---------------------------------------------------------------------------
+  function openMenu(e: MouseEvent, id: number) {
+    e.stopPropagation();
+    openMenuId = openMenuId === id ? null : id;
+  }
+
+  function startEdit(e: MouseEvent, project: Project) {
+    e.stopPropagation();
+    openMenuId = null;
+    editingProject = project;
+    formName       = project.name;
+    formDesc       = project.description ?? '';
+    formFondo      = project.fondo ?? '';
+    formSerie      = project.serie ?? '';
+    formSignatura  = project.signatura ?? '';
+    showCreateModal = true;
+  }
+
+  async function openDeleteModal(e: MouseEvent, project: Project) {
+    e.stopPropagation();
+    openMenuId = null;
+    deletingProject = project;
+    deleteMoveTarget = '';
+    deleteError = '';
+    deleteCollectionCount = 0;
+    deleteImageCount = 0;
+    showDeleteModal = true;
+    isLoadingDeleteInfo = true;
+    try {
+      const [cols, imgs] = await Promise.all([
+        collectionsApi.list({ project_id: project.id }),
+        recordsApi.count({ project_id: project.id }),
+      ]);
+      deleteCollectionCount = cols.length;
+      deleteImageCount = imgs;
+    } catch (err) {
+      console.error('[Projects] Error obteniendo info del proyecto:', err);
+    } finally {
+      isLoadingDeleteInfo = false;
+    }
+  }
+
+  function closeDeleteModal() {
+    showDeleteModal = false;
+    deletingProject = null;
+    deleteMoveTarget = '';
+    deleteError = '';
+    isDeleting = false;
+  }
+
+  async function executeDelete() {
+    if (!deletingProject) return;
+    isDeleting = true;
+    deleteError = '';
+    try {
+      if (deleteMoveTarget !== '') {
+        await projectsApi.moveCollections(deletingProject.id, deleteMoveTarget as number);
+      }
+      await projectsApi.delete(deletingProject.id);
+      await loadProjects();
+      closeDeleteModal();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      deleteError = `No se pudo eliminar el proyecto: ${msg}`;
+      isDeleting = false;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -171,13 +245,7 @@
   }
 
   // Progreso simulado (conectar con backend cuando esté disponible)
-  const mockProgress = [45, 12, 89, 60, 100];
   const mockStatuses = ['En Progreso', 'Iniciado', 'Revisión', 'Pausado', 'Completado'];
-  const mockTeams = [['MG','JL'], ['PM'], ['AR','JL'], ['MG','PM'], ['AR']];
-
-  // Avanzar / retroceder wizard
-  function nextStep() { if (wizardStep < 3) wizardStep++; }
-  function prevStep() { if (wizardStep > 1) wizardStep--; }
 </script>
 
 <!-- ============================================================
@@ -189,7 +257,7 @@
   <div class="page-header">
     <div>
       <h1 class="page-title">Gestión de Proyectos</h1>
-      <p class="page-subtitle">Administra los expedientes y asignaciones</p>
+      <p class="page-subtitle">Fondos, series, secciones</p>
     </div>
     <!-- Botón "Nuevo Proyecto" solo visible cuando ya hay proyectos -->
     {#if canCreate && projects.length > 0}
@@ -245,18 +313,15 @@
         <thead>
           <tr>
             <th>Proyecto</th>
+            <th>Referencia</th>
             <th>Estado</th>
-            <th>Progreso</th>
-            <th>Equipo</th>
             <th>Fecha Inicio</th>
             <th class="text-right">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {#each filteredProjects as project, i}
-            {@const progress = mockProgress[i % mockProgress.length]}
-            {@const status   = mockStatuses[i % mockStatuses.length]}
-            {@const team     = mockTeams[i % mockTeams.length]}
+            {@const status = mockStatuses[i % mockStatuses.length]}
 
             <tr onclick={() => handleProjectClick(project.id)} class="table-row">
               <!-- Proyecto -->
@@ -269,40 +334,29 @@
                   </div>
                   <div>
                     <p class="project-name">{project.name}</p>
-                    <p class="project-code">{project.description?.slice(0, 20) ?? '—'}</p>
+                    <p class="project-code">{project.description?.slice(0, 30) ?? '—'}</p>
                   </div>
                 </div>
+              </td>
+
+              <!-- Referencia archivística -->
+              <td>
+                {#if project.signatura}
+                  <span class="signatura-badge">{project.signatura}</span>
+                {:else if project.fondo || project.serie}
+                  <div class="breadcrumb-cell">
+                    {#if project.fondo}<span class="breadcrumb-part">{project.fondo}</span>{/if}
+                    {#if project.fondo && project.serie}<span class="breadcrumb-sep">›</span>{/if}
+                    {#if project.serie}<span class="breadcrumb-part">{project.serie}</span>{/if}
+                  </div>
+                {:else}
+                  <span class="text-muted">—</span>
+                {/if}
               </td>
 
               <!-- Estado -->
               <td>
                 <span class="status-badge" style={getStatusStyle(status)}>{status}</span>
-              </td>
-
-              <!-- Progreso -->
-              <td>
-                <div class="progress-cell">
-                  <span class="progress-pct">{progress}%</span>
-                  <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" style="width:{progress}%"></div>
-                  </div>
-                </div>
-              </td>
-
-              <!-- Equipo -->
-              <td>
-                <div class="team-cell">
-                  {#each team as member}
-                    <div class="team-avatar">{member}</div>
-                  {/each}
-                  {#if canCreate}
-                    <div class="team-add">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                      </svg>
-                    </div>
-                  {/if}
-                </div>
               </td>
 
               <!-- Fecha -->
@@ -316,19 +370,29 @@
                 </div>
               </td>
 
-              <!-- Acciones: botón Ver que navega al detalle del proyecto -->
+              <!-- Acciones -->
               <td class="text-right">
-                <button
-                  class="btn-ver"
-                  onclick={(e) => { e.stopPropagation(); handleProjectClick(project.id); }}
-                  title="Ver proyecto"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                  Ver
-                </button>
+                <div class="action-menu-wrap">
+                  <button
+                    class="btn-menu"
+                    onclick={(e) => openMenu(e, project.id)}
+                    title="Acciones"
+                  >
+                    <span class="material-symbols-outlined icon-sm">more_vert</span>
+                  </button>
+                  {#if openMenuId === project.id}
+                    <div class="action-menu">
+                      <button class="action-item" onclick={(e) => startEdit(e, project)}>
+                        <span class="material-symbols-outlined icon-sm">edit</span>
+                        Editar
+                      </button>
+                      <button class="action-item action-item-danger" onclick={(e) => openDeleteModal(e, project)}>
+                        <span class="material-symbols-outlined icon-sm">delete</span>
+                        Eliminar
+                      </button>
+                    </div>
+                  {/if}
+                </div>
               </td>
             </tr>
           {/each}
@@ -340,7 +404,7 @@
 </div>
 
 <!-- ============================================================
-     MODAL: Crear Nuevo Proyecto (wizard 3 pasos)
+     MODAL: Crear Nuevo Proyecto
      ============================================================ -->
 {#if showCreateModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -348,11 +412,10 @@
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal(); }}>
     <div class="modal-card">
 
-      <!-- Cabecera del modal -->
+      <!-- Cabecera -->
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">Crear Nuevo Proyecto</h3>
-          <p class="modal-subtitle">Asistente de configuración de proyecto</p>
+          <h3 class="modal-title">{editingProject ? 'Editar Proyecto' : 'Nuevo Proyecto'}</h3>
         </div>
         <button class="modal-close" onclick={closeModal}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -361,189 +424,49 @@
         </button>
       </div>
 
-      <!-- Indicador de pasos -->
-      <!--
-        Layout correcto (imagen 2):
-        - Cada paso: ícono centrado arriba + label centrado abajo (flex-direction: column)
-        - Líneas conectoras entre pasos, alineadas al centro del ícono
-        Las líneas se ponen ENTRE los divs de paso, no dentro de ellos
-      -->
-      <div class="wizard-steps">
-        {#each [
-          { step: 1, icon: 'doc',   label: 'Información' },
-          { step: 2, icon: 'gear',  label: 'Configuración' },
-          { step: 3, icon: 'users', label: 'Equipo' },
-        ] as s, i}
+      <!-- Formulario -->
+      <div class="form-section">
 
-          <!-- Línea conectora: aparece ANTES de cada paso excepto el primero -->
-          {#if i > 0}
-            <div class="step-connector" class:done={wizardStep > i}></div>
-          {/if}
+        <div class="form-field">
+          <label class="field-label">NOMBRE DEL PROYECTO <span class="field-required">*</span></label>
+          <input
+            class="field-input"
+            type="text"
+            placeholder="Ej: Fondo Colonial 2024"
+            bind:value={formName}
+            autofocus
+          />
+        </div>
 
-          <!-- Paso: ícono + label en columna -->
-          <div class="wizard-step" class:active={wizardStep === s.step} class:done={wizardStep > s.step}>
-            <div class="step-icon-wrap">
-              {#if s.icon === 'doc'}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-              {:else if s.icon === 'gear'}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="3"/>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-              {:else}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-              {/if}
-            </div>
-            <span class="step-label">{s.label}</span>
+        <div class="form-field">
+          <label class="field-label">DESCRIPCIÓN</label>
+          <input
+            class="field-input"
+            type="text"
+            placeholder="Breve descripción del contenido"
+            bind:value={formDesc}
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label class="field-label">FONDO</label>
+            <input class="field-input" type="text" placeholder="Ej: Archivo Anexo: Grupo I" bind:value={formFondo} />
           </div>
-
-        {/each}
-      </div>
-
-      <!-- Contenido por paso -->
-      <div class="wizard-body">
-
-        <!-- PASO 1: Información -->
-        {#if wizardStep === 1}
-          <div class="form-grid">
-            <div class="form-field full">
-              <label class="field-label">NOMBRE DEL PROYECTO</label>
-              <input class="field-input" type="text" placeholder="Ej: Fondo Colonial 2023" bind:value={formName} />
-            </div>
-            <div class="form-field full">
-              <label class="field-label">DESCRIPCIÓN</label>
-              <input class="field-input" type="text" placeholder="Descripción breve del contenido..." bind:value={formDesc} />
-            </div>
-            <div class="form-field">
-              <label class="field-label">UBICACIÓN FÍSICA</label>
-              <input class="field-input" type="text" placeholder="Ej: Estante 4, Caja 12" bind:value={formLocation} />
-            </div>
-            <div class="form-field">
-              <label class="field-label">CANTIDAD EST.</label>
-              <input class="field-input" type="number" bind:value={formQuantity} />
-            </div>
-            <div class="form-field">
-              <label class="field-label">FECHA LÍMITE</label>
-              <input class="field-input" type="date" bind:value={formDate} />
-            </div>
-            <div class="form-field">
-              <label class="field-label">PRIORIDAD</label>
-              <input class="field-input" type="text" placeholder="Alta / Media / Baja" bind:value={formPriority} />
-            </div>
+          <div class="form-field">
+            <label class="field-label">SERIE / SECCIÓN</label>
+            <input class="field-input" type="text" placeholder="Ej: Aduanas" bind:value={formSerie} />
           </div>
+        </div>
 
-        <!-- PASO 2: Configuración -->
-        {:else if wizardStep === 2}
-          <div class="form-section">
-            <div class="form-field full">
-              <label class="field-label">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-                RESOLUCIÓN DE CAPTURA
-              </label>
-              <div class="btn-group">
-                {#each [300, 600, 1200] as dpi}
-                  <button
-                    class="btn-group-item"
-                    class:selected={formDpi === dpi}
-                    onclick={() => formDpi = dpi as 300|600|1200}
-                  >
-                    {dpi} DPI
-                  </button>
-                {/each}
-              </div>
-            </div>
-            <div class="form-field full">
-              <label class="field-label">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-                FORMATO DE SALIDA
-              </label>
-              <div class="btn-group">
-                {#each ['TIFF', 'JPEG', 'PNG'] as fmt}
-                  <button
-                    class="btn-group-item"
-                    class:selected={formFormat === fmt}
-                    onclick={() => formFormat = fmt as 'TIFF'|'JPEG'|'PNG'}
-                  >
-                    {fmt}
-                  </button>
-                {/each}
-              </div>
-            </div>
-            <div class="form-field full">
-              <label class="field-label">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <circle cx="12" cy="10" r="3"/>
-                </svg>
-                MODO DE COLOR
-              </label>
-              <select class="field-input" bind:value={formColorMode}>
-                <option value="">Select option...</option>
-                <option value="RGB">RGB</option>
-                <option value="CMYK">CMYK</option>
-                <option value="Grayscale">Escala de grises</option>
-                <option value="BW">Blanco y Negro</option>
-              </select>
-            </div>
-          </div>
-
-        <!-- PASO 3: Equipo -->
-        {:else}
-          <div class="form-section">
-            <!-- Resumen -->
-            {#if formName}
-              <div class="summary-box">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                Resumen: Proyecto "<strong>{formName}</strong>" con configuración {formDpi} DPI - {formFormat}.
-              </div>
-            {/if}
-
-            <div class="form-field full">
-              <div class="team-label-row">
-                <label class="field-label">ASIGNAR OPERARIO</label>
-                <span class="role-badge">Responsable</span>
-              </div>
-              <select class="field-input" bind:value={formOperator}>
-                <option value="">Select option...</option>
-                <option value="m.garcia">María García</option>
-                <option value="p.mora">Pedro Mora</option>
-                <option value="a.ruiz">Ana Ruiz</option>
-              </select>
-            </div>
-
-            <div class="form-field full">
-              <div class="team-label-row">
-                <label class="field-label">ASIGNAR REVISOR</label>
-                <span class="role-badge">Control de Calidad</span>
-              </div>
-              <select class="field-input" bind:value={formReviewer}>
-                <option value="">Select option...</option>
-                <option value="j.lopez">Juan López</option>
-                <option value="r.torres">Rosa Torres</option>
-              </select>
-            </div>
-          </div>
-        {/if}
+        <div class="form-field">
+          <label class="field-label">SIGNATURA ARCHIVÍSTICA</label>
+          <input class="field-input" type="text" placeholder="Ej: CO.AGN.SAA-I.1.1.1" bind:value={formSignatura} />
+        </div>
 
       </div>
 
-      <!-- Mensaje de error visible al usuario cuando createProject falla -->
+      <!-- Error -->
       {#if createError}
         <div class="create-error">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -554,34 +477,131 @@
         </div>
       {/if}
 
-      <!-- Footer del wizard: Cancel + dots + Siguiente / Finalizar -->
-      <div class="wizard-footer">
+      <!-- Footer -->
+      <div class="modal-footer">
         <button class="btn-ghost" onclick={closeModal}>Cancelar</button>
+        <button
+          class="btn-primary"
+          onclick={handleCreateProject}
+          disabled={isCreating || !formName.trim()}
+        >
+          {#if isCreating}
+            <div class="spinner-sm"></div>
+            {editingProject ? 'Guardando…' : 'Creando…'}
+          {:else}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            {editingProject ? 'Guardar cambios' : 'Crear proyecto'}
+          {/if}
+        </button>
+      </div>
 
-        <!-- Dots de progreso -->
-        <div class="wizard-dots">
-          {#each [1,2,3] as s}
-            <div class="dot" class:active={wizardStep === s}></div>
-          {/each}
+    </div>
+  </div>
+{/if}
+
+<!-- ============================================================
+     MODAL: Eliminar Proyecto
+     ============================================================ -->
+{#if showDeleteModal && deletingProject}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeDeleteModal(); }}>
+    <div class="modal-card delete-modal-card">
+
+      <!-- Cabecera -->
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Eliminar proyecto</h3>
+          <p class="modal-subtitle">"{deletingProject.name}"</p>
+        </div>
+        <button class="modal-close" onclick={closeDeleteModal}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      {#if isLoadingDeleteInfo}
+        <div class="delete-loading">
+          <div class="spinner"></div>
+          <span>Verificando contenido...</span>
+        </div>
+      {:else if deleteCollectionCount > 0}
+        <!-- Proyecto NO vacío — aviso + opción de mover -->
+        <div class="delete-warning">
+          <div class="delete-warning-icon">
+            <span class="material-symbols-outlined icon-md">warning</span>
+          </div>
+          <div>
+            <p class="delete-warning-title">Este proyecto no está vacío</p>
+            <p class="delete-warning-body">
+              Contiene <strong>{deleteCollectionCount} {deleteCollectionCount === 1 ? 'colección' : 'colecciones'}</strong>
+              {#if deleteImageCount > 0}
+                con <strong>{deleteImageCount} {deleteImageCount === 1 ? 'imagen' : 'imágenes'}</strong>
+              {/if}.
+              Si lo eliminas sin mover, todo el contenido se perderá de forma permanente.
+            </p>
+          </div>
         </div>
 
-        {#if wizardStep < 3}
-          <button class="btn-primary" onclick={nextStep}>
-            Siguiente
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
+        <div class="delete-move-section">
+          <label class="field-label">MOVER COLECCIONES A OTRO PROYECTO (OPCIONAL)</label>
+          <select class="field-input" bind:value={deleteMoveTarget}>
+            <option value="">— Eliminar sin mover —</option>
+            {#each projects.filter(p => p.id !== deletingProject!.id) as p}
+              <option value={p.id}>{p.name}</option>
+            {/each}
+          </select>
+          {#if deleteMoveTarget !== ''}
+            <p class="delete-move-hint">
+              Las {deleteCollectionCount} {deleteCollectionCount === 1 ? 'colección' : 'colecciones'} se moverán antes de eliminar el proyecto.
+            </p>
+          {/if}
+        </div>
+
+      {:else}
+        <!-- Proyecto vacío — confirmación simple -->
+        <p class="delete-confirm-text">
+          ¿Estás seguro de que deseas eliminar <strong>"{deletingProject.name}"</strong>?
+          Esta acción no se puede deshacer.
+        </p>
+      {/if}
+
+      <!-- Error -->
+      {#if deleteError}
+        <div class="create-error">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+          {deleteError}
+        </div>
+      {/if}
+
+      <!-- Footer -->
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick={closeDeleteModal} disabled={isDeleting}>Cancelar</button>
+        {#if deleteCollectionCount > 0 && deleteMoveTarget !== ''}
+          <button class="btn-danger" onclick={executeDelete} disabled={isDeleting}>
+            {#if isDeleting}
+              <div class="spinner-sm"></div>
+              Moviendo y eliminando…
+            {:else}
+              <span class="material-symbols-outlined icon-sm">drive_file_move</span>
+              Mover y eliminar
+            {/if}
           </button>
         {:else}
-          <button
-            class="btn-primary"
-            onclick={handleCreateProject}
-            disabled={isCreating || !formName.trim()}
-          >
-            {isCreating ? 'Creando...' : 'Finalizar'}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
+          <button class="btn-danger" onclick={executeDelete} disabled={isDeleting || isLoadingDeleteInfo}>
+            {#if isDeleting}
+              <div class="spinner-sm"></div>
+              Eliminando…
+            {:else}
+              <span class="material-symbols-outlined icon-sm">delete</span>
+              {deleteCollectionCount > 0 ? 'Eliminar sin mover' : 'Eliminar proyecto'}
+            {/if}
           </button>
         {/if}
       </div>
@@ -669,39 +689,48 @@
 
   .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
 
-  /* Botón Ver en la tabla de proyectos */
-  .btn-ver {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    background: none;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-semibold);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    white-space: nowrap;
-    min-height: 0;
-  }
+  /* Dropdown de acciones por fila */
+  .action-menu-wrap { position: relative; display: inline-flex; justify-content: flex-end; }
 
-  .btn-ver:hover { border-color: var(--color-primary); color: var(--color-primary); }
-
-  .btn-icon {
+  .btn-menu {
     width: 32px; height: 32px;
-    background: none; border: none;
+    background: none; border: 1px solid transparent;
+    border-radius: var(--radius-sm);
     display: flex; align-items: center; justify-content: center;
     color: var(--color-light-grey);
     cursor: pointer;
-    border-radius: var(--radius-sm);
     transition: all var(--transition-fast);
-    min-height: 0;
   }
 
-  .btn-icon:hover { background-color: rgba(255,255,255,0.05); color: var(--color-light); }
+  .btn-menu:hover { background-color: var(--color-surface-alt); border-color: var(--border-color); color: var(--color-light); }
+
+  .action-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 140px;
+    z-index: 50;
+    overflow: hidden;
+  }
+
+  .action-item {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 9px 14px;
+    background: none; border: none;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color var(--transition-fast);
+  }
+
+  .action-item:hover { background-color: var(--color-surface); color: var(--color-light); }
+  .action-item-danger:hover { color: var(--color-error); }
 
   /* Error en modal */
   .create-error {
@@ -744,8 +773,14 @@
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-xl);
-    overflow: hidden;
+    overflow: visible;
   }
+
+  /* Round table corners without overflow:hidden */
+  .projects-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-xl); }
+  .projects-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-xl); }
+  .projects-table tbody tr:last-child td:first-child  { border-bottom-left-radius: var(--radius-xl); }
+  .projects-table tbody tr:last-child td:last-child   { border-bottom-right-radius: var(--radius-xl); }
 
   .projects-table {
     width: 100%;
@@ -797,6 +832,23 @@
   .project-name { font-weight: var(--fw-semibold); color: var(--color-light); margin: 0 0 2px; }
   .project-code { font-size: 11px; color: var(--color-light-grey); margin: 0; }
 
+  /* Archival reference column */
+  .signatura-badge {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    color: var(--color-secondary);
+    background-color: rgba(150,177,240,0.1);
+    border: 1px solid rgba(150,177,240,0.25);
+    border-radius: var(--radius-sm);
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+
+  .breadcrumb-cell { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; max-width: 240px; }
+  .breadcrumb-part { font-size: 12px; color: var(--color-light-grey); }
+  .breadcrumb-sep { font-size: 12px; color: var(--color-light-grey); opacity: 0.4; }
+  .text-muted { font-size: var(--text-sm); color: var(--color-light-grey); opacity: 0.4; }
+
   .status-badge {
     display: inline-block;
     padding: 3px 10px;
@@ -806,54 +858,9 @@
     white-space: nowrap;
   }
 
-  .progress-cell { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
-  .progress-pct  { font-size: 11px; color: var(--color-light-grey); }
-
-  .progress-bar-bg {
-    height: 4px;
-    background-color: var(--color-surface-alt);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-  }
-
-  .progress-bar-fill {
-    height: 100%;
-    background-color: var(--color-primary);
-    border-radius: var(--radius-full);
-    transition: width var(--transition-slow);
-  }
-
-  .team-cell { display: flex; align-items: center; gap: -4px; }
-
-  .team-avatar {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background-color: rgba(188,130,60,0.2);
-    border: 2px solid var(--color-surface);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: var(--fw-bold);
-    color: var(--color-warning);
-    margin-right: -4px;
-    flex-shrink: 0;
-  }
-
-  .team-add {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background-color: var(--color-surface-alt);
-    border: 2px solid var(--color-surface);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey);
-    cursor: pointer;
-    margin-right: -4px;
-    transition: all var(--transition-fast);
-  }
-
-  .team-add:hover { background-color: var(--color-primary); color: white; }
-
   .date-cell { display: flex; align-items: center; gap: 7px; color: var(--color-light-grey); font-size: var(--text-sm); white-space: nowrap; }
 
-  /* ══ MODAL WIZARD ══ */
+  /* ══ MODAL ══ */
   .modal-backdrop {
     position: fixed; inset: 0;
     background-color: rgba(0,0,0,0.65);
@@ -868,7 +875,7 @@
     border-radius: var(--radius-xl);
     padding: 28px;
     width: 100%;
-    max-width: 420px;
+    max-width: 440px;
     box-shadow: var(--shadow-lg);
     display: flex;
     flex-direction: column;
@@ -897,93 +904,16 @@
 
   .modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
 
-  /* ── Wizard steps indicator ─────────────────────────────────────────────
-     Layout (imagen de referencia):
-       [línea] [ícono]    [línea] [ícono]    [línea] [ícono]
-                [label]            [label]            [label]
+  /* Form layout */
+  .form-section { display: flex; flex-direction: column; gap: 14px; }
 
-     Los conectores (.step-connector) están entre los pasos en el flex row.
-     Cada .wizard-step es columna: ícono encima, label debajo.
-  ── */
-  .wizard-steps {
-    display: flex;
-    align-items: flex-start;   /* alinear por la parte superior (ícono) */
-    justify-content: center;
-    gap: 0;
-    padding: 8px 0;
-  }
-
-  /* Cada paso: columna centrada */
-  .wizard-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    min-width: 80px;
-  }
-
-  /* Línea conectora entre pasos */
-  /* margin-top centra la línea con el ícono (18px = mitad del círculo de 36px) */
-  .step-connector {
-    width: 48px;
-    height: 2px;
-    background-color: var(--border-color);
-    margin-top: 18px;       /* alinea con el centro del ícono */
-    flex-shrink: 0;
-    transition: background-color var(--transition-base);
-  }
-
-  .step-connector.done { background-color: var(--color-primary); }
-
-  /* Círculo del paso */
-  .step-icon-wrap {
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    background-color: var(--color-surface);
-    border: 2px solid var(--border-color);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey);
-    transition: all var(--transition-base);
-    flex-shrink: 0;
-  }
-
-  .wizard-step.active .step-icon-wrap {
-    background-color: rgba(90,140,98,0.2);
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-  }
-
-  .wizard-step.done .step-icon-wrap {
-    background-color: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
-  }
-
-  /* Label debajo del ícono */
-  .step-label {
-    font-size: 12px;
-    color: var(--color-light-grey);
-    white-space: nowrap;
-    text-align: center;
-    line-height: 1;
-  }
-
-  .wizard-step.active .step-label { color: var(--color-primary); font-weight: var(--fw-semibold); }
-  .wizard-step.done .step-label   { color: var(--color-light); }
-
-  /* Formularios del wizard */
-  .wizard-body { min-height: 200px; }
-
-  .form-grid {
+  .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
   }
 
-  .form-section { display: flex; flex-direction: column; gap: 14px; }
-
   .form-field { display: flex; flex-direction: column; gap: 6px; }
-  .form-field.full { grid-column: 1 / -1; }
 
   .field-label {
     display: flex;
@@ -995,6 +925,8 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
+
+  .field-required { color: var(--color-error); }
 
   .field-input {
     font-family: var(--font-family);
@@ -1013,80 +945,100 @@
   .field-input:focus { border-color: var(--color-primary); }
   .field-input::placeholder { color: var(--color-light-grey); opacity: 0.5; }
 
-  /* Button group (DPI / format selector) */
-  .btn-group {
-    display: flex;
-    gap: 8px;
-  }
-
-  .btn-group-item {
-    flex: 1;
-    height: 40px;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-semibold);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .btn-group-item:hover { border-color: var(--color-primary); color: var(--color-light); }
-  .btn-group-item.selected { background-color: rgba(90,140,98,0.15); border-color: var(--color-primary); color: var(--color-primary); }
-
-  /* Team label row */
-  .team-label-row { display: flex; align-items: center; justify-content: space-between; }
-
-  .role-badge {
-    font-size: 11px;
-    color: var(--color-secondary);
-    background-color: rgba(150,177,240,0.1);
-    border: 1px solid rgba(150,177,240,0.3);
-    border-radius: var(--radius-full);
-    padding: 2px 8px;
-  }
-
-  /* Resumen en paso 3 */
-  .summary-box {
+  /* Modal footer */
+  .modal-footer {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 10px;
-    padding: 12px 14px;
-    background-color: rgba(90,140,98,0.1);
-    border: 1px solid rgba(90,140,98,0.3);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    line-height: 1.5;
-  }
-
-  .summary-box strong { color: var(--color-light); }
-
-  /* Footer wizard */
-  .wizard-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
     padding-top: 4px;
     border-top: 1px solid var(--border-color);
   }
 
-  .wizard-dots {
-    display: flex;
-    gap: 6px;
-    flex: 1;
-    justify-content: center;
-  }
-
-  .dot {
-    width: 8px; height: 8px;
+  /* Spinner for loading state */
+  .spinner-sm {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
     border-radius: 50%;
-    background-color: var(--border-color);
-    transition: background-color var(--transition-base);
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
   }
 
-  .dot.active { background-color: var(--color-primary); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Delete modal ──────────────────────────────────────── */
+  .delete-modal-card { max-width: 480px; }
+
+  .delete-loading {
+    display: flex; align-items: center; gap: 12px;
+    color: var(--color-light-grey);
+    font-size: var(--text-sm);
+    padding: 8px 0;
+  }
+
+  .delete-warning {
+    display: flex; gap: 14px; align-items: flex-start;
+    background-color: rgba(208,100,60,0.1);
+    border: 1px solid rgba(208,100,60,0.35);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+  }
+
+  .delete-warning-icon {
+    color: var(--color-error);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .delete-warning-title {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-bold);
+    color: var(--color-error);
+    margin: 0 0 4px;
+  }
+
+  .delete-warning-body {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .delete-move-section {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  .delete-move-hint {
+    font-size: 12px;
+    color: var(--color-primary);
+    margin: 0;
+    padding-left: 2px;
+  }
+
+  .delete-confirm-text {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .btn-danger {
+    display: flex; align-items: center; gap: 8px;
+    background-color: var(--color-error);
+    color: white;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-bold);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 9px 18px;
+    min-height: var(--touch-target-min);
+    cursor: pointer;
+    transition: background-color var(--transition-base);
+    white-space: nowrap;
+  }
+
+  .btn-danger:hover { filter: brightness(1.15); }
+  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

@@ -22,50 +22,94 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { camerasApi } from '$lib/api';
+  import { camerasApi, type CameraDevice, type CameraControlsRequest } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
+  import { wbSamplingStore } from '$lib/stores/wbSampling';
+  import { histogramStore } from '$lib/stores/histogram';
 
   // ---------------------------------------------------------------------------
   // PROPS
   // ---------------------------------------------------------------------------
   let {
     cameraMode,
-    controlMode,
     shutterSpeed,
     iso,
     aperture,
     onCameraModeChange,
-    onControlModeChange,
     onShutterSpeedChange,
     onIsoChange,
     onApertureChange,
+    onDevicesChange,
   }: {
     cameraMode: 'single' | 'double';
-    controlMode: 'manual' | 'automatic';
     shutterSpeed: string;
     iso: string;
     aperture: string;
     onCameraModeChange: (mode: 'single' | 'double') => void;
-    onControlModeChange: (mode: 'manual' | 'automatic') => void;
     onShutterSpeedChange: (value: string) => void;
     onIsoChange: (value: string) => void;
     onApertureChange: (value: string) => void;
+    onDevicesChange?: (devices: CameraDevice[]) => void;
   } = $props();
 
   // ---------------------------------------------------------------------------
   // ESTADO LOCAL
   // ---------------------------------------------------------------------------
 
-  // Cámara seleccionada actualmente en el selector (solo relevante en double)
-  // 'left' = índice 0, 'right' = índice 1 en la API
-  let selectedCamera = $state<'left' | 'right'>('left');
+  // Cámara seleccionada actualmente (0 = izquierda, 1 = derecha)
+  let selectedCameraIndex = $state(0);
+
+  // Lista de dispositivos reales cargados desde la API
+  let devices = $state<CameraDevice[]>([]);
+
+  // Estado del sidebar: colapsado por defecto (optimizado para pantalla de 7")
+  let sidebarOpen = $state(false);
+
+  // Posición actual del foco (dioptrias: 0 = infinito, 10 = 10cm)
+  let lensPosition = $state(0);
+  let isFocusing = $state(false);
+  let focusDebounce: ReturnType<typeof setTimeout> | null = null;
+  let focusResultMsg: string | null = $state(null);
+  let focusResultOk: boolean = $state(true);
+  let focusResultTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Zoom per-camera (1.0 = full sensor, 4.0 = 4× ScalerCrop)
+  let cameraZoom = $state<Record<number, number>>({ 0: 1, 1: 1 });
+  let zoomDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  // Shutter speed and ISO per-camera (manual mode only)
+  let cameraShutter = $state<Record<number, string>>({ 0: '1/125s', 1: '1/125s' });
+  let cameraIso     = $state<Record<number, string>>({ 0: '100',    1: '100'    });
+
+  // WB calibration state
+  let isWbCalibrating = $state(false);
+  let wbResultMsg: string | null = $state(null);
+  let wbResultOk: boolean = $state(true);
+  let wbResultTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // WB picker (click-to-neutralize) state
+  let isWbPickerActive = $state(false);
+
+  // Deactivate picker if the store is cleared externally (e.g. Escape)
+  $effect(() => {
+    if (!$wbSamplingStore.active) {
+      isWbPickerActive = false;
+    }
+  });
+
+  // Cámara actualmente seleccionada (derivado)
+  const selectedDevice = $derived(devices.find(d => d.index === selectedCameraIndex));
+  const cameraDisplayName = $derived(
+    selectedDevice
+      ? `${selectedDevice.label || selectedDevice.model || 'Camera'} [${selectedCameraIndex}]`
+      : `Camera ${selectedCameraIndex}`
+  );
 
   // Secciones abiertas del acordeón
   let openSections = $state(['basic', 'focus', 'settings', 'histogram']);
 
   // Dropdowns abiertos
   let showCameraDropdown = $state(false);
-  let showModeDropdown = $state(false);
 
   // Dropdown activo de Basic (shutter/iso/aperture) — solo uno a la vez
   let openDropdown = $state<'shutter' | 'iso' | 'aperture' | null>(null);
@@ -85,12 +129,11 @@
   let exposure = $state(0);      // Exposición (-3 a +3)
 
   // Opciones de los dropdowns de Basic
-  const shutterOptions = ['1/8000s','1/4000s','1/2000s','1/1000s','1/500s','1/250s','1/125s','1/60s','1/30s','1/15s','1/8s','1/4s','1/2s','1s','1.6s','2s','3.2s','4s','5s','8s'];
-  const isoOptions     = ['100','200','400','800','1600','3200','6400','12800','25600'];
+  // Shutter speed options useful for scanning (fixed lighting, no motion)
+  const shutterOptions = ['1/1000s','1/500s','1/250s','1/125s','1/60s','1/30s','1/15s','1/8s','1/4s','1/2s','1s','1.6s','2s','3.2s','4s'];
+  // ISO options: keep low for archival quality (IMX519 analogue gain max ≈ 16× = ISO 1600)
+  const isoOptions     = ['100','200','400','800','1600'];
   const apertureOptions = ['1.4','2.0','2.8','4.0','5.6','8.0','11.0','13.0','16.0','22.0'];
-
-  // Datos del histograma (simulados — en producción vendrán del stream de cámara)
-  const histogramBars = [12,15,20,28,35,45,58,72,85,95,100,98,92,82,70,55,42,30,22,16,12,10,8,6,5,4,3,2,2,1];
 
   // ---------------------------------------------------------------------------
   // FUNCIÓN: abrir un dropdown de Basic y calcular su posición en viewport
@@ -131,17 +174,181 @@
 
   // ---------------------------------------------------------------------------
   // FUNCIÓN: Autofocus
-  // Llama al backend con el índice de la cámara seleccionada.
-  // left = index 0, right = index 1
+  // Llama al backend y actualiza el slider de foco con el resultado.
   // ---------------------------------------------------------------------------
+  function showFocusResult(ok: boolean, msg: string) {
+    focusResultOk = ok;
+    focusResultMsg = msg;
+    if (focusResultTimer) clearTimeout(focusResultTimer);
+    focusResultTimer = setTimeout(() => { focusResultMsg = null; }, 5000);
+  }
+
   async function handleAutoFocus() {
-    const idx = selectedCamera === 'left' ? 0 : 1;
+    const idx = selectedCameraIndex;
     try {
-      await camerasApi.calibrate({ camera_index: idx });
-      cameraStatus.reportSuccess();
+      isFocusing = true;
+      const result = await camerasApi.calibrate({ camera_index: idx });
+      if (result.success && result.lens_position != null) {
+        lensPosition = result.lens_position;
+        cameraStatus.reportSuccess();
+        showFocusResult(true, `Foco: ${result.lens_position.toFixed(2)} dpt`);
+      } else {
+        const msg = result.error ?? 'Autofocus falló';
+        cameraStatus.reportFailure(msg);
+        showFocusResult(false, msg);
+      }
     } catch (error) {
-      cameraStatus.reportFailure('Error en autofocus');
+      const msg = 'Error en autofocus';
+      cameraStatus.reportFailure(msg);
+      showFocusResult(false, msg);
+    } finally {
+      isFocusing = false;
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // FUNCIÓN: Calibración white balance
+  // Llama al backend, actualiza los gains y refresca la lista de dispositivos.
+  // ---------------------------------------------------------------------------
+  function showWbResult(ok: boolean, msg: string) {
+    wbResultOk = ok;
+    wbResultMsg = msg;
+    if (wbResultTimer) clearTimeout(wbResultTimer);
+    wbResultTimer = setTimeout(() => { wbResultMsg = null; }, 5000);
+  }
+
+  async function handleWbCalibration() {
+    const idx = selectedCameraIndex;
+    try {
+      isWbCalibrating = true;
+      const result = await camerasApi.calibrateWhiteBalance({ camera_index: idx });
+      if (result.success) {
+        // Refresh device list so selectedDevice.awb_gains picks up new values
+        try {
+          devices = await camerasApi.listDevices();
+        } catch { /* ignore — gains will apply on next mount */ }
+        // Reset sliders to neutral; the new baseGains already encodes the calibrated WB
+        temperature = 0;
+        tint = 0;
+        // Apply the calibrated gains immediately
+        if (result.awb_gains && result.awb_gains.length >= 2) {
+          try {
+            await camerasApi.setCameraControls(idx, {
+              awb_enable: false,
+              colour_gains: [result.awb_gains[0], result.awb_gains[1]]
+            });
+          } catch { /* ignore */ }
+        }
+        const tempLabel = result.colour_temperature ? ` (~${result.colour_temperature}K)` : '';
+        cameraStatus.reportSuccess();
+        showWbResult(true, `WB calibrado${tempLabel}`);
+      } else {
+        const msg = result.error ?? 'Calibración WB falló';
+        cameraStatus.reportFailure(msg);
+        showWbResult(false, msg);
+      }
+    } catch {
+      const msg = 'Error calibrando WB';
+      cameraStatus.reportFailure(msg);
+      showWbResult(false, msg);
+    } finally {
+      isWbCalibrating = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // FUNCIÓN: WB picker — click-to-neutralize
+  // Activa el modo de muestreo en LiveViewport. Cuando el usuario hace clic
+  // sobre un área blanca/neutra, se calcula la corrección de ganancias y se
+  // guarda en el registro de la cámara.
+  //
+  // Fórmula: neutral_gray = (R+G+B)/3
+  //   new_red_gain  = baseGains[0] * (gray / R)
+  //   new_blue_gain = baseGains[1] * (gray / B)
+  // Esto corrige la diferencia entre el color observado y el gris neutro,
+  // relativo a las ganancias de calibración almacenadas.
+  // ---------------------------------------------------------------------------
+  function handleWbPicker() {
+    if (isWbPickerActive) {
+      // Toggle off — cancel sampling
+      wbSamplingStore.set({ active: false, cameraIndex: 0, onSample: null });
+      isWbPickerActive = false;
+      return;
+    }
+    isWbPickerActive = true;
+    wbSamplingStore.set({
+      active: true,
+      cameraIndex: selectedCameraIndex,
+      onSample: (r: number, g: number, b: number) => applyPickedWb(r, g, b),
+    });
+  }
+
+  async function applyPickedWb(r: number, g: number, b: number) {
+    isWbPickerActive = false;
+    const idx = selectedCameraIndex;
+
+    if (r === 0 && b === 0) {
+      showWbResult(false, 'Pixel inválido — elige un área con luz');
+      return;
+    }
+    const gray = (r + g + b) / 3;
+    const safeR = Math.max(r, 1);
+    const safeB = Math.max(b, 1);
+    const newRed  = Math.max(0.1, Math.min(8.0, baseGains[0] * (gray / safeR)));
+    const newBlue = Math.max(0.1, Math.min(8.0, baseGains[1] * (gray / safeB)));
+    const gains: [number, number] = [newRed, newBlue];
+
+    try {
+      isWbCalibrating = true;
+      // Apply to camera immediately so preview updates
+      await camerasApi.setCameraControls(idx, { awb_enable: false, colour_gains: gains });
+      // Persist to registry
+      const result = await camerasApi.commitWhiteBalance(idx, gains);
+      if (result.success) {
+        try { devices = await camerasApi.listDevices(); } catch { /* ignore */ }
+        temperature = 0;
+        tint = 0;
+        cameraStatus.reportSuccess();
+        showWbResult(true, `WB muestrado (R=${newRed.toFixed(2)}, B=${newBlue.toFixed(2)})`);
+      } else {
+        showWbResult(false, result.error ?? 'Error al guardar WB');
+      }
+    } catch {
+      showWbResult(false, 'Error aplicando WB');
+    } finally {
+      isWbCalibrating = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // FUNCIÓN: Ajuste manual de foco (slider vertical)
+  // Envía el valor al backend con debounce de 150ms.
+  // ---------------------------------------------------------------------------
+  function handleFocusSlider(value: number) {
+    lensPosition = value;
+    if (focusDebounce) clearTimeout(focusDebounce);
+    focusDebounce = setTimeout(async () => {
+      try {
+        await camerasApi.setFocus(selectedCameraIndex, value);
+      } catch {
+        // fallo silencioso — el preview mostrará el foco actual
+      }
+    }, 150);
+  }
+
+  // ---------------------------------------------------------------------------
+  // FUNCIÓN: Zoom de cámara (ScalerCrop via API) por índice de cámara
+  // ---------------------------------------------------------------------------
+  function handleZoomSlider(value: number) {
+    cameraZoom = { ...cameraZoom, [selectedCameraIndex]: value };
+    if (zoomDebounce) clearTimeout(zoomDebounce);
+    zoomDebounce = setTimeout(async () => {
+      try {
+        await camerasApi.setCameraControls(selectedCameraIndex, { zoom_factor: value });
+      } catch {
+        // fallo silencioso
+      }
+    }, 150);
   }
 
   // ---------------------------------------------------------------------------
@@ -149,7 +356,26 @@
   // ---------------------------------------------------------------------------
   $effect(() => {
     if (cameraMode === 'single') {
-      selectedCamera = 'left';
+      selectedCameraIndex = 0;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Sync parent display values when the selected camera changes
+  // so LiveViewport metadata bar stays up to date.
+  // ---------------------------------------------------------------------------
+  $effect(() => {
+    onShutterSpeedChange(cameraShutter[selectedCameraIndex] ?? '1/125s');
+    onIsoChange(cameraIso[selectedCameraIndex] ?? '100');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Al cambiar de cámara, actualizar lensPosition desde calibración si disponible
+  // ---------------------------------------------------------------------------
+  $effect(() => {
+    const dev = devices.find(d => d.index === selectedCameraIndex);
+    if (dev?.lens_position !== undefined) {
+      lensPosition = dev.lens_position;
     }
   });
 
@@ -161,7 +387,90 @@
     showCameraDropdown = false;
     showModeDropdown = false;
   }
+
+  // ---------------------------------------------------------------------------
+  // HELPERS: Settings sliders → camera controls
+  // ---------------------------------------------------------------------------
+
+  /** Parse shutter-speed string "1/8000s" or "1.6s" → microseconds integer */
+  function parseShutterUs(s: string): number {
+    const frac = s.match(/^([\d.]+)\/([\d.]+)s$/);
+    if (frac) return Math.round(parseFloat(frac[1]) / parseFloat(frac[2]) * 1_000_000);
+    return Math.round(parseFloat(s) * 1_000_000);
+  }
+
+  // Debounce timer for live-slider settings
+  let settingsDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  /** Send camera controls to the backend (debounced by default 200ms) */
+  function applySettings(controls: CameraControlsRequest, debounceMs = 200) {
+    if (settingsDebounce) clearTimeout(settingsDebounce);
+    settingsDebounce = setTimeout(async () => {
+      try {
+        await camerasApi.setCameraControls(selectedCameraIndex, controls);
+      } catch {
+        // Fallo silencioso — la cámara puede no estar disponible
+      }
+    }, debounceMs);
+  }
+
+  /** Base AWB gains from calibration (fallback to neutral [2.0, 1.5]) */
+  const baseGains = $derived<[number, number]>(
+    (selectedDevice?.awb_gains && selectedDevice.awb_gains.length >= 2)
+      ? [selectedDevice.awb_gains[0], selectedDevice.awb_gains[1]]
+      : [2.0, 1.5]
+  );
+
+  /** Compute colour_gains from temperature/tint sliders */
+  function computeColourGains(temp: number, t: number): [number, number] {
+    const tempF = temp * 0.004;   // ±0.4 range over ±100
+    const tintF = t   * 0.003;   // ±0.3 range over ±100
+    const red  = Math.max(0.1, Math.min(8.0, baseGains[0] * (1 + tempF - tintF)));
+    const blue = Math.max(0.1, Math.min(8.0, baseGains[1] * (1 - tempF + tintF)));
+    return [red, blue];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cargar dispositivos reales al montar
+  // ---------------------------------------------------------------------------
+  onMount(() => {
+    camerasApi.listDevices()
+      .then(d => {
+        devices = d;
+        onDevicesChange?.(d);
+      })
+      .catch(() => { /* fallo silencioso — el selector mostrará Camera 0/1 */ });
+  });
 </script>
+
+<!-- ============================================================
+     SIDEBAR WRAPPER — colapsado por defecto en pantallas de 7"
+     ============================================================ -->
+<div class="sidebar-wrapper">
+
+  {#if !sidebarOpen}
+    <!-- ── TIRA DE ICONOS (sidebar colapsado) ── -->
+    <div class="icon-strip">
+      <!-- Botón para expandir -->
+      <button class="strip-btn toggle" onclick={() => sidebarOpen = true} aria-label="Camara control">
+        <svg
+									width="18"
+									height="18"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<circle cx="12" cy="12" r="3" />
+									<path
+										d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+									/>
+								</svg>
+      </button>
+    </div>
+
+  {:else}
+    <!-- ── PANEL COMPLETO (sidebar expandido) ── -->
 
 <!-- ============================================================
      PANEL DE CONTROLES
@@ -170,6 +479,12 @@
 
   <div class="panel-header">
     <h2 class="panel-title">Camera Controls</h2>
+    <!-- Botón para colapsar -->
+    <button class="collapse-btn" onclick={() => sidebarOpen = false} aria-label="Colapsar panel">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
   </div>
 
   <div class="panel-body">
@@ -194,8 +509,8 @@
     </div>
 
     <!-- ── SELECTOR DE CÁMARA ── -->
-    <!-- En modo single: muestra solo "Arducam — Left", no clickeable -->
-    <!-- En modo double: dropdown con Left y Right para seleccionar cuál controlar -->
+    <!-- En modo single: no clickeable (siempre cámara 0)     -->
+    <!-- En modo double: dropdown para seleccionar cuál controlar -->
     <div class="relative">
       <button
         class="camera-selector"
@@ -207,12 +522,11 @@
           <circle cx="12" cy="13" r="4"/>
         </svg>
         <span class="camera-name">
-          {#if cameraMode === 'single'}
-            Arducam — Left
-          {:else}
-            Arducam — {selectedCamera === 'left' ? 'Left' : 'Right'}
-          {/if}
+          {cameraDisplayName}
         </span>
+        {#if selectedDevice?.calibrated}
+          <span class="cal-dot" title="Calibrada">✓</span>
+        {/if}
         {#if cameraMode === 'double'}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 12 15 18 9"/>
@@ -226,75 +540,47 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="fixed-backdrop" onclick={() => showCameraDropdown = false}></div>
         <div class="camera-dropdown">
-          <button
-            class="camera-option"
-            class:selected={selectedCamera === 'left'}
-            onclick={() => { selectedCamera = 'left'; showCameraDropdown = false; }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            Arducam — Left
-          </button>
-          <button
-            class="camera-option"
-            class:selected={selectedCamera === 'right'}
-            onclick={() => { selectedCamera = 'right'; showCameraDropdown = false; }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            Arducam — Right
-          </button>
+          {#each devices as device}
+            <button
+              class="camera-option"
+              class:selected={selectedCameraIndex === device.index}
+              onclick={() => { selectedCameraIndex = device.index; showCameraDropdown = false; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              {`${device.label || device.model || 'Camera'} [${device.index}]`}
+              {#if device.calibrated}
+                <span class="cal-dot" title="Calibrada">✓</span>
+              {/if}
+            </button>
+          {/each}
+          {#if devices.length === 0}
+            <div class="camera-option" style="opacity:0.5; cursor:default">Sin cámaras detectadas</div>
+          {/if}
         </div>
       {/if}
     </div>
 
-    <!-- ── ESTADO + MODO ── -->
-    <div class="status-mode-row">
-      <div class="camera-on">
-        <span class="on-dot"></span>
-        <span class="on-label">On</span>
-      </div>
-
-      <div class="mode-wrapper">
-        <span class="mode-label-text">Mode</span>
-        <div class="relative" style="width: 100%">
-          <button class="mode-btn" style="width:100%" onclick={() => showModeDropdown = !showModeDropdown}>
-            <span class="capitalize">{controlMode}</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-          {#if showModeDropdown}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="fixed-backdrop" onclick={() => showModeDropdown = false}></div>
-            <div class="mode-dropdown">
-              <button onclick={() => { onControlModeChange('manual'); showModeDropdown = false; }}>Manual</button>
-              <button onclick={() => { onControlModeChange('automatic'); showModeDropdown = false; }}>Automatic</button>
-            </div>
-          {/if}
-        </div>
-      </div>
+    <!-- ── ESTADO DE CÁMARA ── -->
+    <div class="camera-status-row">
+      <span class="status-dot" class:dot-connected={selectedDevice !== undefined} class:dot-disconnected={selectedDevice === undefined}></span>
+      {#if selectedDevice !== undefined}
+        <span class="status-label">Conectada</span>
+      {:else}
+        <span class="status-label status-warn">No detectada</span>
+      {/if}
     </div>
 
-    <!-- ── AUTOFOCUS ── -->
-    <button class="btn-autofocus" onclick={handleAutoFocus}>
-      Auto Focus
-    </button>
 
     <!-- ══════════════════════════════════════════
          ACORDEÓN: BASIC
-         Deshabilitado en modo 'automatic'
          ══════════════════════════════════════════ -->
-    <div class="accordion-block" class:disabled={controlMode === 'automatic'}>
+    <div class="accordion-block">
       <button
         class="accordion-trigger"
-        onclick={() => controlMode === 'manual' && toggleSection('basic')}
-        disabled={controlMode === 'automatic'}
+        onclick={() => toggleSection('basic')}
       >
         <div class="acc-left">
           <span>Basic</span>
@@ -303,12 +589,12 @@
           </svg>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          class="chevron" class:rotated={openSections.includes('basic') && controlMode === 'manual'}>
+          class="chevron" class:rotated={openSections.includes('basic')}>
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
 
-      {#if openSections.includes('basic') && controlMode === 'manual'}
+      {#if openSections.includes('basic')}
         <div class="accordion-content">
 
           <!-- Fila: Shutter Speed -->
@@ -321,7 +607,7 @@
               class:open={openDropdown === 'shutter'}
               onclick={() => openBasicDropdown('shutter')}
             >
-              <span>{shutterSpeed}</span>
+              <span>{cameraShutter[selectedCameraIndex] ?? '1/125s'}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 style="transform: rotate({openDropdown === 'shutter' ? 180 : 0}deg); transition: transform 0.2s">
                 <polyline points="6 9 12 15 18 9"/>
@@ -338,7 +624,7 @@
               class:open={openDropdown === 'iso'}
               onclick={() => openBasicDropdown('iso')}
             >
-              <span>{iso}</span>
+              <span>{cameraIso[selectedCameraIndex] ?? '100'}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 style="transform: rotate({openDropdown === 'iso' ? 180 : 0}deg); transition: transform 0.2s">
                 <polyline points="6 9 12 15 18 9"/>
@@ -346,7 +632,8 @@
             </button>
           </div>
 
-          <!-- Fila: Aperture -->
+          <!-- Fila: Aperture (solo si la cámara lo soporta) -->
+          {#if selectedDevice?.has_aperture_control}
           <div class="control-row">
             <span class="control-label">Aperture</span>
             <button
@@ -362,6 +649,7 @@
               </svg>
             </button>
           </div>
+          {/if}
 
         </div>
       {/if}
@@ -386,27 +674,75 @@
 
       {#if openSections.includes('focus')}
         <div class="accordion-content">
-          <!-- Botones de ajuste fino de foco: <<< << ● >> >>> -->
-          <!-- Para conectar con backend: camerasApi.calibrate({ camera_index, step }) -->
-          <div class="focus-row">
-            <button class="focus-btn" aria-label="Foco <<<">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-5px"><polyline points="15 18 9 12 15 6"/></svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-5px"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <button class="focus-btn" aria-label="Foco <<">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
-            </button>
-            <!-- Punto central verde = posición neutral -->
-            <button class="focus-btn center" aria-label="Foco neutro"></button>
-            <button class="focus-btn" aria-label="Foco >>">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
-            </button>
-            <button class="focus-btn" aria-label="Foco >>>">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-5px"><polyline points="9 18 15 12 9 6"/></svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-5px"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
+          <!-- Autofocus -->
+          <button class="btn-autofocus" onclick={handleAutoFocus} disabled={isFocusing}>
+            {#if isFocusing}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin-icon">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+              Enfocando…
+            {:else}
+              Enfocar auto
+            {/if}
+          </button>
+          {#if focusResultMsg}
+            <p class:text-success={focusResultOk} class:text-error={!focusResultOk} class="focus-result-msg">{focusResultMsg}</p>
+          {/if}
+
+          <!-- Foco manual (horizontal) -->
+          <div class="zoom-row">
+            <div class="zoom-header">
+              <span class="zoom-row-label">Foco manual</span>
+              <span class="zoom-value">{(lensPosition ?? 0).toFixed(1)} dpt</span>
+            </div>
+            <input
+              type="range"
+              class="zoom-slider"
+              min="0"
+              max="10"
+              step="0.1"
+              value={lensPosition}
+              oninput={(e) => handleFocusSlider(Number((e.target as HTMLInputElement).value))}
+              aria-label="Posición de foco (dioptrias)"
+            />
+            <div class="zoom-ticks">
+              <span title="Infinito (lejos)">∞</span>
+              <span>5 dpt</span>
+              <span title="Macro (10 cm)">10cm</span>
+            </div>
+          </div>
+
+          <!-- Zoom de cámara (ScalerCrop por cámara) -->
+          <div class="zoom-row">
+            <div class="zoom-header">
+              <span class="zoom-row-label">Zoom</span>
+              <span class="zoom-value">
+                {(cameraZoom[selectedCameraIndex] ?? 1).toFixed(1)}×
+                {#if (cameraZoom[selectedCameraIndex] ?? 1) > 1}
+                  <button
+                    class="zoom-reset-btn"
+                    onclick={() => handleZoomSlider(1)}
+                    aria-label="Restablecer zoom a 1×"
+                  >reset</button>
+                {/if}
+              </span>
+            </div>
+            <input
+              type="range"
+              class="zoom-slider"
+              min="1"
+              max="4"
+              step="0.5"
+              value={cameraZoom[selectedCameraIndex] ?? 1}
+              oninput={(e) => handleZoomSlider(Number((e.target as HTMLInputElement).value))}
+              aria-label="Zoom de cámara (ScalerCrop)"
+            />
+            <div class="zoom-ticks">
+              <span>1×</span>
+              <span>2×</span>
+              <span>3×</span>
+              <span>4×</span>
+            </div>
           </div>
         </div>
       {/if}
@@ -414,13 +750,11 @@
 
     <!-- ══════════════════════════════════════════
          ACORDEÓN: SETTINGS
-         Deshabilitado en modo 'automatic'
          ══════════════════════════════════════════ -->
-    <div class="accordion-block" class:disabled={controlMode === 'automatic'}>
+    <div class="accordion-block">
       <button
         class="accordion-trigger"
-        onclick={() => controlMode === 'manual' && toggleSection('settings')}
-        disabled={controlMode === 'automatic'}
+        onclick={() => toggleSection('settings')}
       >
         <div class="acc-left">
           <span>Settings</span>
@@ -429,29 +763,55 @@
           </svg>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          class="chevron" class:rotated={openSections.includes('settings') && controlMode === 'manual'}>
+          class="chevron" class:rotated={openSections.includes('settings')}>
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
 
-      {#if openSections.includes('settings') && controlMode === 'manual'}
+      {#if openSections.includes('settings')}
         <div class="accordion-content settings-content">
 
           <!-- White Balance -->
           <div class="settings-block">
-            <span class="settings-label">White Balance</span>
+            <span class="settings-label">
+              White Balance
+            </span>
             <div class="wb-row">
-              <button class="wb-btn">
-                <span>Shot</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              <!-- wb_auto: auto white balance calibration -->
+              <button
+                class="wb-pipette"
+                onclick={handleWbCalibration}
+                disabled={isWbCalibrating}
+                aria-label="Calibrar white balance automáticamente (AWB convergencia)"
+              >
+                {#if isWbCalibrating}
+                  <span class="material-symbols-outlined icon-sm">sync</span>
+                {:else}
+                  <span class="material-symbols-outlined icon-sm">wb_auto</span>
+                {/if}
               </button>
-              <!-- Pipette: calibrar white balance automáticamente -->
-              <button class="wb-pipette" onclick={async () => { try { await camerasApi.calibrateWhiteBalance(); } catch(e) {} }} aria-label="Calibrar white balance">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z"/>
-                </svg>
+              <!-- colorize: click-to-neutralize (experimental) -->
+              <button
+                class="wb-pipette wb-picker-btn"
+                class:wb-picker-active={isWbPickerActive}
+                onclick={handleWbPicker}
+                disabled={isWbCalibrating}
+                aria-label={isWbPickerActive ? 'Cancelar muestreo de white balance' : 'Muestrear white balance: toca un área blanca en el preview (experimental)'}
+                aria-pressed={isWbPickerActive}
+              >
+                <span class="material-symbols-outlined icon-sm">colorize</span>
+                <span class="wb-exp-badge">exp</span>
               </button>
             </div>
+            {#if isWbPickerActive}
+              <p class="wb-picker-hint">
+                Toca un área blanca o gris neutro en el preview.
+                <button class="wb-picker-cancel" onclick={handleWbPicker}>Cancelar</button>
+              </p>
+            {/if}
+            {#if wbResultMsg}
+              <p class:text-success={wbResultOk} class:text-error={!wbResultOk} class="focus-result-msg">{wbResultMsg}</p>
+            {/if}
           </div>
 
           <!-- Slider Temperatura: azul → arena (col design system) -->
@@ -466,6 +826,10 @@
                   max="100"
                   bind:value={temperature}
                   class="styled-range"
+                  oninput={() => applySettings({
+                    awb_enable: false,
+                    colour_gains: computeColourGains(temperature, tint)
+                  })}
                 />
               </div>
               <div class="slider-val">{temperature}</div>
@@ -483,6 +847,10 @@
                   max="100"
                   bind:value={tint}
                   class="styled-range"
+                  oninput={() => applySettings({
+                    awb_enable: false,
+                    colour_gains: computeColourGains(temperature, tint)
+                  })}
                 />
               </div>
               <div class="slider-val">{tint}</div>
@@ -502,6 +870,7 @@
               step="1"
               bind:value={exposure}
               class="styled-range exposure-range"
+              oninput={() => applySettings({ ae_enable: true, exposure_value: exposure })}
             />
             <!-- Marcas debajo del slider -->
             <div class="exposure-marks">
@@ -540,11 +909,12 @@
       {#if openSections.includes('histogram')}
         <div class="accordion-content">
           <div class="histogram">
-            {#each histogramBars as h}
+            {#each { length: 30 } as _, i}
+              {@const hist = $histogramStore[selectedCameraIndex] ?? { r: [], g: [], b: [] }}
               <div class="bar-group">
-                <div class="bar red"   style="height:{h*0.9}%"></div>
-                <div class="bar green" style="height:{h*0.95}%"></div>
-                <div class="bar blue"  style="height:{h}%"></div>
+                <div class="bar red"   style="height:{hist.r[i] ?? 0}%"></div>
+                <div class="bar green" style="height:{hist.g[i] ?? 0}%"></div>
+                <div class="bar blue"  style="height:{hist.b[i] ?? 0}%"></div>
               </div>
             {/each}
           </div>
@@ -558,7 +928,9 @@
     </div>
 
   </div><!-- /panel-body -->
-</div>
+</div><!-- /controls-panel -->
+  {/if}<!-- /sidebarOpen -->
+</div><!-- /sidebar-wrapper -->
 
 <!-- ══════════════════════════════════════════════════════════════
      DROPDOWNS DE BASIC (fuera del panel para escapar overflow:hidden)
@@ -578,15 +950,25 @@
     {#if openDropdown === 'shutter'}
       {#each shutterOptions as opt}
         <button
-          class:selected={opt === shutterSpeed}
-          onclick={() => { onShutterSpeedChange(opt); openDropdown = null; }}
+          class:selected={opt === (cameraShutter[selectedCameraIndex] ?? '1/125s')}
+          onclick={() => {
+            cameraShutter = { ...cameraShutter, [selectedCameraIndex]: opt };
+            onShutterSpeedChange(opt);
+            applySettings({ ae_enable: false, exposure_time_us: parseShutterUs(opt) }, 0);
+            openDropdown = null;
+          }}
         >{opt}</button>
       {/each}
     {:else if openDropdown === 'iso'}
       {#each isoOptions as opt}
         <button
-          class:selected={opt === iso}
-          onclick={() => { onIsoChange(opt); openDropdown = null; }}
+          class:selected={opt === (cameraIso[selectedCameraIndex] ?? '100')}
+          onclick={() => {
+            cameraIso = { ...cameraIso, [selectedCameraIndex]: opt };
+            onIsoChange(opt);
+            applySettings({ ae_enable: false, analogue_gain: parseInt(opt) / 100 }, 0);
+            openDropdown = null;
+          }}
         >{opt}</button>
       {/each}
     {:else if openDropdown === 'aperture'}
@@ -601,6 +983,150 @@
 {/if}
 
 <style>
+  /* ── Sidebar wrapper ── */
+  .sidebar-wrapper {
+    height: 100%;
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  /* ── Tira de iconos (sidebar colapsado) ── */
+  .icon-strip {
+    width: 48px;
+    height: 100%;
+    background-color: var(--color-surface-alt);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .strip-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    color: var(--color-light-grey);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .strip-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--color-light);
+  }
+
+  .strip-btn.toggle {
+    color: var(--color-primary);
+  }
+
+  /* ── Botón de colapsar (dentro del panel) ── */
+  .collapse-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: var(--color-light-grey);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+  }
+
+  .collapse-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--color-light);
+  }
+
+  /* ── Icono giratorio (autofocus en curso) ── */
+  .spin-icon {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* ── Zoom slider (horizontal, per-camera ScalerCrop) ── */
+  .zoom-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 0 2px;
+  }
+
+  .zoom-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .zoom-row-label {
+    font-size: 11px;
+    color: var(--color-light-grey);
+    user-select: none;
+  }
+
+  .zoom-value {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-light);
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .zoom-reset-btn {
+    font-size: 9px;
+    font-family: var(--font-family);
+    color: var(--color-light-grey);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .zoom-reset-btn:hover { color: var(--color-primary); }
+
+  .zoom-slider {
+    width: 100%;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+  }
+
+  .zoom-ticks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--color-light-grey);
+    padding: 0 2px;
+    user-select: none;
+  }
+
+  /* ── Badge de calibración ── */
+  .cal-dot {
+    font-size: 10px;
+    color: var(--color-success, #4ade80);
+    line-height: 1;
+  }
+
   /* ── Panel principal ── */
   .controls-panel {
     width: 280px;
@@ -623,6 +1149,7 @@
     border-bottom: 1px solid var(--border-color);
     flex-shrink: 0;
     text-align: center;
+    position: relative;
   }
 
   .panel-title {
@@ -742,96 +1269,38 @@
   .camera-option.selected { background-color: var(--color-primary); color: white; }
 
   /* ── Fila Estado + Modo ── */
-  .status-mode-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .camera-on {
+  .camera-status-row {
     display: flex;
     align-items: center;
     gap: 7px;
   }
 
-  .on-dot {
+  .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: var(--color-primary);
-    box-shadow: 0 0 8px rgba(90,140,98,0.5);
     flex-shrink: 0;
   }
 
-  .on-label {
+  .dot-connected {
+    background-color: #5a8c62;
+    box-shadow: 0 0 8px rgba(90,140,98,0.5);
+  }
+
+  .dot-disconnected {
+    background-color: #e07830;
+    box-shadow: 0 0 8px rgba(224,120,48,0.4);
+  }
+
+  .status-label {
     font-size: 12px;
     font-weight: var(--fw-bold);
     color: var(--color-light);
   }
 
-  .mode-wrapper {
-    flex: 1;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .status-warn {
+    color: #e07830;
   }
-
-  .mode-label-text {
-    font-size: 11px;
-    color: var(--color-light-grey);
-    white-space: nowrap;
-  }
-
-  .mode-btn {
-    flex: 1;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 0 10px;
-    height: 38px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-family: var(--font-family);
-    font-size: 12px;
-    color: var(--color-light);
-    cursor: pointer;
-    transition: border-color var(--transition-base);
-  }
-
-  .mode-btn:hover { border-color: rgba(255,255,255,0.2); }
-
-  .mode-dropdown {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    z-index: 30;
-    box-shadow: var(--shadow-md);
-  }
-
-  .mode-dropdown button {
-    width: 100%;
-    padding: 10px 12px;
-    text-align: left;
-    font-family: var(--font-family);
-    font-size: 12px;
-    color: var(--color-light);
-    background: none;
-    border: none;
-    cursor: pointer;
-    min-height: var(--touch-target-min);
-    display: flex;
-    align-items: center;
-    transition: background-color var(--transition-fast);
-  }
-
-  .mode-dropdown button:hover { background-color: var(--color-primary); color: white; }
 
   /* ── Auto Focus ── */
   .btn-autofocus {
@@ -850,6 +1319,8 @@
   }
 
   .btn-autofocus:hover { background-color: var(--color-primary-hover); }
+  .btn-autofocus:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-autofocus:disabled:hover { background-color: var(--color-primary); }
 
   /* ── Acordeón ── */
   .accordion-block {
