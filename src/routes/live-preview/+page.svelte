@@ -55,6 +55,9 @@
   let iso = $state('200');
   let aperture = $state('13.0');
 
+  // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
+  let rotateDeg = $state<Record<number, number>>({ 0: 0, 1: 0 });
+
   // Nombre real del proyecto (cargado desde la API al montar)
   let projectName = $state<string>('');
 
@@ -215,6 +218,7 @@
       onIsoChange={(v) => iso = v}
       onApertureChange={(v) => aperture = v}
       onDevicesChange={(d) => devices = d}
+      onRotateDegChange={(cam, deg) => rotateDeg = { ...rotateDeg, [cam]: deg }}
     />
 
     <!-- Área central: viewport + tira de miniaturas -->
@@ -230,6 +234,7 @@
         {projectName}
         {collectionId}
         {devices}
+        {rotateDeg}
         onCaptureDone={handleCaptureDone}
       />
 

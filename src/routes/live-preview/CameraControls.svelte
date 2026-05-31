@@ -40,6 +40,7 @@
     onIsoChange,
     onApertureChange,
     onDevicesChange,
+    onRotateDegChange,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -50,6 +51,7 @@
     onIsoChange: (value: string) => void;
     onApertureChange: (value: string) => void;
     onDevicesChange?: (devices: CameraDevice[]) => void;
+    onRotateDegChange?: (cam: number, deg: number) => void;
   } = $props();
 
   // ---------------------------------------------------------------------------
@@ -92,6 +94,17 @@
   // DSLR-specific per-camera state
   let cameraDslrAperture = $state<Record<number, string>>({ 0: '5.6', 1: '5.6' });
   let cameraDslrFormat   = $state<Record<number, string>>({ 0: 'JPEG', 1: 'JPEG' });
+
+  // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
+  let cameraRotateDeg = $state<Record<number, number>>({ 0: 0, 1: 0 });
+
+  function stepRotation(delta: number) {
+    const idx = selectedCameraIndex;
+    const current = cameraRotateDeg[idx] ?? 0;
+    const next = ((current + delta) % 360 + 360) % 360;
+    cameraRotateDeg = { ...cameraRotateDeg, [idx]: next };
+    onRotateDegChange?.(idx, next);
+  }
 
   // WB calibration state
   let isWbCalibrating = $state(false);
@@ -652,6 +665,26 @@
 
       {#if openSections.includes('basic')}
         <div class="accordion-content">
+
+          <!-- Fila: Orientation (portrait / landscape rotation) -->
+          <div class="control-row">
+            <span class="control-label">Orientation</span>
+            <div class="orientation-row">
+              <button class="rotate-step-btn" onclick={() => stepRotation(-90)} aria-label="Rotate 90° CCW">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                  <path d="M3 3v5h5"/>
+                </svg>
+              </button>
+              <span class="orientation-label">{cameraRotateDeg[selectedCameraIndex] ?? 0}°</span>
+              <button class="rotate-step-btn" onclick={() => stepRotation(90)} aria-label="Rotate 90° CW">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                  <path d="M21 3v5h-5"/>
+                </svg>
+              </button>
+            </div>
+          </div>
 
           <!-- Fila: Shutter Speed -->
           <div class="control-row">

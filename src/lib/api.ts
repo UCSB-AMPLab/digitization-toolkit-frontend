@@ -748,6 +748,7 @@ export interface CaptureRequest {
   camera_index?: number;
   resolution?: string;
   include_resolution_in_filename?: boolean;
+  rotate_deg?: number;
   record_id?: number;
   record_title?: string;
   collection_id?: number;
@@ -758,6 +759,8 @@ export interface DualCaptureRequest {
   resolution?: string;
   include_resolution_in_filename?: boolean;
   stagger_ms?: number;
+  rotate_deg_cam0?: number;
+  rotate_deg_cam1?: number;
   record_id?: number;
   record_title?: string;
   sequence?: number;

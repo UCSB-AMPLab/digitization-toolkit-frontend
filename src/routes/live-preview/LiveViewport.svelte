@@ -51,6 +51,7 @@
     collectionId,
     onCaptureDone,
     devices = [],
+    rotateDeg = {},
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -61,6 +62,7 @@
     collectionId: number;
     onCaptureDone: () => void;
     devices?: CameraDevice[];
+    rotateDeg?: Record<number, number>;
   } = $props();
 
   // ---------------------------------------------------------------------------
@@ -345,9 +347,14 @@
 
       let result;
       if (cameraMode === 'double') {
-        result = await camerasApi.captureDual({ ...payload, left_camera_index: leftIdx });
+        result = await camerasApi.captureDual({
+          ...payload,
+          left_camera_index: leftIdx,
+          rotate_deg_cam0: rotateDeg[0] ?? 0,
+          rotate_deg_cam1: rotateDeg[1] ?? 0,
+        });
       } else {
-        result = await camerasApi.capture({ ...payload, camera_index: 0 });
+        result = await camerasApi.capture({ ...payload, camera_index: 0, rotate_deg: rotateDeg[0] ?? 0 });
       }
 
       if (!result.success) {

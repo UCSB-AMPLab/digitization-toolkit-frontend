@@ -1114,6 +1114,40 @@ canvas, button, a, div {
   color: var(--color-light);
 }
 
+/* Orientation control row in Basic accordion */
+.orientation-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rotate-step-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-light-grey);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.rotate-step-btn:hover {
+  color: var(--color-light);
+  border-color: var(--color-light-grey);
+}
+
+.orientation-label {
+  font-size: var(--text-sm);
+  color: var(--color-light);
+  min-width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ============================================================================
    WB CLICK-TO-NEUTRALIZE OVERLAY
    ============================================================================ */
