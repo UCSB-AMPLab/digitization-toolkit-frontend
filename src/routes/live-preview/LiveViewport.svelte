@@ -52,6 +52,7 @@
     onCaptureDone,
     devices = [],
     rotateDeg = {},
+    onRotateDegChange,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -63,7 +64,14 @@
     onCaptureDone: () => void;
     devices?: CameraDevice[];
     rotateDeg?: Record<number, number>;
+    onRotateDegChange?: (cam: number, deg: number) => void;
   } = $props();
+
+  function stepRotation(camIdx: number, delta: number) {
+    const current = (rotateDeg ?? {})[camIdx] ?? 0;
+    const next = ((current + delta) % 360 + 360) % 360;
+    onRotateDegChange?.(camIdx, next);
+  }
 
   // ---------------------------------------------------------------------------
   // ESTADO LOCAL: Viewport
@@ -454,6 +462,9 @@
               src={previewUrls[leftIdx]}
               alt="Camera izquierda"
               class="feed-img"
+              class:feed-rotate-90={(rotateDeg[leftIdx] ?? 0) === 90}
+              class:feed-rotate-180={(rotateDeg[leftIdx] ?? 0) === 180}
+              class:feed-rotate-270={(rotateDeg[leftIdx] ?? 0) === 270}
               onload={() => { if (imgEl0) histogramStore.update(s => ({ ...s, [leftIdx]: computeHistogram(imgEl0!) })); }}
             />
             <!-- WB sampling overlay: visible only when picker is active for this camera -->
@@ -479,6 +490,22 @@
           {/if}
           <!-- Badge identificador de cámara -->
           <div class="feed-label">{cameraLabel(leftIdx)}</div>
+          <!-- Floating rotation overlay -->
+          <div class="feed-rotate-overlay">
+            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, -90)} aria-label="Rotate CCW">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+              </svg>
+            </button>
+            <span class="feed-rotate-deg">{(rotateDeg ?? {})[leftIdx] ?? 0}°</span>
+            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, 90)} aria-label="Rotate CW">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Cámara derecha (rightIdx) — solo en modo double -->
@@ -491,6 +518,9 @@
                 src={previewUrls[rightIdx]}
                 alt="Camera derecha"
                 class="feed-img"
+                class:feed-rotate-90={(rotateDeg[rightIdx] ?? 0) === 90}
+                class:feed-rotate-180={(rotateDeg[rightIdx] ?? 0) === 180}
+                class:feed-rotate-270={(rotateDeg[rightIdx] ?? 0) === 270}
                 onload={() => { if (imgEl1) histogramStore.update(s => ({ ...s, [rightIdx]: computeHistogram(imgEl1!) })); }}
               />
               {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === rightIdx}
@@ -515,6 +545,22 @@
             {/if}
             <!-- Badge identificador de cámara -->
             <div class="feed-label right">{cameraLabel(rightIdx)}</div>
+            <!-- Floating rotation overlay -->
+            <div class="feed-rotate-overlay">
+              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, -90)} aria-label="Rotate CCW">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                  <path d="M3 3v5h5"/>
+                </svg>
+              </button>
+              <span class="feed-rotate-deg">{(rotateDeg ?? {})[rightIdx] ?? 0}°</span>
+              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, 90)} aria-label="Rotate CW">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                  <path d="M21 3v5h-5"/>
+                </svg>
+              </button>
+            </div>
           </div>
         {/if}
 

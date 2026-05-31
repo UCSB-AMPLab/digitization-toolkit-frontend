@@ -56,7 +56,8 @@
   let aperture = $state('13.0');
 
   // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
-  let rotateDeg = $state<Record<number, number>>({ 0: 0, 1: 0 });
+  // Default 90° — most digitisation rigs use vertical (portrait) orientation
+  let rotateDeg = $state<Record<number, number>>({ 0: 90, 1: 90 });
 
   // Nombre real del proyecto (cargado desde la API al montar)
   let projectName = $state<string>('');
@@ -236,6 +237,7 @@
         {devices}
         {rotateDeg}
         onCaptureDone={handleCaptureDone}
+        onRotateDegChange={(cam, deg) => rotateDeg = { ...rotateDeg, [cam]: deg }}
       />
 
       <!-- Tira de miniaturas inferior -->

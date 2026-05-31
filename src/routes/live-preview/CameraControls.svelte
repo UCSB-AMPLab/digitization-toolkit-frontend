@@ -96,7 +96,8 @@
   let cameraDslrFormat   = $state<Record<number, string>>({ 0: 'JPEG', 1: 'JPEG' });
 
   // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
-  let cameraRotateDeg = $state<Record<number, number>>({ 0: 0, 1: 0 });
+  // Default 90° — most digitisation rigs use vertical (portrait) orientation
+  let cameraRotateDeg = $state<Record<number, number>>({ 0: 90, 1: 90 });
 
   function stepRotation(delta: number) {
     const idx = selectedCameraIndex;
