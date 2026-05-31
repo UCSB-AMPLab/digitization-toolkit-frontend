@@ -22,7 +22,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { camerasApi, type CameraDevice, type CameraControlsRequest } from '$lib/api';
+  import { camerasApi, type CameraDevice, type CameraControlsRequest, type CameraCapabilities, type DSLRSettingsUpdate } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore } from '$lib/stores/histogram';
@@ -81,6 +81,18 @@
   let cameraShutter = $state<Record<number, string>>({ 0: '1/125s', 1: '1/125s' });
   let cameraIso     = $state<Record<number, string>>({ 0: '100',    1: '100'    });
 
+  // Backend capabilities (loaded on mount alongside devices)
+  let capabilities = $state<CameraCapabilities | null>(null);
+
+  // Derived capability flags
+  const isDSLR          = $derived(capabilities?.dslr_settings === true);
+  const hasFocusControl = $derived(capabilities?.focus_control === true);
+  const hasLiveControls = $derived(capabilities?.live_controls === true);
+
+  // DSLR-specific per-camera state
+  let cameraDslrAperture = $state<Record<number, string>>({ 0: '5.6', 1: '5.6' });
+  let cameraDslrFormat   = $state<Record<number, string>>({ 0: 'JPEG', 1: 'JPEG' });
+
   // WB calibration state
   let isWbCalibrating = $state(false);
   let wbResultMsg: string | null = $state(null);
@@ -111,17 +123,18 @@
   // Dropdowns abiertos
   let showCameraDropdown = $state(false);
 
-  // Dropdown activo de Basic (shutter/iso/aperture) — solo uno a la vez
-  let openDropdown = $state<'shutter' | 'iso' | 'aperture' | null>(null);
+  // Dropdown activo de Basic (shutter/iso/aperture/format) — solo uno a la vez
+  let openDropdown = $state<'shutter' | 'iso' | 'aperture' | 'format' | null>(null);
 
   // Posición del dropdown de Basic (calculada en viewport para escapar overflow:hidden)
   // Se recalcula cada vez que se abre uno de los dropdowns
   let dropdownPos = $state({ top: 0, left: 0, width: 0 });
 
-  // Referencias a los botones de los dropdowns de Basic
+  // References to the dropdown trigger buttons of Basic
   let shutterBtnEl = $state<HTMLElement | null>(null);
   let isoBtnEl     = $state<HTMLElement | null>(null);
   let apertureBtnEl = $state<HTMLElement | null>(null);
+  let formatBtnEl  = $state<HTMLElement | null>(null);
 
   // Valores de los sliders de Settings
   let temperature = $state(0);   // Temperatura de color (-100 a +100)
@@ -135,12 +148,21 @@
   const isoOptions     = ['100','200','400','800','1600'];
   const apertureOptions = ['1.4','2.0','2.8','4.0','5.6','8.0','11.0','13.0','16.0','22.0'];
 
+  // DSLR shutter options — PTP format (no 's' suffix, Canon EOS 1500D range)
+  const dsrlShutterOptions = ['1/2000','1/1000','1/500','1/250','1/125','1/60','1/30','1/15','1/8','1/4','1/2','1','2','4'];
+  // DSLR ISO options (Canon EOS 1500D)
+  const dsrlIsoOptions = ['100','200','400','800','1600','3200','6400','12800'];
+  // DSLR aperture options (common values — camera will reject unsupported ones)
+  const dsrlApertureOptions = ['3.5','4.0','4.5','5.0','5.6','6.3','7.1','8','9','10','11','13','16','18','20','22'];
+  // DSLR image format options
+  const dsrlFormatOptions = ['JPEG','RAW','RAW+JPEG'];
+
   // ---------------------------------------------------------------------------
   // FUNCIÓN: abrir un dropdown de Basic y calcular su posición en viewport
   // Necesario porque el panel tiene overflow:hidden y los dropdowns se cortaban.
   // La posición se calcula relativa al botón que lo abre.
   // ---------------------------------------------------------------------------
-  function openBasicDropdown(which: 'shutter' | 'iso' | 'aperture') {
+  function openBasicDropdown(which: 'shutter' | 'iso' | 'aperture' | 'format') {
     // Si ya está abierto, cerrar
     if (openDropdown === which) {
       openDropdown = null;
@@ -148,9 +170,10 @@
     }
 
     // Obtener la referencia del botón correspondiente
-    const btnEl = which === 'shutter' ? shutterBtnEl
-                : which === 'iso'     ? isoBtnEl
-                : apertureBtnEl;
+    const btnEl = which === 'shutter'  ? shutterBtnEl
+                : which === 'iso'      ? isoBtnEl
+                : which === 'aperture' ? apertureBtnEl
+                : formatBtnEl;
 
     if (btnEl) {
       const rect = btnEl.getBoundingClientRect();
@@ -434,13 +457,46 @@
   // Cargar dispositivos reales al montar
   // ---------------------------------------------------------------------------
   onMount(() => {
-    camerasApi.listDevices()
-      .then(d => {
-        devices = d;
-        onDevicesChange?.(d);
-      })
-      .catch(() => { /* fallo silencioso — el selector mostrará Camera 0/1 */ });
+    Promise.all([
+      camerasApi.listDevices(),
+      camerasApi.getCapabilities().catch(() => null),
+    ]).then(([d, caps]) => {
+      devices = d;
+      capabilities = caps;
+      onDevicesChange?.(d);
+    }).catch(() => { /* fallo silencioso */ });
   });
+
+  // ---------------------------------------------------------------------------
+  // DSLR: cargar ajustes reales cuando se activa el backend gphoto2
+  // ---------------------------------------------------------------------------
+  $effect(() => {
+    if (!isDSLR) return;
+    const idx = selectedCameraIndex;
+    camerasApi.getDSLRSettings(idx)
+      .then(s => {
+        if (s.shutter_speed) cameraShutter = { ...cameraShutter, [idx]: s.shutter_speed };
+        if (s.iso)           cameraIso     = { ...cameraIso,     [idx]: s.iso };
+        if (s.aperture)      cameraDslrAperture = { ...cameraDslrAperture, [idx]: s.aperture };
+        if (s.image_format) {
+          // Map PTP internal names → user-facing names
+          const fmtMap: Record<string, string> = { 'L': 'JPEG', 'RAW': 'RAW', 'RAW + L': 'RAW+JPEG' };
+          cameraDslrFormat = { ...cameraDslrFormat, [idx]: fmtMap[s.image_format] ?? s.image_format };
+        }
+      })
+      .catch(() => {}); // silencioso — cámara puede no estar conectada
+  });
+
+  // ---------------------------------------------------------------------------
+  // DSLR: helper to apply DSLR settings asynchronously (silent fail)
+  // ---------------------------------------------------------------------------
+  async function applyDSLRSettingsFn(settings: DSLRSettingsUpdate) {
+    try {
+      await camerasApi.applyDSLRSettings(selectedCameraIndex, settings);
+    } catch {
+      // fallo silencioso — la cámara puede no estar disponible
+    }
+  }
 </script>
 
 <!-- ============================================================
@@ -642,9 +698,28 @@
               class:open={openDropdown === 'aperture'}
               onclick={() => openBasicDropdown('aperture')}
             >
-              <span>{aperture}</span>
+              <span>{isDSLR ? (cameraDslrAperture[selectedCameraIndex] ?? '5.6') : aperture}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 style="transform: rotate({openDropdown === 'aperture' ? 180 : 0}deg); transition: transform 0.2s">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+          </div>
+          {/if}
+
+          <!-- Fila: Image Format (solo DSLR) -->
+          {#if isDSLR}
+          <div class="control-row">
+            <span class="control-label">Format</span>
+            <button
+              bind:this={formatBtnEl}
+              class="control-btn"
+              class:open={openDropdown === 'format'}
+              onclick={() => openBasicDropdown('format')}
+            >
+              <span>{cameraDslrFormat[selectedCameraIndex] ?? 'JPEG'}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                style="transform: rotate({openDropdown === 'format' ? 180 : 0}deg); transition: transform 0.2s">
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
             </button>
@@ -674,6 +749,7 @@
 
       {#if openSections.includes('focus')}
         <div class="accordion-content">
+          {#if hasFocusControl}
           <!-- Autofocus -->
           <button class="btn-autofocus" onclick={handleAutoFocus} disabled={isFocusing}>
             {#if isFocusing}
@@ -744,6 +820,12 @@
               <span>4×</span>
             </div>
           </div>
+          {:else}
+          <p class="dslr-note">
+            Set the lens barrel switch to <strong>MF</strong> before capturing.
+            AF causes ~12 s PTP hangs on Canon DSLRs.
+          </p>
+          {/if}
         </div>
       {/if}
     </div>
@@ -770,6 +852,7 @@
 
       {#if openSections.includes('settings')}
         <div class="accordion-content settings-content">
+          {#if hasLiveControls}
 
           <!-- White Balance -->
           <div class="settings-block">
@@ -884,6 +967,7 @@
               {/each}
             </div>
           </div>
+          {/if}
 
         </div>
       {/if}
@@ -948,34 +1032,61 @@
     style="top: {dropdownPos.top}px; left: {dropdownPos.left}px; width: {dropdownPos.width}px"
   >
     {#if openDropdown === 'shutter'}
-      {#each shutterOptions as opt}
+      {#each (isDSLR ? dsrlShutterOptions : shutterOptions) as opt}
         <button
-          class:selected={opt === (cameraShutter[selectedCameraIndex] ?? '1/125s')}
+          class:selected={opt === (cameraShutter[selectedCameraIndex] ?? (isDSLR ? '1/125' : '1/125s'))}
           onclick={() => {
             cameraShutter = { ...cameraShutter, [selectedCameraIndex]: opt };
             onShutterSpeedChange(opt);
-            applySettings({ ae_enable: false, exposure_time_us: parseShutterUs(opt) }, 0);
+            if (isDSLR) {
+              applyDSLRSettingsFn({ shutter_speed: opt });
+            } else {
+              applySettings({ ae_enable: false, exposure_time_us: parseShutterUs(opt) }, 0);
+            }
             openDropdown = null;
           }}
         >{opt}</button>
       {/each}
     {:else if openDropdown === 'iso'}
-      {#each isoOptions as opt}
+      {#each (isDSLR ? dsrlIsoOptions : isoOptions) as opt}
         <button
           class:selected={opt === (cameraIso[selectedCameraIndex] ?? '100')}
           onclick={() => {
             cameraIso = { ...cameraIso, [selectedCameraIndex]: opt };
             onIsoChange(opt);
-            applySettings({ ae_enable: false, analogue_gain: parseInt(opt) / 100 }, 0);
+            if (isDSLR) {
+              applyDSLRSettingsFn({ iso: opt });
+            } else {
+              applySettings({ ae_enable: false, analogue_gain: parseInt(opt) / 100 }, 0);
+            }
             openDropdown = null;
           }}
         >{opt}</button>
       {/each}
     {:else if openDropdown === 'aperture'}
-      {#each apertureOptions as opt}
+      {#each (isDSLR ? dsrlApertureOptions : apertureOptions) as opt}
         <button
-          class:selected={opt === aperture}
-          onclick={() => { onApertureChange(opt); openDropdown = null; }}
+          class:selected={opt === (isDSLR ? (cameraDslrAperture[selectedCameraIndex] ?? '5.6') : aperture)}
+          onclick={() => {
+            if (isDSLR) {
+              cameraDslrAperture = { ...cameraDslrAperture, [selectedCameraIndex]: opt };
+              applyDSLRSettingsFn({ aperture: opt });
+            } else {
+              onApertureChange(opt);
+            }
+            openDropdown = null;
+          }}
+        >{opt}</button>
+      {/each}
+    {:else if openDropdown === 'format'}
+      {#each dsrlFormatOptions as opt}
+        <button
+          class:selected={opt === (cameraDslrFormat[selectedCameraIndex] ?? 'JPEG')}
+          onclick={() => {
+            cameraDslrFormat = { ...cameraDslrFormat, [selectedCameraIndex]: opt };
+            applyDSLRSettingsFn({ image_format: opt });
+            openDropdown = null;
+          }}
         >{opt}</button>
       {/each}
     {/if}

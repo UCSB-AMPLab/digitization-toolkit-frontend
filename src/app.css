@@ -1101,6 +1101,19 @@ canvas, button, a, div {
   margin-top: 6px;
 }
 
+/* DSLR informational note (shown in Focus / Settings accordion when feature unavailable) */
+.dslr-note {
+  font-size: var(--text-sm);
+  color: var(--color-light-grey);
+  line-height: 1.45;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.dslr-note strong {
+  color: var(--color-light);
+}
+
 /* ============================================================================
    WB CLICK-TO-NEUTRALIZE OVERLAY
    ============================================================================ */

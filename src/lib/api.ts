@@ -805,6 +805,32 @@ export interface WhiteBalanceCalibrationResponse {
 // Keep legacy Camera alias
 export type Camera = CameraDevice;
 
+export interface CameraCapabilities {
+  backend: string;
+  live_preview: boolean;
+  focus_control: boolean;
+  live_controls: boolean;
+  zoom: boolean;
+  autofocus_calibration: boolean;
+  dslr_settings: boolean;
+}
+
+export interface DSLRSettings {
+  iso?: string;
+  shutter_speed?: string;
+  aperture?: string;
+  image_format?: string;
+  focus_mode?: string;
+  flash_mode?: string;
+}
+
+export interface DSLRSettingsUpdate {
+  iso?: string;
+  shutter_speed?: string;
+  aperture?: string;
+  image_format?: string;
+}
+
 export const camerasApi = {
   /**
    * List available camera devices
@@ -906,7 +932,34 @@ export const camerasApi = {
     return apiRequest<{ deleted: number; detail: string }>('/cameras/preview/tmp', {
       method: 'DELETE'
     });
-  }
+  },
+
+  /**
+   * Get current backend capabilities (live_preview, focus_control, etc.)
+   */
+  async getCapabilities(): Promise<CameraCapabilities> {
+    return apiRequest<CameraCapabilities>('/cameras/capabilities');
+  },
+
+  /**
+   * Read current DSLR settings from the active PTP session.
+   * Only available when the active backend is gphoto2 (dslr_settings=true).
+   */
+  async getDSLRSettings(cameraIndex: number): Promise<DSLRSettings> {
+    return apiRequest<DSLRSettings>(`/cameras/dslr/${cameraIndex}/settings`);
+  },
+
+  /**
+   * Apply DSLR settings (ISO, shutter speed, aperture, image format).
+   * Only fields provided are applied; others are left at their current camera value.
+   * Only available when the active backend is gphoto2 (dslr_settings=true).
+   */
+  async applyDSLRSettings(cameraIndex: number, settings: DSLRSettingsUpdate): Promise<DSLRSettings> {
+    return apiRequest<DSLRSettings>(`/cameras/dslr/${cameraIndex}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  },
 };
 
 // Camera controls request interface (all fields optional)
