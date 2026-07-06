@@ -26,6 +26,7 @@
   import LiveViewport from './LiveViewport.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import ImageViewerModal from './ImageViewerModal.svelte';
+  import StatusBar from '$lib/components/StatusBar.svelte';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE URL
@@ -253,7 +254,7 @@
     </div>
 
   </div>
-
+      <StatusBar />
 </div>
 
 <!-- ── Modal de inspección de imagen ── -->

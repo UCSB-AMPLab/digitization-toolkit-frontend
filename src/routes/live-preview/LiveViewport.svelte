@@ -37,6 +37,7 @@
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
+  import StatusBar from '$lib/components/StatusBar.svelte';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -343,8 +344,7 @@
   async function handleCapture() {
     if (isCapturing) return;
     isCapturing = true;
-    captureFlash = true;
-    setTimeout(() => { captureFlash = false; }, 150);
+   
 
     try {
       const payload = {
@@ -368,6 +368,9 @@
       if (!result.success) {
         throw new Error(result.error || 'Capture failed');
       }
+
+      captureFlash = true;
+      setTimeout(() => { captureFlash = false; }, 150);
 
       cameraStatus.reportSuccess();
       onCaptureDone();
@@ -567,6 +570,13 @@
       </div>
       <!-- ══ FIN STREAM DE CÁMARA ══ -->
 
+      <!-- mensaje error de captura -->
+      {#if $cameraStatus.captureError}
+        <div class="alert alert-error capture-error-banner" role="alert">
+          <span class="material-symbols-outlined alert-icon">error</span>
+          {$cameraStatus.errorMessage ?? 'Error al capturar'}
+        </div>
+      {/if}
       <!-- ── GRILLA (líneas cian, no arrastrables) ── -->
       {#if showGrid}
         {#each Array.from({length: gridCols - 1}, (_, i) => i) as i}
@@ -799,6 +809,13 @@
 
   .camera-feed:last-child { border-right: none; }
 
+  .capture-error-banner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+  }
   /* Imagen del stream / polling */
   .feed-img {
     width: 100%;

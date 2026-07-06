@@ -1437,6 +1437,9 @@ canvas, button, a, div {
   font-size: var(--text-sm);
   color: var(--color-light-grey);
   white-space: nowrap;
+  position: absolute;
+  bottom: 12px;
+  right: 24px;
 }
 
 .status-bar-dot {
