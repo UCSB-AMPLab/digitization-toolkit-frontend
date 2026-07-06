@@ -386,10 +386,12 @@
                         <span class="material-symbols-outlined icon-sm">edit</span>
                         Editar
                       </button>
-                      <button class="action-item action-item-danger" onclick={(e) => openDeleteModal(e, project)}>
-                        <span class="material-symbols-outlined icon-sm">delete</span>
-                        Eliminar
-                      </button>
+                      {#if $userRole === 'admin'}
+                        <button class="action-item action-item-danger" onclick={(e) => openDeleteModal(e, project)}>
+                          <span class="material-symbols-outlined icon-sm">delete</span>
+                          Eliminar
+                        </button>
+                      {/if}
                     </div>
                   {/if}
                 </div>

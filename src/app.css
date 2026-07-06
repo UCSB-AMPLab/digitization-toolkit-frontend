@@ -881,6 +881,109 @@ canvas, button, a, div {
   margin-top: 6px;
 }
 
+/* DSLR informational note (shown in Focus / Settings accordion when feature unavailable) */
+.dslr-note {
+  font-size: var(--text-sm);
+  color: var(--color-light-grey);
+  line-height: 1.45;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.dslr-note strong {
+  color: var(--color-light);
+}
+
+/* Orientation control row in Basic accordion */
+.orientation-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rotate-step-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-light-grey);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.rotate-step-btn:hover {
+  color: var(--color-light);
+  border-color: var(--color-light-grey);
+}
+
+.orientation-label {
+  font-size: var(--text-sm);
+  color: var(--color-light);
+  min-width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Live preview feed rotation — applied to <img class="feed-img"> */
+.feed-rotate-90  { transform: rotate(90deg);  }
+.feed-rotate-180 { transform: rotate(180deg); }
+.feed-rotate-270 { transform: rotate(270deg); }
+
+/* Floating rotation overlay — bottom-center of each camera feed */
+.feed-rotate-overlay {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(19, 17, 16, 0.70);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 20px;
+  padding: 3px 8px;
+  z-index: 10;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.camera-feed:hover .feed-rotate-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.feed-rotate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--color-light-grey);
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.feed-rotate-btn:hover {
+  color: var(--color-light);
+}
+
+.feed-rotate-deg {
+  font-size: 11px;
+  color: var(--color-light);
+  min-width: 28px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ============================================================================
    WB CLICK-TO-NEUTRALIZE OVERLAY
    ============================================================================ */

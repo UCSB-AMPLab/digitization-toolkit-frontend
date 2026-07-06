@@ -55,6 +55,10 @@
   let iso = $state('200');
   let aperture = $state('13.0');
 
+  // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
+  // Default 90° — most digitisation rigs use vertical (portrait) orientation
+  let rotateDeg = $state<Record<number, number>>({ 0: 90, 1: 90 });
+
   // Nombre real del proyecto (cargado desde la API al montar)
   let projectName = $state<string>('');
 
@@ -215,6 +219,7 @@
       onIsoChange={(v) => iso = v}
       onApertureChange={(v) => aperture = v}
       onDevicesChange={(d) => devices = d}
+      onRotateDegChange={(cam, deg) => rotateDeg = { ...rotateDeg, [cam]: deg }}
     />
 
     <!-- Área central: viewport + tira de miniaturas -->
@@ -230,7 +235,9 @@
         {projectName}
         {collectionId}
         {devices}
+        {rotateDeg}
         onCaptureDone={handleCaptureDone}
+        onRotateDegChange={(cam, deg) => rotateDeg = { ...rotateDeg, [cam]: deg }}
       />
 
       <!-- Tira de miniaturas inferior -->
