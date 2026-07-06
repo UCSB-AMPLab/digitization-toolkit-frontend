@@ -19,6 +19,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
+	import logo from '$lib/assets/captua-logo.svg';
+	import favicon from '$lib/assets/favicon-light.svg';
 
 	let { children } = $props();
 
@@ -146,26 +148,14 @@
 			<div class="logo-wrap">
 				<!-- Círculo verde con asterisco/estrella — logo del sistema -->
 				<div class="logo-circle">
-					<svg
-						width="20"
-						height="20"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="white"
-						stroke-width="2.5"
-					>
-						<line x1="12" y1="2" x2="12" y2="22" />
-						<line x1="2" y1="12" x2="22" y2="12" />
-						<line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-						<line x1="19.07" y1="4.93" x2="4.93" y2="19.07" />
-					</svg>
+				<img src={favicon} alt="icon" class="logo-icon" />
 				</div>
 				{#if expanded}
 					<div class="logo-text">
 						<!-- Nombre del sistema — para cambiarlo, edita este texto -->
-						<p class="logo-name">Preservia</p>
+							<img src={logo} alt="Captua" class="brand-logo-xs" />
 						<!-- Rol del usuario en minúsculas con capitalize por CSS -->
-						<p class="logo-role">{currentUser?.role ?? '—'}</p>
+						<!-- <p class="logo-role">{currentUser?.role ?? '—'}</p> -->
 					</div>
 				{/if}
 			</div>
@@ -386,7 +376,10 @@
 		flex-shrink: 0;
 		box-shadow: 0 4px 12px rgba(90, 140, 98, 0.3);
 	}
-
+	.logo-icon {
+		width: 25px;
+		height: 25px;
+	}
 	.logo-text {
 		display: flex;
 		flex-direction: column;

@@ -945,7 +945,7 @@ canvas, button, a, div {
   color: var(--color-light-grey);
   margin: 0;
   text-align: center;
-  line-height: 1.5;
+  line-height: 0.5;
 }
 
 .setup-form-area {
@@ -1772,3 +1772,33 @@ tr:hover .drag-handle,
   gap: 10px;
   margin-top: 8px;
 }
+
+/* ============================================================================
+LOGO and BRANDING
+   ============================================================================ */
+
+	.brand-logo {
+		width: 100%;
+		max-width: 224px;
+		height: auto;
+		display: block;
+		margin: 0 auto;
+	}
+  	.brand-logo-xl {
+		width: 100%;
+		max-width: 425px;
+		height: auto;
+		display: block;
+		margin: 0 auto;
+	}
+	.brand-logo-xs {
+		width: 100%;
+		max-width: 75px;
+		height: auto;
+		display: block;
+		margin: 0 auto;
+	}
+/* ============================================================================
+   SPACING
+   ============================================================================ */
+   .pd-tp-16{padding-top: 16px;}

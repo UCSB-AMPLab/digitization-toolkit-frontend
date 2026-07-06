@@ -9,6 +9,7 @@
   // ============================================================================
 
   import { goto } from '$app/navigation';
+  import logo from '$lib/assets/captua-logo.svg';
   import favicon from '$lib/assets/favicon.svg';
 
   // Botón "Comenzar" → siempre va a /login
@@ -21,12 +22,10 @@
 
   <!-- Logo + nombre del sistema -->
   <div class="header">
-    <!-- Círculo verde con el ícono del sistema -->
-    <div class="logo">
-      <img src={favicon} alt="Logo Sistema de Digitalización" class="logo-img" />
-    </div>
-    <!-- Para cambiar el nombre del sistema, edita este texto -->
-    <p class="name">Preservia - DigiTool</p>
+    	<div class="card-logo-area">
+			<img src={logo} alt="Captua" class="brand-logo-xl" />
+		</div>
+
   </div>
 
   <!-- Título de bienvenida -->
