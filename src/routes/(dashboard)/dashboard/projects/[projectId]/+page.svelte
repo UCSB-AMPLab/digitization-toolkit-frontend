@@ -37,7 +37,9 @@
   let searchQuery = $state('');
   let recordCount = $state<number | null>(null);
 
-  let canCreate = $derived($authStore.user?.role === 'admin');
+  let canCreate = $derived(
+    $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
+  );
   let canManageMembers = $derived(
     $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
   );
