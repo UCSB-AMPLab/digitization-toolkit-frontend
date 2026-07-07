@@ -15,7 +15,6 @@
   import { goto } from '$app/navigation';
   import { authApi } from '$lib/api';
   import favicon from '$lib/assets/favicon.svg';
-  import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
 
   // ---------------------------------------------------------------------------
   // ESTADO DEL FORMULARIO
@@ -356,21 +355,6 @@
       <div class="logo-circle">
         <img src={favicon} alt="Logo" class="logo-icon" />
       </div>
-    {/if}
-
-    <!-- ── LOGO + TÍTULOS ──────────────────────────────────────── -->
-<div class="setup-logo-area">
-      <!-- Logo + nombre del sistema -->
-      <div>
-        <img src={logo} alt="Captua" class="brand-logo" />
-      </div>
-      <h4 class="pd-tp-16">Primera instalación</h4>
-      <p class="setup-subtitle">Crea la cuenta de administrador para comenzar.</p>
-    </div>
-
-
-    <!-- ── FORMULARIO ─────────────────────────────────────────── -->
-    <div class="setup-form-area">
       <p class="system-name">Preservia</p>
       <p class="setup-title">Primera instalación</p>
       <p class="setup-subtitle">
