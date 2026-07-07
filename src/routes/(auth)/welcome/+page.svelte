@@ -11,7 +11,7 @@
 
   import { goto } from '$app/navigation';
   import { authApi } from '$lib/api';
-  import logo from '$lib/assets/captua-logo.svg';
+  import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
 
   let isChecking = $state(false);
 
