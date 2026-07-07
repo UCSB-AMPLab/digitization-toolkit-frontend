@@ -4,17 +4,33 @@
   // Ruta: /welcome
   //
   // Pantalla de bienvenida con logo y botón "Comenzar".
-  // El botón lleva a /login donde el usuario ingresa sus credenciales.
-  // Para cambiar el destino del botón, edita el goto en handleComenzar().
+  // El botón consulta si es primera instalación (sin usuarios registrados):
+  //   Sí → /setup  (crear cuenta de administrador)
+  //   No → /login  (flujo normal)
   // ============================================================================
 
   import { goto } from '$app/navigation';
+<<<<<<< HEAD
   import logo from '$lib/assets/captua-logo.svg';
+=======
+  import { authApi } from '$lib/api';
+>>>>>>> main
   import favicon from '$lib/assets/favicon.svg';
 
-  // Botón "Comenzar" → siempre va a /login
-  function handleComenzar() {
-    goto('/login');
+  let isChecking = $state(false);
+
+  // Botón "Comenzar" → decide entre /setup y /login según haya usuarios
+  async function handleComenzar() {
+    if (isChecking) return;
+    isChecking = true;
+    try {
+      const { needs_setup } = await authApi.setupStatus();
+      goto(needs_setup ? '/setup' : '/login');
+    } catch {
+      goto('/login');
+    } finally {
+      isChecking = false;
+    }
   }
 </script>
 
@@ -32,7 +48,7 @@
   <h1 class="title">Bienvenido/a</h1>
 
   <!-- Botón de entrada — llama a handleComenzar() -->
-  <button class="btn" onclick={handleComenzar}>
+  <button class="btn" onclick={handleComenzar} disabled={isChecking} aria-busy={isChecking}>
     Comenzar
   </button>
 
@@ -107,6 +123,13 @@
     transition: background-color var(--transition-base);
   }
 
-  .btn:hover  { background-color: rgba(150,177,240,0.1); }
-  .btn:active { transform: scale(0.97); }
+  .btn:hover:not(:disabled)  { background-color: rgba(150,177,240,0.1); }
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>
+
+
+
+
+
+
