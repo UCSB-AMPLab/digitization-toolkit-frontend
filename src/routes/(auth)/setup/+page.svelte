@@ -356,7 +356,6 @@
       <div class="logo-circle">
         <img src={favicon} alt="Logo" class="logo-icon" />
       </div>
-<<<<<<< HEAD
     {/if}
 
     <!-- ── LOGO + TÍTULOS ──────────────────────────────────────── -->
@@ -372,7 +371,6 @@
 
     <!-- ── FORMULARIO ─────────────────────────────────────────── -->
     <div class="setup-form-area">
-=======
       <p class="system-name">Preservia</p>
       <p class="setup-title">Primera instalación</p>
       <p class="setup-subtitle">
@@ -382,7 +380,6 @@
 
     <!-- Formulario -->
     <div class="form-area">
->>>>>>> main
 
       <!-- CAMPO: Usuario -->
       <div class="field-group">
