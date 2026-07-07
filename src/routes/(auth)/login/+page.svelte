@@ -8,10 +8,6 @@
 	//   - Loading:  spinner + overlay mientras espera respuesta del backend
 	//   - Error:    alerta roja "Usuario o contraseña incorrectos"
 	//   - Popup:    modal "¿Olvidaste tu contraseña?" con instrucción de contacto
-	//
-	// Credenciales demo (solo para desarrollo, ver sección DEMO abajo):
-	//   Operario: m.garcia  | Revisor: j.lopez  | Admin: admin
-	//   Contraseña: cualquiera (el mock no verifica)
 	// ============================================================================
 
 	import { onMount } from 'svelte';
@@ -55,16 +51,6 @@
 	const languages = ['ES', 'EN', 'PT'];
 
 	// ---------------------------------------------------------------------------
-	// MODO DEMO
-	// ── Activa credenciales demo en desarrollo para probar la UI sin backend ──
-	// Para desactivar el modo demo en producción, cambia isDemoMode a false
-	// o elimina el bloque completo de credenciales demo del HTML.
-	// ---------------------------------------------------------------------------
-	// Controlled by PUBLIC_DEMO_MODE env var (set in docker-compose.yml).
-	// Defaults to false (real login) when the variable is absent.
-	const isDemoMode = env.PUBLIC_DEMO_MODE === 'true';
-
-	// ---------------------------------------------------------------------------
 	// AL MONTAR: verifica si ya hay sesión y chequea conexión al backend
 	// ---------------------------------------------------------------------------
 	onMount(async () => {
@@ -94,12 +80,6 @@
 	// ---------------------------------------------------------------------------
 	// FUNCIÓN: Maneja el submit del formulario de login
 	//
-	// Flujo DEMO (isDemoMode = true):
-	//   1. Busca el username en demoUsers
-	//   2. Si existe → simula loading 1.5s → crea sesión mock → redirige
-	//   3. Si no existe → muestra error
-	//
-	// Flujo REAL (isDemoMode = false):
 	//   1. Llama a authApi.login() con las credenciales
 	//   2. Obtiene datos del usuario con /users/me
 	//   3. Guarda sesión y redirige al dashboard según rol
@@ -117,68 +97,38 @@
 		isLoading = true;
 
 		try {
-			if (isDemoMode) {
-				// ── MODO DEMO ──────────────────────────────────────────────────────────
-				// Simula la llamada al backend con un delay para ver el estado de carga.
-				// ── Para cambiar el delay del spinner, modifica el valor en ms ──
-				await new Promise((resolve) => setTimeout(resolve, 1500));
+			// Paso 1: autenticar y obtener token JWT
+			const authResponse = await authApi.login({
+				username: username.trim(),
+				password
+			});
 
-				// Busca el usuario en el mapa de demo (case-insensitive)
-				const demoUser = demoUsers[username.trim().toLowerCase()];
+			// Paso 2: obtener datos del usuario autenticado (incluye el rol)
+			// ⚠️ El endpoint /users/me debe devolver el campo 'role' con uno de:
+			//    'admin' | 'operator' | 'reviewer'
+			// Si el backend usa otros nombres de rol, actualizar UserRole en auth.ts
+			const apiBase = browser
+				? env.PUBLIC_API_BASE || 'http://localhost:8000'
+				: 'http://localhost:8000';
 
-				if (!demoUser) {
-					// Usuario no encontrado en el mapa demo
-					errorMessage = 'Usuario o contraseña incorrectos';
-					return;
+			const userResponse = await fetch(`${apiBase}/users/me`, {
+				headers: {
+					Authorization: `Bearer ${authResponse.access_token}`,
+					'Content-Type': 'application/json'
 				}
+			});
 
-				// Crea una sesión mock con token falso y datos del usuario demo
-				// El token 'demo-token' no sirve para llamadas reales al backend
-				authStore.setSession('demo-token', {
-					id: 1,
-					username: username.trim(),
-					email: `${username.trim()}@demo.local`,
-					role: demoUser.role,
-					is_active: true
-				});
-
-				// Redirige al dashboard según el rol del usuario demo
-				goto(getRoleDashboardPath(demoUser.role));
-			} else {
-				// ── MODO REAL (producción) ─────────────────────────────────────────────
-				// Paso 1: autenticar y obtener token JWT
-				const authResponse = await authApi.login({
-					username: username.trim(),
-					password
-				});
-
-				// Paso 2: obtener datos del usuario autenticado (incluye el rol)
-				// ⚠️ El endpoint /users/me debe devolver el campo 'role' con uno de:
-				//    'admin' | 'operator' | 'reviewer'
-				// Si el backend usa otros nombres de rol, actualizar UserRole en auth.ts
-				const apiBase = browser
-					? env.PUBLIC_API_BASE || 'http://localhost:8000'
-					: 'http://localhost:8000';
-
-				const userResponse = await fetch(`${apiBase}/users/me`, {
-					headers: {
-						Authorization: `Bearer ${authResponse.access_token}`,
-						'Content-Type': 'application/json'
-					}
-				});
-
-				if (!userResponse.ok) {
-					throw new Error('No se pudo obtener los datos del usuario');
-				}
-
-				const userData = await userResponse.json();
-
-				// Paso 3: guardar sesión en el store global
-				authStore.setSession(authResponse.access_token, userData);
-
-				// Paso 4: redirigir al dashboard según rol
-				goto(getRoleDashboardPath(userData.role));
+			if (!userResponse.ok) {
+				throw new Error('No se pudo obtener los datos del usuario');
 			}
+
+			const userData = await userResponse.json();
+
+			// Paso 3: guardar sesión en el store global
+			authStore.setSession(authResponse.access_token, userData);
+
+			// Paso 4: redirigir al dashboard según rol
+			goto(getRoleDashboardPath(userData.role));
 		} catch (error) {
 			// Mensaje genérico para no revelar si el usuario existe
 			errorMessage = 'Usuario o contraseña incorrectos';
@@ -390,22 +340,6 @@
 				<!-- En estado loading el texto va en mayúsculas (igual que en el diseño) -->
 				{isLoading ? 'INICIAR SESIÓN' : 'Iniciar sesión'}
 			</button>
-
-			<!-- ── CREDENCIALES DEMO ───────────────────────────────────────────────
-           Solo visible cuando isDemoMode = true. Se pueden descomentar para que se sean visibles en la el prototipo de desarrollo, pero se recomienda eliminar o comentar este bloque en producción para no revelar credenciales.
-           Para ocultar en producción, cambia isDemoMode a false arriba.
-           ─────────────────────────────────────────────────────────────────── -->
-			<!--{#if isDemoMode}
-        <div class="demo-credentials">
-          <p class="demo-title">Credenciales Demo:</p>
-          <p class="demo-text">
-            Operario: <strong>m.garcia</strong> &nbsp;
-            Revisor: <strong>j.lopez</strong> &nbsp;
-            Admin: <strong>admin</strong>
-          </p>
-          <p class="demo-text">(Cualquier contraseña)</p>
-        </div>
-      {/if} -->
 		</div>
 		<!-- /form-area -->
 
@@ -544,36 +478,12 @@
 		padding: 32px 24px 0;
 	}
 
-	.logo-circle {
-		width: 56px;
-		height: 56px;
-		border-radius: 50%;
-		background-color: var(--color-primary);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-shadow: 0 4px 16px rgba(90, 140, 98, 0.35);
-	}
-
-	.logo-icon {
-		width: 28px;
-		height: 28px;
-		filter: brightness(0) invert(1);
-	}
 	.brand-logo {
 		width: 100%;
 		max-width: 224px;
 		height: auto;
 		display: block;
 		margin: 0 auto;
-	}
-
-	.system-name {
-		font-size: var(--text-lead);
-		font-weight: var(--fw-semibold);
-		color: var(--color-primary);
-		margin: 0;
-		text-align: center;
 	}
 
 	/* ── Área del formulario ── */
@@ -748,28 +658,6 @@
 		cursor: not-allowed;
 		letter-spacing: 0.08em;
 	}
-
-	/* Credenciales demo 
-  .demo-credentials {
-    background-color: rgba(255,255,255,0.04);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 10px 14px;
-    text-align: center;
-  }
-
-  .demo-title {
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
-    color: var(--color-light);
-    margin: 0 0 4px;
-  }
-
-  .demo-text {
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    margin: 0;
-  }*/
 
 	/* Footer del card */
 	.card-footer {
