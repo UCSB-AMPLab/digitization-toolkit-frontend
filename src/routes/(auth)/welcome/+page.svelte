@@ -10,8 +10,8 @@
   // ============================================================================
 
   import { goto } from '$app/navigation';
+  import { authApi } from '$lib/api';
   import logo from '$lib/assets/captua-logo.svg';
-  import favicon from '$lib/assets/favicon.svg';
 
   let isChecking = $state(false);
 
@@ -123,9 +123,3 @@
   .btn:active:not(:disabled) { transform: scale(0.97); }
   .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>
-
-
-
-
-
-
