@@ -11,7 +11,7 @@
 
   import { goto } from '$app/navigation';
   import { authApi } from '$lib/api';
-  import favicon from '$lib/assets/favicon.svg';
+  import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
 
   let isChecking = $state(false);
 
@@ -34,12 +34,10 @@
 
   <!-- Logo + nombre del sistema -->
   <div class="header">
-    <!-- Círculo verde con el ícono del sistema -->
-    <div class="logo">
-      <img src={favicon} alt="Logo Sistema de Digitalización" class="logo-img" />
-    </div>
-    <!-- Para cambiar el nombre del sistema, edita este texto -->
-    <p class="name">Preservia - DigiTool</p>
+    	<div class="card-logo-area">
+			<img src={logo} alt="Captua" class="brand-logo-xl" />
+		</div>
+
   </div>
 
   <!-- Título de bienvenida -->
@@ -125,9 +123,3 @@
   .btn:active:not(:disabled) { transform: scale(0.97); }
   .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>
-
-
-
-
-
-
