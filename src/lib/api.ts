@@ -175,6 +175,11 @@ export interface CreateUserData {
 }
 
 export const usersApi = {
+  /** Get the currently authenticated user's profile. Requires a valid token. */
+  async me(): Promise<UserRead> {
+    return apiRequest<UserRead>('/users/me');
+  },
+
   /** List all users. Requires admin token. */
   async list(): Promise<UserRead[]> {
     return apiRequest<UserRead[]>('/auth/users');

@@ -16,11 +16,13 @@
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
-  import { authApi, healthApi } from '$lib/api';
+  import { authApi, healthApi, usersApi } from '$lib/api';
   import { authStore, getRoleDashboardPath, type UserRole } from '$lib/stores/auth';
   import favicon from '$lib/assets/favicon.svg';
+
+  // Roles reconocidos por el frontend — debe reflejar UserRole en stores/auth.ts
+  const KNOWN_ROLES: UserRole[] = ['admin', 'operator', 'reviewer'];
 
   // ---------------------------------------------------------------------------
   // ESTADO DEL FORMULARIO
@@ -156,27 +158,18 @@
         // ⚠️ El endpoint /users/me debe devolver el campo 'role' con uno de:
         //    'admin' | 'operator' | 'reviewer'
         // Si el backend usa otros nombres de rol, actualizar UserRole en auth.ts
-        const apiBase = browser
-          ? (env.PUBLIC_API_BASE || 'http://localhost:8000')
-          : 'http://localhost:8000';
+        const userData = await usersApi.me();
 
-        const userResponse = await fetch(`${apiBase}/users/me`, {
-          headers: {
-            'Authorization': `Bearer ${authResponse.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!userResponse.ok) {
-          throw new Error('No se pudo obtener los datos del usuario');
+        // Paso 3: validar el rol antes de persistir la sesión — un rol
+        // desconocido no debe determinar navegación ni permisos de cámara
+        if (!KNOWN_ROLES.includes(userData.role as UserRole)) {
+          throw new Error(`Rol desconocido recibido del backend: ${userData.role}`);
         }
 
-        const userData = await userResponse.json();
-
-        // Paso 3: guardar sesión en el store global
+        // Paso 4: guardar sesión en el store global
         authStore.setSession(authResponse.access_token, userData);
 
-        // Paso 4: redirigir al dashboard según rol
+        // Paso 5: redirigir al dashboard según rol
         goto(getRoleDashboardPath(userData.role));
       }
 
