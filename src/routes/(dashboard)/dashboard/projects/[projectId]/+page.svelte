@@ -19,7 +19,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { authStore } from '$lib/stores/auth';
+  import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, projectMembersApi,
            type Project, type Collection, type ProjectMember, type UserRead } from '$lib/api';
 
@@ -541,10 +541,12 @@
                         <span class="material-symbols-outlined icon-sm">edit</span>
                         Editar
                       </button>
-                      <button class="action-item action-item-danger" onclick={(e) => openDeleteColModal(e, col)}>
-                        <span class="material-symbols-outlined icon-sm">delete</span>
-                        Eliminar
-                      </button>
+                      {#if $userRole === 'admin'}
+                        <button class="action-item action-item-danger" onclick={(e) => openDeleteColModal(e, col)}>
+                          <span class="material-symbols-outlined icon-sm">delete</span>
+                          Eliminar
+                        </button>
+                      {/if}
                     </div>
                   {/if}
                 </div>

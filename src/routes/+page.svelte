@@ -6,15 +6,13 @@
   //
   // ¿Hay token guardado?
   //   Sí → /dashboard (sesión activa)
-  //   No → verifica si hay usuarios registrados
-  //        ├ Sin usuarios → /setup  (primera instalación)
-  //        └ Con usuarios → /login  (flujo normal)
+  //   No → /welcome (pantalla de bienvenida; el botón "Comenzar" ahí decide
+  //        si va a /setup o /login según haya usuarios registrados)
   // ============================================================================
 
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   import { authStore } from '$lib/stores/auth';
-  import { authApi } from '$lib/api';
 
   if (browser) {
     // Leer sesión actual sin crear suscripción permanente
@@ -28,10 +26,8 @@
       goto('/dashboard');
     } else {
       if (token && !user) authStore.clearSession();
-      // Sin sesión: comprobar si es primera instalación (sin usuarios)
-      authApi.setupStatus()
-        .then(({ needs_setup }) => goto(needs_setup ? '/setup' : '/login'))
-        .catch(() => goto('/login'));
+      // Sin sesión: mostrar la pantalla de bienvenida
+      goto('/welcome');
     }
   }
 </script>

@@ -102,6 +102,243 @@
   }
 </script>
 
+<style>
+  /* ── Wrapper: pantalla completa ── */
+  .setup-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: var(--color-bg);
+    padding: 24px 16px;
+  }
+
+  /* ── Card principal ── */
+  .setup-card {
+    position: relative;
+    width: 100%;
+    max-width: 370px;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Opacidad reducida del formulario durante la carga */
+  .setup-card.is-loading .form-area {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  /* ── Área del logo ── */
+  .card-logo-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 32px 24px 0;
+  }
+
+  .logo-circle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background-color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(90, 140, 98, 0.35);
+  }
+
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+    filter: brightness(0) invert(1);
+  }
+
+  .system-name {
+    font-size: var(--text-lead);
+    font-weight: var(--fw-semibold);
+    color: var(--color-primary);
+    margin: 0;
+    text-align: center;
+  }
+
+  .setup-title {
+    font-size: var(--text-h5);
+    font-weight: var(--fw-bold);
+    color: var(--color-light);
+    margin: 0;
+    text-align: center;
+  }
+
+  .setup-subtitle {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    margin: 0;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ── Área del formulario ── */
+  .form-area {
+    padding: 28px 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field-label {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-light-grey);
+  }
+
+  .setup-hint {
+    font-size: var(--text-sm);
+    color: var(--color-light-grey);
+    opacity: 0.75;
+  }
+
+  /* Input con ícono a la izquierda */
+  .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .input-icon {
+    position: absolute;
+    left: 12px;
+    width: 18px;
+    height: 18px;
+    color: var(--color-light-grey);
+    pointer-events: none;
+  }
+
+  .input-wrapper .input {
+    padding-left: 40px;
+    background-color: var(--color-surface-alt);
+    border-color: #323A31;
+  }
+
+  .input-wrapper .input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+  }
+
+  .input-with-action {
+    padding-right: 44px;
+  }
+
+  /* Botón ojo */
+  .input-action-btn {
+    position: absolute;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-light-grey);
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
+  }
+
+  .input-action-btn:hover { color: var(--color-light); }
+  .input-action-btn svg { width: 18px; height: 18px; }
+
+  /* Error en inputs */
+  .input-error { border-color: var(--color-error) !important; }
+
+  /* Alertas */
+  .alert {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+  }
+
+  .alert-error {
+    background-color: var(--color-error-bg);
+    border: 1px solid var(--color-error);
+    color: var(--color-error);
+  }
+
+  .alert-success {
+    background-color: var(--color-success-bg);
+    border: 1px solid var(--color-success);
+    color: var(--color-success);
+  }
+
+  .alert-icon { width: 18px; height: 18px; flex-shrink: 0; }
+
+  /* Botón principal */
+  .btn-login {
+    width: 100%;
+    font-family: var(--font-family);
+    font-size: var(--text-base);
+    font-weight: var(--fw-semibold);
+    color: var(--color-light);
+    background-color: var(--color-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 14px;
+    min-height: var(--touch-target-lg);
+    cursor: pointer;
+    transition: background-color var(--transition-base), opacity var(--transition-base);
+  }
+
+  .btn-login:hover:not(:disabled) { background-color: var(--color-primary-hover); }
+  .btn-login:active:not(:disabled) { transform: scale(0.98); }
+  .btn-login:disabled { opacity: 0.6; cursor: not-allowed; letter-spacing: 0.08em; }
+
+  /* Overlay de carga */
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(19, 17, 16, 0.65);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    border-radius: var(--radius-xl);
+    z-index: 10;
+    backdrop-filter: blur(2px);
+  }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--color-light);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .loading-text {
+    font-size: var(--text-base);
+    font-weight: var(--fw-medium);
+    color: var(--color-light);
+    margin: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
 <!-- ============================================================
      CONTENEDOR PRINCIPAL
      ============================================================ -->
@@ -113,40 +350,33 @@
 
   <div class="setup-card" class:is-loading={isLoading}>
 
-    <!-- ── LOADING OVERLAY ─────────────────────────────────────── -->
-    {#if isLoading}
-      <div class="setup-loading-overlay" aria-hidden="true">
-        <div class="setup-spinner"></div>
+    <!-- Logo + nombre del sistema + título -->
+    <div class="card-logo-area">
+      <div class="logo-circle">
+        <img src={favicon} alt="Logo" class="logo-icon" />
       </div>
-    {/if}
-
-    <!-- ── LOGO + TÍTULOS ──────────────────────────────────────── -->
-    <div class="setup-logo-area">
-      <div class="setup-logo-circle">
-        <img src={favicon} alt="Logo" class="setup-logo-icon" />
-      </div>
-      <p class="setup-system-name">Preservia</p>
+      <p class="system-name">Preservia</p>
       <p class="setup-title">Primera instalación</p>
       <p class="setup-subtitle">
         Crea la cuenta de administrador para comenzar a usar el sistema.
       </p>
     </div>
 
-    <!-- ── FORMULARIO ─────────────────────────────────────────── -->
-    <div class="setup-form-area">
+    <!-- Formulario -->
+    <div class="form-area">
 
       <!-- CAMPO: Usuario -->
-      <div class="setup-field-group">
-        <label class="setup-field-label" for="su-username">Usuario</label>
-        <div class="setup-input-wrapper">
-          <svg class="setup-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <div class="field-group">
+        <label class="field-label" for="su-username">Usuario</label>
+        <div class="input-wrapper">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
             <circle cx="12" cy="7" r="4"/>
           </svg>
           <input
             id="su-username"
             type="text"
-            class="setup-input"
+            class="input"
             class:input-error={errorMessage}
             placeholder="ej. admin"
             bind:value={username}
@@ -159,17 +389,17 @@
       </div>
 
       <!-- CAMPO: Correo -->
-      <div class="setup-field-group">
-        <label class="setup-field-label" for="su-email">Correo electrónico</label>
-        <div class="setup-input-wrapper">
-          <svg class="setup-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <div class="field-group">
+        <label class="field-label" for="su-email">Correo electrónico</label>
+        <div class="input-wrapper">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
             <polyline points="22,6 12,13 2,6"/>
           </svg>
           <input
             id="su-email"
             type="email"
-            class="setup-input"
+            class="input"
             class:input-error={errorMessage}
             placeholder="admin@ejemplo.com"
             bind:value={email}
@@ -180,17 +410,17 @@
       </div>
 
       <!-- CAMPO: Contraseña -->
-      <div class="setup-field-group">
-        <label class="setup-field-label" for="su-password">Contraseña</label>
-        <div class="setup-input-wrapper">
-          <svg class="setup-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <div class="field-group">
+        <label class="field-label" for="su-password">Contraseña</label>
+        <div class="input-wrapper">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
           <input
             id="su-password"
             type={showPassword ? 'text' : 'password'}
-            class="setup-input setup-input-with-action"
+            class="input input-with-action"
             class:input-error={errorMessage}
             placeholder="Mínimo 8 caracteres"
             bind:value={password}
@@ -199,7 +429,7 @@
           />
           <button
             type="button"
-            class="setup-input-action-btn"
+            class="input-action-btn"
             onclick={() => (showPassword = !showPassword)}
             aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
           >
@@ -221,17 +451,17 @@
       </div>
 
       <!-- CAMPO: Confirmar contraseña -->
-      <div class="setup-field-group">
-        <label class="setup-field-label" for="su-confirm">Confirmar contraseña</label>
-        <div class="setup-input-wrapper">
-          <svg class="setup-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <div class="field-group">
+        <label class="field-label" for="su-confirm">Confirmar contraseña</label>
+        <div class="input-wrapper">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
           <input
             id="su-confirm"
             type={showConfirmPassword ? 'text' : 'password'}
-            class="setup-input setup-input-with-action"
+            class="input input-with-action"
             class:input-error={errorMessage}
             placeholder="Repite la contraseña"
             bind:value={confirmPassword}
@@ -240,7 +470,7 @@
           />
           <button
             type="button"
-            class="setup-input-action-btn"
+            class="input-action-btn"
             onclick={() => (showConfirmPassword = !showConfirmPassword)}
             aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
           >
@@ -285,16 +515,24 @@
       <!-- BOTÓN: Crear cuenta -->
       <button
         type="button"
-        class="setup-btn"
+        class="btn-login"
         onclick={handleSubmit}
         disabled={isLoading}
         aria-busy={isLoading}
       >
-        {isLoading ? 'Creando cuenta…' : 'Crear cuenta de administrador'}
+        {isLoading ? 'CREANDO CUENTA' : 'Crear cuenta de administrador'}
       </button>
 
     </div>
-    <!-- /.setup-form-area -->
+    <!-- /.form-area -->
+
+    <!-- OVERLAY DE CARGA -->
+    {#if isLoading}
+      <div class="loading-overlay" aria-label="Cargando" role="status">
+        <div class="spinner"></div>
+        <p class="loading-text">Creando cuenta</p>
+      </div>
+    {/if}
 
   </div>
   <!-- /.setup-card -->
