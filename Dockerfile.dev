@@ -1,4 +1,7 @@
-FROM node:22-bookworm-slim
+# Pinned by multi-arch index digest for golden-card reproducibility;
+# refresh deliberately with `docker buildx imagetools inspect <image:tag>` when updating.
+ARG NODE_IMAGE=node:22-bookworm-slim@sha256:53ada149d435c38b14476cb57e4a7da73c15595aba79bd6971b547ceb6d018bf
+FROM ${NODE_IMAGE}
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --ignore-scripts || npm install --ignore-scripts
