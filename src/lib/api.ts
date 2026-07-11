@@ -1104,11 +1104,18 @@ export const systemApi = {
       body:   JSON.stringify({ action }),
     });
 
-    const data = await response.json().catch(() => ({}));
+    // El cuerpo puede venir vacío o no ser JSON (p. ej. proxies); nunca
+    // dejamos que eso rompa el tipo de retorno declarado.
+    const data: { message?: string; detail?: string } =
+      await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new PowerControlError(response.status, data.detail || data.message || `HTTP ${response.status}`);
     }
-    return data;
+    return {
+      message: typeof data.message === 'string' && data.message
+        ? data.message
+        : 'Orden recibida. El equipo la ejecutará en unos segundos.'
+    };
   },
 };
 

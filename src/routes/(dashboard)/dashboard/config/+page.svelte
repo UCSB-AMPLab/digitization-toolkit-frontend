@@ -122,7 +122,8 @@
   //   401 → sesión expirada
   // ---------------------------------------------------------------------------
   let pendingPowerAction = $state<PowerAction | null>(null);   // acción esperando confirmación
-  let powerPhase = $state<'idle' | 'sending' | 'poweroff' | 'reboot'>('idle');
+  let sendingPower = $state(false);                            // petición en curso (diálogo abierto)
+  let powerPhase = $state<'idle' | 'poweroff' | 'reboot'>('idle');
   let powerError = $state<string | null>(null);
 
   // Texto del diálogo de confirmación según la acción elegida
@@ -141,22 +142,24 @@
   }
 
   function cancelPower() {
+    if (sendingPower) return; // no cancelar una orden ya enviada
     pendingPowerAction = null;
   }
 
   async function confirmPower() {
     const action = pendingPowerAction;
-    if (!action) return;
-    pendingPowerAction = null;
+    if (!action || sendingPower) return;
     powerError = null;
-    powerPhase = 'sending';
+    // El diálogo permanece abierto con los botones deshabilitados mientras
+    // la petición está en vuelo. El estado bloqueante solo se muestra
+    // cuando el backend confirma (200) — un 501/401 no debe bloquear la página.
+    sendingPower = true;
     try {
       await systemApi.powerControl(action);
       // El backend aceptó la orden; entramos en el estado bloqueante.
       powerPhase = action === 'reboot' ? 'reboot' : 'poweroff';
       if (action === 'reboot') pollForRecovery();
     } catch (e: unknown) {
-      powerPhase = 'idle';
       if (e instanceof PowerControlError && e.status === 501) {
         powerError = 'El control de energía no está disponible en este equipo.';
       } else if (e instanceof PowerControlError && e.status === 401) {
@@ -164,6 +167,9 @@
       } else {
         powerError = (e instanceof Error ? e.message : null) || 'No se pudo completar la operación.';
       }
+    } finally {
+      sendingPower = false;
+      pendingPowerAction = null;
     }
   }
 
@@ -727,11 +733,15 @@
       <p class="confirm-desc">{confirmDesc}</p>
 
       <div class="modal-actions">
-        <button class="btn-ghost" onclick={cancelPower}>Cancelar</button>
+        <button class="btn-ghost" onclick={cancelPower} disabled={sendingPower}>Cancelar</button>
         {#if pendingPowerAction === 'reboot'}
-          <button class="btn-confirm-power" onclick={confirmPower}>Sí, reiniciar</button>
+          <button class="btn-confirm-power" onclick={confirmPower} disabled={sendingPower}>
+            {sendingPower ? 'Enviando…' : 'Sí, reiniciar'}
+          </button>
         {:else}
-          <button class="btn-delete" onclick={confirmPower}>Sí, apagar</button>
+          <button class="btn-delete" onclick={confirmPower} disabled={sendingPower}>
+            {sendingPower ? 'Enviando…' : 'Sí, apagar'}
+          </button>
         {/if}
       </div>
     </div>
@@ -743,7 +753,7 @@
      No hay botones: la única salida es que el equipo se apague
      (poweroff) o que la app se recargue sola (reboot).
      ============================================================ -->
-{#if powerPhase === 'sending' || powerPhase === 'poweroff' || powerPhase === 'reboot'}
+{#if powerPhase === 'poweroff' || powerPhase === 'reboot'}
   <div class="power-overlay">
     <div class="power-overlay-card">
       <div class="spinner-lg"></div>
@@ -752,13 +762,11 @@
         <p class="power-overlay-desc">
           Ya puedes desconectar la corriente cuando la pantalla se apague.
         </p>
-      {:else if powerPhase === 'reboot'}
+      {:else}
         <h3 class="power-overlay-title">Reiniciando el equipo…</h3>
         <p class="power-overlay-desc">
           La aplicación volverá en un momento. No desconectes la corriente.
         </p>
-      {:else}
-        <h3 class="power-overlay-title">Enviando la orden…</h3>
       {/if}
     </div>
   </div>
@@ -1185,6 +1193,7 @@
     white-space: nowrap;
   }
   .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
+  .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Botón destructivo — rojo (apagar) */
   .btn-delete {
@@ -1194,7 +1203,8 @@
     border: none; border-radius: var(--radius-md);
     cursor: pointer; transition: opacity var(--transition-base);
   }
-  .btn-delete:hover { opacity: 0.85; }
+  .btn-delete:hover    { opacity: 0.85; }
+  .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Botón confirmar reinicio — verde primario (no destructivo) */
   .btn-confirm-power {
@@ -1204,7 +1214,8 @@
     border: none; border-radius: var(--radius-md);
     cursor: pointer; transition: background-color var(--transition-base);
   }
-  .btn-confirm-power:hover { background-color: var(--color-primary-hover); }
+  .btn-confirm-power:hover    { background-color: var(--color-primary-hover); }
+  .btn-confirm-power:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* ── Estado bloqueante (apagando / reiniciando) ─────────── */
   .power-overlay {
