@@ -1021,6 +1021,23 @@ export interface StorageDevice {
   type:       string;
 }
 
+// Apagado / reinicio del equipo.
+export type PowerAction = 'poweroff' | 'reboot';
+
+/**
+ * Error de la llamada de energía que conserva el código HTTP.
+ * Necesario para distinguir 501 (control no disponible — máquina de
+ * desarrollo) de un error real, ya que apiRequest() descarta el status.
+ */
+export class PowerControlError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'PowerControlError';
+    this.status = status;
+  }
+}
+
 export const systemApi = {
   async getLogs(params?: { limit?: number; category?: string; level?: string }): Promise<SystemLogEntry[]> {
     const q = new URLSearchParams();
@@ -1065,6 +1082,40 @@ export const systemApi = {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ mountpoint }),
     });
+  },
+
+  /**
+   * Apagar o reiniciar el equipo.
+   *   200 → { message } (el backend se apaga o reinicia segundos después)
+   *   501 → control de energía no disponible (p. ej. entorno de desarrollo)
+   *   401 → sesión expirada
+   * Lanza PowerControlError con el status para que la UI muestre el mensaje
+   * adecuado. No usamos apiRequest() porque descarta el código HTTP.
+   */
+  async powerControl(action: PowerAction): Promise<{ message: string }> {
+    const base  = getApiBase();
+    const token = tokenStore.get();
+    const headers: { [key: string]: string } = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${base}/system/power`, {
+      method: 'POST',
+      headers,
+      body:   JSON.stringify({ action }),
+    });
+
+    // El cuerpo puede venir vacío o no ser JSON (p. ej. proxies); nunca
+    // dejamos que eso rompa el tipo de retorno declarado.
+    const data: { message?: string; detail?: string } =
+      await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new PowerControlError(response.status, data.detail || data.message || `HTTP ${response.status}`);
+    }
+    return {
+      message: typeof data.message === 'string' && data.message
+        ? data.message
+        : 'Orden recibida. El equipo la ejecutará en unos segundos.'
+    };
   },
 };
 
