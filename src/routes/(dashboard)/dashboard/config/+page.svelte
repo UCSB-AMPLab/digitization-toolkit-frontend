@@ -21,7 +21,16 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { systemApi, camerasApi, type SystemLogEntry, type StorageInfo, type StorageDevice } from '$lib/api';
+  import {
+    systemApi,
+    camerasApi,
+    healthApi,
+    PowerControlError,
+    type SystemLogEntry,
+    type StorageInfo,
+    type StorageDevice,
+    type PowerAction
+  } from '$lib/api';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Almacenamiento — info del disco actual
@@ -98,6 +107,80 @@
       flushPreviewError = (e instanceof Error ? e.message : null) || 'Error al limpiar los archivos.';
     } finally {
       flushingPreview = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ESTADO: Energía — apagar / reiniciar el equipo
+  //
+  // Reemplaza el hábito de desconectar la corriente directamente, que corrompe
+  // la tarjeta SD. El backend ejecuta el apagado o reinicio real; segundos
+  // después deja de responder, así que la UI entra en un estado bloqueante.
+  //
+  //   200 → apagado/reinicio en curso (el backend se va enseguida)
+  //   501 → control de energía no disponible (equipo de desarrollo)
+  //   401 → sesión expirada
+  // ---------------------------------------------------------------------------
+  let pendingPowerAction = $state<PowerAction | null>(null);   // acción esperando confirmación
+  let powerPhase = $state<'idle' | 'sending' | 'poweroff' | 'reboot'>('idle');
+  let powerError = $state<string | null>(null);
+
+  // Texto del diálogo de confirmación según la acción elegida
+  let confirmTitle = $derived(
+    pendingPowerAction === 'reboot' ? '¿Reiniciar el equipo?' : '¿Apagar el equipo?'
+  );
+  let confirmDesc = $derived(
+    pendingPowerAction === 'reboot'
+      ? 'El equipo se reiniciará y la aplicación volverá en un momento. No desconectes la corriente durante el reinicio.'
+      : 'Espera a que la pantalla se apague antes de desconectar la corriente. Cualquier captura en curso debe terminar primero.'
+  );
+
+  function askPower(action: PowerAction) {
+    powerError = null;
+    pendingPowerAction = action;
+  }
+
+  function cancelPower() {
+    pendingPowerAction = null;
+  }
+
+  async function confirmPower() {
+    const action = pendingPowerAction;
+    if (!action) return;
+    pendingPowerAction = null;
+    powerError = null;
+    powerPhase = 'sending';
+    try {
+      await systemApi.powerControl(action);
+      // El backend aceptó la orden; entramos en el estado bloqueante.
+      powerPhase = action === 'reboot' ? 'reboot' : 'poweroff';
+      if (action === 'reboot') pollForRecovery();
+    } catch (e: unknown) {
+      powerPhase = 'idle';
+      if (e instanceof PowerControlError && e.status === 501) {
+        powerError = 'El control de energía no está disponible en este equipo.';
+      } else if (e instanceof PowerControlError && e.status === 401) {
+        powerError = 'Tu sesión expiró. Vuelve a iniciar sesión para apagar o reiniciar.';
+      } else {
+        powerError = (e instanceof Error ? e.message : null) || 'No se pudo completar la operación.';
+      }
+    }
+  }
+
+  // Tras un reinicio, el backend se cae y vuelve. Cuando /health responde de
+  // nuevo, recargamos la aplicación para retomar una sesión limpia.
+  async function pollForRecovery() {
+    // Damos margen a que el backend empiece a apagarse antes de sondear.
+    await new Promise((r) => setTimeout(r, 8000));
+    while (powerPhase === 'reboot') {
+      try {
+        await healthApi.check();
+        window.location.reload();
+        return;
+      } catch {
+        // Aún no responde — reintentar.
+        await new Promise((r) => setTimeout(r, 3000));
+      }
     }
   }
 
@@ -559,6 +642,61 @@
     </div>
   </div>
 
+  <!-- ══════════════════════════════════════════════════════════
+       SECCIÓN 4: ENERGÍA
+       Apagar o reiniciar el equipo de forma segura. Reemplaza el
+       hábito de desconectar la corriente, que corrompe la tarjeta SD.
+       ══════════════════════════════════════════════════════════ -->
+  <div class="config-section">
+    <h2 class="section-title">Energía</h2>
+    <div class="config-card">
+
+      <!-- Fila: Apagar el equipo -->
+      <div class="config-row">
+        <div class="row-info">
+          <span class="row-label">Apagar el equipo</span>
+          <span class="row-desc">
+            Apaga el equipo de forma segura. Úsalo siempre antes de desconectar
+            la corriente para no dañar la tarjeta de memoria.
+          </span>
+        </div>
+        <button class="btn-power btn-power-off" onclick={() => askPower('poweroff')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+            <line x1="12" y1="2" x2="12" y2="12"/>
+          </svg>
+          Apagar
+        </button>
+      </div>
+
+      <!-- Fila: Reiniciar el equipo -->
+      <div class="config-row">
+        <div class="row-info">
+          <span class="row-label">Reiniciar el equipo</span>
+          <span class="row-desc">
+            Reinicia el equipo. La aplicación se recargará automáticamente cuando
+            vuelva a estar disponible.
+          </span>
+        </div>
+        <button class="btn-power btn-power-reboot" onclick={() => askPower('reboot')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          Reiniciar
+        </button>
+      </div>
+
+      {#if powerError}
+        <div class="section-divider"></div>
+        <div class="power-error-row">
+          <span class="flush-msg flush-msg-err">{powerError}</span>
+        </div>
+      {/if}
+
+    </div>
+  </div>
+
   <!-- Nota informativa sobre el contexto offline -->
   <p class="info-note">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -570,6 +708,61 @@
   </p>
 
 </div>
+
+<!-- ============================================================
+     MODAL DE CONFIRMACIÓN — Apagar / Reiniciar
+     Mismo estilo que el resto de confirmaciones (ver Usuarios).
+     Evita apagados accidentales con un solo clic.
+     ============================================================ -->
+{#if pendingPowerAction}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-backdrop" onclick={(e) => {
+    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) {
+      cancelPower();
+    }
+  }}>
+    <div class="modal-card modal-confirm">
+      <h3 class="confirm-title">{confirmTitle}</h3>
+      <p class="confirm-desc">{confirmDesc}</p>
+
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick={cancelPower}>Cancelar</button>
+        {#if pendingPowerAction === 'reboot'}
+          <button class="btn-confirm-power" onclick={confirmPower}>Sí, reiniciar</button>
+        {:else}
+          <button class="btn-delete" onclick={confirmPower}>Sí, apagar</button>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- ============================================================
+     ESTADO BLOQUEANTE — el backend se está apagando o reiniciando
+     No hay botones: la única salida es que el equipo se apague
+     (poweroff) o que la app se recargue sola (reboot).
+     ============================================================ -->
+{#if powerPhase === 'sending' || powerPhase === 'poweroff' || powerPhase === 'reboot'}
+  <div class="power-overlay">
+    <div class="power-overlay-card">
+      <div class="spinner-lg"></div>
+      {#if powerPhase === 'poweroff'}
+        <h3 class="power-overlay-title">Apagando el equipo…</h3>
+        <p class="power-overlay-desc">
+          Ya puedes desconectar la corriente cuando la pantalla se apague.
+        </p>
+      {:else if powerPhase === 'reboot'}
+        <h3 class="power-overlay-title">Reiniciando el equipo…</h3>
+        <p class="power-overlay-desc">
+          La aplicación volverá en un momento. No desconectes la corriente.
+        </p>
+      {:else}
+        <h3 class="power-overlay-title">Enviando la orden…</h3>
+      {/if}
+    </div>
+  </div>
+{/if}
 
 <style>
   .page { padding: 32px; max-width: 900px; }
@@ -915,5 +1108,133 @@
     background-color: rgba(255,255,255,0.06);
     border-radius: 3px;
     padding: 1px 4px;
+  }
+
+  /* ── Energía ────────────────────────────────────────────── */
+  .btn-power {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-semibold);
+    border-radius: var(--radius-md);
+    padding: 8px 16px; min-height: var(--touch-target-min);
+    cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+  }
+
+  .btn-power-off {
+    color: var(--color-error);
+    background: none;
+    border: 1px solid rgba(214,103,74,0.4);
+  }
+  .btn-power-off:hover { background-color: rgba(214,103,74,0.1); border-color: var(--color-error); }
+
+  .btn-power-reboot {
+    color: var(--color-light-grey);
+    background: none;
+    border: 1px solid var(--border-color);
+  }
+  .btn-power-reboot:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); background-color: rgba(255,255,255,0.04); }
+
+  .power-error-row { padding: 10px 20px 14px; }
+
+  /* ── Modal de confirmación (mismo estilo que Usuarios) ──── */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background-color: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; padding: 24px;
+  }
+
+  .modal-card {
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 28px;
+    width: 100%; max-width: 420px;
+    box-shadow: var(--shadow-lg);
+    display: flex; flex-direction: column; gap: 16px;
+    max-height: 90vh; overflow-y: auto;
+  }
+
+  .modal-confirm { max-width: 440px; gap: 12px; }
+
+  .confirm-title {
+    font-size: var(--text-h3); font-weight: var(--fw-bold);
+    color: var(--color-light); margin: 0;
+  }
+
+  .confirm-desc {
+    font-size: var(--text-sm); color: var(--color-light-grey);
+    line-height: 1.6; margin: 0;
+  }
+
+  .modal-actions {
+    display: flex; gap: 12px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .btn-ghost {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    flex: 1;
+    background: none; border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); padding: 9px 18px;
+    font-family: var(--font-family); font-size: var(--text-sm);
+    color: var(--color-light-grey); cursor: pointer;
+    transition: all var(--transition-fast); min-height: var(--touch-target-min);
+    white-space: nowrap;
+  }
+  .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
+
+  /* Botón destructivo — rojo (apagar) */
+  .btn-delete {
+    flex: 1; height: 44px;
+    background-color: var(--color-error); color: white;
+    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
+    border: none; border-radius: var(--radius-md);
+    cursor: pointer; transition: opacity var(--transition-base);
+  }
+  .btn-delete:hover { opacity: 0.85; }
+
+  /* Botón confirmar reinicio — verde primario (no destructivo) */
+  .btn-confirm-power {
+    flex: 1; height: 44px;
+    background-color: var(--color-primary); color: white;
+    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
+    border: none; border-radius: var(--radius-md);
+    cursor: pointer; transition: background-color var(--transition-base);
+  }
+  .btn-confirm-power:hover { background-color: var(--color-primary-hover); }
+
+  /* ── Estado bloqueante (apagando / reiniciando) ─────────── */
+  .power-overlay {
+    position: fixed; inset: 0;
+    background-color: rgba(19,17,16,0.92);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 24px;
+  }
+
+  .power-overlay-card {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    gap: 16px; max-width: 420px;
+  }
+
+  .power-overlay-title {
+    font-size: var(--text-h3); font-weight: var(--fw-bold);
+    color: var(--color-light); margin: 0;
+  }
+
+  .power-overlay-desc {
+    font-size: var(--text-base); color: var(--color-light-grey);
+    line-height: 1.6; margin: 0;
+  }
+
+  .spinner-lg {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
   }
 </style>
