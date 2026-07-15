@@ -19,6 +19,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
+	import { m, type StringMessageKey } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
 	import favicon from '$lib/assets/favicon-light.svg';
 
@@ -51,22 +52,32 @@
 	// DEFINICIÓN DE NAVEGACIÓN
 	//
 	// Cada item tiene:
-	//   label   → texto visible en la sidebar expandida
-	//   icon    → clave del ícono SVG a renderizar
-	//   path    → ruta SvelteKit
-	//   roles   → array de roles que pueden ver este item
-	//             si roles está vacío → visible para todos los roles
+	//   labelKey → clave del catálogo i18n ($lib/i18n) con el texto visible
+	//   icon     → clave del ícono SVG a renderizar
+	//   path     → ruta SvelteKit
+	//   roles    → array de roles que pueden ver este item
+	//              si roles está vacío → visible para todos los roles
 	//
 	// Para restringir a solo admin: roles: ['admin']
 	// Para todos: roles: ['admin', 'operator', 'reviewer']
 	// ---------------------------------------------------------------------------
-	const NAV_ITEMS = [
+	const NAV_ITEMS: {
+		sectionKey: StringMessageKey;
+		items: {
+			id: string;
+			labelKey: StringMessageKey;
+			icon: string;
+			path: string;
+			roles: string[];
+			badge?: number | null;
+		}[];
+	}[] = [
 		{
-			section: 'PRINCIPAL',
+			sectionKey: 'nav_section_main',
 			items: [
 				{
 					id: 'dashboard',
-					label: 'Resumen',
+					labelKey: 'nav_overview',
 					icon: 'grid',
 					path: '/dashboard',
 					// Visible para todos los roles
@@ -74,7 +85,7 @@
 				},
 				{
 					id: 'projects',
-					label: 'Proyectos',
+					labelKey: 'nav_projects',
 					icon: 'folder',
 					path: '/dashboard/projects',
 					// Visible para todos los roles
@@ -85,7 +96,7 @@
 				},
 				{
 					id: 'users',
-					label: 'Usuarios',
+					labelKey: 'nav_users',
 					icon: 'users',
 					path: '/dashboard/users',
 					// Solo admin puede ver y gestionar usuarios
@@ -94,11 +105,11 @@
 			]
 		},
 		{
-			section: 'SISTEMA',
+			sectionKey: 'nav_section_system',
 			items: [
 				{
 					id: 'config',
-					label: 'Configuración',
+					labelKey: 'nav_settings',
 					icon: 'settings',
 					path: '/dashboard/config',
 					// Solo admin puede acceder a la configuración del sistema
@@ -164,7 +175,7 @@
 			<button
 				class="collapse-btn"
 				onclick={() => (expanded = !expanded)}
-				aria-label={expanded ? 'Colapsar sidebar' : 'Expandir sidebar'}
+				aria-label={expanded ? $m.nav_collapse_sidebar : $m.nav_expand_sidebar}
 			>
 				<svg
 					width="14"
@@ -185,7 +196,7 @@
 			{#each visibleNav as section}
 				<!-- Título de sección (solo en modo expandido) -->
 				{#if expanded}
-					<p class="s-section-title">{section.section}</p>
+					<p class="s-section-title">{$m[section.sectionKey]}</p>
 				{:else}
 					<div style="height:8px"></div>
 				{/if}
@@ -195,7 +206,7 @@
 						href={item.path}
 						class="s-item"
 						class:active={isActive(item.path)}
-						title={!expanded ? item.label : undefined}
+						title={!expanded ? $m[item.labelKey] : undefined}
 					>
 						<!-- Barra indicadora de ruta activa -->
 						{#if isActive(item.path)}
@@ -264,7 +275,7 @@
 
 						<!-- Label y badge (solo en modo expandido) -->
 						{#if expanded}
-							<span class="s-label">{item.label}</span>
+							<span class="s-label">{$m[item.labelKey]}</span>
 							{#if item.badge}
 								<span class="s-badge">{item.badge}</span>
 							{/if}
@@ -292,7 +303,7 @@
 			{/if}
 
 			<!-- Botón salir: siempre visible, ícono en colapsado + texto en expandido -->
-			<button class="logout-btn" onclick={handleLogout} title="Salir">
+			<button class="logout-btn" onclick={handleLogout} title={$m.nav_logout}>
 				<svg
 					width="15"
 					height="15"
@@ -305,7 +316,7 @@
 					<polyline points="16 17 21 12 16 7" />
 					<line x1="21" y1="12" x2="9" y2="12" />
 				</svg>
-				{#if expanded}<span>Salir</span>{/if}
+				{#if expanded}<span>{$m.nav_logout}</span>{/if}
 			</button>
 		</div>
 	</aside>
