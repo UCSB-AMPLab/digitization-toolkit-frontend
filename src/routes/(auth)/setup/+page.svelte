@@ -14,6 +14,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authApi } from '$lib/api';
+	import { m } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
 
 	// ---------------------------------------------------------------------------
@@ -51,13 +52,13 @@
 	// VALIDACIÓN
 	// ---------------------------------------------------------------------------
 	function validate(): string {
-		if (!username.trim()) return 'El nombre de usuario es obligatorio';
-		if (username.trim().length < 3) return 'El usuario debe tener al menos 3 caracteres';
-		if (!email.trim()) return 'El correo electrónico es obligatorio';
-		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Formato de correo no válido';
-		if (!password) return 'La contraseña es obligatoria';
-		if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
-		if (password !== confirmPassword) return 'Las contraseñas no coinciden';
+		if (!username.trim()) return $m.setup_val_username_required;
+		if (username.trim().length < 3) return $m.setup_val_username_short;
+		if (!email.trim()) return $m.setup_val_email_required;
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return $m.setup_val_email_format;
+		if (!password) return $m.setup_val_password_required;
+		if (password.length < 8) return $m.setup_val_password_short;
+		if (password !== confirmPassword) return $m.setup_val_password_mismatch;
 		return '';
 	}
 
@@ -81,14 +82,14 @@
 				email: email.trim(),
 				password
 			});
-			successMessage = '¡Cuenta creada! Redirigiendo al inicio de sesión…';
+			successMessage = $m.setup_success;
 			setTimeout(() => goto('/login'), 1500);
 		} catch (err: any) {
 			const detail = err?.message || '';
 			if (detail.includes('409') || detail.toLowerCase().includes('already')) {
-				errorMessage = 'Ese usuario o correo ya existe';
+				errorMessage = $m.setup_err_exists;
 			} else {
-				errorMessage = 'No se pudo crear la cuenta. Verifica la conexión al servidor.';
+				errorMessage = $m.setup_err_create;
 			}
 		} finally {
 			isLoading = false;
@@ -114,15 +115,15 @@
 					<img src={logo} alt="Captua" class="brand-logo-xl" />
 				</div>
 			</div>
-			<p class="setup-title">Primera instalación</p>
-			<p class="setup-subtitle">Crea cuenta del administrador.</p>
+			<p class="setup-title">{$m.setup_title}</p>
+			<p class="setup-subtitle">{$m.setup_subtitle}</p>
 		</div>
 
 		<!-- Formulario -->
 		<div class="form-area">
 			<!-- CAMPO: Usuario -->
 			<div class="field-group">
-				<label class="field-label" for="su-username">Usuario</label>
+				<label class="field-label" for="su-username">{$m.common_username_label}</label>
 				<div class="input-wrapper">
 					<svg
 						class="input-icon"
@@ -139,7 +140,7 @@
 						type="text"
 						class="input"
 						class:input-error={errorMessage}
-						placeholder="ej. admin"
+						placeholder={$m.setup_ph_username}
 						bind:value={username}
 						disabled={isLoading}
 						autocomplete="username"
@@ -151,7 +152,7 @@
 
 			<!-- CAMPO: Correo -->
 			<div class="field-group">
-				<label class="field-label" for="su-email">Correo electrónico</label>
+				<label class="field-label" for="su-email">{$m.common_email}</label>
 				<div class="input-wrapper">
 					<svg
 						class="input-icon"
@@ -168,7 +169,7 @@
 						type="email"
 						class="input"
 						class:input-error={errorMessage}
-						placeholder="admin@ejemplo.com"
+						placeholder={$m.setup_ph_email}
 						bind:value={email}
 						disabled={isLoading}
 						autocomplete="email"
@@ -178,7 +179,7 @@
 
 			<!-- CAMPO: Contraseña -->
 			<div class="field-group">
-				<label class="field-label" for="su-password">Contraseña</label>
+				<label class="field-label" for="su-password">{$m.common_password_label}</label>
 				<div class="input-wrapper">
 					<svg
 						class="input-icon"
@@ -195,7 +196,7 @@
 						type={showPassword ? 'text' : 'password'}
 						class="input input-with-action"
 						class:input-error={errorMessage}
-						placeholder="Mínimo 8 caracteres"
+						placeholder={$m.setup_ph_password}
 						bind:value={password}
 						disabled={isLoading}
 						autocomplete="new-password"
@@ -204,7 +205,7 @@
 						type="button"
 						class="input-action-btn"
 						onclick={() => (showPassword = !showPassword)}
-						aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+						aria-label={showPassword ? $m.common_hide_password : $m.common_show_password}
 					>
 						{#if showPassword}
 							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -222,12 +223,12 @@
 						{/if}
 					</button>
 				</div>
-				<span class="setup-hint">Mínimo 8 caracteres</span>
+				<span class="setup-hint">{$m.setup_ph_password}</span>
 			</div>
 
 			<!-- CAMPO: Confirmar contraseña -->
 			<div class="field-group">
-				<label class="field-label" for="su-confirm">Confirmar contraseña</label>
+				<label class="field-label" for="su-confirm">{$m.common_confirm_password}</label>
 				<div class="input-wrapper">
 					<svg
 						class="input-icon"
@@ -244,7 +245,7 @@
 						type={showConfirmPassword ? 'text' : 'password'}
 						class="input input-with-action"
 						class:input-error={errorMessage}
-						placeholder="Repite la contraseña"
+						placeholder={$m.setup_ph_confirm}
 						bind:value={confirmPassword}
 						disabled={isLoading}
 						autocomplete="new-password"
@@ -253,7 +254,7 @@
 						type="button"
 						class="input-action-btn"
 						onclick={() => (showConfirmPassword = !showConfirmPassword)}
-						aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+						aria-label={showConfirmPassword ? $m.common_hide_password : $m.common_show_password}
 					>
 						{#if showConfirmPassword}
 							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -315,16 +316,16 @@
 				disabled={isLoading}
 				aria-busy={isLoading}
 			>
-				{isLoading ? 'CREANDO CUENTA' : 'Crear cuenta de administrador'}
+				{isLoading ? $m.setup_submit_loading : $m.setup_submit}
 			</button>
 		</div>
 		<!-- /.form-area -->
 
 		<!-- OVERLAY DE CARGA -->
 		{#if isLoading}
-			<div class="loading-overlay" aria-label="Cargando" role="status">
+			<div class="loading-overlay" aria-label={$m.common_loading} role="status">
 				<div class="spinner"></div>
-				<p class="loading-text">Creando cuenta</p>
+				<p class="loading-text">{$m.setup_creating}</p>
 			</div>
 		{/if}
 	</div>

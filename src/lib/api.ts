@@ -1,5 +1,7 @@
 import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
+import { get } from 'svelte/store';
+import { m } from './i18n';
 
 /**
  * Centralized API client for Digitization Toolkit
@@ -57,7 +59,7 @@ async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ detail: 'Request failed' }));
+    const errorData = await response.json().catch(() => ({ detail: get(m).api_request_failed }));
     throw new Error(errorData.detail || `HTTP ${response.status}`);
   }
 
@@ -1114,7 +1116,7 @@ export const systemApi = {
     return {
       message: typeof data.message === 'string' && data.message
         ? data.message
-        : 'Orden recibida. El equipo la ejecutará en unos segundos.'
+        : get(m).api_power_ack
     };
   },
 };

@@ -18,7 +18,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, recordsApi, projectsApi, type Record, type CameraDevice } from '$lib/api';
+  import { camerasApi, recordsApi, projectsApi, type Record as ApiRecord, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
 
   import TopBar from './TopBar.svelte';
@@ -57,17 +57,17 @@
 
   // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
   // Default 90° — most digitisation rigs use vertical (portrait) orientation
-  let rotateDeg = $state<Record<number, number>>({ 0: 90, 1: 90 });
+  let rotateDeg = $state<{ [cam: number]: number }>({ 0: 90, 1: 90 });
 
   // Nombre real del proyecto (cargado desde la API al montar)
   let projectName = $state<string>('');
 
   // Lista de registros/imágenes capturadas en esta colección
-  let records = $state<Record[]>([]);
+  let records = $state<ApiRecord[]>([]);
   let selectedRecordId = $state<number | null>(null);
 
   // Registro inspeccionado en el modal de imagen (null = modal cerrado)
-  let inspectedRecord = $state<Record | null>(null);
+  let inspectedRecord = $state<ApiRecord | null>(null);
 
   // Estado de carga general (al iniciar, al capturar, etc.)
   let isLoading = $state(false);
@@ -159,7 +159,7 @@
   // HANDLER: Retoma de un registro desde el modal de imagen
   // Elimina las imágenes existentes y vuelve a capturar para el mismo registro.
   // ---------------------------------------------------------------------------
-  async function handleRetake(record: Record) {
+  async function handleRetake(record: ApiRecord) {
     // Cerrar modal y limpiar selección
     inspectedRecord = null;
 

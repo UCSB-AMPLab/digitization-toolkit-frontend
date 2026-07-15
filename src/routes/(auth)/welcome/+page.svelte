@@ -11,6 +11,7 @@
 
   import { goto } from '$app/navigation';
   import { authApi } from '$lib/api';
+  import { m } from '$lib/i18n';
   import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
 
   let isChecking = $state(false);
@@ -41,11 +42,11 @@
   </div>
 
   <!-- Título de bienvenida -->
-  <h1 class="title">Bienvenido/a</h1>
+  <h1 class="title">{$m.welcome_title}</h1>
 
   <!-- Botón de entrada — llama a handleComenzar() -->
   <button class="btn" onclick={handleComenzar} disabled={isChecking} aria-busy={isChecking}>
-    Comenzar
+    {$m.welcome_start}
   </button>
 
 </div>

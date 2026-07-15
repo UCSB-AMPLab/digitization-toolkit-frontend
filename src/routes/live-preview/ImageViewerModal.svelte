@@ -18,7 +18,8 @@
   //   - Click en el backdrop cierra el modal (sin confirmar)
   // ============================================================================
 
-  import { recordsApi, type Record } from '$lib/api';
+  import { recordsApi, type Record as ApiRecord } from '$lib/api';
+  import { m } from '$lib/i18n';
 
   let {
     record,
@@ -26,10 +27,10 @@
     onClose,
     onRetake,
   }: {
-    record: Record;
+    record: ApiRecord;
     cameraMode: 'single' | 'double';
     onClose: () => void;
-    onRetake: (record: Record) => void;
+    onRetake: (record: ApiRecord) => void;
   } = $props();
 
   // Estado de confirmación de retoma
@@ -39,7 +40,7 @@
   const images = $derived(() => {
     const imgs = record.images ?? [];
     return [...imgs].sort((a, b) => {
-      const order: Record<string, number> = { left: 0, single: 0, right: 1 };
+      const order: { [key: string]: number } = { left: 0, single: 0, right: 1 };
       return (order[a.role ?? 'single'] ?? 0) - (order[b.role ?? 'single'] ?? 0);
     });
   });
@@ -60,9 +61,9 @@
     <!-- ── Cabecera ── -->
     <div class="img-viewer-header">
       <span class="img-viewer-title">
-        {record.title || `Registro #${record.id}`}
+        {record.title || $m.record_fallback_title(record.id)}
       </span>
-      <button class="img-viewer-close-btn" onclick={onClose} aria-label="Cerrar">
+      <button class="img-viewer-close-btn" onclick={onClose} aria-label={$m.common_close}>
         <span class="material-symbols-outlined icon-md">close</span>
       </button>
     </div>
@@ -74,13 +75,13 @@
           <!-- Badge L/R en modo doble cámara -->
           {#if cameraMode === 'double' && img.role && img.role !== 'single'}
             <span class="img-viewer-badge">
-              {img.role === 'left' ? 'L' : 'R'}
+              {img.role === 'left' ? $m.badge_left : $m.badge_right}
             </span>
           {/if}
 
           <img
             src={recordsApi.getImageFileUrl(img.id)}
-            alt={record.title || `Image ${img.id}`}
+            alt={record.title || $m.col_image_alt(img.id)}
             class="img-viewer-img"
           />
         </div>
@@ -99,24 +100,24 @@
         <!-- Acciones normales -->
         <button class="btn btn-secondary" onclick={onClose}>
           <span class="material-symbols-outlined icon-sm">close</span>
-          Cerrar
+          {$m.common_close}
         </button>
         <button class="btn btn-danger" onclick={() => confirmRetake = true}>
           <span class="material-symbols-outlined icon-sm">refresh</span>
-          Volver a capturar
+          {$m.lvm_retake}
         </button>
       {:else}
         <!-- Confirmación de retoma -->
         <span class="img-viewer-confirm-msg">
-          ¿Eliminar imágenes actuales y volver a capturar este registro?
+          {$m.lvm_retake_confirm}
         </span>
         <div class="img-viewer-confirm-btns">
           <button class="btn btn-secondary" onclick={() => confirmRetake = false}>
-            Cancelar
+            {$m.common_cancel}
           </button>
           <button class="btn btn-danger" onclick={() => { confirmRetake = false; onRetake(record); }}>
             <span class="material-symbols-outlined icon-sm">check</span>
-            Confirmar
+            {$m.common_confirm}
           </button>
         </div>
       {/if}
