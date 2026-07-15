@@ -13,6 +13,7 @@
   // ============================================================================
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
+  import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
 
   // ---------------------------------------------------------------------------
@@ -54,11 +55,6 @@
 
   const isDouble = $derived(() => images().some(i => i.role === 'left' || i.role === 'right'));
 
-  function roleLabel(img: RecordImage): string | null {
-    if (img.role === 'left')  return 'L';
-    if (img.role === 'right') return 'R';
-    return null;
-  }
 </script>
 
 <!-- ============================================================
@@ -77,11 +73,11 @@
     <div class="img-viewer-header">
       <div class="img-viewer-header-title-group">
         <span class="img-viewer-title">
-          {record.title || `Registro #${record.id}`}
+          {record.title || $m.record_fallback_title(record.id)}
         </span>
         <StatusBadge status={record.status} />
       </div>
-      <button class="img-viewer-close-btn" onclick={onClose} aria-label="Cerrar">
+      <button class="img-viewer-close-btn" onclick={onClose} aria-label={$m.common_close}>
         <span class="material-symbols-outlined icon-md">close</span>
       </button>
     </div>
@@ -91,15 +87,15 @@
       {#each images() as img}
         <div class="img-viewer-frame">
           <!-- Badge L/R en captura doble -->
-          {#if isDouble() && roleLabel(img)}
+          {#if isDouble() && (img.role === 'left' || img.role === 'right')}
             <span class="img-viewer-badge">
-              {roleLabel(img)}
+              {img.role === 'left' ? $m.badge_left : $m.badge_right}
             </span>
           {/if}
 
           <img
             src={recordsApi.getImageFileUrl(img.id)}
-            alt={record.title || `Image ${img.id}`}
+            alt={record.title || $m.col_image_alt(img.id)}
             class="img-viewer-img"
           />
         </div>
@@ -121,29 +117,29 @@
         <!-- Acciones normales -->
         <button class="btn btn-secondary" onclick={onClose}>
           <span class="material-symbols-outlined icon-sm">close</span>
-          Cerrar
+          {$m.common_close}
         </button>
         <div style="display:flex; gap:8px;">
           {#if isLocked && userRole !== 'admin'}
             <span class="img-viewer-locked-msg">
               <span class="material-symbols-outlined icon-sm">lock</span>
-              Registro bloqueado ({record.status === 'in_review' ? 'en revisión' : 'aprobado'})
+              {$m.col_record_locked(record.status === 'in_review' ? $m.col_status_in_review_lc : $m.col_status_approved_lc)}
             </span>
           {:else}
             <button class="btn btn-warning" onclick={() => confirmAction = 'retake'}>
               <span class="material-symbols-outlined icon-sm">refresh</span>
-              Retomar
+              {$m.col_retake}
             </button>
             <button class="btn btn-danger" onclick={() => confirmAction = 'delete'}>
               <span class="material-symbols-outlined icon-sm">delete</span>
-              Eliminar
+              {$m.common_delete}
             </button>
           {/if}
 
           {#if record.status === 'approved' && canReview && onStatusChange}
             <button class="btn btn-warning" onclick={() => onStatusChange!(record.id, 'rejected')}>
               <span class="material-symbols-outlined icon-sm">flag</span>
-              Marcar para revisión
+              {$m.col_flag_for_review}
             </button>
           {/if}
         </div>
@@ -151,30 +147,30 @@
       {:else if confirmAction === 'retake'}
         <!-- Confirmación de retoma -->
         <span class="img-viewer-confirm-msg">
-          ¿Descartar este registro y volver a capturar desde la vista en vivo?
+          {$m.col_retake_confirm}
         </span>
         <div class="img-viewer-confirm-btns">
           <button class="btn btn-secondary" onclick={() => confirmAction = null}>
-            Cancelar
+            {$m.common_cancel}
           </button>
           <button class="btn btn-warning" onclick={() => { confirmAction = null; onRetake(record); }}>
             <span class="material-symbols-outlined icon-sm">check</span>
-            Confirmar
+            {$m.common_confirm}
           </button>
         </div>
 
       {:else if confirmAction === 'delete'}
         <!-- Confirmación de eliminación -->
         <span class="img-viewer-confirm-msg">
-          ¿Eliminar permanentemente este registro y todas sus imágenes?
+          {$m.col_delete_record_confirm}
         </span>
         <div class="img-viewer-confirm-btns">
           <button class="btn btn-secondary" onclick={() => confirmAction = null}>
-            Cancelar
+            {$m.common_cancel}
           </button>
           <button class="btn btn-danger" onclick={() => { confirmAction = null; onDelete(record); }}>
             <span class="material-symbols-outlined icon-sm">check</span>
-            Eliminar
+            {$m.common_delete}
           </button>
         </div>
       {/if}

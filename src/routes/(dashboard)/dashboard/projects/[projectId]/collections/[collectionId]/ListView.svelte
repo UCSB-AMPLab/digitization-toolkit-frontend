@@ -9,6 +9,7 @@
   // ============================================================================
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
+  import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   // @ts-ignore — installed in Docker, not locally
   import { dndzone } from 'svelte-dnd-action';
@@ -91,17 +92,17 @@
         <circle cx="8.5" cy="8.5" r="1.5"/>
         <polyline points="21 15 16 10 5 21"/>
       </svg>
-      <span>Sin imágenes en esta colección</span>
+      <span>{$m.col_empty_collection}</span>
     </div>
 
   {:else}
     <!-- Cabecera de tabla -->
     <div class="list-header">
-      <span class="col-thumb">Imágenes</span>
-      <span class="col-title">Título</span>
-      <span class="col-status">Estado</span>
-      <span class="col-count">Capturas</span>
-      <span class="col-date">Fecha</span>
+      <span class="col-thumb">{$m.col_col_images}</span>
+      <span class="col-title">{$m.col_col_title}</span>
+      <span class="col-status">{$m.common_status}</span>
+      <span class="col-count">{$m.col_col_captures}</span>
+      <span class="col-date">{$m.pd_col_date}</span>
     </div>
 
     <!-- Filas con DnD -->
@@ -164,7 +165,7 @@
             <span
               class="selectable-check"
               onclick={(e) => { e.stopPropagation(); onToggleSelect!(record.id); }}
-              title="Seleccionar"
+              title={$m.col_select}
             >
               {#if selectedIds.has(record.id)}
                 <span class="material-symbols-outlined icon-sm">check_box</span>
@@ -173,7 +174,7 @@
               {/if}
             </span>
           {/if}
-          {record.title || `Registro #${record.id}`}
+          {record.title || $m.record_fallback_title(record.id)}
         </span>
 
         <!-- Estado QA -->

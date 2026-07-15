@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { m } from '$lib/i18n';
   // ============================================================================
   // COMPONENTE: RightToolbar
   // Archivo: src/routes/gallery/[collectionId]/RightToolbar.svelte
@@ -62,8 +63,8 @@
     class="tool-btn"
     class:active={viewMode === 'list'}
     onclick={() => onViewModeChange('list')}
-    title="Vista lista"
-    aria-label="Vista lista"
+    title={$m.col_view_list}
+    aria-label={$m.col_view_list}
   >
     {#if viewMode === 'list'}
       <div class="active-indicator"></div>
@@ -76,8 +77,8 @@
     class="tool-btn"
     class:active={viewMode === 'spread'}
     onclick={() => onViewModeChange('spread')}
-    title="Vista libro"
-    aria-label="Vista libro abierto"
+    title={$m.col_view_spread}
+    aria-label={$m.col_view_spread_aria}
   >
     {#if viewMode === 'spread'}
       <div class="active-indicator"></div>
@@ -94,8 +95,8 @@
     class="tool-btn"
     class:active={viewMode === 'grid'}
     onclick={() => onViewModeChange('grid')}
-    title="Vista cuadrícula"
-    aria-label="Vista cuadrícula"
+    title={$m.col_view_grid}
+    aria-label={$m.col_view_grid}
   >
     {#if viewMode === 'grid'}
       <div class="active-indicator"></div>
@@ -114,7 +115,7 @@
     <div class="divider"></div>
 
     <!-- Zoom in -->
-    <button class="tool-btn" onclick={handleZoomIn} title="Zoom in" aria-label="Zoom in">
+    <button class="tool-btn" onclick={handleZoomIn} title={$m.col_zoom_in} aria-label={$m.col_zoom_in}>
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -124,7 +125,7 @@
     </button>
 
     <!-- Zoom out -->
-    <button class="tool-btn" onclick={handleZoomOut} title="Zoom out" aria-label="Zoom out">
+    <button class="tool-btn" onclick={handleZoomOut} title={$m.col_zoom_out} aria-label={$m.col_zoom_out}>
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -133,7 +134,7 @@
     </button>
 
     <!-- Fit to screen -->
-    <button class="tool-btn" onclick={handleFitScreen} title="Ajustar pantalla" aria-label="Ajustar a pantalla">
+    <button class="tool-btn" onclick={handleFitScreen} title={$m.col_fit_screen} aria-label={$m.col_fit_screen_aria}>
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
       </svg>
@@ -147,8 +148,8 @@
       class="tool-btn"
       class:export-ready={canExport}
       onclick={onExport}
-      title={canExport ? 'Exportar BagIt (todos aprobados)' : 'Exportar BagIt (requiere todos aprobados)'}
-      aria-label="Exportar BagIt"
+      title={canExport ? $m.col_export_available : $m.col_export_unavailable}
+      aria-label={$m.col_export}
       disabled={!canExport}
     >
       <span class="material-symbols-outlined icon-md">archive</span>

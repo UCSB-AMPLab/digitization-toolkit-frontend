@@ -17,6 +17,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
+  import { m } from '$lib/i18n';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
@@ -90,11 +91,11 @@
 
   let dateError = $derived(
     (colDateStart && !isValidISODate(colDateStart))
-      ? 'Fecha de inicio inválida. Acepta año (AAAA), año-mes (AAAA-MM) o fecha completa (AAAA-MM-DD).'
+      ? $m.pd_val_start_date
       : (colDateEnd && !isValidISODate(colDateEnd))
-      ? 'Fecha de fin inválida. Acepta año (AAAA), año-mes (AAAA-MM) o fecha completa (AAAA-MM-DD).'
+      ? $m.pd_val_end_date
       : (colDateStart && colDateEnd && colDateEnd < colDateStart)
-      ? 'La fecha de fin no puede ser anterior a la fecha de inicio.'
+      ? $m.pd_val_date_range
       : ''
   );
 
@@ -172,7 +173,7 @@
       addUserId = null;
       addRole = 'reviewer';
     } catch (err) {
-      memberError = err instanceof Error ? err.message : 'Error al añadir colaborador';
+      memberError = err instanceof Error ? err.message : $m.pd_err_member_add;
     } finally {
       isAddingMember = false;
     }
@@ -183,7 +184,7 @@
       await projectMembersApi.remove(projectId, userId);
       await loadMembers();
     } catch (err) {
-      memberError = err instanceof Error ? err.message : 'Error al eliminar colaborador';
+      memberError = err instanceof Error ? err.message : $m.pd_err_member_remove;
     }
   }
 
@@ -261,7 +262,7 @@
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      createError = `No se pudo crear la colección: ${msg}`;
+      createError = $m.pd_err_create_collection(msg);
       console.error('[ProjectDetail] Error creando colección:', err);
     } finally {
       isCreating = false;
@@ -363,7 +364,7 @@
       closeDeleteColModal();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      deleteColError = `No se pudo eliminar la colección: ${msg}`;
+      deleteColError = $m.pd_err_delete_collection(msg);
       isDeletingCol = false;
     }
   }
@@ -371,12 +372,12 @@
   // ---------------------------------------------------------------------------
   // HELPERS DE UI (mock — conectar con backend)
   // ---------------------------------------------------------------------------
-  const mockStatuses = ['Activa', 'Activa', 'Pausado', 'Activa', 'Completada'];
+  let mockStatuses = $derived([$m.pd_status_active, $m.pd_status_active, $m.proj_status_paused, $m.pd_status_active, $m.pd_status_completed]);
 
   function getStatusStyle(status: string): string {
-    if (status === 'Activa')     return 'color: var(--color-primary); background: rgba(90,140,98,0.15)';
-    if (status === 'Pausado')    return 'color: var(--color-light-grey); background: rgba(171,183,183,0.12)';
-    if (status === 'Completada') return 'color: var(--color-success); background: rgba(111,191,115,0.15)';
+    if (status === $m.pd_status_active)    return 'color: var(--color-primary); background: rgba(90,140,98,0.15)';
+    if (status === $m.proj_status_paused)    return 'color: var(--color-light-grey); background: rgba(171,183,183,0.12)';
+    if (status === $m.pd_status_completed) return 'color: var(--color-success); background: rgba(111,191,115,0.15)';
     return '';
   }
 </script>
@@ -390,7 +391,7 @@
   <div class="page-header">
     <div>
       <h1 class="page-title">{project?.name ?? '—'}</h1>
-      <p class="page-subtitle">Gestión de colecciones del proyecto</p>
+      <p class="page-subtitle">{$m.pd_subtitle}</p>
     </div>
     <!-- Botón "+ Nueva colección" solo visible cuando ya hay colecciones -->
     {#if canCreate && collections.length > 0}
@@ -398,7 +399,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
-        Nueva colección
+        {$m.pd_new_collection}
       </button>
     {/if}
   </div>
@@ -408,7 +409,7 @@
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M2.5 12H21M2.5 12l5-5M2.5 12l5 5"/>
     </svg>
-    Volver a Proyectos
+    {$m.pd_back}
   </button>
 
   <!-- KPI Cards + Colaboradores button -->
@@ -417,19 +418,19 @@
       <div class="kpi-card">
         <div class="kpi-line" style="background: var(--color-primary)"></div>
         <div class="kpi-num">{collections.length}</div>
-        <div class="kpi-lbl">Colecciones</div>
+        <div class="kpi-lbl">{$m.dash_kpi_collections}</div>
       </div>
 
       <div class="kpi-card">
         <div class="kpi-line" style="background: var(--color-secondary)"></div>
         <div class="kpi-num">{recordCount ?? '—'}</div>
-        <div class="kpi-lbl">Total imágenes</div>
+        <div class="kpi-lbl">{$m.pd_kpi_total_images}</div>
       </div>
     </div>
 
     <button class="btn-collaborators" onclick={openMembersModal}>
       <span class="material-symbols-outlined icon-sm">group</span>
-      <span>Colaboradores</span>
+      <span>{$m.pd_members}</span>
       {#if members.length > 0}
         <span class="member-badge">{members.length}</span>
       {/if}
@@ -442,13 +443,13 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <input type="text" placeholder="Buscar por nombre, código..." bind:value={searchQuery} class="search-input" />
+      <input type="text" placeholder={$m.proj_search_placeholder} bind:value={searchQuery} class="search-input" />
     </div>
     <button class="btn-ghost">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
       </svg>
-      Filtros
+      {$m.common_filters}
     </button>
   </div>
 
@@ -456,16 +457,16 @@
   {#if isLoading}
     <div class="loading">
       <div class="spinner"></div>
-      <span>Cargando colecciones...</span>
+      <span>{$m.pd_loading}</span>
     </div>
   {:else if filteredCollections.length === 0}
     <div class="empty-state">
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
       </svg>
-      <span>{searchQuery ? 'Sin resultados' : 'No hay colecciones aún'}</span>
+      <span>{searchQuery ? $m.pd_empty_search : $m.pd_empty}</span>
       {#if canCreate && !searchQuery}
-        <button class="btn-primary" onclick={() => showCreateModal = true}>Crear primera colección</button>
+        <button class="btn-primary" onclick={() => showCreateModal = true}>{$m.pd_create_first}</button>
       {/if}
     </div>
   {:else}
@@ -473,11 +474,11 @@
       <table class="collections-table">
         <thead>
           <tr>
-            <th>Colección</th>
-            <th>Estado</th>
-            <th>Núm. Imágenes</th>
-            <th>Fecha</th>
-            <th class="text-right">Acciones</th>
+            <th>{$m.pd_col_collection}</th>
+            <th>{$m.common_status}</th>
+            <th>{$m.pd_col_images}</th>
+            <th>{$m.pd_col_date}</th>
+            <th class="text-right">{$m.common_actions}</th>
           </tr>
         </thead>
         <tbody>
@@ -533,7 +534,7 @@
                   <button
                     class="btn-menu"
                     onclick={(e) => openColMenu(e, col.id)}
-                    title="Acciones"
+                    title={$m.common_actions}
                   >
                     <span class="material-symbols-outlined icon-sm">more_vert</span>
                   </button>
@@ -541,12 +542,12 @@
                     <div class="action-menu">
                       <button class="action-item" onclick={(e) => startEditCollection(e, col)}>
                         <span class="material-symbols-outlined icon-sm">edit</span>
-                        Editar
+                        {$m.common_edit}
                       </button>
                       {#if $userRole === 'admin'}
                         <button class="action-item action-item-danger" onclick={(e) => openDeleteColModal(e, col)}>
                           <span class="material-symbols-outlined icon-sm">delete</span>
-                          Eliminar
+                          {$m.common_delete}
                         </button>
                       {/if}
                     </div>
@@ -573,8 +574,8 @@
 
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">{editingCollection ? 'Editar Colección' : 'Nueva Colección'}</h3>
-          <p class="modal-subtitle">Proyecto: {project?.name ?? '—'}</p>
+          <h3 class="modal-title">{editingCollection ? $m.pd_modal_edit_title : $m.pd_modal_create_title}</h3>
+          <p class="modal-subtitle">{$m.pd_modal_project(project?.name ?? '—')}</p>
         </div>
         <button class="modal-close" onclick={closeModal}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -586,11 +587,11 @@
       <div class="modal-body">
         <!-- Título -->
         <div class="form-field">
-          <label class="field-label">TÍTULO <span class="field-required">*</span></label>
+          <label class="field-label">{$m.pd_field_title} <span class="field-required">*</span></label>
           <input
             class="field-input"
             type="text"
-            placeholder="Ej: Misiones Religiosas"
+            placeholder={$m.pd_ph_title}
             bind:value={colName}
             autofocus
           />
@@ -598,48 +599,48 @@
 
         <!-- Signatura -->
         <div class="form-field">
-          <label class="field-label">SIGNATURA</label>
+          <label class="field-label">{$m.pd_field_refcode}</label>
           <input
             class="field-input"
             type="text"
-            placeholder="Ej: CO.AGN.SAA-I.1.1.2"
+            placeholder={$m.pd_ph_refcode}
             bind:value={colSignatura}
           />
         </div>
 
         <!-- Nombre del creador -->
         <div class="form-field">
-          <label class="field-label">NOMBRE DEL CREADOR</label>
+          <label class="field-label">{$m.pd_field_creator}</label>
           <input
             class="field-input"
             type="text"
-            placeholder="Persona o institución que creó los documentos"
+            placeholder={$m.pd_ph_creator}
             bind:value={colCreator}
           />
         </div>
 
         <!-- Fechas de creación -->
         <div class="form-field">
-          <label class="field-label">FECHAS DE CREACIÓN</label>
+          <label class="field-label">{$m.pd_field_dates}</label>
           <div class="date-range-row">
             <div class="date-field">
-              <span class="date-sub-label">DESDE</span>
+              <span class="date-sub-label">{$m.pd_date_from}</span>
               <input
                 class="field-input"
                 class:field-input--error={colDateStart !== '' && !isValidISODate(colDateStart)}
                 type="text"
-                placeholder="Ej: 1987, 1987-04 o 1987-04-15"
+                placeholder={$m.pd_ph_date_from}
                 bind:value={colDateStart}
               />
             </div>
             <span class="date-sep">—</span>
             <div class="date-field">
-              <span class="date-sub-label">HASTA (opcional)</span>
+              <span class="date-sub-label">{$m.pd_date_to}</span>
               <input
                 class="field-input"
                 class:field-input--error={colDateEnd !== '' && !isValidISODate(colDateEnd)}
                 type="text"
-                placeholder="Ej: 1990, 1990-12 o 1990-12-31"
+                placeholder={$m.pd_ph_date_to}
                 bind:value={colDateEnd}
               />
             </div>
@@ -651,10 +652,10 @@
 
         <!-- Notas / Descripción -->
         <div class="form-field">
-          <label class="field-label">NOTAS / DESCRIPCIÓN</label>
+          <label class="field-label">{$m.pd_field_notes}</label>
           <textarea
             class="field-textarea"
-            placeholder="Descripción breve u observaciones..."
+            placeholder={$m.pd_ph_notes}
             bind:value={colDesc}
           ></textarea>
         </div>
@@ -672,7 +673,7 @@
       {/if}
 
       <div class="modal-actions">
-        <button class="btn-ghost" onclick={closeModal}>Cancelar</button>
+        <button class="btn-ghost" onclick={closeModal}>{$m.common_cancel}</button>
         <button
           class="btn-crear"
           onclick={handleCreateCollection}
@@ -681,7 +682,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>
-          {isCreating ? (editingCollection ? 'Guardando...' : 'Creando...') : (editingCollection ? 'Guardar cambios' : 'Crear Colección')}
+          {isCreating ? (editingCollection ? $m.common_saving : $m.common_creating) : (editingCollection ? $m.common_save_changes : $m.pd_create_btn)}
         </button>
       </div>
 
@@ -700,8 +701,8 @@
 
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">Colaboradores</h3>
-          <p class="modal-subtitle">Proyecto: {project?.name ?? '—'}</p>
+          <h3 class="modal-title">{$m.pd_members}</h3>
+          <p class="modal-subtitle">{$m.pd_modal_project(project?.name ?? '—')}</p>
         </div>
         <button class="modal-close" onclick={() => showMembersModal = false}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -714,20 +715,20 @@
 
         <!-- Current members list -->
         <ul class="members-list">
-          {#each members as m}
-            <li class="member-row" class:member-row--implicit={m.is_implicit}>
-              <div class="member-av">{m.username.slice(0,2).toUpperCase()}</div>
+          {#each members as member}
+            <li class="member-row" class:member-row--implicit={member.is_implicit}>
+              <div class="member-av">{member.username.slice(0,2).toUpperCase()}</div>
               <div class="member-info">
-                <span class="member-name">{m.username}</span>
-                <span class="member-email">{m.email}</span>
+                <span class="member-name">{member.username}</span>
+                <span class="member-email">{member.email}</span>
               </div>
-              <span class="role-badge role-badge--{m.role}">{m.role}</span>
-              {#if m.is_implicit}
-                <span class="member-implicit-icon" title="Acceso implícito (no se puede eliminar)">
+              <span class="role-badge role-badge--{member.role}">{member.role}</span>
+              {#if member.is_implicit}
+                <span class="member-implicit-icon" title={$m.pd_member_implicit}>
                   <span class="material-symbols-outlined icon-sm">lock</span>
                 </span>
               {:else if canManageMembers}
-                <button class="btn-remove-member" onclick={() => handleRemoveMember(m.user_id)} title="Eliminar colaborador">
+                <button class="btn-remove-member" onclick={() => handleRemoveMember(member.user_id)} title={$m.pd_member_remove}>
                   <span class="material-symbols-outlined icon-sm">person_remove</span>
                 </button>
               {/if}
@@ -738,17 +739,17 @@
         <!-- Add member — only for admin/operator -->
         {#if canManageMembers}
           <div class="add-member-section">
-            <p class="add-member-title">Añadir colaborador</p>
+            <p class="add-member-title">{$m.pd_member_add}</p>
             <div class="add-member-row">
               <select class="field-input add-member-select" bind:value={addUserId}>
-                <option value={null}>— Seleccionar usuario —</option>
+                <option value={null}>{$m.pd_member_select}</option>
                 {#each filteredUsers as u}
                   <option value={u.id}>{u.username} ({u.email})</option>
                 {/each}
               </select>
               <select class="field-input add-role-select" bind:value={addRole}>
-                <option value="reviewer">Revisor</option>
-                <option value="operator">Operador</option>
+                <option value="reviewer">{$m.role_reviewer}</option>
+                <option value="operator">{$m.role_operator}</option>
               </select>
               <button
                 class="btn-crear"
@@ -756,7 +757,7 @@
                 disabled={!addUserId || isAddingMember}
               >
                 <span class="material-symbols-outlined icon-sm">person_add</span>
-                {isAddingMember ? 'Añadiendo...' : 'Añadir'}
+                {isAddingMember ? $m.pd_member_adding : $m.pd_member_add_btn}
               </button>
             </div>
           </div>
@@ -774,7 +775,7 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn-ghost" onclick={() => showMembersModal = false}>Cerrar</button>
+        <button class="btn-ghost" onclick={() => showMembersModal = false}>{$m.common_close}</button>
       </div>
 
     </div>
@@ -792,7 +793,7 @@
 
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">Eliminar colección</h3>
+          <h3 class="modal-title">{$m.pd_delete_collection_title}</h3>
           <p class="modal-subtitle">{deletingCol.name}</p>
         </div>
         <button class="modal-close" onclick={closeDeleteColModal}>
@@ -805,7 +806,7 @@
       {#if isLoadingDeleteColInfo}
         <div class="delete-loading">
           <div class="spinner"></div>
-          Cargando información...
+          {$m.pd_delete_loading}
         </div>
       {:else if deleteColRecordCount > 0}
         <div class="delete-warning">
@@ -813,31 +814,31 @@
             <span class="material-symbols-outlined icon-md">warning</span>
           </div>
           <div>
-            <p class="delete-warning-title">Esta colección no está vacía</p>
+            <p class="delete-warning-title">{$m.pd_col_not_empty}</p>
             <p class="delete-warning-body">
-              Contiene <strong>{deleteColRecordCount} {deleteColRecordCount === 1 ? 'registro' : 'registros'}</strong>.
-              Las imágenes asociadas se eliminarán permanentemente si no se mueven.
+              {$m.proj_contains_pre}<strong>{$m.pd_records_count(deleteColRecordCount)}</strong>.
+              {$m.pd_delete_warning}
             </p>
           </div>
         </div>
 
         <div class="delete-move-section">
-          <label class="field-label">MOVER REGISTROS ANTES DE ELIMINAR (OPCIONAL)</label>
+          <label class="field-label">{$m.pd_move_label}</label>
           <select class="field-input" bind:value={deleteMoveColTarget}>
-            <option value="">— Eliminar registros definitivamente —</option>
+            <option value="">{$m.pd_move_none}</option>
             {#each collections.filter(c => c.id !== deletingCol!.id) as c}
               <option value={c.id}>{c.name}</option>
             {/each}
           </select>
           {#if deleteMoveColTarget === ''}
-            <p class="delete-move-hint">Los registros e imágenes se perderán permanentemente.</p>
+            <p class="delete-move-hint">{$m.pd_move_hint_none}</p>
           {:else}
-            <p class="delete-move-hint">Los registros se moverán a la colección seleccionada antes de eliminar.</p>
+            <p class="delete-move-hint">{$m.pd_move_hint_selected}</p>
           {/if}
         </div>
       {:else}
         <p class="delete-confirm-text">
-          ¿Estás seguro de que quieres eliminar la colección <strong>"{deletingCol.name}"</strong>? Esta acción no se puede deshacer.
+          {$m.pd_delete_confirm_pre}<strong>"{deletingCol.name}"</strong>? {$m.common_irreversible}
         </p>
       {/if}
 
@@ -851,14 +852,14 @@
       {/if}
 
       <div class="modal-actions">
-        <button class="btn-ghost" onclick={closeDeleteColModal} disabled={isDeletingCol}>Cancelar</button>
+        <button class="btn-ghost" onclick={closeDeleteColModal} disabled={isDeletingCol}>{$m.common_cancel}</button>
         <button
           class="btn-danger"
           onclick={executeDeleteCol}
           disabled={isDeletingCol || isLoadingDeleteColInfo}
         >
           <span class="material-symbols-outlined icon-sm">delete</span>
-          {isDeletingCol ? 'Eliminando...' : (deleteMoveColTarget !== '' ? 'Mover y eliminar' : 'Eliminar colección')}
+          {isDeletingCol ? $m.common_deleting : (deleteMoveColTarget !== '' ? $m.proj_move_and_delete : $m.pd_delete_collection_title)}
         </button>
       </div>
 

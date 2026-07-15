@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Record } from '$lib/api';
+  import { m } from '$lib/i18n';
 
   type RecordStatus = Record['status'];
   type UserRole = 'admin' | 'operator' | 'reviewer';
@@ -41,35 +42,33 @@
   <div class="action-bar">
     <div class="action-bar-left">
       <span class="action-bar-count">{selectedCount}</span>
-      <span class="action-bar-label">
-        {selectedCount === 1 ? 'registro seleccionado' : 'registros seleccionados'}
-      </span>
+      <span class="action-bar-label">{$m.col_selected_label(selectedCount)}</span>
     </div>
 
     <div class="action-bar-actions">
       {#if canOperate}
         <button class="action-bar-btn btn-in-review" onclick={() => onBulkStatusChange('in_review')}>
           <span class="material-symbols-outlined icon-sm">rate_review</span>
-          Enviar a revisión
+          {$m.col_send_to_review}
         </button>
       {/if}
 
       {#if canReview}
         <button class="action-bar-btn btn-approved" onclick={() => onBulkStatusChange('approved')}>
           <span class="material-symbols-outlined icon-sm">check_circle</span>
-          Aprobar
+          {$m.col_approve}
         </button>
 
         <button class="action-bar-btn btn-rejected" onclick={handleReject}>
           <span class="material-symbols-outlined icon-sm">cancel</span>
-          Rechazar
+          {$m.col_reject}
         </button>
       {/if}
 
       {#if canOperate}
         <button class="action-bar-btn btn-captured" onclick={() => onBulkStatusChange('captured')}>
           <span class="material-symbols-outlined icon-sm">photo_camera</span>
-          Volver a capturado
+          {$m.col_return_to_captured}
         </button>
       {/if}
     </div>
@@ -77,7 +76,7 @@
     <div class="action-bar-right">
       <button class="action-bar-deselect" onclick={onDeselect}>
         <span class="material-symbols-outlined icon-sm">close</span>
-        Deseleccionar
+        {$m.col_deselect}
       </button>
     </div>
   </div>
@@ -87,25 +86,25 @@
   <div class="rejection-modal-backdrop" role="dialog" aria-modal="true">
     <div class="rejection-modal-card">
       <div class="rejection-modal-header">
-        <h3 class="rejection-modal-title">Rechazar registros</h3>
-        <button class="rejection-modal-close" onclick={cancelReject} aria-label="Cerrar">
+        <h3 class="rejection-modal-title">{$m.col_reject_modal_title}</h3>
+        <button class="rejection-modal-close" onclick={cancelReject} aria-label={$m.common_close}>
           <span class="material-symbols-outlined icon-sm">close</span>
         </button>
       </div>
       <p class="rejection-note-label">
-        Nota de rechazo para los {selectedCount} registros seleccionados (opcional):
+        {$m.col_reject_note_label(selectedCount)}
       </p>
       <textarea
         class="rejection-note-textarea"
         bind:value={rejectionNote}
-        placeholder="Describe el motivo del rechazo..."
+        placeholder={$m.col_reject_note_placeholder}
         rows="4"
       ></textarea>
       <div class="rejection-modal-actions">
-        <button class="btn-secondary" onclick={cancelReject}>Cancelar</button>
+        <button class="btn-secondary" onclick={cancelReject}>{$m.common_cancel}</button>
         <button class="btn-danger" onclick={confirmReject}>
           <span class="material-symbols-outlined icon-sm">cancel</span>
-          Confirmar rechazo
+          {$m.col_reject_confirm}
         </button>
       </div>
     </div>

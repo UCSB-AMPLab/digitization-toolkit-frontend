@@ -15,6 +15,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { authStore } from '$lib/stores/auth';
+  import { m } from '$lib/i18n';
 
   let { children } = $props();
 
@@ -67,13 +68,13 @@
       <button
         class="btn-back"
         onclick={() => goto(`/dashboard/projects/${projectId}`)}
-        aria-label="Volver al proyecto"
+        aria-label={$m.col_back_to_project}
       >
         <span class="material-symbols-outlined" style="font-size:20px">arrow_back</span>
       </button>
 
       <!-- Breadcrumb -->
-      <nav class="breadcrumb" aria-label="Navegación">
+      <nav class="breadcrumb" aria-label={$m.col_breadcrumb_nav}>
         <span class="bc-item bc-project">{projectName}</span>
         <span class="bc-sep">/</span>
         <span class="bc-item bc-collection">{collectionName}</span>
@@ -87,14 +88,14 @@
         <button
           class="btn-camera"
           onclick={() => goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`)}
-          title="Abrir en cámara"
+          title={$m.col_open_in_camera}
         >
           <span class="material-symbols-outlined" style="font-size:18px">photo_camera</span>
-          <span>Live Scan</span>
+          <span>{$m.col_live_preview}</span>
         </button>
       {/if}
 
-      <div class="user-avatar" aria-label="Usuario actual">{userInitials}</div>
+      <div class="user-avatar" aria-label={$m.col_current_user}>{userInitials}</div>
 
     </div>
   </div>
