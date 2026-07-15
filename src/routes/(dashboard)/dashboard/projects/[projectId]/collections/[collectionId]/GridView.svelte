@@ -38,6 +38,7 @@
   // ============================================================================
 
   import { recordsApi, collectionsApi, type Record } from '$lib/api';
+  import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   // @ts-ignore — installed in Docker, not locally
   import { dndzone } from 'svelte-dnd-action';
@@ -172,7 +173,7 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
         </svg>
-        <span>Filtros</span>
+        <span>{$m.common_filters}</span>
       </button>
 
       <div class="toolbar-divider"></div>
@@ -183,7 +184,7 @@
           <line x1="9" y1="20" x2="15" y2="20"/>
           <line x1="12" y1="4" x2="12" y2="20"/>
         </svg>
-        <span>Renombrar</span>
+        <span>{$m.col_rename}</span>
       </button>
     </div>
 
@@ -204,7 +205,7 @@
           class:active={isReorderMode}
           onclick={toggleReorderMode}
         >
-          {isReorderMode ? 'Listo' : 'Reordenar'}
+          {isReorderMode ? $m.col_reorder_done : $m.col_reorder}
         </button>
 
         <!-- Slider de columnas -->
@@ -220,8 +221,8 @@
           step="1"
           bind:value={columns}
           class="columns-slider"
-          title="Tamaño de thumbnails"
-          aria-label="Número de columnas"
+          title={$m.col_thumb_size}
+          aria-label={$m.col_columns_aria}
         />
 
       </div>
@@ -232,13 +233,13 @@
   <!-- Panel de filtros -->
   {#if showFilterPanel}
     <div class="filter-panel">
-      <span class="filter-title">Filtrar por estado:</span>
+      <span class="filter-title">{$m.col_filter_by_status}</span>
       <div class="filter-chips">
         {#each [
-          { id: 'approved',   label: 'Aprobado' },
-          { id: 'rejected',   label: 'Rechazado' },
-          { id: 'in_review',  label: 'En revisión' },
-          { id: 'captured',   label: 'Capturado' },
+          { id: 'approved',   label: $m.status_approved },
+          { id: 'rejected',   label: $m.status_rejected },
+          { id: 'in_review',  label: $m.status_in_review },
+          { id: 'captured',   label: $m.status_captured },
         ] as f}
       <button
             class="filter-chip"
@@ -249,7 +250,7 @@
           </button>
         {/each}
         {#if activeStatusFilter}
-          <button class="filter-chip clear" onclick={() => activeStatusFilter = null}>× Limpiar</button>
+          <button class="filter-chip clear" onclick={() => activeStatusFilter = null}>{$m.col_clear_filter}</button>
         {/if}
       </div>
     </div>
@@ -280,7 +281,7 @@
             {/if}
           </div>
           <div class="card-meta">
-            <span class="card-name" title={record.title}>{record.title || `Imagen ${i + 1}`}</span>
+            <span class="card-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
             <div class="card-status-row"><StatusBadge status={record.status} /></div>
           </div>
         </div>
@@ -343,7 +344,7 @@
         </div>
 
         <div class="card-meta">
-          <span class="card-name" title={record.title}>{record.title || `Imagen ${i + 1}`}</span>
+          <span class="card-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
           <div class="card-status-row">
             <StatusBadge status={record.status} />
           </div>
@@ -364,18 +365,18 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) showRenameModal = false; }}>
     <div class="modal-card">
-      <h3 class="modal-title">Renombrar imágenes</h3>
+      <h3 class="modal-title">{$m.col_rename_modal_title}</h3>
       <p class="modal-subtitle">
-        Todas las imágenes se renombrarán usando el patrón:
+        {$m.col_rename_desc}
         <code class="code-inline">{renameCollectionId}_001</code>...
       </p>
       <div class="modal-field">
-        <label class="modal-label">ID de colección</label>
-        <input class="modal-input" type="text" bind:value={renameCollectionId} placeholder="id_coleccion" />
+        <label class="modal-label">{$m.col_collection_id}</label>
+        <input class="modal-input" type="text" bind:value={renameCollectionId} placeholder={$m.col_collection_id_ph} />
       </div>
       <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => showRenameModal = false}>Cancelar</button>
-        <button class="modal-btn confirm" onclick={handleConfirmRename}>Renombrar</button>
+        <button class="modal-btn cancel" onclick={() => showRenameModal = false}>{$m.common_cancel}</button>
+        <button class="modal-btn confirm" onclick={handleConfirmRename}>{$m.col_rename}</button>
       </div>
     </div>
   </div>
@@ -398,19 +399,19 @@
           </svg>
         </div>
         <div>
-          <h3 class="modal-title">¿Finalizar Proyecto?</h3>
-          <p class="modal-subtitle-sm">Esta acción marcará el proyecto como terminado</p>
+          <h3 class="modal-title">{$m.col_finalize_title}</h3>
+          <p class="modal-subtitle-sm">{$m.col_finalize_subtitle}</p>
         </div>
       </div>
       <p class="modal-desc">
-        Al finalizar el proyecto se asume que <strong>todas las correcciones y revisiones fueron completadas</strong>. Las imágenes se guardarán automáticamente en la tarjeta de memoria.
+        {$m.col_finalize_p1}<strong>{$m.col_finalize_bold}</strong>{$m.col_finalize_p2}
       </p>
       <div class="modal-actions">
         <button class="modal-btn cancel" onclick={handleCancelFinalize} disabled={isFinalizing}>
-          Cancelar
+          {$m.common_cancel}
         </button>
         <button class="modal-btn confirm" onclick={handleConfirmFinalize} disabled={isFinalizing}>
-          {isFinalizing ? 'Finalizando...' : 'Sí, Finalizar'}
+          {isFinalizing ? $m.col_finalizing : $m.col_finalize_btn}
         </button>
       </div>
     </div>

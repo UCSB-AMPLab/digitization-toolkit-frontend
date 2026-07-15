@@ -11,6 +11,7 @@
   // ============================================================================
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
+  import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
 
   // ---------------------------------------------------------------------------
@@ -93,7 +94,7 @@
           <circle cx="8.5" cy="8.5" r="1.5"/>
           <polyline points="21 15 16 10 5 21"/>
         </svg>
-        <span>Sin imágenes en esta colección</span>
+        <span>{$m.col_empty_collection}</span>
       </div>
     {:else}
       {#each thumbItems as item, i}

@@ -1,23 +1,24 @@
 <script lang="ts">
-  import type { Record } from '$lib/api';
+  import type { Record as ApiRecord } from '$lib/api';
+  import { m } from '$lib/i18n';
 
-  let { records }: { records: Record[] } = $props();
+  let { records }: { records: ApiRecord[] } = $props();
 
   const statusKeys = ['captured', 'in_review', 'rejected', 'approved'] as const;
-  type S = typeof statusKeys[number];
+  type S = ApiRecord['status'];
 
-  const labels: Record<S, string> = {
-    captured:  'Capturados',
-    in_review: 'En revisión',
-    rejected:  'Rechazados',
-    approved:  'Aprobados',
-  };
+  let labels = $derived<{ [K in S]: string }>({
+    captured:  $m.status_captured_plural,
+    in_review: $m.status_in_review,
+    rejected:  $m.status_rejected_plural,
+    approved:  $m.status_approved_plural,
+  });
 
   let counts = $derived(
     statusKeys.reduce((acc, s) => {
       acc[s] = records.filter(r => r.status === s).length;
       return acc;
-    }, {} as Record<S, number>)
+    }, {} as { [K in S]: number })
   );
 
   let total = $derived(records.length || 1); // avoid div by 0
@@ -44,7 +45,7 @@
       {/if}
     {/each}
     {#if records.length === 0}
-      <span class="status-bar-item">Sin registros</span>
+      <span class="status-bar-item">{$m.col_no_records}</span>
     {/if}
   </div>
 </div>

@@ -19,6 +19,7 @@
   // ============================================================================
 
   import type { Record, RecordImage } from '$lib/api';
+  import { m } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -75,14 +76,14 @@
 
   // Tipos de error disponibles para "Marcar error"
   // Para agregar tipos, añadir aquí
-  const ERROR_TYPES = [
-    { id: 'blur',     label: 'Imagen Borrosa',          color: '#bc823c' },
-    { id: 'glare',    label: 'Reflejo/Brillo',           color: '#c05a44' },
-    { id: 'shadow',   label: 'Sombras',                  color: '#8b7355' },
-    { id: 'focus',    label: 'Fuera de Foco',            color: '#7ba3a3' },
-    { id: 'exposure', label: 'Exposición',               color: '#c4a052' },
-    { id: 'dirt',     label: 'Impurezas en superficie',  color: '#a85e78' },
-  ];
+  const ERROR_TYPES = $derived([
+    { id: 'blur',     label: $m.col_err_blurry,   color: '#bc823c' },
+    { id: 'glare',    label: $m.col_err_glare,    color: '#c05a44' },
+    { id: 'shadow',   label: $m.col_err_shadows,  color: '#8b7355' },
+    { id: 'focus',    label: $m.col_err_focus,    color: '#7ba3a3' },
+    { id: 'exposure', label: $m.col_err_exposure, color: '#c4a052' },
+    { id: 'dirt',     label: $m.col_err_debris,   color: '#a85e78' },
+  ]);
 
   let annotations = $state<Annotation[]>([]);
 
@@ -180,10 +181,10 @@
   }
 
   function roleName(img: RecordImage, i: number): string {
-    if (img.role === 'left')  return 'Imagen izquierda';
-    if (img.role === 'right') return 'Imagen derecha';
-    if (img.role === 'overview') return 'Vista general';
-    return `Imagen ${i + 1}`;
+    if (img.role === 'left')  return $m.col_role_left;
+    if (img.role === 'right') return $m.col_role_right;
+    if (img.role === 'overview') return $m.col_role_overview;
+    return $m.col_image_n(i + 1);
   }
 </script>
 
@@ -201,8 +202,8 @@
       class="strip-btn"
       class:active={activeTab === 'info' && isExpanded}
       onclick={() => toggleTab('info')}
-      aria-label="Image info"
-      title="Image info"
+      aria-label={$m.col_tab_info}
+      title={$m.col_tab_info}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -214,8 +215,8 @@
       class="strip-btn"
       class:active={activeTab === 'edit' && isExpanded}
       onclick={() => toggleTab('edit')}
-      aria-label="Preview controls"
-      title="Preview Controls"
+      aria-label={$m.col_tab_edit}
+      title={$m.col_tab_edit}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -228,8 +229,8 @@
       class="strip-btn"
       class:active={activeTab === 'comments' && isExpanded}
       onclick={() => toggleTab('comments')}
-      aria-label="Anotaciones"
-      title="Anotaciones"
+      aria-label={$m.col_tab_comments}
+      title={$m.col_tab_comments}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -244,7 +245,7 @@
       <!-- ══ TAB: IMAGE INFO ══ -->
       {#if activeTab === 'info'}
         <div class="panel-section">
-          <h3 class="panel-title">Image info</h3>
+          <h3 class="panel-title">{$m.col_tab_info}</h3>
 
             {#if currentRecord}
 
@@ -255,7 +256,7 @@
               </div>
 
               {#if sortedImages.length === 0}
-                <p class="empty-text">Sin imágenes</p>
+                <p class="empty-text">{$m.col_no_images}</p>
 
               {:else}
                 {#each sortedImages as img, i}
@@ -274,42 +275,42 @@
 
                       {#if img.format}
                         <div class="info-row">
-                          <span class="info-label">Formato</span>
+                          <span class="info-label">{$m.col_info_format}</span>
                           <span class="info-value">{img.format.toUpperCase()}</span>
                         </div>
                       {/if}
 
                       {#if img.resolution_width && img.resolution_height}
                         <div class="info-row">
-                          <span class="info-label">Dimensiones</span>
+                          <span class="info-label">{$m.col_info_dimensions}</span>
                           <span class="info-value">{img.resolution_width} × {img.resolution_height}</span>
                         </div>
                       {/if}
 
                       {#if img.file_size}
                         <div class="info-row">
-                          <span class="info-label">Tamaño</span>
+                          <span class="info-label">{$m.col_info_size}</span>
                           <span class="info-value">{formatFileSize(img.file_size)}</span>
                         </div>
                       {/if}
 
                       {#if img.sequence != null}
                         <div class="info-row">
-                          <span class="info-label">Secuencia</span>
+                          <span class="info-label">{$m.col_info_sequence}</span>
                           <span class="info-value">{img.sequence}</span>
                         </div>
                       {/if}
 
                       {#if img.filename}
                         <div class="info-row">
-                          <span class="info-label">Archivo</span>
+                          <span class="info-label">{$m.col_info_file}</span>
                           <span class="info-value filename-val" title={img.filename}>{img.filename}</span>
                         </div>
                       {/if}
 
                       {#if img.created_at}
                         <div class="info-row">
-                          <span class="info-label">Capturada</span>
+                          <span class="info-label">{$m.col_info_captured}</span>
                           <span class="info-value">{formatDateTime(img.created_at)}</span>
                         </div>
                       {/if}
@@ -320,7 +321,7 @@
               {/if}
 
             {:else}
-              <p class="empty-text">Selecciona un registro</p>
+              <p class="empty-text">{$m.col_select_record}</p>
             {/if}
           </div>
 
@@ -328,25 +329,25 @@
         {:else if activeTab === 'edit'}
           <div class="panel-section">
             <div class="preview-card">
-              <h3 class="panel-title">Preview Controls</h3>
+              <h3 class="panel-title">{$m.col_tab_edit}</h3>
 
             <!-- Rotar -->
             <div class="control-group">
-              <label class="control-label">Rotate</label>
+              <label class="control-label">{$m.col_rotate}</label>
               <div class="rotate-row">
                 <button class="rotate-btn" onclick={onRotateLeft}>
                   <!-- Ícono rotar izquierda -->
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/>
                   </svg>
-                  <span>Left</span>
+                  <span>{$m.col_rotate_left}</span>
                 </button>
                 <button class="rotate-btn" onclick={onRotateRight}>
                   <!-- Ícono rotar derecha -->
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
                   </svg>
-                  <span>Right</span>
+                  <span>{$m.col_rotate_right}</span>
                 </button>
               </div>
             </div>
@@ -361,7 +362,7 @@
                     <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
                     <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                   </svg>
-                  <span>Brightness</span>
+                  <span>{$m.col_brightness}</span>
                 </div>
                 <span class="slider-val">{brightness > 0 ? `+${brightness}` : brightness}</span>
               </div>
@@ -378,7 +379,7 @@
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20V2z"/>
                   </svg>
-                  <span>Contrast</span>
+                  <span>{$m.col_contrast}</span>
                 </div>
                 <span class="slider-val">{contrast > 0 ? `+${contrast}` : contrast}</span>
               </div>
@@ -394,7 +395,7 @@
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
                   </svg>
-                  <span>Saturation</span>
+                  <span>{$m.col_saturation}</span>
                 </div>
                 <span class="slider-val">{saturation > 0 ? `+${saturation}` : saturation}</span>
               </div>
@@ -417,7 +418,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                 </svg>
-                <h3 class="panel-title" style="margin:0">Anotaciones</h3>
+                <h3 class="panel-title" style="margin:0">{$m.col_tab_comments}</h3>
               </div>
               <span class="annotation-count">{annotations.length}</span>
             </div>
@@ -425,7 +426,7 @@
             <!-- Lista de anotaciones -->
             <div class="annotations-list">
               {#if annotations.length === 0}
-                <p class="empty-text">Sin anotaciones — agrega una nota o marca un error</p>
+                <p class="empty-text">{$m.col_no_annotations}</p>
               {:else}
                 {#each annotations as ann}
                   <div class="annotation-card">
@@ -449,7 +450,7 @@
                     <div class="annotation-footer">
                       <span class="annotation-time">{formatTime(ann.timestamp)}</span>
                       <!-- Botón eliminar (visible en hover) -->
-                      <button class="delete-annotation-btn" onclick={() => handleDeleteAnnotation(ann.id)} aria-label="Eliminar anotación">
+                      <button class="delete-annotation-btn" onclick={() => handleDeleteAnnotation(ann.id)} aria-label={$m.col_delete_annotation}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                         </svg>
@@ -467,13 +468,13 @@
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                   <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
-                <span>Marcar error</span>
+                <span>{$m.col_flag_error}</span>
               </button>
               <button class="action-btn" onclick={() => showNoteModal = true}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <span>Agregar nota</span>
+                <span>{$m.col_add_note}</span>
               </button>
             </div>
 
@@ -495,8 +496,8 @@
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) { showErrorModal = false; selectedErrorTypes = []; } }}>
     <div class="modal-card">
       <div class="modal-header">
-        <h3 class="modal-title">Tipología de Error</h3>
-        <button class="modal-close" onclick={() => { showErrorModal = false; selectedErrorTypes = []; }} aria-label="Cerrar">
+        <h3 class="modal-title">{$m.col_error_type_title}</h3>
+        <button class="modal-close" onclick={() => { showErrorModal = false; selectedErrorTypes = []; }} aria-label={$m.common_close}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -516,8 +517,8 @@
         {/each}
       </div>
       <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => { showErrorModal = false; selectedErrorTypes = []; }}>Cancelar</button>
-        <button class="modal-btn confirm" disabled={selectedErrorTypes.length === 0} onclick={handleSaveError}>Guardar</button>
+        <button class="modal-btn cancel" onclick={() => { showErrorModal = false; selectedErrorTypes = []; }}>{$m.common_cancel}</button>
+        <button class="modal-btn confirm" disabled={selectedErrorTypes.length === 0} onclick={handleSaveError}>{$m.common_save}</button>
       </div>
     </div>
   </div>
@@ -532,22 +533,22 @@
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) { showNoteModal = false; noteText = ''; } }}>
     <div class="modal-card">
       <div class="modal-header">
-        <h3 class="modal-title">Agregar Nota</h3>
-        <button class="modal-close" onclick={() => { showNoteModal = false; noteText = ''; }} aria-label="Cerrar">
+        <h3 class="modal-title">{$m.col_add_note_title}</h3>
+        <button class="modal-close" onclick={() => { showNoteModal = false; noteText = ''; }} aria-label={$m.common_close}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-      <label class="note-label">Nota</label>
+      <label class="note-label">{$m.col_note}</label>
       <!-- svelte-ignore a11y_autofocus -->
       <textarea
         class="note-textarea"
         bind:value={noteText}
-        placeholder="Describe el problema o agrega un comentario..."
+        placeholder={$m.col_note_placeholder}
         autofocus
       ></textarea>
       <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => { showNoteModal = false; noteText = ''; }}>Cancelar</button>
-        <button class="modal-btn confirm" disabled={!noteText.trim()} onclick={handleSaveNote}>Guardar</button>
+        <button class="modal-btn cancel" onclick={() => { showNoteModal = false; noteText = ''; }}>{$m.common_cancel}</button>
+        <button class="modal-btn confirm" disabled={!noteText.trim()} onclick={handleSaveNote}>{$m.common_save}</button>
       </div>
     </div>
   </div>

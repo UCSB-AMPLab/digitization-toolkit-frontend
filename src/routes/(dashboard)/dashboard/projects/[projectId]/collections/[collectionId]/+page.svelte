@@ -21,6 +21,7 @@
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
   import { recordsApi, collectionsApi, type Record } from '$lib/api';
+  import { m } from '$lib/i18n';
 
   import LeftSidebar from './LeftSidebar.svelte';
   import ListView from './ListView.svelte';
@@ -183,7 +184,7 @@
       const result = await collectionsApi.exportBagit(collectionId);
       exportResult = result;
     } catch (err: any) {
-      exportError = err?.message ?? 'Error al exportar';
+      exportError = err?.message ?? $m.col_err_export;
     } finally {
       isExporting = false;
     }
@@ -224,7 +225,7 @@
       {#if isLoading}
         <div class="loading-state">
           <div class="spinner"></div>
-          <span>Cargando imágenes...</span>
+          <span>{$m.col_loading_images}</span>
         </div>
 
       {:else if viewMode === 'grid'}
@@ -313,26 +314,26 @@
     <div class="export-modal-card">
       {#if isExporting}
         <div class="spinner"></div>
-        <h3 class="export-modal-title">Generando BagIt...</h3>
-        <p class="export-modal-subtitle">Copiando imágenes y calculando checksums</p>
+        <h3 class="export-modal-title">{$m.col_export_generating}</h3>
+        <p class="export-modal-subtitle">{$m.col_export_copying}</p>
       {:else if exportResult}
         <span class="material-symbols-outlined icon-lg export-success-icon">check_circle</span>
-        <h3 class="export-modal-title">Exportación completada</h3>
+        <h3 class="export-modal-title">{$m.col_export_done}</h3>
         <p class="export-modal-subtitle">{exportResult.zip_filename}</p>
         <p class="export-modal-subtitle">{(exportResult.size_bytes / 1024 / 1024).toFixed(1)} MB</p>
         <div class="export-modal-actions">
           <a href={collectionsApi.getExportDownloadUrl(collectionId)} download class="btn-primary">
             <span class="material-symbols-outlined icon-sm">download</span>
-            Descargar ZIP
+            {$m.col_download_zip}
           </a>
-          <button class="btn-secondary" onclick={() => showExportModal = false}>Cerrar</button>
+          <button class="btn-secondary" onclick={() => showExportModal = false}>{$m.common_close}</button>
         </div>
       {:else if exportError}
         <span class="material-symbols-outlined icon-lg export-error-icon">error</span>
-        <h3 class="export-modal-title">Error al exportar</h3>
+        <h3 class="export-modal-title">{$m.col_err_export}</h3>
         <p class="export-modal-subtitle">{exportError}</p>
         <div class="export-modal-actions">
-          <button class="btn-secondary" onclick={() => showExportModal = false}>Cerrar</button>
+          <button class="btn-secondary" onclick={() => showExportModal = false}>{$m.common_close}</button>
         </div>
       {/if}
     </div>

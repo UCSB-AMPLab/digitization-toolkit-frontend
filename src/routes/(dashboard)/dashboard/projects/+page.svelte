@@ -18,6 +18,7 @@
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { m } from '$lib/i18n';
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, type Project } from '$lib/api';
 
@@ -136,7 +137,7 @@
       resetForm();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      createError = `No se pudo crear el proyecto: ${msg}`;
+      createError = $m.proj_err_create(msg);
     } finally {
       isCreating = false;
     }
@@ -225,7 +226,7 @@
       closeDeleteModal();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      deleteError = `No se pudo eliminar el proyecto: ${msg}`;
+      deleteError = $m.proj_err_delete(msg);
       isDeleting = false;
     }
   }
@@ -233,19 +234,26 @@
   // ---------------------------------------------------------------------------
   // HELPERS DE ESTADO (mock — en producción vendrá del backend)
   // ---------------------------------------------------------------------------
+  let statusStyleMap = $derived<Record<string, string>>({
+    [$m.proj_status_in_progress]: 'color: var(--color-primary); background: rgba(90,140,98,0.15)',
+    [$m.proj_status_started]:     'color: var(--color-secondary); background: rgba(150,177,240,0.15)',
+    [$m.proj_status_review]:      'color: var(--color-warning); background: rgba(208,154,68,0.15)',
+    [$m.proj_status_paused]:      'color: var(--color-light-grey); background: rgba(171,183,183,0.12)',
+    [$m.proj_status_completed]:   'color: var(--color-success); background: rgba(111,191,115,0.15)',
+  });
+
   function getStatusStyle(status: string): string {
-    const map: Record<string, string> = {
-      'En Progreso': 'color: var(--color-primary); background: rgba(90,140,98,0.15)',
-      'Iniciado':    'color: var(--color-secondary); background: rgba(150,177,240,0.15)',
-      'Revisión':    'color: var(--color-warning); background: rgba(208,154,68,0.15)',
-      'Pausado':     'color: var(--color-light-grey); background: rgba(171,183,183,0.12)',
-      'Completado':  'color: var(--color-success); background: rgba(111,191,115,0.15)',
-    };
-    return map[status] ?? 'color: var(--color-light-grey); background: rgba(0,0,0,0.2)';
+    return statusStyleMap[status] ?? 'color: var(--color-light-grey); background: rgba(0,0,0,0.2)';
   }
 
   // Progreso simulado (conectar con backend cuando esté disponible)
-  const mockStatuses = ['En Progreso', 'Iniciado', 'Revisión', 'Pausado', 'Completado'];
+  let mockStatuses = $derived([
+    $m.proj_status_in_progress,
+    $m.proj_status_started,
+    $m.proj_status_review,
+    $m.proj_status_paused,
+    $m.proj_status_completed,
+  ]);
 </script>
 
 <!-- ============================================================
@@ -256,8 +264,8 @@
   <!-- Header -->
   <div class="page-header">
     <div>
-      <h1 class="page-title">Gestión de Proyectos</h1>
-      <p class="page-subtitle">Fondos, series, secciones</p>
+      <h1 class="page-title">{$m.proj_title}</h1>
+      <p class="page-subtitle">{$m.proj_subtitle}</p>
     </div>
     <!-- Botón "Nuevo Proyecto" solo visible cuando ya hay proyectos -->
     {#if canCreate && projects.length > 0}
@@ -265,7 +273,7 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
-        Nuevo Proyecto
+        {$m.proj_new}
       </button>
     {/if}
   </div>
@@ -278,7 +286,7 @@
       </svg>
       <input
         type="text"
-        placeholder="Buscar por nombre, código..."
+        placeholder={$m.proj_search_placeholder}
         bind:value={searchQuery}
         class="search-input"
       />
@@ -287,7 +295,7 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
       </svg>
-      Filtros
+      {$m.common_filters}
     </button>
   </div>
 
@@ -295,16 +303,16 @@
   {#if isLoading}
     <div class="loading">
       <div class="spinner"></div>
-      <span>Cargando proyectos...</span>
+      <span>{$m.proj_loading}</span>
     </div>
   {:else if filteredProjects.length === 0}
     <div class="empty-state">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
       </svg>
-      <span>{searchQuery ? 'Sin resultados para tu búsqueda' : 'No hay proyectos aún'}</span>
+      <span>{searchQuery ? $m.proj_empty_search : $m.proj_empty}</span>
       {#if canCreate && !searchQuery}
-        <button class="btn-primary" onclick={() => showCreateModal = true}>Crear primer proyecto</button>
+        <button class="btn-primary" onclick={() => showCreateModal = true}>{$m.proj_create_first}</button>
       {/if}
     </div>
   {:else}
@@ -312,11 +320,11 @@
       <table class="projects-table">
         <thead>
           <tr>
-            <th>Proyecto</th>
-            <th>Referencia</th>
-            <th>Estado</th>
-            <th>Fecha Inicio</th>
-            <th class="text-right">Acciones</th>
+            <th>{$m.proj_col_project}</th>
+            <th>{$m.proj_col_reference}</th>
+            <th>{$m.common_status}</th>
+            <th>{$m.proj_col_start_date}</th>
+            <th class="text-right">{$m.common_actions}</th>
           </tr>
         </thead>
         <tbody>
@@ -376,7 +384,7 @@
                   <button
                     class="btn-menu"
                     onclick={(e) => openMenu(e, project.id)}
-                    title="Acciones"
+                    title={$m.common_actions}
                   >
                     <span class="material-symbols-outlined icon-sm">more_vert</span>
                   </button>
@@ -384,12 +392,12 @@
                     <div class="action-menu">
                       <button class="action-item" onclick={(e) => startEdit(e, project)}>
                         <span class="material-symbols-outlined icon-sm">edit</span>
-                        Editar
+                        {$m.common_edit}
                       </button>
                       {#if $userRole === 'admin'}
                         <button class="action-item action-item-danger" onclick={(e) => openDeleteModal(e, project)}>
                           <span class="material-symbols-outlined icon-sm">delete</span>
-                          Eliminar
+                          {$m.common_delete}
                         </button>
                       {/if}
                     </div>
@@ -417,7 +425,7 @@
       <!-- Cabecera -->
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">{editingProject ? 'Editar Proyecto' : 'Nuevo Proyecto'}</h3>
+          <h3 class="modal-title">{editingProject ? $m.proj_modal_edit_title : $m.proj_new}</h3>
         </div>
         <button class="modal-close" onclick={closeModal}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -430,40 +438,40 @@
       <div class="form-section">
 
         <div class="form-field">
-          <label class="field-label">NOMBRE DEL PROYECTO <span class="field-required">*</span></label>
+          <label class="field-label">{$m.proj_field_name} <span class="field-required">*</span></label>
           <input
             class="field-input"
             type="text"
-            placeholder="Ej: Fondo Colonial 2024"
+            placeholder={$m.proj_ph_name}
             bind:value={formName}
             autofocus
           />
         </div>
 
         <div class="form-field">
-          <label class="field-label">DESCRIPCIÓN</label>
+          <label class="field-label">{$m.proj_field_description}</label>
           <input
             class="field-input"
             type="text"
-            placeholder="Breve descripción del contenido"
+            placeholder={$m.proj_ph_description}
             bind:value={formDesc}
           />
         </div>
 
         <div class="form-row">
           <div class="form-field">
-            <label class="field-label">FONDO</label>
-            <input class="field-input" type="text" placeholder="Ej: Archivo Anexo: Grupo I" bind:value={formFondo} />
+            <label class="field-label">{$m.proj_field_fonds}</label>
+            <input class="field-input" type="text" placeholder={$m.proj_ph_fonds} bind:value={formFondo} />
           </div>
           <div class="form-field">
-            <label class="field-label">SERIE / SECCIÓN</label>
-            <input class="field-input" type="text" placeholder="Ej: Aduanas" bind:value={formSerie} />
+            <label class="field-label">{$m.proj_field_series}</label>
+            <input class="field-input" type="text" placeholder={$m.proj_ph_series} bind:value={formSerie} />
           </div>
         </div>
 
         <div class="form-field">
-          <label class="field-label">SIGNATURA ARCHIVÍSTICA</label>
-          <input class="field-input" type="text" placeholder="Ej: CO.AGN.SAA-I.1.1.1" bind:value={formSignatura} />
+          <label class="field-label">{$m.proj_field_refcode}</label>
+          <input class="field-input" type="text" placeholder={$m.proj_ph_refcode} bind:value={formSignatura} />
         </div>
 
       </div>
@@ -481,7 +489,7 @@
 
       <!-- Footer -->
       <div class="modal-footer">
-        <button class="btn-ghost" onclick={closeModal}>Cancelar</button>
+        <button class="btn-ghost" onclick={closeModal}>{$m.common_cancel}</button>
         <button
           class="btn-primary"
           onclick={handleCreateProject}
@@ -489,12 +497,12 @@
         >
           {#if isCreating}
             <div class="spinner-sm"></div>
-            {editingProject ? 'Guardando…' : 'Creando…'}
+            {editingProject ? $m.common_saving : $m.common_creating}
           {:else}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            {editingProject ? 'Guardar cambios' : 'Crear proyecto'}
+            {editingProject ? $m.common_save_changes : $m.proj_create_btn}
           {/if}
         </button>
       </div>
@@ -515,7 +523,7 @@
       <!-- Cabecera -->
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">Eliminar proyecto</h3>
+          <h3 class="modal-title">{$m.proj_delete_title}</h3>
           <p class="modal-subtitle">"{deletingProject.name}"</p>
         </div>
         <button class="modal-close" onclick={closeDeleteModal}>
@@ -528,7 +536,7 @@
       {#if isLoadingDeleteInfo}
         <div class="delete-loading">
           <div class="spinner"></div>
-          <span>Verificando contenido...</span>
+          <span>{$m.proj_checking_contents}</span>
         </div>
       {:else if deleteCollectionCount > 0}
         <!-- Proyecto NO vacío — aviso + opción de mover -->
@@ -537,28 +545,28 @@
             <span class="material-symbols-outlined icon-md">warning</span>
           </div>
           <div>
-            <p class="delete-warning-title">Este proyecto no está vacío</p>
+            <p class="delete-warning-title">{$m.proj_not_empty}</p>
             <p class="delete-warning-body">
-              Contiene <strong>{deleteCollectionCount} {deleteCollectionCount === 1 ? 'colección' : 'colecciones'}</strong>
+              {$m.proj_contains_pre}<strong>{$m.proj_collections_count(deleteCollectionCount)}</strong>
               {#if deleteImageCount > 0}
-                con <strong>{deleteImageCount} {deleteImageCount === 1 ? 'imagen' : 'imágenes'}</strong>
+                {$m.proj_contains_mid}<strong>{$m.proj_images_count(deleteImageCount)}</strong>
               {/if}.
-              Si lo eliminas sin mover, todo el contenido se perderá de forma permanente.
+              {$m.proj_delete_warning}
             </p>
           </div>
         </div>
 
         <div class="delete-move-section">
-          <label class="field-label">MOVER COLECCIONES A OTRO PROYECTO (OPCIONAL)</label>
+          <label class="field-label">{$m.proj_move_label}</label>
           <select class="field-input" bind:value={deleteMoveTarget}>
-            <option value="">— Eliminar sin mover —</option>
+            <option value="">{$m.proj_move_none}</option>
             {#each projects.filter(p => p.id !== deletingProject!.id) as p}
               <option value={p.id}>{p.name}</option>
             {/each}
           </select>
           {#if deleteMoveTarget !== ''}
             <p class="delete-move-hint">
-              Las {deleteCollectionCount} {deleteCollectionCount === 1 ? 'colección' : 'colecciones'} se moverán antes de eliminar el proyecto.
+              {$m.proj_move_hint(deleteCollectionCount)}
             </p>
           {/if}
         </div>
@@ -566,8 +574,8 @@
       {:else}
         <!-- Proyecto vacío — confirmación simple -->
         <p class="delete-confirm-text">
-          ¿Estás seguro de que deseas eliminar <strong>"{deletingProject.name}"</strong>?
-          Esta acción no se puede deshacer.
+          {$m.proj_delete_confirm_pre}<strong>"{deletingProject.name}"</strong>?
+          {$m.common_irreversible}
         </p>
       {/if}
 
@@ -584,25 +592,25 @@
 
       <!-- Footer -->
       <div class="modal-footer">
-        <button class="btn-ghost" onclick={closeDeleteModal} disabled={isDeleting}>Cancelar</button>
+        <button class="btn-ghost" onclick={closeDeleteModal} disabled={isDeleting}>{$m.common_cancel}</button>
         {#if deleteCollectionCount > 0 && deleteMoveTarget !== ''}
           <button class="btn-danger" onclick={executeDelete} disabled={isDeleting}>
             {#if isDeleting}
               <div class="spinner-sm"></div>
-              Moviendo y eliminando…
+              {$m.proj_deleting_moving}
             {:else}
               <span class="material-symbols-outlined icon-sm">drive_file_move</span>
-              Mover y eliminar
+              {$m.proj_move_and_delete}
             {/if}
           </button>
         {:else}
           <button class="btn-danger" onclick={executeDelete} disabled={isDeleting || isLoadingDeleteInfo}>
             {#if isDeleting}
               <div class="spinner-sm"></div>
-              Eliminando…
+              {$m.common_deleting}
             {:else}
               <span class="material-symbols-outlined icon-sm">delete</span>
-              {deleteCollectionCount > 0 ? 'Eliminar sin mover' : 'Eliminar proyecto'}
+              {deleteCollectionCount > 0 ? $m.proj_delete_without_moving : $m.proj_delete_title}
             {/if}
           </button>
         {/if}

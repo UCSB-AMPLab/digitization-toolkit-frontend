@@ -9,6 +9,7 @@
   // ============================================================================
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
+  import { m } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -75,7 +76,7 @@
        ══════════════════════════════════════════════════════ -->
 
   <!-- Botón anterior (par anterior) -->
-  <button class="nav-btn left" onclick={onPrev} disabled={selectedIndex <= 0} aria-label="Anterior">
+  <button class="nav-btn left" onclick={onPrev} disabled={selectedIndex <= 0} aria-label={$m.col_prev}>
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
       <polyline points="15 18 9 12 15 6"/>
       </svg>
@@ -89,13 +90,13 @@
         {#if selectedRecord}
           <div class="spread-label">
             <span class="spread-name">{getRecordName(selectedRecord)}</span>
-            <span class="spread-side">Página izq.</span>
+            <span class="spread-side">{$m.col_left_page_short}</span>
           </div>
         {/if}
         {#if getImageUrl(spreadLeftImage)}
           <img
             src={getImageUrl(spreadLeftImage)}
-            alt="Página izquierda"
+            alt={$m.col_left_page}
             class="spread-image left"
             draggable="false"
             style="transform: scale({zoom}) rotate({rotation}deg); transition: transform 0.15s ease;"
@@ -113,13 +114,13 @@
         {#if spreadRightImage}
           <div class="spread-label right">
             <span class="spread-name">{getRecordName(selectedRecord)}</span>
-            <span class="spread-side">Página der.</span>
+            <span class="spread-side">{$m.col_right_page_short}</span>
           </div>
         {/if}
         {#if getImageUrl(spreadRightImage)}
           <img
             src={getImageUrl(spreadRightImage)}
-            alt="Página derecha"
+            alt={$m.col_right_page}
             class="spread-image right"
             draggable="false"
             style="transform: scale({zoom}) rotate({rotation}deg); transition: transform 0.15s ease;"
@@ -132,7 +133,7 @@
     </div>
 
     <!-- Botón siguiente (par siguiente) -->
-  <button class="nav-btn right" onclick={onNext} disabled={selectedIndex >= records.length - 1} aria-label="Siguiente">
+  <button class="nav-btn right" onclick={onNext} disabled={selectedIndex >= records.length - 1} aria-label={$m.col_next}>
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
       <polyline points="9 18 15 12 9 6"/>
     </svg>
