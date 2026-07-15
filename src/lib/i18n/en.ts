@@ -212,7 +212,6 @@ export const en: Messages = {
 	users_ph_username: 'e.g. maria.garcia',
 	users_ph_email: 'e.g. maria@archive.org',
 	users_ph_password: 'Enter password',
-	users_toggle_password: 'Show or hide password',
 	users_ph_confirm: 'Confirm password',
 	users_field_account_status: 'Account status',
 	users_field_assign_role: 'Assign role',

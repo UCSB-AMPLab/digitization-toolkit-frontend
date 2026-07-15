@@ -21,7 +21,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
   import {
     systemApi,
     camerasApi,
@@ -328,7 +328,7 @@
 
   function formatLogTime(iso: string): string {
     try {
-      return new Date(iso).toLocaleTimeString('es', {
+      return new Date(iso).toLocaleTimeString($locale, {
         hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
       });
     } catch { return iso; }

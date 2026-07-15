@@ -231,7 +231,6 @@ export const es = {
 	users_ph_username: 'Ej: maria.garcia',
 	users_ph_email: 'Ej: maria@archivo.org',
 	users_ph_password: 'Ingrese contraseña',
-	users_toggle_password: 'Mostrar u ocultar contraseña',
 	users_ph_confirm: 'Confirme contraseña',
 	users_field_account_status: 'Estado de la cuenta',
 	users_field_assign_role: 'Asignar rol',

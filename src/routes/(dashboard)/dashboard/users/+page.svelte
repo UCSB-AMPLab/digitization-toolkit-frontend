@@ -18,7 +18,7 @@
 
   import { onMount } from 'svelte';
   import { usersApi, type UserRead } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
   // TIPOS LOCALES
@@ -249,7 +249,7 @@
 
   function formatDate(iso?: string): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString($locale, { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
   let ROLES: { value: UserRole; label: string; desc: string }[] = $derived([
@@ -546,7 +546,7 @@
                 placeholder={$m.users_ph_password}
                 bind:value={formPassword}
               />
-              <button class="eye-btn" onclick={() => showPassword = !showPassword} aria-label={$m.users_toggle_password}>
+              <button class="eye-btn" onclick={() => showPassword = !showPassword} aria-label={showPassword ? $m.common_hide_password : $m.common_show_password}>
                 {#if showPassword}
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
@@ -571,7 +571,7 @@
                 placeholder={$m.users_ph_confirm}
                 bind:value={formConfirm}
               />
-              <button class="eye-btn" onclick={() => showConfirm = !showConfirm} aria-label={$m.users_toggle_password}>
+              <button class="eye-btn" onclick={() => showConfirm = !showConfirm} aria-label={showConfirm ? $m.common_hide_password : $m.common_show_password}>
                 {#if showConfirm}
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
