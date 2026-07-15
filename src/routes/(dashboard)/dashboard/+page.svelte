@@ -19,6 +19,7 @@
   import { env } from '$env/dynamic/public';
   import { authStore } from '$lib/stores/auth';
   import { camerasApi, projectsApi, collectionsApi, recordsApi } from '$lib/api';
+  import { m } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Usuario y rol
@@ -44,7 +45,7 @@
   let userName = $derived(
     currentUser?.username
       ? currentUser.username.charAt(0).toUpperCase() + currentUser.username.slice(1)
-      : 'bienvenido'
+      : $m.dash_greeting_fallback
   );
 
   // ---------------------------------------------------------------------------
@@ -211,11 +212,11 @@
 
   <!-- Saludo personalizado -->
   <div class="page-header">
-    <h1 class="greeting">¡Hola {userName}!</h1>
+    <h1 class="greeting">{$m.dash_greeting(userName)}</h1>
     <p class="subtitle">
-      {#if isAdmin}Panel de administración — Resumen general del sistema
-      {:else if isOperator}Panel de operario — Tus proyectos asignados
-      {:else}Panel de revisión — Colecciones pendientes de revisión
+      {#if isAdmin}{$m.dash_subtitle_admin}
+      {:else if isOperator}{$m.dash_subtitle_operator}
+      {:else}{$m.dash_subtitle_reviewer}
       {/if}
     </p>
   </div>
@@ -231,9 +232,7 @@
         <line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
       <span>
-        El almacenamiento está al <strong>{storagePercent}%</strong>
-        ({formatStorage(storageUsedGB)} / {formatStorage(storageTotalGB)}).
-        Revisa la <a href="/dashboard/config" class="alert-link">Configuración</a> para liberar espacio.
+        {$m.dash_storage_alert_p1}<strong>{storagePercent}%</strong>{$m.dash_storage_alert_p2(formatStorage(storageUsedGB), formatStorage(storageTotalGB))}<a href="/dashboard/config" class="alert-link">{$m.nav_settings}</a>{$m.dash_storage_alert_p3}
       </span>
     </div>
   {/if}
@@ -244,19 +243,19 @@
     <div class="kpi-card">
       <div class="kpi-line" style="background: var(--color-primary)"></div>
       <div class="kpi-number">{isLoadingStats ? '—' : projectCount}</div>
-      <div class="kpi-label">Proyectos activos</div>
+      <div class="kpi-label">{$m.dash_kpi_active_projects}</div>
     </div>
 
     <div class="kpi-card">
       <div class="kpi-line" style="background: var(--color-secondary)"></div>
       <div class="kpi-number">{isLoadingStats ? '—' : collectionCount}</div>
-      <div class="kpi-label">Colecciones</div>
+      <div class="kpi-label">{$m.dash_kpi_collections}</div>
     </div>
 
     <div class="kpi-card">
       <div class="kpi-line" style="background: var(--color-warning)"></div>
       <div class="kpi-number">{isLoadingStats ? '—' : recordCount.toLocaleString()}</div>
-      <div class="kpi-label">Total registros</div>
+      <div class="kpi-label">{$m.dash_kpi_total_records}</div>
     </div>
 
   </div>
@@ -267,12 +266,12 @@
        ══════════════════════════════════════════════════════ -->
   {#if canSeeCameras}
     <div class="section">
-      <h2 class="section-title">Probar cámaras</h2>
+      <h2 class="section-title">{$m.dash_test_cameras}</h2>
 
       <div class="cameras-layout">
         {#each (['left', 'right'] as const) as side}
           {@const isExpanded = expandedCamera === side}
-          {@const label = side === 'left' ? 'Left Scanner Camera' : 'Right Scanner Camera'}
+          {@const label = side === 'left' ? $m.dash_camera_left : $m.dash_camera_right}
           {@const status = cameraStatus[side]}
           {@const active = streamActive[side]}
 
@@ -297,7 +296,7 @@
                   OK
                 {:else if status === 'not-found'}
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  Not found
+                  {$m.camera_not_detected}
                 {:else}—{/if}
               </div>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -313,7 +312,7 @@
                 <!-- Para sustituir: ver comentario en fetchFrame() arriba -->
                 <div class="preview-area">
                   {#if previewUrls[side] && active}
-                    <img src={previewUrls[side]} alt="Camera {side}" class="preview-img" />
+                    <img src={previewUrls[side]} alt={side === 'left' ? $m.dash_camera_left : $m.dash_camera_right} class="preview-img" />
                   {:else}
                     <div class="no-signal">
                       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -321,7 +320,7 @@
                         <circle cx="12" cy="13" r="4"/>
                         <line x1="1" y1="1" x2="23" y2="23"/>
                       </svg>
-                      <span>No activa</span>
+                      <span>{$m.dash_camera_not_active}</span>
                     </div>
                   {/if}
                 </div>
@@ -336,7 +335,7 @@
                       <circle cx="12" cy="12" r="3"/>
                     {/if}
                   </svg>
-                  {active ? 'Detener' : 'Probar'}
+                  {active ? $m.dash_camera_stop : $m.dash_camera_test}
                 </button>
 
                 <!-- Botones secundarios -->
@@ -345,7 +344,7 @@
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
                     </svg>
-                    Focus
+                    {$m.dash_camera_focus}
                   </button>
                   <button class="btn-secondary" onclick={() => handleCapture(side)}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -353,7 +352,7 @@
                       <circle cx="8.5" cy="8.5" r="1.5"/>
                       <polyline points="21 15 16 10 5 21"/>
                     </svg>
-                    Capturar
+                    {$m.common_capture}
                   </button>
                 </div>
               </div>
@@ -372,7 +371,7 @@
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
         <circle cx="12" cy="13" r="4"/>
       </svg>
-      <span>2 cameras</span>
+      <span>{$m.dash_two_cameras}</span>
       <div class="cam-dot" class:ok={cameraStatus.left === 'ok' || cameraStatus.right === 'ok'}></div>
     </div>
   {/if}
