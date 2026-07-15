@@ -16,6 +16,7 @@
   // ============================================================================
 
   import { authStore } from '$lib/stores/auth';
+  import { m } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -53,7 +54,7 @@
     <button
       class="btn-circle"
       onclick={onBack}
-      aria-label="Volver"
+      aria-label={$m.tb_back}
     >
       <!-- Ícono flecha izquierda -->
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -67,7 +68,7 @@
     <!-- Badge "In Review" — estilo sand/naranja del design system -->
     <!-- Para cambiar el texto o el color, modifica aquí -->
     <div class="status-badge">
-      In review
+      {$m.status_in_review}
     </div>
 
     <!-- Avatar circular con iniciales del usuario -->

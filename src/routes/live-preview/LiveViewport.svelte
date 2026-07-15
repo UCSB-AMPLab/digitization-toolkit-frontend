@@ -31,6 +31,7 @@
   // ============================================================================
 
   import { onMount, onDestroy } from 'svelte';
+  import { m } from '$lib/i18n';
   import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
   import { camerasApi, type CameraDevice } from '$lib/api';
@@ -350,7 +351,7 @@
       const payload = {
         project_name: projectName || `project_${projectId}`,
         collection_id: collectionId || undefined,
-        record_title: `Captura ${new Date().toISOString().slice(0,19)}`,
+        record_title: $m.lv_capture_title(new Date().toISOString().slice(0,19)),
       };
 
       let result;
@@ -373,7 +374,7 @@
       onCaptureDone();
 
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Error al capturar';
+      const msg = error instanceof Error ? error.message : $m.lv_capture_error;
       cameraStatus.reportFailure(msg);
       console.error('[LiveViewport] Capture error:', error);
     } finally {
@@ -419,7 +420,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
           </svg>
-          Reconectando con la cámara…
+          {$m.lv_reconnecting}
         </div>
       {/if}
 
@@ -460,7 +461,7 @@
             <img
               bind:this={imgEl0}
               src={previewUrls[leftIdx]}
-              alt="Camera izquierda"
+              alt={$m.lv_camera_left_alt}
               class="feed-img"
               class:feed-rotate-90={(rotateDeg[leftIdx] ?? 0) === 90}
               class:feed-rotate-180={(rotateDeg[leftIdx] ?? 0) === 180}
@@ -474,7 +475,7 @@
               <div
                 class="wb-sample-overlay"
                 onclick={(e) => handleWbSampleClick(leftIdx, e)}
-                title="Haz clic en un área blanca o gris neutro"
+                title={$m.lv_wb_click_hint}
               ></div>
             {/if}
           {:else}
@@ -484,22 +485,22 @@
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
-              <span>Sin señal — Izquierda</span>
-              <small>Verifica conexión del hardware</small>
+              <span>{$m.lv_no_signal_left}</span>
+              <small>{$m.lv_check_hw}</small>
             </div>
           {/if}
           <!-- Badge identificador de cámara -->
           <div class="feed-label">{cameraLabel(leftIdx)}</div>
           <!-- Floating rotation overlay -->
           <div class="feed-rotate-overlay">
-            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, -90)} aria-label="Rotate CCW">
+            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, -90)} aria-label={$m.lv_rotate_ccw}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                 <path d="M3 3v5h5"/>
               </svg>
             </button>
             <span class="feed-rotate-deg">{(rotateDeg ?? {})[leftIdx] ?? 0}°</span>
-            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, 90)} aria-label="Rotate CW">
+            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, 90)} aria-label={$m.lv_rotate_cw}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                 <path d="M21 3v5h-5"/>
@@ -516,7 +517,7 @@
               <img
                 bind:this={imgEl1}
                 src={previewUrls[rightIdx]}
-                alt="Camera derecha"
+                alt={$m.lv_camera_right_alt}
                 class="feed-img"
                 class:feed-rotate-90={(rotateDeg[rightIdx] ?? 0) === 90}
                 class:feed-rotate-180={(rotateDeg[rightIdx] ?? 0) === 180}
@@ -529,7 +530,7 @@
                 <div
                   class="wb-sample-overlay"
                   onclick={(e) => handleWbSampleClick(rightIdx, e)}
-                  title="Haz clic en un área blanca o gris neutro"
+                  title={$m.lv_wb_click_hint}
                 ></div>
               {/if}
             {:else}
@@ -539,22 +540,22 @@
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
-                <span>Sin señal — Derecha</span>
-                <small>Verifica conexión del hardware</small>
+                <span>{$m.lv_no_signal_right}</span>
+                <small>{$m.lv_check_hw}</small>
               </div>
             {/if}
             <!-- Badge identificador de cámara -->
             <div class="feed-label right">{cameraLabel(rightIdx)}</div>
             <!-- Floating rotation overlay -->
             <div class="feed-rotate-overlay">
-              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, -90)} aria-label="Rotate CCW">
+              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, -90)} aria-label={$m.lv_rotate_ccw}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                   <path d="M3 3v5h5"/>
                 </svg>
               </button>
               <span class="feed-rotate-deg">{(rotateDeg ?? {})[rightIdx] ?? 0}°</span>
-              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, 90)} aria-label="Rotate CW">
+              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, 90)} aria-label={$m.lv_rotate_cw}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                   <path d="M21 3v5h-5"/>
@@ -615,13 +616,13 @@
           <line x1="8" y1="11" x2="14" y2="11"/>
         </svg>
       </button>
-      <button class="float-btn" onclick={resetZoom} aria-label="Fit to screen">
+      <button class="float-btn" onclick={resetZoom} aria-label={$m.col_fit_screen_aria}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
         </svg>
       </button>
       <div class="float-divider"></div>
-      <button class="float-btn" onclick={() => showGridModal = true} aria-label="Grid settings">
+      <button class="float-btn" onclick={() => showGridModal = true} aria-label={$m.lv_grid_settings}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
           <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -633,8 +634,8 @@
           class="float-btn"
           class:float-btn-active={swapped}
           onclick={() => swapped = !swapped}
-          aria-label="Cambiar orientación de cámaras"
-          title={swapped ? 'Orientación invertida (camára 1 = izquierda)' : 'Orientación normal (cámara 0 = izquierda)'}
+          aria-label={$m.lv_swap_orientation}
+          title={swapped ? $m.lv_orientation_swapped : $m.lv_orientation_normal}
         >
           <span class="material-symbols-outlined" style="font-size:18px">sync</span>
         </button>
@@ -667,13 +668,13 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) showGridModal = false; }}>
     <div class="modal-card">
-      <h3 class="modal-title">Cuadrícula y Guías</h3>
-      <p class="modal-subtitle">Activa las ayudas visuales de encuadre.</p>
+      <h3 class="modal-title">{$m.lv_grid_modal_title}</h3>
+      <p class="modal-subtitle">{$m.lv_grid_modal_subtitle}</p>
       <div class="modal-body">
         <div class="modal-toggle-row">
           <div>
-            <p class="modal-toggle-title">Cuadrícula</p>
-            <p class="modal-toggle-sub">Mostrar grid 3×3 de captura</p>
+            <p class="modal-toggle-title">{$m.lv_grid}</p>
+            <p class="modal-toggle-sub">{$m.lv_grid_desc}</p>
           </div>
           <button class="toggle-btn" class:on={showGrid} onclick={() => showGrid = !showGrid}>
             <div class="toggle-thumb" class:on={showGrid}></div>
@@ -681,8 +682,8 @@
         </div>
         <div class="modal-toggle-row">
           <div>
-            <p class="modal-toggle-title">Líneas de Guía</p>
-            <p class="modal-toggle-sub">Guías arrastrables (rojo)</p>
+            <p class="modal-toggle-title">{$m.lv_guides}</p>
+            <p class="modal-toggle-sub">{$m.lv_guides_desc}</p>
           </div>
           <button class="toggle-btn" class:on={showGuides} onclick={() => showGuides = !showGuides}>
             <div class="toggle-thumb" class:on={showGuides}></div>
@@ -690,7 +691,7 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="modal-btn confirm" onclick={() => showGridModal = false}>Cerrar</button>
+        <button class="modal-btn confirm" onclick={() => showGridModal = false}>{$m.common_close}</button>
       </div>
     </div>
   </div>

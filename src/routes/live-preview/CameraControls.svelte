@@ -22,6 +22,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
+  import { m } from '$lib/i18n';
   import { camerasApi, type CameraDevice, type CameraControlsRequest, type CameraCapabilities, type DSLRSettingsUpdate } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
@@ -127,8 +128,8 @@
   const selectedDevice = $derived(devices.find(d => d.index === selectedCameraIndex));
   const cameraDisplayName = $derived(
     selectedDevice
-      ? `${selectedDevice.label || selectedDevice.model || 'Camera'} [${selectedCameraIndex}]`
-      : `Camera ${selectedCameraIndex}`
+      ? `${selectedDevice.label || selectedDevice.model || $m.cam_fallback_name} [${selectedCameraIndex}]`
+      : `${$m.cam_fallback_name} ${selectedCameraIndex}`
   );
 
   // Secciones abiertas del acordeón
@@ -228,14 +229,14 @@
       if (result.success && result.lens_position != null) {
         lensPosition = result.lens_position;
         cameraStatus.reportSuccess();
-        showFocusResult(true, `Foco: ${result.lens_position.toFixed(2)} dpt`);
+        showFocusResult(true, $m.cam_focus_result(result.lens_position.toFixed(2)));
       } else {
-        const msg = result.error ?? 'Autofocus falló';
+        const msg = result.error ?? $m.cam_af_failed;
         cameraStatus.reportFailure(msg);
         showFocusResult(false, msg);
       }
     } catch (error) {
-      const msg = 'Error en autofocus';
+      const msg = $m.cam_af_error;
       cameraStatus.reportFailure(msg);
       showFocusResult(false, msg);
     } finally {
@@ -278,14 +279,14 @@
         }
         const tempLabel = result.colour_temperature ? ` (~${result.colour_temperature}K)` : '';
         cameraStatus.reportSuccess();
-        showWbResult(true, `WB calibrado${tempLabel}`);
+        showWbResult(true, $m.cam_wb_calibrated(tempLabel));
       } else {
-        const msg = result.error ?? 'Calibración WB falló';
+        const msg = result.error ?? $m.cam_wb_failed;
         cameraStatus.reportFailure(msg);
         showWbResult(false, msg);
       }
     } catch {
-      const msg = 'Error calibrando WB';
+      const msg = $m.cam_wb_error;
       cameraStatus.reportFailure(msg);
       showWbResult(false, msg);
     } finally {
@@ -325,7 +326,7 @@
     const idx = selectedCameraIndex;
 
     if (r === 0 && b === 0) {
-      showWbResult(false, 'Pixel inválido — elige un área con luz');
+      showWbResult(false, $m.cam_wb_invalid_pixel);
       return;
     }
     const gray = (r + g + b) / 3;
@@ -346,12 +347,12 @@
         temperature = 0;
         tint = 0;
         cameraStatus.reportSuccess();
-        showWbResult(true, `WB muestrado (R=${newRed.toFixed(2)}, B=${newBlue.toFixed(2)})`);
+        showWbResult(true, $m.cam_wb_sampled(newRed.toFixed(2), newBlue.toFixed(2)));
       } else {
-        showWbResult(false, result.error ?? 'Error al guardar WB');
+        showWbResult(false, result.error ?? $m.cam_wb_save_error);
       }
     } catch {
-      showWbResult(false, 'Error aplicando WB');
+      showWbResult(false, $m.cam_wb_apply_error);
     } finally {
       isWbCalibrating = false;
     }
@@ -422,7 +423,6 @@
   function closeAll() {
     openDropdown = null;
     showCameraDropdown = false;
-    showModeDropdown = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -522,7 +522,7 @@
     <!-- ── TIRA DE ICONOS (sidebar colapsado) ── -->
     <div class="icon-strip">
       <!-- Botón para expandir -->
-      <button class="strip-btn toggle" onclick={() => sidebarOpen = true} aria-label="Camara control">
+      <button class="strip-btn toggle" onclick={() => sidebarOpen = true} aria-label={$m.cam_panel_expand_aria}>
         <svg
 									width="18"
 									height="18"
@@ -548,9 +548,9 @@
 <div class="controls-panel">
 
   <div class="panel-header">
-    <h2 class="panel-title">Camera Controls</h2>
+    <h2 class="panel-title">{$m.cam_panel_title}</h2>
     <!-- Botón para colapsar -->
-    <button class="collapse-btn" onclick={() => sidebarOpen = false} aria-label="Colapsar panel">
+    <button class="collapse-btn" onclick={() => sidebarOpen = false} aria-label={$m.cam_panel_collapse}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="15 18 9 12 15 6"/>
       </svg>
@@ -565,7 +565,7 @@
         <div class="radio-circle" class:active={cameraMode === 'single'} style="border-color: {cameraMode === 'single' ? 'var(--color-light)' : 'var(--color-light-grey)'}">
           {#if cameraMode === 'single'}<div class="radio-dot" style="background: var(--color-light)"></div>{/if}
         </div>
-        <span style="color: {cameraMode === 'single' ? 'var(--color-light)' : 'var(--color-light-grey)'}; font-size: 12px;">Single Camera</span>
+        <span style="color: {cameraMode === 'single' ? 'var(--color-light)' : 'var(--color-light-grey)'}; font-size: 12px;">{$m.cam_mode_single}</span>
         <input type="radio" style="display:none" checked={cameraMode === 'single'} onchange={() => onCameraModeChange('single')} />
       </label>
 
@@ -573,7 +573,7 @@
         <div class="radio-circle" style="border-color: {cameraMode === 'double' ? 'var(--color-primary)' : 'var(--color-light-grey)'}">
           {#if cameraMode === 'double'}<div class="radio-dot" style="background: var(--color-primary)"></div>{/if}
         </div>
-        <span style="color: {cameraMode === 'double' ? 'var(--color-light)' : 'var(--color-light-grey)'}; font-size: 12px;">Double Camera</span>
+        <span style="color: {cameraMode === 'double' ? 'var(--color-light)' : 'var(--color-light-grey)'}; font-size: 12px;">{$m.cam_mode_double}</span>
         <input type="radio" style="display:none" checked={cameraMode === 'double'} onchange={() => onCameraModeChange('double')} />
       </label>
     </div>
@@ -595,7 +595,7 @@
           {cameraDisplayName}
         </span>
         {#if selectedDevice?.calibrated}
-          <span class="cal-dot" title="Calibrada">✓</span>
+          <span class="cal-dot" title={$m.cam_calibrated}>✓</span>
         {/if}
         {#if cameraMode === 'double'}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -620,14 +620,14 @@
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
-              {`${device.label || device.model || 'Camera'} [${device.index}]`}
+              {`${device.label || device.model || $m.cam_fallback_name} [${device.index}]`}
               {#if device.calibrated}
-                <span class="cal-dot" title="Calibrada">✓</span>
+                <span class="cal-dot" title={$m.cam_calibrated}>✓</span>
               {/if}
             </button>
           {/each}
           {#if devices.length === 0}
-            <div class="camera-option" style="opacity:0.5; cursor:default">Sin cámaras detectadas</div>
+            <div class="camera-option" style="opacity:0.5; cursor:default">{$m.cam_none_detected}</div>
           {/if}
         </div>
       {/if}
@@ -637,9 +637,9 @@
     <div class="camera-status-row">
       <span class="status-dot" class:dot-connected={selectedDevice !== undefined} class:dot-disconnected={selectedDevice === undefined}></span>
       {#if selectedDevice !== undefined}
-        <span class="status-label">Conectada</span>
+        <span class="status-label">{$m.cam_connected}</span>
       {:else}
-        <span class="status-label status-warn">No detectada</span>
+        <span class="status-label status-warn">{$m.camera_not_detected}</span>
       {/if}
     </div>
 
@@ -653,7 +653,7 @@
         onclick={() => toggleSection('basic')}
       >
         <div class="acc-left">
-          <span>Basic</span>
+          <span>{$m.cam_section_basic}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
@@ -669,16 +669,16 @@
 
           <!-- Fila: Orientation (portrait / landscape rotation) -->
           <div class="control-row">
-            <span class="control-label">Orientation</span>
+            <span class="control-label">{$m.cam_orientation}</span>
             <div class="orientation-row">
-              <button class="rotate-step-btn" onclick={() => stepRotation(-90)} aria-label="Rotate 90° CCW">
+              <button class="rotate-step-btn" onclick={() => stepRotation(-90)} aria-label={$m.cam_rotate_ccw}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                   <path d="M3 3v5h5"/>
                 </svg>
               </button>
               <span class="orientation-label">{cameraRotateDeg[selectedCameraIndex] ?? 0}°</span>
-              <button class="rotate-step-btn" onclick={() => stepRotation(90)} aria-label="Rotate 90° CW">
+              <button class="rotate-step-btn" onclick={() => stepRotation(90)} aria-label={$m.cam_rotate_cw}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                   <path d="M21 3v5h-5"/>
@@ -689,7 +689,7 @@
 
           <!-- Fila: Shutter Speed -->
           <div class="control-row">
-            <span class="control-label">Shutter Speed</span>
+            <span class="control-label">{$m.cam_shutter}</span>
             <!-- El botón guarda su referencia para calcular la posición del dropdown -->
             <button
               bind:this={shutterBtnEl}
@@ -725,7 +725,7 @@
           <!-- Fila: Aperture (solo si la cámara lo soporta) -->
           {#if selectedDevice?.has_aperture_control}
           <div class="control-row">
-            <span class="control-label">Aperture</span>
+            <span class="control-label">{$m.cam_aperture}</span>
             <button
               bind:this={apertureBtnEl}
               class="control-btn"
@@ -744,7 +744,7 @@
           <!-- Fila: Image Format (solo DSLR) -->
           {#if isDSLR}
           <div class="control-row">
-            <span class="control-label">Format</span>
+            <span class="control-label">{$m.cam_format}</span>
             <button
               bind:this={formatBtnEl}
               class="control-btn"
@@ -770,7 +770,7 @@
     <div class="accordion-block">
       <button class="accordion-trigger" onclick={() => toggleSection('focus')}>
         <div class="acc-left">
-          <span>Focus</span>
+          <span>{$m.cam_section_focus}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
@@ -790,9 +790,9 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin-icon">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
               </svg>
-              Enfocando…
+              {$m.cam_focusing}
             {:else}
-              Enfocar auto
+              {$m.cam_autofocus}
             {/if}
           </button>
           {#if focusResultMsg}
@@ -802,7 +802,7 @@
           <!-- Foco manual (horizontal) -->
           <div class="zoom-row">
             <div class="zoom-header">
-              <span class="zoom-row-label">Foco manual</span>
+              <span class="zoom-row-label">{$m.cam_manual_focus}</span>
               <span class="zoom-value">{(lensPosition ?? 0).toFixed(1)} dpt</span>
             </div>
             <input
@@ -813,12 +813,12 @@
               step="0.1"
               value={lensPosition}
               oninput={(e) => handleFocusSlider(Number((e.target as HTMLInputElement).value))}
-              aria-label="Posición de foco (dioptrias)"
+              aria-label={$m.cam_focus_slider_aria}
             />
             <div class="zoom-ticks">
-              <span title="Infinito (lejos)">∞</span>
+              <span title={$m.cam_focus_infinity}>∞</span>
               <span>5 dpt</span>
-              <span title="Macro (10 cm)">10cm</span>
+              <span title={$m.cam_focus_macro}>10cm</span>
             </div>
           </div>
 
@@ -832,8 +832,8 @@
                   <button
                     class="zoom-reset-btn"
                     onclick={() => handleZoomSlider(1)}
-                    aria-label="Restablecer zoom a 1×"
-                  >reset</button>
+                    aria-label={$m.cam_zoom_reset_aria}
+                  >{$m.cam_zoom_reset}</button>
                 {/if}
               </span>
             </div>
@@ -845,7 +845,7 @@
               step="0.5"
               value={cameraZoom[selectedCameraIndex] ?? 1}
               oninput={(e) => handleZoomSlider(Number((e.target as HTMLInputElement).value))}
-              aria-label="Zoom de cámara (ScalerCrop)"
+              aria-label={$m.cam_zoom_slider_aria}
             />
             <div class="zoom-ticks">
               <span>1×</span>
@@ -856,8 +856,8 @@
           </div>
           {:else}
           <p class="dslr-note">
-            Set the lens barrel switch to <strong>MF</strong> before capturing.
-            AF causes ~12 s PTP hangs on Canon DSLRs.
+            {$m.cam_dslr_note_p1}<strong>MF</strong>{$m.cam_dslr_note_p2}
+            {$m.cam_dslr_note_p3}
           </p>
           {/if}
         </div>
@@ -873,7 +873,7 @@
         onclick={() => toggleSection('settings')}
       >
         <div class="acc-left">
-          <span>Settings</span>
+          <span>{$m.cam_section_settings}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
@@ -891,7 +891,7 @@
           <!-- White Balance -->
           <div class="settings-block">
             <span class="settings-label">
-              White Balance
+              {$m.cam_wb}
             </span>
             <div class="wb-row">
               <!-- wb_auto: auto white balance calibration -->
@@ -899,7 +899,7 @@
                 class="wb-pipette"
                 onclick={handleWbCalibration}
                 disabled={isWbCalibrating}
-                aria-label="Calibrar white balance automáticamente (AWB convergencia)"
+                aria-label={$m.cam_wb_calibrate_aria}
               >
                 {#if isWbCalibrating}
                   <span class="material-symbols-outlined icon-sm">sync</span>
@@ -913,7 +913,7 @@
                 class:wb-picker-active={isWbPickerActive}
                 onclick={handleWbPicker}
                 disabled={isWbCalibrating}
-                aria-label={isWbPickerActive ? 'Cancelar muestreo de white balance' : 'Muestrear white balance: toca un área blanca en el preview (experimental)'}
+                aria-label={isWbPickerActive ? $m.cam_wb_cancel_aria : $m.cam_wb_sample_aria}
                 aria-pressed={isWbPickerActive}
               >
                 <span class="material-symbols-outlined icon-sm">colorize</span>
@@ -922,8 +922,8 @@
             </div>
             {#if isWbPickerActive}
               <p class="wb-picker-hint">
-                Toca un área blanca o gris neutro en el preview.
-                <button class="wb-picker-cancel" onclick={handleWbPicker}>Cancelar</button>
+                {$m.cam_wb_hint}
+                <button class="wb-picker-cancel" onclick={handleWbPicker}>{$m.common_cancel}</button>
               </p>
             {/if}
             {#if wbResultMsg}
@@ -933,7 +933,7 @@
 
           <!-- Slider Temperatura: azul → arena (col design system) -->
           <div class="settings-block">
-            <span class="settings-label">Temperatura</span>
+            <span class="settings-label">{$m.cam_temperature}</span>
             <div class="slider-row">
               <!-- Track con gradiente visible + input range encima -->
               <div class="slider-track-wrapper temp">
@@ -955,7 +955,7 @@
 
           <!-- Slider Tinte: verde → magenta -->
           <div class="settings-block">
-            <span class="settings-label">Tinte</span>
+            <span class="settings-label">{$m.cam_tint}</span>
             <div class="slider-row">
               <div class="slider-track-wrapper tint">
                 <input
@@ -976,7 +976,7 @@
 
           <!-- Slider Exposure: -3 a +3 con marcas -->
           <div class="settings-block exposure-block">
-            <span class="settings-label">Exposure</span>
+            <span class="settings-label">{$m.cam_exposure}</span>
             <div class="exposure-val" class:nonzero={exposure !== 0}>
               {exposure > 0 ? `+${exposure}` : exposure}
             </div>
@@ -991,11 +991,11 @@
             />
             <!-- Marcas debajo del slider -->
             <div class="exposure-marks">
-              {#each [-3, -2, -1, 0, 1, 2, 3] as m}
-                <div class="e-mark" class:active={m === exposure}>
+              {#each [-3, -2, -1, 0, 1, 2, 3] as mark}
+                <div class="e-mark" class:active={mark === exposure}>
                   <div class="e-tick"></div>
-                  {#if Math.abs(m) === 3 || m === 0}
-                    <span>{m > 0 ? `+${m}` : m}</span>
+                  {#if Math.abs(mark) === 3 || mark === 0}
+                    <span>{mark > 0 ? `+${mark}` : mark}</span>
                   {/if}
                 </div>
               {/each}
@@ -1013,7 +1013,7 @@
     <div class="accordion-block">
       <button class="accordion-trigger" onclick={() => toggleSection('histogram')}>
         <div class="acc-left">
-          <span>Histogram</span>
+          <span>{$m.cam_histogram}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
