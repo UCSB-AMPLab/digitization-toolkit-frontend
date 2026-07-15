@@ -16,6 +16,7 @@
 	import { env } from '$env/dynamic/public';
 	import { authApi, healthApi } from '$lib/api';
 	import { authStore, getRoleDashboardPath, type UserRole } from '$lib/stores/auth';
+	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
 	import favicon from '$lib/assets/favicon.svg';
 
@@ -35,20 +36,19 @@
 	let isLoading = $state(false); // true mientras se procesa el login
 	let errorMessage = $state(''); // mensaje de error (vacío = sin error)
 	let isConnected = $state(false); // true si el backend responde
-	let currentLang = $state('ES'); // idioma activo en el selector
 
 	// ── POPUP "¿Olvidaste tu contraseña?" ─────────────────────────────────────
 	// showForgotPopup controla la visibilidad del modal.
-	// Para cambiar el mensaje del popup, edita la variable forgotMessage abajo.
+	// Para cambiar el mensaje del popup, edita login_forgot_message en $lib/i18n.
 	let showForgotPopup = $state(false);
 
-	// Mensaje que aparece dentro del popup.
-	// ── Para personalizar el mensaje, edita este texto ──
-	const forgotMessage = 'Para recuperar tu contraseña, comunícate con el responsable del proyecto.';
-
 	// Idiomas disponibles en el selector de idioma del footer.
-	// Para agregar idiomas, añade la sigla aquí y conecta con una librería i18n.
-	const languages = ['ES', 'EN', 'PT'];
+	// Las siglas se muestran siempre en su propio idioma (no se traducen).
+	// PT queda fuera hasta que exista un catálogo pt.ts en $lib/i18n.
+	const languages: { code: Locale; label: string }[] = [
+		{ code: 'es', label: 'ES' },
+		{ code: 'en', label: 'EN' }
+	];
 
 	// ---------------------------------------------------------------------------
 	// AL MONTAR: verifica si ya hay sesión y chequea conexión al backend
@@ -90,7 +90,7 @@
 
 		// Validación de campos vacíos
 		if (!username.trim() || !password.trim()) {
-			errorMessage = 'Por favor completa todos los campos';
+			errorMessage = $m.login_error_fill_all_fields;
 			return;
 		}
 
@@ -119,7 +119,7 @@
 			});
 
 			if (!userResponse.ok) {
-				throw new Error('No se pudo obtener los datos del usuario');
+				throw new Error($m.login_error_user_fetch);
 			}
 
 			const userData = await userResponse.json();
@@ -131,7 +131,7 @@
 			goto(getRoleDashboardPath(userData.role));
 		} catch (error) {
 			// Mensaje genérico para no revelar si el usuario existe
-			errorMessage = 'Usuario o contraseña incorrectos';
+			errorMessage = $m.login_error_bad_credentials;
 			console.error('[Login] Error:', error);
 		} finally {
 			// Siempre apagar el loading al terminar (éxito o error)
@@ -188,15 +188,8 @@
 		showPassword = !showPassword;
 	}
 
-	// ---------------------------------------------------------------------------
-	// ACCIÓN: Cambiar idioma
-	// Actualmente solo cambia el estado visual del selector.
-	// ── Para conectar con i18n real, implementar aquí (ej: paraglide, i18next) ──
-	// ---------------------------------------------------------------------------
-	function setLanguage(lang: string) {
-		currentLang = lang;
-		// TODO: locale.set(lang.toLowerCase());
-	}
+	// El cambio de idioma lo hace setLanguage de $lib/i18n: escribe la cookie
+	// dtk_locale y recarga la página para que el SSR renderice el idioma nuevo.
 </script>
 
 <!-- ============================================================
@@ -214,7 +207,7 @@
 		<div class="form-area">
 			<!-- CAMPO: Usuario -->
 			<div class="field-group">
-				<label class="field-label" for="username">Usuario</label>
+				<label class="field-label" for="username">{$m.common_username_label}</label>
 				<div class="input-wrapper">
 					<!-- Ícono persona -->
 					<svg
@@ -232,7 +225,7 @@
 						type="text"
 						class="input"
 						class:input-error={errorMessage}
-						placeholder="Ingresa tu usuario"
+						placeholder={$m.login_username_placeholder}
 						bind:value={username}
 						disabled={isLoading}
 						autocomplete="username"
@@ -244,7 +237,7 @@
 
 			<!-- CAMPO: Contraseña -->
 			<div class="field-group">
-				<label class="field-label" for="password">Contraseña</label>
+				<label class="field-label" for="password">{$m.common_password_label}</label>
 				<div class="input-wrapper">
 					<!-- Ícono candado -->
 					<svg
@@ -263,7 +256,7 @@
 						type={showPassword ? 'text' : 'password'}
 						class="input input-with-action"
 						class:input-error={errorMessage}
-						placeholder="Ingresa tu contraseña"
+						placeholder={$m.login_password_placeholder}
 						bind:value={password}
 						disabled={isLoading}
 						autocomplete="current-password"
@@ -273,7 +266,7 @@
 						type="button"
 						class="input-action-btn"
 						onclick={togglePassword}
-						aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+						aria-label={showPassword ? $m.common_hide_password : $m.common_show_password}
 					>
 						{#if showPassword}
 							<!-- Ojo tachado: contraseña visible -->
@@ -299,7 +292,7 @@
 			<div class="row-options">
 				<label class="remember-label">
 					<input type="checkbox" class="checkbox" bind:checked={rememberMe} disabled={isLoading} />
-					<span>Recuérdame</span>
+					<span>{$m.login_remember_me}</span>
 				</label>
 				<!-- Al hacer click abre el popup — ver handleForgotPassword() arriba -->
 				<button
@@ -308,7 +301,7 @@
 					onclick={handleForgotPassword}
 					disabled={isLoading}
 				>
-					¿Olvidaste tu contraseña?
+					{$m.login_forgot_link}
 				</button>
 			</div>
 
@@ -338,7 +331,7 @@
 				aria-busy={isLoading}
 			>
 				<!-- En estado loading el texto va en mayúsculas (igual que en el diseño) -->
-				{isLoading ? 'INICIAR SESIÓN' : 'Iniciar sesión'}
+				{isLoading ? $m.login_submit_loading : $m.login_submit}
 			</button>
 		</div>
 		<!-- /form-area -->
@@ -348,10 +341,10 @@
 			<!-- Punto verde/rojo + texto "Conectado" / "Sin conexión" -->
 			<div class="connection-status">
 				<span class="status-dot" class:success={isConnected} class:error={!isConnected}></span>
-				<span class="status-text">{isConnected ? 'Conectado' : 'Sin conexión'}</span>
+				<span class="status-text">{isConnected ? $m.login_connected : $m.login_offline}</span>
 			</div>
 
-			<!-- Selector de idioma (visual) — conectar con i18n en setLanguage() -->
+			<!-- Selector de idioma — escribe la cookie y recarga (ver $lib/i18n) -->
 			<div class="lang-selector">
 				<svg
 					viewBox="0 0 24 24"
@@ -370,10 +363,10 @@
 					<button
 						type="button"
 						class="lang-btn"
-						class:active={currentLang === lang}
-						onclick={() => setLanguage(lang)}
+						class:active={$locale === lang.code}
+						onclick={() => setLanguage(lang.code)}
 					>
-						{lang}
+						{lang.label}
 					</button>
 					{#if i < languages.length - 1}
 						<span class="lang-sep">|</span>
@@ -384,9 +377,9 @@
 
 		<!-- OVERLAY DE CARGA: se superpone sobre el card durante el login -->
 		{#if isLoading}
-			<div class="loading-overlay" aria-label="Cargando" role="status">
+			<div class="loading-overlay" aria-label={$m.common_loading} role="status">
 				<div class="spinner"></div>
-				<p class="loading-text">Cargando</p>
+				<p class="loading-text">{$m.common_loading}</p>
 			</div>
 		{/if}
 	</div>
@@ -397,7 +390,7 @@
 <!-- ============================================================
      POPUP: ¿Olvidaste tu contraseña?
      Se muestra sobre todo el contenido cuando showForgotPopup = true.
-     Para cambiar el mensaje, edita la variable forgotMessage arriba.
+     Para cambiar el mensaje, edita login_forgot_message en $lib/i18n.
      Para cerrar: botón "Cerrar", tecla Escape, o click fuera del modal.
      ============================================================ -->
 {#if showForgotPopup}
@@ -409,7 +402,7 @@
 		onclick={handleBackdropClick}
 		role="dialog"
 		aria-modal="true"
-		aria-label="Recuperación de contraseña"
+		aria-label={$m.login_forgot_dialog_aria}
 	>
 		<!-- Contenido del modal -->
 		<div class="popup-card">
@@ -429,14 +422,16 @@
 			</div>
 
 			<!-- Título del popup -->
-			<h3 class="popup-title">Recuperar contraseña</h3>
+			<h3 class="popup-title">{$m.login_forgot_title}</h3>
 
 			<!-- Mensaje principal -->
-			<!-- Para cambiar este texto, edita la variable forgotMessage arriba -->
-			<p class="popup-message">{forgotMessage}</p>
+			<!-- Para cambiar este texto, edita login_forgot_message en $lib/i18n -->
+			<p class="popup-message">{$m.login_forgot_message}</p>
 
 			<!-- Botón cerrar -->
-			<button type="button" class="popup-close-btn" onclick={closeForgotPopup}> Cerrar </button>
+			<button type="button" class="popup-close-btn" onclick={closeForgotPopup}>
+				{$m.common_close}
+			</button>
 		</div>
 	</div>
 {/if}
