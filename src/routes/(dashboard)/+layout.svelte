@@ -19,7 +19,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
-	import { m, type Messages } from '$lib/i18n';
+	import { m, type StringMessageKey } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
 	import favicon from '$lib/assets/favicon-light.svg';
 
@@ -62,10 +62,10 @@
 	// Para todos: roles: ['admin', 'operator', 'reviewer']
 	// ---------------------------------------------------------------------------
 	const NAV_ITEMS: {
-		sectionKey: keyof Messages;
+		sectionKey: StringMessageKey;
 		items: {
 			id: string;
-			labelKey: keyof Messages;
+			labelKey: StringMessageKey;
 			icon: string;
 			path: string;
 			roles: string[];

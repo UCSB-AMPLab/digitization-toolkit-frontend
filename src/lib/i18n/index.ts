@@ -26,6 +26,16 @@ import { en } from './en';
 export type Messages = typeof es;
 export type Locale = 'es' | 'en';
 
+/**
+ * Claves del catálogo cuyo valor es un string simple (sin parámetros).
+ * Úsalo cuando una clave se guarda como dato (p. ej. NAV_ITEMS) para que
+ * una futura entrada con parámetros (función) no pueda colarse donde se
+ * espera texto plano.
+ */
+export type StringMessageKey = {
+	[K in keyof Messages]: Messages[K] extends string ? K : never;
+}[keyof Messages];
+
 export const DEFAULT_LOCALE: Locale = 'es';
 export const LOCALE_COOKIE = 'dtk_locale';
 
