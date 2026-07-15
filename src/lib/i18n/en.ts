@@ -351,7 +351,7 @@ export const en: Messages = {
 	status_rejected_plural: 'Rejected',
 	status_approved_plural: 'Approved',
 	col_no_records: 'No records',
-	col_selected_count: (n: number) => (n === 1 ? '1 record selected' : `${n} records selected`),
+	col_selected_label: (n: number) => (n === 1 ? 'record selected' : 'records selected'),
 	col_send_to_review: 'Send to review',
 	col_approve: 'Approve',
 	col_reject: 'Reject',

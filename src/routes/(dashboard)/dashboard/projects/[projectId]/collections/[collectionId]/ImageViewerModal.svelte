@@ -55,11 +55,6 @@
 
   const isDouble = $derived(() => images().some(i => i.role === 'left' || i.role === 'right'));
 
-  function roleLabel(img: RecordImage): string | null {
-    if (img.role === 'left')  return 'L';
-    if (img.role === 'right') return 'R';
-    return null;
-  }
 </script>
 
 <!-- ============================================================
@@ -92,7 +87,7 @@
       {#each images() as img}
         <div class="img-viewer-frame">
           <!-- Badge L/R en captura doble -->
-          {#if isDouble() && roleLabel(img)}
+          {#if isDouble() && (img.role === 'left' || img.role === 'right')}
             <span class="img-viewer-badge">
               {img.role === 'left' ? $m.badge_left : $m.badge_right}
             </span>

@@ -371,8 +371,8 @@ export const es = {
 	status_rejected_plural: 'Rechazados',
 	status_approved_plural: 'Aprobados',
 	col_no_records: 'Sin registros',
-	col_selected_count: (n: number) =>
-		n === 1 ? '1 registro seleccionado' : `${n} registros seleccionados`,
+	col_selected_label: (n: number) =>
+		n === 1 ? 'registro seleccionado' : 'registros seleccionados',
 	col_send_to_review: 'Enviar a revisión',
 	col_approve: 'Aprobar',
 	col_reject: 'Rechazar',

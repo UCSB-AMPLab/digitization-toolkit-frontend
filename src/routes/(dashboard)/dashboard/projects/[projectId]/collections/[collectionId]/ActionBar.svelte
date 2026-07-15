@@ -41,7 +41,8 @@
 {#if selectedCount > 0}
   <div class="action-bar">
     <div class="action-bar-left">
-      <span class="action-bar-label">{$m.col_selected_count(selectedCount)}</span>
+      <span class="action-bar-count">{selectedCount}</span>
+      <span class="action-bar-label">{$m.col_selected_label(selectedCount)}</span>
     </div>
 
     <div class="action-bar-actions">
