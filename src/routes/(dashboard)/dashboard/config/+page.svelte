@@ -21,6 +21,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
+  import { m } from '$lib/i18n';
   import {
     systemApi,
     camerasApi,
@@ -100,11 +101,11 @@
       const result = await camerasApi.flushPreviewTmp();
       const n = result.deleted;
       flushPreviewResult = n === 0
-        ? 'No había archivos temporales pendientes.'
-        : `${n} archivo${n !== 1 ? 's' : ''} eliminado${n !== 1 ? 's' : ''} correctamente.`;
+        ? $m.config_tmp_none
+        : $m.config_tmp_deleted(n);
       setTimeout(() => { flushPreviewResult = null; }, 5000);
     } catch (e: unknown) {
-      flushPreviewError = (e instanceof Error ? e.message : null) || 'Error al limpiar los archivos.';
+      flushPreviewError = (e instanceof Error ? e.message : null) || $m.config_err_clean;
     } finally {
       flushingPreview = false;
     }
@@ -128,12 +129,12 @@
 
   // Texto del diálogo de confirmación según la acción elegida
   let confirmTitle = $derived(
-    pendingPowerAction === 'reboot' ? '¿Reiniciar el equipo?' : '¿Apagar el equipo?'
+    pendingPowerAction === 'reboot' ? $m.config_confirm_reboot_title : $m.config_confirm_shutdown_title
   );
   let confirmDesc = $derived(
     pendingPowerAction === 'reboot'
-      ? 'El equipo se reiniciará y la aplicación volverá en un momento. No desconectes la corriente durante el reinicio.'
-      : 'Espera a que la pantalla se apague antes de desconectar la corriente. Cualquier captura en curso debe terminar primero.'
+      ? $m.config_confirm_reboot_desc
+      : $m.config_confirm_shutdown_desc
   );
 
   function askPower(action: PowerAction) {
@@ -161,11 +162,11 @@
       if (action === 'reboot') pollForRecovery();
     } catch (e: unknown) {
       if (e instanceof PowerControlError && e.status === 501) {
-        powerError = 'El control de energía no está disponible en este equipo.';
+        powerError = $m.config_err_power_unavailable;
       } else if (e instanceof PowerControlError && e.status === 401) {
-        powerError = 'Tu sesión expiró. Vuelve a iniciar sesión para apagar o reiniciar.';
+        powerError = $m.config_err_session_expired;
       } else {
-        powerError = (e instanceof Error ? e.message : null) || 'No se pudo completar la operación.';
+        powerError = (e instanceof Error ? e.message : null) || $m.config_err_operation;
       }
     } finally {
       sendingPower = false;
@@ -224,7 +225,7 @@
     try {
       devices = await systemApi.getStorageDevices();
     } catch {
-      devicesError = 'No se pudieron leer los dispositivos.';
+      devicesError = $m.config_err_read_devices;
     } finally {
       devicesLoading = false;
     }
@@ -236,10 +237,10 @@
     storageOpSuccess = null;
     try {
       const result = await systemApi.mountDevice(devicePath);
-      storageOpSuccess = `Montado correctamente en ${result.mountpoint ?? 'directorio desconocido'}.`;
+      storageOpSuccess = $m.config_mounted_at(result.mountpoint ?? $m.config_unknown_location);
       await refreshDevices();
     } catch (e: unknown) {
-      storageOpError = (e instanceof Error ? e.message : null) || 'Error al montar el dispositivo.';
+      storageOpError = (e instanceof Error ? e.message : null) || $m.config_err_mount;
     } finally {
       mountingDevice = null;
     }
@@ -251,11 +252,11 @@
     storageOpSuccess = null;
     try {
       const result = await systemApi.activateStorage(mountpoint);
-      storageOpSuccess = `Almacenamiento activo: ${result.projects_path}`;
+      storageOpSuccess = $m.config_storage_active(result.projects_path);
       storageInfo = await systemApi.getStorage();
       setTimeout(() => { storageOpSuccess = null; }, 6000);
     } catch (e: unknown) {
-      storageOpError = (e instanceof Error ? e.message : null) || 'Error al activar el almacenamiento.';
+      storageOpError = (e instanceof Error ? e.message : null) || $m.config_err_activate;
     } finally {
       activatingPath = null;
     }
@@ -272,7 +273,7 @@
       await refreshDevices();
       setTimeout(() => { storageOpSuccess = null; }, 6000);
     } catch (e: unknown) {
-      storageOpError = (e instanceof Error ? e.message : null) || 'Error al desmontar el dispositivo.';
+      storageOpError = (e instanceof Error ? e.message : null) || $m.config_err_unmount;
     } finally {
       unmountingDevice = null;
     }
@@ -284,10 +285,10 @@
     try {
       await systemApi.resetStorage();
       storageInfo = await systemApi.getStorage();
-      storageOpSuccess = 'Restaurado al almacenamiento predeterminado.';
+      storageOpSuccess = $m.config_restored_default;
       setTimeout(() => { storageOpSuccess = null; }, 5000);
     } catch (e: unknown) {
-      storageOpError = (e instanceof Error ? e.message : null) || 'Error al restaurar.';
+      storageOpError = (e instanceof Error ? e.message : null) || $m.config_err_restore;
     } finally {
       resettingStorage = false;
     }
@@ -307,7 +308,7 @@
     try {
       logs = await systemApi.getLogs({ limit: 50 });
     } catch {
-      logsError = 'No se pudieron cargar los logs del sistema.';
+      logsError = $m.config_err_logs;
     } finally {
       logsLoading = false;
     }
@@ -335,15 +336,15 @@
 
   function formatLogMessage(log: SystemLogEntry): { before: string; bold: string; after: string } {
     const subject = log.subject ?? '';
-    const actor   = log.actor   ?? 'sistema';
+    const actor   = log.actor   ?? $m.log_actor_system;
     switch (log.action) {
-      case 'login_success':      return { before: 'Usuario ',    bold: actor,   after: ' inició sesión exitosamente.' };
-      case 'login_failed':       return { before: 'Acceso fallido. Usuario: ', bold: actor, after: log.detail ? ` (${log.detail}).` : '.' };
-      case 'user_created':       return { before: 'Usuario ',    bold: subject, after: ` creado por ${actor}.` };
-      case 'project_created':    return { before: 'Proyecto ',   bold: subject, after: ` creado por ${actor}.` };
-      case 'project_deleted':    return { before: 'Proyecto ',   bold: subject, after: ` eliminado por ${actor}.` };
-      case 'collection_created': return { before: 'Colección ',  bold: subject, after: ` creada por ${actor}.` };
-      default: return { before: log.action.replace(/_/g, ' '), bold: subject, after: log.detail ? ` — ${log.detail}` : '' };
+      case 'login_success':      return { before: $m.log_user_prefix,    bold: actor,   after: $m.log_login_success_suffix };
+      case 'login_failed':       return { before: $m.log_login_failed_prefix, bold: actor, after: log.detail ? $m.log_login_failed_detail(log.detail) : '.' };
+      case 'user_created':       return { before: $m.log_user_prefix,    bold: subject, after: $m.log_created_by_m(actor) };
+      case 'project_created':    return { before: $m.log_project_prefix,   bold: subject, after: $m.log_created_by_m(actor) };
+      case 'project_deleted':    return { before: $m.log_project_prefix,   bold: subject, after: $m.log_deleted_by_m(actor) };
+      case 'collection_created': return { before: $m.log_collection_prefix,  bold: subject, after: $m.log_created_by_f(actor) };
+      default: return { before: log.action.replace(/_/g, ' '), bold: subject, after: log.detail ? $m.log_detail_suffix(log.detail) : '' };
     }
   }
 
@@ -357,8 +358,8 @@
   <!-- Header -->
   <div class="page-header">
     <div>
-      <h1 class="page-title">Configuración</h1>
-      <p class="page-subtitle">Parámetros del sistema de digitalización</p>
+      <h1 class="page-title">{$m.nav_settings}</h1>
+      <p class="page-subtitle">{$m.config_subtitle}</p>
     </div>
   </div>
 
@@ -368,7 +369,7 @@
        La alerta se activa cuando el uso supera STORAGE_ALERT_THRESHOLD.
        ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
-    <h2 class="section-title">Almacenamiento</h2>
+    <h2 class="section-title">{$m.config_section_storage}</h2>
     <div class="config-card">
 
       <!-- Alerta de almacenamiento casi lleno -->
@@ -381,8 +382,7 @@
             <line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
           <span>
-            El almacenamiento está al <strong>{storagePercent}%</strong>.
-            Se recomienda liberar espacio o expandir la capacidad.
+            {$m.config_storage_alert_pre}<strong>{storagePercent}%</strong>{$m.config_storage_alert_post}
           </span>
         </div>
       {/if}
@@ -390,10 +390,10 @@
       <!-- Fila: Almacenamiento usado + barra de progreso -->
       <div class="config-row">
         <div class="row-info">
-          <span class="row-label">Almacenamiento usado</span>
+          <span class="row-label">{$m.config_storage_used}</span>
         </div>
         {#if storageLoading}
-          <span class="row-value muted">Cargando…</span>
+          <span class="row-value muted">{$m.common_loading_ellipsis}</span>
         {:else}
           <span class="row-value" class:alert-text={storageAlert}>
             {formatStorage(storageUsedGB)} / {formatStorage(storageTotalGB)}
@@ -414,11 +414,11 @@
       <!-- Fila: Almacenamiento primario (ruta del disco) -->
       <div class="config-row">
         <div class="row-info">
-          <span class="row-label">Almacenamiento primario</span>
+          <span class="row-label">{$m.config_storage_primary}</span>
           <span class="row-desc">
-            Ruta donde se guardan las imágenes
+            {$m.config_storage_primary_desc}
             {#if storageInfo?.is_override}
-              <span class="storage-override-badge">externo</span>
+              <span class="storage-override-badge">{$m.config_badge_external}</span>
             {/if}
           </span>
         </div>
@@ -430,8 +430,8 @@
       <!-- ── Selector de unidad externa (expandible) ── -->
       <button class="config-row logs-expand-row" onclick={toggleDevices}>
         <div class="row-info">
-          <span class="row-label">Unidad de almacenamiento <span class="badge-experimental">experimental</span></span>
-          <span class="row-desc">Conectar un disco USB o tarjeta SD como almacenamiento adicional</span>
+          <span class="row-label">{$m.config_storage_device} <span class="badge-experimental">{$m.config_badge_experimental}</span></span>
+          <span class="row-desc">{$m.config_storage_device_desc}</span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           style="transform: rotate({devicesExpanded ? 180 : 0}deg); transition: transform 0.3s ease; flex-shrink:0; color: var(--color-light-grey)">
@@ -449,9 +449,9 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
               </svg>
-              <span>Usando almacenamiento externo. Las imágenes nuevas se guardan en <strong>{storagePrimaryPath}</strong>.</span>
+              <span>{$m.config_external_active_pre}<strong>{storagePrimaryPath}</strong>.</span>
               <button class="btn-reset-storage" onclick={resetStorage} disabled={resettingStorage}>
-                {resettingStorage ? 'Restaurando…' : 'Restaurar predeterminado'}
+                {resettingStorage ? $m.config_restore_progress : $m.config_restore_default}
               </button>
             </div>
           {/if}
@@ -463,7 +463,7 @@
               <line x1="12" y1="9" x2="12" y2="13"/>
               <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
-            <span><strong>Función experimental.</strong> La compatibilidad depende del formato del dispositivo (exFAT, ext4). Discos formateados para Windows (NTFS) o macOS (APFS) pueden no funcionar correctamente. No usar como única copia de seguridad.</span>
+            <span><strong>{$m.config_experimental_lead}</strong> {$m.config_experimental_body}</span>
           </div>
 
           <!-- Alerta de advertencia sobre proyectos existentes -->
@@ -473,7 +473,7 @@
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
-            <span>Solo los proyectos nuevos se guardarán en la unidad seleccionada. Los proyectos existentes permanecen donde están.</span>
+            <span>{$m.config_new_projects_note}</span>
           </div>
 
           <!-- Mensajes de operación -->
@@ -486,11 +486,11 @@
 
           <!-- Lista de dispositivos -->
           {#if devicesLoading}
-            <p class="logs-status">Detectando dispositivos…</p>
+            <p class="logs-status">{$m.config_detecting_devices}</p>
           {:else if devicesError}
             <p class="logs-status logs-status-error">{devicesError}</p>
           {:else if devices.length === 0}
-            <p class="logs-status">No se detectaron particiones disponibles.</p>
+            <p class="logs-status">{$m.config_no_partitions}</p>
           {:else}
             {#each devices as device}
               {@const isActive = storageInfo?.is_override && storageInfo.projects_path.startsWith(device.mountpoint ?? '__none__')}
@@ -498,13 +498,13 @@
                 <div class="device-info">
                   <span class="device-name">
                     {device.label || device.name}
-                    {#if isActive}<span class="storage-override-badge">activo</span>{/if}
+                    {#if isActive}<span class="storage-override-badge">{$m.config_badge_active}</span>{/if}
                   </span>
                   <span class="device-meta">
                     {device.size}
                     {#if device.fstype} · {device.fstype}{/if}
                     {#if device.mountpoint} · <span class="device-mountpoint">{device.mountpoint}</span>{/if}
-                    {#if !device.mountpoint} · <em>no montado</em>{/if}
+                    {#if !device.mountpoint} · <em>{$m.config_not_mounted}</em>{/if}
                   </span>
                 </div>
                 <div class="device-actions">
@@ -515,18 +515,18 @@
                         onclick={() => activateStorage(device.mountpoint!)}
                         disabled={activatingPath === device.mountpoint || unmountingDevice === device.mountpoint}
                       >
-                        {activatingPath === device.mountpoint ? 'Activando…' : 'Activar'}
+                        {activatingPath === device.mountpoint ? $m.config_activating : $m.config_activate}
                       </button>
                     {:else}
-                      <span class="device-active-label">✓ En uso</span>
+                      <span class="device-active-label">{$m.config_in_use}</span>
                     {/if}
                     <button
                       class="btn-device btn-unmount"
                       onclick={() => unmountDevice(device.mountpoint!)}
                       disabled={unmountingDevice === device.mountpoint || activatingPath === device.mountpoint}
-                      title="Desmontar de forma segura antes de desconectar"
+                      title={$m.config_unmount_tooltip}
                     >
-                      {unmountingDevice === device.mountpoint ? 'Desmontando…' : 'Desmontar'}
+                      {unmountingDevice === device.mountpoint ? $m.config_unmounting : $m.config_unmount}
                     </button>
                   {:else}
                     <button
@@ -534,7 +534,7 @@
                       onclick={() => mountDevice(device.path)}
                       disabled={mountingDevice === device.path}
                     >
-                      {mountingDevice === device.path ? 'Montando…' : 'Montar'}
+                      {mountingDevice === device.path ? $m.config_mounting : $m.config_mount}
                     </button>
                   {/if}
                 </div>
@@ -548,7 +548,7 @@
               <polyline points="23 4 23 10 17 10"/>
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
             </svg>
-            Actualizar lista
+            {$m.config_refresh_list}
           </button>
 
         </div>
@@ -563,14 +563,14 @@
        Solo administradores (el layout controla el acceso a esta página).
        ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
-    <h2 class="section-title">Diagnóstico</h2>
+    <h2 class="section-title">{$m.config_section_diagnostics}</h2>
     <div class="config-card">
 
       <!-- Fila expandible: click para mostrar/ocultar logs -->
       <button class="config-row logs-expand-row" onclick={toggleLogs}>
         <div class="row-info">
-          <span class="row-label">Logs del sistema</span>
-          <span class="row-desc">Actividad reciente — última hora</span>
+          <span class="row-label">{$m.config_system_logs}</span>
+          <span class="row-desc">{$m.config_system_logs_desc}</span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           style="transform: rotate({logsExpanded ? 180 : 0}deg); transition: transform 0.3s ease; flex-shrink:0; color: var(--color-light-grey)">
@@ -582,11 +582,11 @@
         <div class="section-divider"></div>
         <div class="logs-panel-body">
           {#if logsLoading}
-            <p class="logs-status">Cargando actividad reciente…</p>
+            <p class="logs-status">{$m.config_logs_loading}</p>
           {:else if logsError}
             <p class="logs-status logs-status-error">{logsError}</p>
           {:else if logs.length === 0}
-            <p class="logs-status">Sin actividad registrada todavía.</p>
+            <p class="logs-status">{$m.config_logs_empty}</p>
           {:else}
             {#each logs as log}
               {@const parts = formatLogMessage(log)}
@@ -613,16 +613,15 @@
        SECCIÓN 3: MANTENIMIENTO
        ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
-    <h2 class="section-title">Mantenimiento</h2>
+    <h2 class="section-title">{$m.config_section_maintenance}</h2>
     <div class="config-card">
 
       <!-- Fila: Limpiar archivos temporales de previsualización -->
       <div class="config-row">
         <div class="row-info">
-          <span class="row-label">Archivos temporales de previsualización</span>
+          <span class="row-label">{$m.config_tmp_files}</span>
           <span class="row-desc">
-            Elimina los archivos <code class="inline-code">dtk_preview_c*.jpg</code> de <code class="inline-code">/tmp</code>
-            que pueden quedar si el servidor se reinicia inesperadamente
+            {$m.config_tmp_files_desc_p1}<code class="inline-code">dtk_preview_c*.jpg</code>{$m.config_tmp_files_desc_p2}<code class="inline-code">/tmp</code>{$m.config_tmp_files_desc_p3}
           </span>
         </div>
         <button
@@ -630,7 +629,7 @@
           onclick={flushPreviewTmp}
           disabled={flushingPreview}
         >
-          {flushingPreview ? 'Limpiando…' : 'Limpiar /tmp'}
+          {flushingPreview ? $m.config_cleaning : $m.config_clean_tmp}
         </button>
       </div>
 
@@ -654,16 +653,15 @@
        hábito de desconectar la corriente, que corrompe la tarjeta SD.
        ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
-    <h2 class="section-title">Energía</h2>
+    <h2 class="section-title">{$m.config_section_power}</h2>
     <div class="config-card">
 
       <!-- Fila: Apagar el equipo -->
       <div class="config-row">
         <div class="row-info">
-          <span class="row-label">Apagar el equipo</span>
+          <span class="row-label">{$m.config_shutdown_label}</span>
           <span class="row-desc">
-            Apaga el equipo de forma segura. Úsalo siempre antes de desconectar
-            la corriente para no dañar la tarjeta de memoria.
+            {$m.config_shutdown_desc}
           </span>
         </div>
         <button class="btn-power btn-power-off" onclick={() => askPower('poweroff')}>
@@ -671,17 +669,16 @@
             <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
             <line x1="12" y1="2" x2="12" y2="12"/>
           </svg>
-          Apagar
+          {$m.config_shutdown_btn}
         </button>
       </div>
 
       <!-- Fila: Reiniciar el equipo -->
       <div class="config-row">
         <div class="row-info">
-          <span class="row-label">Reiniciar el equipo</span>
+          <span class="row-label">{$m.config_reboot_label}</span>
           <span class="row-desc">
-            Reinicia el equipo. La aplicación se recargará automáticamente cuando
-            vuelva a estar disponible.
+            {$m.config_reboot_desc}
           </span>
         </div>
         <button class="btn-power btn-power-reboot" onclick={() => askPower('reboot')}>
@@ -689,7 +686,7 @@
             <polyline points="23 4 23 10 17 10"/>
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
           </svg>
-          Reiniciar
+          {$m.config_reboot_btn}
         </button>
       </div>
 
@@ -710,7 +707,7 @@
       <line x1="12" y1="8" x2="12" y2="12"/>
       <line x1="12" y1="16" x2="12.01" y2="16"/>
     </svg>
-    Este sistema opera completamente offline. Los datos se almacenan localmente en el dispositivo.
+    {$m.config_offline_note}
   </p>
 
 </div>
@@ -733,14 +730,14 @@
       <p class="confirm-desc">{confirmDesc}</p>
 
       <div class="modal-actions">
-        <button class="btn-ghost" onclick={cancelPower} disabled={sendingPower}>Cancelar</button>
+        <button class="btn-ghost" onclick={cancelPower} disabled={sendingPower}>{$m.common_cancel}</button>
         {#if pendingPowerAction === 'reboot'}
           <button class="btn-confirm-power" onclick={confirmPower} disabled={sendingPower}>
-            {sendingPower ? 'Enviando…' : 'Sí, reiniciar'}
+            {sendingPower ? $m.config_sending : $m.config_confirm_reboot_btn}
           </button>
         {:else}
           <button class="btn-delete" onclick={confirmPower} disabled={sendingPower}>
-            {sendingPower ? 'Enviando…' : 'Sí, apagar'}
+            {sendingPower ? $m.config_sending : $m.config_confirm_shutdown_btn}
           </button>
         {/if}
       </div>
@@ -758,14 +755,14 @@
     <div class="power-overlay-card">
       <div class="spinner-lg"></div>
       {#if powerPhase === 'poweroff'}
-        <h3 class="power-overlay-title">Apagando el equipo…</h3>
+        <h3 class="power-overlay-title">{$m.config_shutting_down}</h3>
         <p class="power-overlay-desc">
-          Ya puedes desconectar la corriente cuando la pantalla se apague.
+          {$m.config_shutdown_overlay_desc}
         </p>
       {:else}
-        <h3 class="power-overlay-title">Reiniciando el equipo…</h3>
+        <h3 class="power-overlay-title">{$m.config_rebooting}</h3>
         <p class="power-overlay-desc">
-          La aplicación volverá en un momento. No desconectes la corriente.
+          {$m.config_reboot_overlay_desc}
         </p>
       {/if}
     </div>

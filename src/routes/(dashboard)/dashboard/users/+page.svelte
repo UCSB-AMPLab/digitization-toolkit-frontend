@@ -18,6 +18,7 @@
 
   import { onMount } from 'svelte';
   import { usersApi, type UserRead } from '$lib/api';
+  import { m } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
   // TIPOS LOCALES
@@ -109,7 +110,7 @@
       loadError = '';
       users = await usersApi.list();
     } catch (err) {
-      loadError = err instanceof Error ? err.message : 'Error al cargar usuarios';
+      loadError = err instanceof Error ? err.message : $m.users_err_load;
       console.error('[Users] Error cargando:', err);
     } finally {
       isLoading = false;
@@ -161,16 +162,16 @@
         await loadUsers();
         showUserModal = false;
       } catch (err) {
-        formError = err instanceof Error ? err.message : 'Error al guardar';
+        formError = err instanceof Error ? err.message : $m.users_err_save;
       } finally {
         isSaving = false;
       }
     } else {
       // Create: validate then call API
-      if (!formUsername.trim()) { formError = 'El nombre de usuario es obligatorio.'; return; }
-      if (!formEmail.trim())    { formError = 'El email es obligatorio.'; return; }
-      if (!formPassword.trim()) { formError = 'La contraseña es obligatoria.'; return; }
-      if (formPassword !== formConfirm) { formError = 'Las contraseñas no coinciden.'; return; }
+      if (!formUsername.trim()) { formError = $m.users_val_username_required; return; }
+      if (!formEmail.trim())    { formError = $m.users_val_email_required; return; }
+      if (!formPassword.trim()) { formError = $m.users_val_password_required; return; }
+      if (formPassword !== formConfirm) { formError = $m.users_val_password_mismatch; return; }
 
       isSaving = true;
       try {
@@ -183,7 +184,7 @@
         await loadUsers();
         showUserModal = false;
       } catch (err) {
-        formError = err instanceof Error ? err.message : 'Error al crear usuario';
+        formError = err instanceof Error ? err.message : $m.users_err_create;
       } finally {
         isSaving = false;
       }
@@ -217,9 +218,9 @@
 
   function roleLabel(role: string): string {
     const map: Record<string, string> = {
-      operator: 'Operario',
-      reviewer: 'Revisor',
-      admin:    'Administrador',
+      operator: $m.role_operator,
+      reviewer: $m.role_reviewer,
+      admin:    $m.role_admin,
     };
     return map[role] ?? role;
   }
@@ -251,11 +252,11 @@
     return new Date(iso).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  const ROLES: { value: UserRole; label: string; desc: string }[] = [
-    { value: 'reviewer', label: 'Revisor',       desc: 'Control de calidad' },
-    { value: 'operator', label: 'Operario',       desc: 'Digitalización de documentos' },
-    { value: 'admin',    label: 'Administrador',  desc: 'Gestión completa del sistema' },
-  ];
+  let ROLES: { value: UserRole; label: string; desc: string }[] = $derived([
+    { value: 'reviewer', label: $m.role_reviewer,    desc: $m.role_reviewer_desc },
+    { value: 'operator', label: $m.role_operator,    desc: $m.role_operator_desc },
+    { value: 'admin',    label: $m.role_admin,       desc: $m.role_admin_desc },
+  ]);
 </script>
 
 <!-- ============================================================
@@ -266,15 +267,15 @@
   <!-- Header -->
   <div class="page-header">
     <div>
-      <h1 class="page-title">Gestión de Usuarios</h1>
-      <p class="page-subtitle">Control de acceso y roles del personal</p>
+      <h1 class="page-title">{$m.users_title}</h1>
+      <p class="page-subtitle">{$m.users_subtitle}</p>
     </div>
     <!-- Botón "Nuevo Usuario" — siempre visible para el admin -->
     <button class="btn-primary" onclick={openCreateModal}>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
-      Nuevo Usuario
+      {$m.users_new}
     </button>
   </div>
 
@@ -287,7 +288,7 @@
       </svg>
       <input
         type="text"
-        placeholder="Buscar usuario..."
+        placeholder={$m.users_search_placeholder}
         bind:value={searchQuery}
         class="search-input"
       />
@@ -299,10 +300,10 @@
         <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
       </svg>
       <select class="filter-select" bind:value={filterRole}>
-        <option value="">Rol</option>
-        <option value="operator">Operario</option>
-        <option value="reviewer">Revisor</option>
-        <option value="admin">Administrador</option>
+        <option value="">{$m.users_filter_role}</option>
+        <option value="operator">{$m.role_operator}</option>
+        <option value="reviewer">{$m.role_reviewer}</option>
+        <option value="admin">{$m.role_admin}</option>
       </select>
     </div>
 
@@ -312,9 +313,9 @@
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
       </svg>
       <select class="filter-select" bind:value={filterStatus}>
-        <option value="">Estado</option>
-        <option value="active">Activo</option>
-        <option value="inactive">Inactivo</option>
+        <option value="">{$m.common_status}</option>
+        <option value="active">{$m.users_status_active}</option>
+        <option value="inactive">{$m.users_status_inactive}</option>
       </select>
     </div>
   </div>
@@ -323,7 +324,7 @@
   {#if isLoading}
     <div class="loading-state">
       <div class="spinner"></div>
-      <span>Cargando usuarios...</span>
+      <span>{$m.users_loading}</span>
     </div>
 
   {:else if loadError}
@@ -334,7 +335,7 @@
         <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>
       {loadError}
-      <button class="btn-ghost" onclick={loadUsers}>Reintentar</button>
+      <button class="btn-ghost" onclick={loadUsers}>{$m.common_retry}</button>
     </div>
 
   {:else if filteredUsers.length === 0}
@@ -345,7 +346,7 @@
         <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
         <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
       </svg>
-      <span>{searchQuery || filterRole || filterStatus ? 'Sin resultados para los filtros aplicados' : 'No hay usuarios aún'}</span>
+      <span>{searchQuery || filterRole || filterStatus ? $m.users_empty_filtered : $m.users_empty}</span>
     </div>
 
   {:else}
@@ -353,11 +354,11 @@
       <table class="users-table">
         <thead>
           <tr>
-            <th>Usuario</th>
-            <th>Rol</th>
-            <th>Estado</th>
-            <th>Registrado</th>
-            <th class="col-actions">Acciones</th>
+            <th>{$m.common_user}</th>
+            <th>{$m.users_filter_role}</th>
+            <th>{$m.common_status}</th>
+            <th>{$m.users_col_registered}</th>
+            <th class="col-actions">{$m.common_actions}</th>
           </tr>
         </thead>
         <tbody>
@@ -389,7 +390,7 @@
                 <div class="status-cell">
                   <div class="status-dot" class:active={user.is_active}></div>
                   <span class:inactive={!user.is_active}>
-                    {user.is_active ? 'Activo' : 'Inactivo'}
+                    {user.is_active ? $m.users_status_active : $m.users_status_inactive}
                   </span>
                 </div>
               </td>
@@ -425,7 +426,7 @@
                         openMenuId = user.id;
                       }
                     }}
-                    aria-label="Acciones"
+                    aria-label={$m.common_actions}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <circle cx="12" cy="5" r="1.5" fill="currentColor"/>
@@ -445,7 +446,7 @@
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                         </svg>
-                        Editar
+                        {$m.common_edit}
                       </button>
                       <!-- Separador -->
                       <div class="dropdown-sep"></div>
@@ -457,7 +458,7 @@
                           <path d="M10 11v6M14 11v6"/>
                           <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                         </svg>
-                        Eliminar
+                        {$m.common_delete}
                       </button>
                     </div>
                   {/if}
@@ -492,13 +493,13 @@
       <div class="modal-header">
         <div>
           <h3 class="modal-title">
-            {isEditMode ? 'Editar usuario' : 'Crear nuevo usuario'}
+            {isEditMode ? $m.users_modal_edit_title : $m.users_modal_create_title}
           </h3>
           <p class="modal-subtitle">
-            {isEditMode ? 'Modifica los datos del usuario' : 'Agregar usuario al sistema'}
+            {isEditMode ? $m.users_modal_edit_subtitle : $m.users_modal_create_subtitle}
           </p>
         </div>
-        <button class="modal-close" onclick={() => showUserModal = false} aria-label="Cerrar">
+        <button class="modal-close" onclick={() => showUserModal = false} aria-label={$m.common_close}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -510,11 +511,11 @@
 
         <!-- Nombre de usuario (readonly en edit) -->
         <div class="form-field">
-          <label class="field-label">Nombre de usuario</label>
+          <label class="field-label">{$m.users_field_username}</label>
           <input
             class="field-input"
             type="text"
-            placeholder="Ej: maria.garcia"
+            placeholder={$m.users_ph_username}
             bind:value={formUsername}
             readonly={isEditMode}
             class:field-readonly={isEditMode}
@@ -523,11 +524,11 @@
 
         <!-- Email (readonly en edit) -->
         <div class="form-field">
-          <label class="field-label">Correo electrónico</label>
+          <label class="field-label">{$m.common_email}</label>
           <input
             class="field-input"
             type="email"
-            placeholder="Ej: maria@archivo.org"
+            placeholder={$m.users_ph_email}
             bind:value={formEmail}
             readonly={isEditMode}
             class:field-readonly={isEditMode}
@@ -537,15 +538,15 @@
         <!-- Contraseña (solo en create) -->
         {#if !isEditMode}
           <div class="form-field">
-            <label class="field-label">Contraseña</label>
+            <label class="field-label">{$m.common_password_label}</label>
             <div class="password-wrapper">
               <input
                 class="field-input"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Ingrese contraseña"
+                placeholder={$m.users_ph_password}
                 bind:value={formPassword}
               />
-              <button class="eye-btn" onclick={() => showPassword = !showPassword} aria-label="Toggle contraseña">
+              <button class="eye-btn" onclick={() => showPassword = !showPassword} aria-label={$m.users_toggle_password}>
                 {#if showPassword}
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
@@ -562,15 +563,15 @@
           </div>
 
           <div class="form-field">
-            <label class="field-label">Confirmar contraseña</label>
+            <label class="field-label">{$m.common_confirm_password}</label>
             <div class="password-wrapper">
               <input
                 class="field-input"
                 type={showConfirm ? 'text' : 'password'}
-                placeholder="Confirme contraseña"
+                placeholder={$m.users_ph_confirm}
                 bind:value={formConfirm}
               />
-              <button class="eye-btn" onclick={() => showConfirm = !showConfirm} aria-label="Toggle confirmar">
+              <button class="eye-btn" onclick={() => showConfirm = !showConfirm} aria-label={$m.users_toggle_password}>
                 {#if showConfirm}
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
@@ -590,7 +591,7 @@
         <!-- Estado activo (solo en edit) -->
         {#if isEditMode}
           <div class="form-field">
-            <label class="field-label">Estado de la cuenta</label>
+            <label class="field-label">{$m.users_field_account_status}</label>
             <button
               class="active-toggle"
               class:active={formIsActive}
@@ -599,7 +600,7 @@
               <div class="toggle-track">
                 <div class="toggle-thumb"></div>
               </div>
-              <span>{formIsActive ? 'Activo' : 'Inactivo'}</span>
+              <span>{formIsActive ? $m.users_status_active : $m.users_status_inactive}</span>
             </button>
           </div>
         {/if}
@@ -610,7 +611,7 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
-            Asignar rol
+            {$m.users_field_assign_role}
           </label>
           <div class="roles-list">
             {#each ROLES as roleOpt}
@@ -662,12 +663,12 @@
 
       <!-- Botones del modal -->
       <div class="modal-actions">
-        <button class="btn-ghost" onclick={() => showUserModal = false}>Cancelar</button>
+        <button class="btn-ghost" onclick={() => showUserModal = false}>{$m.common_cancel}</button>
         <button class="btn-crear" onclick={handleSaveUser} disabled={isSaving}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>
-          {isSaving ? 'Guardando...' : isEditMode ? 'Guardar cambios' : 'Crear usuario'}
+          {isSaving ? $m.common_saving : isEditMode ? $m.common_save_changes : $m.users_create_btn}
         </button>
       </div>
 
@@ -691,23 +692,23 @@
     <div class="modal-card modal-confirm">
 
       <!-- Título alineado a la izquierda -->
-      <h3 class="confirm-title">¿Eliminar usuario?</h3>
+      <h3 class="confirm-title">{$m.users_delete_title}</h3>
 
       <!-- Descripción con el nombre del usuario destacado -->
       <p class="confirm-desc">
-        ¿Estás seguro que quieres eliminar a
+        {$m.users_delete_confirm_pre}
         <strong>{deletingUser.username}</strong>
         ({deletingUser.email})?
-        Esta acción no se puede deshacer.
+        {$m.common_irreversible}
       </p>
 
       <!-- Botones: Cancelar (ghost) + Sí, eliminar (rojo) -->
       <div class="modal-actions">
         <button class="btn-ghost" onclick={() => showDeleteModal = false} disabled={isDeleting}>
-          Cancelar
+          {$m.common_cancel}
         </button>
         <button class="btn-delete" onclick={handleConfirmDelete} disabled={isDeleting}>
-          {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+          {isDeleting ? $m.common_deleting : $m.users_delete_btn}
         </button>
       </div>
 
