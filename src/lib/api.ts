@@ -444,6 +444,15 @@ export const collectionsApi = {
   },
 
   /**
+   * Physically renumber every image file in the collection, sequentially
+   * from 1 (zero-padded), based on current display order. All-or-nothing:
+   * on any failure no files or DB rows are left renumbered.
+   */
+  async renumberImages(collectionId: number): Promise<{ renumbered: number; prefix: string; width: number }> {
+    return apiRequest(`/collections/${collectionId}/images/renumber`, { method: 'POST' });
+  },
+
+  /**
    * Trigger a BagIt export for the collection (all records must be approved).
    * Returns metadata about the generated zip including a download_url.
    */
