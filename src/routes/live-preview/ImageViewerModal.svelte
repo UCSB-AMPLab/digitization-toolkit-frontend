@@ -30,11 +30,36 @@
     record: ApiRecord;
     cameraMode: 'single' | 'double';
     onClose: () => void;
-    onRetake: (record: ApiRecord) => void;
+    onRetake: (record: ApiRecord) => Promise<void>;
   } = $props();
 
   // Estado de confirmación de retoma
   let confirmRetake = $state(false);
+
+  // Estado de la retoma en curso — bloquea el cierre del modal mientras
+  // se captura, para no perder de vista un error si la captura falla.
+  let retaking = $state(false);
+  let retakeError = $state<string | null>(null);
+
+  async function confirmAndRetake() {
+    confirmRetake = false;
+    retaking = true;
+    retakeError = null;
+    try {
+      // onRetake solo borra las imágenes previas si la nueva captura tuvo éxito.
+      await onRetake(record);
+      // Éxito: el padre ya cerró el modal (inspectedRecord = null).
+    } catch (err) {
+      retakeError = err instanceof Error ? err.message : String(err);
+    } finally {
+      retaking = false;
+    }
+  }
+
+  function handleClose() {
+    if (retaking) return; // no cerrar mientras la captura está en curso
+    onClose();
+  }
 
   // Imágenes del registro, ordenadas por rol (left primero, right después)
   const images = $derived(() => {
@@ -51,7 +76,7 @@
      ============================================================ -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="img-viewer-backdrop" onclick={onClose}>
+<div class="img-viewer-backdrop" onclick={handleClose}>
 
   <!-- Contenido del modal: stopPropagation para no cerrar al hacer click dentro -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -63,10 +88,18 @@
       <span class="img-viewer-title">
         {record.title || $m.record_fallback_title(record.id)}
       </span>
-      <button class="img-viewer-close-btn" onclick={onClose} aria-label={$m.common_close}>
+      <button class="img-viewer-close-btn" onclick={handleClose} disabled={retaking} aria-label={$m.common_close}>
         <span class="material-symbols-outlined icon-md">close</span>
       </button>
     </div>
+
+    <!-- ── Error visible de retoma: la imagen original se conserva ── -->
+    {#if retakeError}
+      <div class="img-viewer-retake-error">
+        <span class="material-symbols-outlined icon-sm">error</span>
+        <span>{$m.lvm_retake_error(retakeError)}</span>
+      </div>
+    {/if}
 
     <!-- ── Área de imágenes ── -->
     <div class="img-viewer-images">
@@ -96,9 +129,15 @@
 
     <!-- ── Pie de página ── -->
     <div class="img-viewer-footer">
-      {#if !confirmRetake}
+      {#if retaking}
+        <!-- Captura de reemplazo en curso -->
+        <span class="img-viewer-confirm-msg">
+          <span class="img-viewer-spinner"></span>
+          {$m.lvm_retaking}
+        </span>
+      {:else if !confirmRetake}
         <!-- Acciones normales -->
-        <button class="btn btn-secondary" onclick={onClose}>
+        <button class="btn btn-secondary" onclick={handleClose}>
           <span class="material-symbols-outlined icon-sm">close</span>
           {$m.common_close}
         </button>
@@ -115,7 +154,7 @@
           <button class="btn btn-secondary" onclick={() => confirmRetake = false}>
             {$m.common_cancel}
           </button>
-          <button class="btn btn-danger" onclick={() => { confirmRetake = false; onRetake(record); }}>
+          <button class="btn btn-danger" onclick={confirmAndRetake}>
             <span class="material-symbols-outlined icon-sm">check</span>
             {$m.common_confirm}
           </button>

@@ -554,6 +554,8 @@ export const en: Messages = {
 	tb_back: 'Back',
 	lvm_retake: 'Retake',
 	lvm_retake_confirm: 'Delete the current images and recapture this record?',
+	lvm_retaking: 'Capturing replacement image…',
+	lvm_retake_error: (message: string) => `Retake failed: ${message}. The original image was kept.`,
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
