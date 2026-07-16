@@ -92,7 +92,7 @@
 
   // Modal de Renombrar
   let showRenameModal    = $state(false);
-  let renameCollectionId = $state(`coleccion_${collectionId}`);
+  let renameCollectionId = $state(`unidad_documental_${collectionId}`);
 
   // Modal de Finalizar (controlado por el prop triggerFinalizeModal)
   let isFinalizing = $state(false);
