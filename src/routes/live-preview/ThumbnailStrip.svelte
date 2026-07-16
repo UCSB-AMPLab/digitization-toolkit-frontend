@@ -60,11 +60,28 @@
   }
 
   // ---------------------------------------------------------------------------
+  // ORDEN: la tira no depende del orden en que llegan los registros (NEH-159:
+  // el backend no garantiza un ORDER BY, así que el orden de llegada puede
+  // variar). Se ordena con el mismo criterio que la galería — sequence
+  // ascendente (nulls al final), luego id — y se invierte para mostrar lo más
+  // reciente primero. Cuando NEH-122 haga que la captura asigne sequence,
+  // este criterio lo recoge sin cambios.
+  // ---------------------------------------------------------------------------
+  function archivalOrder(a: Record, b: Record): number {
+    if (a.sequence == null && b.sequence == null) return a.id - b.id;
+    if (a.sequence == null) return 1;
+    if (b.sequence == null) return -1;
+    return a.sequence - b.sequence;
+  }
+
+  let orderedRecords = $derived([...records].sort(archivalOrder).reverse());
+
+  // ---------------------------------------------------------------------------
   // DERIVADO: lista plana de items para la tira
   // ---------------------------------------------------------------------------
   let thumbItems = $derived(
     cameraMode === 'double'
-      ? [...records].reverse().flatMap((record): ThumbItem[] => {
+      ? orderedRecords.flatMap((record): ThumbItem[] => {
           if (!record.images || record.images.length === 0) {
             return [{ record, image: null, role: null, thumbnailUrl: null }];
           }
@@ -80,7 +97,7 @@
             thumbnailUrl: thumbnailUrl(img),
           }));
         })
-      : [...records].reverse().map((record): ThumbItem => {
+      : orderedRecords.map((record): ThumbItem => {
           const img = record.images?.[0] ?? null;
           return { record, image: img, role: imageRole(img), thumbnailUrl: thumbnailUrl(img) };
         })
