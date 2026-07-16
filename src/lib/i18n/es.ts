@@ -578,6 +578,8 @@ export const es = {
 	tb_back: 'Volver',
 	lvm_retake: 'Volver a capturar',
 	lvm_retake_confirm: '¿Eliminar imágenes actuales y volver a capturar este registro?',
+	lvm_retaking: 'Capturando imagen de reemplazo…',
+	lvm_retake_error: (message: string) => `Falló la retoma: ${message}. Se conservó la imagen original.`,
 
 	// ── Mensajes del cliente API ─────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',

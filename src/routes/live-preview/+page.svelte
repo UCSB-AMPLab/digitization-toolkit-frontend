@@ -20,6 +20,7 @@
   import { authStore } from '$lib/stores/auth';
   import { camerasApi, recordsApi, projectsApi, type Record as ApiRecord, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
+  import { m } from '$lib/i18n';
 
   import TopBar from './TopBar.svelte';
   import CameraControls from './CameraControls.svelte';
@@ -157,39 +158,50 @@
 
   // ---------------------------------------------------------------------------
   // HANDLER: Retoma de un registro desde el modal de imagen
-  // Elimina las imágenes existentes y vuelve a capturar para el mismo registro.
+  // Vuelve a capturar PRIMERO y solo borra las imágenes anteriores si la
+  // nueva captura tiene éxito. Así, si la captura falla o se interrumpe a
+  // mitad de camino, la(s) imagen(es) original(es) — la única copia del
+  // escaneo — quedan intactas. El modal (ImageViewerModal) espera esta
+  // promesa: si se rechaza, muestra el error y permanece abierto en vez de
+  // cerrarse silenciosamente.
   // ---------------------------------------------------------------------------
   async function handleRetake(record: ApiRecord) {
-    // Cerrar modal y limpiar selección
-    inspectedRecord = null;
-
-    try {
-      // Eliminar las imágenes actuales del registro
-      for (const img of record.images ?? []) {
-        await recordsApi.deleteImage(img.id);
-      }
-
-      // Volver a capturar
-      if (cameraMode === 'double') {
-        await camerasApi.captureDual({
-          project_name: projectName,
-          collection_id: collectionId ?? undefined,
-          record_id: record.id,
-        });
-      } else {
-        await camerasApi.capture({
-          project_name: projectName,
-          camera_index: 0,
-          collection_id: collectionId ?? undefined,
-          record_id: record.id,
-        });
-      }
-    } catch (err) {
-      console.error('[LivePreview] Error en retoma:', err);
-    } finally {
-      // Actualizar lista de registros independientemente del resultado
-      await loadRecords();
+    let result;
+    if (cameraMode === 'double') {
+      result = await camerasApi.captureDual({
+        project_name: projectName,
+        collection_id: collectionId ?? undefined,
+        record_id: record.id,
+        rotate_deg_cam0: rotateDeg[0] ?? 0,
+        rotate_deg_cam1: rotateDeg[1] ?? 0,
+      });
+    } else {
+      result = await camerasApi.capture({
+        project_name: projectName,
+        camera_index: 0,
+        collection_id: collectionId ?? undefined,
+        record_id: record.id,
+        rotate_deg: rotateDeg[0] ?? 0,
+      });
     }
+
+    if (!result.success) {
+      throw new Error(result.error || $m.lv_capture_error);
+    }
+
+    // La captura de reemplazo ya está a salvo en disco/BD — recién ahora es
+    // seguro borrar las imágenes anteriores. Un fallo al borrar una imagen
+    // vieja no deshace la retoma (la nueva imagen ya existe); solo se registra.
+    for (const img of record.images ?? []) {
+      try {
+        await recordsApi.deleteImage(img.id);
+      } catch (err) {
+        console.error('[LivePreview] Error borrando imagen antigua tras retoma exitosa:', err);
+      }
+    }
+
+    inspectedRecord = null;
+    await loadRecords();
   }
 </script>
 
