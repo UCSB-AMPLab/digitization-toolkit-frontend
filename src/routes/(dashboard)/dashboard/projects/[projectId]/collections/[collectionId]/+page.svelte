@@ -174,8 +174,12 @@
   let isExporting     = $state(false);
   let exportResult    = $state<{ bag_name: string; zip_filename: string; size_bytes: number; download_url: string } | null>(null);
   let exportError     = $state<string | null>(null);
+  // Registros que impiden exportar (aún no aprobados)
+  let showBlockersModal = $state(false);
+  let blockingRecords   = $derived(records.filter(r => r.status !== 'approved'));
 
   async function handleExport() {
+    if (!canExport) { showBlockersModal = true; return; }
     showExportModal = true;
     isExporting = true;
     exportResult = null;
@@ -339,7 +343,58 @@
     </div>
   </div>
 {/if}
+<!-- Modal: registros que bloquean la exportación -->
+{#if showBlockersModal}
+  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="export-modal-card">
+      <span class="material-symbols-outlined icon-lg export-error-icon">block</span>
+      <h3 class="export-modal-title">{$m.col_export_blocked_title}</h3>
+      <p class="export-modal-subtitle">{$m.col_export_blocked_desc}</p>
+      <ul class="blockers-list">
+        {#each blockingRecords as r}
+          <li>
+            <button class="blocker-item" onclick={() => { showBlockersModal = false; inspectedRecord = r; }}>
+              <span class="material-symbols-outlined icon-sm">image</span>
+              {r.title || $m.record_fallback_title(r.id)}
+            </button>
+          </li>
+        {/each}
+      </ul>
+      <div class="export-modal-actions">
+        <button class="btn-secondary" onclick={() => showBlockersModal = false}>{$m.common_close}</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   @keyframes spin { to { transform: rotate(360deg); } }
+  .blockers-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+  .blocker-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-light);
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+  }
+  .blocker-item:hover { background: var(--color-surface-alt-2); }
 </style>

@@ -93,11 +93,21 @@
             </span>
           {/if}
 
-          <img
+        <img
             src={recordsApi.getImageFileUrl(img.id)}
             alt={record.title || $m.col_image_alt(img.id)}
             class="img-viewer-img"
           />
+          <a
+            class="img-viewer-download"
+            href={recordsApi.getImageFileUrl(img.id)}
+            download
+            title={$m.col_download_image}
+            aria-label={$m.col_download_image}
+            onclick={(e) => e.stopPropagation()}
+          >
+            <span class="material-symbols-outlined icon-sm">download</span>
+          </a>
         </div>
       {/each}
 
@@ -180,6 +190,24 @@
 </div>
 
 <style>
+.img-viewer-frame { position: relative; }
+
+  .img-viewer-download {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--color-light);
+    text-decoration: none;
+    transition: background-color var(--transition-fast);
+  }
+  .img-viewer-download:hover { background: var(--color-primary); }
   .btn-warning {
     display: inline-flex;
     align-items: center;

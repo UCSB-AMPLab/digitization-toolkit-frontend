@@ -150,7 +150,6 @@
       onclick={onExport}
       title={canExport ? $m.col_export_available : $m.col_export_unavailable}
       aria-label={$m.col_export}
-      disabled={!canExport}
     >
       <span class="material-symbols-outlined icon-md">archive</span>
     </button>

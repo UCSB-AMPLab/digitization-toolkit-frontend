@@ -474,6 +474,9 @@ export const es = {
 	col_export_copying: 'Copiando imágenes y calculando checksums',
 	col_export_done: 'Exportación completada',
 	col_download_zip: 'Descargar ZIP',
+	col_download_image: 'Descargar imagen',
+	col_export_blocked_title: 'Aún no se puede exportar',
+	col_export_blocked_desc: 'Todos los registros deben estar aprobados antes de exportar. Los siguientes aún no lo están:',
 
 	// ── Primera instalación ──────────────────────────────────────────────────
 	setup_title: 'Primera instalación',

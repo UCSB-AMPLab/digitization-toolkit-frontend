@@ -451,6 +451,9 @@ export const en: Messages = {
 	col_export_copying: 'Copying images and computing checksums',
 	col_export_done: 'Export complete',
 	col_download_zip: 'Download ZIP',
+	col_download_image: 'Download image',
+	col_export_blocked_title: 'Cannot export yet',
+	col_export_blocked_desc: 'All records must be approved before exporting. The following are not approved yet:',
 
 	// ── First-time setup ─────────────────────────────────────────────────────
 	setup_title: 'First-time setup',
