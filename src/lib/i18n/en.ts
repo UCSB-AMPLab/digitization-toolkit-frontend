@@ -454,6 +454,16 @@ export const en: Messages = {
 	col_download_image: 'Download image',
 	col_export_blocked_title: 'Cannot export yet',
 	col_export_blocked_desc: 'All records must be approved before exporting. The following are not approved yet:',
+	col_download_choose_title: 'Export or download',
+	col_download_choose_desc: 'Choose what to get from this volume',
+	col_bagit_option_title: 'Archive package (BagIt)',
+	col_bagit_option_desc: 'Certified final version: images, checksums, and manifest.',
+	col_bagit_requires_approval: 'Requires all approved',
+	col_images_option_title: 'Images (ZIP)',
+	col_images_option_desc: 'Just the image files, no preservation metadata.',
+	col_images_always: 'Available anytime',
+	col_zip_generating: 'Preparing images ZIP…',
+	col_zip_error: 'Could not generate the ZIP',
 
 	// ── First-time setup ─────────────────────────────────────────────────────
 	setup_title: 'First-time setup',

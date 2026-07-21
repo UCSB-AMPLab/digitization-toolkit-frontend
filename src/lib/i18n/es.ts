@@ -477,6 +477,16 @@ export const es = {
 	col_download_image: 'Descargar imagen',
 	col_export_blocked_title: 'Aún no se puede exportar',
 	col_export_blocked_desc: 'Todos los registros deben estar aprobados antes de exportar. Los siguientes aún no lo están:',
+	col_download_choose_title: 'Exportar o descargar',
+	col_download_choose_desc: 'Elige qué quieres obtener de este volumen',
+	col_bagit_option_title: 'Paquete de archivo (BagIt)',
+	col_bagit_option_desc: 'Versión final certificada: imágenes, checksums y manifiesto.',
+	col_bagit_requires_approval: 'Requiere todos aprobados',
+	col_images_option_title: 'Imágenes (ZIP)',
+	col_images_option_desc: 'Solo los archivos de imagen, sin metadatos de preservación.',
+	col_images_always: 'Disponible en cualquier momento',
+	col_zip_generating: 'Preparando ZIP de imágenes…',
+	col_zip_error: 'No se pudo generar el ZIP',
 
 	// ── Primera instalación ──────────────────────────────────────────────────
 	setup_title: 'Primera instalación',
