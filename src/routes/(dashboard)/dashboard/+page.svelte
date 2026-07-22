@@ -115,13 +115,13 @@
   async function loadStats() {
     try {
       isLoadingStats = true;
-      const [projects, collections, count] = await Promise.all([
+      const [projects, collectionCountResult, count] = await Promise.all([
         projectsApi.list(),
-        collectionsApi.list(),
+        collectionsApi.count(),
         recordsApi.count(),
       ]);
       projectCount    = projects.length;
-      collectionCount = collections.length;
+      collectionCount = collectionCountResult;
       recordCount     = count;
     } catch (err) {
       console.error('[Dashboard] Stats error:', err);

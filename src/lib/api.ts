@@ -50,6 +50,20 @@ export class AuthError extends Error {
   }
 }
 
+// Thrown for any other non-ok response so callers that need the raw
+// `detail` payload (e.g. the export endpoint's structured
+// `{ message, blocking_record_ids }` body) can inspect it, while
+// `.message` still reads as a normal string for existing catch blocks
+// that only care about the text (most of them).
+export class ApiError extends Error {
+  detail?: unknown;
+  constructor(message: string, detail?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.detail = detail;
+  }
+}
+
 // Endpoints where a 401 means "bad input" (wrong credentials, wrong old
 // password), not "your session is dead" — there's either no session yet or
 // the session is perfectly valid, so these must NOT trigger the global
@@ -81,6 +95,14 @@ async function apiRequest<T>(
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: get(m).api_request_failed }));
     const detail = errorData.detail || `HTTP ${response.status}`;
+    // Some endpoints (e.g. the export blockers check) return a structured
+    // `detail` object instead of a string. Stringifying that object
+    // directly would throw "[object Object]" at callers, so pull out a
+    // readable message while keeping the raw detail available via ApiError.
+    const isStructuredDetail = typeof detail === 'object' && detail !== null;
+    const message = isStructuredDetail
+      ? (detail as { message?: string }).message || JSON.stringify(detail)
+      : detail;
 
     // 401 means the token itself is missing/invalid/expired (or its user was
     // deactivated) — the session is genuinely dead, so clear it globally.
@@ -109,7 +131,7 @@ async function apiRequest<T>(
       throw new AuthError(response.status, detail);
     }
 
-    throw new Error(detail);
+    throw new ApiError(message, isStructuredDetail ? detail : undefined);
   }
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {
@@ -420,6 +442,21 @@ export interface UpdateCollectionData {
 
 export const collectionsApi = {
   /**
+   * Get the count of collections matching the given filters.
+   */
+  async count(params?: {
+    project_id?: number;
+    parent_collection_id?: number;
+  }): Promise<number> {
+    const queryParams = new URLSearchParams();
+    if (params?.project_id !== undefined) queryParams.set('project_id', params.project_id.toString());
+    if (params?.parent_collection_id !== undefined) queryParams.set('parent_collection_id', params.parent_collection_id.toString());
+    const query = queryParams.toString();
+    const result = await apiRequest<{ count: number }>(`/collections/count${query ? '?' + query : ''}`);
+    return result.count;
+  },
+
+  /**
    * Get all collections (optionally filtered)
    */
   async list(params?: {
@@ -433,9 +470,30 @@ export const collectionsApi = {
     if (params?.parent_collection_id !== undefined) queryParams.set('parent_collection_id', params.parent_collection_id.toString());
     if (params?.skip !== undefined) queryParams.set('skip', params.skip.toString());
     if (params?.limit !== undefined) queryParams.set('limit', params.limit.toString());
-    
+
     const query = queryParams.toString();
     return apiRequest<Collection[]>(`/collections${query ? '?' + query : ''}`);
+  },
+
+  /**
+   * Get the complete set of collections matching the given filters.
+   *
+   * GET /collections is paginated (backend default limit=100, max 1000 per
+   * page), so a bare list() call silently truncates any project past the
+   * page size (NEH-121). Pages through skip/limit until a short page arrives.
+   * Stable pagination relies on the backend's ORDER BY id.
+   */
+  async listAll(params?: {
+    project_id?: number;
+    parent_collection_id?: number;
+  }): Promise<Collection[]> {
+    const PAGE = 1000; // backend's maximum page size
+    const all: Collection[] = [];
+    for (let skip = 0; ; skip += PAGE) {
+      const page = await this.list({ ...params, skip, limit: PAGE });
+      all.push(...page);
+      if (page.length < PAGE) return all;
+    }
   },
 
   /**

@@ -20,7 +20,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { recordsApi, collectionsApi, type Record } from '$lib/api';
+  import { recordsApi, collectionsApi, ApiError, type Record } from '$lib/api';
   import { m } from '$lib/i18n';
   import JSZip from 'jszip';
 
@@ -196,7 +196,19 @@
       const result = await collectionsApi.exportBagit(collectionId);
       exportResult = result;
     } catch (err: any) {
-      exportError = err?.message ?? $m.col_err_export;
+      // El cliente pre-valida canExport contra el estado local de records,
+      // pero ese estado puede quedar desactualizado (otro operador aprobó/
+      // rechazó registros entre tanto). Si el backend igual devuelve un 422
+      // con blocking_record_ids, refrescamos records y mostramos el modal
+      // de bloqueadores real en vez del modal de error genérico.
+      const detail = err instanceof ApiError ? (err.detail as { blocking_record_ids?: number[] } | undefined) : undefined;
+      if (detail?.blocking_record_ids) {
+        showExportModal = false;
+        await loadRecords();
+        showBlockersModal = true;
+      } else {
+        exportError = err?.message ?? $m.col_err_export;
+      }
     } finally {
       isExporting = false;
     }
