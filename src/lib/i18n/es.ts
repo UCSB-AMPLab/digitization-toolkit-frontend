@@ -59,8 +59,10 @@ export const es = {
 	login_connected: 'Conectado',
 	login_offline: 'Sin conexión',
 	login_error_fill_all_fields: 'Por favor completa todos los campos',
-	login_error_user_fetch: 'No se pudo obtener los datos del usuario',
 	login_error_bad_credentials: 'Usuario o contraseña incorrectos',
+
+	// ── Sesión ───────────────────────────────────────────────────────────────
+	session_validating: 'Verificando sesión…',
 
 	// ── Navegación (dashboard) ───────────────────────────────────────────────
 	nav_section_main: 'PRINCIPAL',

@@ -1,7 +1,9 @@
 import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
 import { env } from '$env/dynamic/public';
 import { get } from 'svelte/store';
 import { m } from './i18n';
+import { authStore } from './stores/auth';
 
 /**
  * Centralized API client for Digitization Toolkit
@@ -36,6 +38,24 @@ export const tokenStore = {
   }
 };
 
+// Thrown for 401/403 responses so callers that care can distinguish an
+// auth failure from any other API error (most existing catch blocks just
+// read `.message`, which still works since this extends Error).
+export class AuthError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'AuthError';
+    this.status = status;
+  }
+}
+
+// Endpoints where a 401/403 means "bad input" (wrong credentials, wrong old
+// password, deactivated account), not "your session is dead" — there's
+// either no session yet or the session is perfectly valid, so these must
+// NOT trigger the global clear-session-and-redirect below.
+const SESSION_EXEMPT_ENDPOINTS = ['/auth/login', '/auth/password-reset'];
+
 // API request helper with authentication
 async function apiRequest<T>(
   endpoint: string,
@@ -60,7 +80,23 @@ async function apiRequest<T>(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: get(m).api_request_failed }));
-    throw new Error(errorData.detail || `HTTP ${response.status}`);
+    const detail = errorData.detail || `HTTP ${response.status}`;
+
+    const isSessionExempt = SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p));
+    if ((response.status === 401 || response.status === 403) && !isSessionExempt) {
+      // Only meaningful in the browser: clears the stale/rejected session and
+      // routes to /login so the UI never keeps rendering as a broken
+      // "logged-in" shell against a token the backend has already rejected.
+      if (browser) {
+        authStore.clearSession();
+        if (!window.location.pathname.startsWith('/login')) {
+          goto('/login');
+        }
+      }
+      throw new AuthError(response.status, detail);
+    }
+
+    throw new Error(detail);
   }
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {
@@ -177,6 +213,16 @@ export interface CreateUserData {
 }
 
 export const usersApi = {
+  /**
+   * Get the authenticated user's own profile (including role).
+   * Used to validate a stored token is still good — on session
+   * start/reload and after login — since /users/me requires a valid,
+   * active-user token and 401s otherwise.
+   */
+  async me(): Promise<User> {
+    return apiRequest<User>('/users/me');
+  },
+
   /** List all users. Requires admin token. */
   async list(): Promise<UserRead[]> {
     return apiRequest<UserRead[]>('/auth/users');
