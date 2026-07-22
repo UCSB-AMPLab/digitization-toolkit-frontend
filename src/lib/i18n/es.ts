@@ -590,6 +590,7 @@ export const es = {
 	lv_guides_desc: 'Guías arrastrables (rojo)',
 	lv_capture_title: (timestamp: string) => `Captura ${timestamp}`,
 	lv_capture_error: 'Error al capturar',
+	lv_capture_not_ready: 'Cargando la colección…',
 	lv_thumb_empty: 'Sin capturas aún — usa el botón de captura',
 	tb_back: 'Volver',
 	lvm_retake: 'Volver a capturar',
