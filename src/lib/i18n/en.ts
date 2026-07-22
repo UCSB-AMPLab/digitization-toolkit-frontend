@@ -368,6 +368,7 @@ export const en: Messages = {
 	col_columns_aria: 'Number of columns',
 	col_filter_by_status: 'Filter by status:',
 	col_clear_filter: '× Clear',
+	col_filters_disabled_reorder: 'Filters are disabled while reordering to avoid corrupting the sequence',
 	col_image_n: (i: number) => `Image ${i}`,
 	col_renumber_modal_title: 'Renumber images',
 	col_renumber_desc: 'All images will be renumbered starting from 1.',

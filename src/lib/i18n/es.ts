@@ -390,6 +390,7 @@ export const es = {
 	col_columns_aria: 'Número de columnas',
 	col_filter_by_status: 'Filtrar por estado:',
 	col_clear_filter: '× Limpiar',
+	col_filters_disabled_reorder: 'Los filtros se desactivan durante el reordenamiento para no alterar la secuencia',
 	col_image_n: (i: number) => `Imagen ${i}`,
 	col_renumber_modal_title: 'Renumerar imágenes',
 	col_renumber_desc: 'Todas las imágenes se renumerarán partiendo de 1.',
