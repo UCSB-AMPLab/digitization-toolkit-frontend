@@ -13,12 +13,12 @@
   // En vista 'spread' o 'grid', el sidebar se colapsa mostrando solo el strip.
   // Solo se muestran los paneles en vista 'single'.
   //
-  // Las anotaciones son locales (estado del componente).
-  // Para persistirlas en el backend, conectar handleAddNote / handleDeleteAnnotation
-  // a un endpoint de notas cuando esté disponible.
+  // Las anotaciones se persisten en el backend (recordsApi.*Annotation*),
+  // escopadas al record actual: se recargan cada vez que currentRecord cambia.
   // ============================================================================
 
-  import type { Record, RecordImage } from '$lib/api';
+  import type { Record, RecordImage, RecordAnnotation } from '$lib/api';
+  import { recordsApi } from '$lib/api';
   import { m } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
@@ -65,14 +65,10 @@
   let contrast = $state(0);
   let saturation = $state(0);
 
-  // Anotaciones locales
-  // Para persistir en backend, conectar a una API de anotaciones
-  interface Annotation {
-    id: string;
-    errorTypes: string[];
-    note: string;
-    timestamp: Date;
-  }
+  // Anotaciones: persistidas en el backend, escopadas al record actual
+  let annotations = $state<RecordAnnotation[]>([]);
+  let annotationsError = $state<string | null>(null);
+  let isSavingAnnotation = $state(false);
 
   // Tipos de error disponibles para "Marcar error"
   // Para agregar tipos, añadir aquí
@@ -85,7 +81,25 @@
     { id: 'dirt',     label: $m.col_err_debris,   color: '#a85e78' },
   ]);
 
-  let annotations = $state<Annotation[]>([]);
+  // Recarga las anotaciones cada vez que cambia el record activo; evita que
+  // las anotaciones de un record se sigan mostrando al navegar a otro.
+  $effect(() => {
+    const recordId = currentRecord?.id ?? null;
+    annotations = [];
+    annotationsError = null;
+    if (recordId == null) return;
+
+    let cancelled = false;
+    recordsApi.getAnnotations(recordId)
+      .then(data => { if (!cancelled) annotations = data; })
+      .catch(err => {
+        if (cancelled) return;
+        console.error('[LeftSidebar] Error cargando anotaciones:', err);
+        annotationsError = $m.col_annotation_load_error;
+      });
+
+    return () => { cancelled = true; };
+  });
 
   // Modal de "Marcar error"
   let showErrorModal = $state(false);
@@ -117,37 +131,56 @@
   // ACCIONES
   // ---------------------------------------------------------------------------
 
-  function handleSaveError() {
-    if (selectedErrorTypes.length === 0) return;
-    annotations = [{
-      id: Date.now().toString(),
-      errorTypes: selectedErrorTypes,
-      note: '',
-      timestamp: new Date(),
-    }, ...annotations];
-    selectedErrorTypes = [];
-    showErrorModal = false;
+  async function handleSaveError() {
+    if (selectedErrorTypes.length === 0 || !currentRecord || isSavingAnnotation) return;
+    isSavingAnnotation = true;
+    annotationsError = null;
+    try {
+      const created = await recordsApi.addAnnotation(currentRecord.id, { error_types: selectedErrorTypes });
+      annotations = [created, ...annotations];
+      selectedErrorTypes = [];
+      showErrorModal = false;
+    } catch (err) {
+      console.error('[LeftSidebar] Error guardando anotación:', err);
+      annotationsError = $m.col_annotation_save_error;
+    } finally {
+      isSavingAnnotation = false;
+    }
   }
 
-  function handleSaveNote() {
-    if (!noteText.trim()) return;
-    annotations = [{
-      id: Date.now().toString(),
-      errorTypes: [],
-      note: noteText.trim(),
-      timestamp: new Date(),
-    }, ...annotations];
-    noteText = '';
-    showNoteModal = false;
+  async function handleSaveNote() {
+    if (!noteText.trim() || !currentRecord || isSavingAnnotation) return;
+    isSavingAnnotation = true;
+    annotationsError = null;
+    try {
+      const created = await recordsApi.addAnnotation(currentRecord.id, { note: noteText.trim() });
+      annotations = [created, ...annotations];
+      noteText = '';
+      showNoteModal = false;
+    } catch (err) {
+      console.error('[LeftSidebar] Error guardando anotación:', err);
+      annotationsError = $m.col_annotation_save_error;
+    } finally {
+      isSavingAnnotation = false;
+    }
   }
 
-  function handleDeleteAnnotation(id: string) {
+  async function handleDeleteAnnotation(id: number) {
+    const previous = annotations;
     annotations = annotations.filter(a => a.id !== id);
+    try {
+      await recordsApi.deleteAnnotation(id);
+    } catch (err) {
+      console.error('[LeftSidebar] Error eliminando anotación:', err);
+      annotations = previous;
+      annotationsError = $m.col_annotation_delete_error;
+    }
   }
 
   // Formatea la hora de una anotación
-  function formatTime(date: Date): string {
-    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  function formatTime(dateStr?: string): string {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   }
 
   // Formatea tamaño de archivo
@@ -423,6 +456,10 @@
               <span class="annotation-count">{annotations.length}</span>
             </div>
 
+            {#if annotationsError}
+              <p class="annotations-error">{annotationsError}</p>
+            {/if}
+
             <!-- Lista de anotaciones -->
             <div class="annotations-list">
               {#if annotations.length === 0}
@@ -432,9 +469,9 @@
                   <div class="annotation-card">
                     <div class="annotation-body">
                       <!-- Tags de tipo de error -->
-                      {#if ann.errorTypes.length > 0}
+                      {#if ann.error_types.length > 0}
                         <div class="error-tags">
-                          {#each ann.errorTypes as errorId}
+                          {#each ann.error_types as errorId}
                             <div class="error-tag">
                               <div class="error-dot" style="background-color: {getErrorColor(errorId)}"></div>
                               <span>{getErrorLabel(errorId)}</span>
@@ -448,7 +485,7 @@
                       {/if}
                     </div>
                     <div class="annotation-footer">
-                      <span class="annotation-time">{formatTime(ann.timestamp)}</span>
+                      <span class="annotation-time">{formatTime(ann.created_at)}</span>
                       <!-- Botón eliminar (visible en hover) -->
                       <button class="delete-annotation-btn" onclick={() => handleDeleteAnnotation(ann.id)} aria-label={$m.col_delete_annotation}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -463,14 +500,14 @@
 
             <!-- Botones de acción -->
             <div class="annotation-actions">
-              <button class="action-btn" onclick={() => showErrorModal = true}>
+              <button class="action-btn" disabled={!currentRecord} onclick={() => showErrorModal = true}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                   <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
                 <span>{$m.col_flag_error}</span>
               </button>
-              <button class="action-btn" onclick={() => showNoteModal = true}>
+              <button class="action-btn" disabled={!currentRecord} onclick={() => showNoteModal = true}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
@@ -518,7 +555,7 @@
       </div>
       <div class="modal-actions">
         <button class="modal-btn cancel" onclick={() => { showErrorModal = false; selectedErrorTypes = []; }}>{$m.common_cancel}</button>
-        <button class="modal-btn confirm" disabled={selectedErrorTypes.length === 0} onclick={handleSaveError}>{$m.common_save}</button>
+        <button class="modal-btn confirm" disabled={selectedErrorTypes.length === 0 || isSavingAnnotation} onclick={handleSaveError}>{$m.common_save}</button>
       </div>
     </div>
   </div>
@@ -548,7 +585,7 @@
       ></textarea>
       <div class="modal-actions">
         <button class="modal-btn cancel" onclick={() => { showNoteModal = false; noteText = ''; }}>{$m.common_cancel}</button>
-        <button class="modal-btn confirm" disabled={!noteText.trim()} onclick={handleSaveNote}>{$m.common_save}</button>
+        <button class="modal-btn confirm" disabled={!noteText.trim() || isSavingAnnotation} onclick={handleSaveNote}>{$m.common_save}</button>
       </div>
     </div>
   </div>
@@ -913,6 +950,18 @@
   }
 
   .action-btn:hover { background-color: rgba(90,140,98,0.12); border-color: var(--color-primary); color: var(--color-primary); }
+  .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .action-btn:disabled:hover { background-color: var(--color-surface); border-color: var(--border-color); color: var(--color-light-grey); }
+
+  .annotations-error {
+    font-size: var(--text-xs);
+    color: var(--color-error);
+    background-color: rgba(214,103,74,0.1);
+    border: 1px solid rgba(214,103,74,0.3);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    margin: 0 0 12px;
+  }
 
   .empty-text {
     font-size: var(--text-sm);
