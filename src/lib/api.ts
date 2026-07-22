@@ -38,9 +38,11 @@ export const tokenStore = {
   }
 };
 
-// Thrown for 401/403 responses so callers that care can distinguish an
-// auth failure from any other API error (most existing catch blocks just
-// read `.message`, which still works since this extends Error).
+// Thrown for 401 responses (session teardown path — see apiRequest below)
+// so callers that care can distinguish a session/auth failure from any
+// other API error (most existing catch blocks just read `.message`,
+// which still works since this extends Error). As of NEH-167, 403
+// responses are NOT AuthErrors — they throw a plain Error instead.
 export class AuthError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -83,7 +85,14 @@ async function apiRequest<T>(
     const detail = errorData.detail || `HTTP ${response.status}`;
 
     const isSessionExempt = SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p));
-    if ((response.status === 401 || response.status === 403) && !isSessionExempt) {
+    // Teardown fires on 401 only (NEH-167). As of NEH-167 the backend
+    // guarantees a missing/invalid/expired Authorization header always
+    // returns 401 — never 403 — so 401 strictly means "session problem."
+    // 403 is now reserved for legitimate in-session authorization denials
+    // (role checks, creator-only checks, etc.) against a *valid* session,
+    // and should surface as a normal catchable error rather than logging
+    // the user out.
+    if (response.status === 401 && !isSessionExempt) {
       // Only meaningful in the browser: clears the stale/rejected session and
       // routes to /login so the UI never keeps rendering as a broken
       // "logged-in" shell against a token the backend has already rejected.
