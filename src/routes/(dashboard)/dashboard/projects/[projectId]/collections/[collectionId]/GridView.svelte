@@ -12,16 +12,16 @@
   //   - Cuando cancela → llama onFinalizeModalClosed()
   //
   // TOOLBAR:
-  //   [Filtros | Renombrar]      [🖐 Reordenar / Listo]  [slider ──●──]
+  //   [Filtros | Renumerar]      [🖐 Reordenar / Listo]  [slider ──●──]
   //
   // SLIDER: controla el número de columnas del grid
   //   izquierda (2) = cards grandes | derecha (6) = cards pequeñas
   //
   // TOOLBAR SUPERIOR:
-  //   Filtros | Renombrar           [Reordenar 🖐 ──●── ] [Finalizar]
+  //   Filtros | Renumerar           [Reordenar 🖐 ──●── ] [Finalizar]
   //
   //   - Filtros     → panel de filtros por estado
-  //   - Renombrar   → modal de renombrado masivo
+  //   - Renumerar   → renumera secuencialmente los archivos de imagen (desde 1)
   //   - Reordenar   → botón que activa el modo drag-and-drop
   //                   cuando está activo el texto cambia a "Listo"
   //   - Slider      → controla el número de columnas del grid
@@ -90,9 +90,10 @@
   let showFilterPanel   = $state(false);
   let activeStatusFilter = $state<string | null>(null);
 
-  // Modal de Renombrar
-  let showRenameModal    = $state(false);
-  let renameCollectionId = $state(`unidad_documental_${collectionId}`);
+  // Modal de Renumerar
+  let showRenumberModal = $state(false);
+  let renumbering       = $state(false);
+  let renumberError     = $state<string | null>(null);
 
   // Modal de Finalizar (controlado por el prop triggerFinalizeModal)
   let isFinalizing = $state(false);
@@ -137,9 +138,24 @@
     }
   }
 
-  async function handleConfirmRename() {
-    // TODO: await collectionsApi.renameImages(collectionId, renameCollectionId);
-    showRenameModal = false;
+  async function handleConfirmRenumber() {
+    renumbering = true;
+    renumberError = null;
+    try {
+      await collectionsApi.renumberImages(collectionId);
+      showRenumberModal = false;
+      onRecordsUpdate();
+    } catch (err) {
+      renumberError = err instanceof Error ? err.message : String(err);
+    } finally {
+      renumbering = false;
+    }
+  }
+
+  function handleCloseRenumberModal() {
+    if (renumbering) return; // no cerrar mientras la operación está en curso
+    showRenumberModal = false;
+    renumberError = null;
   }
 
   async function handleConfirmFinalize() {
@@ -178,13 +194,13 @@
 
       <div class="toolbar-divider"></div>
 
-      <button class="toolbar-btn" onclick={() => showRenameModal = true}>
+      <button class="toolbar-btn" onclick={() => showRenumberModal = true}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="4 7 4 4 20 4 20 7"/>
           <line x1="9" y1="20" x2="15" y2="20"/>
           <line x1="12" y1="4" x2="12" y2="20"/>
         </svg>
-        <span>{$m.col_rename}</span>
+        <span>{$m.col_renumber}</span>
       </button>
     </div>
 
@@ -358,25 +374,28 @@
 </div>
 
 <!-- ============================================================
-     MODAL: Renombrar
+     MODAL: Renumerar
      ============================================================ -->
-{#if showRenameModal}
+{#if showRenumberModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) showRenameModal = false; }}>
+  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) handleCloseRenumberModal(); }}>
     <div class="modal-card">
-      <h3 class="modal-title">{$m.col_rename_modal_title}</h3>
-      <p class="modal-subtitle">
-        {$m.col_rename_desc}
-        <code class="code-inline">{renameCollectionId}_001</code>...
-      </p>
-      <div class="modal-field">
-        <label class="modal-label">{$m.col_collection_id}</label>
-        <input class="modal-input" type="text" bind:value={renameCollectionId} placeholder={$m.col_collection_id_ph} />
-      </div>
+      <h3 class="modal-title">{$m.col_renumber_modal_title}</h3>
+      <p class="modal-subtitle">{$m.col_renumber_desc}</p>
+      {#if renumberError}
+        <div class="modal-error-banner" role="alert" aria-live="polite">{$m.col_renumber_error(renumberError)}</div>
+      {/if}
       <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => showRenameModal = false}>{$m.common_cancel}</button>
-        <button class="modal-btn confirm" onclick={handleConfirmRename}>{$m.col_rename}</button>
+        {#if renumbering}
+          <span class="modal-subtitle-sm">
+            <span class="spin material-symbols-outlined icon-sm" style="display:inline-block">progress_activity</span>
+            {$m.col_renumbering}
+          </span>
+        {:else}
+          <button class="modal-btn cancel" onclick={handleCloseRenumberModal}>{$m.common_cancel}</button>
+          <button class="modal-btn confirm" onclick={handleConfirmRenumber}>{$m.col_renumber}</button>
+        {/if}
       </div>
     </div>
   </div>
@@ -625,16 +644,8 @@
   .modal-desc      { font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.6; margin: 0; }
   .modal-desc strong { color: var(--color-light); }
 
-  .code-inline { font-family: monospace; font-size: var(--text-sm); background-color: var(--color-surface); padding: 1px 6px; border-radius: var(--radius-sm); color: var(--color-primary); }
-
   .finalize-header { display: flex; align-items: center; gap: 12px; }
   .finalize-icon { width: 44px; height: 44px; border-radius: 50%; background-color: var(--color-highlight); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-
-  .modal-field { display: flex; flex-direction: column; gap: 6px; }
-  .modal-label { font-size: var(--text-sm); font-weight: var(--fw-semibold); color: var(--color-light); }
-
-  .modal-input { font-family: var(--font-family); font-size: var(--text-base); color: var(--color-light); background-color: var(--color-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 14px; outline: none; transition: border-color var(--transition-base); min-height: var(--touch-target-min); }
-  .modal-input:focus { border-color: var(--color-primary); }
 
   .modal-actions { display: flex; gap: 12px; }
 
@@ -644,4 +655,14 @@
   .modal-btn.confirm { background-color: var(--color-primary); color: white; border-color: var(--color-primary); }
   .modal-btn.confirm:hover { background-color: var(--color-primary-hover); }
   .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .modal-error-banner {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background-color: rgba(220, 80, 60, 0.12);
+    border: 1px solid var(--color-error);
+    color: var(--color-error);
+    font-size: var(--text-sm);
+  }
 </style>
