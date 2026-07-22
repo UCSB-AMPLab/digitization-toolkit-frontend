@@ -99,6 +99,10 @@
   let isCapturing = $state(false);
   let captureFlash = $state(false);
 
+  // Listo para capturar: solo cuando projectId/collectionId ya se resolvieron
+  // (evita disparar una captura desde una URL vacía/mal formada).
+  const captureReady = $derived(projectId > 0 && collectionId > 0);
+
   // Referencia al contenedor del viewport (para calcular posición de guías)
   let viewportEl = $state<HTMLElement | null>(null);
 
@@ -349,7 +353,7 @@
 
     try {
       const payload = {
-        project_name: projectName || `project_${projectId}`,
+        project_name: projectName,
         collection_id: collectionId || undefined,
         record_title: $m.lv_capture_title(new Date().toISOString().slice(0,19)),
       };
@@ -648,7 +652,8 @@
         class="capture-btn"
         class:capturing={isCapturing}
         onclick={handleCapture}
-        disabled={isCapturing}
+        disabled={isCapturing || !captureReady}
+        title={captureReady ? undefined : $m.lv_capture_not_ready}
         aria-label="Capturar"
       >
         <div class="capture-ring outer"></div>

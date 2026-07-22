@@ -566,6 +566,7 @@ export const en: Messages = {
 	lv_guides_desc: 'Draggable guides (red)',
 	lv_capture_title: (timestamp: string) => `Capture ${timestamp}`,
 	lv_capture_error: 'Capture failed',
+	lv_capture_not_ready: 'Loading collection…',
 	lv_thumb_empty: 'No captures yet — use the capture button',
 	tb_back: 'Back',
 	lvm_retake: 'Retake',
