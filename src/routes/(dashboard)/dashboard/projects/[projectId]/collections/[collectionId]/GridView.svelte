@@ -121,7 +121,19 @@
   // ACCIONES
   // ---------------------------------------------------------------------------
 
-  function toggleReorderMode() { isReorderMode = !isReorderMode; }
+  function toggleReorderMode() {
+    isReorderMode = !isReorderMode;
+    if (isReorderMode) {
+      // Record order is the archival page order and reorderRecords() persists
+      // the full collection sequence. dndzone's `items` must match the #each
+      // exactly (svelte-dnd-action requirement), so reordering only ever
+      // operates on the full, unfiltered list — a filtered subset would let
+      // dndzone's indices drift from what's rendered and corrupt the
+      // persisted sequence (NEH-83).
+      activeStatusFilter = null;
+      showFilterPanel = false;
+    }
+  }
 
   function handleDndConsider(e: CustomEvent) {
     localRecords = e.detail.items;
@@ -185,7 +197,12 @@
 
     <!-- Izquierda: Filtros + Renombrar -->
     <div class="toolbar-left">
-      <button class="toolbar-btn" onclick={() => showFilterPanel = !showFilterPanel}>
+      <button
+        class="toolbar-btn"
+        disabled={isReorderMode}
+        title={isReorderMode ? $m.col_filters_disabled_reorder : undefined}
+        onclick={() => showFilterPanel = !showFilterPanel}
+      >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
         </svg>
@@ -281,7 +298,7 @@
       onconsider={handleDndConsider}
       onfinalize={handleDndFinalize}
     >
-      {#each localRecords.filter(r => !activeStatusFilter || r.status === activeStatusFilter) as record, i (record.id)}
+      {#each localRecords as record, i (record.id)}
         {@const thumbUrl = getThumbnailUrl(record)}
         <div class="grid-card draggable" id="record-{record.id}">
           <div class="drag-handle visible">
@@ -480,6 +497,8 @@
   }
 
   .toolbar-btn:hover { color: var(--color-light); background-color: rgba(255,255,255,0.05); }
+  .toolbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .toolbar-btn:disabled:hover { color: var(--color-light-grey); background-color: transparent; }
 
   .toolbar-divider { width: 1px; height: 18px; background-color: var(--border-color); margin: 0 4px; }
 
