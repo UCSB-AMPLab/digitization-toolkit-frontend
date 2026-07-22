@@ -73,7 +73,7 @@
 
     <!-- Avatar circular con iniciales del usuario -->
     <!-- El color verde viene del design system (--color-primary) -->
-    <div class="user-avatar" aria-label="Usuario actual">
+    <div class="user-avatar" aria-label={$m.tb_current_user}>
       {userInitials()}
     </div>
   </div>
