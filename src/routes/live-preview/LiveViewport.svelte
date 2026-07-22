@@ -346,7 +346,7 @@
   // CAPTURA
   // ---------------------------------------------------------------------------
   async function handleCapture() {
-    if (isCapturing) return;
+    if (isCapturing || !captureReady) return;
     isCapturing = true;
     captureFlash = true;
     setTimeout(() => { captureFlash = false; }, 150);
