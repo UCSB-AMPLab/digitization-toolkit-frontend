@@ -50,10 +50,10 @@ export class AuthError extends Error {
   }
 }
 
-// Endpoints where a 401/403 means "bad input" (wrong credentials, wrong old
-// password, deactivated account), not "your session is dead" — there's
-// either no session yet or the session is perfectly valid, so these must
-// NOT trigger the global clear-session-and-redirect below.
+// Endpoints where a 401 means "bad input" (wrong credentials, wrong old
+// password), not "your session is dead" — there's either no session yet or
+// the session is perfectly valid, so these must NOT trigger the global
+// clear-session-and-redirect below.
 const SESSION_EXEMPT_ENDPOINTS = ['/auth/login', '/auth/password-reset'];
 
 // API request helper with authentication
@@ -82,17 +82,30 @@ async function apiRequest<T>(
     const errorData = await response.json().catch(() => ({ detail: get(m).api_request_failed }));
     const detail = errorData.detail || `HTTP ${response.status}`;
 
+    // 401 means the token itself is missing/invalid/expired (or its user was
+    // deactivated) — the session is genuinely dead, so clear it globally.
+    // 403 means the token is fine but the role/permission check for this one
+    // action failed (RoleChecker and every per-resource permission check in
+    // the backend run strictly after get_current_user, which is what raises
+    // 401 — a 403 can only happen on an already-valid, already-active
+    // session). Treating it the same as a dead session would silently log a
+    // user out of a perfectly good session over a single denied action, and
+    // would swallow the inline "you can't do that" errors that callers
+    // (e.g. project member management, bulk status changes) already show.
     const isSessionExempt = SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p));
-    if ((response.status === 401 || response.status === 403) && !isSessionExempt) {
-      // Only meaningful in the browser: clears the stale/rejected session and
-      // routes to /login so the UI never keeps rendering as a broken
-      // "logged-in" shell against a token the backend has already rejected.
-      if (browser) {
-        authStore.clearSession();
-        if (!window.location.pathname.startsWith('/login')) {
-          goto('/login');
-        }
+    const isDeadSession = response.status === 401 && !isSessionExempt;
+
+    // Only meaningful in the browser: clears the stale/rejected session and
+    // routes to /login so the UI never keeps rendering as a broken
+    // "logged-in" shell against a token the backend has already rejected.
+    if (isDeadSession && browser) {
+      authStore.clearSession();
+      if (!window.location.pathname.startsWith('/login')) {
+        goto('/login');
       }
+    }
+
+    if (response.status === 401 || response.status === 403) {
       throw new AuthError(response.status, detail);
     }
 
