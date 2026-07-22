@@ -78,7 +78,7 @@
   async function loadRecords() {
     try {
       isLoading = true;
-      const data = await recordsApi.list({ collection_id: collectionId });
+      const data = await recordsApi.listAll({ collection_id: collectionId });
       // Sort by sequence (nulls last), then by id
       records = data.sort((a, b) => {
         if (a.sequence == null && b.sequence == null) return a.id - b.id;

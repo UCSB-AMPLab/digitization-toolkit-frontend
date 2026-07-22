@@ -103,12 +103,12 @@
 
   // ---------------------------------------------------------------------------
   // FUNCIÓN: Carga los registros de la colección actual
-  // Llama a recordsApi.list() filtrando por collectionId
+  // Llama a recordsApi.listAll() filtrando por collectionId
   // ---------------------------------------------------------------------------
   async function loadRecords() {
     try {
       isLoading = true;
-      const data = await recordsApi.list({ collection_id: collectionId });
+      const data = await recordsApi.listAll({ collection_id: collectionId });
       records = data;
       // Seleccionar el primer registro si existe
       if (data.length > 0 && !selectedRecordId) {

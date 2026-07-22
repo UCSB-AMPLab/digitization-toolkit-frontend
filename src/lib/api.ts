@@ -574,6 +574,29 @@ export const recordsApi = {
   },
 
   /**
+   * Get the complete set of records matching the given filters.
+   *
+   * GET /records is paginated (backend default limit=100, max 1000 per page),
+   * so a bare list() call silently truncates any collection past the page
+   * size (NEH-163). Pages through skip/limit until a short page arrives.
+   * Stable pagination relies on the backend's ORDER BY id.
+   */
+  async listAll(params?: {
+    collection_id?: number;
+    project_id?: number;
+    object_typology?: string;
+    orphaned?: boolean;
+  }): Promise<Record[]> {
+    const PAGE = 1000; // backend's maximum page size
+    const all: Record[] = [];
+    for (let skip = 0; ; skip += PAGE) {
+      const page = await this.list({ ...params, skip, limit: PAGE });
+      all.push(...page);
+      if (page.length < PAGE) return all;
+    }
+  },
+
+  /**
    * Get a single record by ID (with all images)
    */
   async get(id: number): Promise<Record> {
