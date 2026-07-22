@@ -518,6 +518,20 @@ export interface Record {
   rejection_note?: string;
 }
 
+export interface RecordAnnotation {
+  id: number;
+  record_id: number;
+  error_types: string[];
+  note?: string | null;
+  created_at?: string;
+  created_by?: string;
+}
+
+export interface CreateRecordAnnotationData {
+  error_types?: string[];
+  note?: string;
+}
+
 export interface CreateRecordData {
   title: string;
   description?: string;
@@ -700,6 +714,30 @@ export const recordsApi = {
       method: 'POST',
       body: JSON.stringify({ record_ids, status, rejection_note })
     });
+  },
+
+  /**
+   * List a record's QA annotations (flagged errors + notes), newest first.
+   */
+  async getAnnotations(recordId: number): Promise<RecordAnnotation[]> {
+    return apiRequest<RecordAnnotation[]>(`/records/${recordId}/annotations`);
+  },
+
+  /**
+   * Add an annotation (flagged error and/or note) to a record.
+   */
+  async addAnnotation(recordId: number, data: CreateRecordAnnotationData): Promise<RecordAnnotation> {
+    return apiRequest<RecordAnnotation>(`/records/${recordId}/annotations`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * Delete a single annotation.
+   */
+  async deleteAnnotation(annotationId: number): Promise<void> {
+    await apiRequest(`/records/annotations/${annotationId}`, { method: 'DELETE' });
   }
 };
 
