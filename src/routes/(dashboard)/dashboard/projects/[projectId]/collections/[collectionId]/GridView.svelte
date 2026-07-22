@@ -384,7 +384,7 @@
       <h3 class="modal-title">{$m.col_renumber_modal_title}</h3>
       <p class="modal-subtitle">{$m.col_renumber_desc}</p>
       {#if renumberError}
-        <p class="modal-error-banner">{$m.col_renumber_error(renumberError)}</p>
+        <div class="modal-error-banner" role="alert" aria-live="polite">{$m.col_renumber_error(renumberError)}</div>
       {/if}
       <div class="modal-actions">
         {#if renumbering}
