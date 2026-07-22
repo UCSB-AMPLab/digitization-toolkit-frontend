@@ -52,10 +52,11 @@ export class AuthError extends Error {
   }
 }
 
-// Endpoints where a 401/403 means "bad input" (wrong credentials, wrong old
-// password, deactivated account), not "your session is dead" — there's
-// either no session yet or the session is perfectly valid, so these must
-// NOT trigger the global clear-session-and-redirect below.
+// Endpoints where a 401 means "bad input" (wrong credentials, wrong old
+// password), not "your session is dead" — there's either no session yet or
+// the session is perfectly valid, so these must NOT trigger the global
+// clear-session-and-redirect below. (403s never tear down the session —
+// see NEH-167 — so this list only matters for 401.)
 const SESSION_EXEMPT_ENDPOINTS = ['/auth/login', '/auth/password-reset'];
 
 // API request helper with authentication
