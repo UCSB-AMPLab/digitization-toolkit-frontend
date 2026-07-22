@@ -49,8 +49,10 @@ export const en: Messages = {
 	login_connected: 'Connected',
 	login_offline: 'Offline',
 	login_error_fill_all_fields: 'Please fill in all fields',
-	login_error_user_fetch: 'Could not load your user details',
 	login_error_bad_credentials: 'Incorrect username or password',
+
+	// ── Session ──────────────────────────────────────────────────────────────
+	session_validating: 'Verifying session…',
 
 	// ── Navigation (dashboard) ───────────────────────────────────────────────
 	nav_section_main: 'MAIN',

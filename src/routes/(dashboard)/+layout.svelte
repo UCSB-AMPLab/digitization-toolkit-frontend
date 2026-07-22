@@ -19,6 +19,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
+	import { usersApi } from '$lib/api';
 	import { m, type StringMessageKey } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
 	import favicon from '$lib/assets/favicon-light.svg';
@@ -37,12 +38,47 @@
 	// ---------------------------------------------------------------------------
 	let currentUser = $state<any>(null);
 
+	// true mientras se valida la sesión contra el backend al montar el layout;
+	// el contenido protegido no se renderiza hasta que esto sea false (NEH-63).
+	let isValidatingSession = $state(true);
+
 	onMount(() => {
-		// Auth guard: si no hay token, redirigir al login
+		// Guard reactivo: si la sesión se limpia MIENTRAS se usa la app (p. ej.
+		// apiRequest interceptó un 401/403 en algún llamado posterior), salir.
 		const unsub = authStore.subscribe((s) => {
 			currentUser = s.user;
-			if (!s.token) goto('/login');
+			if (!s.token && !isValidatingSession) goto('/login');
 		});
+
+		// Validación al montar: un token en localStorage no garantiza que el
+		// backend todavía lo acepte (pudo expirar, o el usuario fue
+		// desactivado). Antes de este fix, un token viejo pasaba este guard
+		// sin más chequeo y el dashboard se renderizaba igual, degradando en
+		// un shell "logueado" roto en cuanto la primera llamada a la API
+		// fallaba en silencio. Ahora se valida con /users/me antes de mostrar
+		// cualquier contenido protegido.
+		(async () => {
+			const token = authStore.getToken();
+			if (!token) {
+				goto('/login');
+				return;
+			}
+			try {
+				const freshUser = await usersApi.me();
+				// Refresca el usuario en el store (por si el rol cambió del
+				// lado del backend desde el último login) antes de renderizar.
+				authStore.setSession(token, freshUser);
+			} catch {
+				// apiRequest ya limpió la sesión y redirigió a /login ante un
+				// 401/403; para cualquier otro error (p. ej. red caída) no
+				// podemos confirmar la sesión, así que tampoco renderizamos.
+				goto('/login');
+				return;
+			} finally {
+				isValidatingSession = false;
+			}
+		})();
+
 		return unsub;
 	});
 
@@ -148,6 +184,16 @@
 	}
 </script>
 
+<!-- ============================================================
+     SPLASH: se muestra mientras se valida la sesión con /users/me.
+     Ningún contenido protegido se renderiza hasta que termine (NEH-63).
+     ============================================================ -->
+{#if isValidatingSession || !currentUser}
+	<div class="session-splash" role="status" aria-live="polite">
+		<div class="spinner"></div>
+		<p class="splash-text">{$m.session_validating}</p>
+	</div>
+{:else}
 <!-- ============================================================
      SHELL: sidebar + contenido
      ============================================================ -->
@@ -326,8 +372,42 @@
 		{@render children()}
 	</main>
 </div>
+{/if}
 
 <style>
+	/* ── Splash de validación de sesión ── */
+	.session-splash {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 14px;
+		width: 100vw;
+		height: 100vh;
+		background-color: var(--color-bg);
+	}
+
+	.session-splash .spinner {
+		width: 40px;
+		height: 40px;
+		border: 3px solid var(--border-color);
+		border-top-color: var(--color-light);
+		border-radius: 50%;
+		animation: splash-spin 0.8s linear infinite;
+	}
+
+	.splash-text {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		margin: 0;
+	}
+
+	@keyframes splash-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
 	.shell {
 		display: flex;
 		width: 100vw;

@@ -12,9 +12,7 @@
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { browser } from '$app/environment';
-	import { env } from '$env/dynamic/public';
-	import { authApi, healthApi } from '$lib/api';
+	import { authApi, healthApi, usersApi, tokenStore } from '$lib/api';
 	import { authStore, getRoleDashboardPath, type UserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
@@ -107,22 +105,12 @@
 			// ⚠️ El endpoint /users/me debe devolver el campo 'role' con uno de:
 			//    'admin' | 'operator' | 'reviewer'
 			// Si el backend usa otros nombres de rol, actualizar UserRole en auth.ts
-			const apiBase = browser
-				? env.PUBLIC_API_BASE || 'http://localhost:8000'
-				: 'http://localhost:8000';
-
-			const userResponse = await fetch(`${apiBase}/users/me`, {
-				headers: {
-					Authorization: `Bearer ${authResponse.access_token}`,
-					'Content-Type': 'application/json'
-				}
-			});
-
-			if (!userResponse.ok) {
-				throw new Error($m.login_error_user_fetch);
-			}
-
-			const userData = await userResponse.json();
+			//
+			// usersApi.me() usa apiRequest, que arma el header Authorization desde
+			// tokenStore — hay que persistir el token recién obtenido primero para
+			// que este llamado lo levante.
+			tokenStore.set(authResponse.access_token);
+			const userData = await usersApi.me();
 
 			// Paso 3: guardar sesión en el store global
 			authStore.setSession(authResponse.access_token, userData);
