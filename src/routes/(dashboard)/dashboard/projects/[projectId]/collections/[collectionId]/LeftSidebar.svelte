@@ -133,11 +133,18 @@
 
   async function handleSaveError() {
     if (selectedErrorTypes.length === 0 || !currentRecord || isSavingAnnotation) return;
+    const recordId = currentRecord.id;
     isSavingAnnotation = true;
     annotationsError = null;
     try {
-      const created = await recordsApi.addAnnotation(currentRecord.id, { error_types: selectedErrorTypes });
-      annotations = [created, ...annotations];
+      const created = await recordsApi.addAnnotation(recordId, { error_types: selectedErrorTypes });
+      // Si el record activo cambió mientras la request estaba en curso, el
+      // effect de carga ya reemplazó `annotations` por las del nuevo record;
+      // no anteponer aquí, o mostraríamos una anotación del record anterior.
+      // La anotación ya quedó guardada en el backend y aparecerá al volver.
+      if (currentRecord?.id === recordId) {
+        annotations = [created, ...annotations];
+      }
       selectedErrorTypes = [];
       showErrorModal = false;
     } catch (err) {
@@ -150,11 +157,17 @@
 
   async function handleSaveNote() {
     if (!noteText.trim() || !currentRecord || isSavingAnnotation) return;
+    const recordId = currentRecord.id;
     isSavingAnnotation = true;
     annotationsError = null;
     try {
-      const created = await recordsApi.addAnnotation(currentRecord.id, { note: noteText.trim() });
-      annotations = [created, ...annotations];
+      const created = await recordsApi.addAnnotation(recordId, { note: noteText.trim() });
+      // Mismo guard que handleSaveError: si el record cambió durante el
+      // await, el effect de carga ya tiene la lista correcta para el nuevo
+      // record activo.
+      if (currentRecord?.id === recordId) {
+        annotations = [created, ...annotations];
+      }
       noteText = '';
       showNoteModal = false;
     } catch (err) {
@@ -166,14 +179,20 @@
   }
 
   async function handleDeleteAnnotation(id: number) {
+    const recordId = currentRecord?.id ?? null;
     const previous = annotations;
     annotations = annotations.filter(a => a.id !== id);
     try {
       await recordsApi.deleteAnnotation(id);
     } catch (err) {
       console.error('[LeftSidebar] Error eliminando anotación:', err);
-      annotations = previous;
-      annotationsError = $m.col_annotation_delete_error;
+      // Solo restaurar si seguimos en el mismo record: si cambió, el effect
+      // de carga ya cargó la lista del nuevo record y restaurar aquí la
+      // pisaría con datos del record anterior.
+      if (currentRecord?.id === recordId) {
+        annotations = previous;
+        annotationsError = $m.col_annotation_delete_error;
+      }
     }
   }
 
