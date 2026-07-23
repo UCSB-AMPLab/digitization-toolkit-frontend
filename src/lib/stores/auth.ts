@@ -7,6 +7,7 @@
 
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
 
 // ----------------------------------------------------------------------------
 // TIPOS
@@ -96,6 +97,28 @@ function createAuthStore() {
     // ── Verifica si hay sesión activa ──────────────────────────────────────
     isAuthenticated(): boolean {
       return get({ subscribe }).token !== null;
+    },
+
+    // ── Guard centralizado para rutas fuera de (dashboard) ──────────────────
+    // (dashboard)/+layout.svelte ya valida la sesión a fondo contra
+    // /users/me; las rutas que viven fuera de ese grupo (live-preview, la
+    // galería full-screen de colecciones) no heredan eso y cada una
+    // reimplementaba su propio chequeo de "hay token" copy-pasteado, sin
+    // validar rol (NEH-66). Un solo guard aquí reemplaza esas copias:
+    // redirige a /login si no hay sesión, y a `fallback` si `roles` no
+    // incluye el rol del usuario actual. Devuelve true si el llamador puede
+    // continuar montando la página.
+    requireSession(roles?: UserRole[], fallback = '/dashboard'): boolean {
+      const state = get({ subscribe });
+      if (!state.token) {
+        goto('/login');
+        return false;
+      }
+      if (roles && roles.length > 0 && !roles.includes(state.user?.role as UserRole)) {
+        goto(fallback);
+        return false;
+      }
+      return true;
     },
   };
 }
