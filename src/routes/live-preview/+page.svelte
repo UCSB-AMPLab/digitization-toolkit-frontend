@@ -11,7 +11,9 @@
   //   CameraControls.svelte → panel izquierdo con ajustes de cámara
   //   LiveViewport.svelte   → área central con la vista de cámara en vivo
   //   ThumbnailStrip.svelte → tira de miniaturas inferior
-  //   Para acceder temporalmente hacer inicio de sesion y luego entrar a http://localhost:5173/live-preview?projectId=1&collectionId=1
+  //   Para acceder: iniciar sesión como admin u operator y entrar a
+  //   http://localhost:5173/live-preview?projectId=1&collectionId=1
+  //   (reviewer es redirigido — ver el guard de rol en el onMount, NEH-66)
   // ============================================================================
 
   import { onMount } from 'svelte';
@@ -77,9 +79,12 @@
   // AL MONTAR: verifica auth y carga registros existentes de la colección
   // ---------------------------------------------------------------------------
   onMount(async () => {
-    // Verificar que hay sesión activa
-    if (!authStore.isAuthenticated()) {
-      goto('/login');
+    // Verificar sesión + rol: la pantalla de captura es solo para admin y
+    // operator — reviewer no puede disparar capturas ni borrar (el backend
+    // ya lo rechaza con 403 en cameras.py/records.py), pero antes de este
+    // fix esta ruta (fuera del grupo (dashboard)) solo chequeaba que hubiera
+    // un token, sin validar rol (NEH-66).
+    if (!authStore.requireSession(['admin', 'operator'])) {
       return;
     }
 

@@ -33,7 +33,9 @@
   onMount(() => {
     const unsub = authStore.subscribe((s) => {
       currentUser = s.user;
-      if (!s.token) goto('/login');
+      // Guard centralizado (NEH-66): mismo chequeo de "hay token" que antes
+      // vivía copy-pasteado acá, en live-preview y en la página hija.
+      authStore.requireSession();
     });
     return unsub;
   });

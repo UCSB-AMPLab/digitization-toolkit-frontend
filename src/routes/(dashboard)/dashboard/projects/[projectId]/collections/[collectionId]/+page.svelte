@@ -68,8 +68,7 @@
   // AL MONTAR
   // ---------------------------------------------------------------------------
   onMount(async () => {
-    if (!authStore.isAuthenticated()) {
-      goto('/login');
+    if (!authStore.requireSession()) {
       return;
     }
     await loadRecords();
