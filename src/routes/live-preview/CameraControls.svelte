@@ -23,7 +23,7 @@
 
   import { onMount } from 'svelte';
   import { m } from '$lib/i18n';
-  import { camerasApi, type CameraDevice, type CameraControlsRequest, type CameraCapabilities, type DSLRSettingsUpdate } from '$lib/api';
+  import { camerasApi, AuthError, type CameraDevice, type CameraControlsRequest, type CameraCapabilities, type DSLRSettingsUpdate } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore } from '$lib/stores/histogram';
@@ -478,7 +478,14 @@
       devices = d;
       capabilities = caps;
       onDevicesChange?.(d);
-    }).catch(() => { /* fallo silencioso */ });
+    }).catch((err) => {
+      // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
+      // limpió la sesión y redirige a /login; dejar `devices` como está en
+      // vez de que este catch conflate el error de auth con un estado real
+      // de "no hay cámaras conectadas" (NEH-64).
+      if (err instanceof AuthError && err.status === 401) return;
+      /* cualquier otro error: fallo silencioso, cámara puede no estar conectada */
+    });
   });
 
   // ---------------------------------------------------------------------------

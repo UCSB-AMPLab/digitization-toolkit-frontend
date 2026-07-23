@@ -18,7 +18,7 @@
   import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, projectsApi, collectionsApi, recordsApi } from '$lib/api';
+  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError } from '$lib/api';
   import { m } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
@@ -137,7 +137,12 @@
         left:  devices.some(d => d.index === 0) ? 'ok' : 'not-found',
         right: devices.some(d => d.index === 1) ? 'ok' : 'not-found',
       };
-    } catch {
+    } catch (err) {
+      // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
+      // limpió la sesión y redirige a /login; no pisar esa navegación
+      // mostrando cámaras "not-found" que leerían como una falla de
+      // hardware (NEH-64).
+      if (err instanceof AuthError && err.status === 401) return;
       cameraStatus = { left: 'not-found', right: 'not-found' };
     }
   }
