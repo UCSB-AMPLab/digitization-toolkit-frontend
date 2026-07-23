@@ -41,9 +41,12 @@
   let canCreate = $derived(
     $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
   );
-  let canManageMembers = $derived(
-    $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
-  );
+  // Solo admin puede crear/asignar/quitar colaboradores — el backend ya lo
+  // exige (allow_admin en add_project_member/remove_project_member,
+  // NEH-80); operator y reviewer ni siquiera pueden consultar la lista de
+  // usuarios (GET /auth/users es admin-only), así que el picker no debe
+  // intentar cargarla para ellos.
+  let canManageMembers = $derived($authStore.user?.role === 'admin');
 
   // Colecciones filtradas
   let filteredCollections = $derived(
@@ -544,7 +547,7 @@
                         <span class="material-symbols-outlined icon-sm">edit</span>
                         {$m.common_edit}
                       </button>
-                      {#if $userRole === 'admin'}
+                      {#if $userRole === 'admin' || $userRole === 'operator'}
                         <button class="action-item action-item-danger" onclick={(e) => openDeleteColModal(e, col)}>
                           <span class="material-symbols-outlined icon-sm">delete</span>
                           {$m.common_delete}
@@ -704,7 +707,7 @@
           <h3 class="modal-title">{$m.pd_members}</h3>
           <p class="modal-subtitle">{$m.pd_modal_project(project?.name ?? '—')}</p>
         </div>
-        <button class="modal-close" onclick={() => showMembersModal = false}>
+        <button class="modal-close modal-close--circle" onclick={() => showMembersModal = false} aria-label={$m.common_close}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -772,10 +775,6 @@
           </div>
         {/if}
 
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn-ghost" onclick={() => showMembersModal = false}>{$m.common_close}</button>
       </div>
 
     </div>
@@ -1182,6 +1181,22 @@
   }
 
   .modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
+
+  /* Colaboradores: única forma de cerrar el modal — círculo con target
+     táctil de 44x44 (--touch-target-min) y feedback de hover/active visible
+     (mismo patrón que .btn-back en +layout@.svelte y .btn:active global) */
+  .modal-close--circle {
+    width: var(--touch-target-min);
+    height: var(--touch-target-min);
+    border-radius: var(--radius-full);
+  }
+
+  .modal-close--circle:hover { background-color: var(--border-color); }
+
+  .modal-close--circle:active {
+    background-color: var(--border-color);
+    transform: scale(0.97);
+  }
 
   .modal-body { display: flex; flex-direction: column; gap: 14px; }
 

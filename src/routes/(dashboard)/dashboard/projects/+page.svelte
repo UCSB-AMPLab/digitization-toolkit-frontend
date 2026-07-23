@@ -39,10 +39,10 @@
       : projects
   );
 
-  // ¿El usuario puede crear proyectos? (admin y operator)
-  let canCreate = $derived(
-    $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
-  );
+  // ¿El usuario puede crear proyectos? Solo admin — el backend ya lo exige
+  // (allow_admin en create_project, NEH-80); operator puede crear y
+  // eliminar colecciones dentro de un proyecto, pero no proyectos.
+  let canCreate = $derived($authStore.user?.role === 'admin');
 
   // ---------------------------------------------------------------------------
   // ESTADO: Modal de crear proyecto (formulario simplificado)
