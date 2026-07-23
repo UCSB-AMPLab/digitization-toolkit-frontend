@@ -4,7 +4,8 @@
   // Ruta: /dashboard/users
   // Archivo: src/routes/(dashboard)/dashboard/users/+page.svelte
   //
-  // Solo visible para administradores (el layout ya controla el acceso).
+  // Solo visible para administradores (el layout redirige a los roles
+  // sin acceso — ver el guard de rol en (dashboard)/+layout.svelte).
   //
   // Funcionalidades:
   //   - Tabla de usuarios: avatar, username, email, rol, estado, registrado, acciones

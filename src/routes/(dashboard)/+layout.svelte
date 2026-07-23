@@ -167,6 +167,40 @@
 	);
 
 	// ---------------------------------------------------------------------------
+	// GUARD DE ROL POR RUTA (NEH-65)
+	//
+	// Ocultar los links de navegación no basta: cualquier usuario logueado
+	// puede llegar a /dashboard/users o /dashboard/config escribiendo la URL
+	// directamente. NAV_ITEMS ya declara qué roles pueden ver cada ruta, así
+	// que la reusamos como única fuente de verdad para el control de acceso
+	// en vez de mantener una lista de rutas admin-only por separado.
+	// ---------------------------------------------------------------------------
+
+	// Busca el item de navegación que corresponde a una ruta dada, usando
+	// coincidencia exacta o de subruta (el más específico, si hay varios)
+	function findNavItem(path: string) {
+		return NAV_ITEMS.flatMap((section) => section.items)
+			.filter((item) => path === item.path || path.startsWith(item.path + '/'))
+			.sort((a, b) => b.path.length - a.path.length)[0];
+	}
+
+	// true si la ruta actual no tiene restricción de rol, o si el rol del
+	// usuario actual está entre los permitidos
+	let hasRoleAccess = $derived.by(() => {
+		const item = findNavItem(currentPath);
+		if (!item) return true;
+		return item.roles.length === 0 || item.roles.includes(currentUser?.role ?? '');
+	});
+
+	// Redirige fuera de rutas admin-only en cuanto sabemos el rol del usuario
+	// (al montar, o si navega del lado del cliente a otra ruta restringida)
+	$effect(() => {
+		if (!isValidatingSession && currentUser && !hasRoleAccess) {
+			goto('/dashboard');
+		}
+	});
+
+	// ---------------------------------------------------------------------------
 	// HELPERS
 	// ---------------------------------------------------------------------------
 
@@ -188,7 +222,7 @@
      SPLASH: se muestra mientras se valida la sesión con /users/me.
      Ningún contenido protegido se renderiza hasta que termine (NEH-63).
      ============================================================ -->
-{#if isValidatingSession || !currentUser}
+{#if isValidatingSession || !currentUser || !hasRoleAccess}
 	<div class="session-splash" role="status" aria-live="polite">
 		<div class="spinner"></div>
 		<p class="splash-text">{$m.session_validating}</p>
