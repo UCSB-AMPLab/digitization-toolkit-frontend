@@ -191,7 +191,7 @@
   async function loadCollections() {
     try {
       isLoading = true;
-      const data = await collectionsApi.list({ project_id: projectId });
+      const data = await collectionsApi.listAll({ project_id: projectId });
       collections = data;
     } catch (err) {
       console.error('[ProjectDetail] Error cargando colecciones:', err);

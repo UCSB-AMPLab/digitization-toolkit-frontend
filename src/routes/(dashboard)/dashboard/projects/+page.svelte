@@ -192,11 +192,11 @@
     showDeleteModal = true;
     isLoadingDeleteInfo = true;
     try {
-      const [cols, imgs] = await Promise.all([
-        collectionsApi.list({ project_id: project.id }),
+      const [colCount, imgs] = await Promise.all([
+        collectionsApi.count({ project_id: project.id }),
         recordsApi.count({ project_id: project.id }),
       ]);
-      deleteCollectionCount = cols.length;
+      deleteCollectionCount = colCount;
       deleteImageCount = imgs;
     } catch (err) {
       console.error('[Projects] Error obteniendo info del proyecto:', err);
