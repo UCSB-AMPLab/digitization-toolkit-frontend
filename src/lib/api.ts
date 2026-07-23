@@ -102,7 +102,7 @@ async function apiRequest<T>(
     const isStructuredDetail = typeof detail === 'object' && detail !== null;
     const message = isStructuredDetail
       ? (detail as { message?: string }).message || JSON.stringify(detail)
-      : detail;
+      : String(detail);
 
     // 401 means the token itself is missing/invalid/expired (or its user was
     // deactivated) — the session is genuinely dead, so clear it globally.
@@ -128,7 +128,9 @@ async function apiRequest<T>(
     }
 
     if (response.status === 401 || response.status === 403) {
-      throw new AuthError(response.status, detail);
+      // Pass the extracted string, not the raw detail: if an auth error ever
+      // carries a structured detail body, Error.message must stay readable.
+      throw new AuthError(response.status, message);
     }
 
     throw new ApiError(message, isStructuredDetail ? detail : undefined);
