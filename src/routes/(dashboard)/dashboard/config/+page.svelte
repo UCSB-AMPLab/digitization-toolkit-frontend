@@ -4,7 +4,8 @@
   // Ruta: /dashboard/config
   // Archivo: src/routes/(dashboard)/dashboard/config/+page.svelte
   //
-  // Solo visible para administradores (el layout controla el acceso).
+  // Solo visible para administradores (el layout redirige a los roles
+  // sin acceso — ver el guard de rol en (dashboard)/+layout.svelte).
   //
   // Secciones:
   //   1. Almacenamiento
@@ -560,7 +561,7 @@
   <!-- ══════════════════════════════════════════════════════════
        SECCIÓN 2: DIAGNÓSTICO DEL SISTEMA
        Logs de actividad reciente. Ocultos por defecto, expandibles.
-       Solo administradores (el layout controla el acceso a esta página).
+       Solo administradores (el layout redirige a los roles sin acceso).
        ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_diagnostics}</h2>
