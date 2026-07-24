@@ -23,6 +23,7 @@
 	import { m, type StringMessageKey } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
 	import favicon from '$lib/assets/favicon-light.svg';
+	import BugReportButton from '$lib/bug-report/BugReportButton.svelte';
 
 	let { children } = $props();
 
@@ -381,6 +382,8 @@
 			{:else}
 				<div class="user-av-sm">{userInitials}</div>
 			{/if}
+			
+			<BugReportButton {expanded} />
 
 			<!-- Botón salir: siempre visible, ícono en colapsado + texto en expandido -->
 			<button class="logout-btn" onclick={handleLogout} title={$m.nav_logout}>
