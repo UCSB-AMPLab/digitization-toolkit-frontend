@@ -3,6 +3,8 @@
   import favicon from '$lib/assets/favicon.svg';
   import VirtualKeyboard from '$lib/components/VirtualKeyboard.svelte';
   import { locale } from '$lib/i18n';
+  import { onMount } from 'svelte';
+  import { initErrorCapture } from '$lib/bug-report/error-capture';
 
   let { children, data } = $props();
 
@@ -10,6 +12,7 @@
   // El idioma solo cambia con recarga completa (ver setLanguage en $lib/i18n),
   // así que basta fijarlo una vez por carga.
   locale.set(data.locale);
+  onMount(() => { initErrorCapture(); });
 </script>
 
 <svelte:head>
