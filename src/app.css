@@ -967,11 +967,6 @@ canvas, button, a, div {
   font-variant-numeric: tabular-nums;
 }
 
-/* Live preview feed rotation — applied to <img class="feed-img"> */
-.feed-rotate-90  { transform: rotate(90deg);  }
-.feed-rotate-180 { transform: rotate(180deg); }
-.feed-rotate-270 { transform: rotate(270deg); }
-
 /* Floating rotation overlay — bottom-center of each camera feed */
 .feed-rotate-overlay {
   position: absolute;

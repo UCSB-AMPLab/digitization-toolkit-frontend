@@ -5,7 +5,9 @@
   // Vista spread: muestra las dos páginas (izq + der) del registro seleccionado
   // lado a lado, como un libro abierto.
   //
-  // La imagen se muestra usando el thumbnail (si existe) o la URL completa.
+  // Siempre carga la imagen completa (no el thumbnail, que el backend limita
+  // a 200x200px para las tiras/grillas) — este es el visor principal de
+  // lectura/inspección, igual que ImageViewerModal.
   // ============================================================================
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
@@ -56,13 +58,39 @@
   // ---------------------------------------------------------------------------
   function getImageUrl(img: RecordImage | null): string | null {
     if (!img) return null;
-    if (img.thumbnail_path) return recordsApi.getImageThumbnailUrl(img.id);
     return recordsApi.getImageFileUrl(img.id);
   }
 
   // Nombre del record para mostrar en labels
   function getRecordName(record: Record | null): string {
     return record?.title ?? '—';
+  }
+
+  // ---------------------------------------------------------------------------
+  // TAMAÑO MEDIDO DE CADA PÁGINA — evita que la imagen rotada se recorte
+  // ---------------------------------------------------------------------------
+  // .spread-image no tiene width/height fijo (solo max-width/max-height), y
+  // .spread-page tiene overflow:hidden. Un simple rotate(90/270deg) sobre esa
+  // caja se recorta porque la página cambia de landscape a portrait (o
+  // viceversa) y el rectángulo rotado ya no calza en el contenedor original.
+  //
+  // El arreglo: medimos cada .spread-page y, en 90°/270°, le damos a la
+  // imagen el tamaño del contenedor con ancho/alto intercambiados, centrada
+  // de forma absoluta — así la caja ya rotada vuelve a calzar exacto.
+  let leftPageW  = $state(0);
+  let leftPageH  = $state(0);
+  let rightPageW = $state(0);
+  let rightPageH = $state(0);
+
+  function spreadImageStyle(rotation: number, zoom: number, containerW: number, containerH: number): string {
+    const base = `transition: transform 0.15s ease;`;
+    if ((rotation === 90 || rotation === 270) && containerW && containerH) {
+      // La caja intercambiada (containerH x containerW) es más ancha que el
+      // 100% del panel sin rotar — hay que anular max-width/max-height
+      // (heredados de .spread-image) o los recortan de vuelta.
+      return `${base} position: absolute; top: 50%; left: 50%; width: ${containerH}px; height: ${containerW}px; max-width: none; max-height: none; transform: translate(-50%, -50%) scale(${zoom}) rotate(${rotation}deg);`;
+    }
+    return `${base} transform: scale(${zoom}) rotate(${rotation}deg);`;
   }
 </script>
 
@@ -86,7 +114,7 @@
     <div class="spread-wrapper">
 
       <!-- Página izquierda -->
-      <div class="spread-page">
+      <div class="spread-page" bind:clientWidth={leftPageW} bind:clientHeight={leftPageH}>
         {#if selectedRecord}
           <div class="spread-label">
             <span class="spread-name">{getRecordName(selectedRecord)}</span>
@@ -99,7 +127,7 @@
             alt={$m.col_left_page}
             class="spread-image left"
             draggable="false"
-            style="transform: scale({zoom}) rotate({rotation}deg); transition: transform 0.15s ease;"
+            style={spreadImageStyle(rotation, zoom, leftPageW, leftPageH)}
           />
         {:else}
           <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
@@ -110,7 +138,7 @@
       <div class="book-spine"></div>
 
       <!-- Página derecha -->
-      <div class="spread-page">
+      <div class="spread-page" bind:clientWidth={rightPageW} bind:clientHeight={rightPageH}>
         {#if spreadRightImage}
           <div class="spread-label right">
             <span class="spread-name">{getRecordName(selectedRecord)}</span>
@@ -123,7 +151,7 @@
             alt={$m.col_right_page}
             class="spread-image right"
             draggable="false"
-            style="transform: scale({zoom}) rotate({rotation}deg); transition: transform 0.15s ease;"
+            style={spreadImageStyle(rotation, zoom, rightPageW, rightPageH)}
           />
         {:else}
           <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
@@ -182,6 +210,7 @@
     display: flex;
     align-items: stretch;
     height: 90%;
+    width: 100%;
     max-width: calc(100% - 120px);
     gap: 0;
   }

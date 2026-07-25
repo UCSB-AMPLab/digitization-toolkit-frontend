@@ -134,6 +134,33 @@
   let imgEl0: HTMLImageElement | null = $state(null);
   let imgEl1: HTMLImageElement | null = $state(null);
 
+  // Tamaño medido de cada panel .camera-feed (px), usado para que la imagen
+  // rotada no se recorte contra el overflow:hidden del panel — ver
+  // feedRotateStyle más abajo.
+  let feedW0 = $state(0);
+  let feedH0 = $state(0);
+  let feedW1 = $state(0);
+  let feedH1 = $state(0);
+
+  // Un simple `transform: rotate()` sobre una caja del mismo tamaño del
+  // panel se recorta en 90°/270°, porque el panel es rectangular
+  // (landscape) y la imagen rotada pasa a ser portrait (o viceversa): el
+  // rectángulo rotado ya no calza en el rectángulo original y
+  // overflow:hidden le corta las puntas.
+  //
+  // El arreglo: antes de rotar, le damos a la imagen el tamaño del panel
+  // con ancho/alto intercambiados, centrada de forma absoluta. Rotada
+  // 90°/270°, esa caja intercambiada vuelve a calzar exacto en el panel.
+  // 180° no cambia de orientación, así que no necesita este ajuste.
+  function feedRotateStyle(rotation: number, containerW: number, containerH: number): string {
+    if (rotation === 90 || rotation === 270) {
+      if (!containerW || !containerH) return `transform: rotate(${rotation}deg);`;
+      return `position: absolute; top: 50%; left: 50%; width: ${containerH}px; height: ${containerW}px; transform: translate(-50%, -50%) rotate(${rotation}deg);`;
+    }
+    if (rotation === 180) return `transform: rotate(180deg);`;
+    return '';
+  }
+
   // ---------------------------------------------------------------------------
   // WB SAMPLING — click-to-neutralize
   // Reads a 3×3 pixel block from the blob-URL preview image via an offscreen
@@ -459,7 +486,7 @@
       <div class="camera-feeds-wrapper" style="transform: scale({zoom * 0.85})">
 
         <!-- Cámara izquierda (leftIdx) — siempre visible -->
-        <div class="camera-feed">
+        <div class="camera-feed" bind:clientWidth={feedW0} bind:clientHeight={feedH0}>
           {#if previewUrls[leftIdx]}
             <!-- Frame en vivo del polling — se actualiza cada PREVIEW_INTERVAL_MS -->
             <img
@@ -467,9 +494,7 @@
               src={previewUrls[leftIdx]}
               alt={$m.lv_camera_left_alt}
               class="feed-img"
-              class:feed-rotate-90={(rotateDeg[leftIdx] ?? 0) === 90}
-              class:feed-rotate-180={(rotateDeg[leftIdx] ?? 0) === 180}
-              class:feed-rotate-270={(rotateDeg[leftIdx] ?? 0) === 270}
+              style={feedRotateStyle(rotateDeg[leftIdx] ?? 0, feedW0, feedH0)}
               onload={() => { if (imgEl0) histogramStore.update(s => ({ ...s, [leftIdx]: computeHistogram(imgEl0!) })); }}
             />
             <!-- WB sampling overlay: visible only when picker is active for this camera -->
@@ -515,7 +540,7 @@
 
         <!-- Cámara derecha (rightIdx) — solo en modo double -->
         {#if cameraMode === 'double'}
-          <div class="camera-feed">
+          <div class="camera-feed" bind:clientWidth={feedW1} bind:clientHeight={feedH1}>
             {#if previewUrls[rightIdx]}
               <!-- Frame en vivo del polling -->
               <img
@@ -523,9 +548,7 @@
                 src={previewUrls[rightIdx]}
                 alt={$m.lv_camera_right_alt}
                 class="feed-img"
-                class:feed-rotate-90={(rotateDeg[rightIdx] ?? 0) === 90}
-                class:feed-rotate-180={(rotateDeg[rightIdx] ?? 0) === 180}
-                class:feed-rotate-270={(rotateDeg[rightIdx] ?? 0) === 270}
+                style={feedRotateStyle(rotateDeg[rightIdx] ?? 0, feedW1, feedH1)}
                 onload={() => { if (imgEl1) histogramStore.update(s => ({ ...s, [rightIdx]: computeHistogram(imgEl1!) })); }}
               />
               {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === rightIdx}
