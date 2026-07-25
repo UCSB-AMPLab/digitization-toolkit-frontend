@@ -7,9 +7,9 @@
   // Muestra:
   //   - Nombre del proyecto + subtítulo
   //   - Botón "Volver a Proyectos"
-  //   - KPI cards: Colecciones, Total imágenes, Colaboradores
+  //   - KPI cards: Colecciones, Total registros, Colaboradores
   //   - Barra de búsqueda + Filtros
-  //   - Tabla de colecciones: Colección, Estado, Núm. imágenes, Responsable, Fecha, Acciones
+  //   - Tabla de colecciones: Colección, Estado, Núm. registros, Responsable, Fecha, Acciones
   //   - Botón "Nueva Colección" → modal
   //
   // Modal "Nueva Colección":
@@ -36,7 +36,21 @@
   let collections = $state<Collection[]>([]);
   let isLoading   = $state(true);
   let searchQuery = $state('');
-  let recordCount = $state<number | null>(null);
+
+  // Records living directly under the project (no collection) — the
+  // single-parent DB constraint means a record's project_id is NULL as
+  // soon as it's filed into a collection, so this alone undercounts.
+  let directRecordCount = $state<number | null>(null);
+
+  // Total = direct records + each collection's own record_count (now
+  // populated by GET /collections/, NEH-179). Collections aren't nested
+  // via the UI today, so summing the (flat, top-level) list covers every
+  // record under the project without a recursive traversal.
+  let recordCount = $derived(
+    directRecordCount === null
+      ? null
+      : directRecordCount + collections.reduce((sum, c) => sum + (c.record_count ?? 0), 0)
+  );
 
   let canCreate = $derived(
     $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
@@ -119,7 +133,7 @@
 
   async function loadRecordCount() {
     try {
-      recordCount = await recordsApi.count({ project_id: projectId });
+      directRecordCount = await recordsApi.count({ project_id: projectId });
     } catch (err) {
       console.error('[ProjectDetail] Error cargando conteo de registros:', err);
     }
@@ -427,7 +441,7 @@
       <div class="kpi-card">
         <div class="kpi-line" style="background: var(--color-secondary)"></div>
         <div class="kpi-num">{recordCount ?? '—'}</div>
-        <div class="kpi-lbl">{$m.pd_kpi_total_images}</div>
+        <div class="kpi-lbl">{$m.pd_kpi_total_records}</div>
       </div>
     </div>
 
@@ -479,7 +493,7 @@
           <tr>
             <th>{$m.pd_col_collection}</th>
             <th>{$m.common_status}</th>
-            <th>{$m.pd_col_images}</th>
+            <th>{$m.pd_col_records}</th>
             <th>{$m.pd_col_date}</th>
             <th class="text-right">{$m.common_actions}</th>
           </tr>
