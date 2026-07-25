@@ -261,12 +261,10 @@
         </svg>
         <span>{$m.col_renumber}</span>
       </button>
-    </div>
 
-    <!-- Derecha: Reordenar + Slider de columnas -->
-    <div class="toolbar-right">
+      <div class="toolbar-divider"></div>
+
       <div class="reorder-group">
-
         <!-- Ícono mano -->
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
           style="color: {isReorderMode ? 'var(--color-primary)' : 'var(--color-light-grey)'}; flex-shrink:0">
@@ -282,25 +280,27 @@
         >
           {isReorderMode ? $m.col_reorder_done : $m.col_reorder}
         </button>
-
-        <!-- Slider de columnas -->
-        <!--
-          Izquierda (2) = menos columnas = thumbnails más grandes (como screenshot 3)
-          Derecha   (6) = más columnas   = thumbnails más pequeños (como screenshot 2)
-          Para cambiar el rango, modifica min y max
-        -->
-        <input
-          type="range"
-          min="2"
-          max="6"
-          step="1"
-          bind:value={columns}
-          class="columns-slider"
-          title={$m.col_thumb_size}
-          aria-label={$m.col_columns_aria}
-        />
-
       </div>
+    </div>
+
+    <!-- Derecha: Slider de columnas, solo -->
+    <div class="toolbar-right">
+      <!-- Slider de columnas -->
+      <!--
+        Izquierda (2) = menos columnas = thumbnails más grandes (como screenshot 3)
+        Derecha   (6) = más columnas   = thumbnails más pequeños (como screenshot 2)
+        Para cambiar el rango, modifica min y max
+      -->
+      <input
+        type="range"
+        min="2"
+        max="6"
+        step="1"
+        bind:value={columns}
+        class="columns-slider"
+        title={$m.col_thumb_size}
+        aria-label={$m.col_columns_aria}
+      />
     </div>
 
   </div>
@@ -550,7 +550,10 @@
   .toolbar-divider { width: 1px; height: 18px; background-color: var(--border-color); margin: 0 4px; }
 
   /* Reordenar group */
-  .reorder-group { display: flex; align-items: center; gap: 10px; }
+  /* padding-left: 12px iguala el padding izquierdo de .toolbar-btn (6px
+     12px) — sin esto, el ícono de mano queda pegado al divisor mientras
+     el ícono de Renumerar (dentro de un botón con ese padding) no. */
+  .reorder-group { display: flex; align-items: center; gap: 10px; padding-left: 12px; }
 
   .reorder-btn {
     font-family: var(--font-family);
