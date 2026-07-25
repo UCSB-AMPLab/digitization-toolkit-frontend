@@ -63,9 +63,11 @@
   // ORDEN: la tira no depende del orden en que llegan los registros (NEH-159:
   // el backend no garantiza un ORDER BY, así que el orden de llegada puede
   // variar). Se ordena con el mismo criterio que la galería — sequence
-  // ascendente (nulls al final), luego id — y se invierte para mostrar lo más
-  // reciente primero. Cuando NEH-122 haga que la captura asigne sequence,
-  // este criterio lo recoge sin cambios.
+  // ascendente (nulls al final), luego id — en orden cronológico de lectura:
+  // lo más antiguo a la izquierda y la captura más reciente en el extremo
+  // DERECHO (convención acordada, NEH-159/NEH-183 — no invertir). Cuando
+  // NEH-122 haga que la captura asigne sequence, este criterio lo recoge
+  // sin cambios.
   // ---------------------------------------------------------------------------
   function archivalOrder(a: Record, b: Record): number {
     if (a.sequence == null && b.sequence == null) return a.id - b.id;
@@ -74,7 +76,7 @@
     return a.sequence - b.sequence;
   }
 
-  let orderedRecords = $derived([...records].sort(archivalOrder).reverse());
+  let orderedRecords = $derived([...records].sort(archivalOrder));
 
   // ---------------------------------------------------------------------------
   // DERIVADO: lista plana de items para la tira

@@ -43,6 +43,17 @@
 	// el contenido protegido no se renderiza hasta que esto sea false (NEH-63).
 	let isValidatingSession = $state(true);
 
+	// Etiqueta traducida del rol: el enum viaja en inglés desde el backend
+	// (admin/operator/reviewer) y no debe mostrarse crudo (NEH-183).
+	function roleLabel(role: string | null | undefined): string {
+		const labels: Record<string, string> = {
+			admin: $m.role_admin,
+			operator: $m.role_operator,
+			reviewer: $m.role_reviewer
+		};
+		return role ? (labels[role] ?? role) : '—';
+	}
+
 	onMount(() => {
 		// Guard reactivo: si la sesión se limpia MIENTRAS se usa la app (p. ej.
 		// apiRequest interceptó un 401/403 en algún llamado posterior), salir.
@@ -376,7 +387,7 @@
 					<div class="user-av">{userInitials}</div>
 					<div class="user-text">
 						<span class="user-name">{currentUser?.username ?? '—'}</span>
-						<span class="user-role">{currentUser?.role ?? '—'}</span>
+						<span class="user-role">{roleLabel(currentUser?.role)}</span>
 					</div>
 				</div>
 			{:else}
