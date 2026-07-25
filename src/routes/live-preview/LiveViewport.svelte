@@ -396,7 +396,11 @@
       }
 
       if (!result.success) {
-        throw new Error(result.error || 'Capture failed');
+        // Antes de NEH-72 este texto no se mostraba en ninguna parte, así que
+        // el literal en inglés daba igual. Ahora es lo que lee el operario en
+        // el banner cuando el backend no manda un `error` propio, y tiene que
+        // salir del catálogo.
+        throw new Error(result.error || $m.lv_capture_error);
       }
 
       // El flash solo dispara cuando el backend confirmó la captura: es la
@@ -458,7 +462,9 @@
       {#if $cameraStatus.captureError}
         <div class="capture-error-banner" role="alert">
           <span class="material-symbols-outlined icon-sm">error</span>
-          {$cameraStatus.errorMessage ?? $m.lv_capture_error}
+          <!-- `||` y no `??`: un mensaje vacío también tiene que caer al
+               catálogo, o el banner sale sin texto. -->
+          {$cameraStatus.errorMessage || $m.lv_capture_error}
         </div>
       {/if}
 
