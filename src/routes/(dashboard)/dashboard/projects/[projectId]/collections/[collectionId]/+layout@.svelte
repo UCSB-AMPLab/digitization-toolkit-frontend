@@ -125,10 +125,13 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 16px;
-    height: 52px;
+    height: 72px;
     flex-shrink: 0;
-    background-color: var(--color-sidebar);
-    border-bottom: 1px solid var(--border-color);
+    /* Antes: var(--color-sidebar), una variable que no existe en ningún
+       lado del proyecto — sin fallback, el fondo caía en transparente.
+       Ahora usa el mismo fondo + borde que el topbar de Live Preview. */
+    background-color: var(--color-surface-alt);
+    border-bottom: 2px solid var(--color-primary);
   }
 
   .topbar-left {
@@ -142,6 +145,29 @@
     align-items: center;
     gap: 10px;
   }
+
+  /* Botón cámara — misma forma/estructura que el badge "En revisión" de
+     Live Preview (TopBar.svelte: .status-badge — píldora, sin borde), pero
+     en verde primario del design system en vez de sand, y con min-height
+     táctil (44px) porque este SÍ es clickeable, a diferencia del badge. */
+  .btn-camera {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    min-height: var(--touch-target-min);
+    border-radius: var(--radius-full);
+    border: none;
+    background-color: var(--color-primary);
+    color: var(--color-light);
+    font-family: var(--font-family);
+    font-size: 13px;
+    font-weight: var(--fw-bold);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color var(--transition-base);
+  }
+  .btn-camera:hover { background-color: var(--color-primary-hover); }
 
   /* Botón volver */
   .btn-back {
@@ -173,21 +199,6 @@
     font-weight: var(--fw-bold);
   }
   .bc-sep { color: var(--color-light-grey); }
-
-  /* Botón cámara */
-  .btn-camera {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--color-light);
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .btn-camera:hover { background: var(--color-bg); border-color: var(--color-primary); color: var(--color-primary); }
 
   /* Avatar */
   .user-avatar {
