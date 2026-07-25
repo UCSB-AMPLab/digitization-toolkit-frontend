@@ -87,6 +87,7 @@
   let previewUrls    = $state<Record<string, string>>({});
   let streamActive   = $state<Record<string, boolean>>({ left: false, right: false });
   let cameraStatus   = $state<Record<string, 'ok' | 'not-found' | 'unknown'>>({ left: 'unknown', right: 'unknown' });
+  let cameraModel    = $state<Record<string, string | null>>({ left: null, right: null });
   let previewIntervals: Record<string, ReturnType<typeof setInterval>> = {};
   let isFetchingPreview: Record<string, boolean> = {};
 
@@ -133,9 +134,17 @@
   async function checkCamerasStatus() {
     try {
       const devices = await camerasApi.listDevices();
+      const left  = devices.find(d => d.index === 0);
+      const right = devices.find(d => d.index === 1);
       cameraStatus = {
-        left:  devices.some(d => d.index === 0) ? 'ok' : 'not-found',
-        right: devices.some(d => d.index === 1) ? 'ok' : 'not-found',
+        left:  left  ? 'ok' : 'not-found',
+        right: right ? 'ok' : 'not-found',
+      };
+      // Modelo real reportado por /cameras/devices — Canon EOS 1500D/Rebel T7
+      // en gphoto2 (Rionegro), imx519 en picamera2. Nunca hardcodear (NEH-73).
+      cameraModel = {
+        left:  left?.model  ?? null,
+        right: right?.model ?? null,
       };
     } catch (err) {
       // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
@@ -144,6 +153,7 @@
       // hardware (NEH-64).
       if (err instanceof AuthError && err.status === 401) return;
       cameraStatus = { left: 'not-found', right: 'not-found' };
+      cameraModel = { left: null, right: null };
     }
   }
 
@@ -292,7 +302,7 @@
               </div>
               <div class="cam-info">
                 <span class="cam-name">{label}</span>
-                <span class="cam-model">imx519</span>
+                <span class="cam-model">{cameraModel[side] ?? '—'}</span>
               </div>
               <!-- Badge OK / Not found -->
               <div class="cam-badge" class:ok={status === 'ok'} class:notfound={status === 'not-found'}>
