@@ -12,7 +12,6 @@
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
-  import StatusBadge from '$lib/components/StatusBadge.svelte';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -125,12 +124,9 @@
             {/if}
           </div>
 
-          <!-- Nombre + status -->
+          <!-- Nombre -->
           <div class="thumb-info">
             <span class="thumb-name" title={item.record.title}>{item.record.title || `Img ${i+1}`}</span>
-            <div class="thumb-status">
-              <StatusBadge status={item.record.status} />
-            </div>
           </div>
 
         </button>
@@ -241,11 +237,9 @@
 
   .thumb-info {
     flex-shrink: 0;
-    height: 36px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 2px;
     padding: 0 2px;
   }
 
@@ -263,8 +257,6 @@
 
   .thumb-item.selected .thumb-name,
   .thumb-item:hover .thumb-name { color: var(--color-light); }
-
-  .thumb-status { display: flex; align-items: center; }
 
   .spin { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
