@@ -13,9 +13,24 @@ import { goto } from '$app/navigation';
 // TIPOS
 // ----------------------------------------------------------------------------
 
-// Roles disponibles en el sistema
-// Si el backend agrega roles nuevos, agregarlos aquí
-export type UserRole = 'admin' | 'operator' | 'reviewer';
+// Roles disponibles en el sistema. Si el backend agrega roles nuevos,
+// agregarlos aquí — es el único lugar donde vive la lista.
+//
+// El arreglo es la fuente y el tipo se deriva de él, no al revés: hace falta
+// la lista en tiempo de ejecución para validar lo que responde el backend
+// (isUserRole, abajo), y tenerla escrita dos veces es garantía de que tarde o
+// temprano se separen.
+export const USER_ROLES = ['admin', 'operator', 'reviewer'] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
+
+// El rol llega del backend como texto libre en el JSON: TypeScript lo tipa
+// como UserRole, pero nada verifica que de verdad lo sea. Un rol nuevo del
+// backend, o un typo, se colaría hasta la navegación y los permisos de cámara
+// sin que nadie lo note (NEH-117).
+export function isUserRole(value: unknown): value is UserRole {
+  return typeof value === 'string' && (USER_ROLES as readonly string[]).includes(value);
+}
 
 // Datos del usuario autenticado
 export interface AuthUser {

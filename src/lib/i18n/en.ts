@@ -50,6 +50,7 @@ export const en: Messages = {
 	login_offline: 'Offline',
 	login_error_fill_all_fields: 'Please fill in all fields',
 	login_error_bad_credentials: 'Incorrect username or password',
+	login_error_unknown_role: 'Your account has a role this app does not recognize. Let whoever administers the device know.',
 
 	// ── Session ──────────────────────────────────────────────────────────────
 	session_validating: 'Verifying session…',

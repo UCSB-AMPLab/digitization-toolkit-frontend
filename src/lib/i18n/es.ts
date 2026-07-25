@@ -60,6 +60,7 @@ export const es = {
 	login_offline: 'Sin conexión',
 	login_error_fill_all_fields: 'Por favor completa todos los campos',
 	login_error_bad_credentials: 'Usuario o contraseña incorrectos',
+	login_error_unknown_role: 'Tu cuenta tiene un rol que la aplicación no reconoce. Avisa a quien administra el equipo.',
 
 	// ── Sesión ───────────────────────────────────────────────────────────────
 	session_validating: 'Verificando sesión…',
