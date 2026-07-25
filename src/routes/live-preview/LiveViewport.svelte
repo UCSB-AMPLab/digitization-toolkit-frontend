@@ -375,8 +375,6 @@
   async function handleCapture() {
     if (isCapturing || !captureReady) return;
     isCapturing = true;
-    captureFlash = true;
-    setTimeout(() => { captureFlash = false; }, 150);
 
     try {
       const payload = {
@@ -398,8 +396,19 @@
       }
 
       if (!result.success) {
-        throw new Error(result.error || 'Capture failed');
+        // Antes de NEH-72 este texto no se mostraba en ninguna parte, así que
+        // el literal en inglés daba igual. Ahora es lo que lee el operario en
+        // el banner cuando el backend no manda un `error` propio, y tiene que
+        // salir del catálogo.
+        throw new Error(result.error || $m.lv_capture_error);
       }
+
+      // El flash solo dispara cuando el backend confirmó la captura: es la
+      // única señal de éxito que ve el operador, y si dispara siempre, una
+      // captura fallida se ve idéntica a una buena y la página se pierde
+      // sin que nadie se entere hasta la revisión o la exportación (NEH-72).
+      captureFlash = true;
+      setTimeout(() => { captureFlash = false; }, 150);
 
       cameraStatus.reportSuccess();
       onCaptureDone();
@@ -445,9 +454,23 @@
       onmouseleave={stopDrag}
     >
 
+      <!-- Banner: la última captura falló (NEH-72). `cameraStatus` ya
+           registraba el fallo, pero nada lo mostraba: el componente que iba a
+           hacerlo nunca se montó y después se eliminó. Se limpia solo con la
+           siguiente captura buena (`reportSuccess`), así que no puede quedarse
+           colgado a mitad de una secuencia. -->
+      {#if $cameraStatus.captureError}
+        <div class="capture-error-banner" role="alert">
+          <span class="material-symbols-outlined icon-sm">error</span>
+          <!-- `||` y no `??`: un mensaje vacío también tiene que caer al
+               catálogo, o el banner sale sin texto. -->
+          {$cameraStatus.errorMessage || $m.lv_capture_error}
+        </div>
+      {/if}
+
       <!-- Banner: reconectando tras errores consecutivos de preview -->
       {#if previewConnectError}
-        <div class="reconnect-banner">
+        <div class="reconnect-banner" class:stacked={$cameraStatus.captureError}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
           </svg>
@@ -749,6 +772,30 @@
     border-radius: var(--radius-sm);
   }
 
+  /* Banner de captura fallida — mismo lenguaje visual que el de reconexión,
+     pero opaco y sin pulso: es un estado que exige acción, no una espera.
+     z-index 60 lo deja por encima de todo lo que se dibuja en el viewport
+     (guías y overlays llegan hasta 50), para que no quede tapado justo
+     cuando el operador tiene las guías de encuadre puestas. */
+  .capture-error-banner {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 80%;
+    padding: 8px 16px;
+    background: rgba(190, 45, 35, 0.96);
+    color: #fff;
+    font-size: 0.8rem;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+  }
+
   /* Banner de reconexión */
   .reconnect-banner {
     position: absolute;
@@ -768,6 +815,11 @@
     pointer-events: none;
     animation: pulse-opacity 1.5s ease-in-out infinite;
   }
+
+  /* Una cámara caída dispara los dos banners a la vez, y ambos se centran
+     arriba: cuando eso pasa, el de reconexión baja para no quedar debajo
+     del de captura fallida. */
+  .reconnect-banner.stacked { top: 52px; }
 
   @keyframes pulse-opacity {
     0%, 100% { opacity: 1; }
