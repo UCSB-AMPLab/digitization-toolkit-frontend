@@ -52,6 +52,32 @@ export const locale = writable<Locale>(DEFAULT_LOCALE);
 export const m = derived(locale, (l) => catalogs[l]);
 
 /**
+ * Etiqueta traducida de un rol: `{$roleLabel(member.role)}`.
+ *
+ * El enum viaja en inglés desde el backend (admin/operator/reviewer, con
+ * CHECK constraint en la base) y no debe mostrarse crudo (NEH-183). Vive
+ * aquí, y no en cada página, porque el mapeo se había copiado en tres
+ * lugares y se sale de sincronía en cuanto cambie un rol o una clave.
+ *
+ * Devuelve el valor crudo si el rol es desconocido — preferible a ocultar
+ * un rol nuevo que el backend ya emite — y un guion si no hay ninguno.
+ * Las clases CSS de los badges siguen usando el valor crudo.
+ */
+export const roleLabel = derived(
+	m,
+	($m) =>
+		(role: string | null | undefined): string => {
+			if (!role) return '—';
+			const labels: Record<string, string> = {
+				admin: $m.role_admin,
+				operator: $m.role_operator,
+				reviewer: $m.role_reviewer
+			};
+			return labels[role] ?? role;
+		}
+);
+
+/**
  * Cambia el idioma: persiste la cookie (1 año) y recarga la página para que
  * el SSR vuelva a renderizar todo en el idioma nuevo.
  */
