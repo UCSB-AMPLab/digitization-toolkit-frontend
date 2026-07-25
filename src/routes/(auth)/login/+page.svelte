@@ -13,7 +13,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authApi, healthApi, usersApi, tokenStore } from '$lib/api';
-	import { authStore, getRoleDashboardPath, type UserRole } from '$lib/stores/auth';
+	import { authStore, getRoleDashboardPath, isUserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
 	import favicon from '$lib/assets/favicon.svg';
@@ -102,9 +102,9 @@
 			});
 
 			// Paso 2: obtener datos del usuario autenticado (incluye el rol)
-			// ⚠️ El endpoint /users/me debe devolver el campo 'role' con uno de:
-			//    'admin' | 'operator' | 'reviewer'
-			// Si el backend usa otros nombres de rol, actualizar UserRole en auth.ts
+			// El rol que devuelve /users/me tiene que estar en USER_ROLES
+			// (stores/auth.ts). Si el backend agrega roles, esa lista es el único
+			// lugar donde hay que tocarlos — el paso 3 valida contra ella.
 			//
 			// usersApi.me() usa apiRequest, que arma el header Authorization desde
 			// tokenStore — hay que persistir el token recién obtenido primero para
@@ -112,10 +112,26 @@
 			tokenStore.set(authResponse.access_token);
 			const userData = await usersApi.me();
 
-			// Paso 3: guardar sesión en el store global
+			// Paso 3: validar el rol antes de abrir sesión. Sin esto, un rol que
+			// el frontend no conoce entra igual y termina decidiendo navegación y
+			// permisos de cámara (NEH-117).
+			//
+			// Hay que limpiar la sesión: el token ya quedó en localStorage para
+			// poder llamar a /users/me, y el estado inicial de authStore lo vuelve
+			// a leer de ahí — dejarlo puesto significa recargar la página y
+			// aparecer con sesión a medias. clearSession borra también el
+			// auth_user que pudiera haber quedado de una sesión anterior.
+			if (!isUserRole(userData.role)) {
+				authStore.clearSession();
+				console.error('[Login] Rol no reconocido:', userData.role);
+				errorMessage = $m.login_error_unknown_role;
+				return;
+			}
+
+			// Paso 4: guardar sesión en el store global
 			authStore.setSession(authResponse.access_token, userData);
 
-			// Paso 4: redirigir al dashboard según rol
+			// Paso 5: redirigir al dashboard según rol
 			goto(getRoleDashboardPath(userData.role));
 		} catch (error) {
 			// Mensaje genérico para no revelar si el usuario existe
