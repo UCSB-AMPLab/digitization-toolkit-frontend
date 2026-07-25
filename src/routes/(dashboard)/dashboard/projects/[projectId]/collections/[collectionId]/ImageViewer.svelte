@@ -200,8 +200,12 @@
     transition: background-color var(--transition-base);
   }
 
+  /* Simétricas: RightToolbar vive en su propia columna flex de 80px fuera
+     de .viewer-area (ver +page.svelte / RightToolbar.svelte), no se
+     superpone acá — el offset extra que tenía "right" era innecesario y
+     hacía que invadiera la página derecha en pantallas angostas (tablet). */
   .nav-btn.left  { left: 24px; }
-  .nav-btn.right { right: 90px; } /* espacio para toolbar */
+  .nav-btn.right { right: 24px; }
   .nav-btn:hover { background-color: rgba(90,140,98,0.3); }
   .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
