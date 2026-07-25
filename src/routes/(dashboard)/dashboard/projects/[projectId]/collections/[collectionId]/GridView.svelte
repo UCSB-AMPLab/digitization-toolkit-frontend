@@ -37,7 +37,7 @@
   //   Ver comentario TODO en el template.
   // ============================================================================
 
-  import { recordsApi, collectionsApi, type Record } from '$lib/api';
+  import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   // @ts-ignore — installed in Docker, not locally
@@ -115,6 +115,48 @@
   function getThumbnailUrl(record: Record): string | null {
     if (!record.images || record.images.length === 0) return null;
     return recordsApi.getImageThumbnailUrl(record.images[0].id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // GRID ITEMS: una tarjeta por imagen, no por registro
+  //
+  // Un registro con captura doble (izq + der) antes mostraba una sola
+  // tarjeta (la primera imagen). Ahora produce dos tarjetas, cada una con
+  // su badge L/R — mismo criterio que ThumbnailStrip.svelte (misma
+  // carpeta), reutilizado acá para que grid y la tira inferior muestren la
+  // misma cantidad de imágenes.
+  // ---------------------------------------------------------------------------
+  interface GridItem {
+    record: Record;
+    image: RecordImage | null;
+    role: 'L' | 'R' | null;
+    thumbnailUrl: string | null;
+  }
+
+  function imageRole(img: RecordImage | null): 'L' | 'R' | null {
+    if (!img) return null;
+    if (img.role === 'left')  return 'L';
+    if (img.role === 'right') return 'R';
+    return null;
+  }
+
+  function flattenToGridItems(recs: Record[]): GridItem[] {
+    return recs.flatMap((record): GridItem[] => {
+      if (!record.images || record.images.length === 0) {
+        return [{ record, image: null, role: null, thumbnailUrl: null }];
+      }
+      // Izquierda primero, luego derecha, luego sin rol (id como desempate)
+      const sorted = [...record.images].sort((a, b) => {
+        const order = (r?: string | null) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
+        return order(a.role) - order(b.role) || a.id - b.id;
+      });
+      return sorted.map((img): GridItem => ({
+        record,
+        image: img,
+        role: imageRole(img),
+        thumbnailUrl: recordsApi.getImageThumbnailUrl(img.id),
+      }));
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -326,8 +368,8 @@
     class:reorder-mode={isReorderMode}
     style="--grid-cols: {columns}"
   >
-    {#each records.filter(r => !activeStatusFilter || r.status === activeStatusFilter) as record, i}
-      {@const thumbUrl = getThumbnailUrl(record)}
+    {#each flattenToGridItems(records.filter(r => !activeStatusFilter || r.status === activeStatusFilter)) as item, i (item.record.id + '-' + (item.image?.id ?? 'none'))}
+      {@const record = item.record}
 
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -348,8 +390,8 @@
         {/if}
 
         <div class="card-image-wrapper" class:reorder={isReorderMode}>
-          {#if thumbUrl}
-            <img src={thumbUrl} alt={record.title} class="card-image" draggable="false" />
+          {#if item.thumbnailUrl}
+            <img src={item.thumbnailUrl} alt={record.title} class="card-image" draggable="false" />
           {:else}
             <div class="card-placeholder">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -358,6 +400,11 @@
                 <polyline points="21 15 16 10 5 21"/>
               </svg>
             </div>
+          {/if}
+
+          <!-- Badge L/R — solo si el registro tiene captura doble -->
+          {#if item.role}
+            <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
           {/if}
 
           <!-- Multi-select overlay -->
@@ -637,6 +684,25 @@
   .grid-card:not(.draggable):hover .card-image { transform: scale(1.04); }
 
   .card-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--color-light-grey); opacity: 0.3; }
+
+  /* Badge L/R — mismo estilo que ThumbnailStrip.svelte (misma carpeta), pero
+     abajo en vez de arriba: el checkbox de selección (.selectable-overlay,
+     global en app.css) ya ocupa la esquina superior-izquierda con z-index:5
+     y fondo opaco — un badge arriba quedaría tapado detrás. */
+  .role-badge {
+    position: absolute;
+    bottom: 6px; left: 6px;
+    background: rgba(19,17,16,0.8);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: var(--fw-bold);
+    color: var(--color-light);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .role-badge.right { left: auto; right: 6px; }
 
   .status-badge { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 3; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
   .status-badge.approved { background-color: var(--color-success); }
