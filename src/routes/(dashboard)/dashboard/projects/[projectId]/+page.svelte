@@ -17,7 +17,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { m } from '$lib/i18n';
+  import { m, roleLabel } from '$lib/i18n';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
@@ -739,7 +739,8 @@
                 <span class="member-name">{member.username}</span>
                 <span class="member-email">{member.email}</span>
               </div>
-              <span class="role-badge role-badge--{member.role}">{member.role}</span>
+              <!-- La clase CSS conserva el valor crudo del enum; solo el texto se traduce. -->
+              <span class="role-badge role-badge--{member.role}">{$roleLabel(member.role)}</span>
               {#if member.is_implicit}
                 <span class="member-implicit-icon" title={$m.pd_member_implicit}>
                   <span class="material-symbols-outlined icon-sm">lock</span>

@@ -20,7 +20,7 @@
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
 	import { usersApi } from '$lib/api';
-	import { m, type StringMessageKey } from '$lib/i18n';
+	import { m, roleLabel, type StringMessageKey } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
 	import favicon from '$lib/assets/favicon-light.svg';
 	import BugReportButton from '$lib/bug-report/BugReportButton.svelte';
@@ -376,7 +376,7 @@
 					<div class="user-av">{userInitials}</div>
 					<div class="user-text">
 						<span class="user-name">{currentUser?.username ?? '—'}</span>
-						<span class="user-role">{currentUser?.role ?? '—'}</span>
+						<span class="user-role">{$roleLabel(currentUser?.role)}</span>
 					</div>
 				</div>
 			{:else}

@@ -19,7 +19,7 @@
 
   import { onMount } from 'svelte';
   import { usersApi, type UserRead } from '$lib/api';
-  import { m, locale } from '$lib/i18n';
+  import { m, locale, roleLabel } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
   // TIPOS LOCALES
@@ -217,15 +217,6 @@
   // HELPERS DE UI
   // ---------------------------------------------------------------------------
 
-  function roleLabel(role: string): string {
-    const map: Record<string, string> = {
-      operator: $m.role_operator,
-      reviewer: $m.role_reviewer,
-      admin:    $m.role_admin,
-    };
-    return map[role] ?? role;
-  }
-
   function roleBadgeStyle(role: string): string {
     const styles: Record<string, string> = {
       operator: 'color: var(--color-primary); background: rgba(90,140,98,0.15); border-color: rgba(90,140,98,0.3)',
@@ -382,7 +373,7 @@
               <!-- Badge de rol -->
               <td>
                 <span class="role-badge" style={roleBadgeStyle(user.role)}>
-                  {roleLabel(user.role)}
+                  {$roleLabel(user.role)}
                 </span>
               </td>
 
