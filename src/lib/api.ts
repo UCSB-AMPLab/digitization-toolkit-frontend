@@ -305,7 +305,7 @@ export const usersApi = {
 
   /** Delete a user permanently. Requires admin token. */
   async delete(id: number): Promise<void> {
-    await apiRequest(`/auth/${id}`, { method: 'DELETE' });
+    await apiRequest(`/auth/users/${id}`, { method: 'DELETE' });
   },
 };
 
