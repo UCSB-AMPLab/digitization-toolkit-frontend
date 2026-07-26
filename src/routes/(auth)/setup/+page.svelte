@@ -24,6 +24,7 @@
 	let email = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
+	let bootstrapToken = $state('');
 	let showPassword = $state(false);
 	let showConfirmPassword = $state(false);
 
@@ -77,17 +78,25 @@
 
 		isLoading = true;
 		try {
-			await authApi.register({
-				username: username.trim(),
-				email: email.trim(),
-				password
-			});
+			await authApi.register(
+				{
+					username: username.trim(),
+					email: email.trim(),
+					password
+				},
+				bootstrapToken.trim() || undefined
+			);
 			successMessage = $m.setup_success;
 			setTimeout(() => goto('/login'), 1500);
 		} catch (err: any) {
-			const detail = err?.message || '';
-			if (detail.includes('409') || detail.toLowerCase().includes('already')) {
+			const status = err?.status;
+			const detail = (err?.message || '').toLowerCase();
+			if (detail.includes('already')) {
 				errorMessage = $m.setup_err_exists;
+			} else if (detail.includes('no bootstrap token configured') || detail.includes('setup is unavailable')) {
+				errorMessage = $m.setup_err_unavailable;
+			} else if (status === 401 || detail.includes('bootstrap token')) {
+				errorMessage = $m.setup_err_token;
 			} else {
 				errorMessage = $m.setup_err_create;
 			}
@@ -272,6 +281,36 @@
 						{/if}
 					</button>
 				</div>
+			</div>
+
+			<!-- FIELD: Bootstrap token. Required on provisioned devices -->
+			<div class="field-group">
+				<label class="field-label" for="su-token">{$m.setup_token_label}</label>
+				<div class="input-wrapper">
+					<svg
+						class="input-icon"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+						<path d="M7 11V7a5 5 0 0 1 10 0v4" />
+					</svg>
+					<input
+						id="su-token"
+						type="text"
+						class="input"
+						placeholder={$m.setup_ph_token}
+						bind:value={bootstrapToken}
+						disabled={isLoading}
+						autocomplete="off"
+						autocapitalize="none"
+						autocorrect="off"
+						spellcheck="false"
+					/>
+				</div>
+				<span class="setup-hint">{$m.setup_token_hint}</span>
 			</div>
 
 			<!-- ALERTA: Error -->

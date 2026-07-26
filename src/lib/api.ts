@@ -185,12 +185,14 @@ export const authApi = {
   },
 
   /**
-   * Register a new user
+   * Register a new user.
+   * First-user bootstrap requires the device bootstrap token outside development.
    */
-  async register(data: RegisterData): Promise<User> {
+  async register(data: RegisterData, bootstrapToken?: string): Promise<User> {
     return apiRequest<User>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
+      ...(bootstrapToken ? { headers: { 'X-Bootstrap-Token': bootstrapToken } } : {})
     });
   },
 
