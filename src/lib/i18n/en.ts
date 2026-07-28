@@ -360,6 +360,8 @@ export const en: Messages = {
 	col_reject: 'Reject',
 	col_return_to_captured: 'Return to captured',
 	col_deselect: 'Deselect',
+	col_bulk_status_partial: (skipped: number, total: number) =>
+		`${skipped} of ${total} record${total === 1 ? '' : 's'} could not be updated (invalid status transition) — the rest were.`,
 	col_reject_modal_title: 'Reject records',
 	col_reject_note_label: (n: number) => `Rejection note for the ${n} selected records (optional):`,
 	col_reject_note_placeholder: 'Describe the reason for rejection…',

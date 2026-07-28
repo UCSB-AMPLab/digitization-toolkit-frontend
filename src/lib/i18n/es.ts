@@ -381,6 +381,8 @@ export const es = {
 	col_reject: 'Rechazar',
 	col_return_to_captured: 'Volver a capturado',
 	col_deselect: 'Deseleccionar',
+	col_bulk_status_partial: (skipped: number, total: number) =>
+		`${skipped} de ${total} registro${total === 1 ? '' : 's'} no se ${total === 1 ? 'pudo actualizar' : 'pudieron actualizar'} (transición de estado no permitida) — el resto sí.`,
 	col_reject_modal_title: 'Rechazar registros',
 	col_reject_note_label: (n: number) =>
 		`Nota de rechazo para los ${n} registros seleccionados (opcional):`,
