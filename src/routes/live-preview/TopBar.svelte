@@ -36,11 +36,7 @@
   // Lee el username del store de auth y toma las dos primeras letras
   // Si no hay usuario, muestra '?'
   // ---------------------------------------------------------------------------
-  let userInitials = $derived(() => {
-    let username = '';
-    authStore.subscribe(s => { username = s.user?.username ?? ''; })();
-    return username.slice(0, 2).toUpperCase() || '?';
-  });
+  let userInitials = $derived(($authStore.user?.username ?? '').slice(0, 2).toUpperCase() || '?');
 </script>
 
 <!-- ============================================================
@@ -74,7 +70,7 @@
     <!-- Avatar circular con iniciales del usuario -->
     <!-- El color verde viene del design system (--color-primary) -->
     <div class="user-avatar" aria-label={$m.tb_current_user}>
-      {userInitials()}
+      {userInitials}
     </div>
   </div>
 

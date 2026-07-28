@@ -62,7 +62,7 @@
   }
 
   // Imágenes del registro, ordenadas por rol (left primero, right después)
-  const images = $derived(() => {
+  const images = $derived.by(() => {
     const imgs = record.images ?? [];
     return [...imgs].sort((a, b) => {
       const order: { [key: string]: number } = { left: 0, single: 0, right: 1 };
@@ -103,7 +103,7 @@
 
     <!-- ── Área de imágenes ── -->
     <div class="img-viewer-images">
-      {#each images() as img}
+      {#each images as img}
         <div class="img-viewer-frame">
           <!-- Badge L/R en modo doble cámara -->
           {#if cameraMode === 'double' && img.role && img.role !== 'single'}
@@ -120,7 +120,7 @@
         </div>
       {/each}
 
-      {#if images().length === 0}
+      {#if images.length === 0}
         <div class="img-viewer-frame">
           <span style="--c: var(--color-light-grey)" class="material-symbols-outlined icon-lg">image_not_supported</span>
         </div>
