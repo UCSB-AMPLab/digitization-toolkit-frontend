@@ -312,8 +312,8 @@
 
   <div class="content-area">
 
-    <!-- Panel lateral: en list y spread -->
-    {#if viewMode !== 'grid'}
+    <!-- Panel lateral: solo en spread (vista libro) -->
+    {#if viewMode === 'spread'}
       <LeftSidebar
         {viewMode}
         currentRecord={selectedRecord}
@@ -352,7 +352,7 @@
           {records}
           {collectionId}
           {selectedIds}
-          onRecordClick={(r) => { selectedRecordId = r.id; inspectedRecord = r; }}
+          onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
           onToggleSelect={handleToggleSelect}
           onRecordsUpdate={loadRecords}
         />
