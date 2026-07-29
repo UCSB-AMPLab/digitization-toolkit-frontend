@@ -302,8 +302,8 @@
 
   <div class="content-area">
 
-    <!-- Panel lateral: en list y spread -->
-    {#if viewMode !== 'grid'}
+    <!-- Panel lateral: solo en spread (vista libro) -->
+    {#if viewMode === 'spread'}
       <LeftSidebar
         {viewMode}
         currentRecord={selectedRecord}
