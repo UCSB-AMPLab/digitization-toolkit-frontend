@@ -125,10 +125,20 @@
   function handleRotateLeft()  { rotation = ((rotation - 90) % 360 + 360) % 360; }
   function handleRotateRight() { rotation = (rotation + 90) % 360; }
 
-  // Retomar: navega a live-preview con el mismo proyecto/colección
+  // Retomar: navega a live-preview con el mismo proyecto/colección + el
+  // record puntual, para que live-preview abra directo su modal de retoma
+  // (NEH-209 — antes se perdía el record.id acá y había que buscarlo de
+  // nuevo manualmente en la tira de miniaturas de live-preview).
   function handleRetake(record: Record) {
     inspectedRecord = null;
-    goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`);
+    goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}&recordId=${record.id}`);
+  }
+
+  // Recapturar desde Book view (NEH-209): mismo destino que handleRetake,
+  // disparado desde el botón "Recapturar imagen" del panel izquierdo en vez
+  // del modal de inspección de ListView.
+  function handleRecapture(record: Record) {
+    goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}&recordId=${record.id}`);
   }
 
   // Eliminar registro completo y refrescar lista
@@ -167,11 +177,11 @@
     isSelectMode = false;
   }
 
-  async function handleBulkStatusChange(status: Record['status'], rejectionNote?: string) {
+  async function handleBulkStatusChange(status: 'in_review' | 'approved') {
     bulkStatusNotice = null;
     const requestedIds = Array.from(selectedIds);
     try {
-      const updated = await recordsApi.bulkUpdateStatus(requestedIds, status, rejectionNote);
+      const updated = await recordsApi.bulkUpdateStatus(requestedIds, status);
       // El backend devuelve solo los registros que sí cambiaron — una
       // transición inválida (o de rol insuficiente) se salta en silencio.
       // Comparar contra lo pedido es la única forma de detectarlo del lado
@@ -309,8 +319,11 @@
         currentRecord={selectedRecord}
         currentIndex={selectedIndex}
         totalRecords={records.length}
+        userRole={$userRole}
         onRotateLeft={handleRotateLeft}
         onRotateRight={handleRotateRight}
+        onRecordUpdated={loadRecords}
+        onRecapture={handleRecapture}
       />
     {/if}
 
@@ -390,7 +403,6 @@
     onClose={() => inspectedRecord = null}
     onRetake={handleRetake}
     onDelete={handleDeleteRecord}
-    onStatusChange={async (id, status) => { await recordsApi.updateStatus(id, status); await loadRecords(); inspectedRecord = null; }}
   />
 {/if}
 
@@ -401,6 +413,7 @@
   onBulkStatusChange={handleBulkStatusChange}
   onDeselect={handleDeselectAll}
 />
+
 
 <!-- Modal de exportación BagIt -->
 {#if showExportModal}

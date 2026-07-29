@@ -25,19 +25,16 @@
     onRetake,
     onDelete,
     userRole = null,
-    onStatusChange,
   }: {
     record: Record;
     onClose: () => void;
     onRetake: (record: Record) => void;
     onDelete: (record: Record) => void;
     userRole?: string | null;
-    onStatusChange?: (id: number, status: Record['status']) => void;
   } = $props();
 
   // Lock: in_review and approved block retake/delete for non-admins
   let isLocked = $derived(record.status === 'in_review' || record.status === 'approved');
-  let canReview = $derived(userRole === 'reviewer' || userRole === 'admin');
 
   // ---------------------------------------------------------------------------
   // ESTADO LOCAL
@@ -143,13 +140,6 @@
             <button class="btn btn-danger" onclick={() => confirmAction = 'delete'}>
               <span class="material-symbols-outlined icon-sm">delete</span>
               {$m.common_delete}
-            </button>
-          {/if}
-
-          {#if record.status === 'approved' && canReview && onStatusChange}
-            <button class="btn btn-warning" onclick={() => onStatusChange!(record.id, 'rejected')}>
-              <span class="material-symbols-outlined icon-sm">flag</span>
-              {$m.col_flag_for_review}
             </button>
           {/if}
         </div>

@@ -7,7 +7,7 @@
 //
 // Convenciones:
 //   - Claves con el patrón `area_elemento` (p. ej. `login_remember_me`,
-//     `nav_overview`, `status_captured`).
+//     `nav_overview`, `status_approved`).
 //   - Mensajes completos por clave: nunca concatenar fragmentos en los
 //     componentes. Si el mensaje necesita parámetros, la entrada es una
 //     función: `cameras_detected: (n: number) => n === 1 ? '1 cámara' : `${n} cámaras``.
@@ -77,7 +77,6 @@ export const es = {
 	nav_logout: 'Salir',
 
 	// ── Estados de registro ──────────────────────────────────────────────────
-	status_captured: 'Capturado',
 	status_in_review: 'En revisión',
 	status_rejected: 'Rechazado',
 	status_approved: 'Aprobado',
@@ -370,7 +369,6 @@ export const es = {
 	col_live_preview: 'Previsualización en vivo',
 	col_current_user: 'Usuario actual',
 	col_loading_images: 'Cargando imágenes…',
-	status_captured_plural: 'Capturados',
 	status_rejected_plural: 'Rechazados',
 	status_approved_plural: 'Aprobados',
 	col_no_records: 'Sin registros',
@@ -379,15 +377,20 @@ export const es = {
 	col_send_to_review: 'Enviar a revisión',
 	col_approve: 'Aprobar',
 	col_reject: 'Rechazar',
-	col_return_to_captured: 'Volver a capturado',
 	col_deselect: 'Deseleccionar',
 	col_bulk_status_partial: (skipped: number, total: number) =>
 		`${skipped} de ${total} registro${total === 1 ? '' : 's'} no se ${total === 1 ? 'pudo actualizar' : 'pudieron actualizar'} (transición de estado no permitida) — el resto sí.`,
-	col_reject_modal_title: 'Rechazar registros',
-	col_reject_note_label: (n: number) =>
-		`Nota de rechazo para los ${n} registros seleccionados (opcional):`,
-	col_reject_note_placeholder: 'Describe el motivo del rechazo…',
-	col_reject_confirm: 'Confirmar rechazo',
+	col_reject_reason_label: 'Motivo del rechazo (obligatorio):',
+	col_reject_error: 'No se pudo rechazar el registro. Intenta de nuevo.',
+	col_review_approve_error: 'No se pudo aprobar el registro. Intenta de nuevo.',
+	col_recapture_btn: 'Recapturar imagen',
+	col_annotation_comment_placeholder: 'Agrega un comentario (opcional)...',
+	col_review_confirm_approve: '¿Confirmas que quieres aprobar esta imagen?',
+	col_review_confirm_reject: '¿Confirmas que quieres rechazar esta imagen?',
+	col_review_confirm_undo_approve: '¿Confirmas que quieres deshacer la aprobación de esta imagen?',
+	col_review_confirm_undo_reject: '¿Confirmas que quieres deshacer el rechazo de esta imagen?',
+	col_pending_recapture: 'Pendiente de recaptura',
+	col_approved_badge: 'Aprobada',
 	col_renumber: 'Renumerar',
 	col_reorder_done: 'Listo',
 	col_reorder: 'Reordenar',
@@ -420,7 +423,6 @@ export const es = {
 	col_status_in_review_lc: 'en revisión',
 	col_status_approved_lc: 'aprobado',
 	col_retake: 'Retomar',
-	col_flag_for_review: 'Marcar para revisión',
 	col_retake_confirm: '¿Descartar este registro y volver a capturar desde la vista en vivo?',
 	col_delete_record_confirm: '¿Eliminar permanentemente este registro y todas sus imágenes?',
 	badge_left: 'Izq',
@@ -453,12 +455,6 @@ export const es = {
 	col_annotation_load_error: 'No se pudieron cargar las anotaciones. Intenta de nuevo.',
 	col_annotation_save_error: 'No se pudo guardar la anotación. Intenta de nuevo.',
 	col_annotation_delete_error: 'No se pudo eliminar la anotación. Intenta de nuevo.',
-	col_flag_error: 'Marcar error',
-	col_add_note: 'Agregar nota',
-	col_error_type_title: 'Tipología de Error',
-	col_add_note_title: 'Agregar Nota',
-	col_note: 'Nota',
-	col_note_placeholder: 'Describe el problema o agrega un comentario…',
 	col_role_left: 'Imagen izquierda',
 	col_role_right: 'Imagen derecha',
 	col_role_overview: 'Vista general',

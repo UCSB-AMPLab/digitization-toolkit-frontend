@@ -66,6 +66,16 @@
     return record?.title ?? '—';
   }
 
+  // NEH-209: mientras el registro esté "rejected", sus imágenes actuales
+  // (selectedRecord.images, ya filtradas a is_current por el backend) SON
+  // exactamente las pendientes de recaptura — 1 para modo single, 2 para
+  // dual. No hay que asumir un número fijo: si hay imagen en la página, y
+  // el registro está rechazado, esa página está pendiente de recaptura.
+  // Un solo badge por página (no también uno flotante arriba de ambas — era
+  // redundante y ya se quitó).
+  let isRejected = $derived(selectedRecord?.status === 'rejected');
+  let isApproved = $derived(selectedRecord?.status === 'approved');
+
   // ---------------------------------------------------------------------------
   // TAMAÑO MEDIDO DE CADA PÁGINA — evita que la imagen rotada se recorte
   // ---------------------------------------------------------------------------
@@ -129,6 +139,17 @@
             draggable="false"
             style={spreadImageStyle(rotation, zoom, leftPageW, leftPageH)}
           />
+          {#if isRejected}
+            <span class="pending-recapture-badge">
+              <span class="material-symbols-outlined icon-sm">refresh</span>
+              {$m.col_pending_recapture}
+            </span>
+          {:else if isApproved}
+            <span class="approved-badge">
+              <span class="material-symbols-outlined icon-sm">check_circle</span>
+              {$m.col_approved_badge}
+            </span>
+          {/if}
         {:else}
           <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
         {/if}
@@ -153,6 +174,17 @@
             draggable="false"
             style={spreadImageStyle(rotation, zoom, rightPageW, rightPageH)}
           />
+          {#if isRejected}
+            <span class="pending-recapture-badge">
+              <span class="material-symbols-outlined icon-sm">refresh</span>
+              {$m.col_pending_recapture}
+            </span>
+          {:else if isApproved}
+            <span class="approved-badge">
+              <span class="material-symbols-outlined icon-sm">check_circle</span>
+              {$m.col_approved_badge}
+            </span>
+          {/if}
         {:else}
           <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
         {/if}
@@ -179,6 +211,42 @@
     justify-content: center;
     overflow: hidden;
     min-height: 0;
+  }
+
+  /* Badge por página (NEH-209): un solo indicador de estado debajo de cada
+     página, no también uno flotante arriba de ambas — era redundante. */
+  .pending-recapture-badge {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    background-color: rgba(214,103,74,0.85);
+    color: white;
+    font-size: var(--text-xs);
+    font-weight: var(--fw-bold);
+  }
+
+  .approved-badge {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    background-color: rgba(90,140,98,0.9);
+    color: white;
+    font-size: var(--text-xs);
+    font-weight: var(--fw-bold);
   }
 
   /* ── Botones de navegación ── */

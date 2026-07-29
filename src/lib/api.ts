@@ -616,6 +616,11 @@ export interface RecordImage {
   role?: string; // "left", "right", "single", "overview"
   uploaded_by?: string;
   created_at?: string;
+  // NEH-208: false once a recapture has superseded this image — it stays
+  // queryable via recordsApi.listRejections but drops out of the default
+  // images list/gallery/export.
+  is_current: boolean;
+  superseded_at?: string;
 }
 
 export interface Record {
@@ -633,10 +638,34 @@ export interface Record {
   created_at?: string;
   modified_at?: string;
   images: RecordImage[];
-  // QA workflow
-  status: 'captured' | 'in_review' | 'rejected' | 'approved';
+  // QA workflow (NEH-208): no more "captured" resting state — a record
+  // enters the queue as "in_review" the instant it's captured.
+  status: 'in_review' | 'rejected' | 'approved';
   sequence?: number;
-  rejection_note?: string;
+  // Which camera setup produced this document — set once at capture time.
+  // Determines rejection scope (1 vs 2 images) on the backend; the
+  // frontend never needs to compute this itself, only reflect it.
+  capture_mode: 'single' | 'dual';
+}
+
+// The predefined rejection reasons, mirroring the backend's
+// PREDEFINED_REJECTION_REASONS and the annotation feature's error types.
+export const PREDEFINED_REJECTION_REASONS = ['blur', 'glare', 'shadow', 'focus', 'exposure', 'dirt'] as const;
+export type PredefinedRejectionReason = (typeof PREDEFINED_REJECTION_REASONS)[number];
+
+export interface RejectRecordData {
+  predefined_reason: PredefinedRejectionReason;
+  comment?: string;
+}
+
+export interface RecordRejection {
+  id: number;
+  record_id: number;
+  predefined_reason: string;
+  comment?: string | null;
+  rejected_by?: string | null;
+  rejected_at?: string;
+  images: RecordImage[];
 }
 
 export interface RecordAnnotation {
@@ -810,31 +839,54 @@ export const recordsApi = {
 
   /**
    * Change the QA status of a single record.
+   * NEH-208: the generic status endpoint only allows in_review -> approved
+   * now — rejection requires the mandatory-reason reject() below.
    */
   async updateStatus(
     id: number,
-    status: 'captured' | 'in_review' | 'rejected' | 'approved',
-    rejection_note?: string
+    status: 'in_review' | 'approved'
   ): Promise<Record> {
     return apiRequest<Record>(`/records/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status, rejection_note })
+      body: JSON.stringify({ status })
     });
   },
 
   /**
    * Change the QA status of multiple records at once.
    * Returns successfully updated records (skipped records are omitted).
+   * NEH-208: no bulk-reject — rejection is single-record only, via reject().
    */
   async bulkUpdateStatus(
     record_ids: number[],
-    status: 'captured' | 'in_review' | 'rejected' | 'approved',
-    rejection_note?: string
+    status: 'in_review' | 'approved'
   ): Promise<Record[]> {
     return apiRequest<Record[]>('/records/bulk-status', {
       method: 'POST',
-      body: JSON.stringify({ record_ids, status, rejection_note })
+      body: JSON.stringify({ record_ids, status })
     });
+  },
+
+  /**
+   * Reject a record's current capture with a mandatory predefined reason.
+   * Flags every current image (both sides of a dual-camera pair, or the
+   * single image) as pending recapture — the backend decides how many
+   * based on the record's capture_mode, the frontend just reflects
+   * `response.images` (only current images are returned).
+   */
+  async reject(id: number, data: RejectRecordData): Promise<Record> {
+    return apiRequest<Record>(`/records/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * List a record's rejection history (newest first), each with the
+   * image(s) it flagged at the time.
+   */
+  async listRejections(id: number): Promise<RecordRejection[]> {
+    return apiRequest<RecordRejection[]>(`/records/${id}/rejections`);
   },
 
   /**

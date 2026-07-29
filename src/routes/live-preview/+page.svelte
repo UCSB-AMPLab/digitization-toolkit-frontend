@@ -37,6 +37,14 @@
   // ---------------------------------------------------------------------------
   let projectId = $derived(Number($page.url.searchParams.get('projectId')) || 0);
   let collectionId = $derived(Number($page.url.searchParams.get('collectionId')) || 0);
+  // Presente cuando se llega acá desde el botón "Recapturar imagen" de Book
+  // view (NEH-209) sobre un registro puntual — abre directo su modal de
+  // retoma en vez de obligar a buscarlo de nuevo en la tira de miniaturas.
+  let recordId = $derived(Number($page.url.searchParams.get('recordId')) || 0);
+  // Si la retoma vino de ese flujo, al terminar con éxito volvemos a Book
+  // view en vez de quedarnos en /live-preview (la retoma "suelta", iniciada
+  // desde una miniatura ya cargada acá, no navega a ningún lado).
+  let cameFromRecapture = $state(false);
 
   // ---------------------------------------------------------------------------
   // ESTADO GLOBAL — se pasa como props a los componentes hijos
@@ -104,6 +112,21 @@
     }
 
     await Promise.all(tasks);
+
+    // Si llegamos con un recordId puntual (NEH-209, botón "Recapturar
+    // imagen" de Book view), abrimos directo su modal de retoma y ajustamos
+    // el modo de cámara al capture_mode real del registro — si no, un
+    // registro dual con cameraMode en 'single' (o viceversa) dispararía el
+    // guard de modo-no-coincide del backend en cameras.py.
+    if (recordId) {
+      const target = records.find(r => r.id === recordId);
+      if (target) {
+        cameraMode = target.capture_mode === 'dual' ? 'double' : 'single';
+        selectedRecordId = target.id;
+        inspectedRecord = target;
+        cameFromRecapture = true;
+      }
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -163,12 +186,13 @@
 
   // ---------------------------------------------------------------------------
   // HANDLER: Retoma de un registro desde el modal de imagen
-  // Vuelve a capturar PRIMERO y solo borra las imágenes anteriores si la
-  // nueva captura tiene éxito. Así, si la captura falla o se interrumpe a
-  // mitad de camino, la(s) imagen(es) original(es) — la única copia del
-  // escaneo — quedan intactas. El modal (ImageViewerModal) espera esta
-  // promesa: si se rechaza, muestra el error y permanece abierto en vez de
-  // cerrarse silenciosamente.
+  // El backend (cameras.py, NEH-208) ya se encarga de conservar la(s)
+  // imagen(es) anterior(es) como historial no bien detecta que el registro
+  // está 'rejected' y llega una captura nueva con el mismo record_id — las
+  // marca is_current=false en vez de borrarlas, para que sigan disponibles
+  // como auditoría vía GET /records/{id}/rejections. El frontend NO debe
+  // volver a borrarlas por su cuenta (antes lo hacía acá, destruyendo esa
+  // auditoría — bug corregido en NEH-209).
   // ---------------------------------------------------------------------------
   async function handleRetake(record: ApiRecord) {
     let result;
@@ -194,18 +218,18 @@
       throw new Error(result.error || $m.lv_capture_error);
     }
 
-    // La captura de reemplazo ya está a salvo en disco/BD — recién ahora es
-    // seguro borrar las imágenes anteriores. Un fallo al borrar una imagen
-    // vieja no deshace la retoma (la nueva imagen ya existe); solo se registra.
-    for (const img of record.images ?? []) {
-      try {
-        await recordsApi.deleteImage(img.id);
-      } catch (err) {
-        console.error('[LivePreview] Error borrando imagen antigua tras retoma exitosa:', err);
-      }
+    inspectedRecord = null;
+
+    // Si llegamos acá desde "Recapturar imagen" en Book view (NEH-209),
+    // volvemos ahí en vez de quedarnos en /live-preview — la retoma queda
+    // conclusa y el operador ve de una el resultado en el mismo lugar donde
+    // la pidió. La retoma "suelta" (miniatura ya cargada en esta sesión) no
+    // navega a ningún lado, como siempre.
+    if (cameFromRecapture && projectId && collectionId) {
+      goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
+      return;
     }
 
-    inspectedRecord = null;
     await loadRecords();
   }
 </script>

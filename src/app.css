@@ -1232,7 +1232,6 @@ canvas, button, a, div {
   transition: width 0.3s ease;
 }
 
-.status-bar-segment.seg-captured  { background-color: var(--color-primary); }
 .status-bar-segment.seg-in_review { background-color: var(--color-warning); }
 .status-bar-segment.seg-rejected  { background-color: var(--color-error); }
 .status-bar-segment.seg-approved  { background-color: var(--color-success); }
@@ -1260,7 +1259,6 @@ canvas, button, a, div {
   flex-shrink: 0;
 }
 
-.status-bar-dot.seg-captured  { background-color: var(--color-primary); }
 .status-bar-dot.seg-in_review { background-color: var(--color-warning); }
 .status-bar-dot.seg-rejected  { background-color: var(--color-error); }
 .status-bar-dot.seg-approved  { background-color: var(--color-success); }
@@ -1346,8 +1344,6 @@ canvas, button, a, div {
 
 .action-bar-btn.btn-in-review:hover  { border-color: var(--color-warning); color: var(--color-warning); background-color: var(--color-warning-bg); }
 .action-bar-btn.btn-approved:hover   { border-color: var(--color-success); color: var(--color-success); background-color: var(--color-success-bg); }
-.action-bar-btn.btn-rejected:hover   { border-color: var(--color-error);   color: var(--color-error);   background-color: var(--color-error-bg); }
-.action-bar-btn.btn-captured:hover   { border-color: var(--color-primary); color: var(--color-primary); background-color: rgba(90,140,98,0.08); }
 
 .action-bar-right {
   display: flex;
@@ -1373,89 +1369,6 @@ canvas, button, a, div {
 }
 
 .action-bar-deselect:hover { background-color: var(--color-error-bg); color: var(--color-error); border-color: var(--color-error); }
-
-/* Rejection note modal */
-.rejection-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0,0,0,0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 24px;
-}
-
-.rejection-modal-card {
-  background-color: var(--color-surface-alt);
-  border: 1px solid rgba(214,103,74,0.35);
-  border-radius: var(--radius-xl);
-  padding: 24px;
-  width: 100%;
-  max-width: 480px;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.rejection-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.rejection-modal-title {
-  font-size: var(--text-h4);
-  font-weight: 700;
-  color: var(--color-light);
-  margin: 0;
-}
-
-.rejection-modal-close {
-  width: 32px; height: 32px;
-  border-radius: var(--radius-md);
-  border: none;
-  background: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-light-grey);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.rejection-modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
-
-.rejection-note-label {
-  font-size: var(--text-sm);
-  color: var(--color-light-grey);
-}
-
-.rejection-note-textarea {
-  width: 100%;
-  min-height: 100px;
-  background-color: var(--color-surface);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  color: var(--color-light);
-  font-family: var(--font-family);
-  font-size: var(--text-sm);
-  padding: 10px 12px;
-  resize: vertical;
-  box-sizing: border-box;
-  transition: border-color var(--transition-fast);
-}
-
-.rejection-note-textarea:focus { outline: none; border-color: var(--color-error); }
-.rejection-note-textarea::placeholder { color: var(--color-light-grey); opacity: 0.5; }
-
-.rejection-modal-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
 
 /* ── Selectable check in list rows ── */
 .selectable-check {
