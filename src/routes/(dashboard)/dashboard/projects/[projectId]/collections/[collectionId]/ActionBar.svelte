@@ -2,40 +2,23 @@
   import type { Record } from '$lib/api';
   import { m } from '$lib/i18n';
 
-  type RecordStatus = Record['status'];
+  // NEH-209: 'rejected' is deliberately excluded — rejection is single-record
+  // only, via the mandatory-reason POST /records/{id}/reject (see Book
+  // view's RejectReasonModal), not a bulk generic-status transition.
+  type BulkRecordStatus = 'in_review' | 'approved';
   type UserRole = 'admin' | 'operator' | 'reviewer';
 
   interface Props {
     selectedCount: number;
     userRole: UserRole | null;
-    onBulkStatusChange: (status: RecordStatus, rejectionNote?: string) => void;
+    onBulkStatusChange: (status: BulkRecordStatus) => void;
     onDeselect: () => void;
   }
 
   let { selectedCount, userRole, onBulkStatusChange, onDeselect }: Props = $props();
 
-  // Rejection note modal state
-  let showRejectionModal = $state(false);
-  let rejectionNote      = $state('');
-
   const canReview  = $derived(userRole === 'reviewer' || userRole === 'admin');
   const canOperate = $derived(userRole === 'operator' || userRole === 'admin');
-
-  function handleReject() {
-    showRejectionModal = true;
-    rejectionNote = '';
-  }
-
-  function confirmReject() {
-    onBulkStatusChange('rejected', rejectionNote || undefined);
-    showRejectionModal = false;
-    rejectionNote = '';
-  }
-
-  function cancelReject() {
-    showRejectionModal = false;
-    rejectionNote = '';
-  }
 </script>
 
 {#if selectedCount > 0}
@@ -58,18 +41,6 @@
           <span class="material-symbols-outlined icon-sm">check_circle</span>
           {$m.col_approve}
         </button>
-
-        <button class="action-bar-btn btn-rejected" onclick={handleReject}>
-          <span class="material-symbols-outlined icon-sm">cancel</span>
-          {$m.col_reject}
-        </button>
-      {/if}
-
-      {#if canOperate}
-        <button class="action-bar-btn btn-captured" onclick={() => onBulkStatusChange('captured')}>
-          <span class="material-symbols-outlined icon-sm">photo_camera</span>
-          {$m.col_return_to_captured}
-        </button>
       {/if}
     </div>
 
@@ -78,35 +49,6 @@
         <span class="material-symbols-outlined icon-sm">close</span>
         {$m.col_deselect}
       </button>
-    </div>
-  </div>
-{/if}
-
-{#if showRejectionModal}
-  <div class="rejection-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="rejection-modal-card">
-      <div class="rejection-modal-header">
-        <h3 class="rejection-modal-title">{$m.col_reject_modal_title}</h3>
-        <button class="rejection-modal-close" onclick={cancelReject} aria-label={$m.common_close}>
-          <span class="material-symbols-outlined icon-sm">close</span>
-        </button>
-      </div>
-      <p class="rejection-note-label">
-        {$m.col_reject_note_label(selectedCount)}
-      </p>
-      <textarea
-        class="rejection-note-textarea"
-        bind:value={rejectionNote}
-        placeholder={$m.col_reject_note_placeholder}
-        rows="4"
-      ></textarea>
-      <div class="rejection-modal-actions">
-        <button class="btn-secondary" onclick={cancelReject}>{$m.common_cancel}</button>
-        <button class="btn-danger" onclick={confirmReject}>
-          <span class="material-symbols-outlined icon-sm">cancel</span>
-          {$m.col_reject_confirm}
-        </button>
-      </div>
     </div>
   </div>
 {/if}

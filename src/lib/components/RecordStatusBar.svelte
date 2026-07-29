@@ -4,11 +4,10 @@
 
   let { records }: { records: ApiRecord[] } = $props();
 
-  const statusKeys = ['captured', 'in_review', 'rejected', 'approved'] as const;
+  const statusKeys = ['in_review', 'rejected', 'approved'] as const;
   type S = ApiRecord['status'];
 
   let labels = $derived<{ [K in S]: string }>({
-    captured:  $m.status_captured_plural,
     in_review: $m.status_in_review,
     rejected:  $m.status_rejected_plural,
     approved:  $m.status_approved_plural,

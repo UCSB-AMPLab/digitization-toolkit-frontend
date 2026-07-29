@@ -314,7 +314,6 @@
           { id: 'approved',   label: $m.status_approved },
           { id: 'rejected',   label: $m.status_rejected },
           { id: 'in_review',  label: $m.status_in_review },
-          { id: 'captured',   label: $m.status_captured },
         ] as f}
       <button
             class="filter-chip"
