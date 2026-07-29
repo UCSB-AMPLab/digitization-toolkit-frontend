@@ -339,7 +339,7 @@
           {records}
           {collectionId}
           {selectedIds}
-          onRecordClick={(r) => { selectedRecordId = r.id; inspectedRecord = r; }}
+          onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
           onToggleSelect={handleToggleSelect}
           onRecordsUpdate={loadRecords}
         />
