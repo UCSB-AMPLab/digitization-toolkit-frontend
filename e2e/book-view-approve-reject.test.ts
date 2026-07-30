@@ -173,24 +173,31 @@ async function openBookView(page: import('@playwright/test').Page, ctx: SetupRes
 	// Wait for the panel to actually be interactive before any test starts
 	// clicking inside it — avoids a race where a click lands before the
 	// tab's content has finished rendering.
-	await expect(page.getByText('Motivo del rechazo (obligatorio):')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Marcar error' })).toBeVisible();
 }
 
-// Taps each given reason chip (always visible, no dropdown to open) and
-// asserts it registers as selected before moving on, then saves it as one
-// annotation via "Guardar" — "Rechazar" depends on a SAVED error annotation
-// existing, not on the live chip selection.
-async function flagErrors(page: import('@playwright/test').Page, labels: string[], comment?: string) {
+// "Marcar error" and "Agregar nota" are two independent accordion buttons,
+// collapsed by default. Expands "Marcar error", taps each given error row
+// (asserting it registers as selected before moving on) and saves them as
+// ONE error-only annotation via "Listo" — "Rechazar" depends on a SAVED
+// error annotation existing, not on the live checklist selection.
+async function flagErrors(page: import('@playwright/test').Page, labels: string[]) {
+	await page.getByRole('button', { name: 'Marcar error' }).click();
 	for (const label of labels) {
-		const chip = page.getByRole('button', { name: label, exact: true });
-		await expect(chip).toBeVisible();
-		await chip.click();
-		await expect(chip).toHaveClass(/selected/);
+		const row = page.getByRole('button', { name: label, exact: true });
+		await expect(row).toBeVisible();
+		await row.click();
+		await expect(row).toHaveClass(/selected/);
 	}
-	if (comment) {
-		await page.getByPlaceholder('Agrega un comentario (opcional)...').fill(comment);
-	}
-	await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+	await page.getByRole('button', { name: 'Listo', exact: true }).click();
+}
+
+// "Agregar nota" is a separate accordion — saves a note-only annotation
+// (no error types) via its own "Listo".
+async function addNote(page: import('@playwright/test').Page, text: string) {
+	await page.getByRole('button', { name: 'Agregar nota' }).click();
+	await page.getByPlaceholder('Agrega un comentario (opcional)...').fill(text);
+	await page.getByRole('button', { name: 'Listo', exact: true }).click();
 }
 
 test.describe('Book view — approve/reject (NEH-209)', () => {
@@ -295,6 +302,11 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
 		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
 
+		// A rejected record accepts no more annotations: both accordion
+		// buttons are disabled until it's approved (or recaptured) again.
+		await expect(page.getByRole('button', { name: 'Marcar error' })).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'Agregar nota' })).toBeDisabled();
+
 		// Undo the rejection: Aprobar on a rejected record reverts to
 		// in_review instead of jumping straight to approved.
 		await page.getByRole('button', { name: 'Aprobar' }).click();
@@ -306,6 +318,10 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 			headers: { Authorization: `Bearer ${ctx.token}` }
 		});
 		expect((await statusResp.json()).status).toBe('in_review');
+
+		// Re-enabled again now that it's back in in_review.
+		await expect(page.getByRole('button', { name: 'Marcar error' })).toBeEnabled();
+		await expect(page.getByRole('button', { name: 'Agregar nota' })).toBeEnabled();
 	});
 
 	test('cancelling the confirm popup performs no action', async ({ page, request }) => {
@@ -328,7 +344,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		expect((await statusResp.json()).status).toBe('in_review');
 	});
 
-	test('multi-select reasons + note save as ONE annotation with both tags visible in the Anotaciones list', async ({ page, request }) => {
+	test('"Marcar error" and "Agregar nota" are independent — picking two errors and adding a note create TWO separate annotation cards', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
 			data: { name: `MultiTag ${Date.now()}`, project_id: ctx.projectId }
@@ -338,12 +354,16 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 
 		await openBookView(page, ctx, collection.id);
 
-		await flagErrors(page, ['Imagen Borrosa', 'Reflejo/Brillo'], 'dos motivos a la vez');
+		await flagErrors(page, ['Imagen Borrosa', 'Reflejo/Brillo']);
+		await addNote(page, 'nota independiente');
 
-		await expect(page.getByText('dos motivos a la vez')).toBeVisible();
-		const card = page.locator('.annotation-card', { hasText: 'dos motivos a la vez' });
-		await expect(card.getByText('Imagen Borrosa')).toBeVisible();
-		await expect(card.getByText('Reflejo/Brillo')).toBeVisible();
+		await expect(page.getByText('nota independiente')).toBeVisible();
+		const noteCard = page.locator('.annotation-card', { hasText: 'nota independiente' });
+		await expect(noteCard.getByText('Imagen Borrosa')).toHaveCount(0);
+
+		const errorCard = page.locator('.annotation-card', { has: page.getByText('Imagen Borrosa') });
+		await expect(errorCard.getByText('Reflejo/Brillo')).toBeVisible();
+		await expect(errorCard.getByText('nota independiente')).toHaveCount(0);
 	});
 
 	test('rejecting with multiple reasons selected sends only the FIRST one to the backend', async ({ page, request }) => {
@@ -390,7 +410,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await expect(page).toHaveURL(new RegExp(`/live-preview\\?projectId=${ctx.projectId}&collectionId=${collection.id}&recordId=${recordId}$`));
 	});
 
-	test('regression: the old isolated rejection-comment modal never appears, and all 6 reason chips are visible with no dropdown to open', async ({ page, request }) => {
+	test('regression: the old isolated rejection-comment modal never appears, and "Marcar error"/"Agregar nota" are collapsed accordions, not an always-open list', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
 			data: { name: `Regression ${Date.now()}`, project_id: ctx.projectId }
@@ -404,9 +424,14 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		// heading and a plain textarea with no reason picker.
 		await expect(page.getByText('Rechazar registros')).toHaveCount(0);
 		await expect(page.getByPlaceholder('Describe el motivo del rechazo…')).toHaveCount(0);
-		// All 6 reason chips render immediately, no dropdown/listbox involved.
+		// Collapsed by default: neither the error rows nor the comment box
+		// are visible until their own accordion button is tapped.
+		await expect(page.getByRole('button', { name: 'Imagen Borrosa', exact: true })).toHaveCount(0);
+		await expect(page.getByPlaceholder('Agrega un comentario (opcional)...')).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Marcar error' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Agregar nota' })).toBeVisible();
+		await page.getByRole('button', { name: 'Marcar error' }).click();
 		await expect(page.getByRole('button', { name: 'Imagen Borrosa', exact: true })).toBeVisible();
-		await expect(page.getByRole('listbox')).toHaveCount(0);
 		// Rechazar/Aprobar are inline in the panel, no dialog/modal involved
 		// until a click actually requests confirmation.
 		await expect(page.locator('[role="dialog"]')).toHaveCount(0);
