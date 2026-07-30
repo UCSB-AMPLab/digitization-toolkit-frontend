@@ -117,6 +117,8 @@
     annotationsError = null;
     noteText = '';
     selectedReasons = [];
+    isReasonCardExpanded = false;
+    isNoteCardExpanded = false;
     reviewError = null;
     pendingAction = null;
     if (recordId == null) return;
@@ -133,19 +135,23 @@
     return () => { cancelled = true; };
   });
 
-  // "Agregar nota": texto libre, inline (siempre visible, sin modal). Junto
-  // con los motivos marcados abajo, forma UNA anotación (error_types + note)
-  // al guardar — restaura el comportamiento previo a NEH-209 donde "Marcar
-  // error" completaba la sección de Anotaciones, mientras Rechazar sigue
-  // usando el primer motivo marcado como su `comment`.
+  // "Marcar error" y "Agregar nota" son dos acordeones independientes, cada
+  // uno con su propio botón "Listo" — cada uno crea su PROPIA anotación
+  // (error_types solo, o note solo) en vez de combinarse en una — así lo
+  // pidió el usuario explícitamente ("que sean dos cosas aparte"). El
+  // backend de rechazo formal solo acepta un predefined_reason, así que
+  // "Rechazar" usa el de la anotación de error guardada más antigua (ver
+  // `firstFlaggedReason` más abajo), no la selección viva de checkboxes.
   let noteText = $state('');
-
-  // "Marcar error": selección múltiple mediante chips siempre visibles (sin
-  // paso de abrir/cerrar) — el backend de rechazo formal solo acepta un
-  // predefined_reason, así que "Rechazar" usa el de la anotación guardada
-  // más antigua (ver `firstFlaggedReason` más abajo), no la selección viva
-  // de chips (que se vacía en cada "Guardar").
   let selectedReasons = $state<PredefinedRejectionReason[]>([]);
+  let isReasonCardExpanded = $state(false);
+  let isNoteCardExpanded = $state(false);
+
+  // Un registro rechazado ya no admite más anotaciones — "Marcar error" y
+  // "Agregar nota" quedan deshabilitados hasta que alguien lo apruebe (o lo
+  // recapture, lo que también lo devuelve a 'in_review'); solo 'rejected'
+  // los bloquea.
+  let annotationsLocked = $derived(currentRecord?.status === 'rejected');
 
   // Rechazar/Aprobar (NEH-209) — siempre visibles y habilitados salvo que ya
   // estén en ese mismo estado (no se puede aprobar/rechazar dos veces), para
@@ -206,10 +212,9 @@
   // ACCIONES
   // ---------------------------------------------------------------------------
 
-  // Guarda los motivos marcados (obligatorio al menos uno) + la nota
-  // opcional como UNA anotación.
-  async function handleSaveNote() {
-    const note = noteText.trim();
+  // Guarda los tipos de error marcados como su propia anotación (sin nota)
+  // y colapsa la tarjeta — "Listo" de "Marcar error".
+  async function handleSaveErrors() {
     if (selectedReasons.length === 0 || !currentRecord || isSavingAnnotation) return;
     const recordId = currentRecord.id;
     isSavingAnnotation = true;
@@ -217,29 +222,48 @@
     try {
       const created = await recordsApi.addAnnotation(recordId, {
         error_types: selectedReasons,
-        note: note || undefined,
+        note: undefined,
       });
       // Si el record activo cambió mientras la request estaba en curso, el
       // effect de carga ya reemplazó `annotations` por las del nuevo record;
       // no anteponer aquí, o mostraríamos una anotación del record anterior.
-      // La anotación ya quedó guardada en el backend y aparecerá al volver.
       if (currentRecord?.id === recordId) {
         annotations = [created, ...annotations];
       }
-      noteText = '';
       selectedReasons = [];
+      isReasonCardExpanded = false;
     } catch (err) {
-      console.error('[LeftSidebar] Error guardando anotación:', err);
+      console.error('[LeftSidebar] Error guardando el motivo de error:', err);
       annotationsError = $m.col_annotation_save_error;
     } finally {
       isSavingAnnotation = false;
     }
   }
 
-  // Descarta los chips/nota sin guardar nada.
-  function handleCancelAnnotation() {
-    noteText = '';
-    selectedReasons = [];
+  // Guarda el comentario como su propia anotación (sin tipos de error) y
+  // colapsa la tarjeta — "Listo" de "Agregar nota".
+  async function handleSaveComment() {
+    const note = noteText.trim();
+    if (!note || !currentRecord || isSavingAnnotation) return;
+    const recordId = currentRecord.id;
+    isSavingAnnotation = true;
+    annotationsError = null;
+    try {
+      const created = await recordsApi.addAnnotation(recordId, {
+        error_types: [],
+        note,
+      });
+      if (currentRecord?.id === recordId) {
+        annotations = [created, ...annotations];
+      }
+      noteText = '';
+      isNoteCardExpanded = false;
+    } catch (err) {
+      console.error('[LeftSidebar] Error guardando la nota:', err);
+      annotationsError = $m.col_annotation_save_error;
+    } finally {
+      isSavingAnnotation = false;
+    }
   }
 
   // Pide confirmación antes de rechazar (o deshacer una aprobación). No abre
@@ -298,6 +322,14 @@
             predefined_reason: firstFlaggedReason!,
             comment: noteText.trim() || undefined,
           });
+          // Un registro rechazado ya no admite más anotaciones — colapsar
+          // cualquier tarjeta que hubiera quedado abierta (el botón de
+          // "Marcar error"/"Agregar nota" ya se deshabilita solo vía
+          // `annotationsLocked`, pero esto también descarta lo no guardado).
+          isReasonCardExpanded = false;
+          isNoteCardExpanded = false;
+          selectedReasons = [];
+          noteText = '';
         }
         await onRecordUpdated();
       } catch (err) {
@@ -311,6 +343,7 @@
   }
 
   async function handleDeleteAnnotation(id: number) {
+    if (annotationsLocked) return;
     const recordId = currentRecord?.id ?? null;
     const previous = annotations;
     annotations = annotations.filter(a => a.id !== id);
@@ -637,60 +670,95 @@
                     </div>
                     <div class="annotation-footer">
                       <span class="annotation-time">{formatTime(ann.created_at)}</span>
-                      <!-- Botón eliminar (visible en hover) -->
-                      <button class="delete-annotation-btn" onclick={() => handleDeleteAnnotation(ann.id)} aria-label={$m.col_delete_annotation}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                      </button>
+                      <!-- Botón eliminar (visible en hover) — un registro
+                           rechazado ya no admite cambios en sus anotaciones,
+                           tampoco borrarlas. -->
+                      {#if !annotationsLocked}
+                        <button class="delete-annotation-btn" onclick={() => handleDeleteAnnotation(ann.id)} aria-label={$m.col_delete_annotation}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      {/if}
                     </div>
                   </div>
                 {/each}
               {/if}
             </div>
 
-            <!-- ── Marcar error: chips siempre visibles + comentario + Guardar (NEH-209) ── -->
+            <!-- ── Marcar error: acordeón independiente con lista de checkeo ── -->
             {#if canReview}
               <div class="review-section">
-                <label class="note-label">{$m.col_reject_reason_label}</label>
-                <div class="reason-chips">
-                  {#each ERROR_TYPES as errType}
+                <button
+                  type="button"
+                  class="annotation-toggle"
+                  disabled={annotationsLocked}
+                  onclick={() => isReasonCardExpanded = !isReasonCardExpanded}
+                  aria-expanded={isReasonCardExpanded}
+                >
+                  <span class="material-symbols-outlined icon-sm">warning</span>
+                  <span>{$m.col_mark_error_btn}</span>
+                </button>
+
+                {#if isReasonCardExpanded}
+                  <div class="expandable-card">
+                    <div class="reason-options">
+                      {#each ERROR_TYPES as errType}
+                        <button
+                          type="button"
+                          class="error-type-btn"
+                          class:selected={selectedReasons.includes(errType.id)}
+                          onclick={() => toggleReason(errType.id)}
+                        >
+                          <div class="et-dot" style="background-color: {errType.color}"></div>
+                          <span>{errType.label}</span>
+                          {#if selectedReasons.includes(errType.id)}
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2.5" class="et-check"><polyline points="20 6 9 17 4 12"/></svg>
+                          {/if}
+                        </button>
+                      {/each}
+                    </div>
                     <button
-                      type="button"
-                      class="reason-chip"
-                      class:selected={selectedReasons.includes(errType.id)}
-                      style={selectedReasons.includes(errType.id) ? `--chip-color: ${errType.color}` : ''}
-                      onclick={() => toggleReason(errType.id)}
+                      class="modal-btn confirm reason-done-btn"
+                      disabled={selectedReasons.length === 0 || !currentRecord || isSavingAnnotation}
+                      onclick={handleSaveErrors}
                     >
-                      {#if selectedReasons.includes(errType.id)}
-                        <svg class="chip-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                      {/if}
-                      <span>{errType.label}</span>
+                      {$m.col_reason_done}
                     </button>
-                  {/each}
-                </div>
-                <textarea
-                  class="note-textarea"
-                  bind:value={noteText}
-                  placeholder={$m.col_annotation_comment_placeholder}
-                  disabled={!currentRecord}
-                ></textarea>
-                <div class="annotation-form-actions">
-                  <button
-                    class="modal-btn cancel"
-                    disabled={selectedReasons.length === 0 && !noteText.trim()}
-                    onclick={handleCancelAnnotation}
-                  >
-                    {$m.common_cancel}
-                  </button>
-                  <button
-                    class="modal-btn confirm"
-                    disabled={selectedReasons.length === 0 || !currentRecord || isSavingAnnotation}
-                    onclick={handleSaveNote}
-                  >
-                    {$m.common_save}
-                  </button>
-                </div>
+                  </div>
+                {/if}
+              </div>
+
+              <!-- ── Agregar nota: acordeón independiente, mismo patrón ── -->
+              <div class="review-section review-section--tight">
+                <button
+                  type="button"
+                  class="annotation-toggle"
+                  disabled={annotationsLocked}
+                  onclick={() => isNoteCardExpanded = !isNoteCardExpanded}
+                  aria-expanded={isNoteCardExpanded}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span>{$m.col_add_note}</span>
+                </button>
+
+                {#if isNoteCardExpanded}
+                  <div class="expandable-card">
+                    <textarea
+                      class="note-textarea"
+                      bind:value={noteText}
+                      placeholder={$m.col_annotation_comment_placeholder}
+                      disabled={!currentRecord}
+                    ></textarea>
+                    <button
+                      class="modal-btn confirm reason-done-btn"
+                      disabled={!noteText.trim() || !currentRecord || isSavingAnnotation}
+                      onclick={handleSaveComment}
+                    >
+                      {$m.col_reason_done}
+                    </button>
+                  </div>
+                {/if}
               </div>
             {/if}
 
@@ -1120,6 +1188,14 @@
     border-top: 1px solid var(--border-color);
   }
 
+  /* Sin separador entre "Marcar error" y "Agregar nota" — son dos
+     acordeones hermanos, no secciones distintas del panel. */
+  .review-section--tight {
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: none;
+  }
+
   .annotations-error {
     font-size: var(--text-xs);
     color: var(--color-error);
@@ -1139,38 +1215,68 @@
     margin: 0;
   }
 
-  /* Motivo de rechazo: chips siempre visibles, sin paso de abrir/cerrar
-     (NEH-209) — se acomodan en filas según el ancho disponible. */
-  .reason-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-
-  .reason-chip {
+  /* "Marcar error" / "Agregar nota": dos acordeones independientes, cada
+     uno un botón neutro (ícono + etiqueta) que ocupa una sola fila
+     colapsado, y se expande in-line a su propia tarjeta con "Listo". */
+  .annotation-toggle {
+    width: 100%;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border-radius: var(--radius-full, 999px);
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 16px;
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
-    color: var(--color-light-grey);
+    border-radius: var(--radius-md);
     font-family: var(--font-family);
     font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-light);
     cursor: pointer;
     transition: all var(--transition-fast);
     min-height: var(--touch-target-min);
   }
+  .annotation-toggle:hover { border-color: rgba(90,140,98,0.5); }
+  .annotation-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .reason-chip:hover { border-color: rgba(90,140,98,0.5); }
-  .reason-chip.selected {
-    border: 2px solid var(--chip-color);
-    color: var(--chip-color);
-    background-color: color-mix(in srgb, var(--chip-color) 18%, var(--color-surface));
+  .expandable-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
   }
 
-  .chip-check { flex-shrink: 0; }
+  .reason-options { display: flex; flex-direction: column; gap: 6px; }
+
+  .error-type-btn {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-light-grey);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+    min-height: var(--touch-target-min);
+  }
+
+  .error-type-btn:hover { border-color: rgba(90,140,98,0.5); }
+  .error-type-btn.selected { background-color: rgba(255,255,255,0.06); border-color: var(--color-primary); color: var(--color-light); }
+
+  .et-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .et-check { margin-left: auto; flex-shrink: 0; }
+
+  .reason-done-btn { width: 100%; }
 
   /* Nota textarea */
-  .note-label { font-size: var(--text-sm); color: var(--color-light-grey); }
-
   .note-textarea {
     width: 100%;
     height: 120px;
@@ -1266,9 +1372,4 @@
   .modal-btn.confirm { background-color: var(--color-primary); color: white; border-color: var(--color-primary); }
   .modal-btn.confirm:hover { background-color: var(--color-primary-hover); }
   .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* Chips + comentario: Cancelar/Guardar alineados a la derecha, sin
-     estirarse a todo el ancho como en el popup de confirmación. */
-  .annotation-form-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 4px; }
-  .annotation-form-actions .modal-btn { flex: 0 0 auto; padding: 0 20px; }
 </style>

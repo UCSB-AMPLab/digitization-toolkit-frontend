@@ -380,7 +380,9 @@ export const es = {
 	col_deselect: 'Deseleccionar',
 	col_bulk_status_partial: (skipped: number, total: number) =>
 		`${skipped} de ${total} registro${total === 1 ? '' : 's'} no se ${total === 1 ? 'pudo actualizar' : 'pudieron actualizar'} (transición de estado no permitida) — el resto sí.`,
-	col_reject_reason_label: 'Motivo del rechazo (obligatorio):',
+	col_mark_error_btn: 'Marcar error',
+	col_add_note: 'Agregar nota',
+	col_reason_done: 'Listo',
 	col_reject_error: 'No se pudo rechazar el registro. Intenta de nuevo.',
 	col_review_approve_error: 'No se pudo aprobar el registro. Intenta de nuevo.',
 	col_recapture_btn: 'Recapturar imagen',

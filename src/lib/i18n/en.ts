@@ -359,7 +359,9 @@ export const en: Messages = {
 	col_deselect: 'Deselect',
 	col_bulk_status_partial: (skipped: number, total: number) =>
 		`${skipped} of ${total} record${total === 1 ? '' : 's'} could not be updated (invalid status transition) — the rest were.`,
-	col_reject_reason_label: 'Reason for rejection (required):',
+	col_mark_error_btn: 'Mark error',
+	col_add_note: 'Add note',
+	col_reason_done: 'Done',
 	col_reject_error: 'Could not reject the record. Please try again.',
 	col_review_approve_error: 'Could not approve the record. Please try again.',
 	col_recapture_btn: 'Recapture image',
