@@ -61,9 +61,10 @@
     return recordsApi.getImageFileUrl(img.id);
   }
 
-  // Nombre del record para mostrar en labels
-  function getRecordName(record: Record | null): string {
-    return record?.title ?? '—';
+  // NEH-201: the image's exact file name, not the record's derived title — the
+  // file name is what survives in the BagIt export.
+  function getImageName(img: RecordImage | null): string {
+    return img?.filename ?? '—';
   }
 
   // NEH-209: mientras el registro esté "rejected", sus imágenes actuales
@@ -125,9 +126,9 @@
 
       <!-- Página izquierda -->
       <div class="spread-page" bind:clientWidth={leftPageW} bind:clientHeight={leftPageH}>
-        {#if selectedRecord}
+        {#if spreadLeftImage}
           <div class="spread-label">
-            <span class="spread-name">{getRecordName(selectedRecord)}</span>
+            <span class="spread-name">{getImageName(spreadLeftImage)}</span>
             <span class="spread-side">{$m.col_left_page_short}</span>
           </div>
         {/if}
@@ -162,7 +163,7 @@
       <div class="spread-page" bind:clientWidth={rightPageW} bind:clientHeight={rightPageH}>
         {#if spreadRightImage}
           <div class="spread-label right">
-            <span class="spread-name">{getRecordName(selectedRecord)}</span>
+            <span class="spread-name">{getImageName(spreadRightImage)}</span>
             <span class="spread-side">{$m.col_right_page_short}</span>
           </div>
         {/if}
