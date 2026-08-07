@@ -61,6 +61,7 @@ export const es = {
 	login_error_fill_all_fields: 'Por favor completa todos los campos',
 	login_error_bad_credentials: 'Usuario o contraseña incorrectos',
 	login_error_unknown_role: 'Tu cuenta tiene un rol que la aplicación no reconoce. Avisa a quien administra el equipo.',
+	login_error_backend_unavailable: 'No se pudo conectar con el servidor. Puede estar iniciando; espera unos segundos e intenta de nuevo.',
 
 	// ── Sesión ───────────────────────────────────────────────────────────────
 	session_validating: 'Verificando sesión…',

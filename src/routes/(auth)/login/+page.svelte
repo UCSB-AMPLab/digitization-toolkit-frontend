@@ -13,6 +13,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authApi, healthApi, usersApi, tokenStore } from '$lib/api';
+	import { classifyLoginError } from '$lib/login-error';
 	import { authStore, getRoleDashboardPath, isUserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
@@ -94,12 +95,17 @@
 
 		isLoading = true;
 
+		// Flipped once /auth/login returns 200, so a later failure can't be
+		// reported as a bad password.
+		let credentialsChecked = false;
+
 		try {
 			// Paso 1: autenticar y obtener token JWT
 			const authResponse = await authApi.login({
 				username: username.trim(),
 				password
 			});
+			credentialsChecked = true;
 
 			// Paso 2: obtener datos del usuario autenticado (incluye el rol)
 			// El rol que devuelve /users/me tiene que estar en USER_ROLES
@@ -134,8 +140,15 @@
 			// Paso 5: redirigir al dashboard según rol
 			goto(getRoleDashboardPath(userData.role));
 		} catch (error) {
-			// Mensaje genérico para no revelar si el usuario existe
-			errorMessage = $m.login_error_bad_credentials;
+			// Bad credentials vs. unreachable backend. The credentials
+			// message stays generic; it just no longer covers connection failures.
+			if (classifyLoginError(error, { credentialsChecked }) === 'credentials') {
+				errorMessage = $m.login_error_bad_credentials;
+			} else {
+				errorMessage = $m.login_error_backend_unavailable;
+				// Keep the footer's connection dot consistent with the message.
+				await checkConnection();
+			}
 			console.error('[Login] Error:', error);
 		} finally {
 			// Siempre apagar el loading al terminar (éxito o error)

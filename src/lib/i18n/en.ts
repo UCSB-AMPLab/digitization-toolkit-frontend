@@ -51,6 +51,7 @@ export const en: Messages = {
 	login_error_fill_all_fields: 'Please fill in all fields',
 	login_error_bad_credentials: 'Incorrect username or password',
 	login_error_unknown_role: 'Your account has a role this app does not recognize. Let whoever administers the device know.',
+	login_error_backend_unavailable: 'Could not reach the server. It may still be starting up — wait a few seconds and try again.',
 
 	// ── Session ──────────────────────────────────────────────────────────────
 	session_validating: 'Verifying session…',
