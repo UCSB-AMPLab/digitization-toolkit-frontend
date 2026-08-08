@@ -16,8 +16,13 @@
 	import { classifyLoginError } from '$lib/login-error';
 	import { authStore, getRoleDashboardPath, isUserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
-	import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
+	import logoEs from '$lib/assets/captua-logo-descrp-light-esp.svg';
+	import logoEn from '$lib/assets/captua-logo-descrp-light-eng.svg';
 	import favicon from '$lib/assets/favicon.svg';
+
+	// the descriptor in the logo is baked into the SVG, so the asset
+	// itself has to follow the locale.
+	let logo = $derived($locale === 'en' ? logoEn : logoEs);
 
 	// ---------------------------------------------------------------------------
 	// ESTADO DEL FORMULARIO
