@@ -11,8 +11,13 @@
 
   import { goto } from '$app/navigation';
   import { authApi } from '$lib/api';
-  import { m } from '$lib/i18n';
-  import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
+  import { m, locale } from '$lib/i18n';
+  import logoEs from '$lib/assets/captua-logo-descrp-light-esp.svg';
+  import logoEn from '$lib/assets/captua-logo-descrp-light-eng.svg';
+
+  // The descriptor in the logo is baked into the SVG, so the asset
+  // itself has to follow the locale.
+  let logo = $derived($locale === 'en' ? logoEn : logoEs);
 
   let isChecking = $state(false);
 
