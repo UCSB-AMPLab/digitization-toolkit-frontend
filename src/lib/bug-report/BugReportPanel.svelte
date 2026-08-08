@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { m } from '$lib/i18n';
   import { captureContext } from './context';
   import { getRecentErrors } from './error-capture';
@@ -33,17 +34,43 @@
     if (!win) window.location.href = url;
     onClose();
   }
+
+  // NEH-220: role="dialog" promises the focus lives in here, so move it in on
+  // open and hand it back to whatever opened the modal on close.
+  let dialogEl = $state<HTMLDivElement | null>(null);
+
+  onMount(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    dialogEl?.focus();
+    return () => previouslyFocused?.focus();
+  });
+
+  // Escape is the keyboard equivalent of clicking the backdrop.
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') onClose();
+  }
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
+
+<!-- El backdrop cierra al hacer clic fuera; el equivalente por teclado es
+     Escape, arriba. -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="bug-backdrop"
-  role="dialog"
-  aria-modal="true"
   onclick={(e) => { if ((e.target as HTMLElement).classList.contains('bug-backdrop')) onClose(); }}
 >
-  <div class="bug-card">
+  <div
+    class="bug-card"
+    bind:this={dialogEl}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="bug-report-title"
+    tabindex="-1"
+  >
     <div class="bug-header">
-      <h3 class="bug-title">{$m.bug_report_title}</h3>
+      <h3 class="bug-title" id="bug-report-title">{$m.bug_report_title}</h3>
       <button class="bug-close" onclick={onClose} aria-label={$m.common_close}>
         <span class="material-symbols-outlined icon-md">close</span>
       </button>
@@ -86,6 +113,7 @@
 <style>
   .bug-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 24px; }
   .bug-card { background: var(--color-surface-alt); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 24px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; color: var(--color-light); display: flex; flex-direction: column; gap: 8px; }
+  .bug-card:focus { outline: none; }
   .bug-header { display: flex; align-items: center; justify-content: space-between; }
   .bug-title { font-size: var(--text-h3); font-weight: var(--fw-bold); margin: 0; }
   .bug-close { background: none; border: none; color: var(--color-light-grey); cursor: pointer; }
