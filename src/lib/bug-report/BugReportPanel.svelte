@@ -74,8 +74,8 @@
     {/if}
 
     <div class="bug-actions">
-      <button class="btn-secondary" onclick={onClose}>{$m.common_cancel}</button>
-      <button class="btn-primary" onclick={submit}>
+      <button class="btn btn-secondary" onclick={onClose}>{$m.common_cancel}</button>
+      <button class="btn btn-primary" onclick={submit}>
         <span class="material-symbols-outlined icon-sm">open_in_new</span>
         {$m.bug_submit}
       </button>
