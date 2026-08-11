@@ -32,7 +32,6 @@
   import RightToolbar from './RightToolbar.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
-  import ActionBar from './ActionBar.svelte';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -50,17 +49,6 @@
   let zoom             = $state(1);
   let rotation         = $state(0);
   let isLoading        = $state(true);
-
-  // Multi-select state
-  let selectedIds   = $state<Set<number>>(new Set());
-  let isSelectMode  = $state(false);
-
-  // Aviso cuando un bulk status change actualiza menos registros de los
-  // seleccionados — el backend salta transiciones inválidas en silencio
-  // (records.py bulk-status, solo lo loguea), así que sin esto el operador
-  // cree que toda la selección se movió y el export termina bloqueado
-  // porque faltaba aprobar algo que en realidad nunca cambió (NEH-88).
-  let bulkStatusNotice = $state<string | null>(null);
 
   // Registro inspeccionado en el modal (desde ListView)
   let inspectedRecord = $state<Record | null>(null);
@@ -164,39 +152,6 @@
     triggerFinalizeModal = false;
   }
 
-  // Multi-select handlers
-  function handleToggleSelect(id: number) {
-    const next = new Set(selectedIds);
-    if (next.has(id)) { next.delete(id); } else { next.add(id); }
-    selectedIds = next;
-    isSelectMode = next.size > 0;
-  }
-
-  function handleDeselectAll() {
-    selectedIds = new Set();
-    isSelectMode = false;
-  }
-
-  async function handleBulkStatusChange(status: 'in_review' | 'approved') {
-    bulkStatusNotice = null;
-    const requestedIds = Array.from(selectedIds);
-    try {
-      const updated = await recordsApi.bulkUpdateStatus(requestedIds, status);
-      // El backend devuelve solo los registros que sí cambiaron — una
-      // transición inválida (o de rol insuficiente) se salta en silencio.
-      // Comparar contra lo pedido es la única forma de detectarlo del lado
-      // del cliente.
-      const skipped = requestedIds.length - updated.length;
-      if (skipped > 0) {
-        bulkStatusNotice = $m.col_bulk_status_partial(skipped, requestedIds.length);
-      }
-      await loadRecords();
-      handleDeselectAll();
-    } catch (err) {
-      console.error('[Gallery] Error actualizando estado:', err);
-    }
-  }
-
   // BagIt export
   let showExportModal = $state(false);
   let isExporting     = $state(false);
@@ -295,21 +250,6 @@
 
   <RecordStatusBar {records} />
 
-  <!-- Aviso: un bulk status change actualizó menos registros de los pedidos -->
-  {#if bulkStatusNotice}
-    <div class="alert alert-warning bulk-status-notice" role="alert" aria-live="polite">
-      <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-        <line x1="12" y1="9" x2="12" y2="13"/>
-        <line x1="12" y1="17" x2="12.01" y2="17"/>
-      </svg>
-      <span>{bulkStatusNotice}</span>
-      <button class="bulk-status-notice-close" onclick={() => bulkStatusNotice = null} aria-label={$m.common_close}>
-        <span class="material-symbols-outlined icon-sm">close</span>
-      </button>
-    </div>
-  {/if}
-
   <div class="content-area">
 
     <!-- Panel lateral: solo en spread (vista libro) -->
@@ -339,21 +279,17 @@
         <GridView
           {records}
           {collectionId}
-          {selectedIds}
           {triggerFinalizeModal}
           onRecordsUpdate={loadRecords}
           onFinalized={handleFinalized}
           onFinalizeModalClosed={handleFinalizeModalClosed}
-          onToggleSelect={handleToggleSelect}
         />
 
       {:else if viewMode === 'list'}
         <ListView
           {records}
           {collectionId}
-          {selectedIds}
           onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
-          onToggleSelect={handleToggleSelect}
           onRecordsUpdate={loadRecords}
         />
 
@@ -405,15 +341,6 @@
     onDelete={handleDeleteRecord}
   />
 {/if}
-
-<!-- Barra de acciones multi-selección -->
-<ActionBar
-  selectedCount={selectedIds.size}
-  userRole={$userRole}
-  onBulkStatusChange={handleBulkStatusChange}
-  onDeselect={handleDeselectAll}
-/>
-
 
 <!-- Modal de exportación BagIt -->
 {#if showExportModal}
@@ -522,14 +449,6 @@
 <style>
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .bulk-status-notice { margin: 0 20px 12px; }
-  .bulk-status-notice-close {
-    display: flex; align-items: center; justify-content: center;
-    background: none; border: none; color: inherit; cursor: pointer;
-    margin-left: auto; padding: 2px; border-radius: var(--radius-sm);
-    opacity: 0.7;
-  }
-  .bulk-status-notice-close:hover { opacity: 1; }
   .chooser-options { display: flex; flex-direction: column; gap: 12px; width: 100%; margin: 6px 0 4px; }
   .chooser-option {
     display: flex; gap: 14px; text-align: left; width: 100%;

@@ -49,24 +49,18 @@
   let {
     records,
     collectionId,
-    selectedIds = new Set<number>(),
     triggerFinalizeModal,
     onRecordsUpdate,
     onFinalized,
     onFinalizeModalClosed,
-    onToggleSelect,
   }: {
     records: Record[];
     collectionId: number;
-    selectedIds?: Set<number>;
     triggerFinalizeModal: boolean;
     onRecordsUpdate: () => void;
     onFinalized: () => void;
     onFinalizeModalClosed: () => void;
-    onToggleSelect?: (id: number) => void;
   } = $props();
-
-  let isSelectMode = $derived(selectedIds.size > 0);
 
   // Local copy of records for DnD reordering
   let localRecords = $state<Record[]>([]);
@@ -370,13 +364,9 @@
     {#each flattenToGridItems(records.filter(r => !activeStatusFilter || r.status === activeStatusFilter)) as item, i (item.record.id + '-' + (item.image?.id ?? 'none'))}
       {@const record = item.record}
 
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="grid-card"
         class:draggable={isReorderMode}
-        class:selected={selectedIds.has(record.id)}
-        onclick={() => { if (isSelectMode && onToggleSelect) onToggleSelect(record.id); }}
       >
 
         {#if isReorderMode}
@@ -404,21 +394,6 @@
           <!-- Badge L/R — solo si el registro tiene captura doble -->
           {#if item.role}
             <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
-          {/if}
-
-          <!-- Multi-select overlay -->
-          {#if onToggleSelect}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              class="selectable-overlay"
-              class:selected={selectedIds.has(record.id)}
-              onclick={(e) => { e.stopPropagation(); onToggleSelect!(record.id); }}
-            >
-              {#if selectedIds.has(record.id)}
-                <span class="material-symbols-outlined">check</span>
-              {/if}
-            </div>
           {/if}
         </div>
 
@@ -687,10 +662,7 @@
 
   .card-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--color-light-grey); opacity: 0.3; }
 
-  /* Badge L/R — mismo estilo que ThumbnailStrip.svelte (misma carpeta), pero
-     abajo en vez de arriba: el checkbox de selección (.selectable-overlay,
-     global en app.css) ya ocupa la esquina superior-izquierda con z-index:5
-     y fondo opaco — un badge arriba quedaría tapado detrás. */
+  /* Badge L/R — mismo estilo que ThumbnailStrip.svelte (misma carpeta). */
   .role-badge {
     position: absolute;
     bottom: 6px; left: 6px;
