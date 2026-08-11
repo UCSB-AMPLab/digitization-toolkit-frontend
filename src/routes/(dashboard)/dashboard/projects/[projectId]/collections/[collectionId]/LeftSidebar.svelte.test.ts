@@ -165,28 +165,40 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).not.toBeInTheDocument();
 	});
 
-	it('in_review with no saved error annotations yet: Aprobar enabled, Rechazar disabled', async () => {
+	it('in_review with no saved error annotations yet: Aprobar enabled; Rechazar is clickable but shows a popup asking for a reason instead of confirming', async () => {
 		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
 		await openAnnotationsTab(screen);
 		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeDisabled();
-		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeDisabled();
+
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Debes seleccionar al menos un error.')).toBeVisible();
+		// It's the "select a reason" popup, not the reject confirmation.
+		await expect.element(dialog.getByText('¿Confirmas que quieres rechazar esta imagen?')).not.toBeInTheDocument();
+		expect(rejectSpy).not.toHaveBeenCalled();
 	});
 
-	it('Rechazar stays disabled while an error row is only tapped (not yet saved via Listo), and enables once it persists', async () => {
+	it('Rechazar keeps showing the "select a reason" popup while an error row is only tapped (not yet saved via Listo), and opens the real confirm once it persists', async () => {
 		addAnnotationSpy.mockResolvedValue(makeAnnotation({ error_types: ['exposure'] }));
 		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
 		await openAnnotationsTab(screen);
 		await openReasonCard(screen);
 
 		await screen.getByRole('button', { name: 'Exposición', exact: true }).click();
-		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+		await expect.element(screen.getByRole('dialog').getByText('Debes seleccionar al menos un error.')).toBeVisible();
+		await screen.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).click();
 
 		await screen.getByRole('button', { name: 'Listo' }).click();
 		await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
-		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeDisabled();
+
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+		await expect.element(screen.getByRole('dialog').getByText('¿Confirmas que quieres rechazar esta imagen?')).toBeVisible();
 	});
 
-	it('a note-only annotation (via "Agregar nota") does NOT enable Rechazar — only a saved error type does', async () => {
+	it('a note-only annotation (via "Agregar nota") does NOT satisfy the reason requirement — Rechazar still asks for one', async () => {
 		addAnnotationSpy.mockResolvedValue(makeAnnotation({ error_types: [], note: 'solo comentario' }));
 		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
 		await openAnnotationsTab(screen);
@@ -196,7 +208,8 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await screen.getByRole('button', { name: 'Listo' }).click();
 		await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
 
-		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+		await expect.element(screen.getByRole('dialog').getByText('Debes seleccionar al menos un error.')).toBeVisible();
 	});
 
 	it('approved: Aprobar disabled (can\'t approve twice), Rechazar enabled (undo, no saved annotation needed)', async () => {

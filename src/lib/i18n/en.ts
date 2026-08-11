@@ -359,6 +359,7 @@ export const en: Messages = {
 	col_add_note: 'Add note',
 	col_reason_done: 'Done',
 	col_reject_error: 'Could not reject the record. Please try again.',
+	col_reject_needs_reason: 'You must select at least one error.',
 	col_review_approve_error: 'Could not approve the record. Please try again.',
 	col_recapture_btn: 'Recapture image',
 	col_annotation_comment_placeholder: 'Add a comment (optional)...',

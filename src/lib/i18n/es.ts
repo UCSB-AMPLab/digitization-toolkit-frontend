@@ -379,6 +379,7 @@ export const es = {
 	col_add_note: 'Agregar nota',
 	col_reason_done: 'Listo',
 	col_reject_error: 'No se pudo rechazar el registro. Intenta de nuevo.',
+	col_reject_needs_reason: 'Debes seleccionar al menos un error.',
 	col_review_approve_error: 'No se pudo aprobar el registro. Intenta de nuevo.',
 	col_recapture_btn: 'Recapturar imagen',
 	col_annotation_comment_placeholder: 'Agrega un comentario (opcional)...',
