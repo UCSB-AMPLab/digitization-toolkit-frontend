@@ -283,6 +283,7 @@
           onRecordsUpdate={loadRecords}
           onFinalized={handleFinalized}
           onFinalizeModalClosed={handleFinalizeModalClosed}
+          onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
         />
 
       {:else if viewMode === 'list'}

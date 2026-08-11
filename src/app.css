@@ -1158,8 +1158,16 @@ canvas, button, a, div {
 
 .drag-handle.visible { opacity: 1; }
 
-/* Grid view column layout (dynamic via --grid-cols CSS var) */
-.image-grid { grid-template-columns: repeat(var(--grid-cols, 4), 1fr); }
+/* Grid view column layout (dynamic via --grid-cols CSS var).
+   minmax(0, 1fr), not bare 1fr: a bare `1fr` track's base size is its
+   content's automatic minimum, so a track holding wide unwrappable
+   content (e.g. the StatusBadge pill) grows wider than the others and the
+   remaining tracks shrink to compensate — columns stop being equal width.
+   That breaks NEH-211's guarantee that an L/R pair's two grid-column: span 2
+   halves measure exactly the same as a single-capture column. minmax(0, 1fr)
+   forces every track's base to 0, so the 1fr's divide the row exactly
+   evenly regardless of content. */
+.image-grid { grid-template-columns: repeat(var(--grid-cols, 4), minmax(0, 1fr)); }
 
 .grid-card.selected { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .card-status-row { margin-top: 4px; }
@@ -1276,8 +1284,7 @@ canvas, button, a, div {
 
 .drag-handle:active { cursor: grabbing; }
 
-tr:hover .drag-handle,
-.grid-card:hover .drag-handle { opacity: 1; }
+tr:hover .drag-handle { opacity: 1; }
 
 /* BagIt export button in RightToolbar */
 .tool-btn.export-ready { color: var(--color-success); }
