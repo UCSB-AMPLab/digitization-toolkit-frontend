@@ -161,6 +161,9 @@
   let isApproving = $state(false);
   let reviewError = $state<string | null>(null);
   let pendingAction = $state<'approve' | 'reject' | null>(null);
+  // Se muestra al intentar "Rechazar" sin haber marcado al menos un tipo de
+  // error todavía — antes el botón solo quedaba disabled sin explicar por qué.
+  let showNoReasonPopup = $state(false);
 
   // ---------------------------------------------------------------------------
   // HELPERS
@@ -266,14 +269,21 @@
     }
   }
 
-  // Pide confirmación antes de rechazar (o deshacer una aprobación). No abre
-  // el popup si falta al menos una anotación de error ya guardada para un
-  // rechazo formal (desde 'in_review') — deshacer una aprobación no lo
-  // necesita.
+  // Pide confirmación antes de rechazar (o deshacer una aprobación). Un
+  // rechazo formal (desde 'in_review') requiere al menos una anotación de
+  // error ya guardada — si falta, muestra un popup en vez de abrir el de
+  // confirmación (deshacer una aprobación no lo necesita).
   function requestReject() {
     if (!currentRecord || currentRecord.status === 'rejected' || isRejecting) return;
-    if (currentRecord.status === 'in_review' && firstFlaggedReason === null) return;
+    if (currentRecord.status === 'in_review' && firstFlaggedReason === null) {
+      showNoReasonPopup = true;
+      return;
+    }
     pendingAction = 'reject';
+  }
+
+  function closeNoReasonPopup() {
+    showNoReasonPopup = false;
   }
 
   // Pide confirmación antes de aprobar (o deshacer un rechazo).
@@ -788,12 +798,7 @@
                   {:else if canReview}
                     <button
                       class="btn-review reject"
-                      disabled={
-                        !currentRecord ||
-                        currentRecord.status === 'rejected' ||
-                        (currentRecord.status === 'in_review' && firstFlaggedReason === null) ||
-                        isRejecting
-                      }
+                      disabled={!currentRecord || currentRecord.status === 'rejected' || isRejecting}
                       onclick={requestReject}
                     >
                       <span class="material-symbols-outlined icon-sm">cancel</span>
@@ -835,6 +840,22 @@
       <div class="confirm-actions">
         <button class="modal-btn cancel" onclick={cancelPendingAction}>{$m.common_cancel}</button>
         <button class="modal-btn confirm" onclick={confirmPendingAction}>{$m.common_confirm}</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- ============================================================
+     POPUP: falta seleccionar un motivo de error para rechazar
+     ============================================================ -->
+{#if showNoReasonPopup}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="confirm-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('confirm-backdrop')) closeNoReasonPopup(); }}>
+    <div class="confirm-card" role="dialog" aria-modal="true">
+      <p class="confirm-message">{$m.col_reject_needs_reason}</p>
+      <div class="confirm-actions">
+        <button class="modal-btn confirm" onclick={closeNoReasonPopup}>{$m.common_close}</button>
       </div>
     </div>
   </div>
