@@ -373,14 +373,8 @@ export const es = {
 	status_rejected_plural: 'Rechazados',
 	status_approved_plural: 'Aprobados',
 	col_no_records: 'Sin registros',
-	col_selected_label: (n: number): string =>
-		n === 1 ? 'registro seleccionado' : 'registros seleccionados',
-	col_send_to_review: 'Enviar a revisión',
 	col_approve: 'Aprobar',
 	col_reject: 'Rechazar',
-	col_deselect: 'Deseleccionar',
-	col_bulk_status_partial: (skipped: number, total: number) =>
-		`${skipped} de ${total} registro${total === 1 ? '' : 's'} no se ${total === 1 ? 'pudo actualizar' : 'pudieron actualizar'} (transición de estado no permitida) — el resto sí.`,
 	col_mark_error_btn: 'Marcar error',
 	col_add_note: 'Agregar nota',
 	col_reason_done: 'Listo',
@@ -465,7 +459,6 @@ export const es = {
 	col_col_title: 'Título',
 	col_col_images: 'Imágenes',
 	col_col_captures: 'Capturas',
-	col_select: 'Seleccionar',
 	col_view_list: 'Vista lista',
 	col_view_spread: 'Vista libro',
 	col_view_spread_aria: 'Vista libro abierto',

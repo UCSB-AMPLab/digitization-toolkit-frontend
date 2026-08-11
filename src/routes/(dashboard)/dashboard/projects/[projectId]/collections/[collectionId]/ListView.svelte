@@ -20,20 +20,14 @@
   let {
     records,
     collectionId = 0,
-    selectedIds = new Set<number>(),
     onRecordClick,
-    onToggleSelect,
     onRecordsUpdate,
   }: {
     records: Record[];
     collectionId?: number;
-    selectedIds?: Set<number>;
     onRecordClick: (record: Record) => void;
-    onToggleSelect?: (id: number) => void;
     onRecordsUpdate?: () => void;
   } = $props();
-
-  let isSelectMode = $derived(selectedIds.size > 0);
 
   // Local copy for DnD
   let localRecords = $state<Record[]>([]);
@@ -107,7 +101,7 @@
 
     <!-- Filas con DnD -->
     <div
-      use:dndzone={{ items: localRecords, dragDisabled: isSelectMode }}
+      use:dndzone={{ items: localRecords, dragDisabled: false }}
       onconsider={handleDndConsider}
       onfinalize={handleDndFinalize}
     >
@@ -115,19 +109,10 @@
       {@const imgs = sortedImages(record)}
 
       <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="list-row"
         class:alt={i % 2 !== 0}
-        class:selected={selectedIds.has(record.id)}
-        onclick={(e) => {
-          if (isSelectMode && onToggleSelect) {
-            e.stopPropagation();
-            onToggleSelect(record.id);
-          } else {
-            onRecordClick(record);
-          }
-        }}
+        onclick={() => onRecordClick(record)}
         role="button"
         tabindex="0"
       >
@@ -159,21 +144,6 @@
 
         <!-- Título -->
         <span class="col-title row-title">
-          {#if onToggleSelect}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <span
-              class="selectable-check"
-              onclick={(e) => { e.stopPropagation(); onToggleSelect!(record.id); }}
-              title={$m.col_select}
-            >
-              {#if selectedIds.has(record.id)}
-                <span class="material-symbols-outlined icon-sm">check_box</span>
-              {:else}
-                <span class="material-symbols-outlined icon-sm">check_box_outline_blank</span>
-              {/if}
-            </span>
-          {/if}
           {record.title || $m.record_fallback_title(record.id)}
         </span>
 

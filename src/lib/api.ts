@@ -853,21 +853,6 @@ export const recordsApi = {
   },
 
   /**
-   * Change the QA status of multiple records at once.
-   * Returns successfully updated records (skipped records are omitted).
-   * NEH-208: no bulk-reject — rejection is single-record only, via reject().
-   */
-  async bulkUpdateStatus(
-    record_ids: number[],
-    status: 'in_review' | 'approved'
-  ): Promise<Record[]> {
-    return apiRequest<Record[]>('/records/bulk-status', {
-      method: 'POST',
-      body: JSON.stringify({ record_ids, status })
-    });
-  },
-
-  /**
    * Reject a record's current capture with a mandatory predefined reason.
    * Flags every current image (both sides of a dual-camera pair, or the
    * single image) as pending recapture — the backend decides how many
