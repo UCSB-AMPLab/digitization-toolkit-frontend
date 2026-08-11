@@ -53,6 +53,7 @@
     onRecordsUpdate,
     onFinalized,
     onFinalizeModalClosed,
+    onRecordClick,
   }: {
     records: Record[];
     collectionId: number;
@@ -60,6 +61,10 @@
     onRecordsUpdate: () => void;
     onFinalized: () => void;
     onFinalizeModalClosed: () => void;
+    // Mismo patrón que ListView: click en una tarjeta (simple o par L/R) va
+    // al Book view (spread) de ese registro — el spread ya muestra L y R
+    // juntos, así que no hace falta lógica especial para el caso de par.
+    onRecordClick: (record: Record) => void;
   } = $props();
 
   // Local copy of records for DnD reordering
@@ -106,25 +111,27 @@
 
   // Status simulado — ELIMINADO: usar record.status real
 
-  function getThumbnailUrl(record: Record): string | null {
-    if (!record.images || record.images.length === 0) return null;
-    return recordsApi.getImageThumbnailUrl(record.images[0].id);
-  }
-
   // ---------------------------------------------------------------------------
-  // GRID ITEMS: una tarjeta por imagen, no por registro
+  // GRID GROUPS: una entrada por registro, con 1 o 2 imágenes adentro
   //
-  // Un registro con captura doble (izq + der) antes mostraba una sola
-  // tarjeta (la primera imagen). Ahora produce dos tarjetas, cada una con
-  // su badge L/R — mismo criterio que ThumbnailStrip.svelte (misma
-  // carpeta), reutilizado acá para que grid y la tira inferior muestren la
-  // misma cantidad de imágenes.
+  // Un registro con captura doble (izq + der) agrupa sus dos imágenes en un
+  // único GridGroup — NEH-211: el par L/R se envuelve en un solo contenedor
+  // rectangular en vez de mostrarse como dos tarjetas independientes, para
+  // que se lea como una sola unidad (y, si algún día hay drag-and-drop en
+  // esta vista, el par se mueva junto). Un registro de captura simple
+  // produce un GridGroup con un solo item — mismo criterio de rol que
+  // ThumbnailStrip.svelte (misma carpeta), reutilizado acá.
   // ---------------------------------------------------------------------------
   interface GridItem {
     record: Record;
     image: RecordImage | null;
     role: 'L' | 'R' | null;
     thumbnailUrl: string | null;
+  }
+
+  interface GridGroup {
+    record: Record;
+    items: GridItem[];
   }
 
   function imageRole(img: RecordImage | null): 'L' | 'R' | null {
@@ -134,23 +141,25 @@
     return null;
   }
 
-  function flattenToGridItems(recs: Record[]): GridItem[] {
-    return recs.flatMap((record): GridItem[] => {
-      if (!record.images || record.images.length === 0) {
-        return [{ record, image: null, role: null, thumbnailUrl: null }];
-      }
-      // Izquierda primero, luego derecha, luego sin rol (id como desempate)
-      const sorted = [...record.images].sort((a, b) => {
-        const order = (r?: string | null) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
-        return order(a.role) - order(b.role) || a.id - b.id;
-      });
-      return sorted.map((img): GridItem => ({
-        record,
-        image: img,
-        role: imageRole(img),
-        thumbnailUrl: recordsApi.getImageThumbnailUrl(img.id),
-      }));
+  function gridItemsForRecord(record: Record): GridItem[] {
+    if (!record.images || record.images.length === 0) {
+      return [{ record, image: null, role: null, thumbnailUrl: null }];
+    }
+    // Izquierda primero, luego derecha, luego sin rol (id como desempate)
+    const sorted = [...record.images].sort((a, b) => {
+      const order = (r?: string | null) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
+      return order(a.role) - order(b.role) || a.id - b.id;
     });
+    return sorted.map((img): GridItem => ({
+      record,
+      image: img,
+      role: imageRole(img),
+      thumbnailUrl: recordsApi.getImageThumbnailUrl(img.id),
+    }));
+  }
+
+  function groupToGridItems(recs: Record[]): GridGroup[] {
+    return recs.map((record): GridGroup => ({ record, items: gridItemsForRecord(record) }));
   }
 
   // ---------------------------------------------------------------------------
@@ -334,25 +343,49 @@
       onfinalize={handleDndFinalize}
     >
       {#each localRecords as record, i (record.id)}
-        {@const thumbUrl = getThumbnailUrl(record)}
-        <div class="grid-card draggable" id="record-{record.id}">
-          <div class="drag-handle visible">
-            <span class="material-symbols-outlined icon-sm">drag_indicator</span>
+        {@const items = gridItemsForRecord(record)}
+
+        {#if items.length > 1}
+          <!-- NEH-211: el par L/R se arrastra como una sola unidad — el
+               rectángulo que lo enmarca en la vista normal es también el
+               único elemento draggable acá, no dos por separado. -->
+          <div class="grid-pair draggable" id="record-{record.id}">
+            <div class="reorder-handle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8">
+                <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
+                <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+              </svg>
+            </div>
+            <div class="pair-thumbs">
+              {#each items as item (item.image?.id ?? item.role)}
+                <div class="card-image-wrapper reorder">
+                  {@render thumbContent(item, record)}
+                </div>
+              {/each}
+            </div>
+            <div class="card-meta pair-meta">
+              <span class="card-name pair-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
+              <div class="card-status-row"><StatusBadge status={record.status} /></div>
+            </div>
           </div>
-          <div class="card-image-wrapper reorder">
-            {#if thumbUrl}
-              <img src={thumbUrl} alt={record.title} class="card-image" draggable="false" />
-            {:else}
-              <div class="card-placeholder">
-                <span class="material-symbols-outlined icon-md">image</span>
-              </div>
-            {/if}
+        {:else}
+          {@const item = items[0]}
+          <div class="grid-card draggable" id="record-{record.id}">
+            <div class="reorder-handle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8">
+                <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
+                <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+              </svg>
+            </div>
+            <div class="card-image-wrapper reorder">
+              {@render thumbContent(item, record)}
+            </div>
+            <div class="card-meta">
+              <span class="card-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
+              <div class="card-status-row"><StatusBadge status={record.status} /></div>
+            </div>
           </div>
-          <div class="card-meta">
-            <span class="card-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
-            <div class="card-status-row"><StatusBadge status={record.status} /></div>
-          </div>
-        </div>
+        {/if}
       {/each}
     </div>
   {:else}
@@ -361,55 +394,68 @@
     class:reorder-mode={isReorderMode}
     style="--grid-cols: {columns}"
   >
-    {#each flattenToGridItems(records.filter(r => !activeStatusFilter || r.status === activeStatusFilter)) as item, i (item.record.id + '-' + (item.image?.id ?? 'none'))}
-      {@const record = item.record}
+    {#each groupToGridItems(records.filter(r => !activeStatusFilter || r.status === activeStatusFilter)) as group, i (group.record.id)}
+      {@const record = group.record}
 
-      <div
-        class="grid-card"
-        class:draggable={isReorderMode}
-      >
-
-        {#if isReorderMode}
-          <div class="reorder-handle">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8">
-              <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
-              <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
-            </svg>
+      {#if group.items.length > 1}
+        <!-- NEH-211: par L/R envuelto en un único contenedor rectangular -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="grid-pair" onclick={() => onRecordClick(record)} role="button" tabindex="0">
+          <div class="pair-thumbs">
+            {#each group.items as item (item.image?.id ?? item.role)}
+              <div class="card-image-wrapper">
+                {@render thumbContent(item, record)}
+              </div>
+            {/each}
           </div>
-        {/if}
 
-        <div class="card-image-wrapper" class:reorder={isReorderMode}>
-          {#if item.thumbnailUrl}
-            <img src={item.thumbnailUrl} alt={record.title} class="card-image" draggable="false" />
-          {:else}
-            <div class="card-placeholder">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
+          <div class="card-meta pair-meta">
+            <span class="card-name pair-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
+            <div class="card-status-row">
+              <StatusBadge status={record.status} />
             </div>
-          {/if}
-
-          <!-- Badge L/R — solo si el registro tiene captura doble -->
-          {#if item.role}
-            <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
-          {/if}
-        </div>
-
-        <div class="card-meta">
-          <span class="card-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
-          <div class="card-status-row">
-            <StatusBadge status={record.status} />
           </div>
         </div>
+      {:else}
+        {@const item = group.items[0]}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="grid-card" onclick={() => onRecordClick(record)} role="button" tabindex="0">
+          <div class="card-image-wrapper">
+            {@render thumbContent(item, record)}
+          </div>
 
-      </div>
+          <div class="card-meta">
+            <span class="card-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
+            <div class="card-status-row">
+              <StatusBadge status={record.status} />
+            </div>
+          </div>
+        </div>
+      {/if}
     {/each}
   </div>
   {/if}
 
 </div>
+
+{#snippet thumbContent(item: GridItem, record: Record)}
+  {#if item.thumbnailUrl}
+    <img src={item.thumbnailUrl} alt="{record.title}{item.role ? ' ' + item.role : ''}" class="card-image" draggable="false" />
+  {:else}
+    <div class="card-placeholder">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+    </div>
+  {/if}
+
+  <!-- Badge L/R — solo si el registro tiene captura doble -->
+  {#if item.role}
+    <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
+  {/if}
+{/snippet}
 
 <!-- ============================================================
      MODAL: Renumerar
@@ -604,11 +650,16 @@
 
   /* ── Grid ── */
   .image-grid {
+    /* Compartida con .pair-thumbs (NEH-211): el gap interno del par debe
+       ser idéntico al gap del grid para que cada miniatura L/R mida
+       exactamente lo mismo que una miniatura de documento simple —
+       ver comentario en .grid-pair más abajo. */
+    --grid-gap: 16px;
     flex: 1;
     overflow-y: auto;
     padding: 16px 20px;
     display: grid;
-    gap: 16px;
+    gap: var(--grid-gap);
     align-content: start;
   }
 
@@ -633,8 +684,7 @@
 
   .reorder-handle {
     position: absolute;
-    top: -12px; left: 50%;
-    transform: translateX(-50%);
+    top: 8px; left: 8px;
     width: 28px; height: 28px;
     background-color: var(--color-primary);
     border-radius: 50%;
@@ -661,6 +711,64 @@
   .grid-card:not(.draggable):hover .card-image { transform: scale(1.04); }
 
   .card-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--color-light-grey); opacity: 0.3; }
+
+  /* ── Par L/R (NEH-211) ──
+     El wrapper ocupa 2 columnas reales del grid (grid-column: span 2), no
+     una sola comprimida. Adentro, .pair-thumbs reparte ese ancho en dos
+     .card-image-wrapper con el MISMO gap que usa .image-grid
+     (var(--grid-gap)) y sin padding/border propios — border-box con
+     padding o border restaría ancho y volvería a achicar las miniaturas
+     (ver bug anterior). Álgebra: ancho del wrapper = 2·col + gap; al
+     partirlo en dos con ese mismo gap en el medio, cada mitad da
+     exactamente `col` — igual que una miniatura de documento simple.
+     El marco combina un `outline` fino (no `border`: un outline no
+     participa en el box model/layout, así que no resta ancho) con un
+     relleno verde transparente detrás de las miniaturas. Ese relleno es
+     un ::before absolutamente posicionado (tampoco participa en el layout
+     del flex) que se extiende un poco más allá de .pair-thumbs con
+     `inset` negativo — al no llevar z-index compite en el mismo nivel de
+     stacking que .card-image-wrapper y, por ir primero en el DOM, queda
+     atrás sin necesidad de tocarlo. */
+  .grid-pair {
+    grid-column: span 2;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    transition: transform var(--transition-base);
+    cursor: pointer;
+  }
+
+  .grid-pair:not(.draggable):hover { transform: translateY(-3px); }
+  .grid-pair.draggable { transform: scale(1.01); cursor: grab; }
+  .grid-pair.draggable:hover { transform: scale(1.02); }
+
+  .pair-thumbs {
+    position: relative;
+    display: flex;
+    gap: var(--grid-gap);
+    border-radius: var(--radius-md);
+    outline: 1px solid var(--color-primary);
+    outline-offset: 3px;
+  }
+
+  .pair-thumbs::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: var(--radius-md);
+    background-color: rgba(90, 140, 98, 0.16);
+    pointer-events: none;
+  }
+
+  /* Reutiliza .card-image-wrapper (mismo aspect-ratio/border/radius que un
+     documento simple) — flex:1 1 0 reparte el ancho 50/50 dentro del par. */
+  .pair-thumbs .card-image-wrapper {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .pair-meta { text-align: center; }
+  .pair-name { text-align: center; }
 
   /* Badge L/R — mismo estilo que ThumbnailStrip.svelte (misma carpeta). */
   .role-badge {
