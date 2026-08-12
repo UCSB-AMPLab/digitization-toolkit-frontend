@@ -34,7 +34,7 @@
   import { m } from '$lib/i18n';
   import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
-  import { camerasApi, type CameraDevice } from '$lib/api';
+  import { camerasApi, tokenStore, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
@@ -228,8 +228,7 @@
 
   // ── Helper: cabecera de autenticación ──────────────────────────────────────
   function getAuthHeader(): HeadersInit {
-    if (!browser) return {};
-    const token = localStorage.getItem('access_token');
+    const token = tokenStore.get();
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 

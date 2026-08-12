@@ -18,7 +18,7 @@
   import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError } from '$lib/api';
+  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore } from '$lib/api';
   import { m } from '$lib/i18n';
 
   // ---------------------------------------------------------------------------
@@ -172,8 +172,7 @@
   }
 
   function getAuthHeader(): HeadersInit {
-    if (!browser) return {};
-    const token = localStorage.getItem('access_token');
+    const token = tokenStore.get();
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
