@@ -72,6 +72,13 @@
       day: '2-digit', month: '2-digit', year: 'numeric',
     });
   }
+
+  function handleRowKeydown(event: KeyboardEvent, record: Record): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onRecordClick(record);
+    }
+  }
 </script>
 
 <!-- ============================================================
@@ -108,11 +115,11 @@
     {#each localRecords as record, i (record.id)}
       {@const imgs = sortedImages(record)}
 
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
         class="list-row"
         class:alt={i % 2 !== 0}
         onclick={() => onRecordClick(record)}
+        onkeydown={(event) => handleRowKeydown(event, record)}
         role="button"
         tabindex="0"
       >
