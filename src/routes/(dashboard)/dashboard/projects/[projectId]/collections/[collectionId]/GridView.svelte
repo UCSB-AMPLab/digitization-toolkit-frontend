@@ -158,7 +158,7 @@
     }));
   }
 
-  function groupToGridItems(recs: Record[]): GridGroup[] {
+  function recordsToGridGroups(recs: Record[]): GridGroup[] {
     return recs.map((record): GridGroup => ({ record, items: gridItemsForRecord(record) }));
   }
 
@@ -394,7 +394,7 @@
     class:reorder-mode={isReorderMode}
     style="--grid-cols: {columns}"
   >
-    {#each groupToGridItems(records.filter(r => !activeStatusFilter || r.status === activeStatusFilter)) as group, i (group.record.id)}
+    {#each recordsToGridGroups(records.filter(r => !activeStatusFilter || r.status === activeStatusFilter)) as group, i (group.record.id)}
       {@const record = group.record}
 
       {#if group.items.length > 1}
