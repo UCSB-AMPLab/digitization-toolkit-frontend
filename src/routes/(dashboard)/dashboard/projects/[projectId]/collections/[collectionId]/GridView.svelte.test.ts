@@ -39,7 +39,7 @@ function makePairRecord(overrides: Partial<ApiRecord> = {}): ApiRecord {
 		id: 2,
 		title: 'Document demo 1',
 		status: 'in_review',
-		capture_mode: 'double',
+		capture_mode: 'dual',
 		images: [
 			{
 				id: 20,
