@@ -8,6 +8,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
+import { tokenStore } from './token';
 
 // ----------------------------------------------------------------------------
 // TIPOS
@@ -55,8 +56,9 @@ interface AuthState {
 // Al iniciar, intenta recuperar el token guardado en localStorage
 // Si existe, la app asume que hay sesión (se verificará con el backend)
 const initialState: AuthState = {
-  // Solo accede a localStorage en el browser (no en SSR)
-  token: browser ? localStorage.getItem('access_token') : null,
+  // El token viene de tokenStore (stores/token.ts) — única fuente de verdad,
+  // también la que usa apiRequest() en api.ts para cada request.
+  token: tokenStore.get(),
   user: browser ? (() => { try { const u = localStorage.getItem('auth_user'); return u ? JSON.parse(u) : null; } catch { return null; } })() : null,
   isLoading: false,
 };
@@ -73,10 +75,11 @@ function createAuthStore() {
 
     // ── Guarda el token y los datos del usuario tras login exitoso ─────────
     setSession(token: string, user: AuthUser) {
-      // Persiste el token en localStorage para que sobreviva recargas
+      // El token se persiste vía tokenStore (única fuente de verdad); el
+      // usuario es responsabilidad exclusiva de este store.
+      tokenStore.set(token);
       if (browser) {
-        localStorage.setItem('access_token', token);
-      localStorage.setItem('auth_user', JSON.stringify(user));
+        localStorage.setItem('auth_user', JSON.stringify(user));
       }
       update(state => ({
         ...state,
@@ -86,11 +89,18 @@ function createAuthStore() {
       }));
     },
 
+    // ── Actualiza solo el token (ej: tras /auth/refresh) sin tocar al
+    //    usuario, que no cambia en un refresh ──────────────────────────────
+    updateToken(token: string) {
+      tokenStore.set(token);
+      update(state => ({ ...state, token }));
+    },
+
     // ── Limpia la sesión al hacer logout ──────────────────────────────────
     clearSession() {
+      tokenStore.clear();
       if (browser) {
-        localStorage.removeItem('access_token');
-      localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_user');
       }
       set({
         user: null,

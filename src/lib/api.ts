@@ -4,6 +4,12 @@ import { env } from '$env/dynamic/public';
 import { get } from 'svelte/store';
 import { m } from './i18n';
 import { authStore } from './stores/auth';
+import { tokenStore } from './stores/token';
+
+// Re-exportado por compatibilidad — el resto de la app importa tokenStore
+// desde acá (ver login/+page.svelte). La implementación vive en
+// stores/token.ts, la única fuente de verdad del access token (NEH-41).
+export { tokenStore };
 
 /**
  * Centralized API client for Digitization Toolkit
@@ -19,24 +25,6 @@ function getApiBase(): string {
     ? (env.PUBLIC_API_BASE || fallback)
     : (env.PUBLIC_API_BASE_SSR || env.PUBLIC_API_BASE || fallback);
 }
-
-// Token management
-export const tokenStore = {
-  get: (): string | null => {
-    if (!browser) return null;
-    return localStorage.getItem('access_token');
-  },
-  set: (token: string) => {
-    if (browser) {
-      localStorage.setItem('access_token', token);
-    }
-  },
-  clear: () => {
-    if (browser) {
-      localStorage.removeItem('access_token');
-    }
-  }
-};
 
 // Thrown for 401/403 responses so callers that care can distinguish an
 // auth failure from any other API error (most existing catch blocks just
@@ -209,20 +197,16 @@ export const authApi = {
   },
 
   /**
-   * Logout (clear local token)
-   */
-  logout(): void {
-    tokenStore.clear();
-  },
-
-  /**
-   * Refresh authentication token
+   * Refresh authentication token. Routes through authStore.updateToken()
+   * (not tokenStore directly) so the reactive session state — and anything
+   * derived from it — stays in sync with the new token (NEH-41: the old
+   * version wrote only tokenStore, silently diverging from authStore).
    */
   async refreshToken(): Promise<AuthResponse> {
     const response = await apiRequest<AuthResponse>('/auth/refresh', {
       method: 'POST'
     });
-    tokenStore.set(response.access_token);
+    authStore.updateToken(response.access_token);
     return response;
   },
 
