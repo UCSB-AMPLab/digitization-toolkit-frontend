@@ -173,8 +173,9 @@
   // BagIt export
   let showExportModal = $state(false);
   let isExporting     = $state(false);
-  let exportResult    = $state<{ bag_name: string; zip_filename: string; size_bytes: number; download_url: string } | null>(null);
+  let exportResult    = $state<{ zip_filename: string } | null>(null);
   let exportError     = $state<string | null>(null);
+  let exportProgress  = $state<{ done: number; total: number } | null>(null);
   // Registros que impiden exportar (aún no aprobados)
   let showBlockersModal = $state(false);
   let blockingRecords   = $derived(records.filter(r => r.status !== 'approved'));
@@ -191,9 +192,24 @@
     isExporting = true;
     exportResult = null;
     exportError = null;
+    exportProgress = null;
     try {
-      const result = await collectionsApi.exportBagit(collectionId);
-      exportResult = result;
+      // Export runs as a background job on the appliance
+      const { job_id } = await collectionsApi.exportBagit(collectionId);
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        await new Promise((r) => setTimeout(r, 700));
+        const st = await collectionsApi.getExportStatus(collectionId, job_id);
+        exportProgress = { done: st.done, total: st.total };
+        if (st.state === 'done' && st.zip_filename) {
+          exportResult = { zip_filename: st.zip_filename };
+          break;
+        }
+        if (st.state === 'failed') {
+          exportError = st.error ?? $m.col_err_export;
+          break;
+        }
+      }
     } catch (err: any) {
       // El cliente pre-valida canExport contra el estado local de records,
       // pero ese estado puede quedar desactualizado (otro operador aprobó/
@@ -377,12 +393,17 @@
       {#if isExporting}
         <div class="spinner"></div>
         <h3 class="export-modal-title">{$m.col_export_generating}</h3>
-        <p class="export-modal-subtitle">{$m.col_export_copying}</p>
+        <p class="export-modal-subtitle">
+          {#if exportProgress && exportProgress.total > 0}
+            {exportProgress.done} / {exportProgress.total}
+          {:else}
+            {$m.col_export_copying}
+          {/if}
+        </p>
       {:else if exportResult}
         <span class="material-symbols-outlined icon-lg export-success-icon">check_circle</span>
         <h3 class="export-modal-title">{$m.col_export_done}</h3>
         <p class="export-modal-subtitle">{exportResult.zip_filename}</p>
-        <p class="export-modal-subtitle">{(exportResult.size_bytes / 1024 / 1024).toFixed(1)} MB</p>
         <div class="export-modal-actions">
           <a href={collectionsApi.getExportDownloadUrl(collectionId)} download class="btn-primary">
             <span class="material-symbols-outlined icon-sm">download</span>
