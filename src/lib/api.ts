@@ -562,12 +562,27 @@ export const collectionsApi = {
    * Returns metadata about the generated zip including a download_url.
    */
   async exportBagit(collectionId: number): Promise<{
-    bag_name: string;
-    zip_filename: string;
-    size_bytes: number;
-    download_url: string;
+    job_id: string;
+    state: string;
+    status_url: string;
   }> {
     return apiRequest(`/collections/${collectionId}/export`, { method: 'POST' });
+  },
+
+  /**
+   * Poll the state or progress of a background export job.
+   */
+  async getExportStatus(collectionId: number, jobId: string): Promise<{
+    job_id: string;
+    state: 'queued' | 'running' | 'done' | 'failed';
+    done: number;
+    total: number;
+    zip_filename: string | null;
+    error: string | null;
+    detail: unknown;
+    download_url?: string;
+  }> {
+    return apiRequest(`/collections/${collectionId}/export/status/${jobId}`);
   },
 
   /**
