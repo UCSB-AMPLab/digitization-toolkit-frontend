@@ -160,7 +160,9 @@
   let exportProgress  = $state<{ done: number; total: number } | null>(null);
   // Registros que impiden exportar (aún no aprobados)
   let showBlockersModal = $state(false);
-  let blockingRecords   = $derived(records.filter(r => r.status !== 'approved'));
+
+  const hasCurrentImage = (r: Record) => (r.images ?? []).some((i) => i.is_current);
+  let blockingRecords   = $derived(records.filter(r => r.status !== 'approved' || !hasCurrentImage(r)));
 
   // Selector Exportar/Descargar + descarga de imágenes (ZIP) en el navegador
   let showChooserModal = $state(false);
@@ -255,7 +257,7 @@
   // ---------------------------------------------------------------------------
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
-  let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved'));
+  let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved' && hasCurrentImage(r)));
 </script>
 
 <!-- ============================================================
