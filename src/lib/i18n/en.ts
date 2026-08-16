@@ -118,6 +118,7 @@ export const en: Messages = {
 	config_storage_device: 'Storage drive',
 	config_storage_device_desc: 'Connect a USB drive or SD card as additional storage',
 	config_external_active_pre: 'Using external storage. New images are saved to ',
+	config_storage_override_invalid: 'The external storage setting was invalid and could not be read; using internal storage.',
 	config_restore_progress: 'Restoring…',
 	config_restore_default: 'Restore default',
 	config_experimental_lead: 'Experimental feature.',

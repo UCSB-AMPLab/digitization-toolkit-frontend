@@ -1233,6 +1233,7 @@ export interface SystemLogEntry {
 export interface StorageInfo {
   projects_path: string;
   is_override:   boolean;
+  override_invalid?: boolean;
   total_bytes:   number;
   used_bytes:    number;
   free_bytes:    number;

@@ -131,6 +131,7 @@ export const es = {
 	config_storage_device: 'Unidad de almacenamiento',
 	config_storage_device_desc: 'Conectar un disco USB o tarjeta SD como almacenamiento adicional',
 	config_external_active_pre: 'Usando almacenamiento externo. Las imágenes nuevas se guardan en ',
+	config_storage_override_invalid: 'La configuración de almacenamiento externo no era válida y no se pudo leer; usando almacenamiento interno.',
 	config_restore_progress: 'Restaurando…',
 	config_restore_default: 'Restaurar predeterminado',
 	config_experimental_lead: 'Función experimental.',

@@ -426,6 +426,17 @@
         <span class="row-value muted">{storagePrimaryPath}</span>
       </div>
 
+      {#if storageInfo?.override_invalid}
+        <div class="storage-override-banner storage-override-warning">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span>{$m.config_storage_override_invalid}</span>
+        </div>
+      {/if}
+
       <div class="section-divider"></div>
 
       <!-- ── Selector de unidad externa (expandible) ── -->
@@ -994,6 +1005,13 @@
   }
   .storage-override-banner span { flex: 1; line-height: 1.4; }
   .storage-override-banner strong { font-weight: var(--fw-semibold); }
+
+  .storage-override-warning {
+    margin-top: 10px;
+    background-color: rgba(200,140,60,0.12);
+    border-color: rgba(200,140,60,0.4);
+    color: var(--color-warning, #b5731f);
+  }
 
   .storage-override-badge {
     display: inline-block;
