@@ -49,6 +49,20 @@
   }
 
   // ---------------------------------------------------------------------------
+  // MODO REORDENAR (NEH-137)
+  // ---------------------------------------------------------------------------
+  // Dragging used to be live at all times here, unlike GridView. On the touch
+  // kiosk the gesture for scrolling the list IS the drag gesture, so an
+  // operator scrolling could silently renumber the pages of a volume — and
+  // record order is the archival page order. Reordering now requires entering
+  // an explicit mode, mirroring GridView.
+  let isReorderMode = $state(false);
+
+  function toggleReorderMode() {
+    isReorderMode = !isReorderMode;
+  }
+
+  // ---------------------------------------------------------------------------
   // HELPERS
   // ---------------------------------------------------------------------------
 
@@ -90,6 +104,21 @@
     </div>
 
   {:else}
+    <!-- Barra: solo el modo reordenar. A diferencia de GridView no hay
+         filtros que desactivar aquí, así que no se replica esa parte. -->
+    <div class="list-toolbar">
+      <div class="reorder-group">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          style="color: {isReorderMode ? 'var(--color-primary)' : 'var(--color-light-grey)'}; flex-shrink:0">
+          <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
+          <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+        </svg>
+        <button class="reorder-btn" class:active={isReorderMode} onclick={toggleReorderMode}>
+          {isReorderMode ? $m.col_reorder_done : $m.col_reorder}
+        </button>
+      </div>
+    </div>
+
     <!-- Cabecera de tabla -->
     <div class="list-header">
       <span class="col-thumb">{$m.col_col_images}</span>
@@ -101,7 +130,13 @@
 
     <!-- Filas con DnD -->
     <div
-      use:dndzone={{ items: localRecords, dragDisabled: false }}
+      use:dndzone={{
+        items: localRecords,
+        dragDisabled: !isReorderMode,
+        // Inside reorder mode a plain touch-scroll must still scroll: the drag
+        // only starts if the finger is held down first.
+        delayTouchStart: 200
+      }}
       onconsider={handleDndConsider}
       onfinalize={handleDndFinalize}
     >
@@ -189,6 +224,31 @@
     opacity: 0.4;
     padding: 80px 0;
   }
+
+  /* Barra del modo reordenar — mismos estilos que GridView (NEH-137) */
+  .list-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .reorder-group { display: flex; align-items: center; gap: 10px; }
+
+  .reorder-btn {
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+    color: var(--color-light-grey);
+    background: none; border: none;
+    cursor: pointer; padding: 4px 0;
+    transition: color var(--transition-fast);
+    white-space: nowrap; min-height: 0;
+  }
+
+  .reorder-btn:hover { color: var(--color-light); }
+  .reorder-btn.active { color: var(--color-primary); }
 
   /* Cabecera */
   .list-header {
