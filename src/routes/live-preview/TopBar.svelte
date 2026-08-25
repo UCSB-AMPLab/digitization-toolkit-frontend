@@ -5,14 +5,19 @@
   //
   // Barra superior de la interfaz Live Preview / Gallery.
   // Contiene:
-  //   - Botón volver (izquierda)
-  //   - Tabs "Live Scan" / "Gallery" (centro)
-  //   - Badge de estado + avatar de usuario (derecha)
+  //   - Botón volver + breadcrumb proyecto / volumen (izquierda)
+  //   - Avatar de usuario (derecha)
+  //
+  // El breadcrumb replica el de la vista de colección a propósito: al entrar a
+  // capturar, el operador no debe perder de vista dónde se están guardando las
+  // imágenes.
   //
   // Props:
   //   activeTab       → tab activo ('live' | 'gallery')
   //   onTabChange     → callback al cambiar de tab
   //   onBack          → callback al hacer click en volver
+  //   projectName     → nombre del proyecto ('' mientras carga)
+  //   collectionName  → nombre del volumen ('' mientras carga)
   // ============================================================================
 
   import { authStore } from '$lib/stores/auth';
@@ -25,10 +30,14 @@
     activeTab,
     onTabChange,
     onBack,
+    projectName = '',
+    collectionName = '',
   }: {
     activeTab: 'live' | 'gallery';
     onTabChange: (tab: 'live' | 'gallery') => void;
     onBack: () => void;
+    projectName?: string;
+    collectionName?: string;
   } = $props();
 
   // ---------------------------------------------------------------------------
@@ -57,16 +66,25 @@
         <path d="M19 12H5M12 5l-7 7 7 7"/>
       </svg>
     </button>
+
+    <!-- Breadcrumb: dónde se están guardando las capturas -->
+    {#if projectName || collectionName}
+      <nav class="breadcrumb" aria-label={$m.tb_breadcrumb_nav}>
+        {#if projectName}
+          <span class="bc-item bc-project">{projectName}</span>
+        {/if}
+        {#if projectName && collectionName}
+          <span class="bc-item bc-sep" aria-hidden="true">/</span>
+        {/if}
+        {#if collectionName}
+          <span class="bc-item bc-collection">{collectionName}</span>
+        {/if}
+      </nav>
+    {/if}
   </div>
 
-  <!-- ── Lado derecho: badge de estado + avatar ── -->
+  <!-- ── Lado derecho: avatar ── -->
   <div class="topbar-right">
-    <!-- Badge "In Review" — estilo sand/naranja del design system -->
-    <!-- Para cambiar el texto o el color, modifica aquí -->
-    <div class="status-badge">
-      {$m.status_in_review}
-    </div>
-
     <!-- Avatar circular con iniciales del usuario -->
     <!-- El color verde viene del design system (--color-primary) -->
     <div class="user-avatar" aria-label={$m.tb_current_user}>
@@ -102,8 +120,14 @@
     min-width: 120px;
   }
 
+  .topbar-left {
+    min-width: 0;
+    flex: 1;
+  }
+
   .topbar-right {
     justify-content: flex-end;
+    flex-shrink: 0;
   }
 
   /* Botón circular (volver) */
@@ -169,16 +193,24 @@
     color: var(--color-light);
   }
 
-  /* ── Badge de estado ── */
-  .status-badge {
-    padding: 6px 16px;
-    border-radius: var(--radius-full);
-    background-color: var(--color-highlight);  /* sand/naranja del design system */
-    color: var(--color-light);
-    font-family: var(--font-family);
+  /* ── Breadcrumb: mismos valores que la vista de colección ── */
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 13px;
-    font-weight: var(--fw-bold);
+    min-width: 0;
+  }
+  .bc-item {
+    color: var(--color-light-grey);
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .bc-sep { flex-shrink: 0; }
+  .bc-collection {
+    color: var(--color-light);
+    font-weight: var(--fw-bold);
   }
 
   /* ── Avatar del usuario ── */

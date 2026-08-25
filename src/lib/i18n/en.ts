@@ -606,6 +606,7 @@ export const en: Messages = {
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',
 	lv_thumb_empty: 'No captures yet — use the capture button',
+	tb_breadcrumb_nav: 'Current project and volume',
 	tb_back: 'Back',
 	tb_current_user: 'Current user',
 	lvm_retake: 'Retake',
