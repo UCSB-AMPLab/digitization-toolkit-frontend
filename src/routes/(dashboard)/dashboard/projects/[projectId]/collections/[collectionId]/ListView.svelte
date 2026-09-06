@@ -11,6 +11,7 @@
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
+  import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
   // @ts-ignore — installed in Docker, not locally
   import { dndzone } from 'svelte-dnd-action';
 
@@ -117,6 +118,9 @@
           {isReorderMode ? $m.col_reorder_done : $m.col_reorder}
         </button>
       </div>
+
+      <!-- Conteo por estado, en la misma fila -->
+      <RecordStatusBar {records} variant="inline" />
     </div>
 
     <!-- Cabecera de tabla -->
@@ -229,7 +233,8 @@
   .list-toolbar {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    gap: 16px;
+    justify-content: space-between;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border-color);
   }
