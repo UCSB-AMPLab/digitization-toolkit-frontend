@@ -266,7 +266,10 @@
      ============================================================ -->
 <div class="gallery-wrapper">
 
-  <RecordStatusBar {records} />
+  <!-- En lista la leyenda vive dentro de la barra de Reordenar, no aparte -->
+  {#if viewMode !== 'list'}
+    <RecordStatusBar {records} />
+  {/if}
 
   <div class="content-area">
 

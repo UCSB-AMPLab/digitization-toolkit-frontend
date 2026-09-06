@@ -2,7 +2,12 @@
   import type { Record as ApiRecord } from '$lib/api';
   import { m } from '$lib/i18n';
 
-  let { records }: { records: ApiRecord[] } = $props();
+  // variant 'bar'    → leyenda en su propia franja (grid y vista de libro)
+  // variant 'inline'  → sólo la leyenda, para meterla en una barra existente
+  let { records, variant = 'bar' }: {
+    records: ApiRecord[];
+    variant?: 'bar' | 'inline';
+  } = $props();
 
   const statusKeys = ['in_review', 'rejected', 'approved'] as const;
   type S = ApiRecord['status'];
@@ -13,6 +18,11 @@
     approved:  $m.status_approved_plural,
   });
 
+  // Total de registros del volumen: acompaña a cada conteo para que el número
+  // se lea como proporción. Es la información que antes daba la barra de
+  // segmentos, ahora en texto.
+  let total = $derived(records.length);
+
   let counts = $derived(
     statusKeys.reduce((acc, s) => {
       acc[s] = records.filter(r => r.status === s).length;
@@ -20,26 +30,15 @@
     }, {} as { [K in S]: number })
   );
 
-  let total = $derived(records.length || 1); // avoid div by 0
 </script>
 
-<div class="status-bar-wrapper">
-  <div class="status-bar-track">
-    {#each statusKeys as s}
-      {#if counts[s] > 0}
-        <div
-          class="status-bar-segment seg-{s}"
-          style="--seg-width: {(counts[s] / total * 100).toFixed(1)}%"
-        ></div>
-      {/if}
-    {/each}
-  </div>
+<div class="status-bar-wrapper" class:inline={variant === 'inline'}>
   <div class="status-bar-legend">
     {#each statusKeys as s}
       {#if counts[s] > 0}
         <div class="status-bar-item">
           <div class="status-bar-dot seg-{s}"></div>
-          <span>{labels[s]}: {counts[s]}</span>
+          <span>{labels[s]}: {counts[s]} / {total}</span>
         </div>
       {/if}
     {/each}
@@ -48,3 +47,13 @@
     {/if}
   </div>
 </div>
+
+<style>
+  /* En variante inline el componente no aporta caja propia: hereda la
+     alineación de la barra que lo contiene. */
+  .status-bar-wrapper.inline {
+    padding: 0;
+    border: none;
+    background: none;
+  }
+</style>

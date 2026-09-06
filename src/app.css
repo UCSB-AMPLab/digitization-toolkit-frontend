@@ -1225,25 +1225,6 @@ canvas, button, a, div {
   flex-shrink: 0;
 }
 
-.status-bar-track {
-  flex: 1;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background-color: var(--border-color);
-  display: flex;
-  overflow: hidden;
-}
-
-.status-bar-segment {
-  height: 100%;
-  width: var(--seg-width, 0%);
-  transition: width 0.3s ease;
-}
-
-.status-bar-segment.seg-in_review { background-color: var(--color-warning); }
-.status-bar-segment.seg-rejected  { background-color: var(--color-error); }
-.status-bar-segment.seg-approved  { background-color: var(--color-success); }
-
 .status-bar-legend {
   display: flex;
   align-items: center;
