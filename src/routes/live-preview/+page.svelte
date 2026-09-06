@@ -20,7 +20,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, recordsApi, projectsApi, type Record as ApiRecord, type CameraDevice } from '$lib/api';
+  import { camerasApi, recordsApi, projectsApi, collectionsApi, type Record as ApiRecord, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { m } from '$lib/i18n';
 
@@ -73,6 +73,11 @@
   // Nombre real del proyecto (cargado desde la API al montar)
   let projectName = $state<string>('');
 
+  // Nombre del volumen. La barra superior lo muestra junto al proyecto: sin
+  // esto, quien captura no tiene en pantalla nada que le diga en qué volumen
+  // está guardando, y un volumen equivocado sólo se descubre después.
+  let collectionName = $state<string>('');
+
   // Lista de registros/imágenes capturadas en esta colección
   let records = $state<ApiRecord[]>([]);
   let selectedRecordId = $state<number | null>(null);
@@ -109,6 +114,11 @@
 
     if (collectionId) {
       tasks.push(loadRecords());
+      tasks.push(
+        collectionsApi.get(collectionId)
+          .then(c => { collectionName = c.name; })
+          .catch(e => console.error('[LivePreview] Error cargando volumen:', e))
+      );
     }
 
     await Promise.all(tasks);
@@ -242,6 +252,8 @@
   <!-- ── Barra superior con tabs Live Scan / Gallery ── -->
   <TopBar
     {activeTab}
+    {projectName}
+    {collectionName}
     onTabChange={handleTabChange}
     onBack={handleBack}
   />
