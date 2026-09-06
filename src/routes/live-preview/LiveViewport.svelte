@@ -95,6 +95,11 @@
   let showGuides = $state(true);
   let showGridModal = $state(false);
 
+  // Panel de controles plegable. Abierto por defecto; plegado devuelve al feed
+  // el espacio que el panel le quita. El botón de plegar es siempre visible:
+  // en la pantalla táctil del Pi no hay hover que pueda revelarlo.
+  let controlsOpen = $state(true);
+
   // Estado de la captura
   let isCapturing = $state(false);
   let captureFlash = $state(false);
@@ -677,42 +682,60 @@
     </div><!-- /camera-viewport -->
 
     <!-- ── PANEL FLOTANTE: zoom + grilla ── -->
-    <div class="floating-controls">
-      <button class="float-btn" onclick={zoomIn} aria-label={$m.lv_zoom_in}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+    <div class="floating-controls" class:collapsed={!controlsOpen}>
+      <button
+        class="float-btn float-btn-toggle"
+        onclick={() => controlsOpen = !controlsOpen}
+        aria-expanded={controlsOpen}
+        aria-label={controlsOpen ? $m.lv_controls_collapse : $m.lv_controls_expand}
+        title={controlsOpen ? $m.lv_controls_collapse : $m.lv_controls_expand}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          {#if controlsOpen}
+            <path d="M9 18l6-6-6-6"/>
+          {:else}
+            <path d="M15 18l-6-6 6-6"/>
+          {/if}
         </svg>
       </button>
-      <button class="float-btn" onclick={zoomOut} aria-label={$m.lv_zoom_out}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          <line x1="8" y1="11" x2="14" y2="11"/>
-        </svg>
-      </button>
-      <button class="float-btn" onclick={resetZoom} aria-label={$m.col_fit_screen_aria}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-        </svg>
-      </button>
-      <div class="float-divider"></div>
-      <button class="float-btn" onclick={() => showGridModal = true} aria-label={$m.lv_grid_settings}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-        </svg>
-      </button>
-      {#if cameraMode === 'double'}
+      {#if controlsOpen}
         <div class="float-divider"></div>
-        <button
-          class="float-btn"
-          class:float-btn-active={swapped}
-          onclick={() => swapped = !swapped}
-          aria-label={$m.lv_swap_orientation}
-          title={swapped ? $m.lv_orientation_swapped : $m.lv_orientation_normal}
-        >
-          <span class="material-symbols-outlined" style="font-size:18px">sync</span>
+        <button class="float-btn" onclick={zoomIn} aria-label={$m.lv_zoom_in}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+          </svg>
         </button>
+        <button class="float-btn" onclick={zoomOut} aria-label={$m.lv_zoom_out}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="8" y1="11" x2="14" y2="11"/>
+          </svg>
+        </button>
+        <button class="float-btn" onclick={resetZoom} aria-label={$m.col_fit_screen_aria}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          </svg>
+        </button>
+        <div class="float-divider"></div>
+        <button class="float-btn" onclick={() => showGridModal = true} aria-label={$m.lv_grid_settings}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          </svg>
+        </button>
+        {#if cameraMode === 'double'}
+          <div class="float-divider"></div>
+          <button
+            class="float-btn"
+            class:float-btn-active={swapped}
+            onclick={() => swapped = !swapped}
+            aria-label={$m.lv_swap_orientation}
+            title={swapped ? $m.lv_orientation_swapped : $m.lv_orientation_normal}
+          >
+            <span class="material-symbols-outlined" style="font-size:22px">sync</span>
+          </button>
+        {/if}
       {/if}
     </div>
 
@@ -941,8 +964,8 @@
     backdrop-filter: blur(2px);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 4px;
-    padding: 2px 6px;
-    font-size: 9px;
+    padding: 4px 10px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--color-light);
     pointer-events: none;
@@ -1036,12 +1059,20 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    width: 54px;
+    width: 76px;
     align-items: center;
+    transition: width var(--transition-base);
   }
 
+  /* Plegado: solo el botón de alternar, para devolverle el área al feed */
+  .floating-controls.collapsed {
+    background-color: rgba(26,24,21,0.6);
+  }
+
+  .float-btn-toggle { color: var(--color-light); }
+
   .float-btn {
-    width: 38px; height: 38px;
+    width: 64px; height: 64px;
     display: flex;
     align-items: center;
     justify-content: center;
