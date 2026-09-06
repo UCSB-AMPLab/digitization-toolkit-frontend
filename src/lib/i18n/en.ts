@@ -549,6 +549,7 @@ export const en: Messages = {
 	cam_dslr_note_p1: 'Set the lens barrel switch to ',
 	cam_dslr_note_p2: ' before capturing.',
 	cam_dslr_note_p3: 'AF causes ~12 s PTP hangs on Canon DSLRs.',
+	cam_dslr_af_warning: (mode: string) => `Lens reports ${mode}. Captures can hang until the lens switch is on MF.`,
 	cam_wb: 'White Balance',
 	cam_wb_calibrate_aria: 'Calibrate white balance automatically (AWB convergence)',
 	cam_wb_cancel_aria: 'Cancel white balance sampling',

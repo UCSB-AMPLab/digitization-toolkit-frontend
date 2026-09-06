@@ -571,6 +571,7 @@ export const es = {
 	cam_dslr_note_p1: 'Pon el interruptor del objetivo en ',
 	cam_dslr_note_p2: ' antes de capturar.',
 	cam_dslr_note_p3: 'El enfoque automático (AF) bloquea las DSLR de Canon unos 12 segundos.',
+	cam_dslr_af_warning: (mode: string) => `El objetivo está en ${mode}. La captura puede quedarse bloqueada hasta que el interruptor del objetivo esté en MF.`,
 	cam_wb: 'Balance de blancos',
 	cam_wb_calibrate_aria: 'Calibrar white balance automáticamente (AWB convergencia)',
 	cam_wb_cancel_aria: 'Cancelar muestreo de white balance',
