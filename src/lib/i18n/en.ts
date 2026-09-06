@@ -102,6 +102,8 @@ export const en: Messages = {
 	dash_camera_stop: 'Stop',
 	dash_camera_test: 'Test',
 	dash_camera_focus: 'Focus',
+	dash_camera_capture_ok: 'Test capture saved',
+	dash_camera_capture_error: 'Test capture failed',
 	dash_two_cameras: '2 cameras',
 
 	// ── Settings ─────────────────────────────────────────────────────────────
