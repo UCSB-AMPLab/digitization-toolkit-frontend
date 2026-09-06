@@ -6,7 +6,7 @@
   // Barra superior de la interfaz Live Preview / Gallery.
   // Contiene:
   //   - Botón volver + breadcrumb proyecto / volumen (izquierda)
-  //   - Avatar de usuario (derecha)
+  //   - Botón "Ir a revisión" + avatar de usuario (derecha)
   //
   // El breadcrumb replica el de la vista de colección a propósito: al entrar a
   // capturar, el operador no debe perder de vista dónde se están guardando las
@@ -83,8 +83,20 @@
     {/if}
   </div>
 
-  <!-- ── Lado derecho: avatar ── -->
+  <!-- ── Lado derecho: ir a revisión + avatar ── -->
   <div class="topbar-right">
+    <!-- Simétrico al botón "Ir a captura" de la vista de colección: misma
+         esquina, mismo estilo, sentido contrario. La navegación ya existía en
+         onTabChange('gallery'); desde mayo no había nada que la disparara. -->
+    <button
+      class="btn-review"
+      onclick={() => onTabChange('gallery')}
+      title={$m.tb_go_to_review_title}
+    >
+      <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">rate_review</span>
+      <span>{$m.tb_go_to_review}</span>
+    </button>
+
     <!-- Avatar circular con iniciales del usuario -->
     <!-- El color verde viene del design system (--color-primary) -->
     <div class="user-avatar" aria-label={$m.tb_current_user}>
@@ -191,6 +203,29 @@
   .tab-btn.active {
     background-color: var(--color-primary);
     color: var(--color-light);
+  }
+
+  /* ── Botón "Ir a revisión": espejo de .btn-camera de la vista de colección ── */
+  .btn-review {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    min-height: var(--touch-target-min);
+    border-radius: var(--radius-full);
+    border: none;
+    background-color: var(--color-primary);
+    color: var(--color-light);
+    font-family: var(--font-family);
+    font-size: 13px;
+    font-weight: var(--fw-bold);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color var(--transition-base);
+  }
+
+  .btn-review:hover {
+    background-color: var(--color-primary-hover);
   }
 
   /* ── Breadcrumb: mismos valores que la vista de colección ── */

@@ -628,6 +628,8 @@ export const es = {
 	lv_zoom_in: 'Acercar',
 	lv_zoom_out: 'Alejar',
 	lv_thumb_empty: 'Sin capturas aún — usa el botón de captura',
+	tb_go_to_review: 'Ir a revisión',
+	tb_go_to_review_title: 'Volver a la revisión de este volumen',
 	tb_breadcrumb_nav: 'Proyecto y volumen en curso',
 	tb_back: 'Volver',
 	tb_current_user: 'Usuario actual',
