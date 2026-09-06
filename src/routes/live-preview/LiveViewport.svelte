@@ -225,6 +225,10 @@
   // contador de errores porque significa "cámara no conectada", no "backend
   // caído" — pero sigue siendo información útil por cámara para mostrar un
   // overlay sobre su feed.
+  // This overlay follows continuous polling, outside cameraRefresh. A 404
+  // from before reconnect can briefly restore it after reconnect succeeds;
+  // the next successful frame clears it. Unlike the dashboard, a 404 here
+  // does not stop polling.
   let cameraMissing = $state<Record<number, boolean>>({});
 
   // ── Helper: URL base de la API ─────────────────────────────────────────────

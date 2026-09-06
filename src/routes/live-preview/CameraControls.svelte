@@ -22,6 +22,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
+  import { createCameraRefresh } from '$lib/camera-refresh';
   import { m } from '$lib/i18n';
   import { camerasApi, AuthError, type CameraDevice, type CameraControlsRequest, type CameraCapabilities, type DSLRSettingsUpdate } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
@@ -65,25 +66,14 @@
 
   // Lista de dispositivos reales cargados desde la API
   let devices = $state<CameraDevice[]>([]);
-  // Contador incrementado únicamente cuando publishDevices aplica un
-  // resultado. Cada escritor guarda su propio valor antes de esperar y pasa
-  // ambos a publishDevices al volver — así una respuesta iniciada antes de
-  // una reconexión (que solo avanza el contador al aplicar su propio
-  // resultado) no puede pisar la lista que la reconexión ya dejó más al día.
-  let devicesGen = 0;
-
-  // Único punto de escritura de `devices`: actualiza el estado local y avisa
-  // al padre en el mismo paso, y avanza la generación al aplicar — así una
-  // carga, recarga de calibración o reconexión más vieja en vuelo queda
-  // descartada. Escritores: la carga en onMount, las dos recargas tras
-  // calibración (handleWbCalibration, applyPickedWb), rescanCameras.
-  function publishDevices(gen: number, list: CameraDevice[]): boolean {
-    if (gen !== devicesGen) return false;
-    devicesGen++;
+  // Writers: onMount, handleWbCalibration, applyPickedWb, rescanCameras.
+  // All list results go through cameraRefresh, which publishes local and
+  // parent state together. Calibration reloads wait for an active reconnect.
+  function publishDevices(list: CameraDevice[]) {
     devices = list;
     onDevicesChange?.(list);
-    return true;
   }
+  const cameraRefresh = createCameraRefresh<CameraDevice[]>(publishDevices);
 
   // Estado del sidebar: colapsado por defecto (optimizado para pantalla de 7")
   let sidebarOpen = $state(false);
@@ -284,11 +274,7 @@
       const result = await camerasApi.calibrateWhiteBalance({ camera_index: idx });
       if (result.success) {
         // Refresh device list so selectedDevice.awb_gains picks up new values
-        const gen = devicesGen;
-        try {
-          const d = await camerasApi.listDevices();
-          publishDevices(gen, d);
-        } catch { /* ignore — gains will apply on next mount */ }
+        await cameraRefresh.read(() => camerasApi.listDevices());
         // Reset sliders to neutral; the new baseGains already encodes the calibrated WB
         temperature = 0;
         tint = 0;
@@ -367,11 +353,7 @@
       // Persist to registry
       const result = await camerasApi.commitWhiteBalance(idx, gains);
       if (result.success) {
-        const gen = devicesGen;
-        try {
-          const d = await camerasApi.listDevices();
-          publishDevices(gen, d);
-        } catch { /* ignore */ }
+        await cameraRefresh.read(() => camerasApi.listDevices());
         temperature = 0;
         tint = 0;
         cameraStatus.reportSuccess();
@@ -491,21 +473,8 @@
   // Cargar dispositivos reales al montar
   // ---------------------------------------------------------------------------
   onMount(() => {
-    const gen = devicesGen;
-    Promise.all([
-      camerasApi.listDevices(),
-      camerasApi.getCapabilities().catch(() => null),
-    ]).then(([d, caps]) => {
-      capabilities = caps;
-      publishDevices(gen, d);
-    }).catch((err) => {
-      // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
-      // limpió la sesión y redirige a /login; dejar `devices` como está en
-      // vez de que este catch conflate el error de auth con un estado real
-      // de "no hay cámaras conectadas" (NEH-64).
-      if (err instanceof AuthError && err.status === 401) return;
-      /* cualquier otro error: fallo silencioso, cámara puede no estar conectada */
-    });
+    void camerasApi.getCapabilities().then(caps => { capabilities = caps; }).catch(() => {});
+    void cameraRefresh.read(() => camerasApi.listDevices());
   });
 
   // ---------------------------------------------------------------------------
@@ -519,10 +488,8 @@
   async function rescanCameras() {
     if (rescanInFlight) return;
     rescanInFlight = true;
-    const gen = devicesGen;
     try {
-      const result = await camerasApi.rescan();
-      publishDevices(gen, result);
+      await cameraRefresh.reconnect(() => camerasApi.rescan());
       rescanError = null;
     } catch (err) {
       if (err instanceof AuthError && err.status === 401) return;

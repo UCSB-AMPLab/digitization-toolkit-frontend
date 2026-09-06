@@ -22,6 +22,7 @@
   import { m } from '$lib/i18n';
   import { describeCaptureFailure, describeCaptureOutcome, type CaptureOutcome } from '$lib/capture-outcome';
   import { sidesFromDevices, type SideInfo, type SideStatus } from '$lib/camera-sides';
+  import { createCameraRefresh } from '$lib/camera-refresh';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Usuario y rol
@@ -90,37 +91,24 @@
   let streamActive   = $state<Record<string, boolean>>({ left: false, right: false });
   let cameraStatus   = $state<Record<string, 'ok' | 'not-found' | 'unknown'>>({ left: 'unknown', right: 'unknown' });
   let cameraModel    = $state<Record<string, string | null>>({ left: null, right: null });
-  // Contador incrementado únicamente cuando applyCameraSides aplica un
-  // resultado. Cada escritor guarda su propio valor antes de esperar y pasa
-  // ambos a applyCameraSides al volver — así una respuesta iniciada antes de
-  // una reconexión (que solo avanza el contador al aplicar su propio
-  // resultado) no puede pisar el estado que la reconexión ya dejó más al día.
-  let statusGen = 0;
-
-  // Único punto de escritura de cameraStatus/cameraModel. Al aplicar un
-  // resultado avanza la generación, así que cualquier petición todavía en
-  // vuelo (lista de dispositivos, reconexión, preview) que empezó antes
-  // encuentra su generación obsoleta y se descarta. Escritores:
-  // checkCamerasStatus, rescanCameras, fetchFrame (404 y recuperación).
-  // Mantén esta lista al día si agregas uno nuevo.
-  function applyCameraSides(gen: number, sides: { left: SideInfo; right: SideInfo }): boolean {
-    if (gen !== statusGen) return false;
-    statusGen++;
-    cameraStatus = { left: sides.left.status, right: sides.right.status };
-    cameraModel = { left: sides.left.model, right: sides.right.model };
-    return true;
+  type CameraSides = { left: SideInfo; right: SideInfo };
+  // Writers: initial enumeration, reconnect, and per-side preview results.
+  // List writers use cameraRefresh; previews check its recovery token and
+  // patch only their own side. Every status/model write happens here.
+  function applyCameraSides(sides: Partial<CameraSides>) {
+    for (const side of ['left', 'right'] as const) {
+      const info = sides[side];
+      if (!info) continue;
+      cameraStatus = { ...cameraStatus, [side]: info.status };
+      cameraModel = { ...cameraModel, [side]: info.model };
+    }
   }
+  const cameraRefresh = createCameraRefresh<CameraSides>(applyCameraSides);
 
-  // Reconstruye el par left/right actual con un único lado forzado al status
-  // dado — para que fetchFrame pueda pasar un objeto completo a
-  // applyCameraSides sin pisar el lado que no cambió. 'unknown' se trata como
-  // 'not-found' al reconstruir, ya que applyCameraSides solo produce 'ok' o
-  // 'not-found'.
-  function sidesWithStatus(side: string, status: SideStatus): { left: SideInfo; right: SideInfo } {
-    return {
-      left:  { status: side === 'left'  ? status : (cameraStatus.left  === 'ok' ? 'ok' : 'not-found'), model: cameraModel.left },
-      right: { status: side === 'right' ? status : (cameraStatus.right === 'ok' ? 'ok' : 'not-found'), model: cameraModel.right }
-    };
+  function applyPreviewStatus(token: number | null, side: string, status: SideStatus): boolean {
+    if (!cameraRefresh.acceptPreview(token)) return false;
+    applyCameraSides({ [side]: { status, model: cameraModel[side] } });
+    return true;
   }
   let previewIntervals: Record<string, ReturnType<typeof setInterval>> = {};
   let isFetchingPreview: Record<string, boolean> = {};
@@ -182,23 +170,17 @@
   }
 
   async function checkCamerasStatus() {
-    const gen = statusGen;
-    try {
-      const devices = await camerasApi.listDevices();
-      // Modelo real reportado por /cameras/devices — Canon EOS 1500D/Rebel T7
-      // en gphoto2 (Rionegro), imx519 en picamera2. Nunca hardcodear (NEH-73).
-      applyCameraSides(gen, sidesFromDevices(devices));
-    } catch (err) {
-      // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
-      // limpió la sesión y redirige a /login; no pisar esa navegación
-      // mostrando cámaras "not-found" que leerían como una falla de
-      // hardware (NEH-64).
-      if (err instanceof AuthError && err.status === 401) return;
-      applyCameraSides(gen, {
-        left: { status: 'not-found', model: null },
-        right: { status: 'not-found', model: null }
-      });
-    }
+    await cameraRefresh.read(
+      async () => sidesFromDevices(await camerasApi.listDevices()),
+      (err) => {
+        // A dead login is not a hardware failure; apiRequest redirects (NEH-64).
+        if (err instanceof AuthError && err.status === 401) return;
+        applyCameraSides({
+          left: { status: 'not-found', model: null },
+          right: { status: 'not-found', model: null }
+        });
+      }
+    );
   }
 
   // true mientras hay una petición de "reconectar cámaras" en curso — evita
@@ -211,10 +193,8 @@
   async function rescanCameras() {
     if (rescanInFlight) return;
     rescanInFlight = true;
-    const gen = statusGen;
     try {
-      const devices = await camerasApi.rescan();
-      applyCameraSides(gen, sidesFromDevices(devices));
+      await cameraRefresh.reconnect(async () => sidesFromDevices(await camerasApi.rescan()));
       rescanError = null;
     } catch (err) {
       // Un 401 significa sesión muerta, no un fallo de reconexión — apiRequest
@@ -270,24 +250,20 @@
   async function fetchFrame(side: string, index: number) {
     if (isFetchingPreview[side]) return;
     isFetchingPreview[side] = true;
-    const gen = statusGen;
+    const token = cameraRefresh.previewToken();
     try {
       const res = await fetch(`${getApiBase()}/cameras/preview/${index}`, { headers: getAuthHeader() });
       if (res.status === 404) {
-        // La cámara ya no responde — se desconectó mientras el stream estaba
-        // activo. Reflejarlo en el estado y detener el polling en lugar de
-        // seguir reintentando contra una cámara ausente. Si una reconexión ya
-        // aplicó su resultado mientras esta petición estaba en vuelo,
-        // applyCameraSides descarta esta respuesta obsoleta y no pisa el
-        // estado más reciente.
-        if (applyCameraSides(gen, sidesWithStatus(side, 'not-found'))) {
+        // A preview from before/during reconnect cannot undo its result or
+        // stop the stream. An accepted failure changes only this camera.
+        if (applyPreviewStatus(token, side, 'not-found')) {
           stopStream(side as 'left' | 'right');
         }
         return;
       }
       if (res.ok) {
         if (cameraStatus[side] === 'not-found') {
-          applyCameraSides(gen, sidesWithStatus(side, 'ok'));
+          applyPreviewStatus(token, side, 'ok');
         }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
