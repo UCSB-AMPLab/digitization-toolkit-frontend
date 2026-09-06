@@ -22,6 +22,7 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
+  import { createCameraRefresh } from '$lib/camera-refresh';
   import { m } from '$lib/i18n';
   import { camerasApi, AuthError, type CameraDevice, type CameraControlsRequest, type CameraCapabilities, type DSLRSettingsUpdate } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
@@ -65,6 +66,14 @@
 
   // Lista de dispositivos reales cargados desde la API
   let devices = $state<CameraDevice[]>([]);
+  // Writers: onMount, handleWbCalibration, applyPickedWb, rescanCameras.
+  // All list results go through cameraRefresh, which publishes local and
+  // parent state together. Calibration reloads wait for an active reconnect.
+  function publishDevices(list: CameraDevice[]) {
+    devices = list;
+    onDevicesChange?.(list);
+  }
+  const cameraRefresh = createCameraRefresh<CameraDevice[]>(publishDevices);
 
   // Estado del sidebar: colapsado por defecto (optimizado para pantalla de 7")
   let sidebarOpen = $state(false);
@@ -265,9 +274,7 @@
       const result = await camerasApi.calibrateWhiteBalance({ camera_index: idx });
       if (result.success) {
         // Refresh device list so selectedDevice.awb_gains picks up new values
-        try {
-          devices = await camerasApi.listDevices();
-        } catch { /* ignore — gains will apply on next mount */ }
+        await cameraRefresh.read(() => camerasApi.listDevices());
         // Reset sliders to neutral; the new baseGains already encodes the calibrated WB
         temperature = 0;
         tint = 0;
@@ -346,7 +353,7 @@
       // Persist to registry
       const result = await camerasApi.commitWhiteBalance(idx, gains);
       if (result.success) {
-        try { devices = await camerasApi.listDevices(); } catch { /* ignore */ }
+        await cameraRefresh.read(() => camerasApi.listDevices());
         temperature = 0;
         tint = 0;
         cameraStatus.reportSuccess();
@@ -466,22 +473,31 @@
   // Cargar dispositivos reales al montar
   // ---------------------------------------------------------------------------
   onMount(() => {
-    Promise.all([
-      camerasApi.listDevices(),
-      camerasApi.getCapabilities().catch(() => null),
-    ]).then(([d, caps]) => {
-      devices = d;
-      capabilities = caps;
-      onDevicesChange?.(d);
-    }).catch((err) => {
-      // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
-      // limpió la sesión y redirige a /login; dejar `devices` como está en
-      // vez de que este catch conflate el error de auth con un estado real
-      // de "no hay cámaras conectadas" (NEH-64).
-      if (err instanceof AuthError && err.status === 401) return;
-      /* cualquier otro error: fallo silencioso, cámara puede no estar conectada */
-    });
+    void camerasApi.getCapabilities().then(caps => { capabilities = caps; }).catch(() => {});
+    void cameraRefresh.read(() => camerasApi.listDevices());
   });
+
+  // ---------------------------------------------------------------------------
+  // Reconectar cámaras: reescanea los puertos USB y cierra sesiones obsoletas
+  // (NEH-229). Útil para cualquier backend, no solo DSLR — una cámara puede
+  // desconectarse o dormirse tanto en gphoto2 como en picamera2.
+  // ---------------------------------------------------------------------------
+  let rescanInFlight = $state(false);
+  let rescanError = $state<string | null>(null);
+
+  async function rescanCameras() {
+    if (rescanInFlight) return;
+    rescanInFlight = true;
+    try {
+      await cameraRefresh.reconnect(() => camerasApi.rescan());
+      rescanError = null;
+    } catch (err) {
+      if (err instanceof AuthError && err.status === 401) return;
+      rescanError = err instanceof Error ? err.message : String(err);
+    } finally {
+      rescanInFlight = false;
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // DSLR: cargar ajustes reales cuando se activa el backend gphoto2
@@ -652,6 +668,15 @@
       {/if}
     </div>
 
+    <!-- ── RECONECTAR CÁMARAS (NEH-229) ── -->
+    <div class="reconnect-row">
+      <button class="btn-reconnect" disabled={rescanInFlight} onclick={rescanCameras}>
+        {$m.cam_reconnect}
+      </button>
+      {#if rescanError}
+        <p class="text-error focus-result-msg">{$m.cam_reconnect_error}: {rescanError}</p>
+      {/if}
+    </div>
 
     <!-- ══════════════════════════════════════════
          ACORDEÓN: BASIC
@@ -1458,6 +1483,25 @@
   .status-warn {
     color: #e07830;
   }
+
+  /* ── Reconectar cámaras ── */
+  .reconnect-row { display: flex; flex-direction: column; gap: 4px; }
+
+  .btn-reconnect {
+    height: 36px;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-family);
+    font-size: 12px;
+    color: var(--color-light-grey);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .btn-reconnect:hover { border-color: var(--color-primary); color: var(--color-light); }
+  .btn-reconnect:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* ── Auto Focus ── */
   .btn-autofocus {

@@ -21,6 +21,8 @@
   import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore } from '$lib/api';
   import { m } from '$lib/i18n';
   import { describeCaptureFailure, describeCaptureOutcome, type CaptureOutcome } from '$lib/capture-outcome';
+  import { sidesFromDevices, type SideInfo, type SideStatus } from '$lib/camera-sides';
+  import { createCameraRefresh } from '$lib/camera-refresh';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Usuario y rol
@@ -89,6 +91,25 @@
   let streamActive   = $state<Record<string, boolean>>({ left: false, right: false });
   let cameraStatus   = $state<Record<string, 'ok' | 'not-found' | 'unknown'>>({ left: 'unknown', right: 'unknown' });
   let cameraModel    = $state<Record<string, string | null>>({ left: null, right: null });
+  type CameraSides = { left: SideInfo; right: SideInfo };
+  // Writers: initial enumeration, reconnect, and per-side preview results.
+  // List writers use cameraRefresh; previews check its recovery token and
+  // patch only their own side. Every status/model write happens here.
+  function applyCameraSides(sides: Partial<CameraSides>) {
+    for (const side of ['left', 'right'] as const) {
+      const info = sides[side];
+      if (!info) continue;
+      cameraStatus = { ...cameraStatus, [side]: info.status };
+      cameraModel = { ...cameraModel, [side]: info.model };
+    }
+  }
+  const cameraRefresh = createCameraRefresh<CameraSides>(applyCameraSides);
+
+  function applyPreviewStatus(token: number | null, side: string, status: SideStatus): boolean {
+    if (!cameraRefresh.acceptPreview(token)) return false;
+    applyCameraSides({ [side]: { status, model: cameraModel[side] } });
+    return true;
+  }
   let previewIntervals: Record<string, ReturnType<typeof setInterval>> = {};
   let isFetchingPreview: Record<string, boolean> = {};
   // Resultado de la última captura de prueba por cámara — visible hasta que se
@@ -149,28 +170,40 @@
   }
 
   async function checkCamerasStatus() {
+    await cameraRefresh.read(
+      async () => sidesFromDevices(await camerasApi.listDevices()),
+      (err) => {
+        // A dead login is not a hardware failure; apiRequest redirects (NEH-64).
+        if (err instanceof AuthError && err.status === 401) return;
+        applyCameraSides({
+          left: { status: 'not-found', model: null },
+          right: { status: 'not-found', model: null }
+        });
+      }
+    );
+  }
+
+  // true mientras hay una petición de "reconectar cámaras" en curso — evita
+  // solapar dos reconexiones y deshabilita el botón mientras corre.
+  let rescanInFlight = $state(false);
+  // Mensaje de error de la última reconexión fallida, o null si no hay uno
+  // pendiente de mostrar.
+  let rescanError = $state<string | null>(null);
+
+  async function rescanCameras() {
+    if (rescanInFlight) return;
+    rescanInFlight = true;
     try {
-      const devices = await camerasApi.listDevices();
-      const left  = devices.find(d => d.index === 0);
-      const right = devices.find(d => d.index === 1);
-      cameraStatus = {
-        left:  left  ? 'ok' : 'not-found',
-        right: right ? 'ok' : 'not-found',
-      };
-      // Modelo real reportado por /cameras/devices — Canon EOS 1500D/Rebel T7
-      // en gphoto2 (Rionegro), imx519 en picamera2. Nunca hardcodear (NEH-73).
-      cameraModel = {
-        left:  left?.model  ?? null,
-        right: right?.model ?? null,
-      };
+      await cameraRefresh.reconnect(async () => sidesFromDevices(await camerasApi.rescan()));
+      rescanError = null;
     } catch (err) {
-      // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
-      // limpió la sesión y redirige a /login; no pisar esa navegación
-      // mostrando cámaras "not-found" que leerían como una falla de
-      // hardware (NEH-64).
+      // Un 401 significa sesión muerta, no un fallo de reconexión — apiRequest
+      // ya limpió la sesión y redirige a /login (mismo razonamiento que
+      // checkCamerasStatus, NEH-64).
       if (err instanceof AuthError && err.status === 401) return;
-      cameraStatus = { left: 'not-found', right: 'not-found' };
-      cameraModel = { left: null, right: null };
+      rescanError = err instanceof Error ? err.message : String(err);
+    } finally {
+      rescanInFlight = false;
     }
   }
 
@@ -197,6 +230,9 @@
     streamActive = { ...streamActive, [side]: true };
     const index = side === 'left' ? 0 : 1;
     await fetchFrame(side, index);
+    // fetchFrame() puede haber detenido el stream (cámara no encontrada,
+    // 404) mientras esperábamos — no instalar el polling en ese caso.
+    if (!streamActive[side]) return;
     if (previewIntervals[side]) clearInterval(previewIntervals[side]);
     previewIntervals[side] = setInterval(() => fetchFrame(side, index), PREVIEW_INTERVAL_MS);
   }
@@ -214,9 +250,23 @@
   async function fetchFrame(side: string, index: number) {
     if (isFetchingPreview[side]) return;
     isFetchingPreview[side] = true;
+    const token = cameraRefresh.previewToken();
     try {
       const res = await fetch(`${getApiBase()}/cameras/preview/${index}`, { headers: getAuthHeader() });
+      if (res.status === 404) {
+        // A preview from before/during reconnect cannot undo its result or
+        // stop the stream. An accepted failure changes only this camera.
+        if (applyPreviewStatus(token, side, 'not-found')) {
+          stopStream(side as 'left' | 'right');
+        }
+        return;
+      }
       if (res.ok) {
+        // A good frame is evidence the body is there, whether the badge said
+        // not-found or was still unknown while the device list loaded.
+        if (cameraStatus[side] !== 'ok') {
+          applyPreviewStatus(token, side, 'ok');
+        }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
@@ -441,6 +491,28 @@
           </div>
         {/each}
       </div>
+
+      <!-- Recuperación de cámara: reconectar tras un cable suelto o una cámara
+           que se durmió (NEH-229). Siempre visible cuando la sección de
+           cámaras lo está; la pista de "cámara faltante" solo aparece si
+           algún lado está not-found. -->
+      <div class="cam-recovery">
+        {#if cameraStatus.left === 'not-found' || cameraStatus.right === 'not-found'}
+          {@const missingLabels = (['left', 'right'] as const)
+            .filter(side => cameraStatus[side] === 'not-found')
+            .map(side => (side === 'left' ? $m.dash_camera_left : $m.dash_camera_right))
+            .join(' / ')}
+          <p class="cam-hint">{$m.dash_camera_missing_hint(missingLabels)}</p>
+        {/if}
+        <button class="btn-secondary" disabled={rescanInFlight} onclick={rescanCameras}>
+          {$m.dash_camera_reconnect}
+        </button>
+        {#if rescanError}
+          <p class="capture-status is-error" role="status">
+            {$m.dash_camera_reconnect_error}: {rescanError}
+          </p>
+        {/if}
+      </div>
     </div>
   {/if}
 
@@ -564,6 +636,9 @@
   .cam-info { display: flex; flex-direction: column; text-align: left; flex: 1; min-width: 0; }
   .cam-name  { font-size: 13px; font-weight: var(--fw-bold); color: var(--color-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cam-model { font-size: 11px; color: var(--color-light-grey); }
+
+  .cam-recovery { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 12px; }
+  .cam-hint { font-size: 12px; color: var(--color-light-grey); margin: 0; }
 
   .cam-badge {
     display: flex; align-items: center; gap: 4px;

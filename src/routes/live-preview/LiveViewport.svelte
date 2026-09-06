@@ -220,6 +220,17 @@
   let previewErrorCount = $state(0);
   let previewConnectError = $derived(previewErrorCount >= 3);
 
+  // Cámara individual ausente (404 en su último fetch de preview, NEH-229).
+  // Distinto de previewConnectError: 404 se excluye deliberadamente del
+  // contador de errores porque significa "cámara no conectada", no "backend
+  // caído" — pero sigue siendo información útil por cámara para mostrar un
+  // overlay sobre su feed.
+  // This overlay follows continuous polling, outside cameraRefresh. A 404
+  // from before reconnect can briefly restore it after reconnect succeeds;
+  // the next successful frame clears it. Unlike the dashboard, a 404 here
+  // does not stop polling.
+  let cameraMissing = $state<Record<number, boolean>>({});
+
   // ── Helper: URL base de la API ─────────────────────────────────────────────
   function getApiBase(): string {
     if (!browser) return 'http://localhost:8000';
@@ -258,8 +269,14 @@
 
         previewUrls = { ...previewUrls, [cameraIndex]: newUrl };
         previewErrorCount = 0;  // reset on success
-      } else if (response.status !== 404) {
-        // 404 = cámara no conectada → falla silencioso
+        if (cameraMissing[cameraIndex]) {
+          cameraMissing = { ...cameraMissing, [cameraIndex]: false };
+        }
+      } else if (response.status === 404) {
+        // 404 = cámara no conectada → falla silencioso para el contador de
+        // errores, pero se refleja en el overlay por cámara (NEH-229).
+        cameraMissing = { ...cameraMissing, [cameraIndex]: true };
+      } else {
         // Otros errores (500, etc.) cuentan para el banner
         previewErrorCount += 1;
       }
@@ -540,6 +557,10 @@
               <small>{$m.lv_check_hw}</small>
             </div>
           {/if}
+          <!-- Overlay: la cámara respondió 404 en el último fetch (NEH-229) -->
+          {#if cameraMissing[leftIdx]}
+            <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
+          {/if}
           <!-- Badge identificador de cámara -->
           <div class="feed-label">{cameraLabel(leftIdx)}</div>
           <!-- Floating rotation overlay -->
@@ -592,6 +613,10 @@
                 <span>{$m.lv_no_signal_right}</span>
                 <small>{$m.lv_check_hw}</small>
               </div>
+            {/if}
+            <!-- Overlay: la cámara respondió 404 en el último fetch (NEH-229) -->
+            {#if cameraMissing[rightIdx]}
+              <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
             {/if}
             <!-- Badge identificador de cámara -->
             <div class="feed-label right">{cameraLabel(rightIdx)}</div>
@@ -878,6 +903,26 @@
   }
 
   .camera-feed:last-child { border-right: none; }
+
+  /* Overlay: cámara ausente (404 en el último fetch de preview, NEH-229) */
+  .camera-missing {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 80%;
+    background: rgba(19,17,16,0.85);
+    backdrop-filter: blur(2px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-md);
+    padding: 10px 16px;
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-light);
+    text-align: center;
+    z-index: 6;
+    pointer-events: none;
+  }
 
   /* Imagen del stream / polling */
   .feed-img {
