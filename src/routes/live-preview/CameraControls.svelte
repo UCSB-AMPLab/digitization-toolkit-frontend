@@ -493,7 +493,7 @@
       rescanError = null;
     } catch (err) {
       if (err instanceof AuthError && err.status === 401) return;
-      rescanError = err instanceof Error ? err.message : $m.cam_reconnect_error;
+      rescanError = err instanceof Error ? err.message : String(err);
     } finally {
       rescanInFlight = false;
     }

@@ -201,7 +201,7 @@
       // ya limpió la sesión y redirige a /login (mismo razonamiento que
       // checkCamerasStatus, NEH-64).
       if (err instanceof AuthError && err.status === 401) return;
-      rescanError = err instanceof Error ? err.message : $m.dash_camera_reconnect_error;
+      rescanError = err instanceof Error ? err.message : String(err);
     } finally {
       rescanInFlight = false;
     }
@@ -262,7 +262,9 @@
         return;
       }
       if (res.ok) {
-        if (cameraStatus[side] === 'not-found') {
+        // A good frame is evidence the body is there, whether the badge said
+        // not-found or was still unknown while the device list loaded.
+        if (cameraStatus[side] !== 'ok') {
           applyPreviewStatus(token, side, 'ok');
         }
         const blob = await res.blob();

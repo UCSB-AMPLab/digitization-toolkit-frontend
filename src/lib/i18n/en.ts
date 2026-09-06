@@ -106,7 +106,7 @@ export const en: Messages = {
 	dash_camera_capture_error: 'Test capture failed',
 	dash_two_cameras: '2 cameras',
 	dash_camera_missing_hint: (side: string) =>
-		`${side} not detected. Half-press its shutter button to wake it, or reseat its USB cable, then press "Reconnect cameras".`,
+		`${side}: not detected. Half-press its shutter button to wake it, or reseat its USB cable, then press "Reconnect cameras".`,
 	dash_camera_reconnect: 'Reconnect cameras',
 	dash_camera_reconnect_error: 'Could not reconnect',
 
