@@ -8,14 +8,17 @@
   //   - Botón volver + breadcrumb proyecto / volumen (izquierda)
   //   - Botón "Ir a revisión" + avatar de usuario (derecha)
   //
+  // Hasta mayo de 2026 esta barra tenía tabs "Live Scan / Gallery". El markup se
+  // quitó en 84acac1 y quedaron las props, el estado y el CSS. La navegación que
+  // disparaban vive ahora en el botón "Ir a revisión"; el resto se retira aquí.
+  //
   // El breadcrumb replica el de la vista de colección a propósito: al entrar a
   // capturar, el operador no debe perder de vista dónde se están guardando las
   // imágenes.
   //
   // Props:
-  //   activeTab       → tab activo ('live' | 'gallery')
-  //   onTabChange     → callback al cambiar de tab
   //   onBack          → callback al hacer click en volver
+  //   onGoToReview    → callback para salir a la vista de revisión del volumen
   //   projectName     → nombre del proyecto ('' mientras carga)
   //   collectionName  → nombre del volumen ('' mientras carga)
   // ============================================================================
@@ -27,15 +30,13 @@
   // PROPS
   // ---------------------------------------------------------------------------
   let {
-    activeTab,
-    onTabChange,
     onBack,
+    onGoToReview,
     projectName = '',
     collectionName = '',
   }: {
-    activeTab: 'live' | 'gallery';
-    onTabChange: (tab: 'live' | 'gallery') => void;
     onBack: () => void;
+    onGoToReview: () => void;
     projectName?: string;
     collectionName?: string;
   } = $props();
@@ -86,11 +87,10 @@
   <!-- ── Lado derecho: ir a revisión + avatar ── -->
   <div class="topbar-right">
     <!-- Simétrico al botón "Ir a captura" de la vista de colección: misma
-         esquina, mismo estilo, sentido contrario. La navegación ya existía en
-         onTabChange('gallery'); desde mayo no había nada que la disparara. -->
+         esquina, mismo estilo, sentido contrario. -->
     <button
       class="btn-review"
-      onclick={() => onTabChange('gallery')}
+      onclick={onGoToReview}
       title={$m.tb_go_to_review_title}
     >
       <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">rate_review</span>
@@ -160,49 +160,6 @@
 
   .btn-circle:hover {
     background-color: rgba(255, 255, 255, 0.08);
-  }
-
-  /* ── Tabs centrados (posición absoluta para centrado perfecto) ── */
-  .tabs-container {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  /* Contenedor pill de los tabs */
-  .tabs-pill {
-    background-color: var(--color-surface);
-    padding: 4px;
-    border-radius: var(--radius-lg);
-    display: flex;
-    gap: 0;
-  }
-
-  /* Cada botón tab */
-  .tab-btn {
-    padding: 8px 24px;
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-base);
-    font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    background: none;
-    border: none;
-    cursor: pointer;
-    transition: color var(--transition-base), background-color var(--transition-base);
-    min-height: var(--touch-target-min);
-    white-space: nowrap;
-  }
-
-  .tab-btn:hover {
-    color: var(--color-light);
-  }
-
-  /* Tab activo: fondo verde primario */
-  .tab-btn.active {
-    background-color: var(--color-primary);
-    color: var(--color-light);
   }
 
   /* ── Botón "Ir a revisión": espejo de .btn-camera de la vista de colección ── */

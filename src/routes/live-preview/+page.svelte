@@ -52,7 +52,6 @@
 
   // Tab activo: 'live' = captura en vivo | 'gallery' = visor de imágenes
   // Cambiar de tab redirige a /gallery cuando se selecciona 'gallery'
-  let activeTab = $state<'live' | 'gallery'>('live');
 
   // Modo de cámara: 'single' = una cámara | 'double' = dos cámaras (izq + der)
   let cameraMode = $state<'single' | 'double'>('double');
@@ -160,15 +159,11 @@
   }
 
   // ---------------------------------------------------------------------------
-  // HANDLER: Cambio de tab
-  // Si se cambia a 'gallery', redirige a la vista de galería de la colección
-  // Para cambiar la ruta de galería, modifica el goto aquí
+  // HANDLER: Salir a revisión
+  // Lleva a la vista del volumen, que es donde se revisa lo capturado.
   // ---------------------------------------------------------------------------
-  function handleTabChange(tab: 'live' | 'gallery') {
-    activeTab = tab;
-    if (tab === 'gallery') {
-      goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
-    }
+  function handleGoToReview() {
+    goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -251,11 +246,10 @@
 
   <!-- ── Barra superior con tabs Live Scan / Gallery ── -->
   <TopBar
-    {activeTab}
     {projectName}
     {collectionName}
-    onTabChange={handleTabChange}
     onBack={handleBack}
+    onGoToReview={handleGoToReview}
   />
 
   <!-- ── Área de contenido: controles + viewport + tiras ── -->
