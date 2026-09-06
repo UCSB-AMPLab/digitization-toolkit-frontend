@@ -1079,6 +1079,16 @@ export const camerasApi = {
   },
 
   /**
+   * Rescan USB camera ports and close stale sessions.
+   * Operators only. Returns the refreshed device list, same shape as listDevices().
+   */
+  async rescan(): Promise<CameraDevice[]> {
+    return apiRequest<CameraDevice[]>('/cameras/rescan', {
+      method: 'POST'
+    });
+  },
+
+  /**
    * Single camera capture
    */
   async capture(data: CaptureRequest): Promise<CaptureResponse> {

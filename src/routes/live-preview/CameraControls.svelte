@@ -65,6 +65,25 @@
 
   // Lista de dispositivos reales cargados desde la API
   let devices = $state<CameraDevice[]>([]);
+  // Contador incrementado únicamente cuando publishDevices aplica un
+  // resultado. Cada escritor guarda su propio valor antes de esperar y pasa
+  // ambos a publishDevices al volver — así una respuesta iniciada antes de
+  // una reconexión (que solo avanza el contador al aplicar su propio
+  // resultado) no puede pisar la lista que la reconexión ya dejó más al día.
+  let devicesGen = 0;
+
+  // Único punto de escritura de `devices`: actualiza el estado local y avisa
+  // al padre en el mismo paso, y avanza la generación al aplicar — así una
+  // carga, recarga de calibración o reconexión más vieja en vuelo queda
+  // descartada. Escritores: la carga en onMount, las dos recargas tras
+  // calibración (handleWbCalibration, applyPickedWb), rescanCameras.
+  function publishDevices(gen: number, list: CameraDevice[]): boolean {
+    if (gen !== devicesGen) return false;
+    devicesGen++;
+    devices = list;
+    onDevicesChange?.(list);
+    return true;
+  }
 
   // Estado del sidebar: colapsado por defecto (optimizado para pantalla de 7")
   let sidebarOpen = $state(false);
@@ -265,8 +284,10 @@
       const result = await camerasApi.calibrateWhiteBalance({ camera_index: idx });
       if (result.success) {
         // Refresh device list so selectedDevice.awb_gains picks up new values
+        const gen = devicesGen;
         try {
-          devices = await camerasApi.listDevices();
+          const d = await camerasApi.listDevices();
+          publishDevices(gen, d);
         } catch { /* ignore — gains will apply on next mount */ }
         // Reset sliders to neutral; the new baseGains already encodes the calibrated WB
         temperature = 0;
@@ -346,7 +367,11 @@
       // Persist to registry
       const result = await camerasApi.commitWhiteBalance(idx, gains);
       if (result.success) {
-        try { devices = await camerasApi.listDevices(); } catch { /* ignore */ }
+        const gen = devicesGen;
+        try {
+          const d = await camerasApi.listDevices();
+          publishDevices(gen, d);
+        } catch { /* ignore */ }
         temperature = 0;
         tint = 0;
         cameraStatus.reportSuccess();
@@ -466,13 +491,13 @@
   // Cargar dispositivos reales al montar
   // ---------------------------------------------------------------------------
   onMount(() => {
+    const gen = devicesGen;
     Promise.all([
       camerasApi.listDevices(),
       camerasApi.getCapabilities().catch(() => null),
     ]).then(([d, caps]) => {
-      devices = d;
       capabilities = caps;
-      onDevicesChange?.(d);
+      publishDevices(gen, d);
     }).catch((err) => {
       // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
       // limpió la sesión y redirige a /login; dejar `devices` como está en
@@ -482,6 +507,30 @@
       /* cualquier otro error: fallo silencioso, cámara puede no estar conectada */
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Reconectar cámaras: reescanea los puertos USB y cierra sesiones obsoletas
+  // (NEH-229). Útil para cualquier backend, no solo DSLR — una cámara puede
+  // desconectarse o dormirse tanto en gphoto2 como en picamera2.
+  // ---------------------------------------------------------------------------
+  let rescanInFlight = $state(false);
+  let rescanError = $state<string | null>(null);
+
+  async function rescanCameras() {
+    if (rescanInFlight) return;
+    rescanInFlight = true;
+    const gen = devicesGen;
+    try {
+      const result = await camerasApi.rescan();
+      publishDevices(gen, result);
+      rescanError = null;
+    } catch (err) {
+      if (err instanceof AuthError && err.status === 401) return;
+      rescanError = err instanceof Error ? err.message : $m.cam_reconnect_error;
+    } finally {
+      rescanInFlight = false;
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // DSLR: cargar ajustes reales cuando se activa el backend gphoto2
@@ -652,6 +701,15 @@
       {/if}
     </div>
 
+    <!-- ── RECONECTAR CÁMARAS (NEH-229) ── -->
+    <div class="reconnect-row">
+      <button class="btn-reconnect" disabled={rescanInFlight} onclick={rescanCameras}>
+        {$m.cam_reconnect}
+      </button>
+      {#if rescanError}
+        <p class="text-error focus-result-msg">{$m.cam_reconnect_error}: {rescanError}</p>
+      {/if}
+    </div>
 
     <!-- ══════════════════════════════════════════
          ACORDEÓN: BASIC
@@ -1458,6 +1516,25 @@
   .status-warn {
     color: #e07830;
   }
+
+  /* ── Reconectar cámaras ── */
+  .reconnect-row { display: flex; flex-direction: column; gap: 4px; }
+
+  .btn-reconnect {
+    height: 36px;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-family);
+    font-size: 12px;
+    color: var(--color-light-grey);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .btn-reconnect:hover { border-color: var(--color-primary); color: var(--color-light); }
+  .btn-reconnect:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* ── Auto Focus ── */
   .btn-autofocus {

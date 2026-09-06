@@ -105,6 +105,10 @@ export const en: Messages = {
 	dash_camera_capture_ok: 'Test capture saved',
 	dash_camera_capture_error: 'Test capture failed',
 	dash_two_cameras: '2 cameras',
+	dash_camera_missing_hint: (side: string) =>
+		`${side} not detected. Half-press its shutter button to wake it, or reseat its USB cable, then press "Reconnect cameras".`,
+	dash_camera_reconnect: 'Reconnect cameras',
+	dash_camera_reconnect_error: 'Could not reconnect',
 
 	// ── Settings ─────────────────────────────────────────────────────────────
 	config_subtitle: 'Digitization system settings',
@@ -528,6 +532,8 @@ export const en: Messages = {
 	cam_none_detected: 'No cameras detected',
 	cam_connected: 'Connected',
 	cam_fallback_name: 'Camera',
+	cam_reconnect: 'Reconnect cameras',
+	cam_reconnect_error: 'Could not reconnect',
 	cam_section_basic: 'Basic',
 	cam_section_focus: 'Focus',
 	cam_section_settings: 'Settings',
@@ -578,6 +584,7 @@ export const en: Messages = {
 	lv_no_signal_left: 'No signal — Left',
 	lv_no_signal_right: 'No signal — Right',
 	lv_check_hw: 'Check the hardware connection',
+	lv_camera_missing: 'Camera not detected. Half-press its shutter button or reseat the USB cable, then press "Reconnect cameras".',
 	lv_rotate_ccw: 'Rotate CCW',
 	lv_rotate_cw: 'Rotate CW',
 	lv_grid_settings: 'Grid settings',

@@ -117,6 +117,10 @@ export const es = {
 	dash_camera_capture_ok: 'Captura de prueba realizada',
 	dash_camera_capture_error: 'No se pudo hacer la captura de prueba',
 	dash_two_cameras: '2 cámaras',
+	dash_camera_missing_hint: (side: string) =>
+		`${side}: no se detecta. Presiona el disparador hasta la mitad para despertarla o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".`,
+	dash_camera_reconnect: 'Reconectar cámaras',
+	dash_camera_reconnect_error: 'No se pudo reconectar',
 
 	// ── Configuración ────────────────────────────────────────────────────────
 	config_subtitle: 'Parámetros del sistema de digitalización',
@@ -549,6 +553,8 @@ export const es = {
 	cam_none_detected: 'Sin cámaras detectadas',
 	cam_connected: 'Conectada',
 	cam_fallback_name: 'Cámara',
+	cam_reconnect: 'Reconectar cámaras',
+	cam_reconnect_error: 'No se pudo reconectar',
 	cam_section_basic: 'Ajustes básicos',
 	cam_section_focus: 'Enfoque',
 	cam_section_settings: 'Ajustes',
@@ -600,6 +606,7 @@ export const es = {
 	lv_no_signal_left: 'Sin señal — Izquierda',
 	lv_no_signal_right: 'Sin señal — Derecha',
 	lv_check_hw: 'Verifica conexión del hardware',
+	lv_camera_missing: 'Cámara no detectada. Presiona el disparador hasta la mitad o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".',
 	lv_rotate_ccw: 'Girar a la izquierda',
 	lv_rotate_cw: 'Girar a la derecha',
 	lv_grid_settings: 'Ajustes de cuadrícula',
