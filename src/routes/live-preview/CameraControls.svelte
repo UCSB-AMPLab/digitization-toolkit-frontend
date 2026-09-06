@@ -27,6 +27,7 @@
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore } from '$lib/stores/histogram';
+  import { describeFocusMode } from '$lib/focus-mode';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -95,6 +96,8 @@
   // DSLR-specific per-camera state
   let cameraDslrAperture = $state<Record<number, string>>({ 0: '5.6', 1: '5.6' });
   let cameraDslrFormat   = $state<Record<number, string>>({ 0: 'JPEG', 1: 'JPEG' });
+  let cameraFocusMode    = $state<Record<number, string | undefined>>({});
+  let dslrSettingsSeq = 0;
 
   // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
   // Default 90° — most digitisation rigs use vertical (portrait) orientation
@@ -486,8 +489,12 @@
   $effect(() => {
     if (!isDSLR) return;
     const idx = selectedCameraIndex;
+    const seq = ++dslrSettingsSeq;
     camerasApi.getDSLRSettings(idx)
       .then(s => {
+        // Solo la respuesta más reciente escribe el estado DSLR; una respuesta vieja
+        // que llega tarde se descarta (misma guarda que la captura del dashboard).
+        if (seq !== dslrSettingsSeq) return;
         if (s.shutter_speed) cameraShutter = { ...cameraShutter, [idx]: s.shutter_speed };
         if (s.iso)           cameraIso     = { ...cameraIso,     [idx]: s.iso };
         if (s.aperture)      cameraDslrAperture = { ...cameraDslrAperture, [idx]: s.aperture };
@@ -496,6 +503,9 @@
           const fmtMap: Record<string, string> = { 'L': 'JPEG', 'RAW': 'RAW', 'RAW + L': 'RAW+JPEG' };
           cameraDslrFormat = { ...cameraDslrFormat, [idx]: fmtMap[s.image_format] ?? s.image_format };
         }
+        // Almacenar incluso cuando viene undefined: una reconexión que pierde
+        // el valor debe limpiar la advertencia, no dejar la última leída (NEH-76).
+        cameraFocusMode = { ...cameraFocusMode, [idx]: s.focus_mode };
       })
       .catch(() => {}); // silencioso — cámara puede no estar conectada
   });
@@ -858,6 +868,9 @@
             {$m.cam_dslr_note_p1}<strong>MF</strong>{$m.cam_dslr_note_p2}
             {$m.cam_dslr_note_p3}
           </p>
+          {#if describeFocusMode(cameraFocusMode[selectedCameraIndex]) === 'auto'}
+          <p class="dslr-note is-warning" role="status">{$m.cam_dslr_af_warning(cameraFocusMode[selectedCameraIndex] ?? '')}</p>
+          {/if}
           {/if}
         </div>
       {/if}
@@ -1909,4 +1922,9 @@
   }
 
   .capitalize { text-transform: capitalize; }
+
+  .dslr-note.is-warning {
+    color: var(--color-warning);
+    margin-top: 6px;
+  }
 </style>
