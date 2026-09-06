@@ -114,6 +114,8 @@ export const es = {
 	dash_camera_stop: 'Detener',
 	dash_camera_test: 'Probar',
 	dash_camera_focus: 'Enfocar',
+	dash_camera_capture_ok: 'Captura de prueba realizada',
+	dash_camera_capture_error: 'No se pudo hacer la captura de prueba',
 	dash_two_cameras: '2 cámaras',
 
 	// ── Configuración ────────────────────────────────────────────────────────

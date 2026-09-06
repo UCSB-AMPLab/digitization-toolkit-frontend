@@ -20,6 +20,7 @@
   import { authStore } from '$lib/stores/auth';
   import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore } from '$lib/api';
   import { m } from '$lib/i18n';
+  import { describeCaptureFailure, describeCaptureOutcome, type CaptureOutcome } from '$lib/capture-outcome';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Usuario y rol
@@ -90,6 +91,21 @@
   let cameraModel    = $state<Record<string, string | null>>({ left: null, right: null });
   let previewIntervals: Record<string, ReturnType<typeof setInterval>> = {};
   let isFetchingPreview: Record<string, boolean> = {};
+  // Resultado de la última captura de prueba por cámara — visible hasta que se
+  // limpia (éxito) o hasta la próxima captura (fallo, para que no desaparezca sola).
+  let captureStatus = $state<Record<'left' | 'right', CaptureOutcome | null>>({ left: null, right: null });
+  // Handle del timeout que limpia un resultado "ok" tras 4s — si llega una
+  // segunda captura en esa ventana, hay que cancelar el timer de la primera
+  // para que no borre el resultado (éxito o error) de la segunda (NEH-166).
+  let captureClearTimers: Record<'left' | 'right', ReturnType<typeof setTimeout> | null> = { left: null, right: null };
+  // true mientras hay una petición de captura en curso para ese lado — bloquea
+  // el botón para que no se puedan solapar dos capturas en la misma cámara.
+  let captureInFlight = $state<Record<'left' | 'right', boolean>>({ left: false, right: false });
+  // Contador (no reactivo) por lado: cada captura incrementa su valor y guarda
+  // el suyo en `seq`; si al terminar el contador ya avanzó, esta respuesta es
+  // obsoleta y no debe escribir en captureStatus. Guarda de refuerzo — con el
+  // botón deshabilitado durante la petición no debería llegar a activarse.
+  let captureSeq: Record<'left' | 'right', number> = { left: 0, right: 0 };
 
   // Frecuencia del polling (ms) — para cambiar, modifica este valor
   const PREVIEW_INTERVAL_MS = 2500;
@@ -107,6 +123,7 @@
   onDestroy(() => {
     Object.values(previewIntervals).forEach(clearInterval);
     Object.values(previewUrls).forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
+    Object.values(captureClearTimers).forEach(timer => { if (timer) clearTimeout(timer); });
   });
 
   // ---------------------------------------------------------------------------
@@ -214,7 +231,46 @@
   }
 
   async function handleCapture(side: 'left' | 'right') {
-    try { await camerasApi.capture({ project_name: '_test', camera_index: side === 'left' ? 0 : 1 }); } catch {}
+    // Si ya hay una captura en curso para este lado, ignora el clic — evita
+    // que dos peticiones se solapen y pisen el resultado la una de la otra
+    // (NEH-166).
+    if (captureInFlight[side]) return;
+    captureInFlight = { ...captureInFlight, [side]: true };
+    // Marca esta captura como la más reciente para este lado; cualquier
+    // escritura posterior a captureStatus[side] que no lleve este número ya
+    // quedó obsoleta y se descarta.
+    const seq = ++captureSeq[side];
+    // Cancela el timer de limpieza de una captura anterior en esta cámara,
+    // si lo hay, para que no borre el resultado de esta nueva captura (NEH-166).
+    if (captureClearTimers[side]) {
+      clearTimeout(captureClearTimers[side]!);
+      captureClearTimers[side] = null;
+    }
+    captureStatus = { ...captureStatus, [side]: null };
+    try {
+      const result = await camerasApi.capture({ project_name: '_test', camera_index: side === 'left' ? 0 : 1 });
+      const outcome = describeCaptureOutcome(result);
+      if (seq === captureSeq[side]) {
+        captureStatus = { ...captureStatus, [side]: outcome };
+        if (outcome.kind === 'ok') {
+          captureClearTimers[side] = setTimeout(() => {
+            captureClearTimers[side] = null;
+            // Solo limpiar si el resultado sigue siendo el "ok" que programó
+            // este timer — si una captura posterior ya cambió el estado
+            // (éxito o error), no lo pisemos.
+            if (seq === captureSeq[side] && captureStatus[side]?.kind === 'ok') {
+              captureStatus = { ...captureStatus, [side]: null };
+            }
+          }, 4000);
+        }
+      }
+    } catch (e) {
+      if (seq === captureSeq[side]) {
+        captureStatus = { ...captureStatus, [side]: describeCaptureFailure(e) };
+      }
+    } finally {
+      captureInFlight = { ...captureInFlight, [side]: false };
+    }
   }
 
 </script>
@@ -360,7 +416,7 @@
                     </svg>
                     {$m.dash_camera_focus}
                   </button>
-                  <button class="btn-secondary" onclick={() => handleCapture(side)}>
+                  <button class="btn-secondary" disabled={captureInFlight[side]} onclick={() => handleCapture(side)}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <rect x="3" y="3" width="18" height="18" rx="2"/>
                       <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -369,6 +425,16 @@
                     {$m.common_capture}
                   </button>
                 </div>
+                {#if captureStatus[side]}
+                  <p
+                    class="capture-status"
+                    class:is-error={captureStatus[side].kind === 'error'}
+                    role="status"
+                  >
+                    {captureStatus[side].kind === 'ok' ? $m.dash_camera_capture_ok : $m.dash_camera_capture_error}
+                    {#if captureStatus[side].kind === 'error' && captureStatus[side].detail}: {captureStatus[side].detail}{/if}
+                  </p>
+                {/if}
               </div>
             {/if}
 
@@ -559,6 +625,10 @@
   }
 
   .btn-secondary:hover { border-color: var(--color-primary); color: var(--color-light); }
+  .btn-secondary:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
+
+  .capture-status { margin: 8px 0 0; font-size: var(--text-sm); color: var(--color-light-grey); }
+  .capture-status.is-error { color: var(--color-error); }
 
   /* Badge flotante de cámaras */
   .cameras-badge {
