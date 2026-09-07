@@ -1212,9 +1212,12 @@ export const camerasApi = {
    * body (R30-4) — the backend returns 409 if a different body now sits at
    * that index, which callers should treat like any other save error (the
    * next device refresh re-seeds the index from whatever is really there).
+   * Resolves once the write is acknowledged; the device row the backend
+   * returns is not needed by any caller, and apiRequest yields undefined on
+   * an empty response, so the promise is typed as void rather than as a row.
    */
-  async setOrientation(cameraIndex: number, hardwareId: string, orientation: number): Promise<CameraDevice> {
-    return apiRequest<CameraDevice>(`/cameras/${cameraIndex}/orientation`, {
+  async setOrientation(cameraIndex: number, hardwareId: string, orientation: number): Promise<void> {
+    await apiRequest<CameraDevice>(`/cameras/${cameraIndex}/orientation`, {
       method: 'PUT',
       body: JSON.stringify({ orientation, hardware_id: hardwareId }),
     });
