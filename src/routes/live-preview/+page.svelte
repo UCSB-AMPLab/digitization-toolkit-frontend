@@ -23,6 +23,7 @@
   import { camerasApi, recordsApi, projectsApi, collectionsApi, type Record as ApiRecord, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { m } from '$lib/i18n';
+  import { seedRotation, createOrientationSaver } from '$lib/camera-orientation';
 
   import TopBar from './TopBar.svelte';
   import CameraControls from './CameraControls.svelte';
@@ -66,8 +67,29 @@
   let aperture = $state('13.0');
 
   // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
-  // Default 90° — most digitisation rigs use vertical (portrait) orientation
+  // Default 90° — most digitisation rigs use vertical (portrait) orientation.
+  // This default only holds until the device list arrives — onDevicesChange
+  // below reseeds it from what the appliance actually remembers (NEH-71).
   let rotateDeg = $state<{ [cam: number]: number }>({ 0: 90, 1: 90 });
+
+  // Which body (hardware_id) the operator manually rotated at each camera
+  // index in this session — NOT reactive state: it's bookkeeping consulted
+  // (and updated) alongside rotateDeg, never rendered on its own (R30-3).
+  let rotateTouched = new Map<number, string>();
+
+  // Rotaciones tocadas antes de que llegue la lista de dispositivos: no hay
+  // body al que persistirlas todavía, así que se recuerdan aquí y se aplican
+  // (y guardan) en cuanto onDevicesChange conoce la identidad del índice.
+  // Sin esto, el primer listado sobreescribiría el toque con el valor
+  // guardado y el cambio que la operadora ya vio desaparecería (R31-2).
+  let rotatePending = new Map<number, number>();
+
+  // Persists a rotation change to the backend, coalescing quick repeat taps
+  // on the same camera into a single in-flight PUT (R30-2).
+  const saveOrientation = createOrientationSaver(
+    (i, hw, deg) => camerasApi.setOrientation(i, hw, deg),
+    (i, e) => console.error('[LivePreview] Error guardando orientación:', i, e)
+  );
 
   // Nombre real del proyecto (cargado desde la API al montar)
   let projectName = $state<string>('');
@@ -237,6 +259,28 @@
 
     await loadRecords();
   }
+
+  // ---------------------------------------------------------------------------
+  // HANDLER: Cambio de rotación de una cámara
+  // Único punto de escritura de rotateDeg (NEH-71) — tanto el panel de
+  // controles como el overlay de LiveViewport llaman a esta misma función,
+  // así que nunca hay dos copias del valor desincronizándose entre sí.
+  // Si el índice ya no tiene un dispositivo real (se desconectó, o el modo es
+  // single y estamos mirando la cámara derecha), solo actualizamos el estado
+  // local: no hay body al que persistirle nada.
+  // ---------------------------------------------------------------------------
+  function handleRotateDegChange(cam: number, deg: number) {
+    const device = devices.find(d => d.index === cam);
+    if (!device) {
+      rotateDeg = { ...rotateDeg, [cam]: deg };
+      rotatePending.set(cam, deg);
+      return;
+    }
+    rotatePending.delete(cam);
+    rotateTouched.set(cam, device.hardware_id);
+    rotateDeg = { ...rotateDeg, [cam]: deg };
+    saveOrientation(cam, device.hardware_id, deg);
+  }
 </script>
 
 <!-- ============================================================
@@ -265,8 +309,19 @@
       onShutterSpeedChange={(v) => shutterSpeed = v}
       onIsoChange={(v) => iso = v}
       onApertureChange={(v) => aperture = v}
-      onDevicesChange={(d) => devices = d}
-      onRotateDegChange={(cam, deg) => rotateDeg = { ...rotateDeg, [cam]: deg }}
+      onDevicesChange={(d) => {
+        devices = d;
+        const seeded = seedRotation(rotateDeg, d, rotateTouched);
+        rotateDeg = seeded.rotation;
+        rotateTouched = seeded.touched;
+        // Un toque hecho antes de conocer el dispositivo se aplica ahora que
+        // el índice tiene identidad: queda tocado y se persiste.
+        for (const [cam, deg] of [...rotatePending]) {
+          if (d.some(x => x.index === cam)) handleRotateDegChange(cam, deg);
+        }
+      }}
+      onRotateDegChange={handleRotateDegChange}
+      {rotateDeg}
     />
 
     <!-- Área central: viewport + tira de miniaturas -->
@@ -284,7 +339,7 @@
         {devices}
         {rotateDeg}
         onCaptureDone={handleCaptureDone}
-        onRotateDegChange={(cam, deg) => rotateDeg = { ...rotateDeg, [cam]: deg }}
+        onRotateDegChange={handleRotateDegChange}
       />
 
       <!-- Tira de miniaturas inferior -->

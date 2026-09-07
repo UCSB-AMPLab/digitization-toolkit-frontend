@@ -967,6 +967,9 @@ export interface CameraDevice {
   // Calibration data
   lens_position?: number;
   awb_gains?: [number, number];
+  // Capture rotation (clockwise degrees) the appliance remembers for this
+  // body: 0 | 90 | 180 | 270, or null/absent if it has never been set.
+  orientation?: number | null;
   // Capabilities
   has_aperture_control?: boolean;
   supports_zoom?: boolean;
@@ -1200,6 +1203,23 @@ export const camerasApi = {
     return apiRequest<DSLRSettings>(`/cameras/dslr/${cameraIndex}/settings`, {
       method: 'PUT',
       body: JSON.stringify(settings),
+    });
+  },
+
+  /**
+   * Persist the capture rotation the appliance should remember for the body
+   * currently at `cameraIndex`. `hardwareId` pins the write to that specific
+   * body (R30-4) — the backend returns 409 if a different body now sits at
+   * that index, which callers should treat like any other save error (the
+   * next device refresh re-seeds the index from whatever is really there).
+   * Resolves once the write is acknowledged; the device row the backend
+   * returns is not needed by any caller, and apiRequest yields undefined on
+   * an empty response, so the promise is typed as void rather than as a row.
+   */
+  async setOrientation(cameraIndex: number, hardwareId: string, orientation: number): Promise<void> {
+    await apiRequest<CameraDevice>(`/cameras/${cameraIndex}/orientation`, {
+      method: 'PUT',
+      body: JSON.stringify({ orientation, hardware_id: hardwareId }),
     });
   },
 };
