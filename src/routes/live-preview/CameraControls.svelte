@@ -44,6 +44,7 @@
     onApertureChange,
     onDevicesChange,
     onRotateDegChange,
+    rotateDeg = {},
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -55,6 +56,7 @@
     onApertureChange: (value: string) => void;
     onDevicesChange?: (devices: CameraDevice[]) => void;
     onRotateDegChange?: (cam: number, deg: number) => void;
+    rotateDeg?: Record<number, number>;
   } = $props();
 
   // ---------------------------------------------------------------------------
@@ -108,15 +110,13 @@
   let cameraFocusMode    = $state<Record<number, string | undefined>>({});
   let dslrSettingsSeq = 0;
 
-  // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
-  // Default 90° — most digitisation rigs use vertical (portrait) orientation
-  let cameraRotateDeg = $state<Record<number, number>>({ 0: 90, 1: 90 });
-
+  // La rotación por cámara vive en la página (NEH-71): este panel no guarda
+  // su propia copia, solo lee el prop `rotateDeg` y reporta los pasos hacia
+  // arriba — así nunca queda desincronizado del overlay de LiveViewport.
   function stepRotation(delta: number) {
     const idx = selectedCameraIndex;
-    const current = cameraRotateDeg[idx] ?? 0;
+    const current = rotateDeg[idx] ?? 0;
     const next = ((current + delta) % 360 + 360) % 360;
-    cameraRotateDeg = { ...cameraRotateDeg, [idx]: next };
     onRotateDegChange?.(idx, next);
   }
 
@@ -711,7 +711,7 @@
                   <path d="M3 3v5h5"/>
                 </svg>
               </button>
-              <span class="orientation-label">{cameraRotateDeg[selectedCameraIndex] ?? 0}°</span>
+              <span class="orientation-label">{rotateDeg[selectedCameraIndex] ?? 0}°</span>
               <button class="rotate-step-btn" onclick={() => stepRotation(90)} aria-label={$m.cam_rotate_cw}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
