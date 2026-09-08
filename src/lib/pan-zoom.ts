@@ -66,8 +66,11 @@ export function oneToOneZoom(natural: Size, container: Size, rotation: number, d
   return natural.w / (fitted.w * dpr);
 }
 
+// The zoom ceiling: twice the page's 1:1 (a reviewer can check focus at
+// 200%), never below twice fit since the 1:1 value is clamped to at least
+// fit first (see effectiveOneToOne).
 export function maxZoom(oneToOne: number): number {
-  return Math.max(3, 2 * oneToOne);
+  return 2 * effectiveOneToOne(oneToOne);
 }
 
 // Multiplies or divides by ZOOM_STEP, clamps to [ZOOM_MIN, maxZoom], and
@@ -76,7 +79,12 @@ export function maxZoom(oneToOne: number): number {
 export function stepZoom(zoom: number, direction: 1 | -1, oneToOne: number): number {
   const next = direction === 1 ? zoom * ZOOM_STEP : zoom / ZOOM_STEP;
   const clamped = clamp(next, ZOOM_MIN, maxZoom(oneToOne));
-  return Math.abs(clamped - 1) <= 0.02 ? 1 : clamped;
+  // Snap to fit when the result lands within 2% of 1 OR when the step
+  // crosses 1: stepping down from a clamped ceiling can produce a sequence
+  // (2 -> 1.6 -> 1.28 -> 1.024 -> 0.8192) whose closest value misses the
+  // band, and fit must always be reachable by stepping.
+  const crossesFit = (zoom - 1) * (clamped - 1) < 0;
+  return Math.abs(clamped - 1) <= 0.02 || crossesFit ? 1 : clamped;
 }
 
 // Clamps a page's own 1:1 zoom to at least 1 (R35-1, ruled in round 36):

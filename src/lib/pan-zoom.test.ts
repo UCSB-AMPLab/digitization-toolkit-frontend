@@ -101,12 +101,10 @@ describe('oneToOneZoom', () => {
 });
 
 describe('maxZoom', () => {
-  it('is at least 3 even for a small 1:1', () => {
-    expect(maxZoom(1)).toBe(3);
-    expect(maxZoom(1.4)).toBe(3);
-  });
-
-  it('is double the 1:1 zoom once that exceeds 1.5', () => {
+  it('is twice the 1:1 zoom, and never below twice fit for a 1:1 at or under 1', () => {
+    expect(maxZoom(1)).toBe(2);
+    expect(maxZoom(0.5)).toBe(2);
+    expect(maxZoom(1.4)).toBeCloseTo(2.8, 10);
     expect(maxZoom(6.6667)).toBeCloseTo(13.3334, 4);
   });
 });
@@ -118,6 +116,21 @@ describe('stepZoom', () => {
 
   it('steps down by ZOOM_STEP', () => {
     expect(stepZoom(1, -1, 1)).toBeCloseTo(1 / ZOOM_STEP, 10);
+  });
+
+  it('reaches exactly 1 stepping down from the ceiling of a page whose 1:1 is 1 (R37-1)', () => {
+    // 2 -> 1.6 -> 1.28 -> 1.024 -> would be 0.8192: the closest value misses
+    // the 2% band, so the step that crosses fit must snap to it.
+    let z = maxZoom(1);
+    const seen: number[] = [];
+    for (let i = 0; i < 6 && z > ZOOM_MIN; i++) { z = stepZoom(z, -1, 1); seen.push(z); }
+    expect(seen).toContain(1);
+  });
+
+  it('reaches exactly 1 stepping up from below fit (R37-1)', () => {
+    // 0.78125 -> 0.9765625 -> would be 1.220703125: crosses fit, snaps to 1.
+    expect(stepZoom(0.9765625, 1, 10)).toBe(1);
+    expect(stepZoom(1.024, -1, 1)).toBe(1);
   });
 
   it('clamps at ZOOM_MIN stepping down from the floor', () => {
