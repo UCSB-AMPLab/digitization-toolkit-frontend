@@ -475,6 +475,8 @@ export const es = {
 	col_zoom_out: 'Alejar',
 	col_fit_screen: 'Ajustar pantalla',
 	col_fit_screen_aria: 'Ajustar a pantalla',
+	col_zoom_actual: 'Tamaño real (1:1)',
+	col_zoom_actual_aria: 'Tamaño real (1:1)',
 	col_export_available: 'Exportar BagIt (todos aprobados)',
 	col_export_unavailable: 'Exportar BagIt (requiere todos aprobados)',
 	col_export: 'Exportar BagIt',

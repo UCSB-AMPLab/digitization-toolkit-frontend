@@ -454,6 +454,8 @@ export const en: Messages = {
 	col_zoom_out: 'Zoom out',
 	col_fit_screen: 'Fit to screen',
 	col_fit_screen_aria: 'Fit to screen',
+	col_zoom_actual: 'Actual size (1:1)',
+	col_zoom_actual_aria: 'Actual size (1:1)',
 	col_export_available: 'Export BagIt (all approved)',
 	col_export_unavailable: 'Export BagIt (requires all records approved)',
 	col_export: 'Export BagIt',

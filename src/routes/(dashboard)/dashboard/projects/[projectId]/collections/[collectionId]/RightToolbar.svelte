@@ -18,12 +18,15 @@
   // El ícono activo tiene un marcador verde a la izquierda + fondo oscuro.
   // ============================================================================
 
+  import { stepZoom } from '$lib/pan-zoom';
+
   // ---------------------------------------------------------------------------
   // PROPS
   // ---------------------------------------------------------------------------
   let {
     viewMode,
     zoom,
+    oneToOne = 1,
     canExport = false,
     onViewModeChange,
     onZoomChange,
@@ -33,6 +36,7 @@
   }: {
     viewMode: 'list' | 'spread' | 'grid';
     zoom: number;
+    oneToOne?: number;
     canExport?: boolean;
     onViewModeChange: (mode: 'list' | 'spread' | 'grid') => void;
     onZoomChange: (zoom: number) => void;
@@ -45,9 +49,10 @@
   // ACCIONES
   // ---------------------------------------------------------------------------
 
-  function handleZoomIn()    { onZoomChange(Math.min(zoom + 0.2, 3)); }
-  function handleZoomOut()   { onZoomChange(Math.max(zoom - 0.2, 0.5)); }
+  function handleZoomIn()    { onZoomChange(stepZoom(zoom, 1, oneToOne)); }
+  function handleZoomOut()   { onZoomChange(stepZoom(zoom, -1, oneToOne)); }
   function handleFitScreen() { onZoomChange(1); }
+  function handleActualSize() { onZoomChange(oneToOne); }
 </script>
 
 <!-- ============================================================
@@ -139,6 +144,11 @@
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
       </svg>
     </button>
+
+    <!-- Tamaño real (1:1) -->
+    <button class="tool-btn" onclick={handleActualSize} title={$m.col_zoom_actual} aria-label={$m.col_zoom_actual_aria}>
+      <span class="one-to-one-glyph">1:1</span>
+    </button>
   {/if}
 
   <!-- Separador + Exportar BagIt -->
@@ -213,6 +223,13 @@
     height: 32px;
     background-color: var(--color-primary);
     border-radius: 0 3px 3px 0;
+  }
+
+  /* Botón "1:1" — glifo de texto, no hay ícono Material libre (fit_screen
+     ya lo usa "Ajustar pantalla"). */
+  .one-to-one-glyph {
+    font-size: var(--text-sm);
+    font-weight: var(--fw-bold);
   }
 
   /* Botón retake con borde dorado */
