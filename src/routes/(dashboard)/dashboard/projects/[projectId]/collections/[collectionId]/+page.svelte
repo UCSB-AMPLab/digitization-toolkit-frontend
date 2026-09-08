@@ -49,6 +49,11 @@
   let zoom             = $state(1);
   let rotation         = $state(0);
   let isLoading        = $state(true);
+  // NEH-230: el zoom al que un píxel de imagen ocupa un píxel de
+  // dispositivo — lo calcula ImageViewer (según la página de referencia
+  // medida) y lo usamos acá para el botón "1:1" y el tope de zoom de
+  // RightToolbar.
+  let oneToOne         = $state(1);
 
   // Registro inspeccionado en el modal (desde ListView)
   let inspectedRecord = $state<Record | null>(null);
@@ -325,6 +330,7 @@
           onPrev={handlePrev}
           onNext={handleNext}
           onZoomChange={(z) => zoom = z}
+          onOneToOneChange={(z) => oneToOne = z}
         />
         <div class="thumbnail-area">
           <ThumbnailStrip
@@ -341,6 +347,7 @@
     <RightToolbar
       {viewMode}
       {zoom}
+      {oneToOne}
       {canExport}
       onViewModeChange={handleViewModeChange}
       onZoomChange={(z) => zoom = z}
