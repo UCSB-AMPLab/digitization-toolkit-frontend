@@ -20,7 +20,7 @@
   import { authStore } from '$lib/stores/auth';
   import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore } from '$lib/api';
   import { m } from '$lib/i18n';
-  import { describeCaptureFailure, describeCaptureOutcome, type CaptureOutcome } from '$lib/capture-outcome';
+  import { describeCaptureFailure, describeTestCapture, type CaptureOutcome } from '$lib/capture-outcome';
   import { sidesFromDevices, type SideInfo, type SideStatus } from '$lib/camera-sides';
   import { createCameraRefresh } from '$lib/camera-refresh';
 
@@ -268,6 +268,12 @@
           applyPreviewStatus(token, side, 'ok');
         }
         const blob = await res.blob();
+        // Si el operador detuvo el stream mientras esta petición estaba en
+        // vuelo, el frame llega tarde: no publicarlo, porque ya no hay
+        // polling que lo reemplace y el recuadro se quedaría con una imagen
+        // vieja junto a "Probar". Una captura de prueba sí se muestra con
+        // el stream detenido (NEH-166), pero esa entra por handleCapture.
+        if (!streamActive[side as 'left' | 'right']) return;
         const url = URL.createObjectURL(blob);
         if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
         previewUrls = { ...previewUrls, [side]: url };
@@ -298,21 +304,26 @@
     }
     captureStatus = { ...captureStatus, [side]: null };
     try {
-      const result = await camerasApi.capture({ project_name: '_test', camera_index: side === 'left' ? 0 : 1 });
-      const outcome = describeCaptureOutcome(result);
+      const index = side === 'left' ? 0 : 1;
+      const result = await camerasApi.testCapture(index);
       if (seq === captureSeq[side]) {
+        // La imagen capturada sustituye el frame de preview de este lado
+        // hasta que llegue el próximo frame real (NEH-166) — así el
+        // operador ve lo que la cámara realmente tomó, en el mismo recuadro.
+        const url = URL.createObjectURL(result.blob);
+        if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
+        previewUrls = { ...previewUrls, [side]: url };
+        const outcome = describeTestCapture(result, url);
         captureStatus = { ...captureStatus, [side]: outcome };
-        if (outcome.kind === 'ok') {
-          captureClearTimers[side] = setTimeout(() => {
-            captureClearTimers[side] = null;
-            // Solo limpiar si el resultado sigue siendo el "ok" que programó
-            // este timer — si una captura posterior ya cambió el estado
-            // (éxito o error), no lo pisemos.
-            if (seq === captureSeq[side] && captureStatus[side]?.kind === 'ok') {
-              captureStatus = { ...captureStatus, [side]: null };
-            }
-          }, 4000);
-        }
+        captureClearTimers[side] = setTimeout(() => {
+          captureClearTimers[side] = null;
+          // Solo limpiar si el resultado sigue siendo el "ok" que programó
+          // este timer — si una captura posterior ya cambió el estado
+          // (éxito o error), no lo pisemos.
+          if (seq === captureSeq[side] && captureStatus[side]?.kind === 'ok') {
+            captureStatus = { ...captureStatus, [side]: null };
+          }
+        }, 4000);
       }
     } catch (e) {
       if (seq === captureSeq[side]) {
@@ -431,7 +442,7 @@
                 <!-- Área de preview (polling) -->
                 <!-- Para sustituir: ver comentario en fetchFrame() arriba -->
                 <div class="preview-area">
-                  {#if previewUrls[side] && active}
+                  {#if previewUrls[side]}
                     <img src={previewUrls[side]} alt={side === 'left' ? $m.dash_camera_left : $m.dash_camera_right} class="preview-img" />
                   {:else}
                     <div class="no-signal">
@@ -482,6 +493,9 @@
                     role="status"
                   >
                     {captureStatus[side].kind === 'ok' ? $m.dash_camera_capture_ok : $m.dash_camera_capture_error}
+                    {#if captureStatus[side].kind === 'ok' && captureStatus[side].seconds != null}
+                      {$m.dash_camera_capture_took(captureStatus[side].seconds.toFixed(1))}
+                    {/if}
                     {#if captureStatus[side].kind === 'error' && captureStatus[side].detail}: {captureStatus[side].detail}{/if}
                   </p>
                 {/if}

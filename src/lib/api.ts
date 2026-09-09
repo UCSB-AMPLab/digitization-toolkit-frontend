@@ -131,6 +131,61 @@ async function apiRequest<T>(
   return response.json();
 }
 
+// Sibling of apiRequest() for endpoints that return a binary body (e.g. a
+// captured image) instead of JSON. apiRequest() always calls
+// response.json() on success, which would corrupt a binary payload, so a
+// caller that needs the raw blob (and its response headers) needs its own
+// helper rather than a special case inside apiRequest(). Same auth header,
+// same 401/403 handling, same error-body parsing into the thrown Error's
+// message as apiRequest().
+async function apiRequestBlob(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<{ blob: Blob; headers: Headers }> {
+  const base = getApiBase();
+  const token = tokenStore.get();
+
+  const headers: { [key: string]: string } = {
+    ...(options.headers as { [key: string]: string })
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${base}${endpoint}`, {
+    ...options,
+    headers
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: get(m).api_request_failed }));
+    const detail = errorData.detail || `HTTP ${response.status}`;
+    const isStructuredDetail = typeof detail === 'object' && detail !== null;
+    const message = isStructuredDetail
+      ? (detail as { message?: string }).message || JSON.stringify(detail)
+      : String(detail);
+
+    const isSessionExempt = SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p));
+    const isDeadSession = response.status === 401 && !isSessionExempt;
+
+    if (isDeadSession && browser) {
+      authStore.clearSession();
+      if (!window.location.pathname.startsWith('/login')) {
+        goto('/login');
+      }
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new AuthError(response.status, message);
+    }
+
+    throw new ApiError(message, isStructuredDetail ? detail : undefined);
+  }
+
+  return { blob: await response.blob(), headers: response.headers };
+}
+
 // ============================================================================
 // AUTHENTICATION API
 // ============================================================================
@@ -1010,6 +1065,16 @@ export interface CaptureResponse {
   error?: string;
 }
 
+// Result of camerasApi.testCapture(): the raw image plus the two timing/size
+// headers the backend attaches (NEH-166). A missing header comes back as
+// null, never as an error — apiRequestBlob() only throws for a non-ok
+// response.
+export interface TestCaptureResult {
+  blob: Blob;
+  seconds: number | null;
+  bytes: number | null;
+}
+
 export interface CalibrationRequest {
   camera_index?: number;
   resolution?: string;
@@ -1099,6 +1164,31 @@ export const camerasApi = {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  },
+
+  /**
+   * Take a single test capture from the dashboard's camera panel and return
+   * the image itself rather than saving a record (NEH-166) — the operator
+   * uses this to see what the camera actually took, not to build a project.
+   *
+   * NOTE: the backend route's final path was not settled when this was
+   * written. If the backend lands on `/cameras/{camera_index}/test-capture`
+   * instead, this is the one line to change.
+   */
+  async testCapture(cameraIndex: number): Promise<TestCaptureResult> {
+    const { blob, headers } = await apiRequestBlob(`/cameras/test-capture/${cameraIndex}`, {
+      method: 'POST'
+    });
+    const parseNumericHeader = (value: string | null): number | null => {
+      if (value === null) return null;
+      const n = Number(value);
+      return Number.isNaN(n) ? null : n;
+    };
+    return {
+      blob,
+      seconds: parseNumericHeader(headers.get('X-Capture-Seconds')),
+      bytes: parseNumericHeader(headers.get('X-Capture-Bytes'))
+    };
   },
 
   /**
