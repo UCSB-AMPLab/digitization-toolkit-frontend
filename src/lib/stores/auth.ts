@@ -37,7 +37,7 @@ export function isUserRole(value: unknown): value is UserRole {
 export interface AuthUser {
   id: number;
   username: string;
-  email: string;
+  email: string | null;
   role: UserRole;       // rol que determina a qué dashboard se redirige
   is_active: boolean;
 }

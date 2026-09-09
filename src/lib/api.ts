@@ -137,7 +137,7 @@ async function apiRequest<T>(
 
 export interface RegisterData {
   username: string;
-  email: string;
+  email: string | null;
   password: string;
 }
 
@@ -149,7 +149,7 @@ export interface LoginData {
 export interface User {
   id: number;
   username: string;
-  email: string;
+  email: string | null;
   role: 'admin' | 'operator' | 'reviewer';
   is_active: boolean;
   created_at?: string;
@@ -230,7 +230,7 @@ export const authApi = {
 
 export interface CreateUserData {
   username: string;
-  email: string;
+  email: string | null;
   password: string;
   role: 'admin' | 'operator' | 'reviewer';
 }
@@ -1390,7 +1390,7 @@ export interface ProjectMember {
   added_at:     string;
   added_by?:    string;
   username:     string;
-  email:        string;
+  email:        string | null;
   is_implicit:  boolean;
 }
 

@@ -253,11 +253,12 @@ export const es = {
 	users_err_create: 'Error al crear usuario',
 	users_err_save: 'Error al guardar',
 	users_val_username_required: 'El nombre de usuario es obligatorio.',
-	users_val_email_required: 'El email es obligatorio.',
 	users_val_password_required: 'La contraseña es obligatoria.',
 	users_val_password_mismatch: 'Las contraseñas no coinciden.',
+	users_val_email_format: 'Formato de correo no válido',
 	users_delete_title: '¿Eliminar usuario?',
-	// Fragmento antes del <strong>{usuario}</strong> ({email})?
+	// Fragmento antes del <strong>{usuario}</strong>; luego va " ({email})" solo
+	// si la cuenta tiene correo, y al final el "?".
 	users_delete_confirm_pre: '¿Estás seguro que quieres eliminar a ',
 	users_delete_btn: 'Sí, eliminar',
 
@@ -535,7 +536,6 @@ export const es = {
 	setup_err_unavailable: 'La instalación no está disponible: esta unidad no tiene token de arranque configurado.',
 	setup_val_username_required: 'El nombre de usuario es obligatorio',
 	setup_val_username_short: 'El usuario debe tener al menos 3 caracteres',
-	setup_val_email_required: 'El correo electrónico es obligatorio',
 	setup_val_email_format: 'Formato de correo no válido',
 	setup_val_password_required: 'La contraseña es obligatoria',
 	setup_val_password_short: 'La contraseña debe tener al menos 8 caracteres',

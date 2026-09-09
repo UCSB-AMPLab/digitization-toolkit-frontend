@@ -20,6 +20,7 @@
   import { onMount } from 'svelte';
   import { usersApi, type UserRead } from '$lib/api';
   import { m, locale, roleLabel } from '$lib/i18n';
+  import { normalizeEmail, emailFormatError } from '$lib/email-field';
 
   // ---------------------------------------------------------------------------
   // TIPOS LOCALES
@@ -42,7 +43,7 @@
   let filteredUsers = $derived(users.filter(u => {
     const matchSearch = !searchQuery ||
       u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase());
+      !!u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchRole   = !filterRole   || u.role === filterRole;
     const matchStatus = !filterStatus ||
       (filterStatus === 'active' ? u.is_active : !u.is_active);
@@ -136,7 +137,7 @@
     isEditMode    = true;
     editingUserId = user.id;
     formUsername  = user.username;
-    formEmail     = user.email;
+    formEmail     = user.email ?? '';
     formPassword  = '';
     formConfirm   = '';
     formRole      = user.role as UserRole;
@@ -170,7 +171,7 @@
     } else {
       // Create: validate then call API
       if (!formUsername.trim()) { formError = $m.users_val_username_required; return; }
-      if (!formEmail.trim())    { formError = $m.users_val_email_required; return; }
+      if (emailFormatError(formEmail)) { formError = $m.users_val_email_format; return; }
       if (!formPassword.trim()) { formError = $m.users_val_password_required; return; }
       if (formPassword !== formConfirm) { formError = $m.users_val_password_mismatch; return; }
 
@@ -178,7 +179,7 @@
       try {
         await usersApi.create({
           username: formUsername.trim(),
-          email:    formEmail.trim(),
+          email:    normalizeEmail(formEmail),
           password: formPassword,
           role:     formRole,
         });
@@ -365,7 +366,9 @@
                   </div>
                   <div class="user-info">
                     <span class="user-fullname">{user.username}</span>
-                    <span class="user-username">{user.email}</span>
+                    {#if user.email}
+                      <span class="user-username">{user.email}</span>
+                    {/if}
                   </div>
                 </div>
               </td>
@@ -689,8 +692,7 @@
       <!-- Descripción con el nombre del usuario destacado -->
       <p class="confirm-desc">
         {$m.users_delete_confirm_pre}
-        <strong>{deletingUser.username}</strong>
-        ({deletingUser.email})?
+        <strong>{deletingUser.username}</strong>{#if deletingUser.email} ({deletingUser.email}){/if}?
         {$m.common_irreversible}
       </p>
 

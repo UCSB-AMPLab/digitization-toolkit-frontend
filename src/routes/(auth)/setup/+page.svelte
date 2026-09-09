@@ -16,6 +16,7 @@
 	import { authApi } from '$lib/api';
 	import { m } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
+	import { normalizeEmail, emailFormatError } from '$lib/email-field';
 
 	// ---------------------------------------------------------------------------
 	// ESTADO DEL FORMULARIO
@@ -55,8 +56,7 @@
 	function validate(): string {
 		if (!username.trim()) return $m.setup_val_username_required;
 		if (username.trim().length < 3) return $m.setup_val_username_short;
-		if (!email.trim()) return $m.setup_val_email_required;
-		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return $m.setup_val_email_format;
+		if (emailFormatError(email)) return $m.setup_val_email_format;
 		if (!password) return $m.setup_val_password_required;
 		if (password.length < 8) return $m.setup_val_password_short;
 		if (password !== confirmPassword) return $m.setup_val_password_mismatch;
@@ -81,7 +81,7 @@
 			await authApi.register(
 				{
 					username: username.trim(),
-					email: email.trim(),
+					email: normalizeEmail(email),
 					password
 				},
 				bootstrapToken.trim() || undefined
