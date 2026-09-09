@@ -39,6 +39,18 @@
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
   import { viewportAspect as computeViewportAspect, fitBox, frameAspect, panelGrowFactor } from '$lib/viewport-aspect';
+  import {
+    DEFAULT_CHORD,
+    describeChord,
+    learnFromEvent,
+    ownsEvent,
+    readChord,
+    shouldTrigger,
+    writeChord,
+    clearChord as clearStoredChord,
+    type CaptureChord,
+    type OwnsEventContext
+  } from '$lib/capture-key';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -55,6 +67,7 @@
     devices = [],
     rotateDeg = {},
     onRotateDegChange,
+    otherModalOpen = false,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -67,6 +80,11 @@
     devices?: CameraDevice[];
     rotateDeg?: Record<number, number>;
     onRotateDegChange?: (cam: number, deg: number) => void;
+    // NEH-228: true while the page's own image-inspection modal is open
+    // (Book view's "inspectedRecord"). That modal is rendered by +page.svelte,
+    // not by this component, so its openness arrives as a prop instead of
+    // local state — the capture key must not fire while it's up.
+    otherModalOpen?: boolean;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -95,6 +113,57 @@
   let showGrid = $state(false);
   let showGuides = $state(true);
   let showGridModal = $state(false);
+
+  // ---------------------------------------------------------------------------
+  // TECLA DE CAPTURA (NEH-228)
+  // El pedal USB de digitalización se comporta como un teclado que emite una
+  // sola tecla, distinta por dispositivo. En vez de exigir configuración
+  // manual, quien opera la asigna presionando el pedal una vez en el control
+  // de abajo, y queda guardada en ese navegador. Por defecto es la barra
+  // espaciadora, así que un teclado normal funciona sin tocar nada.
+  // ---------------------------------------------------------------------------
+  let chord = $state<CaptureChord>(readChord());
+
+  // Seguro de "tecla sostenida": se activa cuando una pulsación arranca una
+  // captura y se libera en el keyup correspondiente. Si el keyup nunca llega
+  // (la ventana perdió el foco a mitad de la pulsación), blur y
+  // visibilitychange lo liberan igual — si no, un pedal soltado fuera de
+  // foco dejaría la captura bloqueada hasta recargar la página (ronda 55).
+  let chordHeld = $state(false);
+  // El release se compara contra el `code` físico de la tecla que armó el
+  // seguro, nunca contra `chord.key`: soltar el modificador antes que la
+  // tecla cambia lo que esa tecla reporta (Shift+2 arma con key "@" y suelta
+  // con key "2"), y `code` no cambia con los modificadores. null cuando no
+  // hay seguro armado, o cuando el dispositivo no reportó un `code`
+  // utilizable al presionar.
+  //
+  // El seguro nunca puede sobrevivir a un release que sí llega: se libera
+  // cuando los dos `code` (el de la pulsación y el del release) coinciden,
+  // pero también cuando a cualquiera de los dos le falta un `code`
+  // utilizable — un release sin `code` identificable sigue siendo un
+  // release. Es una guarda deliberadamente débil, la tercera de tres: la
+  // bandera de captura en curso y el flag de repeat ya impiden una segunda
+  // captura real; este seguro solo evita que una repetición del sistema
+  // operativo cuele una captura extra entre el keydown y su keyup. Dejarlo
+  // trabado por falta de `code` es peor que soltarlo de más.
+  let heldCode = $state<string | null>(null);
+
+  // Estado del control para asignar la tecla: mientras `learning` es true,
+  // el próximo keydown de la ventana no dispara una captura — se le entrega
+  // a learnFromEvent en su lugar.
+  let learning = $state(false);
+  // Un modificador solo (Control/Alt/Shift/Meta) llegó mientras se asignaba
+  // la tecla, a la espera de que junto con él llegue la tecla que arma la
+  // combinación. Si en cambio se suelta sin que llegue nada más, keyup lo
+  // reporta como un dispositivo que solo emite el modificador, en vez de
+  // quedarse "asignando" para siempre.
+  let pendingModifier = $state<'Control' | 'Alt' | 'Shift' | 'Meta' | null>(null);
+  let learnMessage = $state<string | null>(null);
+
+  // Los ajustes de cuadrícula ya deciden cuándo el teclado no le pertenece a
+  // la captura; el modal de inspección de imagen vive en la página
+  // (+page.svelte) y llega como prop, así que ambos se combinan acá.
+  let modalOpen = $derived(showGridModal || otherModalOpen);
 
   // Panel de controles plegable. Abierto por defecto; plegado devuelve al feed
   // el espacio que el panel le quita. El botón de plegar es siempre visible:
@@ -371,6 +440,9 @@
         clearInterval(previewInterval);
         previewInterval = null;
       }
+      // NEH-228: también libera el seguro de tecla sostenida — es una de
+      // las dos rutas de recuperación de un keyup que nunca llega (ronda 55).
+      clearChordLatch();
     }
   }
 
@@ -489,6 +561,126 @@
   }
 
   // ---------------------------------------------------------------------------
+  // TECLA DE CAPTURA — manejo de teclado (NEH-228)
+  //
+  // ownsEvent y shouldTrigger responden preguntas distintas y se llaman por
+  // separado (ronda 55): ownsEvent decide si el evento le pertenece a la
+  // captura (y por lo tanto si hay que llamar a preventDefault), sin importar
+  // si esta pulsación en particular debe arrancar una captura. Confundirlas
+  // deja pasar las repeticiones de un pedal sostenido hacia lo que tenga
+  // foco — la primera pulsación se cancela, pero cada repetición después de
+  // esa activa el botón enfocado en vez de la cámara.
+  // ---------------------------------------------------------------------------
+
+  function ownsEventContext(): OwnsEventContext {
+    return {
+      chord,
+      modalOpen,
+      activeElement: browser ? document.activeElement : null,
+    };
+  }
+
+  function clearChordLatch() {
+    chordHeld = false;
+    heldCode = null;
+  }
+
+  function handleWindowKeydown(event: KeyboardEvent) {
+    if (learning) {
+      handleLearnKeydown(event);
+      return;
+    }
+    const ctx = ownsEventContext();
+    if (!ownsEvent(event, ctx)) return;
+    // Siempre que el evento le pertenece a la captura, no a solo cuando de
+    // verdad arranca una: si no, cada repetición después de la primera pasa
+    // de largo hacia el botón enfocado (ronda 55).
+    event.preventDefault();
+    if (shouldTrigger(event, { ...ctx, keyHeld: chordHeld, capturing: isCapturing, ready: captureReady })) {
+      chordHeld = true;
+      // Se guarda el `code` físico, no `chord.key`: es lo único que sigue
+      // identificando esta tecla cuando el release llega con los
+      // modificadores ya sueltos. Si el evento no trae un `code` utilizable,
+      // heldCode queda en null y el seguro depende de blur/visibilitychange.
+      heldCode = event.code || null;
+      handleCapture();
+    }
+  }
+
+  function handleWindowKeyup(event: KeyboardEvent) {
+    if (learning) {
+      // El dispositivo solo mandó un modificador y ahora lo suelta sin que
+      // haya llegado ninguna otra tecla junto con él: se lo decimos a quien
+      // opera en vez de dejar el control "asignando" para siempre.
+      if (pendingModifier && event.key === pendingModifier) {
+        learnMessage = $m.lv_capture_key_modifier_only(pendingModifier);
+        pendingModifier = null;
+      }
+      return;
+    }
+    // El release se compara contra el `code` físico que armó el seguro, no
+    // contra la tecla del chord: soltar un modificador antes que la tecla
+    // cambia lo que esa tecla reporta como `key`, pero no su `code`. Se
+    // libera cuando los dos `code` coinciden, y también cuando a cualquiera
+    // de los dos lados le falta un `code` utilizable — un release sin
+    // `code` identificable sigue siendo un release, y dejar el seguro
+    // trabado por falta de dato es peor que soltarlo de más: la captura en
+    // curso y el flag de repeat son las guardas que de verdad impiden una
+    // segunda captura, este seguro es solo la tercera.
+    if (!heldCode || !event.code || event.code === heldCode) {
+      clearChordLatch();
+    }
+  }
+
+  function handleLearnKeydown(event: KeyboardEvent) {
+    event.preventDefault();
+    const result = learnFromEvent(event);
+    if (result.ok) {
+      chord = result.chord;
+      writeChord(chord);
+      learning = false;
+      pendingModifier = null;
+      learnMessage = null;
+      return;
+    }
+    if (result.reason === 'modifier-only') {
+      pendingModifier = result.modifier;
+      learnMessage = null;
+      return;
+    }
+    // 'unbindable': Dead, Unidentified, o un evento a mitad de composición.
+    learnMessage = $m.lv_capture_key_unbindable;
+  }
+
+  function startLearningChord() {
+    learning = true;
+    pendingModifier = null;
+    learnMessage = null;
+  }
+
+  // Cancelar es siempre un botón visible, nunca una tecla — si no, un pedal
+  // que emite Escape no se podría asignar nunca.
+  function cancelLearningChord() {
+    learning = false;
+    pendingModifier = null;
+    learnMessage = null;
+  }
+
+  function resetChord() {
+    clearStoredChord();
+    chord = DEFAULT_CHORD;
+    cancelLearningChord();
+  }
+
+  function closeGridModal() {
+    showGridModal = false;
+    // Cerrar los ajustes de cuadrícula a mitad de la asignación no debe
+    // dejar el próximo keydown de la ventana secuestrado por un control ya
+    // invisible.
+    cancelLearningChord();
+  }
+
+  // ---------------------------------------------------------------------------
   // MODAL DE GRILLA
   // ---------------------------------------------------------------------------
 
@@ -500,6 +692,8 @@
     return `${dev?.label || dev?.model || 'Camera'} [${idx}]`;
   }
 </script>
+
+<svelte:window onkeydown={handleWindowKeydown} onkeyup={handleWindowKeyup} onblur={clearChordLatch} />
 
 <!-- ============================================================
      VIEWPORT PRINCIPAL
@@ -814,7 +1008,7 @@
 {#if showGridModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) showGridModal = false; }}>
+  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeGridModal(); }}>
     <div class="modal-card">
       <h3 class="modal-title">{$m.lv_grid_modal_title}</h3>
       <p class="modal-subtitle">{$m.lv_grid_modal_subtitle}</p>
@@ -837,9 +1031,33 @@
             <div class="toggle-thumb" class:on={showGuides}></div>
           </button>
         </div>
+
+        <!-- NEH-228: la tecla de captura — se asigna una vez y queda
+             guardada en este navegador. -->
+        <div class="modal-toggle-row capture-key-row">
+          <div>
+            <p class="modal-toggle-title">{$m.lv_capture_key_current(describeChord(chord, $m.lv_capture_key_space))}</p>
+            <p class="modal-toggle-sub">{$m.lv_capture_key_desc}</p>
+          </div>
+          <div class="capture-key-buttons">
+            {#if learning}
+              <button class="capture-key-btn" onclick={cancelLearningChord}>{$m.common_cancel}</button>
+            {:else}
+              <button class="capture-key-btn" onclick={startLearningChord}>{$m.lv_capture_key_learn}</button>
+            {/if}
+            <button class="capture-key-btn" onclick={resetChord}>{$m.lv_capture_key_reset}</button>
+          </div>
+        </div>
+        {#if learning}
+          <p class="modal-toggle-sub capture-key-status" role="status">{$m.lv_capture_key_learning}</p>
+        {/if}
+        {#if learnMessage}
+          <p class="modal-toggle-sub capture-key-status" role="alert">{learnMessage}</p>
+        {/if}
+        <p class="modal-toggle-sub capture-key-note">{$m.lv_capture_key_note}</p>
       </div>
       <div class="modal-actions">
-        <button class="modal-btn confirm" onclick={() => showGridModal = false}>{$m.common_close}</button>
+        <button class="modal-btn confirm" onclick={closeGridModal}>{$m.common_close}</button>
       </div>
     </div>
   </div>
@@ -1286,6 +1504,30 @@
   }
 
   .toggle-thumb.on { transform: translateX(24px); background-color: white; }
+
+  /* NEH-228: fila de la tecla de captura — igual que .modal-toggle-row, pero
+     con dos botones en vez de un toggle a la derecha. */
+  .capture-key-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .capture-key-btn {
+    padding: 8px 12px;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background-color: var(--color-surface-alt);
+    color: var(--color-light);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .capture-key-btn:hover { background-color: rgba(255,255,255,0.05); }
+
+  .capture-key-status { color: var(--color-primary); }
+
+  .capture-key-note { margin-top: -8px; }
 
   .modal-actions { display: flex; gap: 12px; }
 

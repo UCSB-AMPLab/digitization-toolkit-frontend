@@ -340,6 +340,7 @@
         {rotateDeg}
         onCaptureDone={handleCaptureDone}
         onRotateDegChange={handleRotateDegChange}
+        otherModalOpen={inspectedRecord !== null}
       />
 
       <!-- Tira de miniaturas inferior -->
