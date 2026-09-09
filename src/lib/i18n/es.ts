@@ -115,6 +115,7 @@ export const es = {
 	dash_camera_test: 'Probar',
 	dash_camera_focus: 'Enfocar',
 	dash_camera_capture_ok: 'Captura de prueba realizada',
+	dash_camera_capture_took: (s: string) => `en ${s} s`,
 	dash_camera_capture_error: 'No se pudo hacer la captura de prueba',
 	dash_two_cameras: '2 cámaras',
 	dash_camera_missing_hint: (side: string) =>

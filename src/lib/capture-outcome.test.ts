@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeCaptureFailure, describeCaptureOutcome } from './capture-outcome';
+import { describeCaptureFailure, describeCaptureOutcome, describeTestCapture } from './capture-outcome';
 
 describe('describeCaptureOutcome', () => {
 	it('reports ok when the capture succeeded', () => {
@@ -14,6 +14,33 @@ describe('describeCaptureOutcome', () => {
 
 	it('reports an error with no detail when the backend gives none', () => {
 		expect(describeCaptureOutcome({ success: false })).toEqual({ kind: 'error', detail: undefined });
+	});
+});
+
+describe('describeTestCapture', () => {
+	it('reports ok with seconds and bytes', () => {
+		expect(describeTestCapture({ seconds: 1.2, bytes: 483920 })).toEqual({
+			kind: 'ok',
+			seconds: 1.2,
+			bytes: 483920
+		});
+	});
+
+	it('reports ok with null seconds and bytes when the headers were missing', () => {
+		expect(describeTestCapture({ seconds: null, bytes: null })).toEqual({
+			kind: 'ok',
+			seconds: null,
+			bytes: null
+		});
+	});
+
+	it('carries the object URL when one is given', () => {
+		expect(describeTestCapture({ seconds: 1, bytes: 2 }, 'blob:http://x/1')).toEqual({
+			kind: 'ok',
+			seconds: 1,
+			bytes: 2,
+			imageUrl: 'blob:http://x/1'
+		});
 	});
 });
 
