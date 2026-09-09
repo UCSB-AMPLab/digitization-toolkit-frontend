@@ -171,7 +171,7 @@
     } else {
       // Create: validate then call API
       if (!formUsername.trim()) { formError = $m.users_val_username_required; return; }
-      if (emailFormatError(formEmail)) { formError = $m.setup_val_email_format; return; }
+      if (emailFormatError(formEmail)) { formError = $m.users_val_email_format; return; }
       if (!formPassword.trim()) { formError = $m.users_val_password_required; return; }
       if (formPassword !== formConfirm) { formError = $m.users_val_password_mismatch; return; }
 
@@ -692,8 +692,7 @@
       <!-- Descripción con el nombre del usuario destacado -->
       <p class="confirm-desc">
         {$m.users_delete_confirm_pre}
-        <strong>{deletingUser.username}</strong>
-        {#if deletingUser.email}({deletingUser.email}){/if}?
+        <strong>{deletingUser.username}</strong>{#if deletingUser.email} ({deletingUser.email}){/if}?
         {$m.common_irreversible}
       </p>
 

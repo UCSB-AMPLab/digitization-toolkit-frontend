@@ -255,6 +255,7 @@ export const es = {
 	users_val_username_required: 'El nombre de usuario es obligatorio.',
 	users_val_password_required: 'La contraseña es obligatoria.',
 	users_val_password_mismatch: 'Las contraseñas no coinciden.',
+	users_val_email_format: 'Formato de correo no válido',
 	users_delete_title: '¿Eliminar usuario?',
 	// Fragmento antes del <strong>{usuario}</strong> ({email})?
 	users_delete_confirm_pre: '¿Estás seguro que quieres eliminar a ',

@@ -236,6 +236,7 @@ export const en: Messages = {
 	users_val_username_required: 'Username is required.',
 	users_val_password_required: 'Password is required.',
 	users_val_password_mismatch: 'Passwords do not match.',
+	users_val_email_format: 'Invalid email format',
 	users_delete_title: 'Delete user?',
 	users_delete_confirm_pre: 'Are you sure you want to delete ',
 	users_delete_btn: 'Yes, delete',
