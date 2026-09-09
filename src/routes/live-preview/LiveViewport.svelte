@@ -38,6 +38,7 @@
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
+  import { viewportAspect as computeViewportAspect, fitBox, frameAspect, panelGrowFactor } from '$lib/viewport-aspect';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -146,6 +147,50 @@
   let feedH0 = $state(0);
   let feedW1 = $state(0);
   let feedH1 = $state(0);
+
+  // NEH-222: tamaño natural del frame de cada cámara (px). El viewport toma
+  // su forma de estos frames en vez de un 4:3 fijo — ver viewportAspect y
+  // fitBox más abajo.
+  let naturalW0 = $state(0);
+  let naturalH0 = $state(0);
+  let naturalW1 = $state(0);
+  let naturalH1 = $state(0);
+
+  // Tamaño medido del tablero (.mat-board): el viewport se dimensiona en
+  // píxeles dentro de este tamaño (R39-3: un width:100% fijo le gana a
+  // aspect-ratio cuando el alto es el límite, así que el viewport recibe
+  // dimensiones explícitas en vez de depender de CSS para derivarlas).
+  let boardW = $state(0);
+  let boardH = $state(0);
+
+  // Forma del viewport: la del frame en modo single; en modo double, la
+  // suma de los anchos de los dos paneles a una altura común (R39-2).
+  let viewportAspect = $derived(computeViewportAspect(
+    [
+      naturalW0 && naturalH0 ? { w: naturalW0, h: naturalH0, rotation: rotateDeg[leftIdx] ?? 0 } : null,
+      cameraMode === 'double' && naturalW1 && naturalH1
+        ? { w: naturalW1, h: naturalH1, rotation: rotateDeg[rightIdx] ?? 0 }
+        : null,
+    ],
+    cameraMode
+  ));
+
+  // Caja en píxeles que le da al viewport esa forma dentro del tablero medido.
+  let viewportBox = $derived(fitBox(viewportAspect, boardW, boardH));
+
+  // R39-2: factor de crecimiento de cada panel en modo double — la forma
+  // propia de su frame, para que ningún panel quede recortado aunque solo
+  // uno esté rotado. Si un panel todavía no tiene frame propio (sin señal,
+  // o esperando el primer frame), toma prestada la forma del otro panel en
+  // vez de un 1:1 parejo — solo cae a 1 cuando ninguno de los dos la tiene.
+  let leftFrameAspect = $derived(
+    frameAspect({ w: naturalW0, h: naturalH0, rotation: rotateDeg[leftIdx] ?? 0 })
+  );
+  let rightFrameAspect = $derived(
+    frameAspect({ w: naturalW1, h: naturalH1, rotation: rotateDeg[rightIdx] ?? 0 })
+  );
+  let leftFeedAspect = $derived(panelGrowFactor(leftFrameAspect, rightFrameAspect));
+  let rightFeedAspect = $derived(panelGrowFactor(rightFrameAspect, leftFrameAspect));
 
   // Un simple `transform: rotate()` sobre una caja del mismo tamaño del
   // panel se recorta en 90°/270°, porque el panel es rectangular
@@ -460,7 +505,7 @@
      VIEWPORT PRINCIPAL
      ============================================================ -->
 <div class="viewport-outer">
-  <div class="mat-board">
+  <div class="mat-board" bind:clientWidth={boardW} bind:clientHeight={boardH}>
 
     <!-- ══════════════════════════════════════════════════════════
          ÁREA DE CÁMARAS
@@ -470,6 +515,7 @@
       class="camera-viewport"
       class:flash={captureFlash}
       bind:this={viewportEl}
+      style={viewportBox.w && viewportBox.h ? `width: ${viewportBox.w}px; height: ${viewportBox.h}px` : undefined}
       onmousemove={handleMouseMove}
       onmouseup={stopDrag}
       onmouseleave={stopDrag}
@@ -527,14 +573,16 @@
 
            Y elimina el bloque "POLLING DEL PREVIEW" del <script>.
            ══════════════════════════════════════════════════════ -->
-      <div class="camera-feeds-wrapper" style="transform: scale({zoom * 0.85})">
+      <div class="camera-feeds-wrapper" style="transform: scale({zoom})">
 
         <!-- Cámara izquierda (leftIdx) — siempre visible -->
-        <div class="camera-feed" bind:clientWidth={feedW0} bind:clientHeight={feedH0}>
+        <div class="camera-feed" bind:clientWidth={feedW0} bind:clientHeight={feedH0} style="flex-grow: {leftFeedAspect}">
           {#if previewUrls[leftIdx]}
             <!-- Frame en vivo del polling — se actualiza cada PREVIEW_INTERVAL_MS -->
             <img
               bind:this={imgEl0}
+              bind:naturalWidth={naturalW0}
+              bind:naturalHeight={naturalH0}
               src={previewUrls[leftIdx]}
               alt={$m.lv_camera_left_alt}
               class="feed-img"
@@ -588,11 +636,13 @@
 
         <!-- Cámara derecha (rightIdx) — solo en modo double -->
         {#if cameraMode === 'double'}
-          <div class="camera-feed" bind:clientWidth={feedW1} bind:clientHeight={feedH1}>
+          <div class="camera-feed" bind:clientWidth={feedW1} bind:clientHeight={feedH1} style="flex-grow: {rightFeedAspect}">
             {#if previewUrls[rightIdx]}
               <!-- Frame en vivo del polling -->
               <img
                 bind:this={imgEl1}
+                bind:naturalWidth={naturalW1}
+                bind:naturalHeight={naturalH1}
                 src={previewUrls[rightIdx]}
                 alt={$m.lv_camera_right_alt}
                 class="feed-img"
@@ -874,12 +924,16 @@
   }
 
   /* ── Viewport negro interno ── */
+  /* width/aspect-ratio son el respaldo antes de que el tablero (.mat-board)
+     se mida por primera vez — viewportBox llega en 0x0 en ese primer tick
+     y el elemento no tiene todavía un tamaño en línea, así que sin esto se
+     colapsaría a 0. En cuanto viewportBox deja de ser 0x0, el tamaño en
+     línea (width/height en px) pisa a estas dos reglas. max-height:100% NO
+     va aquí a propósito — es justo lo que R39-3 eliminó. */
   .camera-viewport {
     position: relative;
     width: 100%;
-    max-width: 1200px;
-    max-height: 100%;
-    aspect-ratio: 4/3;
+    aspect-ratio: 4 / 3;
     background-color: #0a0a0a;
     border: 1px solid rgba(90,140,98,0.2);
     box-shadow: 0 4px 24px rgba(0,0,0,0.6);
@@ -915,7 +969,7 @@
 
   /* Cada panel de cámara */
   .camera-feed {
-    flex: 1;
+    flex: 1 1 0;
     display: flex;
     align-items: center;
     justify-content: center;
