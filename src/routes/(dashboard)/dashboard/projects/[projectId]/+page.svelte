@@ -737,7 +737,9 @@
               <div class="member-av">{member.username.slice(0,2).toUpperCase()}</div>
               <div class="member-info">
                 <span class="member-name">{member.username}</span>
-                <span class="member-email">{member.email}</span>
+                {#if member.email}
+                  <span class="member-email">{member.email}</span>
+                {/if}
               </div>
               <!-- La clase CSS conserva el valor crudo del enum; solo el texto se traduce. -->
               <span class="role-badge role-badge--{member.role}">{$roleLabel(member.role)}</span>
@@ -762,7 +764,7 @@
               <select class="field-input add-member-select" bind:value={addUserId}>
                 <option value={null}>{$m.pd_member_select}</option>
                 {#each filteredUsers as u}
-                  <option value={u.id}>{u.username} ({u.email})</option>
+                  <option value={u.id}>{u.email ? `${u.username} (${u.email})` : u.username}</option>
                 {/each}
               </select>
               <select class="field-input add-role-select" bind:value={addRole}>
