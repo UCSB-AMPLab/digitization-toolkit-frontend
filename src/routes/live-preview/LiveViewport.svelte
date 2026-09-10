@@ -599,8 +599,11 @@
                 title={$m.lv_wb_click_hint}
               ></div>
             {/if}
-          {:else}
-            <!-- Placeholder: sin señal o esperando primer frame -->
+          {:else if !cameraMissing[leftIdx]}
+            <!-- Placeholder: sin señal o esperando primer frame.
+                 Se omite cuando la cámara ya está marcada como ausente: en ese
+                 caso el aviso de NEH-229 dice lo mismo pero con la instrucción
+                 concreta, y los dos se montaban en el centro del feed. -->
             <div class="no-stream">
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -658,8 +661,11 @@
                   title={$m.lv_wb_click_hint}
                 ></div>
               {/if}
-            {:else}
-              <!-- Placeholder: sin señal o esperando primer frame -->
+            {:else if !cameraMissing[rightIdx]}
+              <!-- Placeholder: sin señal o esperando primer frame.
+                   Se omite cuando la cámara ya está marcada como ausente: en
+                   ese caso el aviso de NEH-229 dice lo mismo pero con la
+                   instrucción concreta, y los dos se montaban en el centro. -->
               <div class="no-stream">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
