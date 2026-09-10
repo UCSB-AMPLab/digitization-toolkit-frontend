@@ -1113,8 +1113,11 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    width: 76px;
+    width: 56px;
     align-items: center;
+    /* Sin scroll a propósito: el panel se dimensiona por su contenido. Vive
+       dentro del visor, que recorta lo que se sale, así que si algún día se
+       agrega otro control hay que revisar que el conjunto siga cabiendo. */
     transition: width var(--transition-base);
   }
 
@@ -1126,7 +1129,9 @@
   .float-btn-toggle { color: var(--color-light); }
 
   .float-btn {
-    width: 64px; height: 64px;
+    /* 44px, no 64: el riel de la vista de colección puede permitirse 64 porque
+       es una barra de altura completa; aquí el panel vive dentro del visor. */
+    width: var(--touch-target-min); height: var(--touch-target-min);
     display: flex;
     align-items: center;
     justify-content: center;
