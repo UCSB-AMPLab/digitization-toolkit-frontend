@@ -970,7 +970,9 @@ canvas, button, a, div {
 /* Floating rotation overlay — bottom-center of each camera feed */
 .feed-rotate-overlay {
   position: absolute;
-  bottom: 8px;
+  /* 32px de la barra de metadatos (.metadata-bar, z-index 40) + 8px de aire.
+     A bottom:8px la píldora quedaba por debajo de esa barra y se veía cortada. */
+  bottom: 40px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -979,16 +981,11 @@ canvas, button, a, div {
   background: rgba(19, 17, 16, 0.70);
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 20px;
-  padding: 3px 8px;
+  border-radius: 26px;
+  padding: 0 6px;
   z-index: 10;
-  opacity: 1;
-  transition: opacity 0.15s ease;
-  pointer-events: none;
-}
-
-.camera-feed:hover .feed-rotate-overlay {
-  opacity: 1;
+  /* Interactivo siempre: en la pantalla táctil del Pi no hay hover que pueda
+     activarlo, y los botones se veían perfectamente sin responder al toque. */
   pointer-events: auto;
 }
 
@@ -996,8 +993,9 @@ canvas, button, a, div {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  /* El ícono sigue midiendo 13px; lo que crece es el área tocable. */
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
   background: transparent;
   border: none;
   border-radius: 50%;
@@ -1011,7 +1009,7 @@ canvas, button, a, div {
 }
 
 .feed-rotate-deg {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--color-light);
   min-width: 28px;
   text-align: center;

@@ -599,8 +599,11 @@
                 title={$m.lv_wb_click_hint}
               ></div>
             {/if}
-          {:else}
-            <!-- Placeholder: sin señal o esperando primer frame -->
+          {:else if !cameraMissing[leftIdx]}
+            <!-- Placeholder: sin señal o esperando primer frame.
+                 Se omite cuando la cámara ya está marcada como ausente: en ese
+                 caso el aviso de NEH-229 dice lo mismo pero con la instrucción
+                 concreta, y los dos se montaban en el centro del feed. -->
             <div class="no-stream">
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -658,8 +661,11 @@
                   title={$m.lv_wb_click_hint}
                 ></div>
               {/if}
-            {:else}
-              <!-- Placeholder: sin señal o esperando primer frame -->
+            {:else if !cameraMissing[rightIdx]}
+              <!-- Placeholder: sin señal o esperando primer frame.
+                   Se omite cuando la cámara ya está marcada como ausente: en
+                   ese caso el aviso de NEH-229 dice lo mismo pero con la
+                   instrucción concreta, y los dos se montaban en el centro. -->
               <div class="no-stream">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -783,7 +789,7 @@
             aria-label={$m.lv_swap_orientation}
             title={swapped ? $m.lv_orientation_swapped : $m.lv_orientation_normal}
           >
-            <span class="material-symbols-outlined" style="font-size:22px">sync</span>
+            <span class="material-symbols-outlined" style="font-size:22px">swap_horiz</span>
           </button>
         {/if}
       {/if}
@@ -1113,8 +1119,11 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    width: 76px;
+    width: 56px;
     align-items: center;
+    /* Sin scroll a propósito: el panel se dimensiona por su contenido. Vive
+       dentro del visor, que recorta lo que se sale, así que si algún día se
+       agrega otro control hay que revisar que el conjunto siga cabiendo. */
     transition: width var(--transition-base);
   }
 
@@ -1126,7 +1135,9 @@
   .float-btn-toggle { color: var(--color-light); }
 
   .float-btn {
-    width: 64px; height: 64px;
+    /* 44px, no 64: el riel de la vista de colección puede permitirse 64 porque
+       es una barra de altura completa; aquí el panel vive dentro del visor. */
+    width: var(--touch-target-min); height: var(--touch-target-min);
     display: flex;
     align-items: center;
     justify-content: center;
