@@ -789,7 +789,7 @@
             aria-label={$m.lv_swap_orientation}
             title={swapped ? $m.lv_orientation_swapped : $m.lv_orientation_normal}
           >
-            <span class="material-symbols-outlined" style="font-size:22px">sync</span>
+            <span class="material-symbols-outlined" style="font-size:22px">swap_horiz</span>
           </button>
         {/if}
       {/if}
