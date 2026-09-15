@@ -452,12 +452,10 @@
       <h2 class="section-title">{$m.dash_in_progress}</h2>
 
       <div class="in-progress">
-        <div class="ip-head">
-          <span>{$m.dash_col_volume}</span>
-          <span>{$m.dash_col_project}</span>
-          <span>{$m.dash_col_last_activity}</span>
-          <span class="ip-actions-head">{$m.dash_col_actions}</span>
-        </div>
+        <span class="ip-h">{$m.dash_col_volume}</span>
+        <span class="ip-h">{$m.dash_col_project}</span>
+        <span class="ip-h">{$m.dash_col_last_activity}</span>
+        <span class="ip-h">{$m.dash_col_actions}</span>
 
         {#each inProgress as row (row.collectionId)}
           <div class="ip-row">
@@ -685,26 +683,36 @@
   }
 
   /* ── Digitalizaciones en curso (NEH-233) ── */
+  /* Una sola rejilla para encabezado y filas: cada .ip-row es display:contents,
+     así que sus celdas son hijas de .in-progress y las columnas se miden una
+     vez para todas. Con rejillas separadas había que adivinar el ancho de la
+     columna de acciones, y el número dejaba de servir al cambiar las etiquetas.
+     Las dos últimas columnas son max-content: miden exactamente lo que ocupan
+     la fecha y los botones, ni un píxel más. */
   .in-progress {
+    display: grid;
+    grid-template-columns: minmax(12rem, 3fr) minmax(8rem, 2fr) max-content max-content;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     overflow: hidden;
   }
 
-  /* La cuarta columna tiene ancho fijo en las dos filas: con auto, el
-     encabezado se medía por su texto y la fila por sus botones, y las tres
-     primeras columnas quedaban desalineadas entre sí. */
-  .ip-head,
-  .ip-row {
-    display: grid;
-    grid-template-columns: minmax(10rem, 2fr) minmax(8rem, 1.4fr) minmax(7rem, 1fr) 21rem;
-    gap: 16px;
+  /* El espacio entre columnas es padding, no gap: con gap la línea que separa
+     las filas se cortaría en los huecos. */
+  .ip-h,
+  .ip-row > * {
+    display: flex;
     align-items: center;
-    padding: 10px 16px;
+    padding: 12px 24px 12px 0;
+    min-width: 0;
   }
+  .ip-h:first-of-type,
+  .ip-row > *:first-child { padding-left: 16px; }
+  .ip-h:last-of-type,
+  .ip-row > *:last-child  { padding-right: 16px; }
 
   /* Mismos valores que .list-header de la vista de volumen. */
-  .ip-head {
+  .ip-h {
     background-color: var(--color-surface-alt);
     border-bottom: 1px solid var(--border-color);
     font-size: var(--text-xs);
@@ -714,19 +722,20 @@
     color: var(--color-light-grey);
   }
 
-  .ip-actions-head { text-align: left; }
-
-  .ip-row + .ip-row { border-top: 1px solid var(--border-color); }
-  .ip-row:hover { background-color: var(--color-surface-alt); }
+  .ip-row { display: contents; }
+  .ip-row + .ip-row > * { border-top: 1px solid var(--border-color); }
 
   /* Volumen y proyecto navegan, así que se ven como enlaces: en el touchscreen
      del Pi no hay hover que lo revele después (ver NEH-237). */
   .ip-volume,
-  .ip-project {
-    text-decoration: none;
-    min-width: 0;
+  .ip-project { text-decoration: none; }
+
+  .ip-volume {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
   }
-  .ip-volume { display: flex; flex-direction: column; gap: 2px; }
   .ip-volume-name {
     color: var(--color-light);
     font-weight: var(--fw-bold);
@@ -736,6 +745,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 100%;
   }
   .ip-signatura {
     font-size: var(--text-xs);
@@ -748,10 +758,10 @@
     text-decoration: underline;
     text-underline-offset: 3px;
     text-decoration-color: rgba(255,255,255,0.2);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
+  .ip-project > span,
+  .ip-project { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   .ip-volume-name:hover,
   .ip-project:hover { text-decoration-color: currentColor; }
 
@@ -763,12 +773,8 @@
     white-space: nowrap;
   }
 
-  /* Los botones arrancan donde arranca la columna, para que el encabezado
-     "Acciones" caiga justo encima del primero. */
-  .ip-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+  .ip-actions { gap: 8px; }
 
-  /* Delineados, no rellenos: repetidos en cinco filas, dos botones sólidos del
-     color de acción convierten la tabla en un muro. */
   /* Heredan forma, alto y tipografía de .btn — incluido --radius-md, que es
      la esquina del resto de los botones del sistema. Aquí solo el color y un
      tamaño de texto menor, porque van repetidos en cinco filas. */
@@ -782,22 +788,35 @@
     border-color: var(--color-primary);
     color: var(--color-primary);
   }
-  .ip-btn-capture:hover { background-color: rgba(90,140,98,0.12); }
+  .ip-btn-capture:hover,
+  .ip-btn-capture:focus-visible {
+    background-color: var(--color-primary);
+    color: var(--color-light);
+  }
 
+  /* Texto oscuro sobre el arena relleno: --color-highlight es #E1B778, y el
+     crema de --color-light encima no se leería. */
   .ip-btn-review {
     border-color: var(--color-highlight);
     color: var(--color-highlight);
   }
-  .ip-btn-review:hover { background-color: rgba(200,150,80,0.12); }
+  .ip-btn-review:hover,
+  .ip-btn-review:focus-visible {
+    background-color: var(--color-highlight);
+    color: var(--color-bg);
+  }
 
+  /* Angosto: una columna, sin encabezados, cada fila como bloque. */
   @media (max-width: 52rem) {
-    .ip-head { display: none; }
-    .ip-row {
-      grid-template-columns: 1fr;
-      gap: 6px;
-      padding: 14px 16px;
-    }
-    /* Ya va a flex-start en la vista ancha; aquí solo hereda. */
+    .in-progress { grid-template-columns: 1fr; }
+    .ip-h { display: none; }
+
+    .ip-row > * { padding: 3px 16px; }
+    .ip-row > *:first-child { padding-top: 14px; }
+    .ip-row > *:last-child  { padding-bottom: 14px; padding-right: 16px; }
+
+    .ip-row + .ip-row > *:first-child { border-top: 1px solid var(--border-color); }
+    .ip-row + .ip-row > *:not(:first-child) { border-top: none; }
   }
 
   .kpi-card {
