@@ -113,6 +113,9 @@ export const en: Messages = {
 
 	// ── Settings ─────────────────────────────────────────────────────────────
 	config_subtitle: 'Digitization system settings',
+	config_section_language: 'Language',
+	config_language_label: 'Interface language',
+	config_language_desc: 'Changes the language across the whole app. The page reloads to apply it; your session stays open.',
 	config_section_storage: 'Storage',
 	config_storage_alert_pre: 'Storage is at ',
 	config_storage_alert_post: '. Consider freeing up space or expanding capacity.',

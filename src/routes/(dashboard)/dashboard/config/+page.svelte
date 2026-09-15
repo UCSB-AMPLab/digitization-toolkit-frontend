@@ -22,7 +22,14 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { m, locale } from '$lib/i18n';
+  import { m, locale, setLanguage, type Locale } from '$lib/i18n';
+  // Idiomas disponibles. El catálogo vive en $lib/i18n; esta lista solo les
+  // pone nombre para el selector.
+  const LANGUAGES: { code: Locale; label: string }[] = [
+    { code: 'es', label: 'Español' },
+    { code: 'en', label: 'English' },
+  ];
+
   import {
     systemApi,
     camerasApi,
@@ -361,6 +368,40 @@
     <div>
       <h1 class="page-title">{$m.nav_settings}</h1>
       <p class="page-subtitle">{$m.config_subtitle}</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       SECCIÓN: IDIOMA
+       Va primero porque es lo único de esta página que es una preferencia de
+       quien usa la app; el resto son operaciones sobre el aparato.
+       setLanguage escribe una cookie y recarga: no toca la sesión.
+       ══════════════════════════════════════════════════════════ -->
+  <div class="config-section">
+    <h2 class="section-title">{$m.config_section_language}</h2>
+    <div class="config-card">
+
+      <div class="config-row">
+        <div class="row-info">
+          <span class="row-label">{$m.config_language_label}</span>
+          <span class="row-desc">{$m.config_language_desc}</span>
+        </div>
+
+        <div class="lang-options" role="group" aria-label={$m.config_language_label}>
+          {#each LANGUAGES as lang}
+            <button
+              type="button"
+              class="lang-option"
+              class:active={$locale === lang.code}
+              aria-pressed={$locale === lang.code}
+              onclick={() => setLanguage(lang.code)}
+            >
+              {lang.label}
+            </button>
+          {/each}
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -873,6 +914,31 @@
 
   .row-label { font-size: var(--text-base); color: var(--color-light); font-weight: var(--fw-medium); }
   .row-desc  { font-size: var(--text-sm); color: var(--color-light-grey); }
+
+  /* Selector de idioma: botones con estado, no un desplegable — dos opciones
+     caben a la vista y así el actual se lee sin abrir nada. */
+  .lang-options { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .lang-option {
+    padding: 8px 16px;
+    min-height: var(--touch-target-min);
+    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--border-color);
+    background-color: transparent;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-light-grey);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color var(--transition-base), border-color var(--transition-base);
+  }
+  .lang-option:hover { color: var(--color-light); }
+  .lang-option.active {
+    border-color: var(--color-light);
+    color: var(--color-light);
+    font-weight: var(--fw-bold);
+  }
 
   .row-value {
     font-size: var(--text-sm); color: var(--color-light);

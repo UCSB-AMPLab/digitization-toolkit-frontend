@@ -125,6 +125,9 @@ export const es = {
 
 	// ── Configuración ────────────────────────────────────────────────────────
 	config_subtitle: 'Parámetros del sistema de digitalización',
+	config_section_language: 'Idioma',
+	config_language_label: 'Idioma de la interfaz',
+	config_language_desc: 'Cambia el idioma de toda la aplicación. La página se recarga para aplicarlo; la sesión no se cierra.',
 	config_section_storage: 'Almacenamiento',
 	// Fragmentos alrededor del <strong>{porcentaje}%</strong>
 	config_storage_alert_pre: 'El almacenamiento está al ',
