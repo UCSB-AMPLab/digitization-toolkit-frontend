@@ -207,6 +207,14 @@
   // ---------------------------------------------------------------------------
   // CICLO DE VIDA
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // ESTADO: Backend de cámara activo (NEH-188)
+  // Se muestra tal cual lo reporta el backend ('picamera2', 'gphoto2', 'chdk'…):
+  // es el identificador que sirve para dar soporte a un equipo en campo. No se
+  // traduce ni se le inventa un nombre comercial.
+  // ---------------------------------------------------------------------------
+  let cameraBackend = $state<string | null>(null);
+
   onMount(async () => {
     try {
       storageInfo = await systemApi.getStorage();
@@ -214,6 +222,12 @@
       // fail silently — bar shows 0% until backend is reachable
     } finally {
       storageLoading = false;
+    }
+
+    try {
+      cameraBackend = (await camerasApi.getCapabilities()).backend;
+    } catch {
+      // Sin captura disponible la fila muestra "no disponible".
     }
   });
 
@@ -618,6 +632,17 @@
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_diagnostics}</h2>
     <div class="config-card">
+
+      <!-- Fila: backend de cámara activo (NEH-188) -->
+      <div class="config-row">
+        <div class="row-info">
+          <span class="row-label">{$m.config_camera_backend}</span>
+          <span class="row-desc">{$m.config_camera_backend_desc}</span>
+        </div>
+        <code class="inline-code">{cameraBackend ?? $m.config_camera_backend_unknown}</code>
+      </div>
+
+      <div class="section-divider"></div>
 
       <!-- Fila expandible: click para mostrar/ocultar logs -->
       <button class="config-row logs-expand-row" onclick={toggleLogs}>
