@@ -464,7 +464,7 @@
               {#if row.signatura}<span class="ip-signatura">{row.signatura}</span>{/if}
             </a>
 
-            <a class="ip-project" href="/dashboard/projects/{row.projectId}">{row.projectName}</a>
+            <a class="ip-project" href="/dashboard/projects/{row.projectId}"><span>{row.projectName}</span></a>
 
             <span class="ip-date">{formatActivity(row.lastActivity)}</span>
 
@@ -725,6 +725,29 @@
   .ip-row { display: contents; }
   .ip-row + .ip-row > * { border-top: 1px solid var(--border-color); }
 
+  /* Ningún texto de la tabla se parte en dos líneas: lo que no cabe se corta
+     con elipsis. Las columnas de fecha y acciones son max-content, así que
+     nunca se aprietan; esto protege volumen y proyecto, que sí son flexibles. */
+  .ip-h,
+  .ip-volume-name,
+  .ip-signatura,
+  .ip-project,
+  .ip-date {
+    white-space: nowrap;
+  }
+
+  /* La elipsis sólo se dibuja sobre una caja de bloque, y las celdas son flex
+     (.ip-row > * las pone en flex), así que el recorte va en el elemento de
+     adentro. Por eso el nombre del proyecto va envuelto en un <span>. */
+  .ip-volume-name,
+  .ip-signatura,
+  .ip-project > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .ip-project { overflow: hidden; }
+
   /* Volumen y proyecto navegan, así que se ven como enlaces: en el touchscreen
      del Pi no hay hover que lo revele después (ver NEH-237). */
   .ip-volume,
@@ -742,10 +765,6 @@
     text-decoration: underline;
     text-underline-offset: 3px;
     text-decoration-color: rgba(255,255,255,0.25);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
   }
   .ip-signatura {
     font-size: var(--text-xs);
@@ -759,8 +778,6 @@
     text-underline-offset: 3px;
     text-decoration-color: rgba(255,255,255,0.2);
   }
-  .ip-project > span,
-  .ip-project { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .ip-volume-name:hover,
   .ip-project:hover { text-decoration-color: currentColor; }
@@ -770,7 +787,6 @@
     line-height: 1.4;
     color: var(--color-light-grey);
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
   }
 
   .ip-actions { gap: 8px; }
