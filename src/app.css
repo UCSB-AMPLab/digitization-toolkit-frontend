@@ -129,6 +129,14 @@
   /* --- Touch targets (7-inch tablet optimization) --- */
   --touch-target-min:  44px;
   --touch-target-lg:   52px;
+
+  /* --- Selección (NEH-237) ---
+     Con qué se marca un elemento elegido. Deliberadamente distinto de
+     --color-primary, que es el color de acción: una selección pintada con el
+     color de acción se lee como un control. El anillo incluye la geometría
+     porque también estaba duplicada a mano en cada tira de miniaturas. */
+  --color-selected: var(--color-light);
+  --selected-ring:  0 0 0 2px rgba(237, 232, 220, 0.2);
 }
 
 /* ============================================================================

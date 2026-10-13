@@ -206,8 +206,8 @@
   }
 
   .thumb-img-wrapper.selected {
-    border-color: var(--color-light);
-    box-shadow: 0 0 0 2px rgba(237,232,220,0.2);
+    border-color: var(--color-selected);
+    box-shadow: var(--selected-ring);
   }
 
   .thumb-img-wrapper.alt { background-color: var(--color-surface); }
