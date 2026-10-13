@@ -448,6 +448,10 @@ export const projectsApi = {
 
 export interface Collection {
   record_count?: number;  // número de registros — devuelto por el backend en algunos endpoints
+  // Fecha del registro modificado más recientemente dentro del volumen: cuándo
+  // se trabajó por última vez. Distinto de updated_at, que solo se mueve al
+  // editar la fila del volumen. Null si no tiene registros (NEH-247).
+  last_activity_at?: string | null;
   id: number;
   name: string;
   description?: string;

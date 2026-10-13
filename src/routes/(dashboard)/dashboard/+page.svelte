@@ -18,8 +18,10 @@
   import { browser } from '$app/environment';
   import { env } from '$env/dynamic/public';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore,
+           type Collection, type Project } from '$lib/api';
+  import { goto } from '$app/navigation';
+  import { m, locale } from '$lib/i18n';
   import { describeCaptureFailure, describeTestCapture, type CaptureOutcome } from '$lib/capture-outcome';
   import { sidesFromDevices, type SideInfo, type SideStatus } from '$lib/camera-sides';
   import { createCameraRefresh } from '$lib/camera-refresh';
@@ -58,6 +60,24 @@
   let collectionCount = $state(0);
   let recordCount     = $state(0);
   let isLoadingStats  = $state(true);
+
+  // ---------------------------------------------------------------------------
+  // ESTADO: Digitalizaciones en curso (NEH-233)
+  // Los cinco volúmenes trabajados más recientemente, con acceso directo a
+  // capturar o revisar sin pasar por el proyecto.
+  // ---------------------------------------------------------------------------
+  const IN_PROGRESS_LIMIT = 5;
+
+  type InProgressRow = {
+    collectionId: number;
+    projectId: number;
+    volumeName: string;
+    signatura: string;
+    projectName: string;
+    lastActivity: string;
+  };
+
+  let inProgress = $state<InProgressRow[]>([]);
 
   // ---------------------------------------------------------------------------
   // ESTADO: Almacenamiento
@@ -162,11 +182,40 @@
       projectCount    = projects.length;
       collectionCount = collectionCountResult;
       recordCount     = count;
+      inProgress      = buildInProgress(await collectionsApi.listAll(), projects);
     } catch (err) {
       console.error('[Dashboard] Stats error:', err);
     } finally {
       isLoadingStats = false;
     }
+  }
+
+  // Un volumen está "en curso" si tiene registros: last_activity_at llega en
+  // null justamente cuando nunca se capturó nada en él (NEH-247). No existe un
+  // estado de volumen en el modelo, así que ésta es la señal disponible.
+  function buildInProgress(collections: Collection[], projects: Project[]): InProgressRow[] {
+    const projectNameById = new Map(projects.map(p => [p.id, p.name]));
+
+    return collections
+      .filter(c => c.last_activity_at && c.project_id !== undefined)
+      .sort((a, b) => (b.last_activity_at ?? '').localeCompare(a.last_activity_at ?? ''))
+      .slice(0, IN_PROGRESS_LIMIT)
+      .map(c => ({
+        collectionId: c.id,
+        projectId:    c.project_id as number,
+        volumeName:   c.name,
+        // Solo si el volumen la tiene: inventar una signatura sería exactamente
+        // el problema de NEH-138.
+        signatura:    (c.archival_metadata?.signatura as string | undefined) ?? '',
+        projectName:  projectNameById.get(c.project_id as number) ?? '',
+        lastActivity: c.last_activity_at as string,
+      }));
+  }
+
+  function formatActivity(iso: string): string {
+    return new Date(iso).toLocaleDateString($locale, {
+      day: '2-digit', month: 'short', year: 'numeric',
+    });
   }
 
   async function checkCamerasStatus() {
@@ -392,6 +441,57 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════
+       SECCIÓN: DIGITALIZACIONES EN CURSO (NEH-233)
+       Acceso directo a capturar o revisar un volumen concreto.
+       Si no hay volúmenes con registros el bloque no se dibuja: en una unidad
+       recién instalada no hay nada que listar, y una tabla vacía con encabezados
+       no informa de nada.
+       ══════════════════════════════════════════════════════ -->
+  {#if inProgress.length > 0}
+    <div class="section">
+      <h2 class="section-title">{$m.dash_in_progress}</h2>
+
+      <div class="in-progress">
+        <span class="ip-h">{$m.dash_col_volume}</span>
+        <span class="ip-h">{$m.dash_col_project}</span>
+        <span class="ip-h">{$m.dash_col_last_activity}</span>
+        <span class="ip-h">{$m.dash_col_actions}</span>
+
+        {#each inProgress as row (row.collectionId)}
+          <div class="ip-row">
+            <a class="ip-volume" href="/dashboard/projects/{row.projectId}/collections/{row.collectionId}">
+              <span class="ip-volume-name">{row.volumeName}</span>
+              {#if row.signatura}<span class="ip-signatura">{row.signatura}</span>{/if}
+            </a>
+
+            <a class="ip-project" href="/dashboard/projects/{row.projectId}"><span>{row.projectName}</span></a>
+
+            <span class="ip-date">{formatActivity(row.lastActivity)}</span>
+
+            <div class="ip-actions">
+              <button
+                class="btn ip-btn ip-btn-capture"
+                onclick={() => goto(`/live-preview?projectId=${row.projectId}&collectionId=${row.collectionId}`)}
+              >
+                <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">photo_camera</span>
+                <span>{$m.col_live_preview}</span>
+              </button>
+
+              <button
+                class="btn ip-btn ip-btn-review"
+                onclick={() => goto(`/dashboard/projects/${row.projectId}/collections/${row.collectionId}`)}
+              >
+                <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">rate_review</span>
+                <span>{$m.tb_go_to_review}</span>
+              </button>
+            </div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  <!-- ══════════════════════════════════════════════════════
        SECCIÓN: PROBAR CÁMARAS
        Solo visible para admin y operator (canSeeCameras)
        ══════════════════════════════════════════════════════ -->
@@ -580,6 +680,159 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
     margin-bottom: 36px;
+  }
+
+  /* ── Digitalizaciones en curso (NEH-233) ── */
+  /* Una sola rejilla para encabezado y filas: cada .ip-row es display:contents,
+     así que sus celdas son hijas de .in-progress y las columnas se miden una
+     vez para todas. Con rejillas separadas había que adivinar el ancho de la
+     columna de acciones, y el número dejaba de servir al cambiar las etiquetas.
+     Las dos últimas columnas son max-content: miden exactamente lo que ocupan
+     la fecha y los botones, ni un píxel más. */
+  .in-progress {
+    display: grid;
+    grid-template-columns: minmax(12rem, 3fr) minmax(8rem, 2fr) max-content max-content;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  /* El espacio entre columnas es padding, no gap: con gap la línea que separa
+     las filas se cortaría en los huecos. */
+  .ip-h,
+  .ip-row > * {
+    display: flex;
+    align-items: center;
+    padding: 12px 24px 12px 0;
+    min-width: 0;
+  }
+  .ip-h:first-of-type,
+  .ip-row > *:first-child { padding-left: 16px; }
+  .ip-h:last-of-type,
+  .ip-row > *:last-child  { padding-right: 16px; }
+
+  /* Mismos valores que .list-header de la vista de volumen. */
+  .ip-h {
+    background-color: var(--color-surface-alt);
+    border-bottom: 1px solid var(--border-color);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-bold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-light-grey);
+  }
+
+  .ip-row { display: contents; }
+  .ip-row + .ip-row > * { border-top: 1px solid var(--border-color); }
+
+  /* Ningún texto de la tabla se parte en dos líneas: lo que no cabe se corta
+     con elipsis. Las columnas de fecha y acciones son max-content, así que
+     nunca se aprietan; esto protege volumen y proyecto, que sí son flexibles. */
+  .ip-h,
+  .ip-volume-name,
+  .ip-signatura,
+  .ip-project,
+  .ip-date {
+    white-space: nowrap;
+  }
+
+  /* La elipsis sólo se dibuja sobre una caja de bloque, y las celdas son flex
+     (.ip-row > * las pone en flex), así que el recorte va en el elemento de
+     adentro. Por eso el nombre del proyecto va envuelto en un <span>. */
+  .ip-volume-name,
+  .ip-signatura,
+  .ip-project > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .ip-project { overflow: hidden; }
+
+  /* Volumen y proyecto navegan, así que se ven como enlaces: en el touchscreen
+     del Pi no hay hover que lo revele después (ver NEH-237). */
+  .ip-volume,
+  .ip-project { text-decoration: none; }
+
+  .ip-volume {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+  }
+  .ip-volume-name {
+    color: var(--color-light);
+    font-weight: var(--fw-bold);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: rgba(255,255,255,0.25);
+  }
+  .ip-signatura {
+    font-size: var(--text-xs);
+    line-height: 1.3;
+    color: var(--color-light-grey);
+  }
+
+  .ip-project {
+    color: var(--color-light-grey);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: rgba(255,255,255,0.2);
+  }
+
+  .ip-volume-name:hover,
+  .ip-project:hover { text-decoration-color: currentColor; }
+
+  .ip-date {
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    color: var(--color-light-grey);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ip-actions { gap: 8px; }
+
+  /* Heredan forma, alto y tipografía de .btn — incluido --radius-md, que es
+     la esquina del resto de los botones del sistema. Aquí solo el color y un
+     tamaño de texto menor, porque van repetidos en cinco filas. */
+  .ip-btn {
+    padding: 8px 14px;
+    font-size: var(--text-sm);
+    background-color: transparent;
+  }
+
+  .ip-btn-capture {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+  .ip-btn-capture:hover,
+  .ip-btn-capture:focus-visible {
+    background-color: var(--color-primary);
+    color: var(--color-light);
+  }
+
+  /* Texto oscuro sobre el arena relleno: --color-highlight es #E1B778, y el
+     crema de --color-light encima no se leería. */
+  .ip-btn-review {
+    border-color: var(--color-highlight);
+    color: var(--color-highlight);
+  }
+  .ip-btn-review:hover,
+  .ip-btn-review:focus-visible {
+    background-color: var(--color-highlight);
+    color: var(--color-bg);
+  }
+
+  /* Angosto: una columna, sin encabezados, cada fila como bloque. */
+  @media (max-width: 52rem) {
+    .in-progress { grid-template-columns: 1fr; }
+    .ip-h { display: none; }
+
+    .ip-row > * { padding: 3px 16px; }
+    .ip-row > *:first-child { padding-top: 14px; }
+    .ip-row > *:last-child  { padding-bottom: 14px; padding-right: 16px; }
+
+    .ip-row + .ip-row > *:first-child { border-top: 1px solid var(--border-color); }
+    .ip-row + .ip-row > *:not(:first-child) { border-top: none; }
   }
 
   .kpi-card {
