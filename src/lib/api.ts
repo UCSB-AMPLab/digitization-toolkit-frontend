@@ -685,9 +685,7 @@ export interface Record {
   id: number;
   title: string;
   description?: string;
-  object_typology?: string; // book, dossier, document, map, planimetry, other
   author?: string;
-  material?: string;
   date?: string;
   custom_attributes?: string;
   project_id?: number;
@@ -743,9 +741,7 @@ export interface CreateRecordAnnotationData {
 export interface CreateRecordData {
   title: string;
   description?: string;
-  object_typology?: string;
   author?: string;
-  material?: string;
   date?: string;
   custom_attributes?: string;
   project_id?: number;
@@ -756,9 +752,7 @@ export interface CreateRecordData {
 export interface UpdateRecordData {
   title?: string;
   description?: string;
-  object_typology?: string;
   author?: string;
-  material?: string;
   date?: string;
   custom_attributes?: string;
   project_id?: number | null;
@@ -787,7 +781,6 @@ export const recordsApi = {
   async list(params?: {
     collection_id?: number;
     project_id?: number;
-    object_typology?: string;
     orphaned?: boolean;
     skip?: number;
     limit?: number;
@@ -795,7 +788,6 @@ export const recordsApi = {
     const queryParams = new URLSearchParams();
     if (params?.collection_id !== undefined) queryParams.set('collection_id', params.collection_id.toString());
     if (params?.project_id !== undefined) queryParams.set('project_id', params.project_id.toString());
-    if (params?.object_typology !== undefined) queryParams.set('object_typology', params.object_typology);
     if (params?.orphaned !== undefined) queryParams.set('orphaned', params.orphaned.toString());
     if (params?.skip !== undefined) queryParams.set('skip', params.skip.toString());
     if (params?.limit !== undefined) queryParams.set('limit', params.limit.toString());
@@ -815,7 +807,6 @@ export const recordsApi = {
   async listAll(params?: {
     collection_id?: number;
     project_id?: number;
-    object_typology?: string;
     orphaned?: boolean;
   }): Promise<Record[]> {
     const PAGE = 1000; // backend's maximum page size
