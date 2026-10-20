@@ -16,6 +16,7 @@
   import { page } from '$app/stores';
   import { authStore } from '$lib/stores/auth';
   import { m } from '$lib/i18n';
+  import UserMenu from '$lib/components/UserMenu.svelte';
 
   let { children } = $props();
 
@@ -43,11 +44,6 @@
   // Roles que pueden abrir la cámara
   let canOpenCamera = $derived(
     currentUser?.role === 'admin' || currentUser?.role === 'operator'
-  );
-
-  // Iniciales del usuario para el avatar
-  let userInitials = $derived(
-    currentUser?.username?.slice(0, 2).toUpperCase() ?? '?'
   );
 
   // ---------------------------------------------------------------------------
@@ -97,7 +93,8 @@
         </button>
       {/if}
 
-      <div class="user-avatar" aria-label={$m.col_current_user}>{userInitials}</div>
+      <!-- Identidad + salir. El avatar abre el menú (NEH-234). -->
+      <UserMenu label={$m.col_current_user} />
 
     </div>
   </div>
@@ -200,20 +197,6 @@
   }
   .bc-sep { color: var(--color-light-grey); }
 
-  /* Avatar */
-  .user-avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background-color: var(--color-primary);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: var(--fw-bold);
-    flex-shrink: 0;
-  }
 
   /* Contenido: ocupa el resto de la pantalla */
   .gallery-content {
