@@ -65,6 +65,38 @@ export const en: Messages = {
 	nav_settings: 'Settings',
 	nav_collapse_sidebar: 'Collapse sidebar',
 	nav_expand_sidebar: 'Expand sidebar',
+	// ── First-run guided tour (NEH-95) ────────────────────────────────────────
+	nav_help: 'Help',
+	tour_aria: 'Guided tour',
+	tour_skip: 'Skip the tour',
+	tour_next: 'Next step',
+	tour_prev: 'Previous step',
+	tour_finish: 'Finish',
+
+	tour_s1_title: 'Create a project',
+	tour_s1_where: 'Go to Projects › New Project.',
+	tour_s1_body:
+		'A project groups what will be digitized from a single fonds. It holds one or more volumes.',
+	tour_s2_title: 'Create a volume',
+	tour_s2_where: 'Go to Projects › your project › New volume.',
+	tour_s2_body:
+		'Each book, box or bundle is a volume belonging to a project. The images are stored inside it.',
+	tour_s3_title: 'Capture',
+	tour_s3_where: 'Go to Projects › your project › your volume › Capture.',
+	tour_s3_body: 'This opens the capture screen for this volume.',
+	tour_s4_title: 'Send for review',
+	tour_s4_where: 'Go to Projects › your project › your volume.',
+	tour_s4_body:
+		'Once capture is finished the images move to review. Capture and naming can still be corrected.',
+	tour_s5_title: 'Review and approve',
+	tour_s5_where: 'Go to Projects › your project › your volume › Approve.',
+	tour_s5_body:
+		'Approve the pages that are right. Those that need retaking are rejected with a reason.',
+	tour_s6_title: 'Export',
+	tour_s6_where: 'Go to Projects › your project › your volume › Export BagIt.',
+	tour_s6_body:
+		'With everything approved, the volume is packaged and becomes available to download.',
+
 	nav_logout: 'Log out',
 
 	// ── Record statuses ──────────────────────────────────────────────────────

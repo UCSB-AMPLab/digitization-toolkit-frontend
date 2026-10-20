@@ -19,6 +19,7 @@
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
   import { m, roleLabel } from '$lib/i18n';
+  import { tour } from '$lib/tour';
 
   // La etiqueta accesible del disparador la pone quien lo usa, porque cada
   // pantalla ya tiene su propia cadena traducida para esto.
@@ -77,7 +78,19 @@
 
       <div class="menu-sep"></div>
 
-      <button class="menu-logout" role="menuitem" onclick={handleLogout}>
+      <!-- Ayuda: este menú existe en captura y en la vista de volumen, que
+           son las dos pantallas sin barra lateral. Es el único sitio desde el
+           que se puede reabrir el recorrido ahí (NEH-95). -->
+      <button class="menu-item" role="menuitem" onclick={() => { open = false; tour.start(); }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span>{$m.nav_help}</span>
+      </button>
+
+      <button class="menu-item menu-logout" role="menuitem" onclick={handleLogout}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
           <polyline points="16 17 21 12 16 7" />
@@ -149,7 +162,7 @@
 
   .menu-sep { height: 1px; background-color: var(--border-color); margin: 0 4px; }
 
-  .menu-logout {
+  .menu-item {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -159,18 +172,26 @@
     border: none;
     border-radius: var(--radius-md);
     background-color: transparent;
-    /* Rojo como el "Salir" de la barra lateral del tablero. Allí el color está
-       escrito a mano como rgba(214,103,74,...); aquí se usan los tokens, que
-       es el mismo valor. */
-    color: var(--color-error);
+    color: var(--color-light-grey);
     font-family: var(--font-family);
     font-size: var(--text-base);
     text-align: left;
     cursor: pointer;
     transition: background-color var(--transition-base);
   }
+  .menu-item:hover,
+  .menu-item:focus-visible {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--color-light);
+  }
+
+  /* Rojo sólo en salir, como el botón de la barra lateral del tablero. Allí
+     el color está escrito a mano como rgba(214,103,74,...); aquí se usan los
+     tokens, que es el mismo valor. */
+  .menu-logout { color: var(--color-error); }
   .menu-logout:hover,
   .menu-logout:focus-visible {
     background-color: var(--color-error-bg);
+    color: var(--color-error);
   }
 </style>
