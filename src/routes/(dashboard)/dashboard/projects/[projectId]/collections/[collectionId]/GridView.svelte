@@ -314,6 +314,7 @@
       <span class="filter-title">{$m.col_filter_by_status}</span>
       <div class="filter-chips">
         {#each [
+          { id: 'captured',   label: $m.status_captured },
           { id: 'approved',   label: $m.status_approved },
           { id: 'rejected',   label: $m.status_rejected },
           { id: 'in_review',  label: $m.status_in_review },

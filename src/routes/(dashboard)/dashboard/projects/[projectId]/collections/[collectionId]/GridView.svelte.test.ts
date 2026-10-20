@@ -91,6 +91,9 @@ describe('GridView toolbar (NEH-210: Gallery has no approve/reject controls)', (
 		const screen = render(GridView, baseProps());
 		await screen.getByRole('button', { name: 'Filtros' }).click();
 
+		// Capturado leads, because NEH-260 gave the operator back a state before
+		// the handover and the panel has to be able to find those records.
+		await expect.element(screen.getByRole('button', { name: 'Capturado', exact: true })).toBeVisible();
 		await expect.element(screen.getByRole('button', { name: 'Aprobado' })).toBeVisible();
 		await expect.element(screen.getByRole('button', { name: 'Rechazado' })).toBeVisible();
 		// exact:true — the grid card is also role="button" (NEH-211 click-to-book-view)

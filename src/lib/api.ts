@@ -612,6 +612,31 @@ export const collectionsApi = {
    * from 1 (zero-padded), based on current display order. All-or-nothing:
    * on any failure no files or DB rows are left renumbered.
    */
+  /**
+   * Hand the collection over for review: every captured record becomes
+   * in_review (NEH-260). Refuses with 422 if any of them still carries a
+   * rejected image or has no image at all, naming all of them at once rather
+   * than stopping at the first — nothing is changed when it refuses.
+   */
+  async promote(collectionId: number): Promise<{ collection_id: number; promoted: number }> {
+    return apiRequest<{ collection_id: number; promoted: number }>(
+      `/collections/${collectionId}/promote`,
+      { method: 'POST' }
+    );
+  },
+
+  /**
+   * Take the handover back: the collection's in_review records return to
+   * captured, for an operator who handed a tomo over too early (NEH-260).
+   * Records a reviewer has already approved or rejected are left alone.
+   */
+  async takeBack(collectionId: number): Promise<{ collection_id: number; taken_back: number }> {
+    return apiRequest<{ collection_id: number; taken_back: number }>(
+      `/collections/${collectionId}/take-back`,
+      { method: 'POST' }
+    );
+  },
+
   async renumberImages(collectionId: number): Promise<{ renumbered: number; prefix: string; width: number }> {
     return apiRequest(`/collections/${collectionId}/images/renumber`, { method: 'POST' });
   },
@@ -694,9 +719,13 @@ export interface Record {
   created_at?: string;
   modified_at?: string;
   images: RecordImage[];
-  // QA workflow (NEH-208): no more "captured" resting state — a record
-  // enters the queue as "in_review" the instant it's captured.
-  status: 'in_review' | 'rejected' | 'approved';
+  // QA workflow. NEH-208 removed the "captured" resting state and sent a
+  // record straight into the queue; NEH-260 brought it back, because the
+  // handover is a deliberate act an operator performs on a whole collection
+  // rather than something that happens to each record as it is shot. A
+  // captured record is still the operator's: it is not in anyone's queue, and
+  // it is the only status from which a record can be moved or deleted.
+  status: 'captured' | 'in_review' | 'rejected' | 'approved';
   sequence?: number;
   // Which camera setup produced this document — set once at capture time.
   // Determines rejection scope (1 vs 2 images) on the backend; the
@@ -888,12 +917,17 @@ export const recordsApi = {
 
   /**
    * Change the QA status of a single record.
-   * NEH-208: the generic status endpoint only allows in_review -> approved
-   * now — rejection requires the mandatory-reason reject() below.
+   * Rejection is not reachable here — it requires the mandatory-reason
+   * reject() below (NEH-208). The backend's transitions are
+   * captured -> in_review (the operator hands one record over),
+   * in_review -> approved, and approved/rejected -> in_review to undo a
+   * mistake. in_review -> captured is deliberately absent: taking a handover
+   * back is a whole-collection act, so it goes through
+   * collectionsApi.takeBack() and not through here (NEH-260).
    */
   async updateStatus(
     id: number,
-    status: 'in_review' | 'approved'
+    status: 'captured' | 'in_review' | 'approved'
   ): Promise<Record> {
     return apiRequest<Record>(`/records/${id}/status`, {
       method: 'PATCH',
