@@ -853,6 +853,7 @@
                   {#if canReview}
                     <button
                       class="btn-review approve"
+                      data-tour="aprobar"
                       disabled={!currentRecord || notReviewable || currentRecord.status === 'approved' || isApproving}
                       onclick={requestApprove}
                     >

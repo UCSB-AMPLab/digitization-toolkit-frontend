@@ -84,6 +84,41 @@ export const es = {
 	nav_settings: 'Configuración',
 	nav_collapse_sidebar: 'Colapsar sidebar',
 	nav_expand_sidebar: 'Expandir sidebar',
+	// ── Recorrido guiado de primer arranque (NEH-95) ──────────────────────────
+	// Los textos están en usted: el personal del archivo se trata de usted, y
+	// así está escrita la tarjeta del operador de Rionegro. El resto del
+	// catálogo todavía está en tú — ver NEH-38.
+	nav_help: 'Ayuda',
+	tour_aria: 'Recorrido guiado',
+	tour_skip: 'Saltar el recorrido',
+	tour_next: 'Paso siguiente',
+	tour_prev: 'Paso anterior',
+	tour_finish: 'Terminar',
+
+	tour_s1_title: 'Crear un proyecto',
+	tour_s1_where: 'Pulse en Proyectos › Nuevo Proyecto.',
+	tour_s1_body:
+		'Un proyecto agrupa lo que se va a digitalizar de un mismo fondo. Agrupa uno o varios volúmenes.',
+	tour_s2_title: 'Crear un volumen',
+	tour_s2_where: 'Pulse en Proyectos › su proyecto › Nuevo volumen.',
+	tour_s2_body:
+		'Cada libro, caja o legajo es un volumen que hace parte de un proyecto. Las imágenes se guardan dentro.',
+	tour_s3_title: 'Capturar',
+	tour_s3_where: 'Pulse en Proyectos › su proyecto › su volumen › Capturar.',
+	tour_s3_body: 'Desde aquí se abre la pantalla de captura de este volumen.',
+	tour_s4_title: 'Pasar a revisión',
+	tour_s4_where: 'Pulse en Proyectos › su proyecto › su volumen.',
+	tour_s4_body:
+		'Al terminar de capturar, las imágenes pasan a revisión. Es posible hacer correcciones de captura y de nomenclatura.',
+	tour_s5_title: 'Revisar y aprobar',
+	tour_s5_where: 'Pulse en Proyectos › su proyecto › su volumen › Aprobar.',
+	tour_s5_body:
+		'Apruebe que las páginas estén bien. Las que haya que repetir se rechazan indicando el motivo.',
+	tour_s6_title: 'Exportar',
+	tour_s6_where: 'Pulse en Proyectos › su proyecto › su volumen › Exportar BagIt.',
+	tour_s6_body:
+		'Con todo aprobado, el volumen se empaqueta y queda disponible para descargarlo.',
+
 	nav_logout: 'Salir',
 
 	// ── Estados de registro ──────────────────────────────────────────────────

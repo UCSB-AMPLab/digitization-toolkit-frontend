@@ -96,6 +96,7 @@
       {#if canOpenCamera}
         <button
           class="btn-camera"
+          data-tour="capturar"
           onclick={() => goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`)}
           title={$m.col_open_in_camera}
         >

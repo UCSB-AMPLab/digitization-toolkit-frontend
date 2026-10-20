@@ -2,6 +2,7 @@
   import '../app.css';
   import favicon from '$lib/assets/favicon.svg';
   import VirtualKeyboard from '$lib/components/VirtualKeyboard.svelte';
+  import GuidedTour from '$lib/components/GuidedTour.svelte';
   import { locale } from '$lib/i18n';
   import { onMount } from 'svelte';
   import { initErrorCapture } from '$lib/bug-report/error-capture';
@@ -20,6 +21,10 @@
 </svelte:head>
 
 {@render children?.()}
+
+<!-- El recorrido guiado se monta aquí, una sola vez, para que sobreviva a los
+     cambios de ruta: sus pasos viven en tres pantallas distintas (NEH-95). -->
+<GuidedTour />
 
 <!-- <VirtualKeyboard /> -->
 
