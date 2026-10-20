@@ -23,8 +23,8 @@
   //   collectionName  → nombre del volumen ('' mientras carga)
   // ============================================================================
 
-  import { authStore } from '$lib/stores/auth';
   import { m } from '$lib/i18n';
+  import UserMenu from '$lib/components/UserMenu.svelte';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -41,12 +41,6 @@
     collectionName?: string;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // INICIALES DEL USUARIO para el avatar
-  // Lee el username del store de auth y toma las dos primeras letras
-  // Si no hay usuario, muestra '?'
-  // ---------------------------------------------------------------------------
-  let userInitials = $derived(($authStore.user?.username ?? '').slice(0, 2).toUpperCase() || '?');
 </script>
 
 <!-- ============================================================
@@ -97,11 +91,8 @@
       <span>{$m.tb_go_to_review}</span>
     </button>
 
-    <!-- Avatar circular con iniciales del usuario -->
-    <!-- El color verde viene del design system (--color-primary) -->
-    <div class="user-avatar" aria-label={$m.tb_current_user}>
-      {userInitials}
-    </div>
+    <!-- Identidad + salir. El avatar abre el menú (NEH-234). -->
+    <UserMenu label={$m.tb_current_user} />
   </div>
 
 </div>
@@ -205,21 +196,4 @@
     font-weight: var(--fw-bold);
   }
 
-  /* ── Avatar del usuario ── */
-  .user-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background-color: var(--color-primary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-light);
-    font-family: var(--font-family);
-    font-weight: var(--fw-bold);
-    font-size: var(--text-sm);
-    flex-shrink: 0;
-    user-select: none;
-  }
 </style>
