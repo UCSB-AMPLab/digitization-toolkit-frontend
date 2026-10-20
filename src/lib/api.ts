@@ -94,16 +94,25 @@ async function apiRequest<T>(
 
     // 401 means the token itself is missing/invalid/expired (or its user was
     // deactivated) — the session is genuinely dead, so clear it globally.
+    // Unless there was no token to begin with, which is the `token` term
+    // below. A 401 cannot mean "your session died" when no session was sent,
+    // and reading it that way broke first-run setup: POST /auth/register on
+    // the first-user path 401s on a wrong bootstrap token (auth.py), the
+    // redirect fired, and the operator landed on /login — which on a fresh
+    // appliance has no account to log into. The setup page has handled that
+    // 401 all along and never got to render it.
     // 403 means the token is fine but the role/permission check for this one
     // action failed (RoleChecker and every per-resource permission check in
     // the backend run strictly after get_current_user, which is what raises
-    // 401 — a 403 can only happen on an already-valid, already-active
+    // 401 — so a 403 nearly always means a valid, active session. The one
+    // exception is POST /auth/login, which returns 403 for an inactive user
+    // with no session at all; harmless here, because a 403 never clears the
     // session). Treating it the same as a dead session would silently log a
     // user out of a perfectly good session over a single denied action, and
     // would swallow the inline "you can't do that" errors that callers
     // (e.g. project member management, bulk status changes) already show.
     const isSessionExempt = SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p));
-    const isDeadSession = response.status === 401 && !isSessionExempt;
+    const isDeadSession = response.status === 401 && !isSessionExempt && !!token;
 
     // Only meaningful in the browser: clears the stale/rejected session and
     // routes to /login so the UI never keeps rendering as a broken
@@ -612,6 +621,10 @@ export const collectionsApi = {
    * from 1 (zero-padded), based on current display order. All-or-nothing:
    * on any failure no files or DB rows are left renumbered.
    */
+  async renumberImages(collectionId: number): Promise<{ renumbered: number; prefix: string; width: number }> {
+    return apiRequest(`/collections/${collectionId}/images/renumber`, { method: 'POST' });
+  },
+
   /**
    * Hand the collection over for review: every captured record becomes
    * in_review (NEH-260). Refuses with 422 if any of them still carries a
@@ -635,10 +648,6 @@ export const collectionsApi = {
       `/collections/${collectionId}/take-back`,
       { method: 'POST' }
     );
-  },
-
-  async renumberImages(collectionId: number): Promise<{ renumbered: number; prefix: string; width: number }> {
-    return apiRequest(`/collections/${collectionId}/images/renumber`, { method: 'POST' });
   },
 
   /**
@@ -724,7 +733,12 @@ export interface Record {
   // handover is a deliberate act an operator performs on a whole collection
   // rather than something that happens to each record as it is shot. A
   // captured record is still the operator's: it is not in anyone's queue, and
-  // it is the only status from which a record can be moved or deleted.
+  // it is the only status a record can be MOVED from (`is_movable`,
+  // records.py). Deletion follows a different rule, which an earlier version
+  // of this comment ran together with the move rule: `delete_record` refuses
+  // only `in_review` and `approved`, and only for non-admins — so a rejected
+  // record is deletable by any contributor, and an admin can delete one in
+  // any status.
   status: 'captured' | 'in_review' | 'rejected' | 'approved';
   sequence?: number;
   // Which camera setup produced this document — set once at capture time.
@@ -1200,9 +1214,10 @@ export const camerasApi = {
    * the image itself rather than saving a record (NEH-166) — the operator
    * uses this to see what the camera actually took, not to build a project.
    *
-   * NOTE: the backend route's final path was not settled when this was
-   * written. If the backend lands on `/cameras/{camera_index}/test-capture`
-   * instead, this is the one line to change.
+   * The path is settled: POST /cameras/test-capture/{camera_index}, chosen
+   * literal-first so it cannot collide with /cameras/{id} (cameras.py). The
+   * route also takes ?resolution= and defaults to medium; this client has no
+   * way to pass it.
    */
   async testCapture(cameraIndex: number): Promise<TestCaptureResult> {
     const { blob, headers } = await apiRequestBlob(`/cameras/test-capture/${cameraIndex}`, {
