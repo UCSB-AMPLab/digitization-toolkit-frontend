@@ -753,8 +753,9 @@ export interface Record {
   status: 'captured' | 'in_review' | 'rejected' | 'approved';
   sequence?: number;
   // Which camera setup produced this document — set once at capture time.
-  // Determines rejection scope (1 vs 2 images) on the backend; the
-  // frontend never needs to compute this itself, only reflect it.
+  // It does not decide what a rejection flags: the backend flags every
+  // current image of the record, whatever its capture_mode (reject_record,
+  // records.py).
   capture_mode: 'single' | 'dual';
 }
 
@@ -945,8 +946,9 @@ export const recordsApi = {
    * Rejection is not reachable here — it requires the mandatory-reason
    * reject() below (NEH-208). The backend's transitions are
    * captured -> in_review (the operator hands one record over),
-   * in_review -> approved, and approved/rejected -> in_review to undo a
-   * mistake. in_review -> captured is deliberately absent: taking a handover
+   * in_review -> approved, approved/rejected -> in_review to undo a
+   * mistake, and rejected -> captured (an operator or admin prepares a
+   * retake, which is why this accepts 'captured'). in_review -> captured is deliberately absent: taking a handover
    * back is a whole-collection act, so it goes through
    * collectionsApi.takeBack() and not through here (NEH-260).
    */
@@ -963,8 +965,8 @@ export const recordsApi = {
   /**
    * Reject a record's current capture with a mandatory predefined reason.
    * Flags every current image (both sides of a dual-camera pair, or the
-   * single image) as pending recapture — the backend decides how many
-   * based on the record's capture_mode, the frontend just reflects
+   * single image) as pending recapture. The backend flags every current
+   * image and does not consult capture_mode; the frontend just reflects
    * `response.images` (only current images are returned).
    */
   async reject(id: number, data: RejectRecordData): Promise<Record> {
