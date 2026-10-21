@@ -58,6 +58,16 @@ export class ApiError extends Error {
 // clear-session-and-redirect below.
 const SESSION_EXEMPT_ENDPOINTS = ['/auth/login', '/auth/password-reset'];
 
+// Whether a failed response means this tab's session is dead and must be
+// cleared. Shared by apiRequest() and apiRequestBlob(); the reasoning is in
+// the comment above its use in apiRequest(). `sentToken` is the token the
+// request carried, read from localStorage before it went out.
+function isDeadSession(status: number, endpoint: string, sentToken: string | null): boolean {
+  if (status !== 401) return false;
+  if (SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p))) return false;
+  return !!sentToken || authStore.getToken() !== null;
+}
+
 // API request helper with authentication
 async function apiRequest<T>(
   endpoint: string,
@@ -94,30 +104,34 @@ async function apiRequest<T>(
 
     // 401 means the token itself is missing/invalid/expired (or its user was
     // deactivated) — the session is genuinely dead, so clear it globally.
-    // Unless there was no token to begin with, which is the `token` term
-    // below. A 401 cannot mean "your session died" when no session was sent,
-    // and reading it that way broke first-run setup: POST /auth/register on
-    // the first-user path 401s on a wrong bootstrap token (auth.py), the
+    // Unless this tab had no session at all, which isDeadSession() checks.
+    // A 401 cannot mean "your session died" when there was no session, and
+    // reading it that way broke first-run setup: POST /auth/register on the
+    // first-user path 401s on a wrong bootstrap token (auth.py), the
     // redirect fired, and the operator landed on /login — which on a fresh
     // appliance has no account to log into. The setup page has handled that
     // 401 all along and never got to render it.
+    // A missing token alone does not mean there was no session. Logging out
+    // in another tab removes the token from localStorage, which this request
+    // read, but leaves this tab's authStore holding the old session, which
+    // the route guards read. So the request goes out with no bearer and gets
+    // a 401, and this tab still shows itself as signed in. The cached session
+    // in authStore counts as a session here, so that 401 clears it.
     // 403 means the token is fine but the role/permission check for this one
     // action failed (RoleChecker and every per-resource permission check in
     // the backend run strictly after get_current_user, which is what raises
-    // 401 — so a 403 nearly always means a valid, active session. The one
-    // exception is POST /auth/login, which returns 403 for an inactive user
-    // with no session at all; harmless here, because a 403 never clears the
-    // session). Treating it the same as a dead session would silently log a
+    // 401 — so a 403 nearly always means a valid, active session. The
+    // exceptions are POST /auth/login, which returns 403 for an inactive user
+    // with no session at all, and POST /auth/register, which returns 403 when
+    // the caller's otherwise valid token belongs to an inactive user; both
+    // are harmless here, because a 403 never clears the session). Treating it the same as a dead session would silently log a
     // user out of a perfectly good session over a single denied action, and
     // would swallow the inline "you can't do that" errors that callers
     // (e.g. project member management, bulk status changes) already show.
-    const isSessionExempt = SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p));
-    const isDeadSession = response.status === 401 && !isSessionExempt && !!token;
-
     // Only meaningful in the browser: clears the stale/rejected session and
     // routes to /login so the UI never keeps rendering as a broken
     // "logged-in" shell against a token the backend has already rejected.
-    if (isDeadSession && browser) {
+    if (isDeadSession(response.status, endpoint, token) && browser) {
       authStore.clearSession();
       if (!window.location.pathname.startsWith('/login')) {
         goto('/login');
@@ -175,10 +189,7 @@ async function apiRequestBlob(
       ? (detail as { message?: string }).message || JSON.stringify(detail)
       : String(detail);
 
-    const isSessionExempt = SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p));
-    const isDeadSession = response.status === 401 && !isSessionExempt;
-
-    if (isDeadSession && browser) {
+    if (isDeadSession(response.status, endpoint, token) && browser) {
       authStore.clearSession();
       if (!window.location.pathname.startsWith('/login')) {
         goto('/login');
