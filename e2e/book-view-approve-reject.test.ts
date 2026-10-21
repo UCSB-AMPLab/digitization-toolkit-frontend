@@ -179,8 +179,14 @@ async function openBookView(page: import('@playwright/test').Page, ctx: SetupRes
 		[ctx.token, JSON.stringify({ id: 0, username: E2E_USERNAME, email: 'e2e@example.com', role: 'admin', is_active: true })]
 	);
 	await page.goto(`/dashboard/projects/${ctx.projectId}/collections/${collectionId}`);
-	// Switch to Book view (spread).
-	await page.getByTitle('Vista libro').click();
+	// Switch to Book view (spread). The toolbar is in the server-rendered
+	// markup, so it can be clicked before the page has hydrated, and that
+	// click is lost: the view stays on list and the left panel, which only
+	// book view renders, never appears. Retry the click until it does.
+	await expect(async () => {
+		await page.getByTitle('Vista libro').click();
+		await expect(page.getByRole('button', { name: 'Anotaciones' })).toBeVisible({ timeout: 1000 });
+	}).toPass({ timeout: 15000 });
 	// Approve/Reject live in the left panel's "Anotaciones" tab (NEH-209
 	// correction) — collapsed by default, open it.
 	await page.getByRole('button', { name: 'Anotaciones' }).click();
@@ -204,6 +210,10 @@ async function flagErrors(page: import('@playwright/test').Page, labels: string[
 		await expect(row).toHaveClass(/selected/);
 	}
 	await page.getByRole('button', { name: 'Listo', exact: true }).click();
+	// The card collapses only once the annotation has been saved and added
+	// to the panel's list. Until then Rechazar still finds no saved reason
+	// and opens the "select a reason" popup instead of the confirmation.
+	await expect(page.getByRole('button', { name: labels[0], exact: true })).toBeHidden();
 }
 
 // "Agregar nota" is a separate accordion — saves a note-only annotation
@@ -212,6 +222,8 @@ async function addNote(page: import('@playwright/test').Page, text: string) {
 	await page.getByRole('button', { name: 'Agregar nota' }).click();
 	await page.getByPlaceholder('Agrega un comentario (opcional)...').fill(text);
 	await page.getByRole('button', { name: 'Listo', exact: true }).click();
+	// As in flagErrors: the card collapses once the note has been saved.
+	await expect(page.getByPlaceholder('Agrega un comentario (opcional)...')).toBeHidden();
 }
 
 test.describe('Book view — approve/reject (NEH-209)', () => {
