@@ -294,10 +294,13 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		});
 		expect((await statusResp.json()).status).toBe('in_review');
 
-		// Back to fully interactive: both buttons available again (Rechazar
-		// still needs a reason picked).
+		// Back to fully interactive: both buttons enabled again. Rechazar
+		// still needs a saved reason, but it asks for one in a popup rather
+		// than staying disabled.
 		await expect(page.getByRole('button', { name: 'Aprobar' })).toBeEnabled();
-		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeEnabled();
+		await page.getByRole('button', { name: 'Rechazar' }).click();
+		await expect(page.getByRole('dialog').getByText('Debes seleccionar al menos un error.')).toBeVisible();
 	});
 
 	test('undo: rejecting then approving-to-undo brings the record back to in_review', async ({ page, request }) => {
