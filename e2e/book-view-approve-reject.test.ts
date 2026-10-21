@@ -80,6 +80,17 @@ async function createRecordWithImages(
 		expect(imgResp.ok(), await imgResp.text()).toBeTruthy();
 	}
 
+	// Hand the collection over, so the record reaches in_review — the only
+	// state a reviewer can approve or reject from (NEH-260). The backend
+	// creates records as captured, and promotion acts on a whole collection.
+	// Every record created before this one has already been promoted, so
+	// this one is the only captured record there.
+	const promoteResp = await request.post(`${API_BASE}/collections/${collectionId}/promote`, {
+		headers: authHeaders
+	});
+	expect(promoteResp.ok(), await promoteResp.text()).toBeTruthy();
+	expect((await promoteResp.json()).promoted).toBe(1);
+
 	return record.id as number;
 }
 
@@ -123,16 +134,6 @@ async function setup(request: APIRequestContext): Promise<SetupResult> {
 		'Single-mode document',
 		'single'
 	);
-
-	// Hand both collections over, so the records reach in_review — the only
-	// state a reviewer can approve or reject from (NEH-260).
-	for (const collectionId of [dualCollection.id, singleCollection.id]) {
-		const promoteResp = await request.post(`${API_BASE}/collections/${collectionId}/promote`, {
-			headers: authHeaders
-		});
-		expect(promoteResp.ok(), await promoteResp.text()).toBeTruthy();
-		expect((await promoteResp.json()).promoted).toBe(1);
-	}
 
 	return {
 		token,
@@ -410,10 +411,11 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		});
 		const collection = await colResp.json();
 		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Recapture document', 'single');
-		await request.post(`${API_BASE}/records/${recordId}/reject`, {
+		const rejectResp = await request.post(`${API_BASE}/records/${recordId}/reject`, {
 			headers: { Authorization: `Bearer ${ctx.token}`, 'Content-Type': 'application/json' },
 			data: { predefined_reason: 'blur' }
 		});
+		expect(rejectResp.ok(), await rejectResp.text()).toBeTruthy();
 
 		await openBookView(page, ctx, collection.id);
 
