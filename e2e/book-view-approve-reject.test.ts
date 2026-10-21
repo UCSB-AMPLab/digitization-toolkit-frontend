@@ -6,8 +6,11 @@
 // project's manual verification passes — there's no seed/fixture script in
 // this repo yet.
 //
-// Requires an admin- or reviewer-role account to already exist in the
-// target backend. Configure via env vars (falls back to the throwaway
+// Requires an admin-role account to already exist in the target backend.
+// A reviewer is not enough: the backend creates records as 'captured', and
+// handing a collection over for review (captured -> in_review) needs an
+// operator or admin, while approving needs a reviewer or admin. Only admin
+// can do both. Configure via env vars (falls back to the throwaway
 // `e2e_neh209` account provisioned in this dev environment):
 //   E2E_USERNAME, E2E_PASSWORD
 import { test, expect, type APIRequestContext } from '@playwright/test';
@@ -37,7 +40,7 @@ async function login(request: APIRequestContext): Promise<string> {
 	});
 	if (!resp.ok()) {
 		throw new Error(
-			`E2E login failed (${resp.status()}). Set E2E_USERNAME/E2E_PASSWORD to a valid admin/reviewer account. Body: ${await resp.text()}`
+			`E2E login failed (${resp.status()}). Set E2E_USERNAME/E2E_PASSWORD to a valid admin account. Body: ${await resp.text()}`
 		);
 	}
 	const { access_token } = await resp.json();
@@ -120,6 +123,16 @@ async function setup(request: APIRequestContext): Promise<SetupResult> {
 		'Single-mode document',
 		'single'
 	);
+
+	// Hand both collections over, so the records reach in_review — the only
+	// state a reviewer can approve or reject from (NEH-260).
+	for (const collectionId of [dualCollection.id, singleCollection.id]) {
+		const promoteResp = await request.post(`${API_BASE}/collections/${collectionId}/promote`, {
+			headers: authHeaders
+		});
+		expect(promoteResp.ok(), await promoteResp.text()).toBeTruthy();
+		expect((await promoteResp.json()).promoted).toBe(1);
+	}
 
 	return {
 		token,
