@@ -68,6 +68,7 @@ export const en: Messages = {
 	nav_logout: 'Log out',
 
 	// ── Record statuses ──────────────────────────────────────────────────────
+	status_captured: 'Captured',
 	status_in_review: 'In review',
 	status_rejected: 'Rejected',
 	status_approved: 'Approved',
@@ -370,6 +371,7 @@ export const en: Messages = {
 	col_live_preview: 'Capture',
 	col_current_user: 'Current user',
 	col_loading_images: 'Loading images…',
+	status_captured_plural: 'Captured',
 	status_rejected_plural: 'Rejected',
 	status_approved_plural: 'Approved',
 	col_no_records: 'No records',

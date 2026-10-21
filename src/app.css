@@ -1254,6 +1254,7 @@ canvas, button, a, div {
   flex-shrink: 0;
 }
 
+.status-bar-dot.seg-captured  { background-color: var(--color-primary); }
 .status-bar-dot.seg-in_review { background-color: var(--color-warning); }
 .status-bar-dot.seg-rejected  { background-color: var(--color-error); }
 .status-bar-dot.seg-approved  { background-color: var(--color-success); }

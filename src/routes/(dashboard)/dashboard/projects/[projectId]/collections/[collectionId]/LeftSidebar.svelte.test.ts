@@ -219,6 +219,15 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeDisabled();
 	});
 
+	it('captured: Aprobar and Rechazar are both disabled — the record has not been handed over for review', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'captured' }) }));
+		await openAnnotationsTab(screen);
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		expect(updateStatusSpy).not.toHaveBeenCalled();
+		expect(rejectSpy).not.toHaveBeenCalled();
+	});
+
 	it('rejected: "Marcar error" and "Agregar nota" are both disabled — a rejected record accepts no more annotations', async () => {
 		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'rejected' }), userRole: 'admin' }));
 		await openAnnotationsTab(screen);

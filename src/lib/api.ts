@@ -58,6 +58,16 @@ export class ApiError extends Error {
 // clear-session-and-redirect below.
 const SESSION_EXEMPT_ENDPOINTS = ['/auth/login', '/auth/password-reset'];
 
+// Whether a failed response means this tab's session is dead and must be
+// cleared. Shared by apiRequest() and apiRequestBlob(); the reasoning is in
+// the comment above its use in apiRequest(). `sentToken` is the token the
+// request carried, read from localStorage before it went out.
+function isDeadSession(status: number, endpoint: string, sentToken: string | null): boolean {
+  if (status !== 401) return false;
+  if (SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p))) return false;
+  return !!sentToken || authStore.getToken() !== null;
+}
+
 // API request helper with authentication
 async function apiRequest<T>(
   endpoint: string,
@@ -94,21 +104,34 @@ async function apiRequest<T>(
 
     // 401 means the token itself is missing/invalid/expired (or its user was
     // deactivated) — the session is genuinely dead, so clear it globally.
+    // Unless this tab had no session at all, which isDeadSession() checks.
+    // A 401 cannot mean "your session died" when there was no session, and
+    // reading it that way broke first-run setup: POST /auth/register on the
+    // first-user path 401s on a wrong bootstrap token (auth.py), the
+    // redirect fired, and the operator landed on /login — which on a fresh
+    // appliance has no account to log into. The setup page has handled that
+    // 401 all along and never got to render it.
+    // A missing token alone does not mean there was no session. Logging out
+    // in another tab removes the token from localStorage, which this request
+    // read, but leaves this tab's authStore holding the old session, which
+    // the route guards read. So the request goes out with no bearer and gets
+    // a 401, and this tab still shows itself as signed in. The cached session
+    // in authStore counts as a session here, so that 401 clears it.
     // 403 means the token is fine but the role/permission check for this one
     // action failed (RoleChecker and every per-resource permission check in
     // the backend run strictly after get_current_user, which is what raises
-    // 401 — a 403 can only happen on an already-valid, already-active
-    // session). Treating it the same as a dead session would silently log a
+    // 401 — so a 403 nearly always means a valid, active session. The
+    // exceptions are POST /auth/login, which returns 403 for an inactive user
+    // with no session at all, and POST /auth/register, which returns 403 when
+    // the caller's otherwise valid token belongs to an inactive user; both
+    // are harmless here, because a 403 never clears the session). Treating it the same as a dead session would silently log a
     // user out of a perfectly good session over a single denied action, and
     // would swallow the inline "you can't do that" errors that callers
     // (e.g. project member management, bulk status changes) already show.
-    const isSessionExempt = SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p));
-    const isDeadSession = response.status === 401 && !isSessionExempt;
-
     // Only meaningful in the browser: clears the stale/rejected session and
     // routes to /login so the UI never keeps rendering as a broken
     // "logged-in" shell against a token the backend has already rejected.
-    if (isDeadSession && browser) {
+    if (isDeadSession(response.status, endpoint, token) && browser) {
       authStore.clearSession();
       if (!window.location.pathname.startsWith('/login')) {
         goto('/login');
@@ -166,10 +189,7 @@ async function apiRequestBlob(
       ? (detail as { message?: string }).message || JSON.stringify(detail)
       : String(detail);
 
-    const isSessionExempt = SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p));
-    const isDeadSession = response.status === 401 && !isSessionExempt;
-
-    if (isDeadSession && browser) {
+    if (isDeadSession(response.status, endpoint, token) && browser) {
       authStore.clearSession();
       if (!window.location.pathname.startsWith('/login')) {
         goto('/login');
@@ -617,6 +637,31 @@ export const collectionsApi = {
   },
 
   /**
+   * Hand the collection over for review: every captured record becomes
+   * in_review (NEH-260). Refuses with 422 if any of them still carries a
+   * rejected image or has no image at all, naming all of them at once rather
+   * than stopping at the first — nothing is changed when it refuses.
+   */
+  async promote(collectionId: number): Promise<{ collection_id: number; promoted: number }> {
+    return apiRequest<{ collection_id: number; promoted: number }>(
+      `/collections/${collectionId}/promote`,
+      { method: 'POST' }
+    );
+  },
+
+  /**
+   * Take the handover back: the collection's in_review records return to
+   * captured, for an operator who handed a tomo over too early (NEH-260).
+   * Records a reviewer has already approved or rejected are left alone.
+   */
+  async takeBack(collectionId: number): Promise<{ collection_id: number; taken_back: number }> {
+    return apiRequest<{ collection_id: number; taken_back: number }>(
+      `/collections/${collectionId}/take-back`,
+      { method: 'POST' }
+    );
+  },
+
+  /**
    * Trigger a BagIt export for the collection (all records must be approved).
    * Returns metadata about the generated zip including a download_url.
    */
@@ -694,13 +739,23 @@ export interface Record {
   created_at?: string;
   modified_at?: string;
   images: RecordImage[];
-  // QA workflow (NEH-208): no more "captured" resting state — a record
-  // enters the queue as "in_review" the instant it's captured.
-  status: 'in_review' | 'rejected' | 'approved';
+  // QA workflow. NEH-208 removed the "captured" resting state and sent a
+  // record straight into the queue; NEH-260 brought it back, because the
+  // handover is a deliberate act an operator performs on a whole collection
+  // rather than something that happens to each record as it is shot. A
+  // captured record is still the operator's: it is not in anyone's queue, and
+  // it is the only status a record can be MOVED from (`is_movable`,
+  // records.py). Deletion follows a different rule, which an earlier version
+  // of this comment ran together with the move rule: `delete_record` refuses
+  // only `in_review` and `approved`, and only for non-admins — so a rejected
+  // record is deletable by any contributor, and an admin can delete one in
+  // any status.
+  status: 'captured' | 'in_review' | 'rejected' | 'approved';
   sequence?: number;
   // Which camera setup produced this document — set once at capture time.
-  // Determines rejection scope (1 vs 2 images) on the backend; the
-  // frontend never needs to compute this itself, only reflect it.
+  // It does not decide what a rejection flags: the backend flags every
+  // current image of the record, whatever its capture_mode (reject_record,
+  // records.py).
   capture_mode: 'single' | 'dual';
 }
 
@@ -888,12 +943,18 @@ export const recordsApi = {
 
   /**
    * Change the QA status of a single record.
-   * NEH-208: the generic status endpoint only allows in_review -> approved
-   * now — rejection requires the mandatory-reason reject() below.
+   * Rejection is not reachable here — it requires the mandatory-reason
+   * reject() below (NEH-208). The backend's transitions are
+   * captured -> in_review (the operator hands one record over),
+   * in_review -> approved, approved/rejected -> in_review to undo a
+   * mistake, and rejected -> captured (an operator or admin prepares a
+   * retake, which is why this accepts 'captured'). in_review -> captured is deliberately absent: taking a handover
+   * back is a whole-collection act, so it goes through
+   * collectionsApi.takeBack() and not through here (NEH-260).
    */
   async updateStatus(
     id: number,
-    status: 'in_review' | 'approved'
+    status: 'captured' | 'in_review' | 'approved'
   ): Promise<Record> {
     return apiRequest<Record>(`/records/${id}/status`, {
       method: 'PATCH',
@@ -904,8 +965,8 @@ export const recordsApi = {
   /**
    * Reject a record's current capture with a mandatory predefined reason.
    * Flags every current image (both sides of a dual-camera pair, or the
-   * single image) as pending recapture — the backend decides how many
-   * based on the record's capture_mode, the frontend just reflects
+   * single image) as pending recapture. The backend flags every current
+   * image and does not consult capture_mode; the frontend just reflects
    * `response.images` (only current images are returned).
    */
   async reject(id: number, data: RejectRecordData): Promise<Record> {
@@ -1166,9 +1227,10 @@ export const camerasApi = {
    * the image itself rather than saving a record (NEH-166) — the operator
    * uses this to see what the camera actually took, not to build a project.
    *
-   * NOTE: the backend route's final path was not settled when this was
-   * written. If the backend lands on `/cameras/{camera_index}/test-capture`
-   * instead, this is the one line to change.
+   * The path is settled: POST /cameras/test-capture/{camera_index}, chosen
+   * literal-first so it cannot collide with /cameras/{id} (cameras.py). The
+   * route also takes ?resolution= and defaults to medium; this client has no
+   * way to pass it.
    */
   async testCapture(cameraIndex: number): Promise<TestCaptureResult> {
     const { blob, headers } = await apiRequestBlob(`/cameras/test-capture/${cameraIndex}`, {

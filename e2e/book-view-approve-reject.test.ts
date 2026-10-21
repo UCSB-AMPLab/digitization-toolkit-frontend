@@ -6,8 +6,11 @@
 // project's manual verification passes — there's no seed/fixture script in
 // this repo yet.
 //
-// Requires an admin- or reviewer-role account to already exist in the
-// target backend. Configure via env vars (falls back to the throwaway
+// Requires an admin-role account to already exist in the target backend.
+// A reviewer is not enough: the backend creates records as 'captured', and
+// handing a collection over for review (captured -> in_review) needs an
+// operator or admin, while approving needs a reviewer or admin. Only admin
+// can do both. Configure via env vars (falls back to the throwaway
 // `e2e_neh209` account provisioned in this dev environment):
 //   E2E_USERNAME, E2E_PASSWORD
 import { test, expect, type APIRequestContext } from '@playwright/test';
@@ -37,7 +40,7 @@ async function login(request: APIRequestContext): Promise<string> {
 	});
 	if (!resp.ok()) {
 		throw new Error(
-			`E2E login failed (${resp.status()}). Set E2E_USERNAME/E2E_PASSWORD to a valid admin/reviewer account. Body: ${await resp.text()}`
+			`E2E login failed (${resp.status()}). Set E2E_USERNAME/E2E_PASSWORD to a valid admin account. Body: ${await resp.text()}`
 		);
 	}
 	const { access_token } = await resp.json();
@@ -76,6 +79,17 @@ async function createRecordWithImages(
 		);
 		expect(imgResp.ok(), await imgResp.text()).toBeTruthy();
 	}
+
+	// Hand the collection over, so the record reaches in_review — the only
+	// state a reviewer can approve or reject from (NEH-260). The backend
+	// creates records as captured, and promotion acts on a whole collection.
+	// Every record created before this one has already been promoted, so
+	// this one is the only captured record there.
+	const promoteResp = await request.post(`${API_BASE}/collections/${collectionId}/promote`, {
+		headers: authHeaders
+	});
+	expect(promoteResp.ok(), await promoteResp.text()).toBeTruthy();
+	expect((await promoteResp.json()).promoted).toBe(1);
 
 	return record.id as number;
 }
@@ -165,8 +179,14 @@ async function openBookView(page: import('@playwright/test').Page, ctx: SetupRes
 		[ctx.token, JSON.stringify({ id: 0, username: E2E_USERNAME, email: 'e2e@example.com', role: 'admin', is_active: true })]
 	);
 	await page.goto(`/dashboard/projects/${ctx.projectId}/collections/${collectionId}`);
-	// Switch to Book view (spread).
-	await page.getByTitle('Vista libro').click();
+	// Switch to Book view (spread). The toolbar is in the server-rendered
+	// markup, so it can be clicked before the page has hydrated, and that
+	// click is lost: the view stays on list and the left panel, which only
+	// book view renders, never appears. Retry the click until it does.
+	await expect(async () => {
+		await page.getByTitle('Vista libro').click();
+		await expect(page.getByRole('button', { name: 'Anotaciones' })).toBeVisible({ timeout: 1000 });
+	}).toPass({ timeout: 15000 });
 	// Approve/Reject live in the left panel's "Anotaciones" tab (NEH-209
 	// correction) — collapsed by default, open it.
 	await page.getByRole('button', { name: 'Anotaciones' }).click();
@@ -190,6 +210,10 @@ async function flagErrors(page: import('@playwright/test').Page, labels: string[
 		await expect(row).toHaveClass(/selected/);
 	}
 	await page.getByRole('button', { name: 'Listo', exact: true }).click();
+	// The card collapses only once the annotation has been saved and added
+	// to the panel's list. Until then Rechazar still finds no saved reason
+	// and opens the "select a reason" popup instead of the confirmation.
+	await expect(page.getByRole('button', { name: labels[0], exact: true })).toBeHidden();
 }
 
 // "Agregar nota" is a separate accordion — saves a note-only annotation
@@ -198,6 +222,8 @@ async function addNote(page: import('@playwright/test').Page, text: string) {
 	await page.getByRole('button', { name: 'Agregar nota' }).click();
 	await page.getByPlaceholder('Agrega un comentario (opcional)...').fill(text);
 	await page.getByRole('button', { name: 'Listo', exact: true }).click();
+	// As in flagErrors: the card collapses once the note has been saved.
+	await expect(page.getByPlaceholder('Agrega un comentario (opcional)...')).toBeHidden();
 }
 
 test.describe('Book view — approve/reject (NEH-209)', () => {
@@ -280,10 +306,13 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		});
 		expect((await statusResp.json()).status).toBe('in_review');
 
-		// Back to fully interactive: both buttons available again (Rechazar
-		// still needs a reason picked).
+		// Back to fully interactive: both buttons enabled again. Rechazar
+		// still needs a saved reason, but it asks for one in a popup rather
+		// than staying disabled.
 		await expect(page.getByRole('button', { name: 'Aprobar' })).toBeEnabled();
-		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeEnabled();
+		await page.getByRole('button', { name: 'Rechazar' }).click();
+		await expect(page.getByRole('dialog').getByText('Debes seleccionar al menos un error.')).toBeVisible();
 	});
 
 	test('undo: rejecting then approving-to-undo brings the record back to in_review', async ({ page, request }) => {
@@ -397,10 +426,11 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		});
 		const collection = await colResp.json();
 		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Recapture document', 'single');
-		await request.post(`${API_BASE}/records/${recordId}/reject`, {
+		const rejectResp = await request.post(`${API_BASE}/records/${recordId}/reject`, {
 			headers: { Authorization: `Bearer ${ctx.token}`, 'Content-Type': 'application/json' },
 			data: { predefined_reason: 'blur' }
 		});
+		expect(rejectResp.ok(), await rejectResp.text()).toBeTruthy();
 
 		await openBookView(page, ctx, collection.id);
 

@@ -78,6 +78,7 @@ export const es = {
 	nav_logout: 'Salir',
 
 	// ── Estados de registro ──────────────────────────────────────────────────
+	status_captured: 'Capturado',
 	status_in_review: 'En revisión',
 	status_rejected: 'Rechazado',
 	status_approved: 'Aprobado',
@@ -391,6 +392,7 @@ export const es = {
 	col_live_preview: 'Capturar',
 	col_current_user: 'Usuario actual',
 	col_loading_images: 'Cargando imágenes…',
+	status_captured_plural: 'Capturados',
 	status_rejected_plural: 'Rechazados',
 	status_approved_plural: 'Aprobados',
 	col_no_records: 'Sin registros',

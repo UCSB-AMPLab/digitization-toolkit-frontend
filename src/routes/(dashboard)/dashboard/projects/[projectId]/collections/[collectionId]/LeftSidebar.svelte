@@ -199,6 +199,11 @@
   // Mensaje del popup de confirmación: depende de la acción pedida Y del
   // estado actual del registro — "Rechazar" sobre un 'approved' deshace la
   // aprobación (no es un rechazo formal), y lo mismo al revés (NEH-209).
+  // Un registro 'captured' todavía no se ha entregado a revisión: el backend
+  // no admite captured → approved, y el rechazo exige 'in_review'. Así que
+  // ninguna de las dos acciones aplica, y los dos botones quedan disabled.
+  let notReviewable = $derived(currentRecord?.status === 'captured');
+
   let pendingActionMessage = $derived.by(() => {
     if (!pendingAction || !currentRecord) return '';
     if (pendingAction === 'approve') {
@@ -274,7 +279,7 @@
   // error ya guardada — si falta, muestra un popup en vez de abrir el de
   // confirmación (deshacer una aprobación no lo necesita).
   function requestReject() {
-    if (!currentRecord || currentRecord.status === 'rejected' || isRejecting) return;
+    if (!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting) return;
     if (currentRecord.status === 'in_review' && firstFlaggedReason === null) {
       showNoReasonPopup = true;
       return;
@@ -288,7 +293,7 @@
 
   // Pide confirmación antes de aprobar (o deshacer un rechazo).
   function requestApprove() {
-    if (!currentRecord || currentRecord.status === 'approved' || isApproving) return;
+    if (!currentRecord || notReviewable || currentRecord.status === 'approved' || isApproving) return;
     pendingAction = 'approve';
   }
 
@@ -798,7 +803,7 @@
                   {:else if canReview}
                     <button
                       class="btn-review reject"
-                      disabled={!currentRecord || currentRecord.status === 'rejected' || isRejecting}
+                      disabled={!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting}
                       onclick={requestReject}
                     >
                       <span class="material-symbols-outlined icon-sm">cancel</span>
@@ -808,7 +813,7 @@
                   {#if canReview}
                     <button
                       class="btn-review approve"
-                      disabled={!currentRecord || currentRecord.status === 'approved' || isApproving}
+                      disabled={!currentRecord || notReviewable || currentRecord.status === 'approved' || isApproving}
                       onclick={requestApprove}
                     >
                       <span class="material-symbols-outlined icon-sm">check_circle</span>
