@@ -61,17 +61,17 @@ export const es = {
 	login_error_fill_all_fields: 'Por favor completa todos los campos',
 	login_error_bad_credentials: 'Usuario o contraseña incorrectos',
 	login_error_unknown_role: 'Tu cuenta tiene un rol que la aplicación no reconoce. Avisa a quien administra el equipo.',
-	login_error_backend_unavailable: 'No se pudo conectar con el servidor. Puede estar iniciando; espera unos segundos e intenta de nuevo.',
+	login_error_backend_unavailable: 'No se pudo conectar con el servidor. Puede que todavía no esté listo: espera unos segundos e intenta de nuevo.',
 	login_error_locked_out: (minutes: number) =>
 		minutes === 1
-			? 'Demasiados intentos fallidos. Espera 1 minuto antes de volver a intentarlo.'
-			: `Demasiados intentos fallidos. Espera ${minutes} minutos antes de volver a intentarlo.`,
-	login_error_locked_out_unknown: 'Demasiados intentos fallidos. Espera unos minutos antes de volver a intentarlo.',
+			? 'Demasiados intentos fallidos. Espera 1 minuto e intenta de nuevo.'
+			: `Demasiados intentos fallidos. Espera ${minutes} minutos e intenta de nuevo.`,
+	login_error_locked_out_unknown: 'Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.',
 
 	// ── Sesión ───────────────────────────────────────────────────────────────
 	session_validating: 'Verificando sesión…',
 	session_backend_waiting: 'Esperando respuesta del servidor…',
-	session_backend_waiting_detail: 'Si acabas de encender el equipo, el servidor puede tardar unos segundos en responder. Captua lo seguirá intentando y continuará en cuanto el servidor responda.',
+	session_backend_waiting_detail: 'Si acabas de encender el equipo, el servidor puede tardar unos segundos en responder. Captua seguirá intentando conectarse y continuará en cuanto lo logre.',
 
 	// ── Navegación (dashboard) ───────────────────────────────────────────────
 	nav_section_main: 'PRINCIPAL',
