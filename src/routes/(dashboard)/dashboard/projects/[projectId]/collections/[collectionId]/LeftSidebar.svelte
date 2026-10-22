@@ -111,6 +111,16 @@
   // También limpia el estado de "Agregar nota"/"Marcar error" (NEH-209): sin
   // esto, un motivo o nota a medio escribir para un registro se filtraría al
   // siguiente al navegar entre documentos.
+  // An annotation saved while the load below is in flight can reach the list
+  // twice (the load answered after the save committed) or not at all (the
+  // load answered from before it). Both merge by id, newest first.
+  function withAnnotation(list: RecordAnnotation[], added: RecordAnnotation): RecordAnnotation[] {
+    return [added, ...list.filter(a => a.id !== added.id)];
+  }
+  function mergeLoaded(loaded: RecordAnnotation[], local: RecordAnnotation[]): RecordAnnotation[] {
+    return [...local.filter(a => !loaded.some(l => l.id === a.id)), ...loaded];
+  }
+
   $effect(() => {
     const recordId = currentRecord?.id ?? null;
     annotations = [];
@@ -125,7 +135,7 @@
 
     let cancelled = false;
     recordsApi.getAnnotations(recordId)
-      .then(data => { if (!cancelled) annotations = data; })
+      .then(data => { if (!cancelled) annotations = mergeLoaded(data, annotations); })
       .catch(err => {
         if (cancelled) return;
         console.error('[LeftSidebar] Error cargando anotaciones:', err);
@@ -236,7 +246,7 @@
       // effect de carga ya reemplazó `annotations` por las del nuevo record;
       // no anteponer aquí, o mostraríamos una anotación del record anterior.
       if (currentRecord?.id === recordId) {
-        annotations = [created, ...annotations];
+        annotations = withAnnotation(annotations, created);
       }
       selectedReasons = [];
       isReasonCardExpanded = false;
@@ -262,7 +272,7 @@
         note,
       });
       if (currentRecord?.id === recordId) {
-        annotations = [created, ...annotations];
+        annotations = withAnnotation(annotations, created);
       }
       noteText = '';
       isNoteCardExpanded = false;

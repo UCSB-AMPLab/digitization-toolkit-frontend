@@ -403,4 +403,46 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
 		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument();
 	});
+
+	// The panel asks for the record's annotations when it opens. If one is
+	// saved while that request is in flight, the server can answer it after
+	// the save has committed, so the list already holds the new annotation
+	// when the save's own response arrives. Seen once in about 14 e2e runs.
+	it('an annotation saved while the first load is in flight appears once', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		const created = makeAnnotation({ id: 42, error_types: ['blur'] });
+		let resolveAdd!: (v: RecordAnnotation) => void;
+		addAnnotationSpy.mockReturnValue(new Promise((r) => { resolveAdd = r; }));
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+
+		resolveLoad([created]);
+		await new Promise((r) => setTimeout(r, 0));
+		resolveAdd(created);
+
+		await expect.element(screen.getByText('Imagen Borrosa').first()).toBeVisible();
+		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
+	});
+
+	it('an annotation saved while the first load is in flight is kept when the load answers without it', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		addAnnotationSpy.mockResolvedValue(makeAnnotation({ id: 43, error_types: ['blur'] }));
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
+
+		resolveLoad([]);
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
+	});
 });
