@@ -155,9 +155,11 @@
 {/if}
 
 {#if notice}
-  <div class="handover-notice {notice.kind}" role={notice.kind === 'error' ? 'alert' : 'status'}>
+  <!-- The live region is the message alone, so a screen reader does not
+       read the icon's ligature name or the close button with it. -->
+  <div class="handover-notice {notice.kind}">
     <span class="material-symbols-outlined" aria-hidden="true">{notice.kind === 'error' ? 'error' : 'check_circle'}</span>
-    <span class="handover-notice-text">{notice.text}</span>
+    <span class="handover-notice-text" role={notice.kind === 'error' ? 'alert' : 'status'}>{notice.text}</span>
     <button class="handover-notice-close" onclick={() => (notice = null)} aria-label={$m.common_close}>
       <span class="material-symbols-outlined" aria-hidden="true">close</span>
     </button>

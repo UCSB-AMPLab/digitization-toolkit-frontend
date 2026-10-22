@@ -67,7 +67,7 @@ describe('HandoverControls', () => {
 
 		await dialog.getByRole('button', { name: 'Enviar', exact: true }).click();
 		expect(promoteSpy).toHaveBeenCalledWith(7);
-		await expect.element(screen.getByRole('status')).toHaveTextContent('Se enviaron 37 registros a revisión.');
+		await expect.element(screen.getByRole('status')).toHaveTextContent(/^Se enviaron 37 registros a revisión\.$/);
 		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 		expect(onChanged).toHaveBeenCalled();
 	});
@@ -101,7 +101,7 @@ describe('HandoverControls', () => {
 		const screen = mount(recs({ captured: 1 }));
 		await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
 		await screen.getByRole('button', { name: 'Enviar', exact: true }).click();
-		await expect.element(screen.getByRole('alert')).toHaveTextContent('No se pudo enviar el volumen a revisión. Intenta de nuevo.');
+		await expect.element(screen.getByRole('alert')).toHaveTextContent(/^No se pudo enviar el volumen a revisión\. Intenta de nuevo\.$/);
 		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 	});
 
@@ -116,7 +116,7 @@ describe('HandoverControls', () => {
 
 		await dialog.getByRole('button', { name: 'Retirar', exact: true }).click();
 		expect(takeBackSpy).toHaveBeenCalledWith(7);
-		await expect.element(screen.getByRole('status')).toHaveTextContent('Se retiraron 24 registros de revisión.');
+		await expect.element(screen.getByRole('status')).toHaveTextContent(/^Se retiraron 24 registros de revisión\.$/);
 		expect(onChanged).toHaveBeenCalled();
 	});
 
