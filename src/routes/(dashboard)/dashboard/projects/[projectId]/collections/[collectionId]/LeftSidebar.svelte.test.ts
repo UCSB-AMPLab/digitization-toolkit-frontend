@@ -516,4 +516,51 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		expect(cards()[1]).toContain('Imagen Borrosa');
 		deleteSpy.mockRestore();
 	});
+
+	it('a save that answers after its annotation was deleted does not put it back', async () => {
+		const a = makeAnnotation({ id: 9, error_types: ['blur'] });
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		let resolveAdd!: (v: RecordAnnotation) => void;
+		addAnnotationSpy.mockReturnValue(new Promise((r) => { resolveAdd = r; }));
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockResolvedValue(undefined as never);
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await flag(screen, 'Imagen Borrosa');
+		resolveLoad([a]);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+
+		resolveAdd(a);
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+		deleteSpy.mockRestore();
+	});
+
+	it('a delete still in flight keeps its annotation out when the record is left and reopened', async () => {
+		const recA = makeRecord({ id: 1 });
+		const recB = makeRecord({ id: 2, title: 'Otro' });
+		const a7 = makeAnnotation({ id: 70, record_id: 1, error_types: ['blur'] });
+		getAnnotationsSpy.mockImplementation(async (id: number) => (id === 1 ? [a7] : []));
+		let resolveDelete!: () => void;
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockReturnValue(new Promise((r) => { resolveDelete = () => r(undefined as never); }));
+
+		const screen = render(LeftSidebar, baseProps({ currentRecord: recA }));
+		await openAnnotationsTab(screen);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+
+		await screen.rerender(baseProps({ currentRecord: recB }));
+		await screen.rerender(baseProps({ currentRecord: recA }));
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+
+		resolveDelete();
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+		deleteSpy.mockRestore();
+	});
 });

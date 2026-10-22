@@ -122,11 +122,15 @@
     const t = (b.created_at ?? '').localeCompare(a.created_at ?? '');
     return t !== 0 ? t : b.id - a.id;
   }
+  // Annotations deleted, or being deleted, from this panel. Annotation ids
+  // are unique across records, so the set is not reset when the record
+  // changes: a delete still in flight on a record left and reopened stays
+  // out of its reload. A failed delete takes its id back out. Not reactive.
+  const deletedIds = new Set<number>();
   function withAnnotation(list: RecordAnnotation[], added: RecordAnnotation): RecordAnnotation[] {
-    return [...list.filter(a => a.id !== added.id), added].sort(byNewest);
+    const rest = list.filter(a => a.id !== added.id);
+    return (deletedIds.has(added.id) ? rest : [...rest, added]).sort(byNewest);
   }
-  // Deleted on this record since the load started. Not reactive.
-  let deletedIds = new Set<number>();
   function mergeLoaded(loaded: RecordAnnotation[], local: RecordAnnotation[]): RecordAnnotation[] {
     const merged = [...local.filter(a => !loaded.some(l => l.id === a.id)), ...loaded];
     return merged.filter(a => !deletedIds.has(a.id)).sort(byNewest);
@@ -135,7 +139,6 @@
   $effect(() => {
     const recordId = currentRecord?.id ?? null;
     annotations = [];
-    deletedIds = new Set();
     annotationsError = null;
     noteText = '';
     selectedReasons = [];
@@ -383,14 +386,16 @@
     if (annotationsLocked) return;
     const recordId = currentRecord?.id ?? null;
     const removed = annotations.find(a => a.id === id);
-    const deleted = deletedIds;
-    deleted.add(id);
+    deletedIds.add(id);
     annotations = annotations.filter(a => a.id !== id);
     try {
       await recordsApi.deleteAnnotation(id);
+      // A load that answered while the delete was in flight may have put it
+      // back.
+      annotations = annotations.filter(a => a.id !== id);
     } catch (err) {
       console.error('[LeftSidebar] Error eliminando anotación:', err);
-      deleted.delete(id);
+      deletedIds.delete(id);
       // Solo restaurar si seguimos en el mismo record: si cambió, el effect
       // de carga ya cargó la lista del nuevo record y restaurar aquí la
       // pisaría con datos del record anterior. Se devuelve solo la anotación
