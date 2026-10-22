@@ -1424,6 +1424,13 @@ export interface CollectionActivity {
   last_status_change_at: string | null;
 }
 
+/** One local calendar day of activity, from GET /activity/daily. */
+export interface DailyActivity {
+  date: string;              // YYYY-MM-DD, a local calendar day
+  captured_images: number;
+  reviewed_records: number;
+}
+
 export const activityApi = {
   /**
    * Per-collection status counts for every collection, or only the
@@ -1435,6 +1442,15 @@ export const activityApi = {
     if (params?.project_id !== undefined) queryParams.set('project_id', params.project_id.toString());
     const query = queryParams.toString();
     return apiRequest<CollectionActivity[]>(`/activity/collections${query ? '?' + query : ''}`);
+  },
+
+  /**
+   * Per-day totals, oldest first, `days` entries ending today. The day
+   * boundaries follow the browser's time zone: `tz_offset_minutes` is
+   * `new Date().getTimezoneOffset()`.
+   */
+  async daily(days = 182, tzOffsetMinutes = new Date().getTimezoneOffset()): Promise<DailyActivity[]> {
+    return apiRequest<DailyActivity[]>(`/activity/daily?days=${days}&tz_offset_minutes=${tzOffsetMinutes}`);
   },
 };
 

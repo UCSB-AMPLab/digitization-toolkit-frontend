@@ -151,6 +151,30 @@ export const es = {
 	dash_camera_reconnect: 'Reconectar cámaras',
 	dash_camera_reconnect_error: 'No se pudo reconectar',
 
+	// ── Calendario de actividad ──────────────────────────────────────────────
+	dash_cal_title: 'Calendario de actividad',
+	dash_cal_view: 'Vista',
+	dash_cal_view_captures: 'Capturas',
+	dash_cal_view_reviews: 'Revisiones',
+	dash_cal_subtitle_captures: 'Imágenes capturadas por día en los últimos seis meses',
+	dash_cal_subtitle_reviews: 'Registros aprobados o rechazados por día en los últimos seis meses',
+	dash_cal_map_captures: 'Imágenes capturadas por día',
+	dash_cal_map_reviews: 'Registros revisados por día',
+	dash_cal_weekday_mon: 'lun',
+	dash_cal_weekday_wed: 'mié',
+	dash_cal_weekday_fri: 'vie',
+	dash_cal_less: 'Menos',
+	dash_cal_more: 'Más',
+	dash_cal_day_captures: (n: number, date: string) =>
+		n === 1 ? `1 imagen capturada el ${date}` : `${n} imágenes capturadas el ${date}`,
+	dash_cal_day_reviews: (n: number, date: string) =>
+		n === 1 ? `1 registro revisado el ${date}` : `${n} registros revisados el ${date}`,
+	dash_cal_days_captures: 'Días con capturas',
+	dash_cal_total_captures: 'Imágenes capturadas',
+	dash_cal_days_reviews: 'Días con revisiones',
+	dash_cal_total_reviews: 'Registros revisados',
+	dash_cal_error: 'No se pudo cargar el calendario de actividad.',
+
 	// ── Configuración ────────────────────────────────────────────────────────
 	config_subtitle: 'Parámetros del sistema de digitalización',
 	config_section_language: 'Idioma',
