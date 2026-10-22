@@ -18,8 +18,9 @@
   //   - Click en el backdrop cierra el modal (sin confirmar)
   // ============================================================================
 
-  import { recordsApi, type Record as ApiRecord } from '$lib/api';
+  import { type Record as ApiRecord } from '$lib/api';
   import { m } from '$lib/i18n';
+  import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
 
   let {
     record,
@@ -112,11 +113,18 @@
             </span>
           {/if}
 
-          <img
-            src={recordsApi.getImageFileUrl(img.id)}
-            alt={record.title || $m.col_image_alt(img.id)}
-            class="img-viewer-img"
-          />
+          <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su miniatura,
+               nunca como imagen rota -->
+          <RecordImageDisplay image={img}>
+            {#snippet children(src, onerror)}
+              <img
+                {src}
+                {onerror}
+                alt={record.title || $m.col_image_alt(img.id)}
+                class="img-viewer-img"
+              />
+            {/snippet}
+          </RecordImageDisplay>
         </div>
       {/each}
 

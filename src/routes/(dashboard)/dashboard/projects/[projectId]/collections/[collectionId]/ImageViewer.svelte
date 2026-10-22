@@ -5,13 +5,15 @@
   // Vista spread: muestra las dos páginas (izq + der) del registro seleccionado
   // lado a lado, como un libro abierto.
   //
-  // Siempre carga la imagen completa (no el thumbnail, que el backend limita
-  // a 200x200px para las tiras/grillas) — este es el visor principal de
-  // lectura/inspección, igual que ImageViewerModal.
+  // Carga la imagen completa (no el thumbnail) — este es el visor principal
+  // de lectura/inspección, igual que ImageViewerModal. Excepción (NEH-139):
+  // un RAW se muestra por su vista previa JPEG y, si no la hay, por su
+  // miniatura; ver RecordImageDisplay.svelte.
   // ============================================================================
 
-  import { recordsApi, type Record, type RecordImage } from '$lib/api';
+  import { type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
+  import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import {
     fittedSize,
     screenExtent,
@@ -68,14 +70,6 @@
   let spreadRightImage = $derived(
     selectedRecord?.images?.find(img => img.role === 'right') ?? null
   );
-
-  // ---------------------------------------------------------------------------
-  // HELPER: URL de una imagen concreta
-  // ---------------------------------------------------------------------------
-  function getImageUrl(img: RecordImage | null): string | null {
-    if (!img) return null;
-    return recordsApi.getImageFileUrl(img.id);
-  }
 
   // NEH-201: the image's exact file name, not the record's derived title — the
   // file name is what survives in the BagIt export.
@@ -265,16 +259,23 @@
           onpointercancel={endDrag}
           onlostpointercapture={endDrag}
         >
-          {#if getImageUrl(spreadLeftImage)}
-            <img
-              src={getImageUrl(spreadLeftImage)}
-              alt={$m.col_left_page}
-              class="spread-image left"
-              draggable="false"
-              bind:naturalWidth={leftNaturalW}
-              bind:naturalHeight={leftNaturalH}
-              style={spreadImageStyle(rotation, leftScale, leftPan, leftFrameW, leftFrameH)}
-            />
+          {#if spreadLeftImage}
+            <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su
+                 miniatura, nunca como imagen rota -->
+            <RecordImageDisplay image={spreadLeftImage}>
+              {#snippet children(src, onerror)}
+                <img
+                  {src}
+                  {onerror}
+                  alt={$m.col_left_page}
+                  class="spread-image left"
+                  draggable="false"
+                  bind:naturalWidth={leftNaturalW}
+                  bind:naturalHeight={leftNaturalH}
+                  style={spreadImageStyle(rotation, leftScale, leftPan, leftFrameW, leftFrameH)}
+                />
+              {/snippet}
+            </RecordImageDisplay>
             {#if isRejected}
               <span class="pending-recapture-badge">
                 <span class="material-symbols-outlined icon-sm">refresh</span>
@@ -315,16 +316,23 @@
           onpointercancel={endDrag}
           onlostpointercapture={endDrag}
         >
-          {#if getImageUrl(spreadRightImage)}
-            <img
-              src={getImageUrl(spreadRightImage)}
-              alt={$m.col_right_page}
-              class="spread-image right"
-              draggable="false"
-              bind:naturalWidth={rightNaturalW}
-              bind:naturalHeight={rightNaturalH}
-              style={spreadImageStyle(rotation, rightScale, rightPan, rightFrameW, rightFrameH)}
-            />
+          {#if spreadRightImage}
+            <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su
+                 miniatura, nunca como imagen rota -->
+            <RecordImageDisplay image={spreadRightImage}>
+              {#snippet children(src, onerror)}
+                <img
+                  {src}
+                  {onerror}
+                  alt={$m.col_right_page}
+                  class="spread-image right"
+                  draggable="false"
+                  bind:naturalWidth={rightNaturalW}
+                  bind:naturalHeight={rightNaturalH}
+                  style={spreadImageStyle(rotation, rightScale, rightPan, rightFrameW, rightFrameH)}
+                />
+              {/snippet}
+            </RecordImageDisplay>
             {#if isRejected}
               <span class="pending-recapture-badge">
                 <span class="material-symbols-outlined icon-sm">refresh</span>

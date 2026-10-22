@@ -15,6 +15,7 @@
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
+  import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import {
     fittedSize,
     screenExtent,
@@ -226,15 +227,22 @@
             </span>
           {/if}
 
-        <img
-            src={recordsApi.getImageFileUrl(img.id)}
-            alt={record.title || $m.col_image_alt(img.id)}
-            class="img-viewer-img"
-            draggable="false"
-            bind:naturalWidth={naturalW[i]}
-            bind:naturalHeight={naturalH[i]}
-            style={frameImageStyle(i)}
-          />
+          <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su miniatura,
+               nunca como imagen rota -->
+          <RecordImageDisplay image={img}>
+            {#snippet children(src, onerror)}
+              <img
+                {src}
+                {onerror}
+                alt={record.title || $m.col_image_alt(img.id)}
+                class="img-viewer-img"
+                draggable="false"
+                bind:naturalWidth={naturalW[i]}
+                bind:naturalHeight={naturalH[i]}
+                style={frameImageStyle(i)}
+              />
+            {/snippet}
+          </RecordImageDisplay>
           <div class="img-viewer-zoom-controls">
             <button
               class="img-viewer-zoom-btn"
