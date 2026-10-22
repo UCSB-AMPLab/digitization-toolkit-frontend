@@ -1453,8 +1453,8 @@ export type PowerAction = 'poweroff' | 'reboot';
 /**
  * Error de la llamada de energía que conserva el código HTTP.
  * Necesario para distinguir 501 (control no disponible — máquina de
- * desarrollo) de un error real. La llamada de energía hace su propio fetch
- * en lugar de pasar por apiRequest().
+ * desarrollo) de un error real. powerControl() llama a fetch directamente,
+ * sin pasar por apiRequest().
  */
 export class PowerControlError extends Error {
   status: number;
@@ -1517,7 +1517,7 @@ export const systemApi = {
    *   501 → control de energía no disponible (p. ej. entorno de desarrollo)
    *   401 → sesión expirada
    * Lanza PowerControlError con el status para que la UI muestre el mensaje
-   * adecuado. No usamos apiRequest() porque descarta el código HTTP.
+   * adecuado. Llama a fetch directamente, sin pasar por apiRequest().
    */
   async powerControl(action: PowerAction): Promise<{ message: string }> {
     const base  = getApiBase();
