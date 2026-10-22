@@ -92,7 +92,7 @@
   // volume status, so this is the signal there is.
   let inProgress = $derived<InProgressRow[]>(
     collections
-      .filter(c => c.last_activity_at && c.project_id !== undefined)
+      .filter(c => c.last_activity_at && c.project_id != null)
       .sort((a, b) => (b.last_activity_at ?? '').localeCompare(a.last_activity_at ?? ''))
       .slice(0, IN_PROGRESS_LIMIT)
       .map(c => ({
@@ -109,7 +109,9 @@
 
   // ---------------------------------------------------------------------------
   // Tablero cards: every volume the activity endpoint reports and the
-  // collections list knows, empty volumes included.
+  // collections list knows, empty volumes included. Volumes are top-level
+  // collections; a nested one has project_id null and is left out on both
+  // views, without walking up to its parent.
   // ---------------------------------------------------------------------------
   type BoardCard = CollectionActivity & { projectId: number; volumeName: string; projectName: string };
 
@@ -118,7 +120,7 @@
     const cards: BoardCard[] = [];
     for (const a of activity ?? []) {
       const c = byId.get(a.collection_id);
-      if (!c || c.project_id === undefined) continue;
+      if (!c || c.project_id == null) continue;
       cards.push({
         ...a,
         projectId:   c.project_id,
@@ -210,47 +212,49 @@
     {/if}
 
     {#if view === 'table'}
-      <div class="in-progress">
-        <span class="ip-h">{$m.dash_col_volume}</span>
-        <span class="ip-h">{$m.dash_col_project}</span>
-        <span class="ip-h">{$m.dash_col_progress}</span>
-        <span class="ip-h">{$m.dash_col_last_activity}</span>
-        <span class="ip-h">{$m.dash_col_actions}</span>
+      <div class="table-wrap">
+        <div class="in-progress">
+          <span class="ip-h">{$m.dash_col_volume}</span>
+          <span class="ip-h">{$m.dash_col_project}</span>
+          <span class="ip-h">{$m.dash_col_progress}</span>
+          <span class="ip-h">{$m.dash_col_last_activity}</span>
+          <span class="ip-h">{$m.dash_col_actions}</span>
 
-        {#each inProgress as row (row.collectionId)}
-          {@const a = activityById.get(row.collectionId)}
-          <div class="ip-row">
-            <a class="ip-volume" href={volumeUrl(row.projectId, row.collectionId)}>
-              <span class="ip-volume-name">{row.volumeName}</span>
-              {#if row.signatura}<span class="ip-signatura">{row.signatura}</span>{/if}
-            </a>
+          {#each inProgress as row (row.collectionId)}
+            {@const a = activityById.get(row.collectionId)}
+            <div class="ip-row">
+              <a class="ip-volume" href={volumeUrl(row.projectId, row.collectionId)}>
+                <span class="ip-volume-name">{row.volumeName}</span>
+                {#if row.signatura}<span class="ip-signatura">{row.signatura}</span>{/if}
+              </a>
 
-            <a class="ip-project" href="/dashboard/projects/{row.projectId}"><span>{row.projectName}</span></a>
+              <a class="ip-project" href="/dashboard/projects/{row.projectId}"><span>{row.projectName}</span></a>
 
-            <div class="ip-progress">
-              {#if a}
-                {@render statusBar(a)}
-                <span class="pl-count">{$m.dash_records_count(a.record_count)}</span>
-              {:else}
-                <span class="pl-count">—</span>
-              {/if}
+              <div class="ip-progress">
+                {#if a}
+                  {@render statusBar(a)}
+                  <span class="pl-count">{$m.dash_records_count(a.record_count)}</span>
+                {:else}
+                  <span class="pl-count">—</span>
+                {/if}
+              </div>
+
+              <span class="ip-date">{formatActivity(row.lastActivity)}</span>
+
+              <div class="ip-actions">
+                <button class="btn ip-btn ip-btn-capture" onclick={() => goto(captureUrl(row.projectId, row.collectionId))}>
+                  <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">photo_camera</span>
+                  <span>{$m.col_live_preview}</span>
+                </button>
+
+                <button class="btn ip-btn ip-btn-review" onclick={() => goto(volumeUrl(row.projectId, row.collectionId))}>
+                  <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">rate_review</span>
+                  <span>{$m.tb_go_to_review}</span>
+                </button>
+              </div>
             </div>
-
-            <span class="ip-date">{formatActivity(row.lastActivity)}</span>
-
-            <div class="ip-actions">
-              <button class="btn ip-btn ip-btn-capture" onclick={() => goto(captureUrl(row.projectId, row.collectionId))}>
-                <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">photo_camera</span>
-                <span>{$m.col_live_preview}</span>
-              </button>
-
-              <button class="btn ip-btn ip-btn-review" onclick={() => goto(volumeUrl(row.projectId, row.collectionId))}>
-                <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">rate_review</span>
-                <span>{$m.tb_go_to_review}</span>
-              </button>
-            </div>
-          </div>
-        {/each}
+          {/each}
+        </div>
       </div>
     {:else if activity}
       <div class="board-wrap">
@@ -542,8 +546,13 @@
     color: var(--color-bg);
   }
 
-  /* Narrow: one column, no headers, each row as a block. */
-  @media (max-width: 52rem) {
+  /* Narrow: one column, no headers, each row as a block. Measured on the
+     block's own width, which the sidebar narrows, not on the viewport. The
+     five columns need about 51rem (814px in Chromium with Mulish and the
+     icon font: 192 + 128 + 128 track minimums, 136 for the date, 228 for
+     the two buttons); 54rem leaves room for longer dates and labels. */
+  .table-wrap { container-type: inline-size; }
+  @container (max-width: 54rem) {
     .in-progress { grid-template-columns: 1fr; }
     .ip-h { display: none; }
 

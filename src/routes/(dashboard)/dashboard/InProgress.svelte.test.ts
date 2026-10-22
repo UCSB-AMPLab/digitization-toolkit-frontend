@@ -3,7 +3,7 @@
 // what the block shows when the endpoint fails.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 const gotoMock = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
@@ -11,6 +11,9 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { activityApi, ApiError, type Collection, type CollectionActivity, type Project, type StatusCounts } from '$lib/api';
 import InProgress from './InProgress.svelte';
+// The design system, for the layout test: container queries, .btn sizes and
+// the bundled Mulish and icon fonts.
+import '../../../app.css';
 
 const VIEW_KEY = 'dtk_dashboard_in_progress_view';
 
@@ -111,6 +114,72 @@ describe('InProgress', () => {
 		await expect.element(card3.getByText('En revisión: 1')).toBeInTheDocument();
 		await expect.element(capture.getByRole('article', { name: 'Tomo vacío' }).getByText('0 registros')).toBeVisible();
 		await expect.element(approved.getByRole('article', { name: 'Tomo 4' }).getByText('51 registros')).toBeVisible();
+	});
+
+	it('Tabla: lists at most the five most recently worked volumes', async () => {
+		const six = [...collections.slice(0, 4), coll(6, 'Tomo 6', '2026-10-18T10:00:00'), coll(7, 'Tomo 7', '2026-10-17T10:00:00')];
+		const screen = render(InProgress, { collections: six, projects });
+		await expect.element(screen.getByText('Tomo 6')).toBeVisible();
+		await expect.element(screen.getByText('Tomo 7')).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Revisar' }).elements().length).toBe(5);
+	});
+
+	it('leaves out nested collections (project_id null) on both views, and no link carries null', async () => {
+		const nested: Collection = {
+			id: 8, name: 'Legajo anidado', project_id: null, parent_collection_id: 1,
+			created_at: '2026-01-01T00:00:00', last_activity_at: '2026-10-23T10:00:00'
+		};
+		activitySpy.mockResolvedValue([...activity, act(8, { captured: 2 }, '2026-10-23T10:00:00')]);
+		const screen = render(InProgress, { collections: [...collections, nested], projects });
+
+		await expect.element(screen.getByText('Tomo 1')).toBeVisible();
+		await expect.element(screen.getByText('Legajo anidado')).not.toBeInTheDocument();
+
+		await screen.getByRole('button', { name: 'Tablero' }).click();
+		await expect.element(screen.getByRole('article', { name: 'Tomo 1' })).toBeVisible();
+		await expect.element(screen.getByText('Legajo anidado')).not.toBeInTheDocument();
+
+		for (const button of screen.getByRole('button', { name: /Capturar|Revisar/ }).elements()) {
+			(button as HTMLElement).click();
+		}
+		const hrefs = screen.getByRole('link').elements().map((a) => a.getAttribute('href') ?? '');
+		expect(hrefs.length).toBeGreaterThan(0);
+		expect(gotoMock.mock.calls.length).toBeGreaterThan(0);
+		expect([...hrefs, ...gotoMock.mock.calls.map((c) => String(c[0]))].filter((u) => u.includes('null'))).toEqual([]);
+	});
+
+	it('Tablero: a card shows the date of its last status change, read as UTC', async () => {
+		localStorage.setItem(VIEW_KEY, 'board');
+		const screen = mount();
+		const card = screen.getByRole('article', { name: 'Tomo 3' });
+		const expected = new Date(Date.UTC(2026, 9, 20, 10)).toLocaleDateString('es', {
+			day: '2-digit', month: 'short', year: 'numeric'
+		});
+		await expect.element(card.getByText(expected)).toBeVisible();
+		expect(card.element().querySelector('time')?.getAttribute('datetime')).toBe('2026-10-20T10:00:00.000Z');
+	});
+
+	it('Tabla: five columns fit without overflow just above 54rem, and stack at 54rem', async () => {
+		await page.viewport(1400, 900);
+		await document.fonts.load('18px "Material Symbols Outlined"');
+		await document.fonts.load('700 12px Mulish');
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		try {
+			host.style.width = `${54 * 16 + 1}px`;
+			const screen = render(InProgress, { target: host, props: { collections, projects } });
+			await expect.element(screen.getByText('34 registros')).toBeVisible();
+			const grid = host.querySelector('.in-progress') as HTMLElement;
+			const header = host.querySelector('.ip-h') as HTMLElement;
+			expect(getComputedStyle(header).display).not.toBe('none');
+			expect(grid.scrollWidth).toBeLessThanOrEqual(grid.clientWidth);
+
+			host.style.width = `${54 * 16}px`;
+			await expect.poll(() => getComputedStyle(header).display).toBe('none');
+			expect(grid.scrollWidth).toBeLessThanOrEqual(grid.clientWidth);
+		} finally {
+			host.remove();
+		}
 	});
 
 	it('Tablero: Capturar on the first two columns, Revisar on En revisión, nothing on Aprobado', async () => {

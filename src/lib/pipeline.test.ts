@@ -1,5 +1,11 @@
 // The pipeline board's placement rule, the stacked-bar segments, grouping
 // and the naive-UTC date parsing the board relies on.
+//
+// Run in a zone that is not UTC, so that reading a naive string as local time
+// would give a different instant and the parseApiDate tests could fail. Node
+// applies a TZ change made at runtime; nothing here builds a Date before it.
+process.env.TZ = 'America/Bogota';
+
 import { describe, it, expect } from 'vitest';
 import { placeVolume, barSegments, groupByStage, parseApiDate } from './pipeline';
 import type { CollectionActivity, StatusCounts } from './api';
@@ -59,6 +65,12 @@ describe('barSegments', () => {
 		expect(segs.map((s) => s.percent)).toEqual([10, 20, 70]);
 	});
 
+	it('puts rejected before in_review when both are present', () => {
+		const segs = barSegments(counts({ in_review: 1, rejected: 1, captured: 1, approved: 1 }));
+		expect(segs.map((s) => s.status)).toEqual(['captured', 'rejected', 'in_review', 'approved']);
+		expect(segs.map((s) => s.percent)).toEqual([25, 25, 25, 25]);
+	});
+
 	it('gives a single status the whole bar', () => {
 		expect(barSegments(counts({ rejected: 3 }))).toEqual([{ status: 'rejected', count: 3, percent: 100 }]);
 	});
@@ -90,6 +102,10 @@ describe('groupByStage', () => {
 });
 
 describe('parseApiDate', () => {
+	it('runs in a zone where local and UTC readings differ', () => {
+		expect(new Date('2026-10-22T17:03:11').toISOString()).toBe('2026-10-22T22:03:11.000Z');
+	});
+
 	it('reads a naive ISO string as UTC', () => {
 		expect(parseApiDate('2026-10-22T17:03:11').toISOString()).toBe('2026-10-22T17:03:11.000Z');
 	});

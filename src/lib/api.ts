@@ -495,7 +495,8 @@ export interface Collection {
   name: string;
   description?: string;
   collection_type?: string;
-  project_id?: number;
+  // Null for a nested collection, which belongs to its parent, not a project.
+  project_id?: number | null;
   parent_collection_id?: number;
   created_by?: string;
   created_at: string;
