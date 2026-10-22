@@ -11,21 +11,22 @@ import GalleryModal from '../../routes/(dashboard)/dashboard/projects/[projectId
 import LiveModal from '../../routes/live-preview/ImageViewerModal.svelte';
 
 const FILE_URL = 'http://dtk.invalid/records/images/1/file';
-const BROKEN_THUMB = 'data:image/png;base64,AAAA';
+// Two different undecodable URLs: an <img> whose src is set to the value it
+// already has does not fire a second error.
+const BROKEN = 'data:image/png;base64,AAAA';
+const BROKEN_THUMB = 'data:image/png;base64,BBBB';
 
-function canvasPng(w: number, h: number): HTMLCanvasElement {
+function canvasPng(w: number, h: number): string {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   const ctx = c.getContext('2d')!;
   ctx.fillStyle = '#3a6ea5';
   ctx.fillRect(0, 0, w, h);
-  return c;
+  return c.toDataURL('image/png');
 }
-const THUMB_URL = canvasPng(60, 40).toDataURL('image/png');
-async function previewBlob(): Promise<Blob> {
-  return new Promise((resolve) => canvasPng(120, 80).toBlob((b) => resolve(b!), 'image/png'));
-}
+const PREVIEW_URL = canvasPng(120, 80);
+const THUMB_URL = canvasPng(60, 40);
 
 function makeImage(overrides: Partial<RecordImage> = {}): RecordImage {
   return { id: 1, record_id: 1, filename: 'IMG_0001.cr2', file_path: '/x', format: 'cr2', is_current: true, ...overrides };
@@ -50,37 +51,34 @@ const modals = [
 
 describe.each(modals)('%s — RAW images (NEH-139)', (_name, renderModal) => {
   let fileSpy: ReturnType<typeof vi.spyOn>;
+  let previewSpy: ReturnType<typeof vi.spyOn>;
   let thumbSpy: ReturnType<typeof vi.spyOn>;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(FILE_URL);
+    fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockImplementation((id: number) => `http://dtk.invalid/records/images/${id}/file`);
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
     thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
   });
   afterEach(() => {
     fileSpy.mockRestore();
+    previewSpy.mockRestore();
     thumbSpy.mockRestore();
-    fetchSpy?.mockRestore();
+    fetchSpy.mockRestore();
   });
 
-  it('shows the JPEG preview the backend sends, labelled, never the file URL', async () => {
-    const blob = await previewBlob();
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(blob, { status: 200, headers: { 'content-type': 'image/jpeg' } }),
-    );
+  it('shows the JPEG preview from /preview, labelled, never the /file URL', async () => {
     const screen = renderModal(makeRecord([makeImage()]));
     const srcs = recordImgSrcs(screen.container);
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src') ?? '').toMatch(/^blob:/);
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
     await expect.element(screen.getByText('Vista previa (RAW)')).toBeVisible();
-    expect(fetchSpy).toHaveBeenCalledWith(FILE_URL, expect.anything());
     expect(srcs).not.toContain(FILE_URL);
   });
 
-  it('falls back to the thumbnail when /file streams RAW bytes', async () => {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('II*\u0000raw', { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
-    );
+  it('falls back to the thumbnail when /preview fails (no sidecar)', async () => {
+    previewSpy.mockReturnValue(BROKEN);
     const screen = renderModal(makeRecord([makeImage()]));
     const srcs = recordImgSrcs(screen.container);
 
@@ -89,25 +87,44 @@ describe.each(modals)('%s — RAW images (NEH-139)', (_name, renderModal) => {
     expect(srcs).not.toContain(FILE_URL);
   });
 
-  it('shows an explicit state with the filename, and no <img>, when nothing can be displayed', async () => {
+  it('nothing displayable, master confirmed by /file: explicit state, filename, and the original is stored', async () => {
+    previewSpy.mockReturnValue(BROKEN);
     thumbSpy.mockReturnValue(BROKEN_THUMB);
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('raw', { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
-    );
     const screen = renderModal(makeRecord([makeImage()]));
     const srcs = recordImgSrcs(screen.container);
 
     await expect.element(screen.getByText('No se puede mostrar este formato')).toBeVisible();
     await expect.element(screen.getByText('IMG_0001.cr2')).toBeVisible();
+    await expect.element(screen.getByText('El archivo original está guardado en el equipo.')).toBeVisible();
+    expect(fetchSpy).toHaveBeenCalledWith(FILE_URL, expect.anything());
     expect(screen.container.querySelector('img')).toBeNull();
     expect(srcs).not.toContain(FILE_URL);
   });
 
-  it('a dual pair with one RAW side: the JPEG side keeps its file URL, the RAW side does not', async () => {
-    fileSpy.mockImplementation((id: number) => `http://dtk.invalid/records/images/${id}/file`);
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('raw', { status: 200, headers: { 'content-type': 'application/octet-stream' } }),
-    );
+  it('nothing displayable, master not confirmed: no claim that the original is stored', async () => {
+    previewSpy.mockReturnValue(BROKEN);
+    thumbSpy.mockReturnValue(BROKEN_THUMB);
+    fetchSpy.mockResolvedValue(new Response('', { status: 401 }));
+    const screen = renderModal(makeRecord([makeImage()]));
+
+    await expect.element(screen.getByText('No se puede mostrar este formato')).toBeVisible();
+    await expect.poll(() => fetchSpy.mock.calls.length).toBeGreaterThan(0);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.container.textContent).not.toContain('El archivo original está guardado');
+  });
+
+  it('nothing displayable and /file answers 404: says the file was not found', async () => {
+    previewSpy.mockReturnValue(BROKEN);
+    thumbSpy.mockReturnValue(BROKEN_THUMB);
+    fetchSpy.mockResolvedValue(new Response('', { status: 404 }));
+    const screen = renderModal(makeRecord([makeImage()]));
+
+    await expect.element(screen.getByText('No se encontró el archivo de esta imagen.')).toBeVisible();
+    expect(screen.container.textContent).not.toContain('El archivo original está guardado');
+  });
+
+  it('a dual pair with one RAW side: neither side ever puts /file in an <img>', async () => {
+    previewSpy.mockImplementation((id: number) => (id === 1 ? PREVIEW_URL : BROKEN));
     const screen = renderModal({
       ...makeRecord([
         makeImage({ id: 1, role: 'left', format: 'jpg', filename: 'L.jpg' }),
@@ -119,8 +136,18 @@ describe.each(modals)('%s — RAW images (NEH-139)', (_name, renderModal) => {
 
     await expect.element(screen.getByText('Miniatura (RAW)')).toBeVisible();
     const now = [...screen.container.querySelectorAll('img')].map((i) => i.getAttribute('src'));
-    expect(now).toContain('http://dtk.invalid/records/images/1/file');
-    expect(now).toContain(THUMB_URL);
-    expect(srcs).not.toContain('http://dtk.invalid/records/images/2/file');
+    expect(now).toEqual(expect.arrayContaining([PREVIEW_URL, THUMB_URL]));
+    expect(srcs.some((u) => u.endsWith('/file'))).toBe(false);
+  });
+});
+
+describe('gallery modal — download link', () => {
+  it('keeps the download link on /file, so it fetches the real master', async () => {
+    const fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(FILE_URL);
+    const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+    const screen = render(GalleryModal, { record: makeRecord([makeImage()]), onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
+    expect(screen.container.querySelector('a.img-viewer-download')?.getAttribute('href')).toBe(FILE_URL);
+    fileSpy.mockRestore();
+    previewSpy.mockRestore();
   });
 });

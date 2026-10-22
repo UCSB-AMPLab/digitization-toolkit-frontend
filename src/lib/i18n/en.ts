@@ -533,6 +533,7 @@ export const en: Messages = {
 	raw_thumbnail_hint: 'The browser cannot display RAW files, and this one has no full-size preview. This is its low-resolution thumbnail.',
 	raw_unviewable_title: 'This format cannot be displayed',
 	raw_unviewable_body: 'The browser cannot display RAW files, and this one has no preview.',
+	raw_original_stored: 'The original file is stored on the device.',
 	image_file_missing: 'The file for this image was not found.',
 	col_export_blocked_title: 'Cannot export yet',
 	col_export_blocked_desc: 'All records must be approved before exporting. The following are not approved yet:',

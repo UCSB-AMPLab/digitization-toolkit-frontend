@@ -66,18 +66,18 @@ function baseProps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('ImageViewer — drag-to-pan and out-of-frame caption (NEH-230)', () => {
-  let getImageFileUrlSpy: ReturnType<typeof vi.spyOn>;
+  let getImagePreviewUrlSpy: ReturnType<typeof vi.spyOn>;
   const dataUrl = make1200x800DataUrl();
 
   beforeEach(() => {
-    // The real getImageFileUrl builds a URL against the API host, which
+    // The real getImagePreviewUrl builds a URL against the API host, which
     // won't resolve to a real image in a headless browser test — point it
     // at a canvas-drawn data URL instead, so naturalWidth/Height are real.
-    getImageFileUrlSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(dataUrl);
+    getImagePreviewUrlSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(dataUrl);
   });
 
   afterEach(() => {
-    getImageFileUrlSpy.mockRestore();
+    getImagePreviewUrlSpy.mockRestore();
   });
 
   it('dragging the left frame pans the left image (translate is nonzero after a drag)', async () => {

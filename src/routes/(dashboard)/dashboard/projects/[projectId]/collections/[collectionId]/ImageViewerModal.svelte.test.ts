@@ -45,17 +45,17 @@ function makeRecord(overrides: Partial<ApiRecord> = {}): ApiRecord {
 }
 
 describe('ImageViewerModal — fit / 1:1 zoom controls (NEH-230)', () => {
-  let getImageFileUrlSpy: ReturnType<typeof vi.spyOn>;
+  let getImagePreviewUrlSpy: ReturnType<typeof vi.spyOn>;
   const dataUrl = make1200x800DataUrl();
 
   beforeEach(() => {
-    // Point getImageFileUrl at a canvas-drawn data URL so naturalWidth/
+    // Point getImagePreviewUrl at a canvas-drawn data URL so naturalWidth/
     // Height are real, same approach as ImageViewer.svelte.test.ts.
-    getImageFileUrlSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(dataUrl);
+    getImagePreviewUrlSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(dataUrl);
   });
 
   afterEach(() => {
-    getImageFileUrlSpy.mockRestore();
+    getImagePreviewUrlSpy.mockRestore();
   });
 
   it('clicking 1:1 scales the image past 1, and fit brings it back to scale(1)', async () => {

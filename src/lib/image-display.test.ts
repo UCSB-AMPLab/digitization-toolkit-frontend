@@ -1,9 +1,9 @@
 // NEH-139: what a viewer may display for a record image.
 import { describe, it, expect, vi } from 'vitest';
-import { displayCandidates, isRawImage, probeImage, type ImageUrlSource } from './image-display';
+import { checkMasterStored, displayCandidates, isRawImage, type ImageUrlSource } from './image-display';
 
 const api: ImageUrlSource = {
-  getImageFileUrl: (id) => `/api/records/images/${id}/file`,
+  getImagePreviewUrl: (id) => `/api/records/images/${id}/preview`,
   getImageThumbnailUrl: (id) => `/api/records/images/${id}/thumbnail`,
 };
 
@@ -26,19 +26,21 @@ describe('isRawImage', () => {
 });
 
 describe('displayCandidates', () => {
-  it('shows a JPEG from its file URL, and nothing else', () => {
+  const isFileUrl = (u: string) => u.endsWith('/file');
+
+  it('shows a JPEG from /preview, and nothing else', () => {
     expect(displayCandidates({ id: 7, format: 'jpg', filename: 'f.jpg' }, api)).toEqual([
-      { kind: 'original', url: '/api/records/images/7/file' },
+      { kind: 'original', url: '/api/records/images/7/preview' },
     ]);
   });
 
-  it('never offers a CR2 file URL as an original: preview to probe, then thumbnail', () => {
+  it('shows a CR2 by its preview, then its thumbnail, never by /file', () => {
     const c = displayCandidates({ id: 9, format: 'cr2', filename: 'f.cr2' }, api);
     expect(c).toEqual([
-      { kind: 'preview', url: '/api/records/images/9/file', probe: true },
+      { kind: 'preview', url: '/api/records/images/9/preview' },
       { kind: 'thumbnail', url: '/api/records/images/9/thumbnail' },
     ]);
-    expect(c.some((x) => x.kind === 'original')).toBe(false);
+    expect(c.some((x) => isFileUrl(x.url))).toBe(false);
   });
 
   it('decides per image in a dual pair where one side is RAW', () => {
@@ -47,42 +49,41 @@ describe('displayCandidates', () => {
     expect(displayCandidates(left, api).map((c) => c.kind)).toEqual(['original']);
     expect(displayCandidates(right, api).map((c) => c.kind)).toEqual(['preview', 'thumbnail']);
   });
+
+  it('a RAW image whose preview is missing still has the thumbnail to fall back to', () => {
+    // /preview answers 404 for a RAW master without a sidecar; the viewer then
+    // moves to the next candidate.
+    const c = displayCandidates({ id: 3, format: 'cr2', filename: 'nosidecar.cr2' }, api);
+    expect(c[1]).toEqual({ kind: 'thumbnail', url: '/api/records/images/3/thumbnail' });
+  });
 });
 
-function response(status: number, contentType: string | null, body = 'x'): Response {
-  const headers = new Headers();
-  if (contentType) headers.set('content-type', contentType);
-  return new Response(status === 204 ? null : body, { status, headers });
+function response(status: number): Response {
+  return new Response('x', { status });
 }
 
-describe('probeImage', () => {
-  it('keeps the body when the backend sends the JPEG preview', async () => {
-    const f = vi.fn().mockResolvedValue(response(200, 'image/jpeg', 'jpegbytes'));
-    const r = await probeImage('/u', f as unknown as typeof fetch);
-    expect(r.status).toBe('image');
-    if (r.status === 'image') expect(await r.blob.text()).toBe('jpegbytes');
-  });
-
-  it('reports not-image and aborts when the backend streams the RAW bytes (no preview)', async () => {
+describe('checkMasterStored', () => {
+  it('stored on 200, and the request is aborted once the headers arrive', async () => {
     let signal: AbortSignal | undefined;
     const f = vi.fn().mockImplementation((_u: string, init?: RequestInit) => {
       signal = init?.signal ?? undefined;
-      return Promise.resolve(response(200, 'application/octet-stream'));
+      return Promise.resolve(response(200));
     });
-    const r = await probeImage('/u', f as unknown as typeof fetch);
-    expect(r).toEqual({ status: 'not-image' });
+    expect(await checkMasterStored('/file', f as unknown as typeof fetch)).toBe('stored');
     expect(signal?.aborted).toBe(true);
   });
 
-  it('reports missing on 404', async () => {
-    const f = vi.fn().mockResolvedValue(response(404, 'application/json'));
-    expect(await probeImage('/u', f as unknown as typeof fetch)).toEqual({ status: 'missing' });
+  it('missing on 404', async () => {
+    const f = vi.fn().mockResolvedValue(response(404));
+    expect(await checkMasterStored('/file', f as unknown as typeof fetch)).toBe('missing');
   });
 
-  it('reports error on other HTTP errors and on network failure', async () => {
-    const f500 = vi.fn().mockResolvedValue(response(500, 'application/json'));
-    expect(await probeImage('/u', f500 as unknown as typeof fetch)).toEqual({ status: 'error' });
+  it('unknown on auth, server and network errors', async () => {
+    for (const status of [401, 403, 500]) {
+      const f = vi.fn().mockResolvedValue(response(status));
+      expect(await checkMasterStored('/file', f as unknown as typeof fetch)).toBe('unknown');
+    }
     const fNet = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
-    expect(await probeImage('/u', fNet as unknown as typeof fetch)).toEqual({ status: 'error' });
+    expect(await checkMasterStored('/file', fNet as unknown as typeof fetch)).toBe('unknown');
   });
 });

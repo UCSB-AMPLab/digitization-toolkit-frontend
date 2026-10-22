@@ -5,24 +5,20 @@
 // URL in an <img> and the operator sees a broken image, reads it as a failed
 // capture, and retakes — and a retake supersedes the master.
 //
-// What the backend offers for a RAW master (backend app/api/records.py):
-//   - GET /records/images/{id}/file serves the `<stem>_preview.jpg` sidecar
-//     instead of the master when the sidecar exists (suffixes .cr2, .nef,
-//     .arw, .raf, .dng). When it does not exist, the same URL streams the RAW
-//     bytes as application/octet-stream.
-//   - GET /records/images/{id}/thumbnail serves a JPEG thumbnail (600 px max).
-//     At capture time it is built from the sidecar; when regenerated on
-//     demand it is built from the master itself, which may fail for RAW.
+// What the backend offers (backend app/api/records.py):
+//   - GET /records/images/{id}/file: the stored master, unchanged, as a
+//     download. For a RAW master these are RAW bytes. Never for an <img>.
+//   - GET /records/images/{id}/preview: something a browser can display — a
+//     JPEG/PNG/WebP master itself, or a RAW master's `_preview.jpg` sidecar.
+//     404 when there is none (RAW without a sidecar, TIFF); never RAW bytes.
+//   - GET /records/images/{id}/thumbnail: a JPEG thumbnail (600 px max).
 // The image object carries `format` (the lower-cased file suffix, e.g. "cr2")
-// and `filename`, but nothing that says whether a sidecar exists. So the only
-// way to know what /file will return for a RAW image is to ask it: the
-// viewer fetches it and checks the Content-Type before showing anything.
+// and `filename`.
 // ============================================================================
 
 import type { RecordImage } from '$lib/api';
 
-/** RAW suffixes: the ones /file substitutes a preview for, plus `.raw`, which
- *  the backend's integrity scan also treats as an image master. */
+/** RAW suffixes, the same list as the backend's `_RAW_SUFFIXES`. */
 export const RAW_FORMATS: ReadonlySet<string> = new Set(['cr2', 'nef', 'arw', 'raf', 'dng', 'raw']);
 
 type ImageLike = Pick<RecordImage, 'format' | 'filename'>;
@@ -35,69 +31,51 @@ export function isRawImage(img: ImageLike): boolean {
 }
 
 /**
- * One way of showing an image, in the order the viewer tries them.
- *  - `original`: the file itself, straight into <img> (non-RAW images).
- *  - `preview`:  the /file URL of a RAW image; it may only go into <img> after
- *                a fetch has confirmed that the response is an image (the
- *                JPEG sidecar), never on the strength of the URL alone.
- *  - `thumbnail`: the /thumbnail JPEG of a RAW image.
+ * One way of showing an image, in the order the viewer tries them; the next
+ * one is used when the <img> fails to load the current one.
+ *  - `original`:  /preview of a non-RAW image, which is the master itself.
+ *  - `preview`:   /preview of a RAW image: its JPEG sidecar.
+ *  - `thumbnail`: /thumbnail of a RAW image.
+ * The /file URL is never a candidate.
  */
 export type DisplayCandidate =
   | { kind: 'original'; url: string }
-  | { kind: 'preview'; url: string; probe: true }
+  | { kind: 'preview'; url: string }
   | { kind: 'thumbnail'; url: string };
 
 export interface ImageUrlSource {
-  getImageFileUrl(imageId: number): string;
+  getImagePreviewUrl(imageId: number): string;
   getImageThumbnailUrl(imageId: number): string;
 }
 
 export function displayCandidates(img: Pick<RecordImage, 'id' | 'format' | 'filename'>, api: ImageUrlSource): DisplayCandidate[] {
   if (!isRawImage(img)) {
-    return [{ kind: 'original', url: api.getImageFileUrl(img.id) }];
+    return [{ kind: 'original', url: api.getImagePreviewUrl(img.id) }];
   }
   return [
-    { kind: 'preview', url: api.getImageFileUrl(img.id), probe: true },
+    { kind: 'preview', url: api.getImagePreviewUrl(img.id) },
     { kind: 'thumbnail', url: api.getImageThumbnailUrl(img.id) },
   ];
 }
 
-/** Outcome of fetching a RAW image's /file URL. */
-export type ProbeResult =
-  | { status: 'image'; blob: Blob }   // the backend sent the JPEG sidecar
-  | { status: 'not-image' }           // 200, but RAW bytes: no sidecar on disk
-  | { status: 'missing' }             // 404: no file on disk for this image
-  | { status: 'error' };              // network failure or another HTTP error
-
 /**
- * Fetch `url` and keep the body only if it is an image. A response that is
- * not an image is aborted as soon as its headers arrive, so the viewer never
- * downloads a whole RAW master it cannot show.
+ * Whether the stored master is on disk, asked of GET /file: the backend
+ * answers 200 only after finding the image row, its file path inside the
+ * storage roots, and the file itself; 404 when any of those is missing.
+ * The request is aborted as soon as the headers arrive, so the master is not
+ * downloaded. Anything else (auth, network, server error) is `unknown`.
  */
-export async function probeImage(url: string, fetchFn: typeof fetch = fetch): Promise<ProbeResult> {
+export type MasterCheck = 'stored' | 'missing' | 'unknown';
+
+export async function checkMasterStored(fileUrl: string, fetchFn: typeof fetch = fetch): Promise<MasterCheck> {
   const controller = new AbortController();
-  let res: Response;
   try {
-    res = await fetchFn(url, { signal: controller.signal });
+    const res = await fetchFn(fileUrl, { signal: controller.signal });
+    controller.abort();
+    if (res.status === 200) return 'stored';
+    if (res.status === 404) return 'missing';
+    return 'unknown';
   } catch {
-    return { status: 'error' };
-  }
-  if (res.status === 404) {
-    controller.abort();
-    return { status: 'missing' };
-  }
-  if (!res.ok) {
-    controller.abort();
-    return { status: 'error' };
-  }
-  const type = (res.headers.get('content-type') ?? '').toLowerCase();
-  if (!type.startsWith('image/')) {
-    controller.abort();
-    return { status: 'not-image' };
-  }
-  try {
-    return { status: 'image', blob: await res.blob() };
-  } catch {
-    return { status: 'error' };
+    return 'unknown';
   }
 }

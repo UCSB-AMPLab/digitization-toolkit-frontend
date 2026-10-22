@@ -926,12 +926,25 @@ export const recordsApi = {
   },
 
   /**
-   * Get file download URL for a record image
+   * Get file download URL for a record image: the stored master, unchanged
+   * (a RAW master comes back as RAW bytes). For an <img>, use
+   * getImagePreviewUrl.
    */
   getImageFileUrl(imageId: number): string {
     const base = getApiBase();
     const token = tokenStore.get();
     return `${base}/records/images/${imageId}/file${token ? '?token=' + token : ''}`;
+  },
+
+  /**
+   * Get a browser-displayable URL for a record image: a JPEG/PNG/WebP master
+   * itself, or a RAW master's JPEG preview. The backend answers 404 when
+   * there is none (RAW without a preview, TIFF) and never sends RAW bytes.
+   */
+  getImagePreviewUrl(imageId: number): string {
+    const base = getApiBase();
+    const token = tokenStore.get();
+    return `${base}/records/images/${imageId}/preview${token ? '?token=' + token : ''}`;
   },
 
   /**
