@@ -57,7 +57,13 @@
     const back = returnTo;
     returnTo = null;
     if (back?.isConnected && !(back as HTMLButtonElement).disabled) { back.focus(); return; }
-    controlsEl?.parentElement?.querySelector<HTMLButtonElement>('.handover-btn:not(:disabled)')?.focus();
+    // The bar's other controls (camera, user menu) stay when no handover
+    // control is left, for instance after a send that found nothing to send.
+    const bar = controlsEl?.parentElement;
+    const next =
+      bar?.querySelector<HTMLButtonElement>('.handover-btn:not(:disabled)') ??
+      bar?.querySelector<HTMLButtonElement>('button:not(:disabled)');
+    next?.focus();
   }
 
   function closeDialog() {
@@ -86,6 +92,10 @@
         await onChanged();
         blockers = ids;
         dialog = 'refused';
+        // The card stays mounted while its contents change, and the button
+        // that had focus is gone: put focus back on the card.
+        await tick();
+        cardEl?.focus();
       } else {
         dialog = null;
         showNotice('error', $m.col_handover_send_error);
@@ -121,7 +131,7 @@
       if (items.length === 0) { e.preventDefault(); cardEl.focus(); return; }
       const first = items[0], last = items[items.length - 1];
       const active = document.activeElement;
-      if (e.shiftKey && (active === first || active === cardEl)) { e.preventDefault(); last.focus(); }
+      if (e.shiftKey && (active === first || active === cardEl || !cardEl.contains(active))) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && (active === last || !cardEl.contains(active))) { e.preventDefault(); first.focus(); }
     }
   }

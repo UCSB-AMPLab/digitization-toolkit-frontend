@@ -94,6 +94,8 @@ describe('HandoverControls', () => {
 		await expect.element(dialog.getByText('Folio 31')).toBeVisible();
 		await expect.element(dialog.getByText('Folio 13')).not.toBeInTheDocument();
 		await expect.element(dialog.getByText('No se cambió el estado de ningún registro.')).toBeVisible();
+		// The submit button that had focus is gone; focus is on the dialog.
+		await expect.element(dialog).toHaveFocus();
 	});
 
 	it('send failed for another reason: an error notice, no refusal dialog', async () => {

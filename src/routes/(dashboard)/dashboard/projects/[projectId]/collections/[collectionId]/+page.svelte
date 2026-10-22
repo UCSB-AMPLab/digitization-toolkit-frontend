@@ -87,17 +87,22 @@
   // Último volumen pedido. No es reactivo: el efecto de abajo solo depende
   // de collectionId.
   let requestedFor = 0;
+  // Número de la última carga pedida: solo esa puede escribir el estado.
+  // Comparar el volumen no basta, porque A→B→A deja dos cargas de A en
+  // vuelo y la más vieja podía llegar última y pisar a la nueva.
+  let loadSeq = 0;
 
   // Devuelve si la lista quedó actualizada, para que quien recarga después
   // de un cambio pueda avisar si no.
   async function loadRecords(): Promise<boolean> {
     const forId = collectionId;
+    const seq = ++loadSeq;
     requestedFor = forId;
     try {
       isLoading = true;
       const data = await recordsApi.listAll({ collection_id: forId });
-      // Una respuesta de un volumen que ya no está abierto se descarta.
-      if (forId !== collectionId) return false;
+      // Una respuesta superada por otra carga se descarta.
+      if (seq !== loadSeq) return false;
       // Sort by sequence (nulls last), then by id
       records = data.sort((a, b) => {
         if (a.sequence == null && b.sequence == null) return a.id - b.id;
@@ -112,7 +117,7 @@
       console.error('[Gallery] Error cargando registros:', err);
       return false;
     } finally {
-      if (forId === collectionId) {
+      if (seq === loadSeq) {
         isLoading = false;
         hasLoaded = true;
       }
