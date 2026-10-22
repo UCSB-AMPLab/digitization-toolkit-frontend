@@ -17,8 +17,13 @@
   import { authStore } from '$lib/stores/auth';
   import { m } from '$lib/i18n';
   import UserMenu from '$lib/components/UserMenu.svelte';
+  import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
 
   let { children } = $props();
+
+  // Controls the page puts in the bar: send for review and take back (NEH-260).
+  const topbarSlot = $state<VolumeTopbarSlot>({ actions: null });
+  setVolumeTopbar(topbarSlot);
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS
@@ -81,6 +86,8 @@
 
     <!-- Derecha: botón cámara (solo operador/admin) + avatar -->
     <div class="topbar-right">
+
+      {@render topbarSlot.actions?.()}
 
       {#if canOpenCamera}
         <button

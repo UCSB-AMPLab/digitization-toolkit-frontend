@@ -32,6 +32,8 @@
   import RightToolbar from './RightToolbar.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
+  import HandoverControls from '$lib/components/HandoverControls.svelte';
+  import { getVolumeTopbar } from '$lib/volume-topbar';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -49,6 +51,9 @@
   let zoom             = $state(1);
   let rotation         = $state(0);
   let isLoading        = $state(true);
+  // Primera carga terminada. Las recargas vuelven a poner isLoading, y los
+  // controles de envío no deben desmontarse a mitad de un envío.
+  let hasLoaded        = $state(false);
   // NEH-230: el zoom al que un píxel de imagen ocupa un píxel de
   // dispositivo — lo calcula ImageViewer (según la página de referencia
   // medida) y lo usamos acá para el botón "1:1" y el tope de zoom de
@@ -90,6 +95,7 @@
       console.error('[Gallery] Error cargando registros:', err);
     } finally {
       isLoading = false;
+      hasLoaded = true;
     }
   }
 
@@ -263,7 +269,25 @@
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
   let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved' && hasCurrentImage(r)));
+
+  // ---------------------------------------------------------------------------
+  // ENVÍO A REVISIÓN (NEH-260) — los controles van en la barra superior del
+  // layout; la página los pone ahí porque es la que tiene los registros.
+  // Solo operador y admin: el backend rechaza promote y take-back a los demás.
+  // ---------------------------------------------------------------------------
+  const topbar = getVolumeTopbar();
+  let canHandOver = $derived($userRole === 'admin' || $userRole === 'operator');
+
+  $effect(() => {
+    if (!topbar) return;
+    topbar.actions = canHandOver && hasLoaded ? handoverActions : null;
+    return () => { topbar.actions = null; };
+  });
 </script>
+
+{#snippet handoverActions()}
+  <HandoverControls {records} {collectionId} onChanged={loadRecords} />
+{/snippet}
 
 <!-- ============================================================
      LAYOUT DE GALERÍA
