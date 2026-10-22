@@ -43,12 +43,21 @@ export class AuthError extends Error {
 // `{ message, blocking_record_ids }` body) can inspect it, while
 // `.message` still reads as a normal string for existing catch blocks
 // that only care about the text (most of them).
+//
+// `status` is the HTTP status of the response, so a caller can tell a 429
+// (login throttle) or a 5xx (backend still booting behind Nginx) from any
+// other failure. `retryAfter` is the raw `Retry-After` header, or null when
+// the response had none or the browser did not expose it.
 export class ApiError extends Error {
   detail?: unknown;
-  constructor(message: string, detail?: unknown) {
+  status?: number;
+  retryAfter: string | null;
+  constructor(message: string, detail?: unknown, status?: number, retryAfter: string | null = null) {
     super(message);
     this.name = 'ApiError';
     this.detail = detail;
+    this.status = status;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -144,7 +153,12 @@ async function apiRequest<T>(
       throw new AuthError(response.status, message);
     }
 
-    throw new ApiError(message, isStructuredDetail ? detail : undefined);
+    throw new ApiError(
+      message,
+      isStructuredDetail ? detail : undefined,
+      response.status,
+      response.headers.get('Retry-After')
+    );
   }
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {
@@ -200,7 +214,12 @@ async function apiRequestBlob(
       throw new AuthError(response.status, message);
     }
 
-    throw new ApiError(message, isStructuredDetail ? detail : undefined);
+    throw new ApiError(
+      message,
+      isStructuredDetail ? detail : undefined,
+      response.status,
+      response.headers.get('Retry-After')
+    );
   }
 
   return { blob: await response.blob(), headers: response.headers };
@@ -1434,7 +1453,8 @@ export type PowerAction = 'poweroff' | 'reboot';
 /**
  * Error de la llamada de energía que conserva el código HTTP.
  * Necesario para distinguir 501 (control no disponible — máquina de
- * desarrollo) de un error real, ya que apiRequest() descarta el status.
+ * desarrollo) de un error real. powerControl() llama a fetch directamente,
+ * sin pasar por apiRequest().
  */
 export class PowerControlError extends Error {
   status: number;
@@ -1497,7 +1517,7 @@ export const systemApi = {
    *   501 → control de energía no disponible (p. ej. entorno de desarrollo)
    *   401 → sesión expirada
    * Lanza PowerControlError con el status para que la UI muestre el mensaje
-   * adecuado. No usamos apiRequest() porque descarta el código HTTP.
+   * adecuado. Llama a fetch directamente, sin pasar por apiRequest().
    */
   async powerControl(action: PowerAction): Promise<{ message: string }> {
     const base  = getApiBase();

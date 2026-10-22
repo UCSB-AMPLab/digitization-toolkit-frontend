@@ -20,6 +20,7 @@
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
 	import { usersApi } from '$lib/api';
+	import { waitForSession, sessionRetryDelay } from '$lib/session-check';
 	import { m, roleLabel, type StringMessageKey } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
 	import favicon from '$lib/assets/favicon-light.svg';
@@ -43,9 +44,14 @@
 	// el contenido protegido no se renderiza hasta que esto sea false (NEH-63).
 	let isValidatingSession = $state(true);
 
+	// true mientras el backend no responde (red caída, 502/503/504 de Nginx
+	// mientras el backend arranca). La sesión guardada se conserva y la
+	// validación se repite sola (NEH-219).
+	let isWaitingForBackend = $state(false);
+
 	onMount(() => {
 		// Guard reactivo: si la sesión se limpia MIENTRAS se usa la app (p. ej.
-		// apiRequest interceptó un 401/403 en algún llamado posterior), salir.
+		// apiRequest interceptó un 401 en algún llamado posterior), salir.
 		const unsub = authStore.subscribe((s) => {
 			currentUser = s.user;
 			if (!s.token && !isValidatingSession) goto('/login');
@@ -53,34 +59,46 @@
 
 		// Validación al montar: un token en localStorage no garantiza que el
 		// backend todavía lo acepte (pudo expirar, o el usuario fue
-		// desactivado). Antes de este fix, un token viejo pasaba este guard
-		// sin más chequeo y el dashboard se renderizaba igual, degradando en
-		// un shell "logueado" roto en cuanto la primera llamada a la API
-		// fallaba en silencio. Ahora se valida con /users/me antes de mostrar
-		// cualquier contenido protegido.
+		// desactivado), así que se valida con /users/me antes de mostrar
+		// cualquier contenido protegido (NEH-63).
+		//
+		// Solo un 401/403 invalida la sesión. Antes, cualquier error mandaba a
+		// /login sin limpiar la sesión; /login, al ver el token, mandaba a /,
+		// y / de vuelta a /dashboard: un ciclo sin fin mientras el backend no
+		// respondía, que es lo que pasa en el kiosco durante el arranque
+		// (NEH-219). Ahora un backend que no responde deja la pantalla de
+		// espera y la validación se reintenta con espera creciente (2 s a 10 s).
+		const controller = new AbortController();
 		(async () => {
 			const token = authStore.getToken();
 			if (!token) {
 				goto('/login');
 				return;
 			}
-			try {
-				const freshUser = await usersApi.me();
+			const outcome = await waitForSession(() => usersApi.me(), {
+				signal: controller.signal,
+				delay: sessionRetryDelay,
+				onWaiting: (waiting) => (isWaitingForBackend = waiting)
+			});
+			if (outcome.kind === 'cancelled') return;
+			if (outcome.kind === 'valid') {
 				// Refresca el usuario en el store (por si el rol cambió del
 				// lado del backend desde el último login) antes de renderizar.
-				authStore.setSession(token, freshUser);
-			} catch {
-				// apiRequest ya limpió la sesión y redirigió a /login ante un
-				// 401/403; para cualquier otro error (p. ej. red caída) no
-				// podemos confirmar la sesión, así que tampoco renderizamos.
+				authStore.setSession(token, outcome.user);
+			} else {
+				// apiRequest ya limpia la sesión ante un 401, pero no ante un
+				// 403. Si la sesión quedara puesta, /login mandaría de vuelta
+				// aquí y el ciclo volvería, así que se limpia en ambos casos.
+				authStore.clearSession();
 				goto('/login');
-				return;
-			} finally {
-				isValidatingSession = false;
 			}
+			isValidatingSession = false;
 		})();
 
-		return unsub;
+		return () => {
+			controller.abort();
+			unsub();
+		};
 	});
 
 	let userInitials = $derived(currentUser?.username?.slice(0, 2).toUpperCase() ?? '?');
@@ -226,7 +244,12 @@
 {#if isValidatingSession || !currentUser || !hasRoleAccess}
 	<div class="session-splash" role="status" aria-live="polite">
 		<div class="spinner"></div>
-		<p class="splash-text">{$m.session_validating}</p>
+		{#if isWaitingForBackend}
+			<p class="splash-text">{$m.session_backend_waiting}</p>
+			<p class="splash-detail">{$m.session_backend_waiting_detail}</p>
+		{:else}
+			<p class="splash-text">{$m.session_validating}</p>
+		{/if}
 	</div>
 {:else}
 <!-- ============================================================
@@ -437,6 +460,16 @@
 		font-size: var(--text-sm);
 		color: var(--color-light-grey);
 		margin: 0;
+	}
+
+	.splash-detail {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		max-width: 420px;
+		text-align: center;
+		line-height: 1.5;
+		margin: 0;
+		padding: 0 16px;
 	}
 
 	@keyframes splash-spin {

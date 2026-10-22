@@ -51,10 +51,17 @@ export const en: Messages = {
 	login_error_fill_all_fields: 'Please fill in all fields',
 	login_error_bad_credentials: 'Incorrect username or password',
 	login_error_unknown_role: 'Your account has a role this app does not recognize. Let whoever administers the device know.',
-	login_error_backend_unavailable: 'Could not reach the server. It may still be starting up — wait a few seconds and try again.',
+	login_error_backend_unavailable: 'Could not reach the server. It may not be ready yet: wait a few seconds and try again.',
+	login_error_locked_out: (minutes: number) =>
+		minutes === 1
+			? 'Too many failed attempts. Wait 1 minute before trying again.'
+			: `Too many failed attempts. Wait ${minutes} minutes before trying again.`,
+	login_error_locked_out_unknown: 'Too many failed attempts. Wait a few minutes before trying again.',
 
 	// ── Session ──────────────────────────────────────────────────────────────
 	session_validating: 'Verifying session…',
+	session_backend_waiting: 'Waiting for the server to respond…',
+	session_backend_waiting_detail: 'If you have just switched the device on, the server can take a few seconds to respond. Captua will keep trying to connect and continue as soon as it can.',
 
 	// ── Navigation (dashboard) ───────────────────────────────────────────────
 	nav_section_main: 'MAIN',

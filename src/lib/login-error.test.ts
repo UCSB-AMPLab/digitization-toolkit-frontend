@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyLoginError } from './login-error';
+import { classifyLoginError, lockoutMinutes, retryAfterOf } from './login-error';
 
 // Local stand-ins for api.ts's error classes: importing the real ones would
 // pull in SvelteKit and force this out of the node test project.
@@ -13,9 +13,13 @@ class AuthError extends Error {
 }
 
 class ApiError extends Error {
-	constructor(message: string) {
+	status?: number;
+	retryAfter: string | null;
+	constructor(message: string, status?: number, retryAfter: string | null = null) {
 		super(message);
 		this.name = 'ApiError';
+		this.status = status;
+		this.retryAfter = retryAfter;
 	}
 }
 
@@ -48,4 +52,35 @@ describe('classifyLoginError', () => {
 	it('treats an unknown throw as an unavailable backend', () => {
 		expect(classifyLoginError('boom', { credentialsChecked: false })).toBe('unavailable');
 	});
+});
+
+describe('the login lockout (NEH-219)', () => {
+	it('treats a 429 from /auth/login as a lockout, not as bad credentials', () => {
+		const error = new ApiError('Too many failed login attempts. Try again later.', 429, '300');
+		expect(classifyLoginError(error, { credentialsChecked: false })).toBe('throttled');
+	});
+
+	it('reads Retry-After off the error', () => {
+		expect(retryAfterOf(new ApiError('x', 429, '300'))).toBe('300');
+		expect(retryAfterOf(new ApiError('x', 429))).toBeNull();
+		expect(retryAfterOf(new TypeError('Failed to fetch'))).toBeNull();
+	});
+
+	it.each([
+		['300', 5],
+		['301', 6],
+		['60', 1],
+		['59', 1],
+		['1', 1],
+		[' 120 ', 2]
+	])('rounds Retry-After %s seconds up to %i minutes', (header, minutes) => {
+		expect(lockoutMinutes(header)).toBe(minutes);
+	});
+
+	it.each([[null], [undefined], [''], ['0'], ['abc'], ['1.5'], ['Wed, 21 Oct 2026 07:28:00 GMT']])(
+		'gives no figure for Retry-After %s',
+		(header) => {
+			expect(lockoutMinutes(header)).toBeNull();
+		}
+	);
 });
