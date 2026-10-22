@@ -791,6 +791,13 @@
                   <p class="annotations-error">{reviewError}</p>
                 {/if}
 
+                <!-- Por qué los dos botones están deshabilitados en un
+                     registro capturado: el operario todavía no lo ha enviado
+                     (NEH-260). En la pantalla táctil no hay tooltip. -->
+                {#if canReview && notReviewable}
+                  <p class="review-hint">{$m.col_review_not_sent_hint}</p>
+                {/if}
+
                 <div class="review-actions">
                   {#if currentRecord?.status === 'rejected' && canOperate}
                     <button
@@ -1325,6 +1332,13 @@
   /* Rechazar / Aprobar (NEH-209) — apilados, uno arriba y otro abajo, no
      lado a lado. */
   .review-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+
+  .review-hint {
+    margin: 0 0 8px;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--color-light-grey);
+  }
 
   .btn-review {
     width: 100%;
