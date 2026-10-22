@@ -356,3 +356,38 @@ describe('LiveViewport — capture key (NEH-228)', () => {
     await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
   });
 });
+
+// NEH-181: the record title is archival data, so the title sent at capture
+// is a timestamp whatever language the operator's interface is in.
+describe('LiveViewport — default record title (NEH-181)', () => {
+  const ISO_LOCAL = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/;
+
+  afterEach(() => {
+    clearChord();
+    locale.set('en');
+  });
+
+  for (const lang of ['es', 'en'] as const) {
+    it(`single capture sends a timestamp title with the UI in ${lang}`, async () => {
+      locale.set(lang);
+      const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+      stubPreviewFetch({});
+      renderViewport(baseProps());
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+      await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+      expect(captureSpy.mock.calls[0][0].record_title).toMatch(ISO_LOCAL);
+    });
+
+    it(`dual capture sends a timestamp title with the UI in ${lang}`, async () => {
+      locale.set(lang);
+      const dualSpy = vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true });
+      stubPreviewFetch({});
+      renderViewport(baseProps({ cameraMode: 'double' }));
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+      await expect.poll(() => dualSpy.mock.calls.length).toBe(1);
+      expect(dualSpy.mock.calls[0][0].record_title).toMatch(ISO_LOCAL);
+    });
+  }
+});

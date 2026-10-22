@@ -3,7 +3,8 @@
 // The title is archival data, so it must not depend on the interface
 // language of whoever pressed the shutter. It is the capture's local
 // date and time in ISO 8601 without an offset, e.g. 2026-10-22T14:05:31.
-// Local time is used because the appliance clock is what the operator sees.
+// The time comes from the browser's clock and time zone, which on a laptop
+// are the laptop's, not necessarily the appliance's.
 // The backend's own default is not used: for dual capture it is the same
 // English literal ("<project> - Dual capture") for every record.
 
