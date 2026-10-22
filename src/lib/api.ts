@@ -1453,7 +1453,8 @@ export type PowerAction = 'poweroff' | 'reboot';
 /**
  * Error de la llamada de energía que conserva el código HTTP.
  * Necesario para distinguir 501 (control no disponible — máquina de
- * desarrollo) de un error real, ya que apiRequest() descarta el status.
+ * desarrollo) de un error real. La llamada de energía hace su propio fetch
+ * en lugar de pasar por apiRequest().
  */
 export class PowerControlError extends Error {
   status: number;
