@@ -60,6 +60,8 @@ export const en: Messages = {
 	nav_section_main: 'MAIN',
 	nav_section_system: 'SYSTEM',
 	nav_overview: 'Overview',
+	session_backend_waiting: 'Waiting for the server to respond…',
+	session_backend_waiting_detail: 'If you have just switched the device on, the server can take a few seconds to respond. Captua will keep trying and continue as soon as the server responds.',
 	nav_projects: 'Projects',
 	nav_users: 'Users',
 	nav_settings: 'Settings',

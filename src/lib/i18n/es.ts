@@ -70,6 +70,8 @@ export const es = {
 	nav_section_main: 'PRINCIPAL',
 	nav_section_system: 'SISTEMA',
 	nav_overview: 'Resumen',
+	session_backend_waiting: 'Esperando respuesta del servidor…',
+	session_backend_waiting_detail: 'Si acabas de encender el equipo, el servidor puede tardar unos segundos en responder. Captua lo seguirá intentando y continuará en cuanto el servidor responda.',
 	nav_projects: 'Proyectos',
 	nav_users: 'Usuarios',
 	nav_settings: 'Configuración',
