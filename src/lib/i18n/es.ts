@@ -704,7 +704,6 @@ export const es = {
 	lv_capture_key_modifier_only: (modifier: string) => `El dispositivo solo envió ${modifier}. Presiona la tecla del pedal, no solo un modificador.`,
 	lv_capture_key_unbindable: 'El dispositivo envió una tecla que no se puede asignar a la captura. Intenta de nuevo.',
 	lv_capture_key_space: 'Espacio',
-	lv_capture_title: (timestamp: string) => `Captura ${timestamp}`,
 	lv_capture_error: 'Error al capturar',
 	lv_capture_not_ready: 'Cargando la colección…',
 	lv_capture_btn: 'Capturar',
