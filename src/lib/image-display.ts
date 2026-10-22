@@ -11,7 +11,8 @@
 //   - GET /records/images/{id}/preview: something a browser can display — a
 //     JPEG/PNG/WebP master itself, or a RAW master's `_preview.jpg` sidecar.
 //     404 when there is none (RAW without a sidecar, TIFF); never RAW bytes.
-//   - GET /records/images/{id}/thumbnail: a JPEG thumbnail (600 px max).
+//   - GET /records/images/{id}/thumbnail: a JPEG thumbnail (600 px max),
+//     the fallback for whatever /preview does not send, such as a TIFF.
 // The image object carries `format` (the lower-cased file suffix, e.g. "cr2")
 // and `filename`.
 // ============================================================================
@@ -21,21 +22,36 @@ import type { RecordImage } from '$lib/api';
 /** RAW suffixes, the same list as the backend's `_RAW_SUFFIXES`. */
 export const RAW_FORMATS: ReadonlySet<string> = new Set(['cr2', 'nef', 'arw', 'raf', 'dng', 'raw']);
 
+/** Masters /preview sends as they are, the same list as the backend's
+ *  `_BROWSER_DISPLAYABLE_SUFFIXES`. Anything else that is not RAW (TIFF, for
+ *  one) gets a 404 from /preview. */
+export const BROWSER_DISPLAYABLE_FORMATS: ReadonlySet<string> = new Set(['jpg', 'jpeg', 'png', 'webp']);
+
 type ImageLike = Pick<RecordImage, 'format' | 'filename'>;
 
-export function isRawImage(img: ImageLike): boolean {
+/** The image's format: the backend's `format` field (the stored file's
+ *  lower-cased suffix), or the filename's extension when it is empty. */
+export function formatOf(img: ImageLike): string {
   const fmt = (img.format ?? '').toLowerCase().replace(/^\./, '');
-  if (fmt) return RAW_FORMATS.has(fmt);
-  const ext = img.filename?.includes('.') ? img.filename.split('.').pop()!.toLowerCase() : '';
-  return RAW_FORMATS.has(ext);
+  if (fmt) return fmt;
+  return img.filename?.includes('.') ? img.filename.split('.').pop()!.toLowerCase() : '';
+}
+
+export function isRawImage(img: ImageLike): boolean {
+  return RAW_FORMATS.has(formatOf(img));
+}
+
+export function isBrowserDisplayable(img: ImageLike): boolean {
+  return BROWSER_DISPLAYABLE_FORMATS.has(formatOf(img));
 }
 
 /**
  * One way of showing an image, in the order the viewer tries them; the next
- * one is used when the <img> fails to load the current one.
- *  - `original`:  /preview of a non-RAW image, which is the master itself.
+ * one is used when the <img> fails to load the current one, and after the
+ * last comes the explicit nothing-to-show state.
+ *  - `original`:  /preview of a JPEG/PNG/WebP image, which is the master itself.
  *  - `preview`:   /preview of a RAW image: its JPEG sidecar.
- *  - `thumbnail`: /thumbnail of a RAW image.
+ *  - `thumbnail`: /thumbnail, for any image.
  * The /file URL is never a candidate.
  */
 export type DisplayCandidate =
@@ -49,13 +65,14 @@ export interface ImageUrlSource {
 }
 
 export function displayCandidates(img: Pick<RecordImage, 'id' | 'format' | 'filename'>, api: ImageUrlSource): DisplayCandidate[] {
-  if (!isRawImage(img)) {
-    return [{ kind: 'original', url: api.getImagePreviewUrl(img.id) }];
+  const thumbnail: DisplayCandidate = { kind: 'thumbnail', url: api.getImageThumbnailUrl(img.id) };
+  if (isRawImage(img)) {
+    return [{ kind: 'preview', url: api.getImagePreviewUrl(img.id) }, thumbnail];
   }
-  return [
-    { kind: 'preview', url: api.getImagePreviewUrl(img.id) },
-    { kind: 'thumbnail', url: api.getImageThumbnailUrl(img.id) },
-  ];
+  if (isBrowserDisplayable(img)) {
+    return [{ kind: 'original', url: api.getImagePreviewUrl(img.id) }, thumbnail];
+  }
+  return [thumbnail];
 }
 
 /**
@@ -67,8 +84,15 @@ export function displayCandidates(img: Pick<RecordImage, 'id' | 'format' | 'file
  */
 export type MasterCheck = 'stored' | 'missing' | 'unknown';
 
-export async function checkMasterStored(fileUrl: string, fetchFn: typeof fetch = fetch): Promise<MasterCheck> {
+export async function checkMasterStored(
+  fileUrl: string,
+  fetchFn: typeof fetch = fetch,
+  signal?: AbortSignal,
+): Promise<MasterCheck> {
   const controller = new AbortController();
+  // The caller's signal (e.g. the component unmounting) cancels the request too.
+  if (signal?.aborted) return 'unknown';
+  signal?.addEventListener('abort', () => controller.abort(), { once: true });
   try {
     const res = await fetchFn(fileUrl, { signal: controller.signal });
     controller.abort();

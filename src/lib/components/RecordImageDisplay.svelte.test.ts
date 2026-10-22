@@ -141,6 +141,73 @@ describe.each(modals)('%s — RAW images (NEH-139)', (_name, renderModal) => {
   });
 });
 
+describe.each(modals)('%s — non-RAW images (NEH-139)', (_name, renderModal) => {
+  let fileSpy: ReturnType<typeof vi.spyOn>;
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  let thumbSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(FILE_URL);
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
+  });
+  afterEach(() => {
+    fileSpy.mockRestore();
+    previewSpy.mockRestore();
+    thumbSpy.mockRestore();
+    fetchSpy.mockRestore();
+  });
+
+  it('a TIFF is shown by its thumbnail, labelled without RAW, and /preview is never tried', async () => {
+    const screen = renderModal(makeRecord([makeImage({ format: 'tiff', filename: 'scan.tiff' })]));
+    const srcs = recordImgSrcs(screen.container);
+
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
+    await expect.element(screen.getByText('Miniatura', { exact: true })).toBeVisible();
+    expect(screen.container.textContent).not.toContain('RAW');
+    expect(srcs).not.toContain(PREVIEW_URL);
+    expect(srcs).not.toContain(FILE_URL);
+  });
+
+  it('a TIFF whose thumbnail fails: format-neutral state naming the format, and the original is stored', async () => {
+    thumbSpy.mockReturnValue(BROKEN_THUMB);
+    const screen = renderModal(makeRecord([makeImage({ format: 'tiff', filename: 'scan.tiff' })]));
+
+    await expect.element(screen.getByText('No se puede mostrar esta imagen')).toBeVisible();
+    await expect.element(screen.getByText('scan.tiff')).toBeVisible();
+    await expect.element(screen.getByText('El navegador no puede mostrar archivos TIFF', { exact: false })).toBeVisible();
+    await expect.element(screen.getByText('El archivo original está guardado en el equipo.')).toBeVisible();
+    expect(screen.container.textContent).not.toContain('RAW');
+    expect(screen.container.querySelector('img')).toBeNull();
+  });
+
+  it('a JPEG whose /preview fails falls back to the thumbnail instead of staying broken', async () => {
+    previewSpy.mockReturnValue(BROKEN);
+    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
+    await expect.element(screen.getByText('Miniatura', { exact: true })).toBeVisible();
+  });
+
+  it('unmounting aborts the in-flight existence check', async () => {
+    previewSpy.mockReturnValue(BROKEN);
+    thumbSpy.mockReturnValue(BROKEN_THUMB);
+    let signal: AbortSignal | undefined;
+    fetchSpy.mockImplementation((_u: RequestInfo | URL, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      return new Promise<Response>(() => {});
+    });
+    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+
+    await expect.poll(() => signal).toBeDefined();
+    expect(signal!.aborted).toBe(false);
+    screen.unmount();
+    expect(signal!.aborted).toBe(true);
+  });
+});
+
 describe('gallery modal — download link', () => {
   it('keeps the download link on /file, so it fetches the real master', async () => {
     const fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(FILE_URL);

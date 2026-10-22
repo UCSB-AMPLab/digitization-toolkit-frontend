@@ -182,3 +182,31 @@ describe('ImageViewer — drag-to-pan and out-of-frame caption (NEH-230)', () =>
     captureSpy.mockRestore();
   });
 });
+
+// NEH-139: the spread view is the main review viewer; a page whose /preview
+// cannot be loaded (a RAW master without a sidecar) shows its thumbnail,
+// labelled, instead of a broken image.
+describe('ImageViewer — preview fallback (NEH-139)', () => {
+  it('preview fails, thumbnail shows', async () => {
+    const thumbUrl = make1200x800DataUrl();
+    const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue('data:image/png;base64,AAAA');
+    const thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(thumbUrl);
+    try {
+      const screen = render(ImageViewer, baseProps({
+        records: [makeRecord({
+          images: [
+            makeImage({ id: 1, role: 'left', format: 'cr2', filename: 'left.cr2' }),
+            makeImage({ id: 2, role: 'right', format: 'cr2', filename: 'right.cr2' }),
+          ],
+        })],
+      }));
+      const left = () => screen.container.querySelector('img.spread-image.left') as HTMLImageElement | null;
+      await expect.poll(() => left()?.getAttribute('src')).toBe(thumbUrl);
+      await expect.poll(() => left()!.naturalWidth).toBeGreaterThan(0);
+      expect(screen.container.querySelectorAll('.spread-frame')[0].textContent).toContain('Miniatura (RAW)');
+    } finally {
+      previewSpy.mockRestore();
+      thumbSpy.mockRestore();
+    }
+  });
+});

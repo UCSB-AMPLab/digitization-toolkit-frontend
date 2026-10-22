@@ -6,21 +6,29 @@
   // y deja que el visor pinte el <img> con su propio snippet (así conserva sus
   // clases con alcance, su transform de pan/zoom y sus bind:naturalWidth).
   //
-  //   - Imagen no RAW: el snippet recibe la URL de /preview (el máster mismo).
-  //   - Imagen RAW: /preview (su vista previa JPEG); si el <img> no la puede
-  //     cargar, /thumbnail; si tampoco, un estado explícito con el nombre del
-  //     archivo — nunca el ícono de imagen rota, que invita a retomar. En ese
-  //     estado se pregunta a /file si el original está en el disco, y solo si
-  //     el backend lo confirma se dice que está guardado.
-  //   - La URL de /file nunca va en un <img>: para un RAW son bytes RAW.
-  //   - La vista previa y la miniatura llevan una etiqueta que dice que son una
-  //     vista previa de un RAW.
+  // Candidatos, en orden (ver displayCandidates en $lib/image-display):
+  //   - JPEG/PNG/WebP: /preview (el máster mismo), luego /thumbnail.
+  //   - RAW: /preview (su vista previa JPEG), luego /thumbnail.
+  //   - Otro formato (TIFF): solo /thumbnail; /preview responde 404.
+  // Si el <img> no carga un candidato se pasa al siguiente. Sin candidatos,
+  // un estado explícito con el nombre del archivo — nunca el ícono de imagen
+  // rota, que invita a retomar. En ese estado se pregunta a /file si el
+  // original está en el disco, y solo si el backend lo confirma se dice que
+  // está guardado. La URL de /file nunca va en un <img>: para un RAW son
+  // bytes RAW. La vista previa y la miniatura llevan una etiqueta.
   // ============================================================================
 
   import { untrack, type Snippet } from 'svelte';
   import { recordsApi, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
-  import { checkMasterStored, displayCandidates, type MasterCheck } from '$lib/image-display';
+  import {
+    checkMasterStored,
+    displayCandidates,
+    formatOf,
+    isBrowserDisplayable,
+    isRawImage,
+    type MasterCheck,
+  } from '$lib/image-display';
 
   let {
     image,
@@ -40,6 +48,18 @@
     return untrack(() => displayCandidates(image, recordsApi));
   });
 
+  const raw = $derived.by(() => { void imageKey; return untrack(() => isRawImage(image)); });
+  // Un formato que el navegador no muestra (TIFF): el texto lo nombra. Si el
+  // formato sí se muestra (un JPEG que no cargó) o no se sabe, el texto es
+  // genérico.
+  const unsupportedExt = $derived.by(() => {
+    void imageKey;
+    return untrack(() => {
+      const fmt = formatOf(image);
+      return fmt && !isRawImage(image) && !isBrowserDisplayable(image) ? fmt.toUpperCase() : null;
+    });
+  });
+
   // Índice del candidato que se está mostrando; candidates.length = ninguno.
   let index = $state(0);
   let master = $state<MasterCheck | 'checking'>('checking');
@@ -53,22 +73,24 @@
   const current = $derived(index < candidates.length ? candidates[index] : null);
 
   // Al quedarse sin nada que mostrar, preguntar si el original está guardado.
+  // Al desmontar o cambiar de imagen se aborta la petición en curso.
   $effect(() => {
     if (current !== null) return;
     const id = untrack(() => image.id);
-    let cancelled = false;
-    checkMasterStored(recordsApi.getImageFileUrl(id)).then((r) => {
-      if (!cancelled) master = r;
+    const controller = new AbortController();
+    checkMasterStored(recordsApi.getImageFileUrl(id), fetch, controller.signal).then((r) => {
+      if (!controller.signal.aborted) master = r;
     });
-    return () => { cancelled = true; };
+    return () => controller.abort();
   });
 
   function handleError() {
-    const c = current;
-    // 'original' (no RAW): se deja como estaba antes de NEH-139.
-    if (!c || c.kind === 'original') return;
-    index += 1;
+    if (current) index += 1;
   }
+
+  const thumbnailHint = $derived(
+    raw ? $m.raw_thumbnail_hint : unsupportedExt ? $m.image_thumbnail_hint_format(unsupportedExt) : $m.image_thumbnail_hint,
+  );
 </script>
 
 {#if current}
@@ -76,22 +98,28 @@
   {#if current.kind === 'preview'}
     <span class="raw-badge" title={$m.raw_preview_hint}>{$m.raw_preview_badge}</span>
   {:else if current.kind === 'thumbnail'}
-    <span class="raw-badge" title={$m.raw_thumbnail_hint}>{$m.raw_thumbnail_badge}</span>
+    <span class="raw-badge" title={thumbnailHint}>{raw ? $m.raw_thumbnail_badge : $m.image_thumbnail_badge}</span>
   {/if}
 {:else if master === 'missing'}
-  <div class="raw-state" data-testid="raw-missing">
+  <div class="raw-state" data-testid="image-missing">
     <span class="material-symbols-outlined icon-lg">image_not_supported</span>
     <span class="raw-filename">{image.filename}</span>
     <span>{$m.image_file_missing}</span>
   </div>
 {:else}
-  <div class="raw-state" data-testid="raw-unviewable">
-    <span class="material-symbols-outlined icon-lg">raw_on</span>
-    <strong>{$m.raw_unviewable_title}</strong>
+  <div class="raw-state" data-testid="image-unviewable">
+    <span class="material-symbols-outlined icon-lg">{raw ? 'raw_on' : 'hide_image'}</span>
+    <strong>{raw ? $m.raw_unviewable_title : $m.image_unviewable_title}</strong>
     <span class="raw-filename">{image.filename}</span>
-    <span>{$m.raw_unviewable_body}</span>
+    <span>
+      {raw
+        ? $m.raw_unviewable_body
+        : unsupportedExt
+          ? $m.image_unviewable_body_format(unsupportedExt)
+          : $m.image_unviewable_body}
+    </span>
     {#if master === 'stored'}
-      <span>{$m.raw_original_stored}</span>
+      <span>{$m.image_original_stored}</span>
     {/if}
   </div>
 {/if}
