@@ -148,6 +148,18 @@ describe('InProgress', () => {
 		expect([...hrefs, ...gotoMock.mock.calls.map((c) => String(c[0]))].filter((u) => u.includes('null'))).toEqual([]);
 	});
 
+	it('Tabla: the last-activity date is read as UTC, like the board', async () => {
+		// 03:00 UTC is the previous evening anywhere west of UTC, so on such a
+		// machine reading it as local time would show the next day.
+		const late = coll(9, 'Tomo tarde', '2026-10-23T03:00:00');
+		const screen = render(InProgress, { collections: [late], projects });
+		const opts = { day: '2-digit', month: 'short', year: 'numeric' } as const;
+		const asUtc = new Date(Date.UTC(2026, 9, 23, 3)).toLocaleDateString('es', opts);
+		const asLocal = new Date('2026-10-23T03:00:00').toLocaleDateString('es', opts);
+		await expect.element(screen.getByText(asUtc)).toBeVisible();
+		if (asLocal !== asUtc) await expect.element(screen.getByText(asLocal)).not.toBeInTheDocument();
+	});
+
 	it('Tablero: a card shows the date of its last status change, read as UTC', async () => {
 		localStorage.setItem(VIEW_KEY, 'board');
 		const screen = mount();

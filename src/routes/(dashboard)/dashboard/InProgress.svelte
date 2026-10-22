@@ -150,15 +150,9 @@
     approved:  $m.status_approved_plural,
   });
 
-  // The Tabla date column, as it was before the board: last_activity_at
-  // parsed with new Date() as given.
-  function formatActivity(iso: string): string {
-    return new Date(iso).toLocaleDateString($locale, {
-      day: '2-digit', month: 'short', year: 'numeric',
-    });
-  }
-
-  // Board cards: last_status_change_at is naive UTC (see parseApiDate).
+  // Both dates on the block, Tabla's last_activity_at (MAX(records.modified_at))
+  // and the cards' last_status_change_at, arrive as naive UTC (see
+  // parseApiDate), so they are read the same way and agree on the day.
   function formatDate(iso: string): string {
     return parseApiDate(iso).toLocaleDateString($locale, {
       day: '2-digit', month: 'short', year: 'numeric',
@@ -239,7 +233,7 @@
                 {/if}
               </div>
 
-              <span class="ip-date">{formatActivity(row.lastActivity)}</span>
+              <span class="ip-date">{formatDate(row.lastActivity)}</span>
 
               <div class="ip-actions">
                 <button class="btn ip-btn ip-btn-capture" onclick={() => goto(captureUrl(row.projectId, row.collectionId))}>
