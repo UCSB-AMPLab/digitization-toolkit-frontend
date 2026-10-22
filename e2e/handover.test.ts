@@ -6,7 +6,7 @@
 // Same requirements as book-view-approve-reject.test.ts: an admin account
 // in the target backend (E2E_USERNAME, E2E_PASSWORD), since the controls
 // are offered to operators and admins.
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Page } from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh209';

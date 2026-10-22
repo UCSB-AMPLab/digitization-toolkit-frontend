@@ -8,7 +8,7 @@
 // target backend. Configure via env vars (falls back to the throwaway
 // `e2e_neh210` account provisioned in this dev environment):
 //   E2E_USERNAME, E2E_PASSWORD
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Page } from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh210';
