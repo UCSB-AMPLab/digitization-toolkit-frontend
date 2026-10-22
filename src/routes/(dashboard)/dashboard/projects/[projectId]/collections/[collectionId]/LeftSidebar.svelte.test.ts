@@ -445,4 +445,75 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await new Promise((r) => setTimeout(r, 0));
 		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
 	});
+
+	const cards = () => [...document.querySelectorAll('.annotation-card')].map((c) => c.textContent ?? '');
+	const flag = async (screen: ReturnType<typeof render>, label: string) => {
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: label, exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+	};
+
+	it('keeps the backend order, newest first, when a save answers after a load that already holds a newer annotation', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		const a = makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-10-21T10:00:00' });
+		const b = makeAnnotation({ id: 2, error_types: ['glare'], created_at: '2026-10-21T10:05:00' });
+		let resolveAdd!: (v: RecordAnnotation) => void;
+		addAnnotationSpy.mockReturnValue(new Promise((r) => { resolveAdd = r; }));
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await flag(screen, 'Imagen Borrosa');
+		resolveLoad([b, a]);
+		await new Promise((r) => setTimeout(r, 0));
+		resolveAdd(a);
+
+		await expect.poll(() => cards().length).toBe(2);
+		// The oldest, which supplies the rejection reason, stays last.
+		expect(cards()[0]).toContain('Reflejo/Brillo');
+		expect(cards()[1]).toContain('Imagen Borrosa');
+	});
+
+	it('an annotation deleted while the first load is in flight does not come back with it', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		const a = makeAnnotation({ id: 7, error_types: ['blur'] });
+		addAnnotationSpy.mockResolvedValue(a);
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockResolvedValue(undefined as never);
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await flag(screen, 'Imagen Borrosa');
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+
+		resolveLoad([a]);
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+		deleteSpy.mockRestore();
+	});
+
+	it('a failed delete puts back only that annotation, keeping one saved meanwhile', async () => {
+		const a = makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-10-21T10:00:00' });
+		const b = makeAnnotation({ id: 2, error_types: ['glare'], created_at: '2026-10-21T10:05:00' });
+		getAnnotationsSpy.mockResolvedValue([a]);
+		let rejectDelete!: (e: Error) => void;
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockReturnValue(new Promise((_, rej) => { rejectDelete = rej; }));
+		addAnnotationSpy.mockResolvedValue(b);
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+		await flag(screen, 'Reflejo/Brillo');
+		await expect.poll(() => cards().length).toBe(1);
+
+		rejectDelete(new Error('network'));
+		await expect.poll(() => cards().length).toBe(2);
+		expect(cards()[0]).toContain('Reflejo/Brillo');
+		expect(cards()[1]).toContain('Imagen Borrosa');
+		deleteSpy.mockRestore();
+	});
 });

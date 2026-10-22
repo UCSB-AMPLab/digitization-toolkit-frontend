@@ -111,19 +111,31 @@
   // También limpia el estado de "Agregar nota"/"Marcar error" (NEH-209): sin
   // esto, un motivo o nota a medio escribir para un registro se filtraría al
   // siguiente al navegar entre documentos.
-  // An annotation saved while the load below is in flight can reach the list
-  // twice (the load answered after the save committed) or not at all (the
-  // load answered from before it). Both merge by id, newest first.
-  function withAnnotation(list: RecordAnnotation[], added: RecordAnnotation): RecordAnnotation[] {
-    return [added, ...list.filter(a => a.id !== added.id)];
+  // The load below and the saves and deletes made while it is in flight can
+  // reach the list in any order: the load can answer after a save committed
+  // (the annotation would show twice), before it (it would be lost), or
+  // before a delete (it would come back). So the list is merged by id, minus
+  // what was deleted meanwhile, and kept in the backend's order, newest
+  // first, whatever path each annotation took: firstFlaggedReason reads the
+  // oldest from the end.
+  function byNewest(a: RecordAnnotation, b: RecordAnnotation): number {
+    const t = (b.created_at ?? '').localeCompare(a.created_at ?? '');
+    return t !== 0 ? t : b.id - a.id;
   }
+  function withAnnotation(list: RecordAnnotation[], added: RecordAnnotation): RecordAnnotation[] {
+    return [...list.filter(a => a.id !== added.id), added].sort(byNewest);
+  }
+  // Deleted on this record since the load started. Not reactive.
+  let deletedIds = new Set<number>();
   function mergeLoaded(loaded: RecordAnnotation[], local: RecordAnnotation[]): RecordAnnotation[] {
-    return [...local.filter(a => !loaded.some(l => l.id === a.id)), ...loaded];
+    const merged = [...local.filter(a => !loaded.some(l => l.id === a.id)), ...loaded];
+    return merged.filter(a => !deletedIds.has(a.id)).sort(byNewest);
   }
 
   $effect(() => {
     const recordId = currentRecord?.id ?? null;
     annotations = [];
+    deletedIds = new Set();
     annotationsError = null;
     noteText = '';
     selectedReasons = [];
@@ -196,8 +208,8 @@
   // Motivo que se envía al rechazar: el primer tipo de error de la
   // anotación guardada MÁS ANTIGUA que tenga alguno (no de los chips
   // seleccionados en este momento, que se vacían en cada "Guardar") —
-  // `annotations` está ordenada de más nueva a más vieja (se antepone al
-  // guardar), así que la más antigua es la última del arreglo.
+  // `annotations` está ordenada de más nueva a más vieja (byNewest), así
+  // que la más antigua es la última del arreglo.
   let firstFlaggedReason: PredefinedRejectionReason | null = $derived.by(() => {
     for (let i = annotations.length - 1; i >= 0; i--) {
       const reason = annotations[i].error_types[0];
@@ -370,17 +382,22 @@
   async function handleDeleteAnnotation(id: number) {
     if (annotationsLocked) return;
     const recordId = currentRecord?.id ?? null;
-    const previous = annotations;
+    const removed = annotations.find(a => a.id === id);
+    const deleted = deletedIds;
+    deleted.add(id);
     annotations = annotations.filter(a => a.id !== id);
     try {
       await recordsApi.deleteAnnotation(id);
     } catch (err) {
       console.error('[LeftSidebar] Error eliminando anotación:', err);
+      deleted.delete(id);
       // Solo restaurar si seguimos en el mismo record: si cambió, el effect
       // de carga ya cargó la lista del nuevo record y restaurar aquí la
-      // pisaría con datos del record anterior.
+      // pisaría con datos del record anterior. Se devuelve solo la anotación
+      // que no se pudo borrar, no la lista de antes: lo guardado mientras
+      // tanto se conserva.
       if (currentRecord?.id === recordId) {
-        annotations = previous;
+        if (removed) annotations = withAnnotation(annotations, removed);
         annotationsError = $m.col_annotation_delete_error;
       }
     }
