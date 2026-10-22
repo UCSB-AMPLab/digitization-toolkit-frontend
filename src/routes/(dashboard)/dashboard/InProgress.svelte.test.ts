@@ -149,15 +149,18 @@ describe('InProgress', () => {
 	});
 
 	it('Tabla: the last-activity date is read as UTC, like the board', async () => {
-		// 03:00 UTC is the previous evening anywhere west of UTC, so on such a
-		// machine reading it as local time would show the next day.
+		// The client project runs Chromium in America/Bogota (vite.config.ts),
+		// where 03:00 UTC is the previous evening, so reading it as local time
+		// would show the next day.
+		expect(new Date('2026-10-23T03:00:00').getTimezoneOffset()).toBe(300);
 		const late = coll(9, 'Tomo tarde', '2026-10-23T03:00:00');
 		const screen = render(InProgress, { collections: [late], projects });
 		const opts = { day: '2-digit', month: 'short', year: 'numeric' } as const;
 		const asUtc = new Date(Date.UTC(2026, 9, 23, 3)).toLocaleDateString('es', opts);
 		const asLocal = new Date('2026-10-23T03:00:00').toLocaleDateString('es', opts);
 		await expect.element(screen.getByText(asUtc)).toBeVisible();
-		if (asLocal !== asUtc) await expect.element(screen.getByText(asLocal)).not.toBeInTheDocument();
+		expect(asLocal).not.toBe(asUtc);
+		await expect.element(screen.getByText(asLocal)).not.toBeInTheDocument();
 	});
 
 	it('Tablero: a card shows the date of its last status change, read as UTC', async () => {
