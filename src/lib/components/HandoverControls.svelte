@@ -8,6 +8,7 @@
   // anyone else (allow_contributor in collections.py).
   // ============================================================================
 
+  import { tick } from 'svelte';
   import { collectionsApi, type Record } from '$lib/api';
   import { m } from '$lib/i18n';
   import { handoverCounts, handoverOffer, promoteBlockers } from '$lib/handover';
@@ -15,7 +16,8 @@
   let { records, collectionId, onChanged }: {
     records: Record[];
     collectionId: number;
-    onChanged: () => Promise<void> | void;
+    // Reloads the records; resolves false if the list could not be refreshed.
+    onChanged: () => Promise<boolean>;
   } = $props();
 
   let counts = $derived(handoverCounts(records));
@@ -26,6 +28,11 @@
   let blockers = $state<number[]>([]);
   let notice   = $state<{ kind: 'success' | 'error'; text: string } | null>(null);
   let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  let controlsEl = $state<HTMLElement | null>(null);
+  let cardEl     = $state<HTMLElement | null>(null);
+  // Where focus was when a dialog opened, to put it back on close.
+  let returnTo: HTMLElement | null = null;
 
   let blockerTitles = $derived(
     blockers.map((id) => records.find((r) => r.id === id)?.title || $m.record_fallback_title(id))
@@ -38,8 +45,32 @@
     if (kind === 'success') noticeTimer = setTimeout(() => (notice = null), 6000);
   }
 
+  function openDialog(d: 'send' | 'take-back') {
+    returnTo = document.activeElement as HTMLElement | null;
+    dialog = d;
+  }
+
+  // Back to the control that opened the dialog, or, when an action has
+  // removed or disabled it, to the first handover control still enabled.
+  async function restoreFocus() {
+    await tick();
+    const back = returnTo;
+    returnTo = null;
+    if (back?.isConnected && !(back as HTMLButtonElement).disabled) { back.focus(); return; }
+    controlsEl?.parentElement?.querySelector<HTMLButtonElement>('.handover-btn:not(:disabled)')?.focus();
+  }
+
   function closeDialog() {
-    if (!busy) dialog = null;
+    if (busy) return;
+    dialog = null;
+    restoreFocus();
+  }
+
+  // After a change the server accepted: report it, unless the records could
+  // not be reloaded, in which case the counts on screen may be out of date.
+  async function reportChange(text: string) {
+    const fresh = await onChanged();
+    showNotice(fresh ? 'success' : 'error', fresh ? text : $m.col_records_reload_error);
   }
 
   async function confirmSend() {
@@ -47,8 +78,7 @@
     try {
       const { promoted } = await collectionsApi.promote(collectionId);
       dialog = null;
-      showNotice('success', promoted > 0 ? $m.col_handover_sent(promoted) : $m.col_handover_nothing_to_send);
-      await onChanged();
+      await reportChange(promoted > 0 ? $m.col_handover_sent(promoted) : $m.col_handover_nothing_to_send);
     } catch (err) {
       const ids = promoteBlockers(err);
       if (ids) {
@@ -62,6 +92,7 @@
       }
     } finally {
       busy = false;
+      if (dialog === null) restoreFocus();
     }
   }
 
@@ -70,40 +101,50 @@
     try {
       const { taken_back } = await collectionsApi.takeBack(collectionId);
       dialog = null;
-      showNotice('success', taken_back > 0 ? $m.col_takeback_done(taken_back) : $m.col_takeback_nothing);
-      await onChanged();
+      await reportChange(taken_back > 0 ? $m.col_takeback_done(taken_back) : $m.col_takeback_nothing);
     } catch {
       dialog = null;
       showNotice('error', $m.col_takeback_error);
     } finally {
       busy = false;
+      if (dialog === null) restoreFocus();
     }
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape' && dialog) closeDialog();
+    if (!dialog) return;
+    if (e.key === 'Escape') { closeDialog(); return; }
+    // Keep Tab inside the dialog: aria-modal tells assistive technology the
+    // rest of the page is inert, but it does not stop the focus leaving.
+    if (e.key === 'Tab' && cardEl) {
+      const items = [...cardEl.querySelectorAll<HTMLElement>('button:not(:disabled)')];
+      if (items.length === 0) { e.preventDefault(); cardEl.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === cardEl)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (active === last || !cardEl.contains(active))) { e.preventDefault(); first.focus(); }
+    }
   }
 
-  // Move focus into a dialog when it opens, and back where it was on close.
   function focusOnOpen(node: HTMLElement) {
-    const previous = document.activeElement as HTMLElement | null;
     node.focus();
-    return { destroy: () => previous?.focus() };
   }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
+<span class="handover-controls" bind:this={controlsEl}>
 {#if offer.takeBack}
-  <button class="btn btn-ghost handover-btn" disabled={busy} onclick={() => (dialog = 'take-back')}>
+  <button class="btn btn-ghost handover-btn" disabled={busy} onclick={() => openDialog('take-back')}>
     {$m.col_handover_take_back}
   </button>
 {/if}
 {#if offer.send}
-  <button class="btn btn-primary handover-btn" disabled={busy} onclick={() => (dialog = 'send')}>
+  <button class="btn btn-primary handover-btn" disabled={busy} onclick={() => openDialog('send')}>
     {offer.send === 'new' ? $m.col_handover_send_new(counts.captured) : $m.col_handover_send}
   </button>
 {/if}
+</span>
 
 {#if dialog}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -115,6 +156,7 @@
       aria-modal="true"
       aria-labelledby="handover-title"
       tabindex="-1"
+      bind:this={cardEl}
       use:focusOnOpen
     >
       {#if dialog === 'send'}
@@ -167,6 +209,9 @@
 {/if}
 
 <style>
+  /* The wrapper adds no box: the buttons sit in the top bar's own row. */
+  .handover-controls { display: contents; }
+
   /* Same pill shape as the camera button beside it in the top bar. */
   .handover-btn {
     border-radius: var(--radius-full);

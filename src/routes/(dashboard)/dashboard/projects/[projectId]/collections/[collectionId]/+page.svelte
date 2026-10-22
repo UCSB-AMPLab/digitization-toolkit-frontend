@@ -16,7 +16,7 @@
   //   ThumbnailStrip.svelte   → tira de miniaturas inferior (solo en spread)
   // ============================================================================
 
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
@@ -79,10 +79,25 @@
     await loadRecords();
   });
 
-  async function loadRecords() {
+  // Volumen cuyos registros están en pantalla. SvelteKit reutiliza esta
+  // página al navegar de un volumen a otro (p. ej. con el historial), así que
+  // collectionId puede cambiar sin que se vuelva a montar: sin esto quedaban
+  // los registros del volumen anterior junto a acciones dirigidas al nuevo.
+  let loadedFor = $state<number | null>(null);
+  // Último volumen pedido. No es reactivo: el efecto de abajo solo depende
+  // de collectionId.
+  let requestedFor = 0;
+
+  // Devuelve si la lista quedó actualizada, para que quien recarga después
+  // de un cambio pueda avisar si no.
+  async function loadRecords(): Promise<boolean> {
+    const forId = collectionId;
+    requestedFor = forId;
     try {
       isLoading = true;
-      const data = await recordsApi.listAll({ collection_id: collectionId });
+      const data = await recordsApi.listAll({ collection_id: forId });
+      // Una respuesta de un volumen que ya no está abierto se descarta.
+      if (forId !== collectionId) return false;
       // Sort by sequence (nulls last), then by id
       records = data.sort((a, b) => {
         if (a.sequence == null && b.sequence == null) return a.id - b.id;
@@ -90,14 +105,25 @@
         if (b.sequence == null) return -1;
         return a.sequence - b.sequence;
       });
+      loadedFor = forId;
       if (records.length > 0) selectedRecordId = records[0].id;
+      return true;
     } catch (err) {
       console.error('[Gallery] Error cargando registros:', err);
+      return false;
     } finally {
-      isLoading = false;
-      hasLoaded = true;
+      if (forId === collectionId) {
+        isLoading = false;
+        hasLoaded = true;
+      }
     }
   }
+
+  // Al pasar a otro volumen sin desmontar la página, cargar los suyos.
+  $effect(() => {
+    const id = collectionId;
+    if (requestedFor !== 0 && id !== requestedFor) untrack(() => { loadRecords(); });
+  });
 
   // ---------------------------------------------------------------------------
   // HANDLERS
@@ -280,13 +306,16 @@
 
   $effect(() => {
     if (!topbar) return;
-    topbar.actions = canHandOver && hasLoaded ? handoverActions : null;
+    topbar.actions = canHandOver && hasLoaded && loadedFor === collectionId ? handoverActions : null;
     return () => { topbar.actions = null; };
   });
 </script>
 
 {#snippet handoverActions()}
-  <HandoverControls {records} {collectionId} onChanged={loadRecords} />
+  <!-- Keyed so a dialog open on one volume does not survive into another. -->
+  {#key collectionId}
+    <HandoverControls {records} {collectionId} onChanged={loadRecords} />
+  {/key}
 {/snippet}
 
 <!-- ============================================================
@@ -312,7 +341,7 @@
         userRole={$userRole}
         onRotateLeft={handleRotateLeft}
         onRotateRight={handleRotateRight}
-        onRecordUpdated={loadRecords}
+        onRecordUpdated={async () => { await loadRecords(); }}
         onRecapture={handleRecapture}
       />
     {/if}

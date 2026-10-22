@@ -450,7 +450,9 @@ export const es = {
 	col_takeback_done: (n: number) => (n === 1 ? 'Se retiró 1 registro de revisión.' : `Se retiraron ${n} registros de revisión.`),
 	col_takeback_nothing: 'No había registros en revisión para retirar.',
 	col_takeback_error: 'No se pudo retirar el volumen de revisión. Intenta de nuevo.',
-	col_review_not_sent_hint: 'Este registro todavía no se ha enviado a revisión. Podrás aprobarlo o rechazarlo cuando esté en revisión.',
+	col_review_not_sent_hint: 'Este registro no está en revisión. Podrás aprobarlo o rechazarlo cuando se envíe a revisión.',
+	// Solo después de un envío o retiro que salió bien.
+	col_records_reload_error: 'El cambio se guardó, pero no se pudo actualizar la lista de registros. Recarga la página para ver el estado actual de los registros.',
 	col_recapture_btn: 'Recapturar imagen',
 	col_annotation_comment_placeholder: 'Agrega un comentario (opcional)...',
 	col_review_confirm_approve: '¿Confirmas que quieres aprobar esta imagen?',

@@ -22,13 +22,13 @@ function recs(spec: Partial<{ [K in S]: number }>): ApiRecord[] {
 describe('HandoverControls', () => {
 	let promoteSpy: ReturnType<typeof vi.spyOn>;
 	let takeBackSpy: ReturnType<typeof vi.spyOn>;
-	let onChanged: ReturnType<typeof vi.fn>;
+	let onChanged: ReturnType<typeof vi.fn<() => Promise<boolean>>>;
 
 	beforeEach(() => {
 		nextId = 1;
 		promoteSpy = vi.spyOn(collectionsApi, 'promote');
 		takeBackSpy = vi.spyOn(collectionsApi, 'takeBack');
-		onChanged = vi.fn();
+		onChanged = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
 	});
 	afterEach(() => {
 		promoteSpy.mockRestore();
@@ -126,6 +126,38 @@ describe('HandoverControls', () => {
 		const dialog = screen.getByRole('dialog');
 		await expect.element(dialog.getByText('El registro en revisión quedará otra vez en estado Capturado', { exact: false })).toBeVisible();
 		await expect.element(dialog.getByText('se queda', { exact: false })).not.toBeInTheDocument();
+	});
+
+	it('a change that succeeds but cannot be reloaded says so, instead of reporting stale counts as current', async () => {
+		promoteSpy.mockResolvedValue({ collection_id: 7, promoted: 2 });
+		onChanged.mockResolvedValue(false);
+		const screen = mount(recs({ captured: 2 }));
+		await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
+		await screen.getByRole('button', { name: 'Enviar', exact: true }).click();
+		await expect.element(screen.getByRole('alert')).toHaveTextContent(
+			/^El cambio se guardó, pero no se pudo actualizar la lista de registros\./
+		);
+	});
+
+	it('Tab stays inside the dialog', async () => {
+		const screen = mount(recs({ captured: 1 }));
+		await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
+		const cancel = screen.getByRole('button', { name: 'Cancelar' });
+		const send = screen.getByRole('button', { name: 'Enviar', exact: true });
+		(send.element() as HTMLElement).focus();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }));
+		await expect.element(cancel).toHaveFocus();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true }));
+		await expect.element(send).toHaveFocus();
+	});
+
+	it('Cancelar returns focus to the button that opened the dialog', async () => {
+		const screen = mount(recs({ captured: 1 }));
+		const trigger = screen.getByRole('button', { name: 'Enviar a revisión' });
+		(trigger.element() as HTMLElement).focus();
+		await trigger.click();
+		await screen.getByRole('button', { name: 'Cancelar' }).click();
+		await expect.element(trigger).toHaveFocus();
 	});
 
 	it('Escape closes a dialog', async () => {

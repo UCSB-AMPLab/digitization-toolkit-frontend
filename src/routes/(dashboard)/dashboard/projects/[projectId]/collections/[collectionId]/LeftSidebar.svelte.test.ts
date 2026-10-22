@@ -225,7 +225,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).toBeDisabled();
 		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
 		// The screen says why, since the Pi has no hover to show a tooltip.
-		await expect.element(screen.getByText('Este registro todavía no se ha enviado a revisión.', { exact: false })).toBeVisible();
+		await expect.element(screen.getByText('Este registro no está en revisión.', { exact: false })).toBeVisible();
 		expect(updateStatusSpy).not.toHaveBeenCalled();
 		expect(rejectSpy).not.toHaveBeenCalled();
 	});
@@ -234,7 +234,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
 		await openAnnotationsTab(screen);
 		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).toBeEnabled();
-		await expect.element(screen.getByText('Este registro todavía no se ha enviado a revisión.', { exact: false })).not.toBeInTheDocument();
+		await expect.element(screen.getByText('Este registro no está en revisión.', { exact: false })).not.toBeInTheDocument();
 	});
 
 	it('rejected: "Marcar error" and "Agregar nota" are both disabled — a rejected record accepts no more annotations', async () => {
