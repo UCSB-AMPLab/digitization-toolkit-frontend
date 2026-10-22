@@ -60,9 +60,12 @@
     // The bar's other controls (camera, user menu) stay when no handover
     // control is left, for instance after a send that found nothing to send.
     const bar = controlsEl?.parentElement;
+    // The notice's close button is left out: the notice can expire.
     const next =
       bar?.querySelector<HTMLButtonElement>('.handover-btn:not(:disabled)') ??
-      bar?.querySelector<HTMLButtonElement>('button:not(:disabled)');
+      [...(bar?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])].find(
+        (b) => !b.closest('.handover-notice')
+      );
     next?.focus();
   }
 
