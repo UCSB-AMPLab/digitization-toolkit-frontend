@@ -383,6 +383,52 @@ export const en: Messages = {
 	col_reject_error: 'Could not reject the record. Please try again.',
 	col_reject_needs_reason: 'You must select at least one error.',
 	col_review_approve_error: 'Could not approve the record. Please try again.',
+	// ── Send for review (NEH-260) ───────────────────────────────────
+	col_handover_send: 'Send for review',
+	col_handover_send_new: (n: number) => (n === 1 ? 'Send 1 new record' : `Send ${n} new records`),
+	col_handover_take_back: 'Withdraw from review',
+	col_handover_confirm_title: 'Send the volume for review?',
+	col_handover_confirm_body: (n: number) =>
+		n === 1
+			? 'The captured record will be in review. While it is, you cannot move it to another volume.'
+			: `The ${n} captured records will be in review. While they are, you cannot move them to another volume.`,
+	col_handover_confirm_undo: (n: number) =>
+		n === 1
+			? 'If you make a mistake, you can withdraw it with "Withdraw from review".'
+			: 'If you make a mistake, you can withdraw them with "Withdraw from review".',
+	col_handover_confirm_submit: 'Send',
+	col_handover_refused_title: 'Could not send the volume',
+	col_handover_refused_body: (n: number) =>
+		n === 1
+			? 'One record cannot be sent yet because it has no image or its image was rejected. Capture its image again and send the volume again.'
+			: `${n} records cannot be sent yet because they have no image or their image was rejected. Capture their images again and send the volume again.`,
+	col_handover_refused_unchanged: 'No records were changed.',
+	col_handover_sent: (n: number) => (n === 1 ? '1 record was sent for review.' : `${n} records were sent for review.`),
+	col_handover_nothing_to_send: 'There were no captured records to send.',
+	col_handover_send_error: 'Could not send the volume for review. Please try again.',
+	col_takeback_confirm_title: 'Withdraw the volume from review?',
+	col_takeback_confirm_body: (n: number) =>
+		n === 1
+			? 'The record in review will be Captured again, and you can keep working on it.'
+			: `The ${n} records in review will be Captured again, and you can keep working on them.`,
+	col_takeback_confirm_kept: (a: number, r: number) => {
+		if (a > 0 && r > 0) {
+			const ap = a === 1 ? 'The approved record' : `The ${a} approved records`;
+			const rp = r === 1 ? 'the rejected one' : `the ${r} rejected ones`;
+			return `${ap} and ${rp} stay as they are, because they have already been reviewed.`;
+		}
+		const n = a > 0 ? a : r;
+		const word = a > 0 ? 'approved' : 'rejected';
+		return n === 1
+			? `The ${word} record stays as it is, because it has already been reviewed.`
+			: `The ${n} ${word} records stay as they are, because they have already been reviewed.`;
+	},
+	col_takeback_confirm_submit: 'Withdraw',
+	col_takeback_done: (n: number) => (n === 1 ? '1 record was withdrawn from review.' : `${n} records were withdrawn from review.`),
+	col_takeback_nothing: 'There were no records in review to withdraw.',
+	col_takeback_error: 'Could not withdraw the volume from review. Please try again.',
+	col_review_not_sent_hint: 'This record is not in review. You can approve or reject it once it is sent for review.',
+	col_records_reload_error: 'The change was saved, but the list of records could not be refreshed. Reload the page to see the records’ current state.',
 	col_recapture_btn: 'Recapture image',
 	col_annotation_comment_placeholder: 'Add a comment (optional)...',
 	col_review_confirm_approve: 'Are you sure you want to approve this image?',

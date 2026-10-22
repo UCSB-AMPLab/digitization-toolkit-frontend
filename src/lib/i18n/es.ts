@@ -404,6 +404,55 @@ export const es = {
 	col_reject_error: 'No se pudo rechazar el registro. Intenta de nuevo.',
 	col_reject_needs_reason: 'Debes seleccionar al menos un error.',
 	col_review_approve_error: 'No se pudo aprobar el registro. Intenta de nuevo.',
+	// ── Envío a revisión (NEH-260) ──────────────────────────────────
+	col_handover_send: 'Enviar a revisión',
+	col_handover_send_new: (n: number) => (n === 1 ? 'Enviar 1 registro nuevo' : `Enviar ${n} registros nuevos`),
+	col_handover_take_back: 'Retirar de revisión',
+	col_handover_confirm_title: '¿Enviar el volumen a revisión?',
+	col_handover_confirm_body: (n: number) =>
+		n === 1
+			? 'El registro capturado quedará en revisión. Mientras lo esté, no podrás moverlo a otro volumen.'
+			: `Los ${n} registros capturados quedarán en revisión. Mientras lo estén, no podrás moverlos a otro volumen.`,
+	col_handover_confirm_undo: (n: number): string =>
+		n === 1
+			? 'Si te equivocas, puedes retirarlo con "Retirar de revisión".'
+			: 'Si te equivocas, puedes retirarlos con "Retirar de revisión".',
+	col_handover_confirm_submit: 'Enviar',
+	col_handover_refused_title: 'No se pudo enviar el volumen',
+	col_handover_refused_body: (n: number) =>
+		n === 1
+			? 'Hay un registro que todavía no se puede enviar porque le falta la imagen o la que tiene fue rechazada. Vuelve a capturar su imagen y envía el volumen de nuevo.'
+			: `Hay ${n} registros que todavía no se pueden enviar porque les falta la imagen o la que tienen fue rechazada. Vuelve a capturar sus imágenes y envía el volumen de nuevo.`,
+	col_handover_refused_unchanged: 'No se cambió el estado de ningún registro.',
+	col_handover_sent: (n: number) => (n === 1 ? 'Se envió 1 registro a revisión.' : `Se enviaron ${n} registros a revisión.`),
+	col_handover_nothing_to_send: 'No había registros capturados para enviar.',
+	col_handover_send_error: 'No se pudo enviar el volumen a revisión. Intenta de nuevo.',
+	col_takeback_confirm_title: '¿Retirar el volumen de revisión?',
+	col_takeback_confirm_body: (n: number) =>
+		n === 1
+			? 'El registro en revisión quedará otra vez en estado Capturado y podrás seguir trabajando en él.'
+			: `Los ${n} registros en revisión quedarán otra vez en estado Capturado y podrás seguir trabajando en ellos.`,
+	// Aprobados (a) y rechazados (r) que el retiro no toca. Con a = r = 0 no
+	// se muestra; el componente no la llama en ese caso.
+	col_takeback_confirm_kept: (a: number, r: number) => {
+		if (a > 0 && r > 0) {
+			const ap = a === 1 ? 'El registro aprobado' : `Los ${a} registros aprobados`;
+			const rp = r === 1 ? 'el rechazado' : `los ${r} rechazados`;
+			return `${ap} y ${rp} se quedan como están, porque ya se revisaron.`;
+		}
+		const n = a > 0 ? a : r;
+		const word = a > 0 ? 'aprobado' : 'rechazado';
+		return n === 1
+			? `El registro ${word} se queda como está, porque ya se revisó.`
+			: `Los ${n} registros ${word}s se quedan como están, porque ya se revisaron.`;
+	},
+	col_takeback_confirm_submit: 'Retirar',
+	col_takeback_done: (n: number) => (n === 1 ? 'Se retiró 1 registro de revisión.' : `Se retiraron ${n} registros de revisión.`),
+	col_takeback_nothing: 'No había registros en revisión para retirar.',
+	col_takeback_error: 'No se pudo retirar el volumen de revisión. Intenta de nuevo.',
+	col_review_not_sent_hint: 'Este registro no está en revisión. Podrás aprobarlo o rechazarlo cuando se envíe a revisión.',
+	// Solo después de un envío o retiro que salió bien.
+	col_records_reload_error: 'El cambio se guardó, pero no se pudo actualizar la lista de registros. Recarga la página para ver el estado actual de los registros.',
 	col_recapture_btn: 'Recapturar imagen',
 	col_annotation_comment_placeholder: 'Agrega un comentario (opcional)...',
 	col_review_confirm_approve: '¿Confirmas que quieres aprobar esta imagen?',

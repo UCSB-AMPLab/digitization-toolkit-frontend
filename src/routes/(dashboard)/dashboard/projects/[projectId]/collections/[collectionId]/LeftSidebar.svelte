@@ -111,6 +111,31 @@
   // También limpia el estado de "Agregar nota"/"Marcar error" (NEH-209): sin
   // esto, un motivo o nota a medio escribir para un registro se filtraría al
   // siguiente al navegar entre documentos.
+  // The load below and the saves and deletes made while it is in flight can
+  // reach the list in any order: the load can answer after a save committed
+  // (the annotation would show twice), before it (it would be lost), or
+  // before a delete (it would come back). So the list is merged by id, minus
+  // what was deleted meanwhile, and kept in the backend's order, newest
+  // first, whatever path each annotation took: firstFlaggedReason reads the
+  // oldest from the end.
+  function byNewest(a: RecordAnnotation, b: RecordAnnotation): number {
+    const t = (b.created_at ?? '').localeCompare(a.created_at ?? '');
+    return t !== 0 ? t : b.id - a.id;
+  }
+  // Annotations deleted, or being deleted, from this panel. Annotation ids
+  // are unique across records, so the set is not reset when the record
+  // changes: a delete still in flight on a record left and reopened stays
+  // out of its reload. A failed delete takes its id back out. Not reactive.
+  const deletedIds = new Set<number>();
+  function withAnnotation(list: RecordAnnotation[], added: RecordAnnotation): RecordAnnotation[] {
+    const rest = list.filter(a => a.id !== added.id);
+    return (deletedIds.has(added.id) ? rest : [...rest, added]).sort(byNewest);
+  }
+  function mergeLoaded(loaded: RecordAnnotation[], local: RecordAnnotation[]): RecordAnnotation[] {
+    const merged = [...local.filter(a => !loaded.some(l => l.id === a.id)), ...loaded];
+    return merged.filter(a => !deletedIds.has(a.id)).sort(byNewest);
+  }
+
   $effect(() => {
     const recordId = currentRecord?.id ?? null;
     annotations = [];
@@ -125,7 +150,7 @@
 
     let cancelled = false;
     recordsApi.getAnnotations(recordId)
-      .then(data => { if (!cancelled) annotations = data; })
+      .then(data => { if (!cancelled) annotations = mergeLoaded(data, annotations); })
       .catch(err => {
         if (cancelled) return;
         console.error('[LeftSidebar] Error cargando anotaciones:', err);
@@ -186,8 +211,8 @@
   // Motivo que se envía al rechazar: el primer tipo de error de la
   // anotación guardada MÁS ANTIGUA que tenga alguno (no de los chips
   // seleccionados en este momento, que se vacían en cada "Guardar") —
-  // `annotations` está ordenada de más nueva a más vieja (se antepone al
-  // guardar), así que la más antigua es la última del arreglo.
+  // `annotations` está ordenada de más nueva a más vieja (byNewest), así
+  // que la más antigua es la última del arreglo.
   let firstFlaggedReason: PredefinedRejectionReason | null = $derived.by(() => {
     for (let i = annotations.length - 1; i >= 0; i--) {
       const reason = annotations[i].error_types[0];
@@ -236,7 +261,7 @@
       // effect de carga ya reemplazó `annotations` por las del nuevo record;
       // no anteponer aquí, o mostraríamos una anotación del record anterior.
       if (currentRecord?.id === recordId) {
-        annotations = [created, ...annotations];
+        annotations = withAnnotation(annotations, created);
       }
       selectedReasons = [];
       isReasonCardExpanded = false;
@@ -262,7 +287,7 @@
         note,
       });
       if (currentRecord?.id === recordId) {
-        annotations = [created, ...annotations];
+        annotations = withAnnotation(annotations, created);
       }
       noteText = '';
       isNoteCardExpanded = false;
@@ -360,17 +385,24 @@
   async function handleDeleteAnnotation(id: number) {
     if (annotationsLocked) return;
     const recordId = currentRecord?.id ?? null;
-    const previous = annotations;
+    const removed = annotations.find(a => a.id === id);
+    deletedIds.add(id);
     annotations = annotations.filter(a => a.id !== id);
     try {
       await recordsApi.deleteAnnotation(id);
+      // A load that answered while the delete was in flight may have put it
+      // back.
+      annotations = annotations.filter(a => a.id !== id);
     } catch (err) {
       console.error('[LeftSidebar] Error eliminando anotación:', err);
+      deletedIds.delete(id);
       // Solo restaurar si seguimos en el mismo record: si cambió, el effect
       // de carga ya cargó la lista del nuevo record y restaurar aquí la
-      // pisaría con datos del record anterior.
+      // pisaría con datos del record anterior. Se devuelve solo la anotación
+      // que no se pudo borrar, no la lista de antes: lo guardado mientras
+      // tanto se conserva.
       if (currentRecord?.id === recordId) {
-        annotations = previous;
+        if (removed) annotations = withAnnotation(annotations, removed);
         annotationsError = $m.col_annotation_delete_error;
       }
     }
@@ -789,6 +821,13 @@
               <div class="review-section">
                 {#if reviewError}
                   <p class="annotations-error">{reviewError}</p>
+                {/if}
+
+                <!-- Por qué los dos botones están deshabilitados en un
+                     registro capturado: el operario todavía no lo ha enviado
+                     (NEH-260). En la pantalla táctil no hay tooltip. -->
+                {#if canReview && notReviewable}
+                  <p class="review-hint">{$m.col_review_not_sent_hint}</p>
                 {/if}
 
                 <div class="review-actions">
@@ -1325,6 +1364,13 @@
   /* Rechazar / Aprobar (NEH-209) — apilados, uno arriba y otro abajo, no
      lado a lado. */
   .review-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+
+  .review-hint {
+    margin: 0 0 8px;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--color-light-grey);
+  }
 
   .btn-review {
     width: 100%;

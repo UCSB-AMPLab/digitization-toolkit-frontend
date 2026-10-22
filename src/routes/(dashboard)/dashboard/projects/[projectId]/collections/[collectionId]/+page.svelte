@@ -16,7 +16,7 @@
   //   ThumbnailStrip.svelte   → tira de miniaturas inferior (solo en spread)
   // ============================================================================
 
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
@@ -32,6 +32,8 @@
   import RightToolbar from './RightToolbar.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
+  import HandoverControls from '$lib/components/HandoverControls.svelte';
+  import { getVolumeTopbar } from '$lib/volume-topbar';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -49,6 +51,9 @@
   let zoom             = $state(1);
   let rotation         = $state(0);
   let isLoading        = $state(true);
+  // Primera carga terminada. Las recargas vuelven a poner isLoading, y los
+  // controles de envío no deben desmontarse a mitad de un envío.
+  let hasLoaded        = $state(false);
   // NEH-230: el zoom al que un píxel de imagen ocupa un píxel de
   // dispositivo — lo calcula ImageViewer (según la página de referencia
   // medida) y lo usamos acá para el botón "1:1" y el tope de zoom de
@@ -74,10 +79,30 @@
     await loadRecords();
   });
 
-  async function loadRecords() {
+  // Volumen cuyos registros están en pantalla. SvelteKit reutiliza esta
+  // página al navegar de un volumen a otro (p. ej. con el historial), así que
+  // collectionId puede cambiar sin que se vuelva a montar: sin esto quedaban
+  // los registros del volumen anterior junto a acciones dirigidas al nuevo.
+  let loadedFor = $state<number | null>(null);
+  // Último volumen pedido. No es reactivo: el efecto de abajo solo depende
+  // de collectionId.
+  let requestedFor = 0;
+  // Número de la última carga pedida: solo esa puede escribir el estado.
+  // Comparar el volumen no basta, porque A→B→A deja dos cargas de A en
+  // vuelo y la más vieja podía llegar última y pisar a la nueva.
+  let loadSeq = 0;
+
+  // Devuelve si la lista quedó actualizada, para que quien recarga después
+  // de un cambio pueda avisar si no.
+  async function loadRecords(): Promise<boolean> {
+    const forId = collectionId;
+    const seq = ++loadSeq;
+    requestedFor = forId;
     try {
       isLoading = true;
-      const data = await recordsApi.listAll({ collection_id: collectionId });
+      const data = await recordsApi.listAll({ collection_id: forId });
+      // Una respuesta superada por otra carga se descarta.
+      if (seq !== loadSeq) return false;
       // Sort by sequence (nulls last), then by id
       records = data.sort((a, b) => {
         if (a.sequence == null && b.sequence == null) return a.id - b.id;
@@ -85,13 +110,25 @@
         if (b.sequence == null) return -1;
         return a.sequence - b.sequence;
       });
+      loadedFor = forId;
       if (records.length > 0) selectedRecordId = records[0].id;
+      return true;
     } catch (err) {
       console.error('[Gallery] Error cargando registros:', err);
+      return false;
     } finally {
-      isLoading = false;
+      if (seq === loadSeq) {
+        isLoading = false;
+        hasLoaded = true;
+      }
     }
   }
+
+  // Al pasar a otro volumen sin desmontar la página, cargar los suyos.
+  $effect(() => {
+    const id = collectionId;
+    if (requestedFor !== 0 && id !== requestedFor) untrack(() => { loadRecords(); });
+  });
 
   // ---------------------------------------------------------------------------
   // HANDLERS
@@ -263,7 +300,28 @@
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
   let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved' && hasCurrentImage(r)));
+
+  // ---------------------------------------------------------------------------
+  // ENVÍO A REVISIÓN (NEH-260) — los controles van en la barra superior del
+  // layout; la página los pone ahí porque es la que tiene los registros.
+  // Solo operador y admin: el backend rechaza promote y take-back a los demás.
+  // ---------------------------------------------------------------------------
+  const topbar = getVolumeTopbar();
+  let canHandOver = $derived($userRole === 'admin' || $userRole === 'operator');
+
+  $effect(() => {
+    if (!topbar) return;
+    topbar.actions = canHandOver && hasLoaded && loadedFor === collectionId ? handoverActions : null;
+    return () => { topbar.actions = null; };
+  });
 </script>
+
+{#snippet handoverActions()}
+  <!-- Keyed so a dialog open on one volume does not survive into another. -->
+  {#key collectionId}
+    <HandoverControls {records} {collectionId} onChanged={loadRecords} />
+  {/key}
+{/snippet}
 
 <!-- ============================================================
      LAYOUT DE GALERÍA
@@ -288,7 +346,7 @@
         userRole={$userRole}
         onRotateLeft={handleRotateLeft}
         onRotateRight={handleRotateRight}
-        onRecordUpdated={loadRecords}
+        onRecordUpdated={async () => { await loadRecords(); }}
         onRecapture={handleRecapture}
       />
     {/if}

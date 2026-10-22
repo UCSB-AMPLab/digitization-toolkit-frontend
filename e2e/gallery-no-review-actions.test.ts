@@ -8,7 +8,7 @@
 // target backend. Configure via env vars (falls back to the throwaway
 // `e2e_neh210` account provisioned in this dev environment):
 //   E2E_USERNAME, E2E_PASSWORD
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Page } from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh210';
@@ -111,6 +111,10 @@ async function openGallery(page: Page, ctx: SetupResult) {
 		[ctx.token, JSON.stringify({ id: 0, username: E2E_USERNAME, email: 'e2e@example.com', role: 'admin', is_active: true })]
 	);
 	await page.goto(`/dashboard/projects/${ctx.projectId}/collections/${ctx.collectionId}`);
+	// The records are fetched on the client after hydration, so a visible
+	// title means the toolbar's handlers are attached. A view switch clicked
+	// before that is lost, and the test then waits on a view that never opens.
+	await expect(page.getByText('Record A')).toBeVisible();
 }
 
 // No approve/reject button, no checkbox, and no bulk action bar — in any
@@ -119,7 +123,9 @@ async function openGallery(page: Page, ctx: SetupResult) {
 async function expectNoReviewActions(page: Page) {
 	await expect(page.getByRole('button', { name: 'Aprobar' })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Rechazar' })).toHaveCount(0);
-	await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toHaveCount(0);
+	// No per-record send inside the gallery. The volume's top bar offers
+	// sending the whole volume (NEH-260), which is not a review ruling.
+	await expect(page.locator('.gallery-content').getByRole('button', { name: 'Enviar a revisión' })).toHaveCount(0);
 	await expect(page.locator('.action-bar')).toHaveCount(0);
 	await expect(page.locator('input[type="checkbox"]')).toHaveCount(0);
 	await expect(page.locator('.selectable-overlay, .selectable-check')).toHaveCount(0);
@@ -164,9 +170,13 @@ test.describe('Gallery — no review actions (NEH-210)', () => {
 		await expect(page.getByRole('button', { name: 'Aprobado' })).toBeVisible();
 		await expectNoReviewActions(page);
 
-		// Clicking a card does nothing review-related (no select-to-approve).
+		// Clicking a card opens Book view (8578bda), as a list row does; it
+		// never selects the card for a bulk review action.
 		await page.locator('.grid-card').first().click();
+		await expect(page.getByRole('button', { name: 'Vista libro abierto' })).toHaveClass(/active/);
 		await expectNoReviewActions(page);
+
+		await page.getByTitle('Vista cuadrícula').click();
 
 		// Reorder mode is a pure drag-and-drop affordance, not a review action.
 		await page.getByRole('button', { name: 'Reordenar' }).click();

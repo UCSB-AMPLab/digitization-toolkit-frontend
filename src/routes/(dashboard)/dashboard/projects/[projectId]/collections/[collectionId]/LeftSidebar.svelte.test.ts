@@ -224,8 +224,17 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await openAnnotationsTab(screen);
 		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).toBeDisabled();
 		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		// The screen says why, since the Pi has no hover to show a tooltip.
+		await expect.element(screen.getByText('Este registro no está en revisión.', { exact: false })).toBeVisible();
 		expect(updateStatusSpy).not.toHaveBeenCalled();
 		expect(rejectSpy).not.toHaveBeenCalled();
+	});
+
+	it('in review: no "not sent" line', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
+		await openAnnotationsTab(screen);
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).toBeEnabled();
+		await expect.element(screen.getByText('Este registro no está en revisión.', { exact: false })).not.toBeInTheDocument();
 	});
 
 	it('rejected: "Marcar error" and "Agregar nota" are both disabled — a rejected record accepts no more annotations', async () => {
@@ -393,5 +402,165 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await expect.element(screen.getByRole('button', { name: 'Recapturar imagen' })).toBeVisible();
 		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
 		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument();
+	});
+
+	// The panel asks for the record's annotations when it opens. If one is
+	// saved while that request is in flight, the server can answer it after
+	// the save has committed, so the list already holds the new annotation
+	// when the save's own response arrives. Seen once in about 14 e2e runs.
+	it('an annotation saved while the first load is in flight appears once', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		const created = makeAnnotation({ id: 42, error_types: ['blur'] });
+		let resolveAdd!: (v: RecordAnnotation) => void;
+		addAnnotationSpy.mockReturnValue(new Promise((r) => { resolveAdd = r; }));
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+
+		resolveLoad([created]);
+		await new Promise((r) => setTimeout(r, 0));
+		resolveAdd(created);
+
+		await expect.element(screen.getByText('Imagen Borrosa').first()).toBeVisible();
+		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
+	});
+
+	it('an annotation saved while the first load is in flight is kept when the load answers without it', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		addAnnotationSpy.mockResolvedValue(makeAnnotation({ id: 43, error_types: ['blur'] }));
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
+
+		resolveLoad([]);
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
+	});
+
+	const cards = () => [...document.querySelectorAll('.annotation-card')].map((c) => c.textContent ?? '');
+	const flag = async (screen: ReturnType<typeof render>, label: string) => {
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: label, exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+	};
+
+	it('keeps the backend order, newest first, when a save answers after a load that already holds a newer annotation', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		const a = makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-10-21T10:00:00' });
+		const b = makeAnnotation({ id: 2, error_types: ['glare'], created_at: '2026-10-21T10:05:00' });
+		let resolveAdd!: (v: RecordAnnotation) => void;
+		addAnnotationSpy.mockReturnValue(new Promise((r) => { resolveAdd = r; }));
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await flag(screen, 'Imagen Borrosa');
+		resolveLoad([b, a]);
+		await new Promise((r) => setTimeout(r, 0));
+		resolveAdd(a);
+
+		await expect.poll(() => cards().length).toBe(2);
+		// The oldest, which supplies the rejection reason, stays last.
+		expect(cards()[0]).toContain('Reflejo/Brillo');
+		expect(cards()[1]).toContain('Imagen Borrosa');
+	});
+
+	it('an annotation deleted while the first load is in flight does not come back with it', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		const a = makeAnnotation({ id: 7, error_types: ['blur'] });
+		addAnnotationSpy.mockResolvedValue(a);
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockResolvedValue(undefined as never);
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await flag(screen, 'Imagen Borrosa');
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+
+		resolveLoad([a]);
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+		deleteSpy.mockRestore();
+	});
+
+	it('a failed delete puts back only that annotation, keeping one saved meanwhile', async () => {
+		const a = makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-10-21T10:00:00' });
+		const b = makeAnnotation({ id: 2, error_types: ['glare'], created_at: '2026-10-21T10:05:00' });
+		getAnnotationsSpy.mockResolvedValue([a]);
+		let rejectDelete!: (e: Error) => void;
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockReturnValue(new Promise((_, rej) => { rejectDelete = rej; }));
+		addAnnotationSpy.mockResolvedValue(b);
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+		await flag(screen, 'Reflejo/Brillo');
+		await expect.poll(() => cards().length).toBe(1);
+
+		rejectDelete(new Error('network'));
+		await expect.poll(() => cards().length).toBe(2);
+		expect(cards()[0]).toContain('Reflejo/Brillo');
+		expect(cards()[1]).toContain('Imagen Borrosa');
+		deleteSpy.mockRestore();
+	});
+
+	it('a save that answers after its annotation was deleted does not put it back', async () => {
+		const a = makeAnnotation({ id: 9, error_types: ['blur'] });
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		let resolveAdd!: (v: RecordAnnotation) => void;
+		addAnnotationSpy.mockReturnValue(new Promise((r) => { resolveAdd = r; }));
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockResolvedValue(undefined as never);
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await flag(screen, 'Imagen Borrosa');
+		resolveLoad([a]);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+
+		resolveAdd(a);
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+		deleteSpy.mockRestore();
+	});
+
+	it('a delete still in flight keeps its annotation out when the record is left and reopened', async () => {
+		const recA = makeRecord({ id: 1 });
+		const recB = makeRecord({ id: 2, title: 'Otro' });
+		const a7 = makeAnnotation({ id: 70, record_id: 1, error_types: ['blur'] });
+		getAnnotationsSpy.mockImplementation(async (id: number) => (id === 1 ? [a7] : []));
+		let resolveDelete!: () => void;
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockReturnValue(new Promise((r) => { resolveDelete = () => r(undefined as never); }));
+
+		const screen = render(LeftSidebar, baseProps({ currentRecord: recA }));
+		await openAnnotationsTab(screen);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+
+		await screen.rerender(baseProps({ currentRecord: recB }));
+		await screen.rerender(baseProps({ currentRecord: recA }));
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+
+		resolveDelete();
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+		deleteSpy.mockRestore();
 	});
 });
