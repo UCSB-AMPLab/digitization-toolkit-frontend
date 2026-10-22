@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
 	plugins: [sveltekit()],
 	test: {
+		// Capped at 2 because the development machine is shared and small.
+		maxWorkers: 2,
 		expect: { requireAssertions: true },
 		projects: [
 			{
