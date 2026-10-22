@@ -1,6 +1,11 @@
 // NEH-219: an unreachable backend must never count as a rejected session.
 import { describe, expect, it, vi } from 'vitest';
-import { classifySessionError, sessionRetryDelay, waitForSession } from './session-check';
+import {
+	abortableSleep,
+	classifySessionError,
+	sessionRetryDelay,
+	waitForSession
+} from './session-check';
 
 // Local stand-ins for api.ts's error classes, as in login-error.test.ts.
 class AuthError extends Error {
@@ -128,3 +133,70 @@ describe('waitForSession', () => {
 		expect(check).toHaveBeenCalledTimes(1);
 	});
 });
+
+// A signal whose abort listeners can be counted.
+function countingSignal() {
+	const controller = new AbortController();
+	const signal = controller.signal;
+	const live = new Set<EventListenerOrEventListenerObject>();
+	const add = signal.addEventListener.bind(signal);
+	const remove = signal.removeEventListener.bind(signal);
+	signal.addEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: AddEventListenerOptions | boolean) => {
+		if (type === 'abort') live.add(listener);
+		add(type, listener, options);
+	}) as AbortSignal['addEventListener'];
+	signal.removeEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: EventListenerOptions | boolean) => {
+		if (type === 'abort') live.delete(listener);
+		remove(type, listener, options);
+	}) as AbortSignal['removeEventListener'];
+	return { controller, signal, live };
+}
+
+describe('abortableSleep', () => {
+	it('leaves no abort listener on the signal after many retries', async () => {
+		vi.useFakeTimers();
+		try {
+			const { signal, live } = countingSignal();
+			let calls = 0;
+			const check = async () => {
+				calls++;
+				if (calls <= 50) throw new ApiError('HTTP 502', 502);
+				return { id: 1 };
+			};
+
+			const done = waitForSession(check, { signal, delay: () => 10 });
+			await vi.advanceTimersByTimeAsync(50 * 10 + 10);
+			const outcome = await done;
+
+			expect(outcome).toEqual({ kind: 'valid', user: { id: 1 } });
+			expect(calls).toBe(51);
+			expect(live.size).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('resolves early when the signal is aborted, and clears its timer', async () => {
+		vi.useFakeTimers();
+		try {
+			const { controller, signal } = countingSignal();
+			const resolved = vi.fn();
+			abortableSleep(10000, signal).then(resolved);
+
+			controller.abort();
+			await vi.advanceTimersByTimeAsync(0);
+
+			expect(resolved).toHaveBeenCalled();
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('resolves at once on a signal that is already aborted', async () => {
+		const controller = new AbortController();
+		controller.abort();
+		await expect(abortableSleep(10000, controller.signal)).resolves.toBeUndefined();
+	});
+});
+

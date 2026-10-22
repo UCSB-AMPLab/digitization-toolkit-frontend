@@ -44,17 +44,24 @@ export interface WaitForSessionOptions {
 	sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
-function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
+// Resolves after `ms`, or as soon as `signal` is aborted. The abort listener
+// is removed when the timer fires, so a long outage does not leave one
+// listener on the signal per retry.
+export function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
 	return new Promise((resolve) => {
-		const timer = setTimeout(resolve, ms);
-		signal?.addEventListener(
-			'abort',
-			() => {
-				clearTimeout(timer);
-				resolve();
-			},
-			{ once: true }
-		);
+		if (signal?.aborted) {
+			resolve();
+			return;
+		}
+		const onAbort = () => {
+			clearTimeout(timer);
+			resolve();
+		};
+		const timer = setTimeout(() => {
+			signal?.removeEventListener('abort', onAbort);
+			resolve();
+		}, ms);
+		signal?.addEventListener('abort', onAbort, { once: true });
 	});
 }
 
@@ -67,7 +74,7 @@ export async function waitForSession<T>(
 		onWaiting,
 		signal,
 		delay = sessionRetryDelay,
-		sleep = defaultSleep
+		sleep = abortableSleep
 	}: WaitForSessionOptions = {}
 ): Promise<SessionCheckOutcome<T>> {
 	let waiting = false;
