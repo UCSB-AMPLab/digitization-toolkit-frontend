@@ -1402,6 +1402,42 @@ export interface CameraControlsRequest {
 }
 
 // ============================================================================
+// ACTIVITY API
+// ============================================================================
+
+// Records per status in one collection. All four keys are always present.
+export interface StatusCounts {
+  captured:  number;
+  in_review: number;
+  rejected:  number;
+  approved:  number;
+}
+
+export interface CollectionActivity {
+  collection_id: number;
+  status_counts: StatusCounts;
+  // Sum of the four status counts.
+  record_count: number;
+  // Newest status change among the collection's records (deleted records
+  // included), naive UTC ISO string; null when there has been none.
+  last_status_change_at: string | null;
+}
+
+export const activityApi = {
+  /**
+   * Per-collection status counts for every collection, or only the
+   * project's when project_id is given. Collections with no records are
+   * included with zero counts.
+   */
+  async collections(params?: { project_id?: number }): Promise<CollectionActivity[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.project_id !== undefined) queryParams.set('project_id', params.project_id.toString());
+    const query = queryParams.toString();
+    return apiRequest<CollectionActivity[]>(`/activity/collections${query ? '?' + query : ''}`);
+  },
+};
+
+// ============================================================================
 // HEALTH CHECK
 // ============================================================================
 
