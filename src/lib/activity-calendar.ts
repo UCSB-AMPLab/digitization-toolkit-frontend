@@ -99,11 +99,17 @@ export function buildGrid(series: DailyActivity[], metric: CalendarMetric): Cale
 	};
 }
 
-/** Index of the day reached from `index` by a key, or `index` when the move leaves the map. */
-export function moveFocus(index: number, key: string, count: number): number {
+/**
+ * Index of the day reached from `index` by a key, or `index` when the move
+ * leaves the map. `lead` is the weekday row (0 = Monday) of day 0; up and down
+ * stay inside the week column, so ArrowUp on a Monday and ArrowDown on a
+ * Sunday do nothing.
+ */
+export function moveFocus(index: number, key: string, count: number, lead = 0): number {
+	const row = (lead + index) % 7;
 	const target =
-		key === 'ArrowUp' ? index - 1
-		: key === 'ArrowDown' ? index + 1
+		key === 'ArrowUp' ? (row === 0 ? index : index - 1)
+		: key === 'ArrowDown' ? (row === 6 ? index : index + 1)
 		: key === 'ArrowLeft' ? index - 7
 		: key === 'ArrowRight' ? index + 7
 		: key === 'Home' ? 0

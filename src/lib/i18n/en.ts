@@ -154,9 +154,9 @@ export const en: Messages = {
 	dash_cal_less: 'Less',
 	dash_cal_more: 'More',
 	dash_cal_day_captures: (n: number, date: string) =>
-		n === 1 ? `1 image captured on ${date}` : `${n} images captured on ${date}`,
+		n === 1 ? `1 image captured on ${date}` : `${n.toLocaleString('en')} images captured on ${date}`,
 	dash_cal_day_reviews: (n: number, date: string) =>
-		n === 1 ? `1 record reviewed on ${date}` : `${n} records reviewed on ${date}`,
+		n === 1 ? `1 record reviewed on ${date}` : `${n.toLocaleString('en')} records reviewed on ${date}`,
 	dash_cal_days_captures: 'Days with captures',
 	dash_cal_total_captures: 'Images captured',
 	dash_cal_days_reviews: 'Days with reviews',

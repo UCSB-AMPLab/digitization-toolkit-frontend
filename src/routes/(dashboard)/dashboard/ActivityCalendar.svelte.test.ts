@@ -117,6 +117,53 @@ describe('ActivityCalendar', () => {
 		expect(document.querySelectorAll('[role="gridcell"][tabindex="0"]')).toHaveLength(1);
 	});
 
+	it('puts each weekday label level with its row', async () => {
+		const screen = render(ActivityCalendar);
+		await expect.element(screen.getByRole('grid')).toBeVisible();
+		const top = (el: Element | null | undefined) => el!.getBoundingClientRect().top;
+		const label = (text: string) =>
+			Array.from(document.querySelectorAll('.act-weekdays span')).find((e) => e.textContent?.trim() === text);
+		// 2026-04-27 is a Monday, 04-28 a Tuesday, 04-29 a Wednesday, 05-01 a Friday.
+		expect(top(label('lun'))).toBe(top(document.querySelector('[data-date="2026-04-27"]')));
+		expect(top(label('mié'))).toBe(top(document.querySelector('[data-date="2026-04-29"]')));
+		expect(top(label('vie'))).toBe(top(document.querySelector('[data-date="2026-05-01"]')));
+		expect(top(label('lun'))).not.toBe(top(document.querySelector('[data-date="2026-04-28"]')));
+	});
+
+	it('groups thousands in the day line', async () => {
+		dailySpy.mockResolvedValue(series({ '2026-10-22': { captured_images: 1212 } }));
+		const screen = render(ActivityCalendar);
+		await expect.element(screen.getByText('1.212 imágenes capturadas el 22 de octubre de 2026')).toBeVisible();
+	});
+
+	it('does not announce the day line as a live region', async () => {
+		const screen = render(ActivityCalendar);
+		await expect.element(screen.getByRole('grid')).toBeVisible();
+		expect(document.querySelector('[aria-live]')).toBeNull();
+	});
+
+	it('returns the line to today when focus leaves the grid', async () => {
+		const screen = render(ActivityCalendar);
+		await expect.element(screen.getByRole('grid')).toBeVisible();
+		document.querySelector<HTMLElement>('[data-date="2026-10-21"]')!.focus();
+		await expect.element(screen.getByText('1 imagen capturada el 21 de octubre de 2026', { exact: true }).first()).toBeVisible();
+		document.querySelector<HTMLElement>('[data-date="2026-10-21"]')!.blur();
+		await expect.element(screen.getByText('212 imágenes capturadas el 22 de octubre de 2026', { exact: true }).first()).toBeVisible();
+		expect(document.querySelector<HTMLElement>('[data-date="2026-10-22"]')!.tabIndex).toBe(0);
+	});
+
+	it('does not wrap from Sunday down or Monday up', async () => {
+		const screen = render(ActivityCalendar);
+		await expect.element(screen.getByRole('grid')).toBeVisible();
+		const at = (d: string) => document.querySelector<HTMLElement>(`[data-date="${d}"]`)!;
+		at('2026-10-18').focus(); // Sunday
+		await userEvent.keyboard('{ArrowDown}');
+		expect(document.activeElement).toBe(at('2026-10-18'));
+		at('2026-10-19').focus(); // Monday
+		await userEvent.keyboard('{ArrowUp}');
+		expect(document.activeElement).toBe(at('2026-10-19'));
+	});
+
 	it('reports an error and offers a retry', async () => {
 		dailySpy.mockRejectedValueOnce(new Error('boom'));
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

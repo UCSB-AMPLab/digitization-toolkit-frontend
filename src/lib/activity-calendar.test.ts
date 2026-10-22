@@ -1,4 +1,9 @@
 import { describe, it, expect } from 'vitest';
+
+// The DST fixture below only fails under millisecond day arithmetic in a
+// timezone that observes DST, so the file pins one.
+process.env.TZ = 'America/Los_Angeles';
+
 import { buildGrid, levelFor, moveFocus, parseLocalDate, WEEKS } from './activity-calendar';
 import type { DailyActivity } from './api';
 
@@ -117,6 +122,26 @@ describe('buildGrid', () => {
 	});
 });
 
+describe('buildGrid across a DST change', () => {
+	// US clocks go back on 2026-11-01; 2026-11-03 is a Tuesday.
+	const grid = buildGrid(series('2026-11-03', 182, (i) => i), 'captured_images');
+
+	it('keeps every day once, in order, with Mondays in the first row', () => {
+		// 2026-05-11 .. 2026-11-03
+		expect(grid.days).toHaveLength(177);
+		expect(grid.weeks).toHaveLength(WEEKS);
+		expect(grid.weeks[0][0]?.date).toBe('2026-05-11');
+		for (const week of grid.weeks) {
+			const monday = week[0];
+			expect(monday && parseLocalDate(monday.date).getDay()).toBe(1);
+		}
+		const dates = grid.days.map((d) => d.date);
+		expect(new Set(dates).size).toBe(dates.length);
+		expect(dates).toContain('2026-11-01');
+		expect(dates[dates.length - 1]).toBe('2026-11-03');
+	});
+});
+
 describe('moveFocus', () => {
 	it('moves by day with up/down and by week with left/right', () => {
 		expect(moveFocus(50, 'ArrowDown', 100)).toBe(51);
@@ -127,6 +152,16 @@ describe('moveFocus', () => {
 	it('jumps to the first and last day with Home and End', () => {
 		expect(moveFocus(50, 'Home', 100)).toBe(0);
 		expect(moveFocus(50, 'End', 100)).toBe(99);
+	});
+	it('does not wrap from Sunday down or Monday up into the next or previous week', () => {
+		// With day 0 on a Monday, index 6 is a Sunday and index 7 the next Monday.
+		expect(moveFocus(6, 'ArrowDown', 100)).toBe(6);
+		expect(moveFocus(7, 'ArrowUp', 100)).toBe(7);
+		expect(moveFocus(5, 'ArrowDown', 100)).toBe(6);
+		expect(moveFocus(8, 'ArrowUp', 100)).toBe(7);
+		// With day 0 on a Wednesday (lead 2), index 4 is a Sunday and index 5 a Monday.
+		expect(moveFocus(4, 'ArrowDown', 100, 2)).toBe(4);
+		expect(moveFocus(5, 'ArrowUp', 100, 2)).toBe(5);
 	});
 	it('stays put at the edges', () => {
 		expect(moveFocus(0, 'ArrowUp', 100)).toBe(0);

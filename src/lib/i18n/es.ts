@@ -166,9 +166,9 @@ export const es = {
 	dash_cal_less: 'Menos',
 	dash_cal_more: 'Más',
 	dash_cal_day_captures: (n: number, date: string) =>
-		n === 1 ? `1 imagen capturada el ${date}` : `${n} imágenes capturadas el ${date}`,
+		n === 1 ? `1 imagen capturada el ${date}` : `${n.toLocaleString('es-CO')} imágenes capturadas el ${date}`,
 	dash_cal_day_reviews: (n: number, date: string) =>
-		n === 1 ? `1 registro revisado el ${date}` : `${n} registros revisados el ${date}`,
+		n === 1 ? `1 registro revisado el ${date}` : `${n.toLocaleString('es-CO')} registros revisados el ${date}`,
 	dash_cal_days_captures: 'Días con capturas',
 	dash_cal_total_captures: 'Imágenes capturadas',
 	dash_cal_days_reviews: 'Días con revisiones',

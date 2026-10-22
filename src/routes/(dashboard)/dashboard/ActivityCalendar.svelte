@@ -18,6 +18,8 @@
   let hovered = $state<number | null>(null);
   let gridEl = $state<HTMLElement | null>(null);
 
+  // 'es' alone leaves four-digit numbers ungrouped; es-CO groups them (1.212).
+  let tag = $derived($locale === 'es' ? 'es-CO' : $locale);
   let metric = $derived<CalendarMetric>(view === 'captures' ? 'captured_images' : 'reviewed_records');
   let grid = $derived(buildGrid(series, metric));
   // Without a focus or a hover the line describes the last day, today.
@@ -25,12 +27,12 @@
   let tabStop = $derived(focused ?? grid.days.length - 1);
 
   function formatDate(value: string, options: Intl.DateTimeFormatOptions): string {
-    return parseLocalDate(value).toLocaleDateString($locale, options);
+    return parseLocalDate(value).toLocaleDateString(tag, options);
   }
   const longDate = (value: string) => formatDate(value, { day: 'numeric', month: 'long', year: 'numeric' });
 
   function monthName(year: number, month: number): string {
-    return new Date(year, month, 1).toLocaleDateString($locale, { month: 'short' });
+    return new Date(year, month, 1).toLocaleDateString(tag, { month: 'short' });
   }
 
   function dayLine(index: number): string {
@@ -72,7 +74,7 @@
   });
 
   async function onKeydown(event: KeyboardEvent, index: number) {
-    const next = moveFocus(index, event.key, grid.days.length);
+    const next = moveFocus(index, event.key, grid.days.length, lead);
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
     focused = next;
@@ -122,9 +124,9 @@
           </div>
           <div class="act-body">
             <div class="act-weekdays" aria-hidden="true">
-              <span></span><span>{$m.dash_cal_weekday_mon}</span><span></span>
+              <span>{$m.dash_cal_weekday_mon}</span><span></span>
               <span>{$m.dash_cal_weekday_wed}</span><span></span>
-              <span>{$m.dash_cal_weekday_fri}</span><span></span>
+              <span>{$m.dash_cal_weekday_fri}</span><span></span><span></span>
             </div>
             <div
               class="act-grid"
@@ -133,6 +135,9 @@
               bind:this={gridEl}
               aria-label={view === 'captures' ? $m.dash_cal_map_captures : $m.dash_cal_map_reviews}
               onmouseleave={() => (hovered = null)}
+              onfocusout={(e) => {
+                if (!gridEl?.contains(e.relatedTarget as Node | null)) focused = null;
+              }}
             >
               {#each [0, 1, 2, 3, 4, 5, 6] as row (row)}
                 <div class="act-row" role="row">
@@ -164,7 +169,7 @@
       </div>
 
       <div class="act-foot">
-        <p class="act-day" aria-live="polite">{dayLine(shown)}</p>
+        <p class="act-day">{dayLine(shown)}</p>
         <div class="act-legend" aria-hidden="true">
           <span>{$m.dash_cal_less}</span>
           {#each [0, 1, 2, 3, 4] as level (level)}<span class="act-swatch act-cell level-{level}"></span>{/each}
@@ -176,11 +181,11 @@
     <div class="act-figures">
       <div class="act-card act-figure">
         <span class="act-figure-label">{view === 'captures' ? $m.dash_cal_days_captures : $m.dash_cal_days_reviews}</span>
-        <span class="act-figure-number">{grid.activeDays.toLocaleString($locale)}</span>
+        <span class="act-figure-number">{grid.activeDays.toLocaleString(tag)}</span>
       </div>
       <div class="act-card act-figure">
         <span class="act-figure-label">{view === 'captures' ? $m.dash_cal_total_captures : $m.dash_cal_total_reviews}</span>
-        <span class="act-figure-number">{grid.total.toLocaleString($locale)}</span>
+        <span class="act-figure-number">{grid.total.toLocaleString(tag)}</span>
       </div>
     </div>
   {/if}
