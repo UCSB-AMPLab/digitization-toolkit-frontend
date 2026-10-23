@@ -15,7 +15,9 @@ export default defineConfig({
 					name: 'client',
 					browser: {
 						enabled: true,
-						provider: playwright(),
+						// A zone west of UTC, so that tests of naive-UTC date parsing
+						// can fail on a UTC host (CI) too.
+						provider: playwright({ contextOptions: { timezoneId: 'America/Bogota' } }),
 						instances: [{ browser: 'chromium' }]
 					},
 					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
