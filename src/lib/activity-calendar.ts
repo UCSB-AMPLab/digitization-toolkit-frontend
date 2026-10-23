@@ -1,6 +1,12 @@
 // Grid construction for the dashboard's activity calendar: a series of local
 // calendar days (GET /activity/daily) becomes WEEKS columns of Monday-first
 // weeks, with month labels and an intensity level per day.
+//
+// The series' dates are calendar days in the browser's IANA zone, as the
+// backend counted them. The grid's own date arithmetic (the window's first
+// Monday, weekdays, months) is done on those calendar dates as UTC midnights,
+// so no local offset or daylight-saving change can move a key by a day,
+// whatever zone the code runs in.
 
 import type { DailyActivity } from './api';
 
@@ -36,9 +42,20 @@ export function parseLocalDate(value: string): Date {
 	return new Date(y, m - 1, d);
 }
 
-/** 0 = Monday ... 6 = Sunday. */
+/** YYYY-MM-DD as UTC midnight of that calendar day, for date arithmetic. */
+function utcDay(value: string): Date {
+	const [y, m, d] = value.split('-').map(Number);
+	return new Date(Date.UTC(y, m - 1, d));
+}
+
+/** The YYYY-MM-DD key of a UTC-midnight calendar day. */
+function dayKey(d: Date): string {
+	return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+/** 0 = Monday ... 6 = Sunday, of a UTC-midnight calendar day. */
 function mondayIndex(d: Date): number {
-	return (d.getDay() + 6) % 7;
+	return (d.getUTCDay() + 6) % 7;
 }
 
 /** Intensity relative to the busiest day: 0 only for a count of 0. */
@@ -55,12 +72,12 @@ export function levelFor(count: number, max: number): Level {
 export function buildGrid(series: DailyActivity[], metric: CalendarMetric): CalendarGrid {
 	if (series.length === 0) return { days: [], weeks: [], months: [], activeDays: 0, total: 0 };
 
-	const last = parseLocalDate(series[series.length - 1].date);
-	const start = new Date(last.getFullYear(), last.getMonth(), last.getDate() - mondayIndex(last) - 7 * (WEEKS - 1));
-	const key = (d: Date) =>
-		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	const last = utcDay(series[series.length - 1].date);
+	const start = new Date(Date.UTC(
+		last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate() - mondayIndex(last) - 7 * (WEEKS - 1)
+	));
 
-	const visible = series.filter((s) => s.date >= key(start));
+	const visible = series.filter((s) => s.date >= dayKey(start));
 	const max = Math.max(0, ...visible.map((s) => s[metric]));
 	const days: CalendarDay[] = visible.map((s) => ({
 		date: s.date,
@@ -70,8 +87,7 @@ export function buildGrid(series: DailyActivity[], metric: CalendarMetric): Cale
 
 	// Fewer than WEEKS weeks of data: the first column starts at the first
 	// day's Monday, with leading slots empty.
-	const first = parseLocalDate(days[0].date);
-	const lead = mondayIndex(first);
+	const lead = mondayIndex(utcDay(days[0].date));
 	const slots: (CalendarDay | null)[] = [...Array(lead).fill(null), ...days];
 	while (slots.length % 7 !== 0) slots.push(null);
 	const weeks: (CalendarDay | null)[][] = [];
@@ -81,10 +97,10 @@ export function buildGrid(series: DailyActivity[], metric: CalendarMetric): Cale
 	weeks.forEach((week, column) => {
 		const ref = week.find((d) => d !== null);
 		if (!ref) return;
-		const date = parseLocalDate(ref.date);
+		const date = utcDay(ref.date);
 		const prev = months[months.length - 1];
-		if (!prev || prev.month !== date.getMonth() || prev.year !== date.getFullYear()) {
-			months.push({ column, year: date.getFullYear(), month: date.getMonth() });
+		if (!prev || prev.month !== date.getUTCMonth() || prev.year !== date.getUTCFullYear()) {
+			months.push({ column, year: date.getUTCFullYear(), month: date.getUTCMonth() });
 		}
 	});
 	// A label for a month that lasts one or two columns would run into the next.

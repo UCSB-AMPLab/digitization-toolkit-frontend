@@ -2,7 +2,7 @@
   // Calendario de actividad: imágenes capturadas o registros revisados por día,
   // de los últimos seis meses (GET /activity/daily).
   import { onMount, tick } from 'svelte';
-  import { activityApi, type DailyActivity } from '$lib/api';
+  import { activityApi, browserTimeZone, type DailyActivity } from '$lib/api';
   import { m, locale } from '$lib/i18n';
   import { buildGrid, moveFocus, parseLocalDate, WEEKS, type CalendarMetric } from '$lib/activity-calendar';
 
@@ -53,7 +53,7 @@
     loading = true;
     failed = false;
     try {
-      series = await activityApi.daily(DAYS, new Date().getTimezoneOffset());
+      series = await activityApi.daily(DAYS, browserTimeZone(), new Date().getTimezoneOffset());
     } catch (err) {
       console.error('[Dashboard] Activity error:', err);
       failed = true;

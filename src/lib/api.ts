@@ -1461,13 +1461,36 @@ export const activityApi = {
 
   /**
    * Per-day totals, oldest first, `days` entries ending today. The day
-   * boundaries follow the browser's time zone: `tz_offset_minutes` is
-   * `new Date().getTimezoneOffset()`.
+   * boundaries follow the browser's time zone. `timeZone` is its IANA name,
+   * with which the backend dates each event by that zone's offset at the
+   * time, so days on either side of a daylight-saving change are counted
+   * correctly; null sends no zone. `tzOffsetMinutes` (`new Date().getTimezoneOffset()`) is sent
+   * as well; the backend uses it, one offset for the whole window, only when
+   * no zone name arrives.
    */
-  async daily(days = 182, tzOffsetMinutes = new Date().getTimezoneOffset()): Promise<DailyActivity[]> {
-    return apiRequest<DailyActivity[]>(`/activity/daily?days=${days}&tz_offset_minutes=${tzOffsetMinutes}`);
+  async daily(
+    days = 182,
+    timeZone: string | null = browserTimeZone(),
+    tzOffsetMinutes = new Date().getTimezoneOffset()
+  ): Promise<DailyActivity[]> {
+    const queryParams = new URLSearchParams({ days: String(days) });
+    if (timeZone) queryParams.set('tz', timeZone);
+    queryParams.set('tz_offset_minutes', String(tzOffsetMinutes));
+    return apiRequest<DailyActivity[]>(`/activity/daily?${queryParams.toString()}`);
   },
 };
+
+/**
+ * The browser's IANA time zone (e.g. America/Bogota), or null where Intl
+ * does not report one.
+ */
+export function browserTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
 
 // ============================================================================
 // HEALTH CHECK
