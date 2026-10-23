@@ -21,14 +21,19 @@ function series(overrides: { [date: string]: Partial<DailyActivity> } = {}): Dai
 describe('activityApi.daily', () => {
 	afterEach(() => vi.restoreAllMocks());
 
-	it('requests the window with the browser time zone offset', async () => {
+	it('requests the window with the browser time zone and its offset', async () => {
 		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
 			async () => new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
 		);
-		await activityApi.daily(182, 300);
-		expect(String(fetchSpy.mock.calls[0][0])).toMatch(/\/activity\/daily\?days=182&tz_offset_minutes=300$/);
+		await activityApi.daily(182, 'America/Bogota', 300);
+		expect(String(fetchSpy.mock.calls[0][0])).toMatch(
+			/\/activity\/daily\?days=182&tz=America%2FBogota&tz_offset_minutes=300$/
+		);
+		// The browser project runs in America/Bogota (vite.config.ts).
 		await activityApi.daily();
-		expect(String(fetchSpy.mock.calls[1][0])).toContain(`tz_offset_minutes=${new Date().getTimezoneOffset()}`);
+		const url = new URL(String(fetchSpy.mock.calls[1][0]), location.origin);
+		expect(url.searchParams.get('tz')).toBe('America/Bogota');
+		expect(url.searchParams.get('tz_offset_minutes')).toBe(String(new Date().getTimezoneOffset()));
 	});
 });
 
@@ -49,10 +54,10 @@ describe('ActivityCalendar', () => {
 		try { localStorage.removeItem('dtk_activity_view'); } catch {}
 	});
 
-	it('asks for 182 days with the browser offset and shows captures by default, ending today', async () => {
+	it('asks for 182 days in the browser zone and shows captures by default, ending today', async () => {
 		const screen = render(ActivityCalendar);
 		await expect.element(screen.getByText('Imágenes capturadas por día en los últimos seis meses')).toBeVisible();
-		expect(dailySpy).toHaveBeenCalledWith(182, new Date().getTimezoneOffset());
+		expect(dailySpy).toHaveBeenCalledWith(182, 'America/Bogota', new Date().getTimezoneOffset());
 		await expect.element(screen.getByText(/^212 imágenes capturadas el 22 de octubre de 2026$/)).toBeVisible();
 		await expect.element(screen.getByRole('grid', { name: 'Imágenes capturadas por día' })).toBeVisible();
 		await expect.element(screen.getByText('Días con capturas')).toBeVisible();
