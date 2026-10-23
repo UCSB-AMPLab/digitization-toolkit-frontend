@@ -25,6 +25,7 @@
   import { sidesFromDevices, type SideInfo, type SideStatus } from '$lib/camera-sides';
   import { createCameraRefresh } from '$lib/camera-refresh';
   import InProgress from './InProgress.svelte';
+  import ActivityCalendar from './ActivityCalendar.svelte';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Usuario y rol
@@ -411,6 +412,8 @@
        no informa de nada.
        ══════════════════════════════════════════════════════ -->
   <InProgress collections={allCollections} projects={allProjects} />
+
+  <ActivityCalendar />
 
   <!-- ══════════════════════════════════════════════════════
        SECCIÓN: PROBAR CÁMARAS
