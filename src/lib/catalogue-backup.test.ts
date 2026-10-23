@@ -9,12 +9,16 @@ process.env.TZ = 'America/Bogota';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	classifyBackup,
+	classifySnapshot,
 	dayRelation,
 	formatBackupDate,
 	startPolling,
 	CURRENT_MAX_AGE_MS,
 	LATE_MAX_AGE_MS,
+	MAX_ANSWER_AGE_MS,
+	MAX_CLOCK_SKEW_MS,
 	POLL_INTERVAL_MS,
+	REQUEST_TIMEOUT_MS,
 	type CatalogueBackupStatus
 } from './catalogue-backup';
 
@@ -63,8 +67,15 @@ describe('classifyBackup', () => {
 		expect(classifyBackup(status(100 * HOUR, false), NOW).level).toBe('off');
 	});
 
-	it('treats a timestamp in the future (clock skew) as current', () => {
+	it('treats a timestamp up to 1 h in the future (clock skew) as current', () => {
+		expect(MAX_CLOCK_SKEW_MS).toBe(HOUR);
 		expect(classifyBackup(status(-10 * 60 * SECOND), NOW).level).toBe('current');
+		expect(classifyBackup(status(-HOUR), NOW).level).toBe('current');
+	});
+
+	it('is unknown for a timestamp more than 1 h in the future', () => {
+		expect(classifyBackup(status(-HOUR - SECOND), NOW)).toEqual({ level: 'unknown', verifiedAt: null });
+		expect(classifyBackup(status(-48 * HOUR), NOW).level).toBe('unknown');
 	});
 
 	it('reads a naive timestamp as UTC, as the API sends them', () => {
@@ -82,6 +93,47 @@ describe('classifyBackup', () => {
 		expect(classifyBackup({ ...status(HOUR), last_verified_at: 'not a date' }, NOW).level).toBe('unknown');
 		expect(classifyBackup({ ...status(HOUR), enabled: 'yes' as unknown as boolean }, NOW).level).toBe('unknown');
 		expect(classifyBackup(null as unknown as CatalogueBackupStatus, NOW).level).toBe('unknown');
+	});
+});
+
+describe('classifySnapshot (the answer held, classified at the current time)', () => {
+	const received = (ageOfCopyMs: number, receivedAgo = 0) => ({
+		kind: 'loaded' as const,
+		status: status(ageOfCopyMs),
+		receivedAt: NOW.getTime() - receivedAgo
+	});
+
+	it('is null while the first answer has not arrived', () => {
+		expect(classifySnapshot({ kind: 'loading' }, NOW.getTime())).toBeNull();
+	});
+
+	it('is unknown when the request failed', () => {
+		expect(classifySnapshot({ kind: 'failed' }, NOW.getTime())?.level).toBe('unknown');
+	});
+
+	it('ages the copy against the current time, not the time the answer arrived', () => {
+		// The copy is 35 h 58 min old at NOW; the answer arrived 5 min before.
+		const snap = received(36 * HOUR - 2 * 60 * SECOND, 5 * 60 * SECOND);
+		expect(classifySnapshot(snap, NOW.getTime() - 5 * 60 * SECOND)?.level).toBe('current');
+		expect(classifySnapshot(snap, NOW.getTime())?.level).toBe('current');
+		expect(classifySnapshot(snap, NOW.getTime() + 3 * 60 * SECOND)?.level).toBe('late');
+	});
+
+	it('trusts an answer up to two poll intervals old', () => {
+		expect(MAX_ANSWER_AGE_MS).toBe(2 * POLL_INTERVAL_MS);
+		expect(classifySnapshot(received(HOUR, MAX_ANSWER_AGE_MS), NOW.getTime())?.level).toBe('current');
+	});
+
+	it('is unknown for an answer older than two poll intervals', () => {
+		expect(classifySnapshot(received(HOUR, MAX_ANSWER_AGE_MS + 1), NOW.getTime())).toEqual({
+			level: 'unknown',
+			verifiedAt: null
+		});
+	});
+
+	it('is unknown for an answer older than two poll intervals even when not configured', () => {
+		const snap = { kind: 'loaded' as const, status: status(null, false), receivedAt: NOW.getTime() - MAX_ANSWER_AGE_MS - 1 };
+		expect(classifySnapshot(snap, NOW.getTime())?.level).toBe('unknown');
 	});
 });
 
@@ -189,13 +241,69 @@ describe('startPolling', () => {
 		expect(onResult).not.toHaveBeenCalled();
 	});
 
+	it('passes each request a signal, aborts it after the timeout and reports a failure', async () => {
+		expect(REQUEST_TIMEOUT_MS).toBe(20 * SECOND);
+		const signals: AbortSignal[] = [];
+		const fetcher = vi.fn(
+			(signal: AbortSignal) =>
+				new Promise<CatalogueBackupStatus>((_resolve, reject) => {
+					signals.push(signal);
+					signal.addEventListener('abort', () => reject(signal.reason));
+				})
+		);
+		const onResult = vi.fn();
+		const stop = startPolling(fetcher, onResult);
+
+		await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS - 1);
+		expect(signals[0].aborted).toBe(false);
+		expect(onResult).not.toHaveBeenCalled();
+
+		await vi.advanceTimersByTimeAsync(1);
+		expect(signals[0].aborted).toBe(true);
+		expect(onResult).toHaveBeenCalledTimes(1);
+		expect(onResult.mock.calls[0][0].ok).toBe(false);
+
+		// The next try comes one interval after the timeout, not sooner.
+		await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS - 1);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		stop();
+	});
+
+	it('does not abort a request that answers within the timeout', async () => {
+		let seen!: AbortSignal;
+		const fetcher = vi.fn(async (signal: AbortSignal) => {
+			seen = signal;
+			return status(HOUR);
+		});
+		const onResult = vi.fn();
+		const stop = startPolling(fetcher, onResult);
+		await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS * 2);
+		expect(seen.aborted).toBe(false);
+		expect(onResult).toHaveBeenCalledWith({ ok: true, status: status(HOUR) });
+		stop();
+	});
+
+	it('aborts the request in flight when stopped', async () => {
+		let seen!: AbortSignal;
+		const fetcher = vi.fn((signal: AbortSignal) => {
+			seen = signal;
+			return new Promise<CatalogueBackupStatus>(() => {});
+		});
+		const stop = startPolling(fetcher, vi.fn());
+		stop();
+		expect(seen.aborted).toBe(true);
+	});
+
 	it('never has two requests in flight', async () => {
 		let inFlight = 0;
 		let maxInFlight = 0;
 		const fetcher = vi.fn(async () => {
 			inFlight++;
 			maxInFlight = Math.max(maxInFlight, inFlight);
-			await new Promise((r) => setTimeout(r, 2 * POLL_INTERVAL_MS));
+			// Slow, but inside the timeout.
+			await new Promise((r) => setTimeout(r, REQUEST_TIMEOUT_MS - 1000));
 			inFlight--;
 			return status(HOUR);
 		});

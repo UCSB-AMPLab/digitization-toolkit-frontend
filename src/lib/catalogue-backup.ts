@@ -21,6 +21,9 @@ export const CURRENT_MAX_AGE_MS = 36 * HOUR_MS;
 /** Up to this age (inclusive) the copy is late; past it, overdue. */
 export const LATE_MAX_AGE_MS = 72 * HOUR_MS;
 
+/** How far in the future a timestamp may be and still count as clock skew. */
+export const MAX_CLOCK_SKEW_MS = HOUR_MS;
+
 /**
  * current → green, late → amber, overdue → red, off → grey (not configured,
  * not a fault). `unknown` is for a response this module cannot read; the
@@ -41,10 +44,11 @@ export interface BackupClassification {
  * Age is `now − last_verified_at`. Both boundaries are inclusive on the
  * fresher side: exactly 36 h is current, exactly 72 h is late.
  *
- * A timestamp in the future (the appliance's clock and this browser's
- * disagree) gives a negative age, which is classified as current: the backend
- * recorded a verified copy, and a few minutes of clock skew between two
- * machines is not evidence that it is missing.
+ * A timestamp up to MAX_CLOCK_SKEW_MS in the future (the appliance's clock
+ * and this browser's disagree) is classified as current: the backend recorded
+ * a verified copy, and that much skew between two machines is not evidence
+ * that it is missing. Further in the future, one of the two clocks is wrong
+ * by more than skew explains and the age means nothing, so it is unknown.
  */
 export function classifyBackup(status: CatalogueBackupStatus, now: Date | number): BackupClassification {
 	if (!status || typeof status.enabled !== 'boolean') return { level: 'unknown', verifiedAt: null };
@@ -56,9 +60,30 @@ export function classifyBackup(status: CatalogueBackupStatus, now: Date | number
 	if (Number.isNaN(verifiedAt.getTime())) return { level: 'unknown', verifiedAt: null };
 
 	const age = (typeof now === 'number' ? now : now.getTime()) - verifiedAt.getTime();
+	if (age < -MAX_CLOCK_SKEW_MS) return { level: 'unknown', verifiedAt: null };
 	if (age <= CURRENT_MAX_AGE_MS) return { level: 'current', verifiedAt };
 	if (age <= LATE_MAX_AGE_MS) return { level: 'late', verifiedAt };
 	return { level: 'overdue', verifiedAt };
+}
+
+/** What the components hold: no answer yet, a failed request, or the last answer. */
+export type CatalogueBackupSnapshot =
+	| { kind: 'loading' }
+	| { kind: 'failed' }
+	| { kind: 'loaded'; status: CatalogueBackupStatus; receivedAt: number };
+
+/**
+ * Classify the held answer at `now`, the current time, not the time the
+ * answer arrived, so a copy keeps ageing on screen between answers. Null while
+ * no answer has arrived. A failed request is unknown, and so is an answer
+ * older than MAX_ANSWER_AGE_MS: an answer that could not be refreshed for that
+ * long says nothing about the copy now.
+ */
+export function classifySnapshot(snapshot: CatalogueBackupSnapshot, now: number): BackupClassification | null {
+	if (snapshot.kind === 'loading') return null;
+	if (snapshot.kind === 'failed') return { level: 'unknown', verifiedAt: null };
+	if (now - snapshot.receivedAt > MAX_ANSWER_AGE_MS) return { level: 'unknown', verifiedAt: null };
+	return classifyBackup(snapshot.status, now);
 }
 
 /**
@@ -103,30 +128,63 @@ export function formatBackupTime(when: Date, locale: string): string {
  */
 export const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
+/** A held answer older than this is unknown (see classifySnapshot). */
+export const MAX_ANSWER_AGE_MS = 2 * POLL_INTERVAL_MS;
+
+/** A request that has not answered after this long is aborted and counts as failed. */
+export const REQUEST_TIMEOUT_MS = 20 * 1000;
+
+/**
+ * How often the components re-classify the held answer against the clock, so
+ * a copy turns amber or red, and an old answer unknown, with no new answer.
+ */
+export const RECLASSIFY_INTERVAL_MS = 60 * 1000;
+
 export type PollResult = { ok: true; status: CatalogueBackupStatus } | { ok: false; error: unknown };
 
 /**
  * Fetch now, then again `intervalMs` after each answer, success or failure.
  * One request at a time: the next is scheduled only when the previous has
- * settled. Stops when `shouldStop(error)` is true for a failure (the caller
- * passes "the session is gone"), or when the returned function is called.
+ * settled. Each request gets its own AbortSignal, aborted after `timeoutMs`
+ * (the request then counts as failed) or when polling stops. Stops when
+ * `shouldStop(error)` is true for a failure (the caller passes "the session
+ * is gone"), or when the returned function is called.
  */
 export function startPolling(
-	fetcher: () => Promise<CatalogueBackupStatus>,
+	fetcher: (signal: AbortSignal) => Promise<CatalogueBackupStatus>,
 	onResult: (result: PollResult) => void,
 	intervalMs: number = POLL_INTERVAL_MS,
-	shouldStop: (error: unknown) => boolean = () => false
+	shouldStop: (error: unknown) => boolean = () => false,
+	timeoutMs: number = REQUEST_TIMEOUT_MS
 ): () => void {
 	let stopped = false;
 	let timer: ReturnType<typeof setTimeout> | null = null;
+	let inFlight: AbortController | null = null;
 
 	const tick = async () => {
 		timer = null;
+		const controller = new AbortController();
+		inFlight = controller;
+		const timeout = setTimeout(
+			() => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+			timeoutMs
+		);
 		let result: PollResult;
 		try {
-			result = { ok: true, status: await fetcher() };
+			// Racing the abort, so a fetcher that ignores the signal still
+			// times out here.
+			const status = await Promise.race([
+				fetcher(controller.signal),
+				new Promise<never>((_resolve, reject) =>
+					controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true })
+				)
+			]);
+			result = { ok: true, status };
 		} catch (error) {
 			result = { ok: false, error };
+		} finally {
+			clearTimeout(timeout);
+			inFlight = null;
 		}
 		if (stopped) return;
 		onResult(result);
@@ -142,5 +200,6 @@ export function startPolling(
 	return () => {
 		stopped = true;
 		if (timer !== null) clearTimeout(timer);
+		inFlight?.abort();
 	};
 }

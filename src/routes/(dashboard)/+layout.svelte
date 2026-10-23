@@ -204,19 +204,20 @@
 			.sort((a, b) => b.path.length - a.path.length)[0];
 	}
 
-	// true si la ruta actual no tiene restricción de rol, o si el rol del
-	// usuario actual está entre los permitidos
-	let hasRoleAccess = $derived.by(() => {
-		const item = findNavItem(currentPath);
+	// true si la ruta no tiene restricción de rol, o si el rol del usuario
+	// actual está entre los permitidos. La usan el guard y el enlace del
+	// indicador de la copia externa, para que no puedan dar respuestas distintas.
+	function canAccess(path: string): boolean {
+		const item = findNavItem(path);
 		if (!item) return true;
 		return item.roles.length === 0 || item.roles.includes(currentUser?.role ?? '');
-	});
+	}
+
+	let hasRoleAccess = $derived(canAccess(currentPath));
 
 	// Si el rol actual puede abrir Configuración: decide si el indicador de la
-	// copia externa enlaza allí. Misma regla que el guard de arriba.
-	let canOpenConfig = $derived(
-		findNavItem('/dashboard/config')?.roles.includes(currentUser?.role ?? '') ?? false
-	);
+	// copia externa enlaza allí.
+	let canOpenConfig = $derived(canAccess('/dashboard/config'));
 
 	// Redirige fuera de rutas admin-only en cuanto sabemos el rol del usuario
 	// (al montar, o si navega del lado del cliente a otra ruta restringida)

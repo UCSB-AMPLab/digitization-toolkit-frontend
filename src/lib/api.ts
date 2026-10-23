@@ -1561,8 +1561,9 @@ export const systemApi = {
     return apiRequest<StorageInfo>('/system/storage');
   },
 
-  async getCatalogueBackup(): Promise<CatalogueBackupStatus> {
-    return apiRequest<CatalogueBackupStatus>('/system/catalogue-backup');
+  /** `signal` lets the caller abort it (the poll's 20 s timeout). */
+  async getCatalogueBackup(signal?: AbortSignal): Promise<CatalogueBackupStatus> {
+    return apiRequest<CatalogueBackupStatus>('/system/catalogue-backup', { signal });
   },
 
   async getStorageDevices(): Promise<StorageDevice[]> {

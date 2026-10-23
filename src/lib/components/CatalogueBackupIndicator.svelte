@@ -1,8 +1,9 @@
 <script lang="ts">
 	// Sidebar indicator of the offsite catalogue copy (NEH-266).
 	//
-	// Reads the shared catalogueBackup store and shows one of the four levels
-	// from classifyBackup, or "could not check" when the request failed. It
+	// Reads the shared catalogue-backup store and shows one of the four levels
+	// from classifySnapshot, re-classified as the clock moves, or "could not
+	// check" when the request failed, timed out or could not be refreshed. It
 	// shows nothing until the first answer arrives, so it never claims a state
 	// the backend has not reported (NEH-138).
 	//
@@ -10,17 +11,17 @@
 	// that can open Configuración, and the others get the same pill without a
 	// link.
 	import { m, locale } from '$lib/i18n';
-	import { catalogueBackup } from '$lib/stores/catalogueBackup';
-	import { classifyBackup, dayRelation, formatBackupDate, type BackupLevel } from '$lib/catalogue-backup';
+	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
+	import { classifySnapshot, dayRelation, formatBackupDate, type BackupLevel } from '$lib/catalogue-backup';
 
 	let { expanded = true, href = null }: { expanded?: boolean; href?: string | null } = $props();
 
 	let view = $derived.by((): { level: BackupLevel; text: string } | null => {
-		const snap = $catalogueBackup;
-		if (snap.kind === 'loading') return null;
-		if (snap.kind === 'failed') return { level: 'unknown', text: $m.backup_ind_unknown };
-		const now = new Date(snap.receivedAt);
-		const { level, verifiedAt } = classifyBackup(snap.status, now);
+		const { snapshot, now: nowMs } = $catalogueBackupNow;
+		const result = classifySnapshot(snapshot, nowMs);
+		if (!result) return null;
+		const { level, verifiedAt } = result;
+		const now = new Date(nowMs);
 		switch (level) {
 			case 'off':
 				return { level, text: $m.backup_ind_off };

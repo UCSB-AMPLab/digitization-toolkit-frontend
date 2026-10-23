@@ -2,17 +2,14 @@
 	// Configuración → Copia externa (NEH-266). Read-only: the destination is
 	// set when the appliance is installed, and nothing here changes it.
 	//
-	// Shows the one box that matches the state classifyBackup gives for the
-	// latest answer of GET /system/catalogue-backup, or "could not check" when
-	// the request failed, never a guessed state (NEH-138).
-	//
-	// `object` and `detail` come from the last *verified* dump: the endpoint
-	// does not report why later attempts failed, so on a late or overdue copy
-	// "Detalle" describes that last good copy, not the failure.
+	// Shows the one box that matches the state classifySnapshot gives for the
+	// latest answer of GET /system/catalogue-backup at the current time, or
+	// "could not check" when the request failed, timed out or could not be
+	// refreshed, never a guessed state (NEH-138).
 	import { m, locale } from '$lib/i18n';
-	import { catalogueBackup } from '$lib/stores/catalogueBackup';
+	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
 	import {
-		classifyBackup,
+		classifySnapshot,
 		dayRelation,
 		formatBackupDate,
 		formatBackupTime,
@@ -24,33 +21,26 @@
 		headline: string;
 		retry: boolean;
 		object: string | null;
-		detail: string | null;
 	};
 
 	let view = $derived.by((): View | null => {
-		const snap = $catalogueBackup;
-		if (snap.kind === 'loading') return null;
-		const none = { retry: false, object: null, detail: null };
-		if (snap.kind === 'failed') return { level: 'unknown', headline: $m.backup_cfg_unknown, ...none };
-
-		const now = new Date(snap.receivedAt);
-		const { level, verifiedAt } = classifyBackup(snap.status, now);
+		const { snapshot, now: nowMs } = $catalogueBackupNow;
+		const result = classifySnapshot(snapshot, nowMs);
+		if (!result) return null;
+		const { level, verifiedAt } = result;
+		const none = { retry: false, object: null };
 		if (level === 'off') return { level, headline: $m.backup_cfg_off, ...none };
-		if (level === 'unknown') return { level, headline: $m.backup_cfg_unknown, ...none };
+		if (level === 'unknown' || snapshot.kind !== 'loaded') return { level: 'unknown', headline: $m.backup_cfg_unknown, ...none };
 		if (!verifiedAt) return { level, headline: $m.backup_cfg_never, ...none, retry: true };
 
+		const now = new Date(nowMs);
 		const day = dayRelation(verifiedAt, now);
 		const date = formatBackupDate(verifiedAt, now, $locale);
-		const facts = { object: snap.status.object, detail: snap.status.detail };
+		const object = snapshot.status.object;
 		if (level === 'current') {
-			return {
-				level,
-				headline: $m.backup_cfg_current(day, date, formatBackupTime(verifiedAt, $locale)),
-				retry: false,
-				...facts
-			};
+			return { level, headline: $m.backup_cfg_current(day, date, formatBackupTime(verifiedAt, $locale)), retry: false, object };
 		}
-		return { level, headline: $m.backup_cfg_stale(day, date), retry: true, ...facts };
+		return { level, headline: $m.backup_cfg_stale(day, date), retry: true, object };
 	});
 </script>
 
@@ -82,9 +72,6 @@
 				{/if}
 				{#if view.object}
 					<p class="fact"><span class="fact-label">{$m.backup_cfg_last_file}</span> · {view.object}</p>
-				{/if}
-				{#if view.detail}
-					<p class="fact"><span class="fact-label">{$m.backup_cfg_detail}</span> · {view.detail}</p>
 				{/if}
 			</div>
 		</div>

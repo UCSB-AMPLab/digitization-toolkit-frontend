@@ -3,7 +3,9 @@
 // "could not check", never one of the four levels (NEH-138).
 //
 // The browser runs in America/Bogota (vite.config.ts). NOW is 12:00 local on
-// 22 October 2026. Only Date is faked, so the poll's timers stay real.
+// 22 October 2026. Date and setInterval (the re-classifying clock) are faked;
+// setTimeout stays real, so the 5-minute poll never fires during a test and
+// the request timeout is tested in catalogue-backup.test.ts instead.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -40,7 +42,7 @@ function fail() {
 }
 
 beforeEach(() => {
-	vi.useFakeTimers({ toFake: ['Date'] });
+	vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
 	vi.setSystemTime(NOW);
 });
 afterEach(() => {
@@ -57,7 +59,7 @@ const cases: [string, Body | 'fail', string, string, string][] = [
 	['red, stale', body({ last_verified_at: ago(96 * HOUR) }), 'overdue', 'Catálogo sin copia desde el 18 de octubre', 'La última copia verificada es del 18 de octubre.'],
 	['red, never verified', body(), 'overdue', 'Catálogo sin copia verificada', 'Todavía no se ha verificado ninguna copia.'],
 	['grey, not configured', body({ enabled: false }), 'off', 'Copia externa sin configurar', 'La copia externa no está configurada en este equipo.'],
-	['request failed', 'fail', 'unknown', 'No se pudo consultar la copia externa', 'No se pudo consultar el estado de la copia externa.']
+	['request failed', 'fail', 'unknown', 'No se pudo consultar el estado de la copia externa', 'No se pudo consultar el estado de la copia externa.']
 ];
 
 describe('sidebar indicator', () => {
@@ -99,6 +101,48 @@ describe('sidebar indicator', () => {
 	});
 });
 
+describe('re-classifying as time passes, with no new answer', () => {
+	it('turns a held green answer amber once the copy passes 36 h', async () => {
+		// 35 h 59 min 30 s old when the answer arrives.
+		answer(body({ last_verified_at: ago(36 * HOUR - 30 * 1000) }));
+		const screen = render(Indicator, { expanded: true, href: null });
+		await expect.element(screen.getByText('Catálogo copiado ayer')).toBeVisible();
+
+		vi.advanceTimersByTime(60 * 1000);
+		await expect.element(screen.getByText('Catálogo sin copia desde ayer')).toBeVisible();
+		expect(screen.container.querySelector('[data-level]')?.getAttribute('data-level')).toBe('late');
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it('turns the card amber the same way', async () => {
+		answer(body({ last_verified_at: ago(36 * HOUR - 30 * 1000) }));
+		const screen = render(Card);
+		await expect.element(screen.getByText('Copia verificada ayer a las 00:00.')).toBeVisible();
+
+		vi.advanceTimersByTime(60 * 1000);
+		await expect.element(screen.getByText('La última copia verificada es de ayer.')).toBeVisible();
+	});
+
+	it('shows unknown once the held answer is older than two poll intervals', async () => {
+		answer(body({ last_verified_at: ago(HOUR) }));
+		const screen = render(Indicator, { expanded: true, href: null });
+		await expect.element(screen.getByText('Catálogo copiado hoy')).toBeVisible();
+
+		vi.advanceTimersByTime(10 * 60 * 1000);
+		await expect.element(screen.getByText('Catálogo copiado hoy')).toBeVisible();
+		vi.advanceTimersByTime(60 * 1000);
+		await expect.element(screen.getByText('No se pudo consultar el estado de la copia externa')).toBeVisible();
+		expect(screen.container.querySelector('[data-level]')?.getAttribute('data-level')).toBe('unknown');
+	});
+
+	it('passes the request an abort signal', async () => {
+		answer(body({ last_verified_at: ago(HOUR) }));
+		render(Indicator, { expanded: true, href: null });
+		await expect.poll(() => fetchSpy.mock.calls.length).toBe(1);
+		expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBeInstanceOf(AbortSignal);
+	});
+});
+
 describe('Configuración card', () => {
 	it.each(cases)('%s', async (_name, b, level, _text, headline) => {
 		if (b === 'fail') fail();
@@ -125,11 +169,12 @@ describe('Configuración card', () => {
 		expect(fresh.container.textContent).not.toMatch(/vuelve a intentar/);
 	});
 
-	it('shows the last verified file and its detail', async () => {
-		answer(body({ last_verified_at: ago(HOUR), object: 'catalogue-2026-10-22.sql.gz', detail: 'verified at remote:dtk: 1024 bytes gzipped' }));
+	it('shows the last verified file and never the backend detail', async () => {
+		answer(body({ last_verified_at: ago(48 * HOUR), object: 'catalogue-2026-10-20.sql.gz', detail: 'verified at remote:dtk: 1024 bytes gzipped' }));
 		const screen = render(Card);
-		await expect.element(screen.getByText(/catalogue-2026-10-22\.sql\.gz/)).toBeVisible();
-		await expect.element(screen.getByText(/1024 bytes gzipped/)).toBeVisible();
+		await expect.element(screen.getByText('Archivo de la última copia')).toBeVisible();
+		await expect.element(screen.getByText(/catalogue-2026-10-20\.sql\.gz/)).toBeVisible();
+		expect(screen.container.textContent).not.toMatch(/1024 bytes gzipped|Detalle/);
 	});
 
 	it('writes "a la" for one o’clock', async () => {
