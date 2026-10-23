@@ -51,6 +51,7 @@
     type CaptureChord,
     type OwnsEventContext
   } from '$lib/capture-key';
+  import { defaultRecordTitle } from '$lib/record-title';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -518,7 +519,7 @@
       const payload = {
         project_name: projectName,
         collection_id: collectionId || undefined,
-        record_title: $m.lv_capture_title(new Date().toISOString().slice(0,19)),
+        record_title: defaultRecordTitle(),
       };
 
       let result;

@@ -692,7 +692,6 @@ export const en: Messages = {
 	lv_capture_key_modifier_only: (modifier: string) => `That device only sent ${modifier}. Press the pedal's actual key, not just a modifier.`,
 	lv_capture_key_unbindable: 'That device sent a key this page cannot bind. Try pressing it again.',
 	lv_capture_key_space: 'Space',
-	lv_capture_title: (timestamp: string) => `Capture ${timestamp}`,
 	lv_capture_error: 'Capture failed',
 	lv_capture_not_ready: 'Loading collection…',
 	lv_capture_btn: 'Capture',
