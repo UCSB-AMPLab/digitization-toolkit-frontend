@@ -61,10 +61,17 @@ export const es = {
 	login_error_fill_all_fields: 'Por favor completa todos los campos',
 	login_error_bad_credentials: 'Usuario o contraseña incorrectos',
 	login_error_unknown_role: 'Tu cuenta tiene un rol que la aplicación no reconoce. Avisa a quien administra el equipo.',
-	login_error_backend_unavailable: 'No se pudo conectar con el servidor. Puede estar iniciando; espera unos segundos e intenta de nuevo.',
+	login_error_backend_unavailable: 'No se pudo conectar con el servidor. Puede que todavía no esté listo: espera unos segundos e intenta de nuevo.',
+	login_error_locked_out: (minutes: number) =>
+		minutes === 1
+			? 'Demasiados intentos fallidos. Espera 1 minuto e intenta de nuevo.'
+			: `Demasiados intentos fallidos. Espera ${minutes} minutos e intenta de nuevo.`,
+	login_error_locked_out_unknown: 'Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.',
 
 	// ── Sesión ───────────────────────────────────────────────────────────────
 	session_validating: 'Verificando sesión…',
+	session_backend_waiting: 'Esperando respuesta del servidor…',
+	session_backend_waiting_detail: 'Si acabas de encender el equipo, el servidor puede tardar unos segundos en responder. Captua seguirá intentando conectarse y continuará en cuanto lo logre.',
 
 	// ── Navegación (dashboard) ───────────────────────────────────────────────
 	nav_section_main: 'PRINCIPAL',
@@ -113,6 +120,21 @@ export const es = {
 	dash_col_project: 'Proyecto',
 	dash_col_last_activity: 'Última modificación',
 	dash_col_actions: 'Acciones',
+	// Vista de tablero o tabla del bloque "en curso"
+	dash_view_label: 'Vista',
+	dash_view_board: 'Tablero',
+	dash_view_table: 'Tabla',
+	dash_col_progress: 'Avance',
+	dash_records_count: (n: number) => (n === 1 ? '1 registro' : `${n} registros`),
+	dash_stage_capture: 'En captura',
+	dash_stage_capture_desc: 'Volúmenes con registros que todavía no están en revisión.',
+	dash_stage_recapture: 'Por recapturar',
+	dash_stage_recapture_desc: 'Volúmenes con imágenes rechazadas que hay que volver a capturar.',
+	dash_stage_review: 'En revisión',
+	dash_stage_review_desc: 'Volúmenes con registros pendientes de revisión.',
+	dash_stage_approved: 'Aprobado',
+	dash_stage_approved_desc: 'Volúmenes con todos los registros aprobados, listos para exportar.',
+	dash_progress_load_error: 'No se pudo cargar el avance de los volúmenes',
 	dash_test_cameras: 'Probar cámaras',
 	dash_camera_left: 'Cámara izquierda',
 	dash_camera_right: 'Cámara derecha',
@@ -715,7 +737,6 @@ export const es = {
 	lv_capture_key_modifier_only: (modifier: string) => `El dispositivo solo envió ${modifier}. Presiona la tecla del pedal, no solo un modificador.`,
 	lv_capture_key_unbindable: 'El dispositivo envió una tecla que no se puede asignar a la captura. Intenta de nuevo.',
 	lv_capture_key_space: 'Espacio',
-	lv_capture_title: (timestamp: string) => `Captura ${timestamp}`,
 	lv_capture_error: 'Error al capturar',
 	lv_capture_not_ready: 'Cargando la colección…',
 	lv_capture_btn: 'Capturar',

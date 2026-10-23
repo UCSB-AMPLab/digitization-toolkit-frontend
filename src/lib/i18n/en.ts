@@ -51,10 +51,17 @@ export const en: Messages = {
 	login_error_fill_all_fields: 'Please fill in all fields',
 	login_error_bad_credentials: 'Incorrect username or password',
 	login_error_unknown_role: 'Your account has a role this app does not recognize. Let whoever administers the device know.',
-	login_error_backend_unavailable: 'Could not reach the server. It may still be starting up — wait a few seconds and try again.',
+	login_error_backend_unavailable: 'Could not reach the server. It may not be ready yet: wait a few seconds and try again.',
+	login_error_locked_out: (minutes: number) =>
+		minutes === 1
+			? 'Too many failed attempts. Wait 1 minute before trying again.'
+			: `Too many failed attempts. Wait ${minutes} minutes before trying again.`,
+	login_error_locked_out_unknown: 'Too many failed attempts. Wait a few minutes before trying again.',
 
 	// ── Session ──────────────────────────────────────────────────────────────
 	session_validating: 'Verifying session…',
+	session_backend_waiting: 'Waiting for the server to respond…',
+	session_backend_waiting_detail: 'If you have just switched the device on, the server can take a few seconds to respond. Captua will keep trying to connect and continue as soon as it can.',
 
 	// ── Navigation (dashboard) ───────────────────────────────────────────────
 	nav_section_main: 'MAIN',
@@ -101,6 +108,21 @@ export const en: Messages = {
 	dash_col_project: 'Project',
 	dash_col_last_activity: 'Last modified',
 	dash_col_actions: 'Actions',
+	// Board or table view of the "in progress" block
+	dash_view_label: 'View',
+	dash_view_board: 'Board',
+	dash_view_table: 'Table',
+	dash_col_progress: 'Progress',
+	dash_records_count: (n: number) => (n === 1 ? '1 record' : `${n} records`),
+	dash_stage_capture: 'Capturing',
+	dash_stage_capture_desc: 'Volumes with records not yet in review.',
+	dash_stage_recapture: 'To recapture',
+	dash_stage_recapture_desc: 'Volumes with rejected images that need to be captured again.',
+	dash_stage_review: 'In review',
+	dash_stage_review_desc: 'Volumes with records awaiting review.',
+	dash_stage_approved: 'Approved',
+	dash_stage_approved_desc: 'Volumes with every record approved, ready to export.',
+	dash_progress_load_error: "Could not load the volumes' progress",
 	dash_test_cameras: 'Test cameras',
 	dash_camera_left: 'Left Scanner Camera',
 	dash_camera_right: 'Right Scanner Camera',
@@ -688,7 +710,6 @@ export const en: Messages = {
 	lv_capture_key_modifier_only: (modifier: string) => `That device only sent ${modifier}. Press the pedal's actual key, not just a modifier.`,
 	lv_capture_key_unbindable: 'That device sent a key this page cannot bind. Try pressing it again.',
 	lv_capture_key_space: 'Space',
-	lv_capture_title: (timestamp: string) => `Capture ${timestamp}`,
 	lv_capture_error: 'Capture failed',
 	lv_capture_not_ready: 'Loading collection…',
 	lv_capture_btn: 'Capture',
