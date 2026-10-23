@@ -32,7 +32,9 @@
   const longDate = (value: string) => formatDate(value, { day: 'numeric', month: 'long', year: 'numeric' });
 
   function monthName(year: number, month: number): string {
-    return new Date(year, month, 1).toLocaleDateString(tag, { month: 'short' });
+    // Plain 'es' here: es-CO writes 'ene.', and the weekday labels beside
+    // the map carry no full stop.
+    return new Date(year, month, 1).toLocaleDateString($locale, { month: 'short' });
   }
 
   function dayLine(index: number): string {
