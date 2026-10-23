@@ -66,18 +66,18 @@ function baseProps(overrides: Record<string, unknown> = {}) {
 }
 
 describe('ImageViewer — drag-to-pan and out-of-frame caption (NEH-230)', () => {
-  let getImageFileUrlSpy: ReturnType<typeof vi.spyOn>;
+  let getImagePreviewUrlSpy: ReturnType<typeof vi.spyOn>;
   const dataUrl = make1200x800DataUrl();
 
   beforeEach(() => {
-    // The real getImageFileUrl builds a URL against the API host, which
+    // The real getImagePreviewUrl builds a URL against the API host, which
     // won't resolve to a real image in a headless browser test — point it
     // at a canvas-drawn data URL instead, so naturalWidth/Height are real.
-    getImageFileUrlSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(dataUrl);
+    getImagePreviewUrlSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(dataUrl);
   });
 
   afterEach(() => {
-    getImageFileUrlSpy.mockRestore();
+    getImagePreviewUrlSpy.mockRestore();
   });
 
   it('dragging the left frame pans the left image (translate is nonzero after a drag)', async () => {
@@ -180,5 +180,33 @@ describe('ImageViewer — drag-to-pan and out-of-frame caption (NEH-230)', () =>
     expect(translateX()).toBeCloseTo(afterSecondMove, 0);
 
     captureSpy.mockRestore();
+  });
+});
+
+// NEH-139: the spread view is the main review viewer; a page whose /preview
+// cannot be loaded (a RAW master without a sidecar) shows its thumbnail,
+// labelled, instead of a broken image.
+describe('ImageViewer — preview fallback (NEH-139)', () => {
+  it('preview fails, thumbnail shows', async () => {
+    const thumbUrl = make1200x800DataUrl();
+    const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue('data:image/png;base64,AAAA');
+    const thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(thumbUrl);
+    try {
+      const screen = render(ImageViewer, baseProps({
+        records: [makeRecord({
+          images: [
+            makeImage({ id: 1, role: 'left', format: 'cr2', filename: 'left.cr2' }),
+            makeImage({ id: 2, role: 'right', format: 'cr2', filename: 'right.cr2' }),
+          ],
+        })],
+      }));
+      const left = () => screen.container.querySelector('img.spread-image.left') as HTMLImageElement | null;
+      await expect.poll(() => left()?.getAttribute('src')).toBe(thumbUrl);
+      await expect.poll(() => left()!.naturalWidth).toBeGreaterThan(0);
+      expect(screen.container.querySelectorAll('.spread-frame')[0].textContent).toContain('Miniatura (RAW)');
+    } finally {
+      previewSpy.mockRestore();
+      thumbSpy.mockRestore();
+    }
   });
 });

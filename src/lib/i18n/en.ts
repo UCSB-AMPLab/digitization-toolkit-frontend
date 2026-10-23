@@ -572,6 +572,24 @@ export const en: Messages = {
 	col_export_done: 'Export complete',
 	col_download_zip: 'Download ZIP',
 	col_download_image: 'Download image',
+	// NEH-139: RAW images in the inspection viewers
+	raw_preview_badge: 'Preview (RAW)',
+	raw_preview_hint: 'The browser cannot display RAW files. This is the JPEG preview stored beside the original.',
+	raw_thumbnail_badge: 'Thumbnail (RAW)',
+	raw_thumbnail_hint: 'The browser cannot display RAW files, and this file has no full-size preview. This is its low-resolution thumbnail.',
+	raw_unviewable_title: 'This format cannot be displayed',
+	raw_unviewable_body: 'The browser cannot display RAW files, and this file has no preview.',
+	image_original_stored: 'The original file is stored on the device.',
+	image_file_missing: 'The file for this image was not found.',
+	// NEH-139: non-RAW images the browser cannot display (TIFF) or that fail to load
+	image_thumbnail_badge: 'Thumbnail',
+	image_thumbnail_hint_format: (ext: string) =>
+		`The browser cannot display ${ext} files. This is the file's low-resolution thumbnail.`,
+	image_thumbnail_hint: 'This file could not be displayed at full size. This is its low-resolution thumbnail.',
+	image_unviewable_title: 'This image cannot be displayed',
+	image_unviewable_body_format: (ext: string) =>
+		`The browser cannot display ${ext} files, and this file's thumbnail could not be displayed either.`,
+	image_unviewable_body: 'Neither this file nor its thumbnail could be displayed.',
 	col_export_blocked_title: 'Cannot export yet',
 	col_export_blocked_desc: 'All records must be approved before exporting. The following are not approved yet:',
 	col_download_choose_title: 'Export or download',
