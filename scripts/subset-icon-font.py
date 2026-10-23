@@ -4,11 +4,13 @@ src/lib/icon-names.json.
 
 Usage:
     python3 -m venv /tmp/fontvenv && /tmp/fontvenv/bin/pip install fonttools brotli
-    /tmp/fontvenv/bin/python scripts/subset-icon-font.py <full-font.woff2> [out.woff2]
+    /tmp/fontvenv/bin/python scripts/subset-icon-font.py [full-font.woff2] [out.woff2]
 
-<full-font.woff2> is the complete Material Symbols Outlined variable font
-(FILL, GRAD, opsz, wght axes). The output defaults to
-static/fonts/MaterialSymbolsOutlined.woff2.
+The input defaults to scripts/fonts/MaterialSymbolsOutlined-full.woff2, the
+complete Material Symbols Outlined variable font (FILL, GRAD, opsz, wght
+axes). It is kept outside static/ so it is never served. Its source and
+version are not recorded; it is the file added in commit 9b807c1. The output
+defaults to static/fonts/MaterialSymbolsOutlined.woff2.
 
 The font maps icon names to glyphs through ligatures in the GSUB 'rlig'
 lookup. Subsetting by character alone would keep every ligature that can be
@@ -25,9 +27,7 @@ from fontTools.ttLib import TTFont
 ROOT = Path(__file__).resolve().parent.parent
 NAMES = json.loads((ROOT / "src/lib/icon-names.json").read_text())
 
-if len(sys.argv) < 2:
-    sys.exit(__doc__)
-src = Path(sys.argv[1])
+src = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "scripts/fonts/MaterialSymbolsOutlined-full.woff2"
 dst = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "static/fonts/MaterialSymbolsOutlined.woff2"
 
 font = TTFont(src)
