@@ -750,6 +750,37 @@ export const en: Messages = {
 	lvm_retaking: 'Capturing replacement image…',
 	lvm_retake_error: (message: string) => `Retake failed: ${message}. The original image was kept.`,
 
+	// ── Offsite catalogue copy (NEH-266) ─────────────────────────────────────
+	backup_ind_current: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
+		day === 'today'
+			? 'Catalogue copied today'
+			: day === 'yesterday'
+				? 'Catalogue copied yesterday'
+				: `Catalogue copied on ${date}`,
+	backup_ind_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
+		day === 'yesterday' ? 'No catalogue copy since yesterday' : `No catalogue copy since ${date}`,
+	backup_ind_never: 'No verified catalogue copy',
+	backup_ind_off: 'Offsite copy not configured',
+	backup_ind_unknown: 'Could not check the offsite copy',
+	backup_section_title: 'Offsite copy',
+	backup_section_desc:
+		'Once a day, the scanner copies the catalogue to the destination configured when it was installed. The catalogue is the database that links each image to its project, its volume and its place in that volume.',
+	backup_section_scope: 'This copy does not include the image files.',
+	backup_cfg_current: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string) => {
+		if (day === 'today') return `Copy verified today at ${time}.`;
+		if (day === 'yesterday') return `Copy verified yesterday at ${time}.`;
+		return `Copy verified on ${date} at ${time}.`;
+	},
+	backup_cfg_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
+		day === 'yesterday' ? 'The last verified copy is from yesterday.' : `The last verified copy is from ${date}.`,
+	backup_cfg_never: 'No copy has been verified yet.',
+	backup_cfg_retry: 'While it is on, the scanner tries the copy again periodically.',
+	backup_cfg_off: 'The offsite copy is not configured on this scanner.',
+	backup_cfg_unknown: 'Could not check the state of the offsite copy.',
+	backup_cfg_last_file: 'Last file',
+	backup_cfg_detail: 'Detail',
+	backup_cfg_locked: 'This is set up when the scanner is installed and cannot be changed here.',
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
 	api_request_failed: 'Request failed'

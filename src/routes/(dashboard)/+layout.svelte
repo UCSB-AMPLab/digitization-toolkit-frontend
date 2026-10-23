@@ -25,6 +25,7 @@
 	import logo from '$lib/assets/captua-logo.svg';
 	import favicon from '$lib/assets/favicon-light.svg';
 	import BugReportButton from '$lib/bug-report/BugReportButton.svelte';
+	import CatalogueBackupIndicator from '$lib/components/CatalogueBackupIndicator.svelte';
 
 	let { children } = $props();
 
@@ -211,6 +212,12 @@
 		return item.roles.length === 0 || item.roles.includes(currentUser?.role ?? '');
 	});
 
+	// Si el rol actual puede abrir Configuración: decide si el indicador de la
+	// copia externa enlaza allí. Misma regla que el guard de arriba.
+	let canOpenConfig = $derived(
+		findNavItem('/dashboard/config')?.roles.includes(currentUser?.role ?? '') ?? false
+	);
+
 	// Redirige fuera de rutas admin-only en cuanto sabemos el rol del usuario
 	// (al montar, o si navega del lado del cliente a otra ruta restringida)
 	$effect(() => {
@@ -391,6 +398,14 @@
 				{/each}
 			{/each}
 		</nav>
+
+		<!-- Estado de la copia externa del catálogo (NEH-266). Visible para
+		     todos los roles; enlaza a Configuración solo para quien puede
+		     abrirla. -->
+		<CatalogueBackupIndicator
+			{expanded}
+			href={canOpenConfig ? '/dashboard/config#offsite-copy' : null}
+		/>
 
 		<!-- Footer: avatar del usuario + botón salir -->
 		<div class="s-footer">
