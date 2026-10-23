@@ -649,8 +649,10 @@ export const collectionsApi = {
 
   /**
    * Physically renumber every image file in the collection, sequentially
-   * from 1 (zero-padded), based on current display order. All-or-nothing:
-   * on any failure no files or DB rows are left renumbered.
+   * from 1 (zero-padded), based on current display order. On a failure the
+   * backend puts the files back under their old names and leaves the rows
+   * unchanged; if a file cannot be put back, the error detail says so.
+   * A name already held by a file outside the collection is refused (422).
    */
   async renumberImages(collectionId: number): Promise<{ renumbered: number; prefix: string; width: number }> {
     return apiRequest(`/collections/${collectionId}/images/renumber`, { method: 'POST' });
