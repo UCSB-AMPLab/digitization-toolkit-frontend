@@ -777,6 +777,40 @@ export const es = {
 	lvm_retaking: 'Capturando imagen de reemplazo…',
 	lvm_retake_error: (message: string) => `Falló la retoma: ${message}. Se conservó la imagen original.`,
 
+	// ── Copia externa del catálogo (NEH-266) ─────────────────────────────────
+	// `day` dice si la copia es de hoy, de ayer o anterior, en la hora local;
+	// `date` es la fecha ya formateada y solo se usa en el último caso.
+	backup_ind_current: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
+		day === 'today'
+			? 'Catálogo copiado hoy'
+			: day === 'yesterday'
+				? 'Catálogo copiado ayer'
+				: `Catálogo copiado el ${date}`,
+	// Una copia con más de 36 horas nunca es de hoy.
+	backup_ind_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
+		day === 'yesterday' ? 'Catálogo sin copia desde ayer' : `Catálogo sin copia desde el ${date}`,
+	backup_ind_never: 'Catálogo sin copia verificada',
+	backup_ind_off: 'Copia externa sin configurar',
+	backup_ind_unknown: 'No se pudo consultar el estado de la copia externa',
+	backup_section_title: 'Copia externa',
+	backup_section_desc:
+		'Una vez al día, el equipo copia el catálogo al destino que se configuró al instalarlo, y comprueba que el destino la recibió completa. El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.',
+	backup_section_scope: 'Esta copia no incluye los archivos de imagen.',
+	backup_cfg_current: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string) => {
+		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
+		if (day === 'today') return `Copia verificada hoy ${at}.`;
+		if (day === 'yesterday') return `Copia verificada ayer ${at}.`;
+		return `Copia verificada el ${date} ${at}.`;
+	},
+	backup_cfg_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
+		day === 'yesterday' ? 'La última copia verificada es de ayer.' : `La última copia verificada es del ${date}.`,
+	backup_cfg_never: 'Todavía no se ha verificado ninguna copia.',
+	backup_cfg_retry: 'El equipo vuelve a intentar la copia cada cierto tiempo mientras está encendido.',
+	backup_cfg_off: 'La copia externa no está configurada en este equipo.',
+	backup_cfg_unknown: 'No se pudo consultar el estado de la copia externa.',
+	backup_cfg_last_file: 'Archivo de la última copia',
+	backup_cfg_locked: 'Esta configuración se define al instalar el equipo y no se puede cambiar desde aquí.',
+
 	// ── Mensajes del cliente API ─────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',
 	api_request_failed: 'Error en la solicitud'

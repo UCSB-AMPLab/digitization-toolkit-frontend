@@ -23,6 +23,7 @@
 
   import { onMount } from 'svelte';
   import { m, locale, setLanguage, type Locale } from '$lib/i18n';
+  import CatalogueBackupCard from './CatalogueBackupCard.svelte';
   // Idiomas disponibles. El catálogo vive en $lib/i18n; esta lista solo les
   // pone nombre para el selector.
   const LANGUAGES: { code: Locale; label: string }[] = [
@@ -622,6 +623,16 @@
       {/if}
 
     </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       SECCIÓN: COPIA EXTERNA DEL CATÁLOGO (NEH-266)
+       Solo lectura: el destino se configura al instalar el equipo.
+       El indicador de la sidebar enlaza a #offsite-copy.
+       ══════════════════════════════════════════════════════════ -->
+  <div class="config-section" id="offsite-copy">
+    <h2 class="section-title">{$m.backup_section_title}</h2>
+    <CatalogueBackupCard />
   </div>
 
   <!-- ══════════════════════════════════════════════════════════

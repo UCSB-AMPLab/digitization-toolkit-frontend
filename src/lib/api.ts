@@ -1515,6 +1515,20 @@ export interface StorageDevice {
   type:       string;
 }
 
+/**
+ * GET /system/catalogue-backup (NEH-249): when the catalogue (the database,
+ * not the image files) was last verified at the offsite destination.
+ * `enabled` is false when no destination was configured at install;
+ * `last_verified_at` is null on a unit that has never completed a verified
+ * dump. `object` and `detail` describe that last verified dump.
+ */
+export interface CatalogueBackupStatus {
+  enabled:          boolean;
+  last_verified_at: string | null;   // ISO 8601 datetime
+  object:           string | null;
+  detail:           string | null;
+}
+
 // Apagado / reinicio del equipo.
 export type PowerAction = 'poweroff' | 'reboot';
 
@@ -1545,6 +1559,11 @@ export const systemApi = {
 
   async getStorage(): Promise<StorageInfo> {
     return apiRequest<StorageInfo>('/system/storage');
+  },
+
+  /** `signal` lets the caller abort it (the poll's 20 s timeout). */
+  async getCatalogueBackup(signal?: AbortSignal): Promise<CatalogueBackupStatus> {
+    return apiRequest<CatalogueBackupStatus>('/system/catalogue-backup', { signal });
   },
 
   async getStorageDevices(): Promise<StorageDevice[]> {
