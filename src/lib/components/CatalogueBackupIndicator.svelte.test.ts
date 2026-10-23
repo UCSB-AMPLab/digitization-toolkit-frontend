@@ -143,6 +143,60 @@ describe('re-classifying as time passes, with no new answer', () => {
 	});
 });
 
+describe('waking from sleep (wall clock jumps, no timer fires)', () => {
+	function wake(event: 'visibilitychange' | 'pageshow') {
+		vi.setSystemTime(new Date(NOW.getTime() + 8 * HOUR));
+		if (event === 'visibilitychange') document.dispatchEvent(new Event('visibilitychange'));
+		else window.dispatchEvent(new Event('pageshow'));
+	}
+
+	it.each(['visibilitychange', 'pageshow'] as const)('on %s, shows unknown while the new request is pending', async (event) => {
+		let calls = 0;
+		fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+			calls++;
+			if (calls > 1) return new Promise<Response>(() => {});
+			return new Response(JSON.stringify(body({ last_verified_at: ago(HOUR) })), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		});
+		const screen = render(Indicator, { expanded: true, href: null });
+		await expect.element(screen.getByText('Catálogo copiado hoy')).toBeVisible();
+
+		wake(event);
+		await expect.element(screen.getByText('No se pudo consultar el estado de la copia externa')).toBeVisible();
+		await expect.poll(() => fetchSpy.mock.calls.length).toBe(2);
+	});
+
+	it('shows the fresh answer once the request made at wake returns', async () => {
+		let calls = 0;
+		fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+			calls++;
+			// The copy stopped on the night of the 22nd; at wake it is 48 h old.
+			const b = calls === 1 ? body({ last_verified_at: ago(HOUR) }) : body({ last_verified_at: ago(40 * HOUR) });
+			return new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
+		});
+		const screen = render(Indicator, { expanded: true, href: null });
+		await expect.element(screen.getByText('Catálogo copiado hoy')).toBeVisible();
+
+		wake('visibilitychange');
+		await expect.element(screen.getByText('Catálogo sin copia desde el 20 de octubre')).toBeVisible();
+		expect(screen.container.querySelector('[data-level]')?.getAttribute('data-level')).toBe('late');
+		expect(fetchSpy).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not ask again on becoming visible when the answer is recent', async () => {
+		answer(body({ last_verified_at: ago(HOUR) }));
+		const screen = render(Indicator, { expanded: true, href: null });
+		await expect.element(screen.getByText('Catálogo copiado hoy')).toBeVisible();
+
+		vi.setSystemTime(new Date(NOW.getTime() + 60 * 1000));
+		document.dispatchEvent(new Event('visibilitychange'));
+		await expect.element(screen.getByText('Catálogo copiado hoy')).toBeVisible();
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+	});
+});
+
 describe('Configuración card', () => {
 	it.each(cases)('%s', async (_name, b, level, _text, headline) => {
 		if (b === 'fail') fail();

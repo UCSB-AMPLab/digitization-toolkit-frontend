@@ -149,6 +149,11 @@ export type PollResult = { ok: true; status: CatalogueBackupStatus } | { ok: fal
  * (the request then counts as failed) or when polling stops. Stops when
  * `shouldStop(error)` is true for a failure (the caller passes "the session
  * is gone"), or when the returned function is called.
+ *
+ * The returned function's `pollNow()` asks at once instead of waiting for the
+ * timer (after the machine wakes, when the timer may be far off). It does
+ * nothing while a request is in flight or after polling has stopped, and the
+ * interval restarts from that request's answer.
  */
 export function startPolling(
 	fetcher: (signal: AbortSignal) => Promise<CatalogueBackupStatus>,
@@ -156,7 +161,7 @@ export function startPolling(
 	intervalMs: number = POLL_INTERVAL_MS,
 	shouldStop: (error: unknown) => boolean = () => false,
 	timeoutMs: number = REQUEST_TIMEOUT_MS
-): () => void {
+): (() => void) & { pollNow: () => void } {
 	let stopped = false;
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	let inFlight: AbortController | null = null;
@@ -197,9 +202,15 @@ export function startPolling(
 
 	tick();
 
-	return () => {
+	const stop = () => {
 		stopped = true;
 		if (timer !== null) clearTimeout(timer);
 		inFlight?.abort();
 	};
+	const pollNow = () => {
+		if (stopped || inFlight !== null) return;
+		if (timer !== null) clearTimeout(timer);
+		tick();
+	};
+	return Object.assign(stop, { pollNow });
 }

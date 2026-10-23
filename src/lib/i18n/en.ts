@@ -764,7 +764,7 @@ export const en: Messages = {
 	backup_ind_unknown: 'Could not check the state of the offsite copy',
 	backup_section_title: 'Offsite copy',
 	backup_section_desc:
-		'Once a day, the scanner copies the catalogue to the destination configured when it was installed, and checks that the copy arrived complete. The catalogue is the database that links each image to its project, its volume and its place in that volume.',
+		'Once a day, the scanner copies the catalogue to the destination configured when it was installed, and checks that the destination received it complete. The catalogue is the database that links each image to its project, its volume and its place in that volume.',
 	backup_section_scope: 'This copy does not include the image files.',
 	backup_cfg_current: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string) => {
 		if (day === 'today') return `Copy verified today at ${time}.`;

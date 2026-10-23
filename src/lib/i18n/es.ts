@@ -794,7 +794,7 @@ export const es = {
 	backup_ind_unknown: 'No se pudo consultar el estado de la copia externa',
 	backup_section_title: 'Copia externa',
 	backup_section_desc:
-		'Una vez al día, el equipo copia el catálogo al destino que se configuró al instalarlo, y comprueba que la copia llegó completa. El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.',
+		'Una vez al día, el equipo copia el catálogo al destino que se configuró al instalarlo, y comprueba que el destino la recibió completa. El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.',
 	backup_section_scope: 'Esta copia no incluye los archivos de imagen.',
 	backup_cfg_current: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string) => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;

@@ -296,6 +296,44 @@ describe('startPolling', () => {
 		expect(seen.aborted).toBe(true);
 	});
 
+	it('pollNow asks at once when idle and restarts the interval from that answer', async () => {
+		const fetcher = vi.fn().mockResolvedValue(status(HOUR));
+		const stop = startPolling(fetcher, vi.fn());
+		await vi.advanceTimersByTimeAsync(60 * SECOND);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+
+		stop.pollNow();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+
+		// The old timer (due 4 min from here) was replaced by a new one.
+		await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS - 1);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(fetcher).toHaveBeenCalledTimes(3);
+		stop();
+	});
+
+	it('pollNow does nothing while a request is in flight', async () => {
+		const fetcher = vi.fn(() => new Promise<CatalogueBackupStatus>(() => {}));
+		const stop = startPolling(fetcher, vi.fn());
+		stop.pollNow();
+		stop.pollNow();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+		stop();
+	});
+
+	it('pollNow does nothing once stopped', async () => {
+		const fetcher = vi.fn().mockResolvedValue(status(HOUR));
+		const stop = startPolling(fetcher, vi.fn());
+		await vi.advanceTimersByTimeAsync(0);
+		stop();
+		stop.pollNow();
+		await vi.advanceTimersByTimeAsync(10 * POLL_INTERVAL_MS);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+	});
+
 	it('never has two requests in flight', async () => {
 		let inFlight = 0;
 		let maxInFlight = 0;
