@@ -539,11 +539,11 @@ export const en: Messages = {
 	image_thumbnail_badge: 'Thumbnail',
 	image_thumbnail_hint_format: (ext: string) =>
 		`The browser cannot display ${ext} files. This is the file's low-resolution thumbnail.`,
-	image_thumbnail_hint: 'This file could not be loaded at full size. This is its low-resolution thumbnail.',
+	image_thumbnail_hint: 'This file could not be displayed at full size. This is its low-resolution thumbnail.',
 	image_unviewable_title: 'This image cannot be displayed',
 	image_unviewable_body_format: (ext: string) =>
-		`The browser cannot display ${ext} files, and this file's thumbnail could not be loaded.`,
-	image_unviewable_body: 'Neither this file nor its thumbnail could be loaded.',
+		`The browser cannot display ${ext} files, and this file's thumbnail could not be displayed either.`,
+	image_unviewable_body: 'Neither this file nor its thumbnail could be displayed.',
 	col_export_blocked_title: 'Cannot export yet',
 	col_export_blocked_desc: 'All records must be approved before exporting. The following are not approved yet:',
 	col_download_choose_title: 'Export or download',

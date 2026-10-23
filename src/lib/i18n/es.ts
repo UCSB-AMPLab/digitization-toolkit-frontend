@@ -563,12 +563,12 @@ export const es = {
 	// NEH-139: imágenes que no son RAW y que el navegador no muestra (TIFF) o que no cargan
 	image_thumbnail_badge: 'Miniatura',
 	image_thumbnail_hint_format: (ext: string) =>
-		`El navegador no puede mostrar archivos ${ext}. Esta es la miniatura del archivo, en baja resolución.`,
-	image_thumbnail_hint: 'No se pudo cargar este archivo en tamaño completo. Esta es su miniatura, en baja resolución.',
+		`El navegador no puede mostrar archivos ${ext}. Esta es la miniatura de este archivo, en baja resolución.`,
+	image_thumbnail_hint: 'No se pudo mostrar este archivo en tamaño completo. Esta es su miniatura, en baja resolución.',
 	image_unviewable_title: 'No se puede mostrar esta imagen',
 	image_unviewable_body_format: (ext: string) =>
-		`El navegador no puede mostrar archivos ${ext}, y no se pudo cargar la miniatura de este archivo.`,
-	image_unviewable_body: 'No se pudo cargar este archivo ni su miniatura.',
+		`El navegador no puede mostrar archivos ${ext}, y la miniatura de este archivo tampoco se pudo mostrar.`,
+	image_unviewable_body: 'No se pudo mostrar este archivo ni su miniatura.',
 	col_export_blocked_title: 'Aún no se puede exportar',
 	col_export_blocked_desc: 'Todos los registros deben estar aprobados antes de exportar. Los siguientes aún no lo están:',
 	col_download_choose_title: 'Exportar o descargar',
