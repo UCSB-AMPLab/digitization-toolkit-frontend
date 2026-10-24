@@ -199,6 +199,41 @@ describe('project page: stems', () => {
 		await expect.element(page.getByText(es.pd_move_hint_none)).toBeInTheDocument();
 	});
 
+	it('requires a target for a volume with records, and offers no choice to delete them', async () => {
+		const plain = vol(27, 'Tomo 30', { filename_stem: null, stem_reserved: false, record_count: 3 });
+		listSpy.mockResolvedValue([plain, other]);
+		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 3, target_collection_id: 24 });
+		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();
+		render(ProjectPage);
+		await openRowMenu('Tomo 30');
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+
+		await expect.element(page.getByText(es.pd_delete_warning)).toBeInTheDocument();
+		const select = page.getByLabelText(es.pd_move_label);
+		await expect.element(select).toHaveAttribute('required');
+		const placeholder = page.getByRole('option', { name: es.pd_move_none });
+		await expect.element(placeholder).toBeDisabled();
+		await expect.element(page.getByRole('button', { name: es.pd_delete_collection_title })).toBeDisabled();
+
+		vi.spyOn(collectionsApi, 'get').mockResolvedValue(plain);
+		await userEvent.selectOptions(select, 'Tomo 100');
+		const confirm = page.getByRole('button', { name: es.proj_move_and_delete });
+		await expect.element(confirm).toBeEnabled();
+		await userEvent.click(confirm);
+		await vi.waitFor(() => expect(deleteSpy).toHaveBeenCalledWith(27));
+		expect(moveSpy).toHaveBeenCalledWith(27, 24);
+	});
+
+	it('leaves the delete enabled for an empty volume', async () => {
+		const empty = vol(28, 'Tomo 31', { filename_stem: null, stem_reserved: false, record_count: 0 });
+		listSpy.mockResolvedValue([empty, other]);
+		vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
+		render(ProjectPage);
+		await openRowMenu('Tomo 31');
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+		await expect.element(page.getByRole('button', { name: es.pd_delete_collection_title })).toBeEnabled();
+	});
+
 	it('disables the delete of a volume that reserves its stem, says why, and moves nothing', async () => {
 		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 0, target_collection_id: 0 });
 		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();

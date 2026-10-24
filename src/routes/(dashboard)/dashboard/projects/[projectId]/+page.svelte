@@ -924,9 +924,11 @@
         </div>
 
         <div class="delete-move-section">
-          <label class="field-label">{$m.pd_move_label}</label>
-          <select class="field-input" bind:value={deleteMoveColTarget}>
-            <option value="">{$m.pd_move_none}</option>
+          <!-- The backend refuses to delete a volume that still has records,
+               so a target is required and the empty option is a placeholder. -->
+          <label class="field-label" for="delete-move-target">{$m.pd_move_label}</label>
+          <select id="delete-move-target" class="field-input" bind:value={deleteMoveColTarget} required aria-required="true">
+            <option value="" disabled>{$m.pd_move_none}</option>
             {#each collections.filter(c => c.id !== deletingCol!.id) as c}
               <option value={c.id}>{c.name}</option>
             {/each}
@@ -957,7 +959,8 @@
         <button
           class="btn-danger"
           onclick={executeDeleteCol}
-          disabled={isDeletingCol || isLoadingDeleteColInfo || deleteRefused(deletingCol)}
+          disabled={isDeletingCol || isLoadingDeleteColInfo || deleteRefused(deletingCol)
+            || (deleteColRecordCount > 0 && deleteMoveColTarget === '')}
         >
           <span class="material-symbols-outlined icon-sm">delete</span>
           {isDeletingCol ? $m.common_deleting : (deleteMoveColTarget !== '' ? $m.proj_move_and_delete : $m.pd_delete_collection_title)}
