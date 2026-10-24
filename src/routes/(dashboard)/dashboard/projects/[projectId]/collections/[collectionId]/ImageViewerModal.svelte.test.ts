@@ -3,6 +3,8 @@
 // image itself.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
+import '../../../../../../../app.css';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -194,5 +196,61 @@ describe('ImageViewerModal — retake only for a captured or rejected record', (
 
   it('still lets an admin delete a record in review', () => {
     expect(footerButtons('in_review', 'admin').some((t) => t.includes(es.common_delete))).toBe(true);
+  });
+});
+
+describe('ImageViewerModal — the footer at phone and monitor widths', () => {
+  let spy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    spy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(make1200x800DataUrl());
+  });
+  afterEach(() => spy.mockRestore());
+
+  async function renderFooter(width: number) {
+    await page.viewport(width, 800);
+    await document.fonts.load('18px "Material Symbols Outlined"');
+    await document.fonts.load('600 16px Mulish');
+    const screen = render(ImageViewerModal, {
+      record: makeRecord({ status: 'captured' }),
+      onClose: vi.fn(),
+      onRetake: vi.fn(),
+      onDelete: vi.fn(),
+      userRole: 'operator',
+    });
+    const content = screen.container.querySelector('.img-viewer-content') as HTMLElement;
+    const footer = content.querySelector('.img-viewer-footer') as HTMLElement;
+    const buttons = Array.from(footer.querySelectorAll('button')) as HTMLElement[];
+    return { content, footer, buttons };
+  }
+
+  // How many lines a button's label takes: the distinct tops of its text's line boxes.
+  function labelLines(b: HTMLElement): number {
+    const text = Array.from(b.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
+    const range = document.createRange();
+    const tops = new Set<number>();
+    for (const node of text) {
+      range.selectNodeContents(node);
+      for (const r of Array.from(range.getClientRects())) if (r.width > 0) tops.add(Math.round(r.top));
+    }
+    return tops.size;
+  }
+
+  for (const width of [320, 360, 390]) {
+    it(`at ${width}px, overflows nothing and keeps every label on one line`, async () => {
+      const { content, footer, buttons } = await renderFooter(width);
+      expect(footer.scrollWidth).toBeLessThanOrEqual(footer.clientWidth);
+      const frame = content.getBoundingClientRect();
+      for (const b of buttons) {
+        expect(b.getBoundingClientRect().right).toBeLessThanOrEqual(frame.right);
+        expect(labelLines(b), b.textContent ?? '').toBe(1);
+      }
+    });
+  }
+
+  it('keeps close, retake and delete on one row on a monitor', async () => {
+    const { buttons } = await renderFooter(1400);
+    expect(buttons.map((b) => b.textContent ?? '').some((t) => t.includes(es.col_retake))).toBe(true);
+    const tops = new Set(buttons.map((b) => Math.round(b.getBoundingClientRect().top)));
+    expect(tops.size).toBe(1);
   });
 });

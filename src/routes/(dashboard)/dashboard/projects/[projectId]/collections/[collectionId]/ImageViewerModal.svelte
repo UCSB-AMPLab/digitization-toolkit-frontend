@@ -294,7 +294,7 @@
           <span class="material-symbols-outlined icon-sm">close</span>
           {$m.common_close}
         </button>
-        <div style="display:flex; gap:8px;">
+        <div class="img-viewer-actions">
           {#if isLocked && userRole !== 'admin'}
             <span class="img-viewer-locked-msg">
               <span class="material-symbols-outlined icon-sm">lock</span>
@@ -399,6 +399,13 @@
   }
   .img-viewer-zoom-btn:hover { background: var(--color-primary); }
   .one-to-one-glyph { font-size: 11px; font-weight: var(--fw-bold); }
+  /* Retake and delete. They wrap onto a second row when the footer is too
+     narrow for both, instead of pushing past the modal at phone width. */
+  .img-viewer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
   .btn-warning {
     display: inline-flex;
     align-items: center;
