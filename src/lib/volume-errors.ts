@@ -61,10 +61,25 @@ export function notEmptyCounts(error: unknown): { subVolumes: number; records: n
 	return { subVolumes: Number(match[1]), records: Number(match[2]) };
 }
 
+/**
+ * How many records blocked a move because they were handed over for review:
+ * the length of `blocking_record_ids` in the move-records 409 (NEH-260), or
+ * null for any other error.
+ */
+export function moveBlockedCount(error: unknown): number | null {
+	if (typeof error !== 'object' || error === null) return null;
+	const e = error as { status?: unknown; detail?: unknown };
+	if (e.status !== 409 || typeof e.detail !== 'object' || e.detail === null) return null;
+	const ids = (e.detail as { blocking_record_ids?: unknown }).blocking_record_ids;
+	return Array.isArray(ids) && ids.length > 0 ? ids.length : null;
+}
+
 /** The message for a failed delete (or the move of records before it). */
 export function volumeDeleteErrorText(error: unknown, msgs: Messages): string {
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
+	const blocked = moveBlockedCount(error);
+	if (blocked !== null) return msgs.pd_err_move_under_review(blocked);
 	if (isNotEmptyRefusal(error)) {
 		const counts = notEmptyCounts(error);
 		if (counts && counts.records === 0 && counts.subVolumes > 0) return msgs.pd_err_delete_has_subvolumes;

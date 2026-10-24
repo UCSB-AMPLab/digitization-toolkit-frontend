@@ -263,6 +263,28 @@ describe('project page: stems', () => {
 		expect(page.getByText(subs, { exact: false }).elements()).toHaveLength(0);
 	});
 
+	it('says the records are under review when the move is refused, and deletes nothing', async () => {
+		const plain = vol(31, 'Tomo 33', { filename_stem: null, stem_reserved: false, record_count: 3 });
+		listSpy.mockResolvedValue([plain, other]);
+		vi.spyOn(collectionsApi, 'get').mockResolvedValue(plain);
+		const message =
+			'Cannot move: 3 record(s) have been handed over for review: [7, 8, 9]. Take this collection back first.';
+		vi.spyOn(collectionsApi, 'moveRecords').mockRejectedValue(
+			new ApiError(message, { message, blocking_record_ids: [7, 8, 9] }, 409)
+		);
+		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();
+		render(ProjectPage);
+		await openRowMenu('Tomo 33');
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+		await userEvent.selectOptions(page.getByLabelText(es.pd_move_label), 'Tomo 100');
+		await userEvent.click(page.getByRole('button', { name: es.proj_move_and_delete }));
+
+		await expect.element(page.getByText(es.pd_err_move_under_review(3))).toBeInTheDocument();
+		expect(page.getByText(message, { exact: false }).elements()).toHaveLength(0);
+		expect(page.getByText(es.pd_err_delete_collection).elements()).toHaveLength(0);
+		expect(deleteSpy).not.toHaveBeenCalled();
+	});
+
 	it('leaves the delete enabled for an empty volume', async () => {
 		const empty = vol(28, 'Tomo 31', { filename_stem: null, stem_reserved: false, record_count: 0 });
 		listSpy.mockResolvedValue([empty, other]);

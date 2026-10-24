@@ -413,6 +413,10 @@ export const es = {
 	pd_err_create_collection: 'No se pudo guardar el volumen. Intenta de nuevo.',
 	pd_err_delete_collection: 'No se pudo eliminar el volumen. Intenta de nuevo.',
 	pd_err_delete_has_subvolumes: 'Este volumen no se puede eliminar porque todavía contiene otros volúmenes.',
+	pd_err_move_under_review: (n: number) =>
+		n === 1
+			? 'Un registro de este volumen está en revisión, así que no se puede mover. Primero retira el volumen de revisión con "Retirar de revisión".'
+			: `${n} registros de este volumen están en revisión, así que no se pueden mover. Primero retira el volumen de revisión con "Retirar de revisión".`,
 	pd_err_delete_not_empty: 'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
 	pd_member_implicit: 'Acceso implícito (no se puede eliminar)',
 	pd_member_remove: 'Eliminar colaborador',

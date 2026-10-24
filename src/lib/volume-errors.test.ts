@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
 import { en } from './i18n/en';
-import { isNotEmptyRefusal, notEmptyCounts, volumeDeleteErrorText, volumeSaveErrorText } from './volume-errors';
+import { isNotEmptyRefusal, moveBlockedCount, notEmptyCounts, volumeDeleteErrorText, volumeSaveErrorText } from './volume-errors';
 
 // A stand-in for api.ts's ApiError, as in volume-stem.test.ts.
 class ApiError extends Error {
@@ -60,6 +60,19 @@ describe('volumeDeleteErrorText', () => {
 		const subs =
 			'Cannot delete a non-empty collection: 2 sub-collection(s) and 0 record(s) remain. Move or delete them first.';
 		expect(volumeDeleteErrorText(new ApiError(subs, undefined, 409), es)).toBe(es.pd_err_delete_has_subvolumes);
+	});
+
+	it('says records under review block a move, with their number', () => {
+		const message =
+			'Cannot move: 2 record(s) have been handed over for review: [4, 5]. Take this collection back first.';
+		const err = new ApiError(message, { message, blocking_record_ids: [4, 5] }, 409);
+		expect(moveBlockedCount(err)).toBe(2);
+		expect(volumeDeleteErrorText(err, es)).toBe(es.pd_err_move_under_review(2));
+		expect(volumeDeleteErrorText(err, es)).not.toContain('Cannot move');
+		const one = new ApiError('x', { message: 'x', blocking_record_ids: [4] }, 409);
+		expect(volumeDeleteErrorText(one, es)).toBe(es.pd_err_move_under_review(1));
+		expect(moveBlockedCount(new ApiError('x', { message: 'x', blocking_record_ids: [] }, 409))).toBeNull();
+		expect(moveBlockedCount(new ApiError('x', undefined, 409))).toBeNull();
 	});
 
 	it('maps the reserved-stem refusal', () => {

@@ -392,6 +392,10 @@ export const en: Messages = {
 	pd_err_create_collection: 'Could not save the volume. Try again.',
 	pd_err_delete_collection: 'Could not delete the volume. Try again.',
 	pd_err_delete_has_subvolumes: 'This volume cannot be deleted because it still contains other volumes.',
+	pd_err_move_under_review: (n: number) =>
+		n === 1
+			? 'One record in this volume is under review, so it cannot be moved. First withdraw the volume from review with "Withdraw from review".'
+			: `${n} records in this volume are under review, so they cannot be moved. First withdraw the volume from review with "Withdraw from review".`,
 	pd_err_delete_not_empty: 'This volume still has records. Move them to another volume before deleting it.',
 	pd_member_implicit: 'Implicit access (cannot be removed)',
 	pd_member_remove: 'Remove collaborator',
