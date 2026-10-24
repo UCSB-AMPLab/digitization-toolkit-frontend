@@ -428,7 +428,7 @@ export const es = {
 	pd_delete_warning: 'Las imágenes asociadas se eliminarán permanentemente si no se mueven.',
 	pd_move_label: 'MOVER REGISTROS ANTES DE ELIMINAR (OPCIONAL)',
 	pd_move_none: '— Eliminar registros definitivamente —',
-	pd_move_hint_none: 'Los registros e imágenes se perderán permanentemente.',
+	pd_move_hint_none: 'Este volumen no se puede eliminar hasta que sus registros se muevan a otro volumen.',
 	pd_move_hint_selected: 'Los registros se moverán al volumen seleccionado antes de eliminar.',
 	pd_delete_confirm_pre: '¿Estás seguro de que quieres eliminar el volumen ',
 	pd_field_stem: 'RAÍZ',

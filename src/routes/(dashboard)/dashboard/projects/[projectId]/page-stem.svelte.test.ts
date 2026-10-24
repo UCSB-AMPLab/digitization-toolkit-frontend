@@ -188,6 +188,15 @@ describe('project page: stems', () => {
 		expect(page.getByText(backend, { exact: false }).elements()).toHaveLength(0);
 	});
 
+	it('says a volume with records cannot be deleted until they are moved', async () => {
+		const plain = vol(27, 'Tomo 30', { filename_stem: null, stem_reserved: false, record_count: 3 });
+		listSpy.mockResolvedValue([plain, other]);
+		render(ProjectPage);
+		await openRowMenu('Tomo 30');
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+		await expect.element(page.getByText(es.pd_move_hint_none)).toBeInTheDocument();
+	});
+
 	it('disables the delete of a volume that reserves its stem, says why, and moves nothing', async () => {
 		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 0, target_collection_id: 0 });
 		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();

@@ -407,7 +407,7 @@ export const en: Messages = {
 	pd_delete_warning: 'The associated images will be permanently deleted unless they are moved.',
 	pd_move_label: 'MOVE RECORDS BEFORE DELETING (OPTIONAL)',
 	pd_move_none: '— Delete records permanently —',
-	pd_move_hint_none: 'The records and images will be permanently lost.',
+	pd_move_hint_none: 'The volume cannot be deleted until its records are moved to another volume.',
 	pd_move_hint_selected: 'The records will be moved to the selected volume before deleting.',
 	pd_delete_confirm_pre: 'Are you sure you want to delete the volume ',
 	pd_field_stem: 'FILE NAME STEM',
