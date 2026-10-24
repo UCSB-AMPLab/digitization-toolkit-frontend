@@ -309,6 +309,47 @@ describe.each(modals)('%s — images freed from the card (NEH-248)', (_name, ren
   });
 });
 
+describe.each(modals)('%s — a freed image shown only by its thumbnail (NEH-248)', (_name, renderModal) => {
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  let thumbSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
+  });
+  afterEach(() => {
+    previewSpy.mockRestore();
+    thumbSpy.mockRestore();
+    fetchSpy.mockRestore();
+  });
+
+  it('a TIFF whose master is freed: the panel over its thumbnail, read from the record', async () => {
+    const screen = renderModal(makeRecord([makeImage({ format: 'tif', filename: 'f.tif', master_freed_at: '2026-10-20T14:03:00' })]));
+
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
+    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+    await expect.element(screen.getByText('Lo que ves es la miniatura, que Captua conserva en el equipo.')).toBeVisible();
+    expect(screen.container.textContent).not.toContain('Miniatura');
+  });
+
+  it('a TIFF whose master is on the card keeps the ordinary thumbnail badge', async () => {
+    const screen = renderModal(makeRecord([makeImage({ format: 'tif', filename: 'f.tif' })]));
+
+    await expect.element(screen.getByText('Miniatura', { exact: true })).toBeVisible();
+    expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
+  });
+
+  it('a JPEG with the field set but a /preview that loads: the image, no panel (the 410 decides)', async () => {
+    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg', master_freed_at: '2026-10-20T14:03:00' })]));
+
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
+  });
+});
+
 describe('gallery modal — download link of a freed master (NEH-248)', () => {
   it('offers no download for a master freed from the card', async () => {
     const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);

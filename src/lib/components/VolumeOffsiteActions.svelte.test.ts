@@ -51,14 +51,14 @@ describe('VolumeOffsiteActions', () => {
 	let freeSpy: ReturnType<typeof vi.spyOn>;
 	let restoreSpy: ReturnType<typeof vi.spyOn>;
 	let jobSpy: ReturnType<typeof vi.spyOn>;
-	let onChanged: ReturnType<typeof vi.fn<() => void>>;
+	let onChanged: ReturnType<typeof vi.fn<(collectionId: number) => void>>;
 
 	beforeEach(() => {
 		planSpy = vi.spyOn(collectionsApi, 'planFree');
 		freeSpy = vi.spyOn(collectionsApi, 'startFree');
 		restoreSpy = vi.spyOn(collectionsApi, 'startRestore');
 		jobSpy = vi.spyOn(collectionsApi, 'getOffsiteJob');
-		onChanged = vi.fn<() => void>();
+		onChanged = vi.fn<(collectionId: number) => void>();
 	});
 	afterEach(() => {
 		planSpy.mockRestore();
@@ -117,7 +117,7 @@ describe('VolumeOffsiteActions', () => {
 		await expect.element(dialog.getByText('Captua terminó de liberar espacio'), { timeout: 6000 }).toBeVisible();
 		await expect.element(dialog.getByText('Captua quitó 9 archivos (270 MB) de la tarjeta.')).toBeVisible();
 		expect(jobSpy).toHaveBeenCalledWith(7, 'j1');
-		expect(onChanged).toHaveBeenCalled();
+		expect(onChanged).toHaveBeenCalledWith(7);
 	});
 
 	it('free: says so when the dry run finds nothing to free, with no confirm button', async () => {
@@ -185,4 +185,35 @@ describe('VolumeOffsiteActions', () => {
 			'Este equipo no está configurado para restaurar: necesita acceso de lectura a la copia externa. Pide a quien instaló el equipo que lo configure.'
 		);
 	});
+
+	const runningRestore = async () => {
+		restoreSpy.mockResolvedValue({ job_id: 'j3', state: 'queued', action: 'restore', status_url: '/collections/7/offsite/jobs/j3' });
+		jobSpy.mockResolvedValue(job({ job_id: 'j3', action: 'restore', state: 'running' }));
+		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000 }));
+		await openMenu(screen);
+		await screen.getByRole('button', { name: 'Restaurar en la tarjeta' }).click();
+		await screen.getByRole('button', { name: 'Restaurar', exact: true }).click();
+		await expect.poll(() => jobSpy.mock.calls.length, { timeout: 6000 }).toBeGreaterThan(0);
+		return screen;
+	};
+	const settle = () => new Promise((r) => setTimeout(r, 2500));
+
+	it('closing the dialog while a job runs stops polling, and says which volume changed', async () => {
+		const screen = await runningRestore();
+		await screen.getByRole('button', { name: 'Cerrar' }).click();
+		const calls = jobSpy.mock.calls.length;
+		await settle();
+		expect(jobSpy.mock.calls.length).toBe(calls);
+		expect(onChanged).toHaveBeenCalledWith(7);
+	});
+
+	it('moving to another volume destroys the component and stops its polling', async () => {
+		const screen = await runningRestore();
+		screen.unmount();
+		const calls = jobSpy.mock.calls.length;
+		await settle();
+		expect(jobSpy.mock.calls.length).toBe(calls);
+		for (const [id] of onChanged.mock.calls) expect(id).toBe(7);
+	});
 });
+

@@ -5,6 +5,7 @@ import {
   displayCandidates,
   formatOf,
   freedFromBody,
+  freedFromMetadata,
   isBrowserDisplayable,
   isRawImage,
   probeFreed,
@@ -218,5 +219,22 @@ describe('checkMasterStored, for a freed master', () => {
   it('is unknown on a 410 that does not say so', async () => {
     const f = vi.fn().mockResolvedValue(response(410));
     expect(await checkMasterStored('/file', f as unknown as typeof fetch)).toBe('unknown');
+  });
+});
+
+describe('freedFromMetadata', () => {
+  it('reads a freed master from the record for a format shown only by its thumbnail', () => {
+    expect(freedFromMetadata({ format: 'tif', filename: 'a.tif', master_freed_at: '2026-10-20T14:03:00' }))
+      .toEqual({ kind: 'capture', freedAt: '2026-10-20T14:03:00' });
+  });
+
+  it('is null when the master is not freed', () => {
+    expect(freedFromMetadata({ format: 'tif', filename: 'a.tif' })).toBeNull();
+    expect(freedFromMetadata({ format: 'tif', filename: 'a.tif', master_freed_at: null })).toBeNull();
+  });
+
+  it('is null for a format with a preview: the 410 of /preview decides there', () => {
+    expect(freedFromMetadata({ format: 'jpg', filename: 'a.jpg', master_freed_at: '2026-10-20T14:03:00' })).toBeNull();
+    expect(freedFromMetadata({ format: 'cr2', filename: 'a.cr2', master_freed_at: '2026-10-20T14:03:00', preview_freed_at: '2026-10-20T14:03:00' })).toBeNull();
   });
 });

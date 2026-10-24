@@ -10,6 +10,8 @@ import type {
 	VolumeOffsiteState
 } from '$lib/api';
 import {
+	freedCountsChanged,
+	freedCountsOf,
 	freedExportCount,
 	isJobLost,
 	offsiteActionErrorText,
@@ -419,5 +421,35 @@ describe('runOffsiteJob', () => {
 		const controller = new AbortController();
 		controller.abort();
 		expect(await runOffsiteJob('free', start, vi.fn(), { ...opts, signal: controller.signal }, es)).toEqual({ kind: 'aborted' });
+	});
+});
+
+describe('freedCountsChanged', () => {
+	const counts = (collectionId: number, files: number, bytes: number) => ({ collectionId, files, bytes });
+
+	it('is false on the first reading of a volume: the page has just loaded its records', () => {
+		expect(freedCountsChanged(null, counts(7, 4, 100), 7)).toBe(false);
+	});
+
+	it('is true when the files or the bytes freed change on the volume shown', () => {
+		expect(freedCountsChanged(counts(7, 0, 0), counts(7, 4, 100), 7)).toBe(true);
+		expect(freedCountsChanged(counts(7, 4, 100), counts(7, 0, 0), 7)).toBe(true);
+		expect(freedCountsChanged(counts(7, 4, 100), counts(7, 4, 120), 7)).toBe(true);
+	});
+
+	it('is false when nothing changed', () => {
+		expect(freedCountsChanged(counts(7, 4, 100), counts(7, 4, 100), 7)).toBe(false);
+	});
+
+	it('never acts for a volume other than the one shown, nor across a change of volume', () => {
+		expect(freedCountsChanged(counts(7, 0, 0), counts(7, 4, 100), 8)).toBe(false);
+		expect(freedCountsChanged(counts(7, 0, 0), counts(8, 4, 100), 8)).toBe(false);
+	});
+});
+
+describe('freedCountsOf', () => {
+	it('reads a backend without the freed counts as nothing freed', () => {
+		const s = { collection_id: 7, freed_files: undefined, freed_bytes: undefined } as unknown as VolumeOffsiteState;
+		expect(freedCountsOf(s)).toEqual({ collectionId: 7, files: 0, bytes: 0 });
 	});
 });

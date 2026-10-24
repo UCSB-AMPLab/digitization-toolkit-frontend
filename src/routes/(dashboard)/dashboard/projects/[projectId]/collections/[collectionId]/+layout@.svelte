@@ -21,6 +21,7 @@
   import VolumeOffsiteActions from '$lib/components/VolumeOffsiteActions.svelte';
   import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
   import type { VolumeOffsiteState } from '$lib/api';
+  import { freedCountsChanged, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
 
   let { children } = $props();
 
@@ -64,10 +65,23 @@
   // dialog is not closed under the admin; it is matched to the volume shown.
   let offsiteState = $state<VolumeOffsiteState | null>(null);
   let offsiteRefresh = $state(0);
+  // What the line last read as freed. When it changes on the volume shown, a
+  // free or a restore has moved files, whether or not its dialog was still
+  // open, so the page reloads the records and their freed state.
+  let lastFreed: FreedCounts | null = null;
 
-  function offsiteChanged() {
-    offsiteRefresh += 1;
-    topbarSlot.reloadRecords?.();
+  function offsiteRead(s: VolumeOffsiteState | null) {
+    if (!s) return;
+    offsiteState = s;
+    const next = freedCountsOf(s);
+    if (freedCountsChanged(lastFreed, next, collectionId)) topbarSlot.reloadRecords?.();
+    lastFreed = next;
+  }
+
+  // A job's end, for the volume it was started for: ask the line again. A
+  // job of a volume no longer shown changes nothing here.
+  function offsiteChanged(forId: number) {
+    if (forId === collectionId) offsiteRefresh += 1;
   }
 
   // ---------------------------------------------------------------------------
@@ -102,7 +116,7 @@
           <span class="bc-sep">/</span>
           <span class="bc-item bc-collection">{collectionName}</span>
         </nav>
-        <VolumeOffsiteIndicator {collectionId} refresh={offsiteRefresh} onState={(s) => { if (s) offsiteState = s; }} />
+        <VolumeOffsiteIndicator {collectionId} refresh={offsiteRefresh} onState={offsiteRead} />
       </div>
       {#if isAdmin && offsiteState && offsiteState.collection_id === collectionId}
         {#key collectionId}

@@ -22,7 +22,9 @@
   // al fallar /preview se le vuelve a preguntar con fetch (probeFreed). Si está
   // liberado, se muestra un aviso tranquilo sobre la miniatura, o solo, si no
   // hay miniatura: está fuera del equipo, no se perdió nada y un administrador
-  // puede restaurar el volumen. Nunca como faltante ni como error.
+  // puede restaurar el volumen. Nunca como faltante ni como error. Un formato
+  // que solo se muestra por su miniatura (TIFF) no pide /preview, así que ahí
+  // decide el master_freed_at del registro (freedFromMetadata).
   // ============================================================================
 
   import { untrack, type Snippet } from 'svelte';
@@ -34,6 +36,7 @@
     formatOf,
     isBrowserDisplayable,
     isRawImage,
+    freedFromMetadata,
     probeFreed,
     type FreedFile,
     type MasterCheck,
@@ -43,14 +46,14 @@
     image,
     children,
   }: {
-    image: Pick<RecordImage, 'id' | 'format' | 'filename'>;
+    image: Pick<RecordImage, 'id' | 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>;
     /** Pinta el <img>: recibe la URL a mostrar y el handler de error. */
     children: Snippet<[string, () => void]>;
   } = $props();
 
   // Solo se vuelve a resolver si cambia la imagen, no cada vez que el padre
   // pasa un objeto nuevo con los mismos datos (p. ej. al recargar la lista).
-  const imageKey = $derived(`${image.id}|${image.format}|${image.filename}`);
+  const imageKey = $derived(`${image.id}|${image.format}|${image.filename}|${image.master_freed_at ?? ''}`);
 
   const candidates = $derived.by(() => {
     void imageKey;
@@ -81,7 +84,7 @@
     void candidates;
     index = 0;
     master = 'checking';
-    freed = null;
+    freed = untrack(() => freedFromMetadata(image));
     probes?.abort();
     probes = null;
   });

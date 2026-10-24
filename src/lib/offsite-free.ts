@@ -352,3 +352,26 @@ export async function runOffsiteJob(
 		return { kind: 'error', text: isJobLost(error) ? msgs.offsite_err_job_lost : msgs.offsite_err_poll };
 	}
 }
+
+/** A volume's freed counts, as GET /collections/{id}/offsite reports them. */
+export interface FreedCounts {
+	collectionId: number;
+	files: number;
+	bytes: number;
+}
+
+export function freedCountsOf(state: VolumeOffsiteState): FreedCounts {
+	return { collectionId: state.collection_id, files: state.freed_files ?? 0, bytes: state.freed_bytes ?? 0 };
+}
+
+/**
+ * Whether the records shown for `currentId` must be reloaded because what is
+ * freed of that volume changed since `prev` was read: a free or a restore
+ * ended, whether or not its dialog was still open, or one ran elsewhere. The
+ * first reading of a volume, and a reading of any other volume, is never a
+ * change: the page loads a volume's records when it shows it.
+ */
+export function freedCountsChanged(prev: FreedCounts | null, next: FreedCounts, currentId: number): boolean {
+	if (prev === null || next.collectionId !== currentId || prev.collectionId !== next.collectionId) return false;
+	return prev.files !== next.files || prev.bytes !== next.bytes;
+}

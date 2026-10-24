@@ -11,7 +11,10 @@
 	// result is reported. Every refusal and failure is mapped in offsite-free.ts.
 	//
 	// Closing the dialog while a job runs stops the polling only: the job goes on
-	// in the backend, and the offsite line shows its result.
+	// in the backend, and the offsite line shows its result; the layout reloads
+	// the records when the line's freed counts change. Destroying the component
+	// (the layout keys it by volume) stops the polling too, and every call of
+	// onChanged names the volume its job was started for.
 	// ============================================================================
 
 	import { tick } from 'svelte';
@@ -33,8 +36,8 @@
 	}: {
 		collectionId: number;
 		offsite: VolumeOffsiteState;
-		/** After a job ends (done or failed): the layout asks the offsite line again and reloads the records. */
-		onChanged: () => void;
+		/** When a job ends or its polling stops, with the volume it was started for: the layout asks the offsite line again. */
+		onChanged: (collectionId: number) => void;
 	} = $props();
 
 	const POLL_INTERVAL_MS = 2000;
@@ -53,6 +56,11 @@
 	let cardEl = $state<HTMLElement | null>(null);
 	let buttonEl = $state<HTMLButtonElement | null>(null);
 	let polling: AbortController | null = null;
+
+	$effect(() => () => {
+		polling?.abort();
+		polling = null;
+	});
 
 	let planView = $derived(step?.kind === 'plan' ? planSummary(step.plan, $m) : null);
 	let resultView = $derived(step?.kind === 'done' ? resultSummary(step.action, step.result, $m) : null);
@@ -97,18 +105,19 @@
 	async function run(action: 'free' | 'restore') {
 		step = { kind: 'running', action };
 		focusCard();
+		const forId = collectionId;
 		const controller = new AbortController();
 		polling = controller;
 		const outcome = await runOffsiteJob(
 			action,
-			() => (action === 'free' ? collectionsApi.startFree(collectionId) : collectionsApi.startRestore(collectionId)),
-			(jobId) => collectionsApi.getOffsiteJob(collectionId, jobId),
+			() => (action === 'free' ? collectionsApi.startFree(forId) : collectionsApi.startRestore(forId)),
+			(jobId) => collectionsApi.getOffsiteJob(forId, jobId),
 			{ intervalMs: POLL_INTERVAL_MS, signal: controller.signal },
 			$m
 		);
 		if (polling === controller) polling = null;
 		// A job may have changed files even when it failed part way.
-		onChanged();
+		onChanged(forId);
 		if (outcome.kind === 'aborted' || controller.signal.aborted) return;
 		step = outcome.kind === 'done' ? { kind: 'done', action, result: outcome.result } : { kind: 'error', action, text: outcome.text };
 		focusCard();

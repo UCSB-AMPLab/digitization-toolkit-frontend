@@ -101,6 +101,19 @@ export function freedFromBody(status: number, body: unknown): FreedFile | null {
 }
 
 /**
+ * The freed master the record says it has, for a format shown only by its
+ * thumbnail (TIFF and the like): no /preview is asked of such a format, so no
+ * 410 can say so. Null for any other format, where the 410 of /preview
+ * decides, and when the master is not freed.
+ */
+export function freedFromMetadata(
+  img: Pick<RecordImage, 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>,
+): FreedFile | null {
+  if (isRawImage(img) || isBrowserDisplayable(img)) return null;
+  return img.master_freed_at ? { kind: 'capture', freedAt: img.master_freed_at } : null;
+}
+
+/**
  * Ask `url` again and return the freed file its 410 describes, or null for
  * any other answer, a network error, or an already aborted `signal`. Only a
  * 410's small JSON body is read; any other request is aborted as soon as the
