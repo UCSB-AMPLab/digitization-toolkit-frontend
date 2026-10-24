@@ -57,6 +57,10 @@
   // ---------------------------------------------------------------------------
   let confirmAction = $state<null | 'retake' | 'delete'>(null);
 
+  // Masters a 410 has said are freed (NEH-248), by image id. The records can
+  // be older than a free, so master_freed_at alone can miss one.
+  let masterFreedById = $state<{ [id: number]: boolean }>({});
+
   // Imágenes del registro, ordenadas por rol (left primero, right después)
   const images = $derived(() => {
     const imgs = record.images ?? [];
@@ -231,7 +235,7 @@
 
           <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su miniatura,
                nunca como imagen rota -->
-          <RecordImageDisplay image={img}>
+          <RecordImageDisplay image={img} bind:masterFreed={masterFreedById[img.id]}>
             {#snippet children(src, onerror)}
               <img
                 {src}
@@ -263,8 +267,9 @@
               <span class="one-to-one-glyph">1:1</span>
             </button>
           </div>
-          <!-- NEH-248: a master freed from the card is not on the scanner to download -->
-          {#if !img.master_freed_at}
+          <!-- NEH-248: a master freed from the card is not on the scanner to
+               download, whether the record says so or a 410 did -->
+          {#if !img.master_freed_at && !masterFreedById[img.id]}
             <a
               class="img-viewer-download"
               href={recordsApi.getImageFileUrl(img.id)}

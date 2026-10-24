@@ -114,6 +114,21 @@ export function freedFromMetadata(
 }
 
 /**
+ * Whether the record says /preview now answers 410: a JPEG, PNG or WebP
+ * whose master is freed (it is its own preview), or a RAW whose preview is.
+ * A RAW whose master alone is freed is still shown by its preview. The 410
+ * stays the rule; this only says when to ask /preview again, as after an
+ * in-place reload, when the <img> already holds the preview it loaded.
+ */
+export function previewFreedByMetadata(
+  img: Pick<RecordImage, 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>,
+): boolean {
+  if (isRawImage(img)) return !!img.preview_freed_at;
+  if (isBrowserDisplayable(img)) return !!img.master_freed_at;
+  return false;
+}
+
+/**
  * Ask `url` again and return the freed file its 410 describes, or null for
  * any other answer, a network error, or an already aborted `signal`. Only a
  * 410's small JSON body is read; any other request is aborted as soon as the
