@@ -727,6 +727,57 @@ export const es = {
 		'Algunas imágenes de este volumen están guardadas en la copia externa y ya no están en la tarjeta, así que no se pueden incluir en el ZIP. Un administrador puede restaurar el volumen desde "Espacio en la tarjeta".',
 	col_export_freed: (n: number): string =>
 		`${n === 1 ? 'Un archivo de este volumen está guardado en la copia externa y ya no está' : `${formatCount(n, 'es')} archivos de este volumen están guardados en la copia externa y ya no están`} en la tarjeta, así que Captua no puede armar el paquete. Para exportar el volumen, primero un administrador debe restaurarlo desde "Espacio en la tarjeta", junto a la línea de la copia externa.`,
+	// ── Manifiesto de captura para Fisqua ───────────────────────────────────
+	col_manifest_option_title: 'Manifiesto de captura (Fisqua)',
+	col_manifest_option_desc: 'Un archivo JSON que le indica a Fisqua qué páginas de este volumen están en la copia externa.',
+	col_manifest_requires: 'Requiere revisión y copia externa',
+	col_manifest_preparing: 'Preparando el manifiesto de captura…',
+	col_manifest_refused_title: 'Todavía no se puede exportar el manifiesto de captura',
+	col_manifest_refused_body: 'Fisqua rechazaría este archivo. Resuelve lo siguiente y vuelve a exportarlo.',
+	col_manifest_records: (ids: number[]): string => {
+		const shown = ids.slice(0, 20).join(', ');
+		const rest = ids.length - 20;
+		return `${ids.length === 1 ? 'Registro' : 'Registros'} ${shown}${rest > 0 ? ` y ${formatCount(rest, 'es')} más` : ''}`;
+	},
+	col_manifest_rule_tenant_missing:
+		'Este equipo no tiene un inquilino configurado, así que el manifiesto no tiene lugar en la copia externa. Un administrador debe definir DTK_OFFSITE_TENANT y reiniciar el backend.',
+	col_manifest_rule_tenant_invalid:
+		'El inquilino configurado en este equipo no es válido. Un administrador debe corregir DTK_OFFSITE_TENANT y reiniciar el backend.',
+	col_manifest_rule_no_stem:
+		'El volumen no tiene raíz, así que sus imágenes no tienen nombres que Fisqua pueda leer. Asígnale la raíz al volumen (su código de referencia en Fisqua).',
+	col_manifest_rule_no_project: 'El volumen no está en un proyecto, y el manifiesto debe indicar el proyecto. Mueve el volumen a un proyecto.',
+	col_manifest_rule_records_captured:
+		'Algunos registros siguen capturados, así que el volumen no se ha enviado a revisión. Envíalo a revisión cuando termines de capturarlo.',
+	col_manifest_rule_sequence_missing: 'Algunos registros no tienen número de secuencia. Renumera el volumen.',
+	col_manifest_rule_sequence_repeated: 'Algunos registros comparten el mismo número de secuencia. Renumera el volumen.',
+	col_manifest_rule_roles_invalid:
+		'Algunos registros no tienen ni una sola imagen ni una imagen izquierda, una derecha o ambas. Vuelve a capturarlos para que cada uno tenga una sola imagen o un par izquierda y derecha.',
+	col_manifest_rule_capture_id_missing:
+		'Algunas imágenes no tienen identificador de captura, así que el manifiesto de captura no tiene su checksum. Vuelve a capturar esos registros.',
+	col_manifest_rule_not_uploaded:
+		'Algunas imágenes todavía no están verificadas en la copia externa. Espera a que la subida a la copia externa las verifique y vuelve a exportar.',
+	col_manifest_rule_preview_not_uploaded:
+		'Las vistas previas de algunas imágenes RAW todavía no están verificadas en la copia externa. Espera a que la subida a la copia externa las verifique y vuelve a exportar.',
+	col_manifest_rule_raw_without_preview:
+		'Algunas imágenes RAW no tienen vista previa, ni en la copia externa ni en la tarjeta. Fisqua no puede leer un archivo RAW, así que hay que volver a capturar esos registros.',
+	col_manifest_rule_upload_refused:
+		'La subida a la copia externa rechazó algunos archivos. Resuelve cada rechazo que muestra la línea de la copia externa del volumen y vuelve a exportar.',
+	col_manifest_rule_key_outside:
+		'Algunos archivos están guardados en la copia externa fuera de las carpetas de este volumen. Los nombres en la copia externa no cambian nunca, así que hay que volver a capturar esos registros.',
+	col_manifest_rule_filename_form:
+		'Algunas imágenes están guardadas en la copia externa con nombres que no siguen los nombres de archivo de este volumen. Los nombres en la copia externa no cambian nunca, así que hay que volver a capturar esos registros.',
+	col_manifest_rule_page_key_repeated:
+		'Hay más de una imagen guardada con el mismo nombre, y Fisqua usa ese nombre para identificar cada página. Hay que volver a capturar esos registros.',
+	col_manifest_rule_sha256_missing:
+		'El manifiesto de captura no tiene un checksum SHA-256 válido para algunas imágenes. Un administrador debe ejecutar la verificación de integridad del volumen y resolver lo que reporte.',
+	col_manifest_rule_preview_sha256_missing:
+		'Las vistas previas de algunas imágenes RAW no tienen checksum SHA-256 registrado, porque se capturaron antes de que Captua lo registrara. Un administrador debe ejecutar backfill-preview-digests para este volumen en el equipo y luego volver a exportar.',
+	col_manifest_rule_no_pages:
+		'Ningún registro enviado a revisión o aprobado tiene imagen, así que Fisqua no tiene páginas que registrar. Envía a revisión registros con imágenes.',
+	col_manifest_rule_other: 'Fisqua rechazaría el archivo por otro motivo.',
+	col_manifest_err_title: 'No se pudo descargar el manifiesto de captura',
+	col_manifest_err_not_found: 'Captua no encontró este volumen. Vuelve al proyecto y ábrelo de nuevo.',
+	col_manifest_err: 'Captua no pudo preparar el manifiesto de captura. Intenta de nuevo.',
 	bug_report_button: 'Reportar un problema',
 	bug_report_title: 'Reportar un problema',
 	bug_report_desc: 'Cuéntanos qué pasó. Se abrirá GitHub con un reporte prellenado.',
