@@ -1033,7 +1033,7 @@ export const es = {
 	offsite_err_no_read_remote:
 		'Este equipo no está configurado para restaurar: necesita acceso de lectura a la copia externa. Pide a quien instaló el equipo que lo configure.',
 	offsite_err_not_in_own_folder:
-		'Algunos archivos de este volumen todavía no están en la carpeta propia del volumen, así que Captua no puede liberarlos ni restaurarlos. Captua los mueve allí al arrancar el equipo: reinicia el equipo y vuelve a intentarlo. Si después del reinicio Captua sigue sin poder liberarlos ni restaurarlos, avisa a un administrador.',
+		'Algunos archivos de este volumen todavía no están en la carpeta propia del volumen, así que Captua no puede liberarlos ni restaurarlos. Captua los mueve allí al arrancar el equipo: reinicia el equipo y vuelve a intentarlo. Si después del reinicio Captua sigue sin poder liberarlos ni restaurarlos, avísale a un administrador.',
 	offsite_err_job_running: 'Captua ya está liberando o restaurando archivos de este volumen. Espera a que termine.',
 	offsite_err_drive_unavailable:
 		'El disco configurado para los proyectos no está disponible. Conéctalo y actívalo, o vuelve al almacenamiento interno, y después intenta de nuevo.',
