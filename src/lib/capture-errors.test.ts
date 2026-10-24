@@ -20,6 +20,8 @@ const NO_VOLUME = 'Captures must go into a volume.';
 const NO_STEM = 'This volume has no file name stem. Give it one before capturing into it.';
 const RETAKE_VOLUME = "A retake must go into the record's own volume.";
 const MODE_DUAL = "Record 12 was captured in 'dual' mode; use the dual-capture endpoint to recapture it.";
+const NAME_TOO_LONG =
+	"This capture's file name would be longer than the 36 characters a pair id holds. Nothing was captured.";
 const MODE_SINGLE = "Record 12 was captured in 'single' mode; use the single-capture endpoint to recapture it.";
 
 describe('captureErrorText', () => {
@@ -32,7 +34,8 @@ describe('captureErrorText', () => {
 			[new ApiError('Record 12 not found', undefined, 404), es.lv_err_record_not_found],
 			[new ApiError(MODE_DUAL, undefined, 422), es.lv_err_retake_mode('dual')],
 			[new ApiError(MODE_SINGLE, undefined, 422), es.lv_err_retake_mode('single')],
-			[new CaptureFailed('Camera 1 is not connected'), es.lv_err_camera_not_connected(1)]
+			[new CaptureFailed('Camera 1 is not connected'), es.lv_err_camera_not_connected(1)],
+			[new ApiError(NAME_TOO_LONG, undefined, 409), es.lv_err_name_too_long]
 		];
 		for (const [error, text] of cases) expect(captureErrorText(error, es)).toBe(text);
 	});
@@ -49,6 +52,7 @@ describe('captureErrorText', () => {
 		expect(captureErrorText(new ApiError('Collection 7 not found', undefined, 409), es)).toBe(es.lv_capture_error);
 		expect(captureErrorText(new ApiError(MODE_DUAL, undefined, 409), es)).toBe(es.lv_capture_error);
 		expect(captureErrorText(new Error(RETAKE_VOLUME), es)).toBe(es.lv_capture_error);
+		expect(captureErrorText(new ApiError(NAME_TOO_LONG, undefined, 422), es)).toBe(es.lv_capture_error);
 	});
 
 	it('gives anything else the generic message, never the backend text', () => {
@@ -87,7 +91,8 @@ describe('the capture error strings', () => {
 				msgs.lv_err_retake_volume,
 				msgs.lv_err_retake_mode('dual'),
 				msgs.lv_err_retake_mode('single'),
-				msgs.lv_err_camera_not_connected(0)
+				msgs.lv_err_camera_not_connected(0),
+				msgs.lv_err_name_too_long
 			]) {
 				expect(text.endsWith('.')).toBe(false);
 			}

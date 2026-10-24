@@ -769,6 +769,7 @@ export const en: Messages = {
 			? 'This record was captured with two cameras; to retake it, choose "Double Camera"'
 			: 'This record was captured with one camera; to retake it, choose "Single Camera"',
 	lv_err_camera_not_connected: (n: number) => `Camera ${n} is not connected`,
+	lv_err_name_too_long: "Captua captured nothing: this capture's file name would be longer than 36 characters",
 	lv_capture_btn: 'Capture',
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',

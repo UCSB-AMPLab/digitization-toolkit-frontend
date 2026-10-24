@@ -8,6 +8,7 @@
 // - a refused request, thrown by api.ts as an ApiError carrying `status`
 //   and the backend's `detail` as its message: the 409s for no volume, no
 //   stem and a retake into another volume (app/core/volume_stem.py), the
+//   409 for a name longer than a pair id (app/core/capture_naming.py), the
 //   404s for an unknown volume or record, and the 422 for a retake in the
 //   wrong capture mode;
 // - a request answered 200 with `success: false`, which the capture screen
@@ -24,6 +25,11 @@ import { isConflict, isVolumeRequired, isWrongRetakeVolume } from './volume-stem
 
 // STEM_REQUIRED_DETAIL in app/core/volume_stem.py.
 const STEM_REQUIRED_DETAIL = 'This volume has no file name stem. Give it one before capturing into it.';
+
+// CAPTURE_NAME_TOO_LONG_DETAIL in app/core/capture_naming.py: the 409 for a
+// capture whose `<stem>-img_<nnnn>` would be longer than a pair id holds.
+const NAME_TOO_LONG_DETAIL =
+	"This capture's file name would be longer than the 36 characters a pair id holds. Nothing was captured.";
 
 // The 404 details in app/api/cameras.py: "Collection {id} not found" from
 // _refuse_capture_without_volume_or_stem, "Record {id} not found" from the
@@ -69,6 +75,7 @@ export function captureErrorText(error: unknown, msgs: Messages): string {
 	if (isStemRequired(error)) return msgs.lv_needs_stem;
 	if (isWrongRetakeVolume(error)) return msgs.lv_err_retake_volume;
 	const status = statusOf(error);
+	if (status === 409 && error.message === NAME_TOO_LONG_DETAIL) return msgs.lv_err_name_too_long;
 	if (status === 404 && VOLUME_NOT_FOUND.test(error.message)) return msgs.lv_err_volume_not_found;
 	if (status === 404 && RECORD_NOT_FOUND.test(error.message)) return msgs.lv_err_record_not_found;
 	const mode = status === 422 ? error.message.match(RETAKE_MODE) : null;
