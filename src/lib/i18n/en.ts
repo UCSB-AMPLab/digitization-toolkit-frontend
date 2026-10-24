@@ -538,7 +538,7 @@ export const en: Messages = {
 	col_status_in_review_lc: 'in review',
 	col_status_approved_lc: 'approved',
 	col_retake: 'Retake',
-	col_retake_confirm: 'Retake this record from live view? Captua keeps the current images as earlier versions.',
+	col_retake_confirm: 'Retake this record from the capture screen? Captua keeps the current images as earlier versions.',
 	col_delete_record_confirm: 'Permanently delete this record and all its images?',
 	badge_left: 'L',
 	badge_right: 'R',
