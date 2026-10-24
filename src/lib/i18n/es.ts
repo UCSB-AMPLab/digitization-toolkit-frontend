@@ -421,6 +421,26 @@ export const es = {
 			? 'Un registro de este volumen está en revisión, así que no se puede mover. Primero retira el volumen con "Retirar de revisión".'
 			: `Hay ${n} registros de este volumen en revisión, así que no se pueden mover. Primero retira el volumen con "Retirar de revisión".`,
 	pd_err_delete_not_empty: 'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
+	// Rechazos de un cambio de archivos mientras otro proceso los lee
+	// (volume-refusals.ts).
+	vol_err_volume_busy:
+		'En ese mismo momento se estaban agregando registros a este volumen, así que Captua no cambió nada. Intenta de nuevo.',
+	vol_err_files_being_read:
+		'Captua está preparando un archivo de este volumen para la copia externa. Intenta de nuevo en un momento.',
+	vol_err_files_being_read_project:
+		'Captua está preparando un archivo de un volumen de este proyecto para la copia externa. Intenta de nuevo en un momento.',
+	vol_err_export_running:
+		'Captua está exportando este volumen. Espera a que termine la exportación y vuelve a intentarlo.',
+	vol_err_export_in_subtree:
+		'Captua está exportando este volumen o uno de los volúmenes que contiene. Espera a que termine la exportación y vuelve a intentarlo.',
+	vol_err_export_in_project:
+		'Captua está exportando un volumen de este proyecto. Espera a que termine la exportación y vuelve a intentarlo.',
+	vol_err_files_changing:
+		'Captua está moviendo, renombrando o eliminando archivos de este volumen. Vuelve a intentar la exportación en un momento.',
+	vol_err_stored_offsite: (n: number): string =>
+		n === 1
+			? 'Un registro tiene archivos que ya están guardados en la copia externa como parte de este volumen, así que no se puede mover a otro volumen.'
+			: `Hay ${n} registros con archivos que ya están guardados en la copia externa como parte de este volumen, así que no se pueden mover a otro volumen.`,
 	pd_member_implicit: 'Acceso implícito (no se puede eliminar)',
 	pd_member_remove: 'Eliminar colaborador',
 	pd_member_add: 'Añadir colaborador',
@@ -545,7 +565,12 @@ export const es = {
 	col_renumber_desc:
 		'Captua numerará los registros de este volumen a partir de 1, en el orden en que aparecen ahora, sin cambiar el nombre de ningún archivo.',
 	col_renumbering: 'Renumerando…',
-	col_renumber_error: (message: string) => `No se pudo renumerar: ${message}`,
+	col_renumber_error: 'Captua no pudo renumerar los registros de este volumen. Intenta de nuevo.',
+	col_reorder_stale:
+		'Mientras reordenabas, se agregaron o se quitaron registros en este volumen, así que Captua no guardó el orden nuevo. Captua volvió a cargar el orden guardado.',
+	col_reorder_error: 'Captua no pudo guardar el orden nuevo. Captua volvió a cargar el orden guardado.',
+	col_delete_record_error_title: 'No se pudo eliminar el registro',
+	col_delete_record_retry: 'Intenta de nuevo en un momento.',
 	col_finalize_title: '¿Finalizar Proyecto?',
 	col_finalize_subtitle: 'Esta acción marcará el proyecto como terminado',
 	// Fragmentos alrededor del <strong> del modal de finalización
@@ -808,6 +833,7 @@ export const es = {
 	lv_err_retake_status: 'Solo se puede volver a capturar un registro en estado Capturado o Rechazado',
 	lv_err_resolution_in_name: 'Captua no puede incluir la resolución en el nombre de archivo de las capturas',
 	lv_err_name_too_long: 'Captua no hizo la captura: el nombre de archivo tendría más de 36 caracteres',
+	lv_err_capture_limit: 'Captua no hizo la captura: este volumen llegó al límite de 9999 capturas; hace falta un volumen nuevo',
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
 	lv_zoom_out: 'Alejar',

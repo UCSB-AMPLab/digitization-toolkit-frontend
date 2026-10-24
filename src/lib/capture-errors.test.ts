@@ -24,6 +24,8 @@ const NAME_TOO_LONG =
 	"This capture's file name would be longer than the 36 characters a pair id holds. Nothing was captured.";
 const NUMBERS_TAKEN =
 	'The next capture numbers of this volume are already taken by files on disk. Nothing was captured.';
+const CAPTURE_LIMIT =
+	'This volume has reached the limit of 9999 captures. A new volume is needed. Nothing was captured.';
 const RESOLUTION = "A capture's file name cannot carry its resolution: the exchange contract fixes the name.";
 const RETAKE_STATUS = 'Only a captured or rejected record can be retaken.';
 const MODE_SINGLE = "Record 12 was captured in 'single' mode; use the single-capture endpoint to recapture it.";
@@ -41,6 +43,7 @@ describe('captureErrorText', () => {
 			[new CaptureFailed('Camera 1 is not connected'), es.lv_err_camera_not_connected(1)],
 			[new ApiError(NAME_TOO_LONG, undefined, 409), es.lv_err_name_too_long],
 			[new ApiError(NUMBERS_TAKEN, undefined, 409), es.lv_err_numbers_taken],
+			[new ApiError(CAPTURE_LIMIT, undefined, 409), es.lv_err_capture_limit],
 			[new ApiError(RESOLUTION, undefined, 422), es.lv_err_resolution_in_name],
 			[new ApiError(RETAKE_STATUS, undefined, 409), es.lv_err_retake_status]
 		];
@@ -58,6 +61,7 @@ describe('captureErrorText', () => {
 		expect(captureErrorText(new ApiError(NO_VOLUME, undefined, 422), es)).toBe(es.lv_capture_error);
 		expect(captureErrorText(new ApiError('Collection 7 not found', undefined, 409), es)).toBe(es.lv_capture_error);
 		expect(captureErrorText(new ApiError(MODE_DUAL, undefined, 409), es)).toBe(es.lv_capture_error);
+		expect(captureErrorText(new ApiError(CAPTURE_LIMIT, undefined, 422), es)).toBe(es.lv_capture_error);
 		expect(captureErrorText(new Error(RETAKE_VOLUME), es)).toBe(es.lv_capture_error);
 		expect(captureErrorText(new ApiError(NAME_TOO_LONG, undefined, 422), es)).toBe(es.lv_capture_error);
 	});

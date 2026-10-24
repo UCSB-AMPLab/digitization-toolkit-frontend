@@ -30,6 +30,14 @@ describe('volumeSaveErrorText', () => {
 		expect(volumeSaveErrorText(length, es)).toBe(es.pd_val_stem_too_long(27));
 	});
 
+	it('maps the 409s of a rename or re-parent refused while files are read', () => {
+		const subtree =
+			'An export of this collection, or of a collection inside it, is running. Wait for it to finish, then try again.';
+		expect(volumeSaveErrorText(new ApiError(subtree, subtree, 409), es)).toBe(es.vol_err_export_in_subtree);
+		const reading = 'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.';
+		expect(volumeSaveErrorText(new ApiError(reading, reading, 409), es)).toBe(es.vol_err_files_being_read);
+	});
+
 	it('gives anything else the generic message, without the backend text', () => {
 		for (const err of [
 			new ApiError('Project 9 not found', undefined, 404),
@@ -73,6 +81,21 @@ describe('volumeDeleteErrorText', () => {
 		expect(volumeDeleteErrorText(one, es)).toBe(es.pd_err_move_under_review(1));
 		expect(moveBlockedCount(new ApiError('x', { message: 'x', blocking_record_ids: [] }, 409))).toBeNull();
 		expect(moveBlockedCount(new ApiError('x', undefined, 409))).toBeNull();
+	});
+
+	it('says records stored offsite block a move, with their number, not that they are under review', () => {
+		const message = 'Cannot move: 3 record(s) have files already stored offsite under this volume: [3, 8, 9].';
+		const err = new ApiError(message, { message, blocking_record_ids: [3, 8, 9] }, 409);
+		expect(moveBlockedCount(err)).toBeNull();
+		expect(volumeDeleteErrorText(err, es)).toBe(es.vol_err_stored_offsite(3));
+		expect(volumeDeleteErrorText(err, en)).toBe(en.vol_err_stored_offsite(3));
+	});
+
+	it('maps the 409s of a move refused while files are read', () => {
+		const running = 'An export of this collection is running. Wait for it to finish, then try again.';
+		expect(volumeDeleteErrorText(new ApiError(running, running, 409), es)).toBe(es.vol_err_export_running);
+		const reading = 'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.';
+		expect(volumeDeleteErrorText(new ApiError(reading, reading, 409), es)).toBe(es.vol_err_files_being_read);
 	});
 
 	it('maps the reserved-stem refusal', () => {

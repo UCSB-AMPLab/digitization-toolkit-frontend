@@ -34,6 +34,7 @@
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
   import HandoverControls from '$lib/components/HandoverControls.svelte';
   import { getVolumeTopbar } from '$lib/volume-topbar';
+  import { fileHoldText } from '$lib/volume-refusals';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -171,13 +172,18 @@
     goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}&recordId=${record.id}`);
   }
 
+  // Por qué no se pudo eliminar el último registro; null si no hay aviso.
+  let deleteRecordError = $state<string | null>(null);
+
   // Eliminar registro completo y refrescar lista
   async function handleDeleteRecord(record: Record) {
     try {
       await recordsApi.delete(record.id);
       await loadRecords();
     } catch (err) {
+      // The backend's English text goes to the console only.
       console.error('[Gallery] Error eliminando registro:', err);
+      deleteRecordError = fileHoldText(err, $m) ?? $m.col_delete_record_retry;
     } finally {
       inspectedRecord = null;
     }
@@ -248,7 +254,7 @@
         await loadRecords();
         showBlockersModal = true;
       } else {
-        exportError = err?.message ?? $m.col_err_export;
+        exportError = fileHoldText(err, $m) ?? err?.message ?? $m.col_err_export;
       }
     } finally {
       isExporting = false;
@@ -462,6 +468,19 @@
           <button class="btn-secondary" onclick={() => showExportModal = false}>{$m.common_close}</button>
         </div>
       {/if}
+    </div>
+  </div>
+{/if}
+<!-- Modal: no se pudo eliminar el registro -->
+{#if deleteRecordError}
+  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="export-modal-card">
+      <span class="material-symbols-outlined icon-lg export-error-icon">error</span>
+      <h3 class="export-modal-title">{$m.col_delete_record_error_title}</h3>
+      <p class="export-modal-subtitle">{deleteRecordError}</p>
+      <div class="export-modal-actions">
+        <button class="btn-secondary" onclick={() => deleteRecordError = null}>{$m.common_close}</button>
+      </div>
     </div>
   </div>
 {/if}

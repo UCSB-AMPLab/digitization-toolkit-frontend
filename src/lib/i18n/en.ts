@@ -399,6 +399,25 @@ export const en: Messages = {
 			? 'One record in this volume is under review, so it cannot be moved. First withdraw the volume from review with "Withdraw from review".'
 			: `${n} records in this volume are under review, so they cannot be moved. First withdraw the volume from review with "Withdraw from review".`,
 	pd_err_delete_not_empty: 'This volume still has records. Move them to another volume before deleting it.',
+	// Refusals of a file change while another process reads the files
+	// (volume-refusals.ts).
+	vol_err_volume_busy:
+		'Records were being added to this volume at the same moment, so Captua changed nothing. Try again.',
+	vol_err_files_being_read:
+		'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.',
+	vol_err_files_being_read_project:
+		'Captua is preparing a file of a volume in this project for the offsite copy. Try again in a moment.',
+	vol_err_export_running: 'Captua is exporting this volume. Wait until the export is finished, then try again.',
+	vol_err_export_in_subtree:
+		'Captua is exporting this volume or a volume inside it. Wait until the export is finished, then try again.',
+	vol_err_export_in_project:
+		'Captua is exporting a volume of this project. Wait until the export is finished, then try again.',
+	vol_err_files_changing:
+		'Captua is moving, renaming or deleting files of this volume. Try the export again in a moment.',
+	vol_err_stored_offsite: (n: number): string =>
+		n === 1
+			? 'One record has files already stored offsite under this volume, so it cannot be moved to another volume.'
+			: `${n} records have files already stored offsite under this volume, so they cannot be moved to another volume.`,
 	pd_member_implicit: 'Implicit access (cannot be removed)',
 	pd_member_remove: 'Remove collaborator',
 	pd_member_add: 'Add collaborator',
@@ -520,7 +539,12 @@ export const en: Messages = {
 	col_renumber_desc:
 		"Captua will number this volume's records from 1, in the order they appear now, without renaming any file.",
 	col_renumbering: 'Renumbering…',
-	col_renumber_error: (message: string) => `Could not renumber: ${message}`,
+	col_renumber_error: 'Captua could not renumber the records of this volume. Try again.',
+	col_reorder_stale:
+		'Records were added to or removed from this volume while you were reordering it, so Captua did not save the new order. Captua has loaded the saved order again.',
+	col_reorder_error: 'Captua could not save the new order. Captua has loaded the saved order again.',
+	col_delete_record_error_title: 'Could not delete the record',
+	col_delete_record_retry: 'Try again in a moment.',
 	col_finalize_title: 'Finalize Project?',
 	col_finalize_subtitle: 'This will mark the project as finished',
 	col_finalize_p1: 'Finalizing the project assumes ',
@@ -777,6 +801,7 @@ export const en: Messages = {
 	lv_err_retake_status: 'Only a captured or rejected record can be retaken',
 	lv_err_resolution_in_name: "Captua cannot put the resolution in a capture's file name",
 	lv_err_name_too_long: "Captua captured nothing: this capture's file name would be longer than 36 characters",
+	lv_err_capture_limit: 'Captua captured nothing: this volume has reached the limit of 9999 captures; a new volume is needed',
 	lv_capture_btn: 'Capture',
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',

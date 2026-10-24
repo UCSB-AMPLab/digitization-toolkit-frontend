@@ -21,6 +21,7 @@
   import { m } from '$lib/i18n';
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, type Project } from '$lib/api';
+  import { fileHoldText } from '$lib/volume-refusals';
 
   // ---------------------------------------------------------------------------
   // ESTADO: Lista de proyectos
@@ -136,8 +137,11 @@
       showCreateModal = false;
       resetForm();
     } catch (err) {
+      // A rename refused while an export or the offsite upload reads the
+      // project's files has its own message.
+      const hold = fileHoldText(err, $m, 'project');
       const msg = err instanceof Error ? err.message : String(err);
-      createError = $m.proj_err_create(msg);
+      createError = hold ?? $m.proj_err_create(msg);
     } finally {
       isCreating = false;
     }
@@ -225,8 +229,11 @@
       await loadProjects();
       closeDeleteModal();
     } catch (err) {
+      // A move of the volumes refused while an export or the offsite upload
+      // reads their files has its own message.
+      const hold = fileHoldText(err, $m, 'project');
       const msg = err instanceof Error ? err.message : String(err);
-      deleteError = $m.proj_err_delete(msg);
+      deleteError = hold ?? $m.proj_err_delete(msg);
       isDeleting = false;
     }
   }
