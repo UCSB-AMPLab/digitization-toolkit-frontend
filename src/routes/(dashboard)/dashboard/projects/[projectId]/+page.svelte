@@ -23,6 +23,8 @@
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, projectMembersApi,
            type Project, type Collection, type ProjectMember, type UserRead } from '$lib/api';
+  import { stemProblem, stemConflict, stemConflictText, needsStem, deleteRefused } from '$lib/volume-stem';
+  import VolumeStemField from './VolumeStemField.svelte';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -81,6 +83,10 @@
   let colDateEnd      = $state('');
   let colCreator      = $state('');
   let colSignatura    = $state('');
+  // The stem ("raíz", filename_stem). Required on a new volume; on an
+  // existing one it can be given once while empty, and is read-only once
+  // the volume reserves it (stem_reserved).
+  let colStem         = $state('');
   let isCreating        = $state(false);
   let createError       = $state('');
   let editingCollection = $state<Collection | null>(null);
@@ -106,6 +112,9 @@
     return false;
   }
 
+  let stemLocked = $derived(!!editingCollection?.stem_reserved);
+  let stemInvalid = $derived(!stemLocked && stemProblem(colStem, !editingCollection) !== null);
+
   let dateError = $derived(
     (colDateStart && !isValidISODate(colDateStart))
       ? $m.pd_val_start_date
@@ -121,6 +130,13 @@
   // ---------------------------------------------------------------------------
   onMount(async () => {
     await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
+    // ?editVolume=<id> opens that volume's form: the capture screen links
+    // here when the volume has no stem yet.
+    const editId = Number($page.url.searchParams.get('editVolume')) || 0;
+    if (editId && canCreate) {
+      const target = collections.find(c => c.id === editId);
+      if (target) openEditCollection(target);
+    }
   });
 
   async function loadProject() {
@@ -226,7 +242,7 @@
   // Modo real: llama a collectionsApi.create() y recarga la lista.
   // ---------------------------------------------------------------------------
   async function handleCreateCollection() {
-    if (!colName.trim()) return;
+    if (!colName.trim() || stemInvalid) return;
     isCreating = true;
     createError = '';
 
@@ -238,12 +254,17 @@
       if (colSignatura.trim()) archMeta.signatura  = colSignatura.trim();
       const archivalMetadata = Object.keys(archMeta).length > 0 ? archMeta : undefined;
 
+      const stem = colStem.trim();
       if (editingCollection) {
-        // Modo edición: actualizar colección existente
+        // Modo edición: actualizar colección existente. The stem is sent
+        // only when it changed, and never once it is reserved; an emptied
+        // stem is sent as null, which the backend allows before a capture.
+        const stemChanged = !stemLocked && stem !== (editingCollection.filename_stem ?? '');
         await collectionsApi.update(editingCollection.id, {
           name: colName.trim(),
           description: colDesc.trim() || undefined,
           archival_metadata: archivalMetadata,
+          ...(stemChanged ? { filename_stem: stem || null } : {}),
         });
         await loadCollections();
       } else if ($authStore.token === 'demo-token') {
@@ -257,6 +278,7 @@
           created_by: $authStore.user?.username,
           record_count: 0,
           archival_metadata: archivalMetadata,
+          filename_stem: stem,
         } as any;
         collections = [...collections, mockCollection];
       } else {
@@ -267,6 +289,7 @@
           project_id: projectId,
           created_by: $authStore.user?.username,
           archival_metadata: archivalMetadata,
+          filename_stem: stem,
         });
         await loadCollections();
       }
@@ -276,10 +299,14 @@
       colName = ''; colDesc = '';
       colDateStart = ''; colDateEnd = '';
       colCreator = ''; colSignatura = '';
+      colStem = '';
 
     } catch (err) {
+      // A stem 409 (duplicate, or fixed by a capture) has its own message;
+      // the backend's English text is never put inside the Spanish one.
+      const conflict = stemConflict(err);
       const msg = err instanceof Error ? err.message : String(err);
-      createError = $m.pd_err_create_collection(msg);
+      createError = conflict ? stemConflictText(conflict, $m) : $m.pd_err_create_collection(msg);
       console.error('[ProjectDetail] Error creando colección:', err);
     } finally {
       isCreating = false;
@@ -293,6 +320,7 @@
     colName = ''; colDesc = '';
     colDateStart = ''; colDateEnd = '';
     colCreator = ''; colSignatura = '';
+    colStem = '';
   }
 
   // ---------------------------------------------------------------------------
@@ -331,8 +359,14 @@
 
   function startEditCollection(e: MouseEvent, col: Collection) {
     e.stopPropagation();
+    openEditCollection(col);
+  }
+
+  function openEditCollection(col: Collection) {
     openColMenuId = null;
+    createError = '';
     editingCollection = col;
+    colStem      = col.filename_stem ?? '';
     colName      = col.name;
     colDesc      = col.description ?? '';
     colSignatura = col.archival_metadata?.signatura ?? '';
@@ -369,19 +403,38 @@
   }
 
   async function executeDeleteCol() {
-    if (!deletingCol) return;
+    if (!deletingCol || deleteRefused(deletingCol)) return;
     isDeletingCol = true;
     deleteColError = '';
     try {
       if (deleteMoveColTarget !== '') {
+        // The list may be older than the volume's last capture. Moving the
+        // records out of a volume the backend then refuses to delete would
+        // leave them moved and the volume still there, so the volume is read
+        // again first and the move is skipped once it reserves its stem.
+        const fresh = await collectionsApi.get(deletingCol.id);
+        if (deleteRefused(fresh)) {
+          deletingCol = fresh;
+          isDeletingCol = false;
+          await loadCollections();
+          return;
+        }
         await collectionsApi.moveRecords(deletingCol.id, Number(deleteMoveColTarget));
       }
       await collectionsApi.delete(deletingCol.id);
       await loadCollections();
       closeDeleteColModal();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      deleteColError = $m.pd_err_delete_collection(msg);
+      const conflict = stemConflict(err);
+      if (conflict === 'stem_reserved' && deletingCol) {
+        // The backend refused: the modal switches to the reserved notice,
+        // which says why, and the delete stays disabled.
+        deletingCol = { ...deletingCol, stem_reserved: true };
+        await loadCollections();
+      } else {
+        const msg = err instanceof Error ? err.message : String(err);
+        deleteColError = conflict ? stemConflictText(conflict, $m) : $m.pd_err_delete_collection(msg);
+      }
       isDeletingCol = false;
     }
   }
@@ -512,7 +565,21 @@
                     </svg>
                   </div>
                   <div>
-                    <p class="col-name">{col.name}</p>
+                    <p class="col-name">
+                      {col.name}
+                      {#if needsStem(col)}
+                        {#if canCreate}
+                          <button
+                            type="button"
+                            class="no-stem-badge"
+                            title={$m.pd_no_stem_title}
+                            onclick={(e) => startEditCollection(e, col)}
+                          >{$m.pd_no_stem_badge}</button>
+                        {:else}
+                          <span class="no-stem-badge" title={$m.pd_no_stem_title}>{$m.pd_no_stem_badge}</span>
+                        {/if}
+                      {/if}
+                    </p>
                     <p class="col-code">{col.archival_metadata?.signatura ?? (project?.signatura ? `${project.signatura}-${String(i+1).padStart(3,'0')}` : String(i+1).padStart(3,'0'))}</p>
                   </div>
                 </div>
@@ -614,6 +681,9 @@
           />
         </div>
 
+        <!-- Raíz (filename_stem) -->
+        <VolumeStemField bind:value={colStem} locked={stemLocked} required={!editingCollection} />
+
         <!-- Signatura -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_refcode}</label>
@@ -694,7 +764,7 @@
         <button
           class="btn-crear"
           onclick={handleCreateCollection}
-          disabled={isCreating || !colName.trim() || dateError !== ''}
+          disabled={isCreating || !colName.trim() || dateError !== '' || stemInvalid}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -819,7 +889,15 @@
         </button>
       </div>
 
-      {#if isLoadingDeleteColInfo}
+      {#if deleteRefused(deletingCol)}
+        <!-- The backend refuses this delete (409); nothing is moved first. -->
+        <div class="delete-warning" role="note">
+          <div class="delete-warning-icon">
+            <span class="material-symbols-outlined icon-md">lock</span>
+          </div>
+          <p class="delete-warning-body">{$m.pd_delete_stem_reserved}</p>
+        </div>
+      {:else if isLoadingDeleteColInfo}
         <div class="delete-loading">
           <div class="spinner"></div>
           {$m.pd_delete_loading}
@@ -872,7 +950,7 @@
         <button
           class="btn-danger"
           onclick={executeDeleteCol}
-          disabled={isDeletingCol || isLoadingDeleteColInfo}
+          disabled={isDeletingCol || isLoadingDeleteColInfo || deleteRefused(deletingCol)}
         >
           <span class="material-symbols-outlined icon-sm">delete</span>
           {isDeletingCol ? $m.common_deleting : (deleteMoveColTarget !== '' ? $m.proj_move_and_delete : $m.pd_delete_collection_title)}
@@ -1085,6 +1163,21 @@
 
   .col-name { font-weight: var(--fw-semibold); color: var(--color-light); margin: 0 0 2px; }
   .col-code { font-size: 11px; color: var(--color-light-grey); margin: 0; }
+  .no-stem-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    font-family: var(--font-family);
+    font-size: 11px;
+    font-weight: var(--fw-bold);
+    color: var(--color-highlight);
+    background: rgba(225, 183, 120, 0.12);
+    border: 1px solid rgba(225, 183, 120, 0.4);
+    border-radius: var(--radius-md);
+    vertical-align: middle;
+  }
+  button.no-stem-badge { cursor: pointer; }
+  button.no-stem-badge:hover { background: rgba(225, 183, 120, 0.22); }
 
   .status-badge {
     display: inline-block;

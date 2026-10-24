@@ -409,6 +409,22 @@ export const en: Messages = {
 	pd_move_hint_none: 'The records and images will be permanently lost.',
 	pd_move_hint_selected: 'The records will be moved to the selected volume before deleting.',
 	pd_delete_confirm_pre: 'Are you sure you want to delete the volume ',
+	pd_field_stem: 'FILE NAME STEM',
+	pd_ph_stem: 'e.g. co-ahr-con-t055',
+	pd_stem_help:
+		"The start of every file name in this volume, normally the volume's Fisqua reference code. It cannot be changed once images have been captured.",
+	pd_stem_locked:
+		'Images have been captured into this volume under this stem, so the stem cannot be changed.',
+	pd_val_stem_required: 'The stem is required.',
+	pd_val_stem_too_long: (max: number) => `The stem can be at most ${max} characters long.`,
+	pd_val_stem_pattern:
+		'Use only lowercase letters a to z and digits, separated by single hyphens, with no hyphen at the start or end.',
+	pd_err_stem_taken: 'Another volume already uses this stem.',
+	pd_err_stem_fixed: 'Images have already been captured into this volume, so its stem cannot be changed.',
+	pd_no_stem_badge: 'No stem',
+	pd_no_stem_title: 'This volume has no stem. Give it one before capturing.',
+	pd_delete_stem_reserved:
+		'This volume cannot be deleted: it has a stem and images have been captured into it. Captua keeps it so that the stem is never given to another volume.',
 
 	// ── Volume workspace (review) ──────────────────────────────────
 	col_back_to_project: 'Back to project',
@@ -735,7 +751,9 @@ export const en: Messages = {
 	lv_capture_key_unbindable: 'That device sent a key this page cannot bind. Try pressing it again.',
 	lv_capture_key_space: 'Space',
 	lv_capture_error: 'Capture failed',
-	lv_capture_not_ready: 'Loading collection…',
+	lv_capture_not_ready: 'Loading the volume…',
+	lv_needs_stem: 'This volume needs a stem before you can capture into it.',
+	lv_needs_stem_link: 'Assign the stem',
 	lv_capture_btn: 'Capture',
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',

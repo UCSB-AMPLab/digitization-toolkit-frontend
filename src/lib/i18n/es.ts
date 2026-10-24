@@ -430,6 +430,22 @@ export const es = {
 	pd_move_hint_none: 'Los registros e imágenes se perderán permanentemente.',
 	pd_move_hint_selected: 'Los registros se moverán al volumen seleccionado antes de eliminar.',
 	pd_delete_confirm_pre: '¿Estás seguro de que quieres eliminar el volumen ',
+	pd_field_stem: 'RAÍZ',
+	pd_ph_stem: 'Ej: co-ahr-con-t055',
+	pd_stem_help:
+		'Es el comienzo del nombre de cada archivo de este volumen. Por lo general es el código de referencia del volumen en Fisqua. No se puede cambiar después de capturar imágenes.',
+	pd_stem_locked:
+		'Ya se capturaron imágenes en este volumen con esta raíz, así que la raíz no se puede cambiar.',
+	pd_val_stem_required: 'La raíz es obligatoria.',
+	pd_val_stem_too_long: (max: number) => `La raíz no puede tener más de ${max} caracteres.`,
+	pd_val_stem_pattern:
+		'Usa solo letras minúsculas de la a a la z y dígitos, separados por un solo guion, sin guion al comienzo ni al final.',
+	pd_err_stem_taken: 'Otro volumen ya usa esta raíz.',
+	pd_err_stem_fixed: 'Ya se capturaron imágenes en este volumen, así que su raíz no se puede cambiar.',
+	pd_no_stem_badge: 'Sin raíz',
+	pd_no_stem_title: 'Este volumen no tiene raíz. Asígnale una para poder capturar.',
+	pd_delete_stem_reserved:
+		'Este volumen no se puede eliminar: tiene raíz y ya se capturaron imágenes en él. Captua lo conserva para que esa raíz no se le asigne a otro volumen.',
 
 	// ── Espacio de trabajo de volumen (revisión) ───────────────────
 	col_back_to_project: 'Volver al proyecto',
@@ -762,7 +778,9 @@ export const es = {
 	lv_capture_key_unbindable: 'El dispositivo envió una tecla que no se puede asignar a la captura. Intenta de nuevo.',
 	lv_capture_key_space: 'Espacio',
 	lv_capture_error: 'Error al capturar',
-	lv_capture_not_ready: 'Cargando la colección…',
+	lv_capture_not_ready: 'Cargando el volumen…',
+	lv_needs_stem: 'Este volumen necesita una raíz antes de capturar.',
+	lv_needs_stem_link: 'Asignar la raíz',
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
 	lv_zoom_out: 'Alejar',
