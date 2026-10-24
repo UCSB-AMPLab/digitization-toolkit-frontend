@@ -285,6 +285,49 @@ describe('project page: stems', () => {
 		expect(deleteSpy).not.toHaveBeenCalled();
 	});
 
+	it('offers no target and moves nothing when sub-volumes and records both block the delete', async () => {
+		const parent = vol(32, 'Caja 3', { filename_stem: null, stem_reserved: false, record_count: 0 });
+		listSpy.mockResolvedValue([parent, other]);
+		vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
+		const both =
+			'Cannot delete a non-empty collection: 1 sub-collection(s) and 2 record(s) remain. Move or delete them first.';
+		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockRejectedValue(new ApiError(both, undefined, 409));
+		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 2, target_collection_id: 24 });
+		render(ProjectPage);
+		await openRowMenu('Caja 3');
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+		const confirm = page.getByRole('button', { name: es.pd_delete_collection_title });
+		await userEvent.click(confirm);
+
+		await expect.element(page.getByText(es.pd_err_delete_has_subvolumes)).toBeInTheDocument();
+		expect(page.getByLabelText(es.pd_move_label).elements()).toHaveLength(0);
+		await expect.element(confirm).toBeDisabled();
+		expect(moveSpy).not.toHaveBeenCalled();
+		expect(deleteSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it('blocks a further try when sub-volumes refuse the delete after the records were moved', async () => {
+		const plain = vol(33, 'Caja 4', { filename_stem: null, stem_reserved: false, record_count: 2 });
+		listSpy.mockResolvedValue([plain, other]);
+		vi.spyOn(recordsApi, 'count').mockResolvedValue(2);
+		vi.spyOn(collectionsApi, 'get').mockResolvedValue(plain);
+		const subs =
+			'Cannot delete a non-empty collection: 1 sub-collection(s) and 0 record(s) remain. Move or delete them first.';
+		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockRejectedValue(new ApiError(subs, undefined, 409));
+		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 2, target_collection_id: 24 });
+		render(ProjectPage);
+		await openRowMenu('Caja 4');
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+		await userEvent.selectOptions(page.getByLabelText(es.pd_move_label), 'Tomo 100');
+		await userEvent.click(page.getByRole('button', { name: es.proj_move_and_delete }));
+
+		await expect.element(page.getByText(es.pd_err_delete_has_subvolumes)).toBeInTheDocument();
+		expect(page.getByLabelText(es.pd_move_label).elements()).toHaveLength(0);
+		await expect.element(page.getByRole('button', { name: es.pd_delete_collection_title })).toBeDisabled();
+		expect(moveSpy).toHaveBeenCalledTimes(1);
+		expect(deleteSpy).toHaveBeenCalledTimes(1);
+	});
+
 	it('leaves the delete enabled for an empty volume', async () => {
 		const empty = vol(28, 'Tomo 31', { filename_stem: null, stem_reserved: false, record_count: 0 });
 		listSpy.mockResolvedValue([empty, other]);

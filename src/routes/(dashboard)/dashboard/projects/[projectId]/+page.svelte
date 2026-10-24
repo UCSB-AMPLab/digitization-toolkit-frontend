@@ -346,6 +346,10 @@
   let isDeletingCol          = $state(false);
   let deleteColError         = $state('');
   let isLoadingDeleteColInfo = $state(false);
+  // Set when the backend refused the delete because the volume still holds
+  // sub-volumes. This screen cannot move those, so the modal offers no
+  // target, the delete stays disabled, and records are never moved.
+  let deleteBlockedBySubvolumes = $state(false);
 
   $effect(() => {
     if (openColMenuId !== null) {
@@ -386,6 +390,7 @@
     deleteMoveColTarget = '';
     deleteColError = '';
     deleteColRecordCount = 0;
+    deleteBlockedBySubvolumes = false;
     showDeleteColModal = true;
     isLoadingDeleteColInfo = true;
     try {
@@ -402,11 +407,12 @@
     deletingCol = null;
     deleteMoveColTarget = '';
     deleteColError = '';
+    deleteBlockedBySubvolumes = false;
     isDeletingCol = false;
   }
 
   async function executeDeleteCol() {
-    if (!deletingCol || deleteRefused(deletingCol)) return;
+    if (!deletingCol || deleteRefused(deletingCol) || deleteBlockedBySubvolumes) return;
     isDeletingCol = true;
     deleteColError = '';
     try {
@@ -434,25 +440,28 @@
         // which says why, and the delete stays disabled.
         deletingCol = { ...deletingCol, stem_reserved: true };
         await loadCollections();
-      } else if (isNotEmptyRefusal(err) && deletingCol && deleteMoveColTarget === '') {
-        // The modal opened believing the volume was empty, and it is not.
-        // When records are the reason, the count is read again so the target
-        // select appears here; sub-volumes, which this screen cannot move,
-        // get their own message.
+      } else if (isNotEmptyRefusal(err) && deletingCol) {
         console.error('[ProjectDetail] Error eliminando volumen:', err);
         const counts = notEmptyCounts(err);
-        if (!counts || counts.records > 0) {
+        if (counts && counts.subVolumes > 0) {
+          // Sub-volumes block the delete, with or without records: moving
+          // the records would not be enough, so no target is offered.
+          deleteBlockedBySubvolumes = true;
+          deleteMoveColTarget = '';
+          deleteColError = $m.pd_err_delete_has_subvolumes;
+        } else if (deleteMoveColTarget === '') {
+          // The modal opened believing the volume was empty, and it is not.
+          // The count is read again so the target select appears here.
           try {
             deleteColRecordCount = await recordsApi.count({ collection_id: deletingCol.id });
           } catch (countErr) {
             console.error('[ProjectDetail] Error obteniendo info de colección:', countErr);
           }
-        }
-        if (counts && counts.subVolumes > 0) {
-          // Moving the records would not be enough: the sub-volumes stay.
-          deleteColError = $m.pd_err_delete_has_subvolumes;
-        } else if (deleteColRecordCount === 0) {
-          // The count could not be read, or the records left meanwhile.
+          if (deleteColRecordCount === 0) {
+            // The count could not be read, or the records left meanwhile.
+            deleteColError = volumeDeleteErrorText(err, $m);
+          }
+        } else {
           deleteColError = volumeDeleteErrorText(err, $m);
         }
       } else {
@@ -925,6 +934,8 @@
           </div>
           <p class="delete-warning-body">{$m.pd_delete_stem_reserved}</p>
         </div>
+      {:else if deleteBlockedBySubvolumes}
+        <!-- No target select: the error below says why the delete is refused. -->
       {:else if isLoadingDeleteColInfo}
         <div class="delete-loading">
           <div class="spinner"></div>
@@ -981,6 +992,7 @@
           class="btn-danger"
           onclick={executeDeleteCol}
           disabled={isDeletingCol || isLoadingDeleteColInfo || deleteRefused(deletingCol)
+            || deleteBlockedBySubvolumes
             || (deleteColRecordCount > 0 && deleteMoveColTarget === '')}
         >
           <span class="material-symbols-outlined icon-sm">delete</span>
