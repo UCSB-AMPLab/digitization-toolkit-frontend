@@ -3,11 +3,17 @@
   // COMPONENTE: ThumbnailStrip (Gallery)
   //
   // Tira horizontal de miniaturas en la parte inferior de la galería.
-  // Muestra una miniatura por cada imagen del registro — si un registro tiene
-  // imagen izquierda Y derecha (captura doble), ambas aparecen como items
-  // independientes con badge L/R, igual que en el live-preview.
   //
-  // En vista 'spread': los dos items del par activo se resaltan.
+  // Una unidad por REGISTRO, no por imagen (NEH-236). Un folio capturado con
+  // dos cámaras tiene dos imágenes, y la vista de lista ya lo trata como una
+  // sola cosa desde NEH-211; la tira las mostraba sueltas y repetía el título
+  // debajo de cada mitad, así que la misma pantalla decía dos cosas distintas
+  // sobre qué es un registro.
+  //
+  // Agrupa por cercanía y no con un marco, igual que la cuadrícula: las dos
+  // mitades casi se tocan y los folios vecinos quedan lejos. El marco claro
+  // queda libre para lo que de verdad necesita marcarse —el folio activo— y
+  // rodea el grupo entero, no cada mitad.
   // ============================================================================
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
@@ -51,33 +57,34 @@
   }
 
   // ---------------------------------------------------------------------------
-  // DERIVADO: lista plana — un item por imagen dentro de cada registro
-  // Los registros con captura doble producen dos items (L + R).
+  // DERIVADO: un grupo por registro, con sus imágenes dentro
   // ---------------------------------------------------------------------------
-  let thumbItems = $derived(
-    records.flatMap((record): ThumbItem[] => {
+  interface ThumbGroup {
+    record: Record;
+    items: ThumbItem[];
+  }
+
+  let thumbGroups = $derived(
+    records.map((record): ThumbGroup => {
       if (!record.images || record.images.length === 0) {
-        return [{ record, image: null, role: null, thumbnailUrl: null }];
+        return { record, items: [{ record, image: null, role: null, thumbnailUrl: null }] };
       }
       // Ordenar: left primero, luego right, luego sin rol (por id como desempate)
       const sorted = [...record.images].sort((a, b) => {
         const order = (r?: string) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
         return order(a.role) - order(b.role) || a.id - b.id;
       });
-      return sorted.map((img): ThumbItem => ({
+      return {
         record,
-        image: img,
-        role: imageRole(img),
-        thumbnailUrl: imageThumbnailUrl(img),
-      }));
+        items: sorted.map((img): ThumbItem => ({
+          record,
+          image: img,
+          role: imageRole(img),
+          thumbnailUrl: imageThumbnailUrl(img),
+        })),
+      };
     })
   );
-
-  // En vista 'spread': resalta el par de items del registro activo
-  function isSelected(item: ThumbItem): boolean {
-    if (viewMode === 'spread') return item.record.id === selectedRecordId;
-    return item.record.id === selectedRecordId;
-  }
 </script>
 
 <!-- ============================================================
@@ -86,7 +93,7 @@
 <div class="thumbnail-strip">
   <div class="strip-scroll">
 
-    {#if thumbItems.length === 0}
+    {#if thumbGroups.length === 0}
       <div class="empty-state">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -96,37 +103,42 @@
         <span>{$m.col_empty_collection}</span>
       </div>
     {:else}
-      {#each thumbItems as item, i}
-        {@const selected = isSelected(item)}
+      {#each thumbGroups as group, i}
+        {@const selected = group.record.id === selectedRecordId}
 
         <button
           class="thumb-item"
           class:selected
-          onclick={() => onSelect(item.record.id)}
+          onclick={() => onSelect(group.record.id)}
         >
 
-          <!-- Imagen -->
-          <div class="thumb-img-wrapper" class:selected class:alt={i % 2 !== 0}>
-            {#if item.thumbnailUrl}
-              <img src={item.thumbnailUrl} alt={item.record.title} class="thumb-img" />
-            {:else}
-              <div class="thumb-placeholder">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-              </div>
-            {/if}
+          <!-- Las mitades del folio, juntas. El marco de seleccionado va aquí
+               y no en cada imagen: lo que se elige es el folio. -->
+          <div class="thumb-pair" class:selected>
+            {#each group.items as item, j}
+              <div class="thumb-img-wrapper" class:alt={j % 2 !== 0}>
+                {#if item.thumbnailUrl}
+                  <img src={item.thumbnailUrl} alt={item.record.title} class="thumb-img" />
+                {:else}
+                  <div class="thumb-placeholder">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                  </div>
+                {/if}
 
-            <!-- Badge L/R -->
-            {#if item.role}
-              <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
-            {/if}
+                <!-- Badge L/R -->
+                {#if item.role}
+                  <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
+                {/if}
+              </div>
+            {/each}
           </div>
 
-          <!-- Nombre -->
+          <!-- Nombre: una vez por folio, no debajo de cada mitad -->
           <div class="thumb-info">
-            <span class="thumb-name" title={item.record.title}>{item.record.title || `Img ${i+1}`}</span>
+            <span class="thumb-name" title={group.record.title}>{group.record.title || `Img ${i+1}`}</span>
           </div>
 
         </button>
@@ -149,10 +161,13 @@
     flex-shrink: 0;
   }
 
+  /* 16px entre folios contra los 4 de --pair-gap: cuatro veces más, que es
+     lo que hace que el ojo lea las dos mitades como una sola cosa. Si se
+     cambia uno, mirar el otro — lo que agrupa es la diferencia, no el valor. */
   .strip-scroll {
     flex: 1;
     display: flex;
-    gap: 10px;
+    gap: 16px;
     overflow-x: auto;
     overflow-y: hidden;
     align-items: stretch;
@@ -174,10 +189,14 @@
     white-space: nowrap;
   }
 
+  /* El ancho lo deciden las mitades: un folio de una imagen mide 100px y uno
+     de dos mide el doble más el hueco interno, así que cada mitad conserva el
+     tamaño de una miniatura simple. El hueco entre folios lo pone .strip-scroll
+     y es bastante mayor que --pair-gap: esa diferencia es la que agrupa. */
   .thumb-item {
+    --pair-gap: 4px;
     display: flex;
     flex-direction: column;
-    width: 100px;
     height: 100%;
     flex-shrink: 0;
     background: none;
@@ -192,22 +211,33 @@
   .thumb-item:hover { opacity: 1; }
   .thumb-item.selected { opacity: 1; }
 
-  .thumb-img-wrapper {
-    position: relative;
-    width: 100%;
+  /* El marco de seleccionado rodea el folio entero. Antes iba en cada imagen,
+     que es lo que hacía parecer que cada mitad era un registro (NEH-236). */
+  .thumb-pair {
+    display: flex;
+    gap: var(--pair-gap);
     flex: 1;
+    min-height: 0;
+    padding: 2px;
     border-radius: var(--radius-md);
-    overflow: hidden;
     border: 2px solid transparent;
     transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  }
+
+  .thumb-pair.selected {
+    border-color: var(--color-selected);
+    box-shadow: var(--selected-ring);
+  }
+
+  .thumb-img-wrapper {
+    position: relative;
+    width: 100px;
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
     background-color: var(--color-surface-alt);
     min-height: 0;
     padding: 3px;
-  }
-
-  .thumb-img-wrapper.selected {
-    border-color: var(--color-selected);
-    box-shadow: var(--selected-ring);
   }
 
   .thumb-img-wrapper.alt { background-color: var(--color-surface); }
