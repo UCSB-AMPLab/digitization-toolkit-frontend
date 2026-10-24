@@ -18,6 +18,7 @@
 // ============================================================================
 
 import { formatCount } from '../format-count';
+import { formatBytes } from '../format-bytes';
 
 export const es = {
 	// ── Comunes (usados en varias pantallas) ─────────────────────────────────
@@ -704,6 +705,12 @@ export const es = {
 	image_unviewable_body_format: (ext: string) =>
 		`El navegador no puede mostrar archivos ${ext}, y la miniatura de este archivo tampoco se pudo mostrar.`,
 	image_unviewable_body: 'No se pudo mostrar este archivo ni su miniatura.',
+	// NEH-248: una imagen liberada de la tarjeta (RecordImageDisplay.svelte)
+	freed_title: 'Imagen guardada en la copia externa',
+	freed_where: 'Este archivo está guardado fuera del equipo, en la copia externa, para liberar espacio en la tarjeta de memoria.',
+	freed_nothing_lost: 'No se perdió nada: Captua verificó la copia externa antes de quitar el archivo de la tarjeta.',
+	freed_restore_hint: 'Si necesitas verlo en tamaño completo, un administrador puede restaurar el volumen en la tarjeta.',
+	freed_thumbnail_note: 'Lo que ves es la miniatura, que Captua conserva en el equipo.',
 	col_export_blocked_title: 'Aún no se puede exportar',
 	col_export_blocked_desc: 'Todos los registros deben estar aprobados antes de exportar. Los siguientes aún no lo están:',
 	col_download_choose_title: 'Exportar o descargar',
@@ -716,6 +723,10 @@ export const es = {
 	col_images_always: 'Disponible en cualquier momento',
 	col_zip_generating: 'Preparando ZIP de imágenes…',
 	col_zip_error: 'No se pudo generar el ZIP',
+	col_zip_freed:
+		'Algunas imágenes de este volumen están guardadas en la copia externa y ya no están en la tarjeta, así que no se pueden incluir en el ZIP. Un administrador puede restaurar el volumen desde "Espacio en la tarjeta".',
+	col_export_freed: (n: number): string =>
+		`${n === 1 ? 'Un archivo de este volumen está guardado en la copia externa y ya no está' : `${formatCount(n, 'es')} archivos de este volumen están guardados en la copia externa y ya no están`} en la tarjeta, así que Captua no puede armar el paquete. Para exportar el volumen, primero un administrador debe restaurarlo desde "Espacio en la tarjeta", junto a la línea de la copia externa.`,
 	bug_report_button: 'Reportar un problema',
 	bug_report_title: 'Reportar un problema',
 	bug_report_desc: 'Cuéntanos qué pasó. Se abrirá GitHub con un reporte prellenado.',
@@ -960,6 +971,135 @@ export const es = {
 		return `Último archivo verificado el ${date} ${at}.`;
 	},
 	offsite_cfg_never: 'Todavía no se ha verificado ningún archivo.',
+
+	// ── Liberar espacio en la tarjeta y restaurar (NEH-248, offsite-free.ts) ─
+	offsite_vol_stored: 'Copia externa completa',
+	offsite_vol_freed: (files: number, bytes: number): string =>
+		`${files === 1 ? '1 archivo liberado' : `${formatCount(files, 'es')} archivos liberados`} de la tarjeta (${formatBytes(bytes, 'es')})`,
+	offsite_manage_open: 'Espacio en la tarjeta',
+	offsite_manage_intro:
+		'Al liberar espacio, Captua quita de la tarjeta de memoria las imágenes y vistas previas de este volumen que ya están verificadas en la copia externa. Conserva las miniaturas, así que el volumen se puede seguir consultando.',
+	offsite_free_action: 'Liberar espacio en la tarjeta',
+	offsite_restore_action: 'Restaurar en la tarjeta',
+	offsite_planning: 'Captua está revisando qué se puede liberar…',
+	offsite_free_confirm_title: '¿Liberar espacio en la tarjeta?',
+	offsite_plan_will_free: (files: number, bytes: number): string =>
+		files === 1
+			? `Captua quitará 1 archivo (${formatBytes(bytes, 'es')}) de la tarjeta. Seguirá guardado en la copia externa.`
+			: `Captua quitará ${formatCount(files, 'es')} archivos (${formatBytes(bytes, 'es')}) de la tarjeta. Seguirán guardados en la copia externa.`,
+	offsite_plan_restore_later: 'Un administrador puede restaurar el volumen más adelante con "Restaurar en la tarjeta".',
+	offsite_free_check_note:
+		'Antes de quitar cada archivo, Captua vuelve a comparar su checksum con el de la copia externa. Puede tardar varios minutos.',
+	offsite_plan_nothing: 'Captua no encontró archivos que se puedan liberar en este volumen.',
+	offsite_plan_left: (n: number): string =>
+		n === 1 ? 'Captua dejará 1 archivo en la tarjeta:' : `Captua dejará ${formatCount(n, 'es')} archivos en la tarjeta:`,
+	offsite_free_confirm: 'Liberar espacio',
+	offsite_running_free: 'Captua está liberando espacio en la tarjeta…',
+	offsite_running_close_note:
+		'Puedes cerrar esta ventana: Captua seguirá trabajando y verás el resultado en la línea de la copia externa del volumen.',
+	offsite_free_done_title: 'Captua terminó de liberar espacio',
+	offsite_free_done: (files: number, bytes: number): string =>
+		files === 0
+			? 'Captua no quitó ningún archivo de la tarjeta.'
+			: files === 1
+				? `Captua quitó 1 archivo (${formatBytes(bytes, 'es')}) de la tarjeta.`
+				: `Captua quitó ${formatCount(files, 'es')} archivos (${formatBytes(bytes, 'es')}) de la tarjeta.`,
+	offsite_done_left: (n: number): string =>
+		n === 1 ? 'Captua dejó 1 archivo en la tarjeta:' : `Captua dejó ${formatCount(n, 'es')} archivos en la tarjeta:`,
+	offsite_restore_confirm_title: '¿Restaurar el volumen en la tarjeta?',
+	offsite_restore_confirm_body: (files: number, bytes: number): string =>
+		files === 1
+			? `Captua traerá de la copia externa el archivo liberado (${formatBytes(bytes, 'es')}), comprobará su checksum y lo pondrá de nuevo en su lugar en la tarjeta.`
+			: `Captua traerá de la copia externa los ${formatCount(files, 'es')} archivos liberados (${formatBytes(bytes, 'es')}), comprobará el checksum de cada uno y los pondrá de nuevo en su lugar en la tarjeta.`,
+	offsite_restore_space_note:
+		'Asegúrate de que la tarjeta tenga ese espacio libre. Puede tardar bastante, según la conexión.',
+	offsite_restore_confirm: 'Restaurar',
+	offsite_running_restore: 'Captua está restaurando los archivos en la tarjeta…',
+	offsite_restore_done_title: 'Captua terminó de restaurar el volumen',
+	offsite_restore_done: (files: number, bytes: number): string =>
+		files === 0
+			? 'Captua no restauró ningún archivo.'
+			: files === 1
+				? `Captua restauró 1 archivo (${formatBytes(bytes, 'es')}) en la tarjeta.`
+				: `Captua restauró ${formatCount(files, 'es')} archivos (${formatBytes(bytes, 'es')}) en la tarjeta.`,
+	offsite_restore_left: (n: number): string =>
+		n === 1 ? 'Captua no pudo restaurar 1 archivo:' : `Captua no pudo restaurar ${formatCount(n, 'es')} archivos:`,
+	offsite_err_no_stem:
+		'Este volumen no tiene raíz, así que ninguno de sus archivos está en la copia externa y no hay nada que liberar ni restaurar.',
+	offsite_err_not_received:
+		'Todavía hay archivos de este volumen sin verificar en la copia externa. Espera a que Captua termine de copiarlos.',
+	offsite_err_listing:
+		'Captua no pudo consultar la copia externa, así que no comprobó ni quitó ningún archivo. Intenta de nuevo más tarde.',
+	offsite_err_no_read_remote:
+		'Este equipo no está configurado para restaurar: necesita acceso de lectura a la copia externa. Pide a quien instaló el equipo que lo configure.',
+	offsite_err_not_in_own_folder:
+		'Algunos archivos de este volumen todavía no están en la carpeta propia del volumen, así que Captua no puede liberarlos ni restaurarlos. Captua los mueve allí al arrancar el equipo: reinicia el equipo y vuelve a intentarlo. Si después del reinicio Captua sigue sin poder liberarlos ni restaurarlos, el motivo está en el log del backend.',
+	offsite_err_job_running: 'Captua ya está liberando o restaurando archivos de este volumen. Espera a que termine.',
+	offsite_err_drive_unavailable:
+		'El disco configurado para los proyectos no está disponible. Conéctalo y actívalo, o vuelve al almacenamiento interno, y después intenta de nuevo.',
+	offsite_err_drive_not_directory:
+		'La ruta de almacenamiento configurada para los proyectos no es una carpeta. Activa el disco de nuevo, o vuelve al almacenamiento interno, y después intenta de nuevo.',
+	offsite_err_drive_not_mounted:
+		'La ruta de almacenamiento configurada para los proyectos no está en un disco conectado. Conecta y activa el disco, o vuelve al almacenamiento interno, y después intenta de nuevo.',
+	offsite_err_plan: 'Captua no pudo revisar qué se puede liberar. Intenta de nuevo en un momento.',
+	offsite_err_free: 'Captua no pudo empezar a liberar espacio. Intenta de nuevo en un momento.',
+	offsite_err_restore: 'Captua no pudo empezar a restaurar el volumen. Intenta de nuevo en un momento.',
+	offsite_err_job_free:
+		'Captua se detuvo antes de terminar de liberar espacio. Revisa la línea de la copia externa del volumen y vuelve a intentarlo.',
+	offsite_err_job_restore:
+		'Captua se detuvo antes de terminar de restaurar el volumen. Revisa la línea de la copia externa del volumen y vuelve a intentarlo.',
+	offsite_err_job_lost:
+		'Captua perdió el rastro de esta tarea, quizá por un reinicio. Revisa la línea de la copia externa del volumen antes de volver a intentarlo.',
+	offsite_err_poll:
+		'No fue posible comunicarse con Captua mientras trabajaba. Puede que siga trabajando: revisa la línea de la copia externa del volumen en unos minutos.',
+	offsite_reason_no_preview_digest: (n: number): string =>
+		n === 1
+			? '1 vista previa todavía no tiene checksum SHA-256 registrado. Captua la conserva en la tarjeta porque ese checksum solo se puede calcular a partir del archivo en el equipo.'
+			: `${formatCount(n, 'es')} vistas previas todavía no tienen checksum SHA-256 registrado. Captua las conserva en la tarjeta porque ese checksum solo se puede calcular a partir del archivo en el equipo.`,
+	offsite_reason_not_in_bucket: (n: number): string =>
+		n === 1 ? '1 archivo no está en la copia externa.' : `${formatCount(n, 'es')} archivos no están en la copia externa.`,
+	offsite_reason_listed_without_sha1: (n: number): string =>
+		n === 1
+			? '1 archivo aparece en la copia externa sin checksum para compararlo.'
+			: `${formatCount(n, 'es')} archivos aparecen en la copia externa sin checksum para compararlos.`,
+	offsite_reason_bucket_sha1_differs: (n: number): string =>
+		n === 1
+			? 'En la copia externa, 1 archivo no coincide con el de la tarjeta.'
+			: `En la copia externa, ${formatCount(n, 'es')} archivos no coinciden con los de la tarjeta.`,
+	offsite_reason_local_file_missing: (n: number): string =>
+		n === 1 ? '1 archivo no está en la tarjeta.' : `${formatCount(n, 'es')} archivos no están en la tarjeta.`,
+	offsite_reason_local_file_unreadable: (n: number): string =>
+		n === 1 ? 'Captua no pudo leer 1 archivo de la tarjeta.' : `Captua no pudo leer ${formatCount(n, 'es')} archivos de la tarjeta.`,
+	offsite_reason_local_sha1_differs: (n: number): string =>
+		n === 1
+			? '1 archivo de la tarjeta ya no coincide con su copia externa.'
+			: `${formatCount(n, 'es')} archivos de la tarjeta ya no coinciden con su copia externa.`,
+	offsite_reason_changed: (n: number): string =>
+		n === 1
+			? '1 archivo se modificó o se eliminó mientras Captua trabajaba.'
+			: `${formatCount(n, 'es')} archivos se modificaron o se eliminaron mientras Captua trabajaba.`,
+	offsite_reason_could_not_remove: (n: number): string =>
+		n === 1 ? 'Captua no pudo quitar 1 archivo de la tarjeta.' : `Captua no pudo quitar ${formatCount(n, 'es')} archivos de la tarjeta.`,
+	offsite_reason_outside_storage: (n: number): string =>
+		n === 1
+			? '1 archivo tiene una ruta fuera del almacenamiento del equipo.'
+			: `${formatCount(n, 'es')} archivos tienen una ruta fuera del almacenamiento del equipo.`,
+	offsite_reason_local_file_differs: (n: number): string =>
+		n === 1
+			? '1 archivo tiene el mismo nombre que otro, distinto, que ya está en la tarjeta; Captua no tocó el de la tarjeta.'
+			: `${formatCount(n, 'es')} archivos tienen el mismo nombre que otros, distintos, que ya están en la tarjeta; Captua no tocó los de la tarjeta.`,
+	offsite_reason_copy_failed: (n: number): string =>
+		n === 1
+			? 'Captua no pudo traer 1 archivo de la copia externa.'
+			: `Captua no pudo traer ${formatCount(n, 'es')} archivos de la copia externa.`,
+	offsite_reason_sha1_differs: (n: number): string =>
+		n === 1
+			? '1 archivo traído de la copia externa no coincidió con su checksum; Captua lo descartó.'
+			: `${formatCount(n, 'es')} archivos traídos de la copia externa no coincidieron con su checksum; Captua los descartó.`,
+	offsite_reason_could_not_write: (n: number): string =>
+		n === 1 ? 'Captua no pudo escribir 1 archivo en la tarjeta.' : `Captua no pudo escribir ${formatCount(n, 'es')} archivos en la tarjeta.`,
+	offsite_reason_other: (n: number): string =>
+		n === 1 ? '1 archivo, por otro motivo.' : `${formatCount(n, 'es')} archivos, por otros motivos.`,
 
 	// ── Mensajes del cliente API ─────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',

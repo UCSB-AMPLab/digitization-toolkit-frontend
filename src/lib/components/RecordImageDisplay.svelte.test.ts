@@ -218,3 +218,107 @@ describe('gallery modal — download link', () => {
     previewSpy.mockRestore();
   });
 });
+
+// NEH-248: a file freed from the card is answered 410 with a body that says it
+// is stored offsite (_freed in app/api/records.py). It must never look missing.
+function freed410(kind: 'capture' | 'preview'): Response {
+  const detail = {
+    message: 'This file is stored offsite and has been freed from the card to make room. An admin can restore the volume to bring it back.',
+    stored_offsite: true,
+    image_id: 1,
+    kind,
+    key: 'rionegro/co-x/captures/IMG_0001.cr2',
+    freed_at: '2026-10-20T14:03:00+00:00',
+  };
+  return new Response(JSON.stringify({ detail }), { status: 410, headers: { 'Content-Type': 'application/json' } });
+}
+
+describe.each(modals)('%s — images freed from the card (NEH-248)', (_name, renderModal) => {
+  let fileSpy: ReturnType<typeof vi.spyOn>;
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  let thumbSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockImplementation((id: number) => `http://dtk.invalid/records/images/${id}/file`);
+    // The <img> cannot load the freed preview; fetch reads its 410.
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(BROKEN);
+    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((u: RequestInfo | URL) =>
+      Promise.resolve(String(u) === BROKEN ? freed410('preview') : freed410('capture')),
+    );
+  });
+  afterEach(() => {
+    fileSpy.mockRestore();
+    previewSpy.mockRestore();
+    thumbSpy.mockRestore();
+    fetchSpy.mockRestore();
+  });
+
+  it('a freed RAW preview: the thumbnail, with the calm panel instead of the thumbnail badge', async () => {
+    const screen = renderModal(makeRecord([makeImage()]));
+
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
+    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+    await expect.element(screen.getByText('No se perdió nada', { exact: false })).toBeVisible();
+    await expect.element(screen.getByText('un administrador puede restaurar el volumen', { exact: false })).toBeVisible();
+    await expect.element(screen.getByText('Lo que ves es la miniatura, que Captua conserva en el equipo.')).toBeVisible();
+    expect(screen.container.textContent).not.toContain('Miniatura (RAW)');
+    expect(fetchSpy).toHaveBeenCalledWith(BROKEN, expect.anything());
+  });
+
+  it('a freed JPEG master: the same panel over its thumbnail', async () => {
+    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+
+    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
+    expect(screen.container.textContent).not.toContain('Miniatura');
+  });
+
+  it('a freed file with no thumbnail: the panel alone, never "not found" or "cannot display"', async () => {
+    thumbSpy.mockReturnValue(BROKEN_THUMB);
+    const screen = renderModal(makeRecord([makeImage()]));
+
+    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+    expect(screen.container.querySelector('img')).toBeNull();
+    expect(screen.container.textContent).not.toContain('Lo que ves es la miniatura');
+    expect(screen.container.textContent).not.toContain('No se encontró el archivo');
+    expect(screen.container.textContent).not.toContain('No se puede mostrar');
+  });
+
+  it('a master /file answers 410 for, with nothing else to show: the panel', async () => {
+    thumbSpy.mockReturnValue(BROKEN_THUMB);
+    // The preview probe says nothing; only /file says the master is freed.
+    fetchSpy.mockImplementation((u: RequestInfo | URL) =>
+      Promise.resolve(String(u) === BROKEN ? new Response('', { status: 404 }) : freed410('capture')),
+    );
+    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+
+    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+    expect(screen.container.textContent).not.toContain('No se encontró el archivo');
+  });
+
+  it('a /preview that fails for another reason keeps the ordinary thumbnail badge', async () => {
+    fetchSpy.mockResolvedValue(new Response('', { status: 404 }));
+    const screen = renderModal(makeRecord([makeImage()]));
+
+    await expect.element(screen.getByText('Miniatura (RAW)')).toBeVisible();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
+  });
+});
+
+describe('gallery modal — download link of a freed master (NEH-248)', () => {
+  it('offers no download for a master freed from the card', async () => {
+    const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+    const screen = render(GalleryModal, {
+      record: makeRecord([makeImage({ master_freed_at: '2026-10-20T14:03:00' })]),
+      onClose: vi.fn(),
+      onRetake: vi.fn(),
+      onDelete: vi.fn(),
+    });
+    expect(screen.container.querySelector('a.img-viewer-download')).toBeNull();
+    previewSpy.mockRestore();
+  });
+});

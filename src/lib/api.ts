@@ -696,6 +696,30 @@ export const collectionsApi = {
   },
 
   /**
+   * Dry run of freeing the volume from the card (NEH-248): what would be
+   * removed and what would stay, and why. Admin only. Changes nothing.
+   * GET /collections/{id}/offsite/free (plan_free in app/core/offsite_free.py).
+   */
+  async planFree(collectionId: number): Promise<FreePlan> {
+    return apiRequest<FreePlan>(`/collections/${collectionId}/offsite/free`);
+  },
+
+  /** Start freeing the volume from the card; 202 with a job to poll. Admin only. */
+  async startFree(collectionId: number): Promise<OffsiteJobStart> {
+    return apiRequest<OffsiteJobStart>(`/collections/${collectionId}/offsite/free`, { method: 'POST' });
+  },
+
+  /** Start copying the volume's freed files back to the card; 202 with a job to poll. Admin only. */
+  async startRestore(collectionId: number): Promise<OffsiteJobStart> {
+    return apiRequest<OffsiteJobStart>(`/collections/${collectionId}/offsite/restore`, { method: 'POST' });
+  },
+
+  /** The state of a free or restore job, with its result once done. Admin only. */
+  async getOffsiteJob(collectionId: number, jobId: string): Promise<OffsiteJobStatus> {
+    return apiRequest<OffsiteJobStatus>(`/collections/${collectionId}/offsite/jobs/${jobId}`);
+  },
+
+  /**
    * Hand the collection over for review: every captured record becomes
    * in_review (NEH-260). Refuses with 422 if any of them still carries a
    * rejected image or has no image at all, naming all of them at once rather
@@ -783,6 +807,12 @@ export interface RecordImage {
   // images list/gallery/export.
   is_current: boolean;
   superseded_at?: string;
+  // NEH-248: set when the master, or a RAW master's preview, was freed from
+  // the card with its verified object offsite (RecordImageRead in
+  // app/schemas/record.py). Stored offsite, not missing. Absent from a
+  // backend that predates freeing.
+  master_freed_at?: string | null;
+  preview_freed_at?: string | null;
 }
 
 export interface Record {
@@ -1637,6 +1667,63 @@ export interface VolumeOffsiteState {
   last_verified_at: string | null;   // ISO 8601 datetime
   received:         boolean;
   refusals:         OffsiteRefusal[];
+  // The objects whose local file was freed from the card, and their bytes
+  // (_object_counts in app/core/image_upload.py); counted among `verified`
+  // too. Absent from a backend that predates freeing.
+  freed_files?:     number;
+  freed_bytes?:     number;
+}
+
+/** One file of a free or restore: the dry run's and the job result's `files` and `refused` entries (_Object.entry in app/core/offsite_free.py). */
+export interface OffsiteFileEntry {
+  image_id: number;
+  kind:     'capture' | 'preview';
+  path:     string;
+  key:      string;
+  bytes?:   number;
+  /** Why the file was not freed or restored; only in `refused`. */
+  reason?:  string;
+}
+
+/** GET /collections/{id}/offsite/free: plan_free in app/core/offsite_free.py. */
+export interface FreePlan {
+  collection_id:      number;
+  filename_stem:      string;
+  would_free:         { files: number; bytes: number };
+  files:              OffsiteFileEntry[];
+  refused:            OffsiteFileEntry[];
+  local_sha1_checked: boolean;
+}
+
+/** The 202 of POST /offsite/free and /offsite/restore (_job_body in app/api/collections.py). */
+export interface OffsiteJobStart {
+  job_id:     string;
+  state:      OffsiteJobState;
+  action:     'free' | 'restore';
+  status_url: string;
+}
+
+export type OffsiteJobState = 'queued' | 'running' | 'done' | 'failed';
+
+/** The result of a finished job: _free_work's or _restore_work's in app/core/offsite_free.py. */
+export interface OffsiteJobResult {
+  collection_id: number;
+  filename_stem: string;
+  freed?:        { files: number; bytes: number };
+  restored?:     { files: number; bytes: number };
+  files:         OffsiteFileEntry[];
+  refused:       OffsiteFileEntry[];
+  manifest:      string | null;
+}
+
+/** GET /collections/{id}/offsite/jobs/{job_id}: OffsiteJob.to_dict in app/core/offsite_free.py. */
+export interface OffsiteJobStatus {
+  job_id:        string;
+  collection_id: number;
+  action:        'free' | 'restore';
+  state:         OffsiteJobState;
+  result:        OffsiteJobResult | null;
+  error:         string | null;
 }
 
 // Apagado / reinicio del equipo.

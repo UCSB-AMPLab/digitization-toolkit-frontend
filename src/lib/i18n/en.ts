@@ -8,6 +8,7 @@
 import type { Messages } from './index';
 
 import { formatCount } from '../format-count';
+import { formatBytes } from '../format-bytes';
 
 export const en: Messages = {
 	// ── Common (shared across screens) ───────────────────────────────────────
@@ -674,6 +675,12 @@ export const en: Messages = {
 	image_unviewable_body_format: (ext: string) =>
 		`The browser cannot display ${ext} files, and this file's thumbnail could not be displayed either.`,
 	image_unviewable_body: 'Neither this file nor its thumbnail could be displayed.',
+	// NEH-248: an image freed from the card (RecordImageDisplay.svelte)
+	freed_title: 'Image stored offsite',
+	freed_where: 'This file is kept outside the scanner, in the offsite copy, to leave room on the SD card.',
+	freed_nothing_lost: 'Nothing is lost: Captua verified the offsite copy before it removed the file from the SD card.',
+	freed_restore_hint: 'To see it at full size, an administrator can restore the volume to the SD card.',
+	freed_thumbnail_note: 'What you see is the thumbnail, which Captua keeps on the scanner.',
 	col_export_blocked_title: 'Cannot export yet',
 	col_export_blocked_desc: 'All records must be approved before exporting. The following are not approved yet:',
 	col_download_choose_title: 'Export or download',
@@ -686,6 +693,10 @@ export const en: Messages = {
 	col_images_always: 'Available anytime',
 	col_zip_generating: 'Preparing images ZIP…',
 	col_zip_error: 'Could not generate the ZIP',
+	col_zip_freed:
+		'Some images of this volume are stored offsite and are not on the SD card, so they cannot be included in the ZIP. An administrator can restore the volume from "Space on the SD card".',
+	col_export_freed: (n: number): string =>
+		`${n === 1 ? 'One file of this volume is stored offsite and is not' : `${formatCount(n, 'en')} files of this volume are stored offsite and are not`} on the SD card, so Captua cannot build the package. To export the volume, an administrator must first restore it from "Space on the SD card", next to the offsite copy line.`,
 	bug_report_button: 'Report a problem',
 	bug_report_title: 'Report a problem',
 	bug_report_desc: 'Tell us what happened. GitHub will open with a prefilled report.',
@@ -919,6 +930,134 @@ export const en: Messages = {
 		return `Last file verified on ${date} at ${time}.`;
 	},
 	offsite_cfg_never: 'No file has been verified yet.',
+
+	// ── Freeing space on the card and restoring (NEH-248, offsite-free.ts) ──
+	offsite_vol_stored: 'Stored offsite',
+	offsite_vol_freed: (files: number, bytes: number): string =>
+		`${files === 1 ? '1 file' : `${formatCount(files, 'en')} files`} freed from the SD card (${formatBytes(bytes, 'en')})`,
+	offsite_manage_open: 'Space on the SD card',
+	offsite_manage_intro:
+		"When you free space, Captua removes from the SD card this volume's images and previews that are already verified in the offsite copy. It keeps the thumbnails, so the volume can still be browsed.",
+	offsite_free_action: 'Free space on the SD card',
+	offsite_restore_action: 'Restore to the SD card',
+	offsite_planning: 'Captua is checking what it can free…',
+	offsite_free_confirm_title: 'Free space on the SD card?',
+	offsite_plan_will_free: (files: number, bytes: number): string =>
+		files === 1
+			? `Captua will remove 1 file (${formatBytes(bytes, 'en')}) from the SD card. It will still be stored in the offsite copy.`
+			: `Captua will remove ${formatCount(files, 'en')} files (${formatBytes(bytes, 'en')}) from the SD card. They will still be stored in the offsite copy.`,
+	offsite_plan_restore_later: 'An administrator can restore the volume later with "Restore to the SD card".',
+	offsite_free_check_note:
+		"Before it removes each file, Captua compares its checksum with the offsite copy's again. This can take several minutes.",
+	offsite_plan_nothing: 'Captua found no files it can free on this volume.',
+	offsite_plan_left: (n: number): string =>
+		n === 1 ? 'Captua will leave 1 file on the SD card:' : `Captua will leave ${formatCount(n, 'en')} files on the SD card:`,
+	offsite_free_confirm: 'Free space',
+	offsite_running_free: 'Captua is freeing space on the SD card…',
+	offsite_running_close_note:
+		"You can close this window: Captua will keep working, and you will see the result in the volume's offsite copy line.",
+	offsite_free_done_title: 'Captua finished freeing space',
+	offsite_free_done: (files: number, bytes: number): string =>
+		files === 0
+			? 'Captua removed no file from the SD card.'
+			: files === 1
+				? `Captua removed 1 file (${formatBytes(bytes, 'en')}) from the SD card.`
+				: `Captua removed ${formatCount(files, 'en')} files (${formatBytes(bytes, 'en')}) from the SD card.`,
+	offsite_done_left: (n: number): string =>
+		n === 1 ? 'Captua left 1 file on the SD card:' : `Captua left ${formatCount(n, 'en')} files on the SD card:`,
+	offsite_restore_confirm_title: 'Restore the volume to the SD card?',
+	offsite_restore_confirm_body: (files: number, bytes: number): string =>
+		files === 1
+			? `Captua will copy the freed file (${formatBytes(bytes, 'en')}) back to the SD card from the offsite copy, and check its checksum before it puts the file in place.`
+			: `Captua will copy the ${formatCount(files, 'en')} freed files (${formatBytes(bytes, 'en')}) back to the SD card from the offsite copy, and check each one's checksum before it puts the file in place.`,
+	offsite_restore_space_note:
+		'Make sure the SD card has that much free space. This can take a long time, depending on the connection.',
+	offsite_restore_confirm: 'Restore',
+	offsite_running_restore: 'Captua is restoring the files to the SD card…',
+	offsite_restore_done_title: 'Captua finished restoring the volume',
+	offsite_restore_done: (files: number, bytes: number): string =>
+		files === 0
+			? 'Captua restored no file.'
+			: files === 1
+				? `Captua restored 1 file (${formatBytes(bytes, 'en')}) to the SD card.`
+				: `Captua restored ${formatCount(files, 'en')} files (${formatBytes(bytes, 'en')}) to the SD card.`,
+	offsite_restore_left: (n: number): string =>
+		n === 1 ? 'Captua could not restore 1 file:' : `Captua could not restore ${formatCount(n, 'en')} files:`,
+	offsite_err_no_stem:
+		'This volume has no stem, so none of its files are stored offsite, and there is nothing to free or restore.',
+	offsite_err_not_received:
+		'Not every file of this volume is verified in the offsite copy yet. Wait for Captua to finish copying them.',
+	offsite_err_listing: 'Captua could not reach the offsite copy, so it checked and removed nothing. Try again later.',
+	offsite_err_no_read_remote:
+		'This scanner is not set up to restore: it needs read access to the offsite copy. Ask whoever installed the scanner to set it up.',
+	offsite_err_not_in_own_folder:
+		"Some of this volume's files are not yet in the volume's own folder, so Captua cannot free or restore them. Captua moves them there at startup: restart the scanner and try again. If Captua still cannot free or restore them after the restart, the reason is in the backend's log.",
+	offsite_err_job_running: 'Captua is already freeing or restoring files of this volume. Wait for it to finish.',
+	offsite_err_drive_unavailable:
+		'The storage drive set for projects is not available. Connect and activate it, or go back to internal storage, then try again.',
+	offsite_err_drive_not_directory:
+		'The storage path set for projects is not a folder. Activate the drive again, or go back to internal storage, then try again.',
+	offsite_err_drive_not_mounted:
+		'The storage path set for projects is not on a connected drive. Connect and activate the drive, or go back to internal storage, then try again.',
+	offsite_err_plan: 'Captua could not check what it can free. Try again in a moment.',
+	offsite_err_free: 'Captua could not start freeing space. Try again in a moment.',
+	offsite_err_restore: 'Captua could not start restoring the volume. Try again in a moment.',
+	offsite_err_job_free:
+		"Captua stopped before it finished freeing space. Check the volume's offsite copy line and try again.",
+	offsite_err_job_restore:
+		"Captua stopped before it finished restoring the volume. Check the volume's offsite copy line and try again.",
+	offsite_err_job_lost:
+		"Captua lost track of this task, perhaps after a restart. Check the volume's offsite copy line before you try again.",
+	offsite_err_poll:
+		"Captua could not be reached while it worked. It may still be working: check the volume's offsite copy line in a few minutes.",
+	offsite_reason_no_preview_digest: (n: number): string =>
+		n === 1
+			? '1 preview has no SHA-256 checksum recorded yet. Captua keeps it on the SD card, because that checksum can only be computed from the file on the scanner.'
+			: `${formatCount(n, 'en')} previews have no SHA-256 checksum recorded yet. Captua keeps them on the SD card, because that checksum can only be computed from the file on the scanner.`,
+	offsite_reason_not_in_bucket: (n: number): string =>
+		n === 1 ? '1 file is not in the offsite copy.' : `${formatCount(n, 'en')} files are not in the offsite copy.`,
+	offsite_reason_listed_without_sha1: (n: number): string =>
+		n === 1
+			? '1 file is listed in the offsite copy without a checksum to compare.'
+			: `${formatCount(n, 'en')} files are listed in the offsite copy without a checksum to compare.`,
+	offsite_reason_bucket_sha1_differs: (n: number): string =>
+		n === 1
+			? 'For 1 file, the offsite copy does not match the file on the SD card.'
+			: `For ${formatCount(n, 'en')} files, the offsite copy does not match the file on the SD card.`,
+	offsite_reason_local_file_missing: (n: number): string =>
+		n === 1 ? '1 file is not on the SD card.' : `${formatCount(n, 'en')} files are not on the SD card.`,
+	offsite_reason_local_file_unreadable: (n: number): string =>
+		n === 1 ? 'Captua could not read 1 file on the SD card.' : `Captua could not read ${formatCount(n, 'en')} files on the SD card.`,
+	offsite_reason_local_sha1_differs: (n: number): string =>
+		n === 1
+			? '1 file on the SD card does not match its offsite copy.'
+			: `${formatCount(n, 'en')} files on the SD card do not match their offsite copy.`,
+	offsite_reason_changed: (n: number): string =>
+		n === 1
+			? '1 file was changed or deleted while Captua was working.'
+			: `${formatCount(n, 'en')} files were changed or deleted while Captua was working.`,
+	offsite_reason_could_not_remove: (n: number): string =>
+		n === 1 ? 'Captua could not remove 1 file from the SD card.' : `Captua could not remove ${formatCount(n, 'en')} files from the SD card.`,
+	offsite_reason_outside_storage: (n: number): string =>
+		n === 1
+			? "1 file has a path outside the scanner's storage."
+			: `${formatCount(n, 'en')} files have a path outside the scanner's storage.`,
+	offsite_reason_local_file_differs: (n: number): string =>
+		n === 1
+			? 'For 1 file, the SD card already holds a different file with the same name; Captua left it as it was.'
+			: `For ${formatCount(n, 'en')} files, the SD card already holds different files with the same names; Captua left them as they were.`,
+	offsite_reason_copy_failed: (n: number): string =>
+		n === 1
+			? 'Captua could not copy 1 file from the offsite copy.'
+			: `Captua could not copy ${formatCount(n, 'en')} files from the offsite copy.`,
+	offsite_reason_sha1_differs: (n: number): string =>
+		n === 1
+			? '1 file copied from the offsite copy did not match its checksum; Captua discarded it.'
+			: `${formatCount(n, 'en')} files copied from the offsite copy did not match their checksums; Captua discarded them.`,
+	offsite_reason_could_not_write: (n: number): string =>
+		n === 1 ? 'Captua could not write 1 file to the SD card.' : `Captua could not write ${formatCount(n, 'en')} files to the SD card.`,
+	offsite_reason_other: (n: number): string =>
+		n === 1 ? '1 file, for another reason.' : `${formatCount(n, 'en')} files, for other reasons.`,
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',

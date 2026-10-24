@@ -1,6 +1,15 @@
 // NEH-139: what a viewer may display for a record image.
 import { describe, it, expect, vi } from 'vitest';
-import { checkMasterStored, displayCandidates, formatOf, isBrowserDisplayable, isRawImage, type ImageUrlSource } from './image-display';
+import {
+  checkMasterStored,
+  displayCandidates,
+  formatOf,
+  freedFromBody,
+  isBrowserDisplayable,
+  isRawImage,
+  probeFreed,
+  type ImageUrlSource,
+} from './image-display';
 
 const api: ImageUrlSource = {
   getImagePreviewUrl: (id) => `/api/records/images/${id}/preview`,
@@ -127,5 +136,87 @@ describe('checkMasterStored', () => {
     caller.abort();
     expect(await checkMasterStored('/file', f as unknown as typeof fetch, caller.signal)).toBe('unknown');
     expect(f).not.toHaveBeenCalled();
+  });
+});
+
+// NEH-248: the 410 of /file, /preview and /thumbnail for a file freed from the
+// card, as _freed in app/api/records.py sends it (freed_detail in
+// app/core/offsite_free.py): FastAPI puts the detail under "detail".
+function freed(kind: 'capture' | 'preview' = 'capture', status = 410): Response {
+  const detail = {
+    message: 'This file is stored offsite and has been freed from the card to make room. An admin can restore the volume to bring it back.',
+    stored_offsite: true,
+    image_id: 9,
+    kind,
+    key: 'rionegro/co-x/captures/f1.CR2',
+    freed_at: '2026-10-20T14:03:00+00:00',
+  };
+  return new Response(JSON.stringify({ detail }), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+describe('freedFromBody', () => {
+  it('reads the kind and the time of a 410 that says the file is stored offsite', () => {
+    expect(freedFromBody(410, { detail: { stored_offsite: true, kind: 'preview', freed_at: '2026-10-20T14:03:00+00:00' } }))
+      .toEqual({ kind: 'preview', freedAt: '2026-10-20T14:03:00+00:00' });
+  });
+
+  it('is null for a 410 without stored_offsite, for any other status, and for a body that is not the detail', () => {
+    expect(freedFromBody(410, { detail: 'Gone' })).toBeNull();
+    expect(freedFromBody(410, { detail: { stored_offsite: false, kind: 'capture' } })).toBeNull();
+    expect(freedFromBody(404, { detail: { stored_offsite: true, kind: 'capture' } })).toBeNull();
+    expect(freedFromBody(410, null)).toBeNull();
+    expect(freedFromBody(410, 'x')).toBeNull();
+  });
+
+  it('accepts a missing time and an unknown kind as a master', () => {
+    expect(freedFromBody(410, { detail: { stored_offsite: true } })).toEqual({ kind: 'capture', freedAt: null });
+  });
+});
+
+describe('probeFreed', () => {
+  it('reads the 410 body of a freed file', async () => {
+    const f = vi.fn().mockResolvedValue(freed('preview'));
+    expect(await probeFreed('/preview', f as unknown as typeof fetch)).toEqual({
+      kind: 'preview',
+      freedAt: '2026-10-20T14:03:00+00:00',
+    });
+  });
+
+  it('is null for any other answer, and aborts the request once the headers of a 200 arrive', async () => {
+    let signal: AbortSignal | undefined;
+    const ok = vi.fn().mockImplementation((_u: string, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      return Promise.resolve(response(200));
+    });
+    expect(await probeFreed('/preview', ok as unknown as typeof fetch)).toBeNull();
+    expect(signal?.aborted).toBe(true);
+    for (const status of [404, 500]) {
+      const f = vi.fn().mockResolvedValue(response(status));
+      expect(await probeFreed('/preview', f as unknown as typeof fetch)).toBeNull();
+    }
+    const fNet = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    expect(await probeFreed('/preview', fNet as unknown as typeof fetch)).toBeNull();
+    const notJson = vi.fn().mockResolvedValue(response(410));
+    expect(await probeFreed('/preview', notJson as unknown as typeof fetch)).toBeNull();
+  });
+
+  it("does not fetch when the caller's signal is already aborted", async () => {
+    const f = vi.fn();
+    const caller = new AbortController();
+    caller.abort();
+    expect(await probeFreed('/preview', f as unknown as typeof fetch, caller.signal)).toBeNull();
+    expect(f).not.toHaveBeenCalled();
+  });
+});
+
+describe('checkMasterStored, for a freed master', () => {
+  it('is freed on the 410 of a master stored offsite, never missing', async () => {
+    const f = vi.fn().mockResolvedValue(freed('capture'));
+    expect(await checkMasterStored('/file', f as unknown as typeof fetch)).toBe('freed');
+  });
+
+  it('is unknown on a 410 that does not say so', async () => {
+    const f = vi.fn().mockResolvedValue(response(410));
+    expect(await checkMasterStored('/file', f as unknown as typeof fetch)).toBe('unknown');
   });
 });

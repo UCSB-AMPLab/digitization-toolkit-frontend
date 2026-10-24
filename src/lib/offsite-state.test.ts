@@ -55,7 +55,8 @@ describe('volumeOffsiteView', () => {
 			kind: 'received',
 			headline: es.offsite_vol_received(412, 412),
 			lastVerified: es.offsite_last_verified('today', formatBackupDate(new Date(TODAY_0905), NOW, 'es'), '09:05'),
-			help: null
+			help: null,
+			freed: null
 		});
 	});
 
@@ -94,7 +95,8 @@ describe('volumeOffsiteView', () => {
 			kind: 'empty',
 			headline: es.offsite_vol_empty,
 			lastVerified: null,
-			help: null
+			help: null,
+			freed: null
 		});
 	});
 
@@ -117,7 +119,8 @@ describe('volumeOffsiteView', () => {
 			kind: 'misconfigured',
 			headline: es.offsite_vol_misconfigured,
 			lastVerified: null,
-			help: null
+			help: null,
+			freed: null
 		});
 	});
 
@@ -130,8 +133,49 @@ describe('volumeOffsiteView', () => {
 			kind: 'unknown',
 			headline: es.offsite_vol_unknown,
 			lastVerified: null,
-			help: null
+			help: null,
+			freed: null
 		});
+	});
+});
+
+describe('volumeOffsiteView, for a volume freed from the card', () => {
+	const freedVolume = (over: Partial<VolumeOffsiteState> = {}) =>
+		volume({ freed_files: 412, freed_bytes: 12_300_000_000, ...over });
+
+	it('says a received volume whose files were freed is stored offsite, with the files and bytes freed', () => {
+		const view = volumeOffsiteView(loaded(freedVolume()), 'on', NOW, 'en', en);
+		expect(view?.kind).toBe('freed');
+		expect(view?.headline).toBe(en.offsite_vol_stored);
+		expect(view?.freed).toBe(en.offsite_vol_freed(412, 12_300_000_000));
+		expect(view?.freed).toBe('412 files freed from the SD card (12.3\u00a0GB)');
+		expect(view?.lastVerified).not.toBeNull();
+		expect(view?.help).toBeNull();
+	});
+
+	it('writes the count and the size as Spanish does', () => {
+		const view = volumeOffsiteView(loaded(freedVolume({ freed_files: 12345 })), 'on', NOW, 'es', es);
+		expect(view?.freed).toBe('12.345 archivos liberados de la tarjeta (12,3\u00a0GB)');
+		expect(es.offsite_vol_freed(1, 2_000_000)).toBe('1 archivo liberado de la tarjeta (2\u00a0MB)');
+	});
+
+	it('keeps the counts of a volume with new files to copy, and says what was freed', () => {
+		const state = freedVolume({ total: 420, verified: 412, pending: 8, received: false });
+		const view = volumeOffsiteView(loaded(state), 'on', NOW, 'es', es);
+		expect(view?.kind).toBe('uploading');
+		expect(view?.headline).toBe(es.offsite_vol_uploading(412, 420, 8));
+		expect(view?.freed).toBe(es.offsite_vol_freed(412, 12_300_000_000));
+	});
+
+	it('says what was freed even when the unit has the copy off', () => {
+		expect(volumeOffsiteView(loaded(freedVolume()), 'off', NOW, 'es', es)?.freed).toBe(
+			es.offsite_vol_freed(412, 12_300_000_000)
+		);
+	});
+
+	it('has no freed line when nothing was freed, or the backend does not send the counts', () => {
+		expect(volumeOffsiteView(loaded(volume({ freed_files: 0, freed_bytes: 0 })), 'on', NOW, 'es', es)?.freed).toBeNull();
+		expect(volumeOffsiteView(loaded(volume()), 'on', NOW, 'es', es)?.kind).toBe('received');
 	});
 });
 

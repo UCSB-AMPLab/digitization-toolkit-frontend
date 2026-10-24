@@ -10,6 +10,12 @@ const KEY = Symbol('volume-topbar');
 
 export interface VolumeTopbarSlot {
 	actions: Snippet | null;
+	/**
+	 * Reloads the page's records, which carry each image's freed state; the
+	 * layout calls it after a free or a restore of the volume (NEH-248).
+	 * Resolves false if the list could not be refreshed.
+	 */
+	reloadRecords: (() => Promise<boolean>) | null;
 }
 
 export function setVolumeTopbar(slot: VolumeTopbarSlot): void {

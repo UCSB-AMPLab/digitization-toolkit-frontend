@@ -36,5 +36,5 @@ export function formatBytes(bytes: number, locale: ByteLocale): string {
 	}
 	const [whole, oneDecimal] = formatters[locale];
 	const text = (unit === 0 || value >= 100 ? whole : oneDecimal).format(value);
-	return `${text} ${UNITS[unit]}`;
+	return `${text}\u00a0${UNITS[unit]}`;
 }

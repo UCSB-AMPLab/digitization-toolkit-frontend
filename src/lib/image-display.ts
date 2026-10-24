@@ -15,6 +15,11 @@
 //     the fallback for whatever /preview does not send, such as a TIFF.
 // The image object carries `format` (the lower-cased file suffix, e.g. "cr2")
 // and `filename`.
+//
+// A file freed from the card (NEH-248) is answered 410 by all three, with a
+// body that says it is stored offsite (_freed in records.py). An <img> that
+// fails says nothing about why, so the viewer asks again with fetch
+// (probeFreed) and shows a freed file as stored offsite, never as missing.
 // ============================================================================
 
 import type { RecordImage } from '$lib/api';
@@ -75,14 +80,59 @@ export function displayCandidates(img: Pick<RecordImage, 'id' | 'format' | 'file
   return [thumbnail];
 }
 
+/** A file freed from the card: the master ("capture") or a RAW master's preview, and when. */
+export interface FreedFile {
+  kind: 'capture' | 'preview';
+  freedAt: string | null;
+}
+
+/**
+ * The freed file a response describes, or null: a 410 whose JSON body's
+ * `detail` has `stored_offsite: true` (freed_detail in
+ * app/core/offsite_free.py). Any other answer is not read as freed.
+ */
+export function freedFromBody(status: number, body: unknown): FreedFile | null {
+  if (status !== 410 || typeof body !== 'object' || body === null) return null;
+  const detail = (body as { detail?: unknown }).detail;
+  if (typeof detail !== 'object' || detail === null) return null;
+  const d = detail as { stored_offsite?: unknown; kind?: unknown; freed_at?: unknown };
+  if (d.stored_offsite !== true) return null;
+  return { kind: d.kind === 'preview' ? 'preview' : 'capture', freedAt: typeof d.freed_at === 'string' ? d.freed_at : null };
+}
+
+/**
+ * Ask `url` again and return the freed file its 410 describes, or null for
+ * any other answer, a network error, or an already aborted `signal`. Only a
+ * 410's small JSON body is read; any other request is aborted as soon as the
+ * headers arrive.
+ */
+export async function probeFreed(url: string, fetchFn: typeof fetch = fetch, signal?: AbortSignal): Promise<FreedFile | null> {
+  const controller = new AbortController();
+  if (signal?.aborted) return null;
+  signal?.addEventListener('abort', () => controller.abort(), { once: true });
+  try {
+    const res = await fetchFn(url, { signal: controller.signal });
+    if (res.status !== 410) {
+      controller.abort();
+      return null;
+    }
+    const body = await res.json().catch(() => null);
+    controller.abort();
+    return freedFromBody(res.status, body);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Whether the stored master is on disk, asked of GET /file: the backend
  * answers 200 only after finding the image row, its file path inside the
- * storage roots, and the file itself; 404 when any of those is missing.
+ * storage roots, and the file itself; 404 when any of those is missing; 410
+ * when the master was freed from the card and is stored offsite (`freed`).
  * The request is aborted as soon as the headers arrive, so the master is not
  * downloaded. Anything else (auth, network, server error) is `unknown`.
  */
-export type MasterCheck = 'stored' | 'missing' | 'unknown';
+export type MasterCheck = 'stored' | 'missing' | 'freed' | 'unknown';
 
 export async function checkMasterStored(
   fileUrl: string,
@@ -95,6 +145,11 @@ export async function checkMasterStored(
   signal?.addEventListener('abort', () => controller.abort(), { once: true });
   try {
     const res = await fetchFn(fileUrl, { signal: controller.signal });
+    if (res.status === 410) {
+      const body = await res.json().catch(() => null);
+      controller.abort();
+      return freedFromBody(410, body) ? 'freed' : 'unknown';
+    }
     controller.abort();
     if (res.status === 200) return 'stored';
     if (res.status === 404) return 'missing';

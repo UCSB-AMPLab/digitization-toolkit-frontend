@@ -36,6 +36,8 @@
   import HandoverControls from '$lib/components/HandoverControls.svelte';
   import { getVolumeTopbar } from '$lib/volume-topbar';
   import { fileHoldText } from '$lib/volume-refusals';
+  import { freedExportCount } from '$lib/offsite-free';
+  import { freedFromBody } from '$lib/image-display';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -265,7 +267,9 @@
           break;
         }
         if (st.state === 'failed') {
-          exportError = st.error ?? $m.col_err_export;
+          // A free that followed the request: the worker checks again (NEH-248).
+          const freed = freedExportCount(st.error);
+          exportError = freed !== null ? $m.col_export_freed(freed) : (st.error ?? $m.col_err_export);
           break;
         }
       }
@@ -281,12 +285,18 @@
         await loadRecords();
         showBlockersModal = true;
       } else {
-        exportError = fileHoldText(err, $m) ?? err?.message ?? $m.col_err_export;
+        // Masters freed from the card are stored offsite, not here: a restore comes first (NEH-248).
+        const freed = freedExportCount(err);
+        exportError = freed !== null ? $m.col_export_freed(freed) : (fileHoldText(err, $m) ?? err?.message ?? $m.col_err_export);
       }
     } finally {
       isExporting = false;
     }
   }
+
+  // Un máster liberado de la tarjeta (410 de /file, NEH-248): está en la copia
+  // externa, no en el equipo, así que no puede ir en el ZIP.
+  class FreedFromCard extends Error {}
 
   // Descarga de imágenes como ZIP, generado en el navegador (sin backend).
   // Nota: para volúmenes muy grandes convendría un endpoint del backend (mejora futura).
@@ -301,6 +311,7 @@
       let done = 0;
       for (const { img, r } of items) {
         const res = await fetch(recordsApi.getImageFileUrl(img.id));
+        if (res.status === 410 && freedFromBody(410, await res.json().catch(() => null))) throw new FreedFromCard();
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
         const ext = (img.format || img.filename?.split('.').pop() || 'jpg').toLowerCase();
@@ -321,7 +332,7 @@
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      zipError = e?.message ?? $m.col_zip_error;
+      zipError = e instanceof FreedFromCard ? $m.col_zip_freed : (e?.message ?? $m.col_zip_error);
     } finally {
       isZipping = false;
     }
@@ -346,6 +357,14 @@
     if (!topbar) return;
     topbar.actions = canHandOver && hasLoaded && loadedFor === collectionId ? handoverActions : null;
     return () => { topbar.actions = null; };
+  });
+
+  // After a free or a restore of the volume (NEH-248), the layout reloads the
+  // records so each image's freed state is current.
+  $effect(() => {
+    if (!topbar) return;
+    topbar.reloadRecords = loadRecords;
+    return () => { topbar.reloadRecords = null; };
   });
 </script>
 
