@@ -107,9 +107,9 @@ export const es = {
 	tour_s3_where: 'Pulse en Proyectos › su proyecto › su volumen › Capturar.',
 	tour_s3_body: 'Desde aquí se abre la pantalla de captura de este volumen.',
 	tour_s4_title: 'Pasar a revisión',
-	tour_s4_where: 'Pulse en Proyectos › su proyecto › su volumen.',
+	tour_s4_where: 'Pulse en Proyectos › su proyecto › su volumen › Enviar a revisión.',
 	tour_s4_body:
-		'Al terminar de capturar, las imágenes pasan a revisión. Es posible hacer correcciones de captura y de nomenclatura.',
+		'Al terminar de capturar, envíe el volumen a revisión. Antes de eso es posible hacer correcciones de captura y de nomenclatura.',
 	tour_s5_title: 'Revisar y aprobar',
 	tour_s5_where: 'Pulse en Proyectos › su proyecto › su volumen › Aprobar.',
 	tour_s5_body:

@@ -153,7 +153,7 @@
   </button>
 {/if}
 {#if offer.send}
-  <button class="btn btn-primary handover-btn" disabled={busy} onclick={() => openDialog('send')}>
+  <button class="btn btn-primary handover-btn" data-tour="entregar" disabled={busy} onclick={() => openDialog('send')}>
     {offer.send === 'new' ? $m.col_handover_send_new(counts.captured) : $m.col_handover_send}
   </button>
 {/if}

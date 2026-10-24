@@ -43,9 +43,10 @@ export const TOUR_STEPS: TourStep[] = [
   // Debajo: el botón de capturar vive en la barra superior, así que una
   // caja encima quedaría pegada al borde o tapando la propia barra.
   { id: 'tour_s3', match: COLLECTION, target: 'capturar',        side: 'bottom' },
-  // El control de pasar a revisión no existe todavía: el backend lo soporta
-  // desde NEH-260 y falta la interfaz. El paso se explica sin resaltar nada.
-  { id: 'tour_s4', match: COLLECTION, target: null,              side: 'top'    },
+  // Debajo, como el de capturar: ambos viven en la barra superior. El botón
+  // sólo existe cuando hay capturas sin enviar, así que en un volumen vacío
+  // el paso se explica sin resaltar nada — que es el respaldo previsto.
+  { id: 'tour_s4', match: COLLECTION, target: 'entregar',        side: 'bottom' },
   { id: 'tour_s5', match: COLLECTION, target: 'aprobar',         side: 'top'    },
   { id: 'tour_s6', match: COLLECTION, target: 'exportar',        side: 'top'    },
 ];

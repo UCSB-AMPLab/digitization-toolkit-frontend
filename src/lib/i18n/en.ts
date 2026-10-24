@@ -94,9 +94,9 @@ export const en: Messages = {
 	tour_s3_where: 'Go to Projects › your project › your volume › Capture.',
 	tour_s3_body: 'This opens the capture screen for this volume.',
 	tour_s4_title: 'Send for review',
-	tour_s4_where: 'Go to Projects › your project › your volume.',
+	tour_s4_where: 'Go to Projects › your project › your volume › Send for review.',
 	tour_s4_body:
-		'Once capture is finished the images move to review. Capture and naming can still be corrected.',
+		'When capture is finished, send the volume for review. Until then, capture and naming can still be corrected.',
 	tour_s5_title: 'Review and approve',
 	tour_s5_where: 'Go to Projects › your project › your volume › Approve.',
 	tour_s5_body:
