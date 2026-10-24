@@ -19,6 +19,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
+	import { tour } from '$lib/tour';
 	import { usersApi } from '$lib/api';
 	import { waitForSession, sessionRetryDelay } from '$lib/session-check';
 	import { m, roleLabel, type StringMessageKey } from '$lib/i18n';
@@ -56,6 +57,11 @@
 		const unsub = authStore.subscribe((s) => {
 			currentUser = s.user;
 			if (!s.token && !isValidatingSession) goto('/login');
+			// Primera vez que esta cuenta entra: se ofrece el recorrido (NEH-95).
+			// La marca se guarda al abrirlo, no al terminarlo — quien lo cierra
+			// enseguida no quiere verlo en cada arranque, y el botón de ayuda
+			// lo reabre cuando quiera.
+			if (s.user) tour.startIfFirstTime(s.user.id);
 		});
 
 		// Validación al montar: un token en localStorage no garantiza que el
@@ -422,6 +428,21 @@
 				<div class="user-av-sm">{userInitials}</div>
 			{/if}
 			
+			<!-- Ayuda encima del botón de fallos. En captura y en la vista de
+			     volumen no hay barra lateral: allí vive en el menú del avatar. -->
+			<button class="help-btn" onclick={() => tour.start()} title={$m.nav_help} aria-label={$m.nav_help}>
+				<!-- SVG y no material-symbols: la fuente de iconos va empaquetada
+				     como subconjunto de los que el proyecto ya usaba, y "help" no
+				     está en él --- se dibujaba la palabra en mayúsculas. Mismo icono
+				     que el de Ayuda en el menú del avatar. -->
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+					<circle cx="12" cy="12" r="10" />
+					<path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 3-3 3" />
+					<line x1="12" y1="17" x2="12.01" y2="17" />
+				</svg>
+				{#if expanded}<span class="help-btn-label">{$m.nav_help}</span>{/if}
+			</button>
+
 			<BugReportButton {expanded} />
 
 			<!-- Botón salir: siempre visible, ícono en colapsado + texto en expandido -->
@@ -794,6 +815,19 @@
 		color: var(--color-light-grey);
 		text-transform: capitalize;
 	}
+
+	.help-btn {
+		display: flex; align-items: center; justify-content: center; gap: 7px;
+		width: 100%; padding: 8px 10px; min-height: 40px;
+		border-radius: var(--radius-md);
+		background: none; border: 1px solid var(--border-color);
+		color: var(--color-light-grey); font-family: var(--font-family);
+		font-size: var(--text-sm); font-weight: var(--fw-semibold);
+		cursor: pointer; transition: all var(--transition-fast); white-space: nowrap;
+		margin-bottom: 8px;
+	}
+	.help-btn:hover { color: var(--color-light); background-color: rgba(255,255,255,0.05); }
+	.help-btn-label { flex: 1; text-align: left; }
 
 	.logout-btn {
 		display: flex;
