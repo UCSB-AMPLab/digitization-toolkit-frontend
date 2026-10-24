@@ -24,11 +24,14 @@
     collectionId = 0,
     onRecordClick,
     onRecordsUpdate,
+    onReorderNotice,
   }: {
     records: Record[];
     collectionId?: number;
     onRecordClick: (record: Record) => void;
     onRecordsUpdate?: () => void;
+    // Why the last drag was not saved, or null once one is saved.
+    onReorderNotice?: (notice: string | null) => void;
   } = $props();
 
   // Local copy for DnD
@@ -37,20 +40,17 @@
 
   function handleDndConsider(e: CustomEvent) { localRecords = e.detail.items; }
 
-  // Why the last drag was not saved; the order on screen is the volume's
-  // again, read back from the backend.
-  let reorderNotice = $state<string | null>(null);
-
   async function handleDndFinalize(e: CustomEvent) {
     localRecords = e.detail.items;
     if (collectionId && onRecordsUpdate) {
       try {
         await collectionsApi.reorderRecords(collectionId, localRecords.map(r => r.id));
-        reorderNotice = null;
+        onReorderNotice?.(null);
         onRecordsUpdate();
       } catch (err) {
         console.error('[ListView] Error reordenando:', err);
-        reorderNotice = reorderErrorText(err, $m);
+        // The page holds the notice: the reload below unmounts this view.
+        onReorderNotice?.(reorderErrorText(err, $m));
         onRecordsUpdate();
       }
     }
@@ -129,15 +129,6 @@
       <!-- Conteo por estado, en la misma fila -->
       <RecordStatusBar {records} variant="inline" />
     </div>
-
-    {#if reorderNotice}
-      <div class="action-notice" role="alert">
-        <span class="action-notice-text">{reorderNotice}</span>
-        <button class="action-notice-close" onclick={() => (reorderNotice = null)} aria-label={$m.common_close}>
-          <span class="material-symbols-outlined icon-sm">close</span>
-        </button>
-      </div>
-    {/if}
 
     <!-- Cabecera de tabla -->
     <div class="list-header">

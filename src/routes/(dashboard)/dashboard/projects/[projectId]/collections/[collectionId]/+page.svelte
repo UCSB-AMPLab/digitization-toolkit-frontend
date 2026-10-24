@@ -128,7 +128,7 @@
   // Al pasar a otro volumen sin desmontar la página, cargar los suyos.
   $effect(() => {
     const id = collectionId;
-    if (requestedFor !== 0 && id !== requestedFor) untrack(() => { loadRecords(); });
+    if (requestedFor !== 0 && id !== requestedFor) untrack(() => { reorderNotice = null; loadRecords(); });
   });
 
   // ---------------------------------------------------------------------------
@@ -171,6 +171,11 @@
   function handleRecapture(record: Record) {
     goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}&recordId=${record.id}`);
   }
+
+  // Por qué no se guardó el último arrastre en la lista o la cuadrícula.
+  // Vive acá y no en la vista porque la recarga que sigue al rechazo pone
+  // isLoading, y eso desmonta la vista que lo mostraría.
+  let reorderNotice = $state<string | null>(null);
 
   // Por qué no se pudo eliminar el último registro; null si no hay aviso.
   let deleteRecordError = $state<string | null>(null);
@@ -340,6 +345,15 @@
     <RecordStatusBar {records} />
   {/if}
 
+  {#if reorderNotice}
+    <div class="action-notice" role="alert">
+      <span class="action-notice-text">{reorderNotice}</span>
+      <button class="action-notice-close" onclick={() => (reorderNotice = null)} aria-label={$m.common_close}>
+        <span class="material-symbols-outlined icon-sm">close</span>
+      </button>
+    </div>
+  {/if}
+
   <div class="content-area">
 
     <!-- Panel lateral: solo en spread (vista libro) -->
@@ -371,6 +385,7 @@
           {collectionId}
           {triggerFinalizeModal}
           onRecordsUpdate={loadRecords}
+          onReorderNotice={(n) => (reorderNotice = n)}
           onFinalized={handleFinalized}
           onFinalizeModalClosed={handleFinalizeModalClosed}
           onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
@@ -382,6 +397,7 @@
           {collectionId}
           onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
           onRecordsUpdate={loadRecords}
+          onReorderNotice={(n) => (reorderNotice = n)}
         />
 
       {:else if viewMode === 'spread'}

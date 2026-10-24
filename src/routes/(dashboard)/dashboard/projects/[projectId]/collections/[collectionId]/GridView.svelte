@@ -55,6 +55,7 @@
     onFinalized,
     onFinalizeModalClosed,
     onRecordClick,
+    onReorderNotice,
   }: {
     records: Record[];
     collectionId: number;
@@ -66,6 +67,8 @@
     // al Book view (spread) de ese registro — el spread ya muestra L y R
     // juntos, así que no hace falta lógica especial para el caso de par.
     onRecordClick: (record: Record) => void;
+    // Why the last drag was not saved, or null once one is saved.
+    onReorderNotice?: (notice: string | null) => void;
   } = $props();
 
   // Local copy of records for DnD reordering
@@ -185,19 +188,16 @@
     localRecords = e.detail.items;
   }
 
-  // Why the last drag was not saved; the order on screen is the volume's
-  // again, read back from the backend.
-  let reorderNotice = $state<string | null>(null);
-
   async function handleDndFinalize(e: CustomEvent) {
     localRecords = e.detail.items;
     try {
       await collectionsApi.reorderRecords(collectionId, localRecords.map(r => r.id));
-      reorderNotice = null;
+      onReorderNotice?.(null);
       onRecordsUpdate();
     } catch (err) {
       console.error('[GridView] Error reordenando:', err);
-      reorderNotice = reorderErrorText(err, $m);
+      // The page holds the notice: the reload below unmounts this view.
+      onReorderNotice?.(reorderErrorText(err, $m));
       onRecordsUpdate(); // restore from server
     }
   }
@@ -316,15 +316,6 @@
     </div>
 
   </div>
-
-  {#if reorderNotice}
-    <div class="action-notice" role="alert">
-      <span class="action-notice-text">{reorderNotice}</span>
-      <button class="action-notice-close" onclick={() => (reorderNotice = null)} aria-label={$m.common_close}>
-        <span class="material-symbols-outlined icon-sm">close</span>
-      </button>
-    </div>
-  {/if}
 
   <!-- Panel de filtros -->
   {#if showFilterPanel}
