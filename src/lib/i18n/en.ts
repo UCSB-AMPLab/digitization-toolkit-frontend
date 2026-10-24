@@ -7,6 +7,8 @@
 
 import type { Messages } from './index';
 
+import { formatCount } from '../format-count';
+
 export const en: Messages = {
 	// ── Common (shared across screens) ───────────────────────────────────────
 	common_username_label: 'Username',
@@ -417,7 +419,7 @@ export const en: Messages = {
 	vol_err_stored_offsite: (n: number): string =>
 		n === 1
 			? 'One record has files already stored offsite under this volume, so it cannot be moved to another volume.'
-			: `${n} records have files already stored offsite under this volume, so they cannot be moved to another volume.`,
+			: `${formatCount(n, 'en')} records have files already stored offsite under this volume, so they cannot be moved to another volume.`,
 	pd_member_implicit: 'Implicit access (cannot be removed)',
 	pd_member_remove: 'Remove collaborator',
 	pd_member_add: 'Add collaborator',
@@ -850,11 +852,11 @@ export const en: Messages = {
 	// ── Offsite copy of the images (NEH-248, offsite-state.ts) ─────────────
 	offsite_vol_label: 'Offsite copy of this volume',
 	offsite_vol_received: (verified: number, total: number) =>
-		`Stored offsite: ${verified} of ${total} files verified`,
+		`Stored offsite: ${formatCount(verified, 'en')} of ${formatCount(total, 'en')} files verified`,
 	offsite_vol_uploading: (verified: number, total: number, pending: number) =>
-		`Uploading: ${verified} of ${total} files verified, ${pending} pending`,
+		`Uploading: ${formatCount(verified, 'en')} of ${formatCount(total, 'en')} files verified, ${formatCount(pending, 'en')} pending`,
 	offsite_vol_attention: (refused: number, verified: number, total: number, pending: number) =>
-		`${refused === 1 ? '1 file needs' : `${refused} files need`} attention · ${verified} of ${total} verified, ${pending} pending`,
+		`${refused === 1 ? '1 file needs' : `${formatCount(refused, 'en')} files need`} attention · ${formatCount(verified, 'en')} of ${formatCount(total, 'en')} verified, ${formatCount(pending, 'en')} pending`,
 	offsite_attention_help:
 		'The offsite copy already holds a different file with the same name. Let whoever administers the scanner know.',
 	offsite_vol_empty: 'Offsite copy: no files to copy yet',
@@ -872,11 +874,11 @@ export const en: Messages = {
 		'The offsite copy of the image files is not configured correctly on this scanner. Let whoever administers it know.',
 	offsite_unit_empty: 'There are no image files to copy yet.',
 	offsite_unit_volumes: (received: number, volumes: number) =>
-		`${received} of ${volumes} ${volumes === 1 ? 'volume' : 'volumes'} stored offsite in full.`,
+		`${formatCount(received, 'en')} of ${formatCount(volumes, 'en')} ${volumes === 1 ? 'volume' : 'volumes'} stored offsite in full.`,
 	offsite_unit_files: (verified: number, total: number, pending: number) =>
-		`${verified} of ${total} files verified, ${pending} pending.`,
+		`${formatCount(verified, 'en')} of ${formatCount(total, 'en')} files verified, ${formatCount(pending, 'en')} pending.`,
 	offsite_unit_refused: (refused: number): string =>
-		refused === 1 ? '1 file needs attention.' : `${refused} files need attention.`,
+		refused === 1 ? '1 file needs attention.' : `${formatCount(refused, 'en')} files need attention.`,
 	offsite_cfg_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		if (day === 'today') return `Last file verified today at ${time}.`;
 		if (day === 'yesterday') return `Last file verified yesterday at ${time}.`;

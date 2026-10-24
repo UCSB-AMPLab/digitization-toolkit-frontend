@@ -17,6 +17,8 @@
 //     cataloga: queda en el componente.
 // ============================================================================
 
+import { formatCount } from '../format-count';
+
 export const es = {
 	// ── Comunes (usados en varias pantallas) ─────────────────────────────────
 	common_username_label: 'Usuario',
@@ -440,7 +442,7 @@ export const es = {
 	vol_err_stored_offsite: (n: number): string =>
 		n === 1
 			? 'Un registro tiene archivos que ya están guardados en la copia externa como parte de este volumen, así que no se puede mover a otro volumen.'
-			: `Hay ${n} registros con archivos que ya están guardados en la copia externa como parte de este volumen, así que no se pueden mover a otro volumen.`,
+			: `Hay ${formatCount(n, 'es')} registros con archivos que ya están guardados en la copia externa como parte de este volumen, así que no se pueden mover a otro volumen.`,
 	pd_member_implicit: 'Acceso implícito (no se puede eliminar)',
 	pd_member_remove: 'Eliminar colaborador',
 	pd_member_add: 'Añadir colaborador',
@@ -887,11 +889,11 @@ export const es = {
 	// ── Copia externa de las imágenes (NEH-248, offsite-state.ts) ─────────
 	offsite_vol_label: 'Copia externa de este volumen',
 	offsite_vol_received: (verified: number, total: number) =>
-		`Copia externa completa: ${verified} de ${total} archivos verificados`,
+		`Copia externa completa: ${formatCount(verified, 'es')} de ${formatCount(total, 'es')} archivos verificados`,
 	offsite_vol_uploading: (verified: number, total: number, pending: number) =>
-		`Copia externa en curso: ${verified} de ${total} archivos verificados, ${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
+		`Copia externa en curso: ${formatCount(verified, 'es')} de ${formatCount(total, 'es')} archivos verificados, ${formatCount(pending, 'es')} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
 	offsite_vol_attention: (refused: number, verified: number, total: number, pending: number) =>
-		`${refused === 1 ? '1 archivo requiere' : `${refused} archivos requieren`} atención · ${verified} de ${total} verificados, ${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
+		`${refused === 1 ? '1 archivo requiere' : `${formatCount(refused, 'es')} archivos requieren`} atención · ${formatCount(verified, 'es')} de ${formatCount(total, 'es')} verificados, ${formatCount(pending, 'es')} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
 	offsite_attention_help: 'En la copia externa ya hay otro archivo con el mismo nombre. Avisa a quien administra el equipo.',
 	offsite_vol_empty: 'Copia externa: todavía no hay archivos para copiar',
 	offsite_vol_no_stem: 'Sin copia externa: este volumen no tiene raíz',
@@ -909,11 +911,11 @@ export const es = {
 		'La copia externa de los archivos de imagen no está bien configurada en este equipo. Avisa a quien administra el equipo.',
 	offsite_unit_empty: 'Todavía no hay archivos de imagen para copiar.',
 	offsite_unit_volumes: (received: number, volumes: number) =>
-		`${received} de ${volumes} ${volumes === 1 ? 'volumen' : 'volúmenes'} con copia externa completa.`,
+		`${formatCount(received, 'es')} de ${formatCount(volumes, 'es')} ${volumes === 1 ? 'volumen' : 'volúmenes'} con copia externa completa.`,
 	offsite_unit_files: (verified: number, total: number, pending: number) =>
-		`${verified} de ${total} archivos verificados, ${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}.`,
+		`${formatCount(verified, 'es')} de ${formatCount(total, 'es')} archivos verificados, ${formatCount(pending, 'es')} ${pending === 1 ? 'pendiente' : 'pendientes'}.`,
 	offsite_unit_refused: (refused: number): string =>
-		refused === 1 ? '1 archivo requiere atención.' : `${refused} archivos requieren atención.`,
+		refused === 1 ? '1 archivo requiere atención.' : `${formatCount(refused, 'es')} archivos requieren atención.`,
 	offsite_cfg_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
 		if (day === 'today') return `Último archivo verificado hoy ${at}.`;

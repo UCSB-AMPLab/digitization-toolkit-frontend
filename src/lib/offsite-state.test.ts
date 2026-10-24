@@ -169,3 +169,18 @@ describe('unitOffsiteView', () => {
 		);
 	});
 });
+
+describe('counts in the offsite lines', () => {
+	it('separate thousands as each language does', () => {
+		const state = volume({ total: 12345, verified: 1786, pending: 10559, received: false });
+		expect(volumeOffsiteView(loaded(state), true, NOW, 'es', es)?.headline).toBe(
+			'Copia externa en curso: 1786 de 12.345 archivos verificados, 10.559 pendientes'
+		);
+		expect(volumeOffsiteView(loaded(state), true, NOW, 'en', en)?.headline).toBe(
+			'Uploading: 1,786 of 12,345 files verified, 10,559 pending'
+		);
+		expect(es.vol_err_stored_offsite(12345)).toContain('12.345 registros');
+		expect(en.vol_err_stored_offsite(1786)).toContain('1,786 records');
+		expect(en.offsite_unit_files(1786, 12345, 0)).toBe('1,786 of 12,345 files verified, 0 pending.');
+	});
+});
