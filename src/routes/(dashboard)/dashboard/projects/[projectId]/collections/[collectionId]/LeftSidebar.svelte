@@ -517,7 +517,7 @@
               <!-- Encabezado del registro -->
               <div class="record-overview">
                 <span class="overview-name">{currentRecord.title || '—'}</span>
-                <span class="overview-pos">{currentIndex} / {formatCount(totalRecords, $locale)}</span>
+                <span class="overview-pos">{formatCount(currentIndex, $locale)} / {formatCount(totalRecords, $locale)}</span>
               </div>
 
               {#if sortedImages.length === 0}

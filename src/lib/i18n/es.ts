@@ -898,6 +898,7 @@ export const es = {
 	offsite_vol_empty: 'Copia externa: todavía no hay archivos para copiar',
 	offsite_vol_no_stem: 'Sin copia externa: este volumen no tiene raíz',
 	offsite_vol_off: 'Copia externa de imágenes sin configurar',
+	offsite_vol_misconfigured: 'Copia externa de imágenes mal configurada',
 	offsite_vol_unknown: 'No se pudo consultar la copia externa de este volumen',
 	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;

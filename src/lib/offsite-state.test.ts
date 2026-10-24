@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
 import { en } from './i18n/en';
 import { formatBackupDate } from './catalogue-backup';
-import { unitOffsiteView, volumeOffsiteView, type UnitImageUploadSummary, type VolumeOffsiteState } from './offsite-state';
+import { unitOffsiteView, unitUploadState, volumeOffsiteView, type UnitImageUploadSummary, type VolumeOffsiteState } from './offsite-state';
 
 // Noon local time, so "today" and "yesterday" do not depend on the host's zone.
 const NOW = new Date(2026, 9, 24, 12, 0, 0);
@@ -46,11 +46,11 @@ const loaded = (state: VolumeOffsiteState) => ({ kind: 'loaded' as const, state 
 
 describe('volumeOffsiteView', () => {
 	it('is null while no answer has arrived', () => {
-		expect(volumeOffsiteView({ kind: 'loading' }, true, NOW, 'es', es)).toBeNull();
+		expect(volumeOffsiteView({ kind: 'loading' }, 'on', NOW, 'es', es)).toBeNull();
 	});
 
 	it('says a received volume is stored offsite, with the time of the last verification', () => {
-		const view = volumeOffsiteView(loaded(volume()), true, NOW, 'es', es);
+		const view = volumeOffsiteView(loaded(volume()), 'on', NOW, 'es', es);
 		expect(view).toEqual({
 			kind: 'received',
 			headline: es.offsite_vol_received(412, 412),
@@ -61,7 +61,7 @@ describe('volumeOffsiteView', () => {
 
 	it('says a volume with pending files is uploading, with the counts', () => {
 		const state = volume({ verified: 300, pending: 112, received: false });
-		const view = volumeOffsiteView(loaded(state), true, NOW, 'en', en);
+		const view = volumeOffsiteView(loaded(state), 'on', NOW, 'en', en);
 		expect(view?.kind).toBe('uploading');
 		expect(view?.headline).toBe(en.offsite_vol_uploading(300, 412, 112));
 		expect(view?.help).toBeNull();
@@ -69,7 +69,7 @@ describe('volumeOffsiteView', () => {
 
 	it('shows refused files as needing attention, before any other count', () => {
 		const state = volume({ verified: 300, pending: 110, refused: 2, received: false });
-		const view = volumeOffsiteView(loaded(state), true, NOW, 'es', es);
+		const view = volumeOffsiteView(loaded(state), 'on', NOW, 'es', es);
 		expect(view?.kind).toBe('attention');
 		expect(view?.headline).toBe(es.offsite_vol_attention(2, 300, 412, 110));
 		expect(view?.help).toBe(es.offsite_attention_help);
@@ -77,7 +77,7 @@ describe('volumeOffsiteView', () => {
 
 	it('gives no last verification when no file has been verified', () => {
 		const state = volume({ verified: 0, pending: 412, received: false, last_verified_at: null });
-		expect(volumeOffsiteView(loaded(state), true, NOW, 'es', es)?.lastVerified).toBeNull();
+		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)?.lastVerified).toBeNull();
 	});
 
 	it('reads a naive timestamp as UTC, as the backend sends it', () => {
@@ -85,12 +85,12 @@ describe('volumeOffsiteView', () => {
 		const state = volume({ last_verified_at: naive });
 		const when = new Date(`${naive}Z`);
 		const time = when.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hour12: false });
-		expect(volumeOffsiteView(loaded(state), true, NOW, 'es', es)?.lastVerified).toContain(time);
+		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)?.lastVerified).toContain(time);
 	});
 
 	it('says when a volume has nothing to store offsite yet', () => {
 		const state = volume({ total: 0, verified: 0, received: false, last_verified_at: null });
-		expect(volumeOffsiteView(loaded(state), true, NOW, 'es', es)).toEqual({
+		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)).toEqual({
 			kind: 'empty',
 			headline: es.offsite_vol_empty,
 			lastVerified: null,
@@ -100,15 +100,25 @@ describe('volumeOffsiteView', () => {
 
 	it('says a volume without a stem is not stored offsite', () => {
 		const state = volume({ filename_stem: null, uploadable: false, total: 0, verified: 0, received: false });
-		expect(volumeOffsiteView(loaded(state), true, NOW, 'es', es)?.kind).toBe('no_stem');
-		expect(volumeOffsiteView(loaded(state), true, NOW, 'es', es)?.headline).toBe(es.offsite_vol_no_stem);
+		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)?.kind).toBe('no_stem');
+		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)?.headline).toBe(es.offsite_vol_no_stem);
 	});
 
 	it('says the copy is not configured when the unit has it off', () => {
 		const state = volume({ verified: 0, pending: 412, received: false, last_verified_at: null });
-		const view = volumeOffsiteView(loaded(state), false, NOW, 'es', es);
+		const view = volumeOffsiteView(loaded(state), 'off', NOW, 'es', es);
 		expect(view?.kind).toBe('off');
 		expect(view?.headline).toBe(es.offsite_vol_off);
+	});
+
+	it('says the copy is misconfigured when the unit reports a reason, not that it is off', () => {
+		const state = volume({ verified: 0, pending: 412, received: false, last_verified_at: null });
+		expect(volumeOffsiteView(loaded(state), 'misconfigured', NOW, 'es', es)).toEqual({
+			kind: 'misconfigured',
+			headline: es.offsite_vol_misconfigured,
+			lastVerified: null,
+			help: null
+		});
 	});
 
 	it('shows the counts when the unit state is not known', () => {
@@ -116,7 +126,7 @@ describe('volumeOffsiteView', () => {
 	});
 
 	it('says it could not check after a failed request, never a guessed state', () => {
-		expect(volumeOffsiteView({ kind: 'failed' }, true, NOW, 'es', es)).toEqual({
+		expect(volumeOffsiteView({ kind: 'failed' }, 'on', NOW, 'es', es)).toEqual({
 			kind: 'unknown',
 			headline: es.offsite_vol_unknown,
 			lastVerified: null,
@@ -135,6 +145,13 @@ describe('unitOffsiteView', () => {
 			level: 'off',
 			lines: [es.offsite_unit_off]
 		});
+	});
+
+	it('says a misconfigured copy needs attention when the backend also reports it disabled', () => {
+		// is_enabled() is false for an invalid tenant prefix, while
+		// unit_upload_summary() gives the reason (app/core/image_upload.py).
+		const view = unitOffsiteView(unit({ enabled: false, misconfigured: 'DTK_OFFSITE_TENANT is invalid' }), NOW, 'es', es);
+		expect(view).toEqual({ level: 'attention', lines: [es.offsite_unit_misconfigured] });
 	});
 
 	it('says a misconfigured copy needs attention, without the backend text', () => {
@@ -173,14 +190,24 @@ describe('unitOffsiteView', () => {
 describe('counts in the offsite lines', () => {
 	it('separate thousands as each language does', () => {
 		const state = volume({ total: 12345, verified: 1786, pending: 10559, received: false });
-		expect(volumeOffsiteView(loaded(state), true, NOW, 'es', es)?.headline).toBe(
+		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)?.headline).toBe(
 			'Copia externa en curso: 1786 de 12.345 archivos verificados, 10.559 pendientes'
 		);
-		expect(volumeOffsiteView(loaded(state), true, NOW, 'en', en)?.headline).toBe(
+		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'en', en)?.headline).toBe(
 			'Uploading: 1,786 of 12,345 files verified, 10,559 pending'
 		);
 		expect(es.vol_err_stored_offsite(12345)).toContain('12.345 registros');
 		expect(en.vol_err_stored_offsite(1786)).toContain('1,786 records');
 		expect(en.offsite_unit_files(1786, 12345, 0)).toBe('1,786 of 12,345 files verified, 0 pending.');
+	});
+});
+
+describe('unitUploadState', () => {
+	it('puts a misconfiguration before the enabled flag', () => {
+		expect(unitUploadState(unit({ enabled: false, misconfigured: 'bad prefix' }))).toBe('misconfigured');
+		expect(unitUploadState(unit({ enabled: true, misconfigured: 'bad prefix' }))).toBe('misconfigured');
+		expect(unitUploadState(unit({ enabled: false }))).toBe('off');
+		expect(unitUploadState(unit())).toBe('on');
+		expect(unitUploadState(undefined)).toBeNull();
 	});
 });

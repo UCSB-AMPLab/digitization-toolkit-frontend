@@ -862,6 +862,7 @@ export const en: Messages = {
 	offsite_vol_empty: 'Offsite copy: no files to copy yet',
 	offsite_vol_no_stem: 'Not stored offsite: this volume has no stem',
 	offsite_vol_off: 'Offsite copy of images not configured',
+	offsite_vol_misconfigured: 'Offsite copy of images configured incorrectly',
 	offsite_vol_unknown: 'Could not check the offsite copy of this volume',
 	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		if (day === 'today') return `last verified today at ${time}`;

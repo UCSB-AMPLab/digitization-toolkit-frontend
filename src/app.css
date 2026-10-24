@@ -1420,8 +1420,10 @@ tr:hover .drag-handle { opacity: 1; }
 }
 .offsite-received .offsite-indicator-icon { color: var(--color-success); }
 .offsite-uploading .offsite-indicator-icon { color: var(--color-secondary); }
-.offsite-attention { color: var(--color-warning); }
-.offsite-attention .offsite-indicator-icon { color: var(--color-warning); }
+.offsite-attention,
+.offsite-misconfigured { color: var(--color-warning); }
+.offsite-attention .offsite-indicator-icon,
+.offsite-misconfigured .offsite-indicator-icon { color: var(--color-warning); }
 
 /* ── Configuración → Copia externa: the image files ── */
 .offsite-unit {

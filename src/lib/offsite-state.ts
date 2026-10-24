@@ -24,7 +24,29 @@ export type VolumeOffsiteSnapshot =
 	| { kind: 'failed' }
 	| { kind: 'loaded'; state: VolumeOffsiteState };
 
-export type VolumeOffsiteKind = 'received' | 'uploading' | 'attention' | 'empty' | 'no_stem' | 'off' | 'unknown';
+export type VolumeOffsiteKind =
+	| 'received'
+	| 'uploading'
+	| 'attention'
+	| 'empty'
+	| 'no_stem'
+	| 'off'
+	| 'misconfigured'
+	| 'unknown';
+
+/**
+ * The unit's image copy: on, off, or misconfigured. The backend's
+ * is_enabled() is false for an invalid tenant prefix too, so a reason in
+ * `misconfigured` comes before `enabled`. Null when the backend sends no
+ * image summary or it is not known yet.
+ */
+export type UnitUploadState = 'on' | 'off' | 'misconfigured';
+
+export function unitUploadState(images: UnitImageUploadSummary | null | undefined): UnitUploadState | null {
+	if (!images || typeof images.enabled !== 'boolean') return null;
+	if (images.misconfigured) return 'misconfigured';
+	return images.enabled ? 'on' : 'off';
+}
 
 export interface VolumeOffsiteView {
 	kind: VolumeOffsiteKind;
@@ -48,13 +70,13 @@ function lastVerifiedArgs(iso: string | null, now: Date, locale: string) {
 }
 
 /**
- * The volume's line. `unitEnabled` is the unit's `images.enabled`, or null
- * when it is not known; false means no file of any volume is being copied,
- * which the counts alone would not say.
+ * The volume's line. `unit` is unitUploadState of the unit's summary, or
+ * null when it is not known; off or misconfigured means no file of any
+ * volume is being copied, which the counts alone would not say.
  */
 export function volumeOffsiteView(
 	snapshot: VolumeOffsiteSnapshot,
-	unitEnabled: boolean | null,
+	unit: UnitUploadState | null,
 	now: Date,
 	locale: string,
 	msgs: Messages
@@ -68,7 +90,8 @@ export function volumeOffsiteView(
 	});
 	if (snapshot.kind === 'failed') return only('unknown', msgs.offsite_vol_unknown);
 	const s = snapshot.state;
-	if (unitEnabled === false) return only('off', msgs.offsite_vol_off);
+	if (unit === 'misconfigured') return only('misconfigured', msgs.offsite_vol_misconfigured);
+	if (unit === 'off') return only('off', msgs.offsite_vol_off);
 	if (!s.uploadable) return only('no_stem', msgs.offsite_vol_no_stem);
 	if (s.total === 0) return only('empty', msgs.offsite_vol_empty);
 
@@ -100,9 +123,10 @@ export function unitOffsiteView(
 	locale: string,
 	msgs: Messages
 ): UnitOffsiteView | null {
-	if (!images || typeof images.enabled !== 'boolean') return null;
-	if (!images.enabled) return { level: 'off', lines: [msgs.offsite_unit_off] };
-	if (images.misconfigured) return { level: 'attention', lines: [msgs.offsite_unit_misconfigured] };
+	const state = unitUploadState(images);
+	if (!images || state === null) return null;
+	if (state === 'misconfigured') return { level: 'attention', lines: [msgs.offsite_unit_misconfigured] };
+	if (state === 'off') return { level: 'off', lines: [msgs.offsite_unit_off] };
 	if (images.total === 0) return { level: 'empty', lines: [msgs.offsite_unit_empty] };
 
 	const lines = [
