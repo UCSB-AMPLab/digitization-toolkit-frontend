@@ -791,8 +791,8 @@ export const es = {
 	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
 	lv_needs_stem_link: 'Asignar la raíz',
 	// Errores de una captura o una retoma que el backend rechazó
-	// (capture-errors.ts). Sin punto final: lvm_retake_error los incluye en
-	// una frase.
+	// (capture-errors.ts). Sin punto final, como lv_capture_error en el
+	// aviso de la pantalla; lvm_retake_error se lo agrega.
 	lv_err_no_volume: 'Elige un volumen antes de capturar',
 	lv_err_volume_not_found: 'Este volumen ya no está en el catálogo',
 	lv_err_record_not_found: 'Este registro ya no está en el catálogo',
@@ -818,7 +818,9 @@ export const es = {
 	lvm_retake: 'Volver a capturar',
 	lvm_retake_confirm: '¿Volver a capturar este registro? Captua conserva las imágenes actuales como versiones anteriores.',
 	lvm_retaking: 'Capturando imagen de reemplazo…',
-	lvm_retake_error: (message: string) => `Falló la retoma: ${message}. Se conservó la imagen original.`,
+	// `message` es una frase propia, con o sin punto final.
+	lvm_retake_error: (message: string) =>
+		`Falló la retoma. ${message.endsWith('.') ? message : `${message}.`} Se conservó la imagen original.`,
 
 	// ── Copia externa del catálogo (NEH-266) ─────────────────────────────────
 	// `day` dice si la copia es de hoy, de ayer o anterior, en la hora local;

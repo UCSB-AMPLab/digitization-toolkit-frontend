@@ -787,7 +787,8 @@ export const en: Messages = {
 	lvm_retake: 'Retake',
 	lvm_retake_confirm: 'Retake this record? Captua keeps the current images as earlier versions.',
 	lvm_retaking: 'Capturing replacement image…',
-	lvm_retake_error: (message: string) => `Retake failed: ${message}. The original image was kept.`,
+	lvm_retake_error: (message: string) =>
+		`Retake failed. ${message.endsWith('.') ? message : `${message}.`} The original image was kept.`,
 
 	// ── Offsite catalogue copy (NEH-266) ─────────────────────────────────────
 	backup_ind_current: (day: 'today' | 'yesterday' | 'earlier', date: string) =>

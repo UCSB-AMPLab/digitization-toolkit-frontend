@@ -87,7 +87,7 @@ describe('isStemRequired', () => {
 });
 
 describe('the capture error strings', () => {
-	it('end without a full stop, since lvm_retake_error puts them inside a sentence', () => {
+	it('end without a full stop, as lv_capture_error does in the capture banner', () => {
 		for (const msgs of [es, en]) {
 			for (const text of [
 				msgs.lv_err_no_volume,
@@ -104,5 +104,20 @@ describe('the capture error strings', () => {
 				expect(text.endsWith('.')).toBe(false);
 			}
 		}
+	});
+});
+
+describe('lvm_retake_error', () => {
+	it('reads as sentences whether or not the message ends with a full stop', () => {
+		for (const msgs of [es, en]) {
+			for (const message of [msgs.lv_needs_stem, msgs.lv_capture_error, msgs.lv_err_retake_volume]) {
+				const text = msgs.lvm_retake_error(message);
+				expect(text).not.toContain('..');
+				expect(text).toContain(message.endsWith('.') ? message : `${message}.`);
+			}
+		}
+		expect(es.lvm_retake_error(es.lv_needs_stem)).toBe(
+			'Falló la retoma. Para capturar imágenes de este volumen, primero hay que asignarle una raíz. Se conservó la imagen original.'
+		);
 	});
 });
