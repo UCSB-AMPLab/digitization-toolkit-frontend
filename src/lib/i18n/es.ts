@@ -564,7 +564,7 @@ export const es = {
 	col_status_in_review_lc: 'en revisión',
 	col_status_approved_lc: 'aprobado',
 	col_retake: 'Retomar',
-	col_retake_confirm: '¿Descartar este registro y volver a capturar desde la vista en vivo?',
+	col_retake_confirm: '¿Volver a capturar este registro desde la vista en vivo? Captua guardará las imágenes actuales como versiones anteriores.',
 	col_delete_record_confirm: '¿Eliminar permanentemente este registro y todas sus imágenes?',
 	badge_left: 'Izq',
 	badge_right: 'Der',
