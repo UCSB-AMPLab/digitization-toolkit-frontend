@@ -72,6 +72,19 @@ describe('project page: stems', () => {
 		await expect.element(page.getByLabelText(es.pd_field_stem)).toHaveValue('');
 	});
 
+	it('shows a volume\'s own signatura, and no code for a volume without one', async () => {
+		vi.mocked(projectsApi.get).mockResolvedValue({ id: 1, name: 'Rionegro', signatura: 'CO.AHR' } as Project);
+		listSpy.mockResolvedValue([
+			vol(30, 'Con signatura', { archival_metadata: { signatura: 'CO.AHR.JUD.198' } }),
+			vol(31, 'Sin signatura')
+		]);
+		const screen = render(ProjectPage);
+		await expect.element(page.getByText('CO.AHR.JUD.198')).toBeInTheDocument();
+		const codes = [...screen.container.querySelectorAll('.col-code')].map((el) => el.textContent?.trim());
+		expect(codes).toEqual(['CO.AHR.JUD.198']);
+		expect(screen.container.textContent).not.toMatch(/CO\.AHR-0\d\d/);
+	});
+
 	it('opens the form of the volume named by ?editVolume', async () => {
 		pageUrl.href = 'http://localhost/dashboard/projects/1?editVolume=23';
 		render(ProjectPage);

@@ -580,7 +580,10 @@
                         {/if}
                       {/if}
                     </p>
-                    <p class="col-code">{col.archival_metadata?.signatura ?? (project?.signatura ? `${project.signatura}-${String(i+1).padStart(3,'0')}` : String(i+1).padStart(3,'0'))}</p>
+                    <!-- Only a signatura the volume has: no code is built from the project's or the row number. -->
+                    {#if col.archival_metadata?.signatura}
+                      <p class="col-code">{col.archival_metadata.signatura}</p>
+                    {/if}
                   </div>
                 </div>
               </td>
