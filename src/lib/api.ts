@@ -668,8 +668,10 @@ export const collectionsApi = {
   },
 
   /**
-   * Set display order of records in a collection.
-   * ordered_ids: record IDs in the desired order (0-based sequence assigned automatically).
+   * Set the order of a volume's records.
+   * ordered_ids: every record ID of the volume, each once, in the desired
+   * order; the backend sets their sequence to 1..N. A list that leaves a
+   * record out, repeats one or names one from another volume is refused (422).
    */
   async reorderRecords(collectionId: number, ordered_ids: number[]): Promise<{ reordered: number }> {
     return apiRequest(`/collections/${collectionId}/records/reorder`, {
@@ -679,13 +681,12 @@ export const collectionsApi = {
   },
 
   /**
-   * Physically renumber every image file in the collection, sequentially
-   * from 1 (zero-padded), based on current display order. On a failure the
-   * backend puts the files back under their old names and leaves the rows
-   * unchanged; if a file cannot be put back, the error detail says so.
-   * A name already held by a file outside the collection is refused (422).
+   * Renumber the volume's records: the backend sets their `sequence` to
+   * 1..N in the current display order, in one transaction. No file is
+   * renamed. `renumbered` is the number of records. If the commit fails
+   * (500), every sequence stays as it was.
    */
-  async renumberImages(collectionId: number): Promise<{ renumbered: number; prefix: string; width: number }> {
+  async renumberImages(collectionId: number): Promise<{ renumbered: number }> {
     return apiRequest(`/collections/${collectionId}/images/renumber`, { method: 'POST' });
   },
 

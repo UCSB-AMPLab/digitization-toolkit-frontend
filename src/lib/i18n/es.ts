@@ -541,8 +541,9 @@ export const es = {
 	col_clear_filter: '× Limpiar',
 	col_filters_disabled_reorder: 'Los filtros se desactivan durante el reordenamiento para no alterar la secuencia',
 	col_image_n: (i: number) => `Imagen ${i}`,
-	col_renumber_modal_title: 'Renumerar imágenes',
-	col_renumber_desc: 'Todas las imágenes se renumerarán partiendo de 1.',
+	col_renumber_modal_title: '¿Renumerar los registros?',
+	col_renumber_desc:
+		'Captua numerará los registros de este volumen a partir de 1, en el orden en que aparecen ahora, sin cambiar el nombre de ningún archivo.',
 	col_renumbering: 'Renumerando…',
 	col_renumber_error: (message: string) => `No se pudo renumerar: ${message}`,
 	col_finalize_title: '¿Finalizar Proyecto?',

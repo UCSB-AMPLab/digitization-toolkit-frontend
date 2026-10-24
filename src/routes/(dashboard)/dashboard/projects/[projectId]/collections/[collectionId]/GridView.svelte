@@ -21,7 +21,7 @@
   //   Filtros | Renumerar           [Reordenar 🖐 ──●── ] [Finalizar]
   //
   //   - Filtros     → panel de filtros por estado
-  //   - Renumerar   → renumera secuencialmente los archivos de imagen (desde 1)
+  //   - Renumerar   → numera los registros desde 1 en el orden actual (no renombra archivos)
   //   - Reordenar   → botón que activa el modo drag-and-drop
   //                   cuando está activo el texto cambia a "Listo"
   //   - Slider      → controla el número de columnas del grid
