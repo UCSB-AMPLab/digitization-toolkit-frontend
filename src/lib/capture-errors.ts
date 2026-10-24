@@ -7,7 +7,8 @@
 // Two kinds of failure reach the capture screen:
 // - a refused request, thrown by api.ts as an ApiError carrying `status`
 //   and the backend's `detail` as its message: the 409s for no volume, no
-//   stem and a retake into another volume (app/core/volume_stem.py), the
+//   stem, a retake into another volume and a retake of a record in review
+//   or approved (app/core/volume_stem.py), the
 //   409s for a name longer than a pair id and for numbers already on disk
 //   (app/core/capture_naming.py), the
 //   404s for an unknown volume or record, and the 422s for a retake in the
@@ -42,6 +43,10 @@ const NUMBERS_TAKEN_DETAIL =
 // never asks for it; the mapping is there so the text is never shown.
 const RESOLUTION_IN_FILENAME_DETAIL =
 	"A capture's file name cannot carry its resolution: the exchange contract fixes the name.";
+
+// RETAKE_STATUS_DETAIL in app/core/volume_stem.py: the 409 for a retake of a
+// record that is in review or approved.
+const RETAKE_STATUS_DETAIL = 'Only a captured or rejected record can be retaken.';
 
 // The 404 details in app/api/cameras.py: "Collection {id} not found" from
 // _refuse_capture_without_volume_or_stem, "Record {id} not found" from the
@@ -87,6 +92,7 @@ export function captureErrorText(error: unknown, msgs: Messages): string {
 	if (isStemRequired(error)) return msgs.lv_needs_stem;
 	if (isWrongRetakeVolume(error)) return msgs.lv_err_retake_volume;
 	const status = statusOf(error);
+	if (status === 409 && error.message === RETAKE_STATUS_DETAIL) return msgs.lv_err_retake_status;
 	if (status === 409 && error.message === NAME_TOO_LONG_DETAIL) return msgs.lv_err_name_too_long;
 	if (status === 409 && error.message === NUMBERS_TAKEN_DETAIL) return msgs.lv_err_numbers_taken;
 	if (status === 404 && VOLUME_NOT_FOUND.test(error.message)) return msgs.lv_err_volume_not_found;

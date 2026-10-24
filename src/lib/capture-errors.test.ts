@@ -25,6 +25,7 @@ const NAME_TOO_LONG =
 const NUMBERS_TAKEN =
 	'The next capture numbers of this volume are already taken by files on disk. Nothing was captured.';
 const RESOLUTION = "A capture's file name cannot carry its resolution: the exchange contract fixes the name.";
+const RETAKE_STATUS = 'Only a captured or rejected record can be retaken.';
 const MODE_SINGLE = "Record 12 was captured in 'single' mode; use the single-capture endpoint to recapture it.";
 
 describe('captureErrorText', () => {
@@ -40,7 +41,8 @@ describe('captureErrorText', () => {
 			[new CaptureFailed('Camera 1 is not connected'), es.lv_err_camera_not_connected(1)],
 			[new ApiError(NAME_TOO_LONG, undefined, 409), es.lv_err_name_too_long],
 			[new ApiError(NUMBERS_TAKEN, undefined, 409), es.lv_err_numbers_taken],
-			[new ApiError(RESOLUTION, undefined, 422), es.lv_err_resolution_in_name]
+			[new ApiError(RESOLUTION, undefined, 422), es.lv_err_resolution_in_name],
+			[new ApiError(RETAKE_STATUS, undefined, 409), es.lv_err_retake_status]
 		];
 		for (const [error, text] of cases) expect(captureErrorText(error, es)).toBe(text);
 	});
@@ -99,7 +101,8 @@ describe('the capture error strings', () => {
 				msgs.lv_err_camera_not_connected(0),
 				msgs.lv_err_name_too_long,
 				msgs.lv_err_numbers_taken,
-				msgs.lv_err_resolution_in_name
+				msgs.lv_err_resolution_in_name,
+				msgs.lv_err_retake_status
 			]) {
 				expect(text.endsWith('.')).toBe(false);
 			}

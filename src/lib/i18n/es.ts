@@ -804,6 +804,7 @@ export const es = {
 	lv_err_camera_not_connected: (n: number) => `La cámara ${n} no está conectada`,
 	lv_err_numbers_taken:
 		'Captua no hizo la captura: ya hay archivos en el disco con los próximos números de captura de este volumen; avisa a quien administra el equipo',
+	lv_err_retake_status: 'Solo se puede volver a capturar un registro que no esté en revisión ni aprobado',
 	lv_err_resolution_in_name: 'Captua no puede incluir la resolución en el nombre de archivo de las capturas',
 	lv_err_name_too_long: 'Captua no hizo la captura: el nombre de archivo tendría más de 36 caracteres',
 	lv_capture_btn: 'Capturar',
