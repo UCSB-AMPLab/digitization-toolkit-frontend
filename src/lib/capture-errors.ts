@@ -10,8 +10,8 @@
 //   stem and a retake into another volume (app/core/volume_stem.py), the
 //   409s for a name longer than a pair id and for numbers already on disk
 //   (app/core/capture_naming.py), the
-//   404s for an unknown volume or record, and the 422 for a retake in the
-//   wrong capture mode;
+//   404s for an unknown volume or record, and the 422s for a retake in the
+//   wrong capture mode and for a resolution in the file name;
 // - a request answered 200 with `success: false`, which the capture screen
 //   turns into a CaptureFailed carrying the backend's `error`: a camera that
 //   is not connected, or the text of whatever failed during the capture.
@@ -36,6 +36,12 @@ const NAME_TOO_LONG_DETAIL =
 // volume whose next capture numbers files on disk already carry.
 const NUMBERS_TAKEN_DETAIL =
 	'The next capture numbers of this volume are already taken by files on disk. Nothing was captured.';
+
+// RESOLUTION_IN_FILENAME_DETAIL in app/core/capture_naming.py: the 422 for a
+// capture that asks for its resolution in the file name. The capture screen
+// never asks for it; the mapping is there so the text is never shown.
+const RESOLUTION_IN_FILENAME_DETAIL =
+	"A capture's file name cannot carry its resolution: the exchange contract fixes the name.";
 
 // The 404 details in app/api/cameras.py: "Collection {id} not found" from
 // _refuse_capture_without_volume_or_stem, "Record {id} not found" from the
@@ -85,6 +91,7 @@ export function captureErrorText(error: unknown, msgs: Messages): string {
 	if (status === 409 && error.message === NUMBERS_TAKEN_DETAIL) return msgs.lv_err_numbers_taken;
 	if (status === 404 && VOLUME_NOT_FOUND.test(error.message)) return msgs.lv_err_volume_not_found;
 	if (status === 404 && RECORD_NOT_FOUND.test(error.message)) return msgs.lv_err_record_not_found;
+	if (status === 422 && error.message === RESOLUTION_IN_FILENAME_DETAIL) return msgs.lv_err_resolution_in_name;
 	const mode = status === 422 ? error.message.match(RETAKE_MODE) : null;
 	if (mode) return msgs.lv_err_retake_mode(mode[1] as 'single' | 'dual');
 	return msgs.lv_capture_error;
