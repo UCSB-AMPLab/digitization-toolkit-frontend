@@ -120,6 +120,33 @@ describe('project page: stems', () => {
 		expect(updateSpy.mock.calls[1][1]).not.toHaveProperty('filename_stem');
 	});
 
+	it('does not let an edit blank a stem, and never sends null', async () => {
+		const updateSpy = vi.spyOn(collectionsApi, 'update').mockResolvedValue(other);
+		render(ProjectPage);
+		await openRowMenu('Tomo 100');
+		await userEvent.click(page.getByRole('button', { name: es.common_edit }));
+		const stem = page.getByLabelText(es.pd_field_stem);
+		await expect.element(stem).toHaveValue('co-ahr-jud-t100');
+		await userEvent.clear(stem);
+		await expect.element(page.getByRole('alert')).toHaveTextContent(es.pd_val_stem_required);
+		await expect.element(page.getByRole('button', { name: es.common_save_changes })).toBeDisabled();
+
+		await userEvent.type(stem, 'co-ahr-jud-t101');
+		await userEvent.click(page.getByRole('button', { name: es.common_save_changes }));
+		await vi.waitFor(() => expect(updateSpy).toHaveBeenCalledTimes(1));
+		expect(updateSpy.mock.calls[0][1]).toMatchObject({ filename_stem: 'co-ahr-jud-t101' });
+	});
+
+	it('saves a volume without a stem without sending one', async () => {
+		const updateSpy = vi.spyOn(collectionsApi, 'update').mockResolvedValue(stemless);
+		render(ProjectPage);
+		await openRowMenu('Tomo 221');
+		await userEvent.click(page.getByRole('button', { name: es.common_edit }));
+		await userEvent.click(page.getByRole('button', { name: es.common_save_changes }));
+		await vi.waitFor(() => expect(updateSpy).toHaveBeenCalledTimes(1));
+		expect(updateSpy.mock.calls[0][1]).not.toHaveProperty('filename_stem');
+	});
+
 	it('requires a valid stem to create a volume, and sends it', async () => {
 		const createSpy = vi.spyOn(collectionsApi, 'create').mockResolvedValue(other);
 		render(ProjectPage);

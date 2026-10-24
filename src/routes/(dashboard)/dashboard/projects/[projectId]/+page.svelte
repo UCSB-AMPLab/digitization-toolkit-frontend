@@ -113,7 +113,11 @@
   }
 
   let stemLocked = $derived(!!editingCollection?.stem_reserved);
-  let stemInvalid = $derived(!stemLocked && stemProblem(colStem, !editingCollection) !== null);
+  // Required on a new volume and on one that already has a stem: a stem can
+  // be changed before the first capture, but never blanked. Only a volume
+  // that has never had one may be saved without it.
+  let stemRequired = $derived(!editingCollection || !!editingCollection.filename_stem);
+  let stemInvalid = $derived(!stemLocked && stemProblem(colStem, stemRequired) !== null);
 
   let dateError = $derived(
     (colDateStart && !isValidISODate(colDateStart))
@@ -257,14 +261,14 @@
       const stem = colStem.trim();
       if (editingCollection) {
         // Modo edición: actualizar colección existente. The stem is sent
-        // only when it changed, and never once it is reserved; an emptied
-        // stem is sent as null, which the backend allows before a capture.
-        const stemChanged = !stemLocked && stem !== (editingCollection.filename_stem ?? '');
+        // only when it changed to a non-empty value, and never once it is
+        // reserved; null is never sent.
+        const stemChanged = !stemLocked && stem !== '' && stem !== (editingCollection.filename_stem ?? '');
         await collectionsApi.update(editingCollection.id, {
           name: colName.trim(),
           description: colDesc.trim() || undefined,
           archival_metadata: archivalMetadata,
-          ...(stemChanged ? { filename_stem: stem || null } : {}),
+          ...(stemChanged ? { filename_stem: stem } : {}),
         });
         await loadCollections();
       } else if ($authStore.token === 'demo-token') {
@@ -685,7 +689,7 @@
         </div>
 
         <!-- Raíz (filename_stem) -->
-        <VolumeStemField bind:value={colStem} locked={stemLocked} required={!editingCollection} />
+        <VolumeStemField bind:value={colStem} locked={stemLocked} required={stemRequired} />
 
         <!-- Signatura -->
         <div class="form-field">
