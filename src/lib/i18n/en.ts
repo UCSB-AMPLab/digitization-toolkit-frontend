@@ -402,7 +402,7 @@ export const en: Messages = {
 	// Refusals of a file change while another process reads the files
 	// (volume-refusals.ts).
 	vol_err_volume_busy:
-		'Records were being added to this volume at the same moment, so Captua changed nothing. Try again.',
+		'Records were being added to or removed from this volume when you asked for the change, so Captua changed nothing. Try again in a moment.',
 	vol_err_files_being_read:
 		'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.',
 	vol_err_files_being_read_project:

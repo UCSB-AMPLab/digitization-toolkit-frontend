@@ -424,7 +424,7 @@ export const es = {
 	// Rechazos de un cambio de archivos mientras otro proceso los lee
 	// (volume-refusals.ts).
 	vol_err_volume_busy:
-		'En ese mismo momento se estaban agregando registros a este volumen, así que Captua no cambió nada. Intenta de nuevo.',
+		'En el momento en que pediste el cambio, se estaban agregando o quitando registros en este volumen, así que Captua no cambió nada. Intenta de nuevo en un momento.',
 	vol_err_files_being_read:
 		'Captua está preparando un archivo de este volumen para la copia externa. Intenta de nuevo en un momento.',
 	vol_err_files_being_read_project:
