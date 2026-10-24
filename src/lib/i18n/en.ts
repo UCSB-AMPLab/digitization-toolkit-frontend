@@ -847,6 +847,43 @@ export const en: Messages = {
 	backup_cfg_last_file: 'File of the last copy',
 	backup_cfg_locked: 'This is set up when the scanner is installed and cannot be changed here.',
 
+	// ── Offsite copy of the images (NEH-248, offsite-state.ts) ─────────────
+	offsite_vol_label: 'Offsite copy of this volume',
+	offsite_vol_received: (verified: number, total: number) =>
+		`Stored offsite: ${verified} of ${total} files verified`,
+	offsite_vol_uploading: (verified: number, total: number, pending: number) =>
+		`Uploading: ${verified} of ${total} files verified, ${pending} pending`,
+	offsite_vol_attention: (refused: number, verified: number, total: number, pending: number) =>
+		`${refused === 1 ? '1 file needs' : `${refused} files need`} attention · ${verified} of ${total} verified, ${pending} pending`,
+	offsite_attention_help:
+		'The offsite copy already holds a different file with the same name. Let whoever administers the scanner know.',
+	offsite_vol_empty: 'Offsite copy: no files to copy yet',
+	offsite_vol_no_stem: 'Not stored offsite: this volume has no stem',
+	offsite_vol_off: 'Offsite copy of images not configured',
+	offsite_vol_unknown: 'Could not check the offsite copy of this volume',
+	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		if (day === 'today') return `last verified today at ${time}`;
+		if (day === 'yesterday') return `last verified yesterday at ${time}`;
+		return `last verified on ${date} at ${time}`;
+	},
+	offsite_unit_title: 'Image files',
+	offsite_unit_off: 'The offsite copy of the image files is not configured on this scanner.',
+	offsite_unit_misconfigured:
+		'The offsite copy of the image files is not configured correctly on this scanner. Let whoever administers it know.',
+	offsite_unit_empty: 'There are no image files to copy yet.',
+	offsite_unit_volumes: (received: number, volumes: number) =>
+		`${received} of ${volumes} ${volumes === 1 ? 'volume' : 'volumes'} stored offsite in full.`,
+	offsite_unit_files: (verified: number, total: number, pending: number) =>
+		`${verified} of ${total} files verified, ${pending} pending.`,
+	offsite_unit_refused: (refused: number): string =>
+		refused === 1 ? '1 file needs attention.' : `${refused} files need attention.`,
+	offsite_cfg_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		if (day === 'today') return `Last file verified today at ${time}.`;
+		if (day === 'yesterday') return `Last file verified yesterday at ${time}.`;
+		return `Last file verified on ${date} at ${time}.`;
+	},
+	offsite_cfg_never: 'No file has been verified yet.',
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
 	api_request_failed: 'Request failed'

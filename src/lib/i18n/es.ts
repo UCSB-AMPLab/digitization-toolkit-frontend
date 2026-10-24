@@ -884,6 +884,44 @@ export const es = {
 	backup_cfg_last_file: 'Archivo de la última copia',
 	backup_cfg_locked: 'Esta configuración se define al instalar el equipo y no se puede cambiar desde aquí.',
 
+	// ── Copia externa de las imágenes (NEH-248, offsite-state.ts) ─────────
+	offsite_vol_label: 'Copia externa de este volumen',
+	offsite_vol_received: (verified: number, total: number) =>
+		`Copia externa completa: ${verified} de ${total} archivos verificados`,
+	offsite_vol_uploading: (verified: number, total: number, pending: number) =>
+		`Copia externa en curso: ${verified} de ${total} archivos verificados, ${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
+	offsite_vol_attention: (refused: number, verified: number, total: number, pending: number) =>
+		`${refused === 1 ? '1 archivo requiere' : `${refused} archivos requieren`} atención · ${verified} de ${total} verificados, ${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
+	offsite_attention_help: 'En la copia externa ya hay otro archivo con el mismo nombre. Avisa a quien administra el equipo.',
+	offsite_vol_empty: 'Copia externa: todavía no hay archivos para copiar',
+	offsite_vol_no_stem: 'Sin copia externa: este volumen no tiene raíz',
+	offsite_vol_off: 'Copia externa de imágenes sin configurar',
+	offsite_vol_unknown: 'No se pudo consultar la copia externa de este volumen',
+	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
+		if (day === 'today') return `última verificación: hoy ${at}`;
+		if (day === 'yesterday') return `última verificación: ayer ${at}`;
+		return `última verificación: el ${date} ${at}`;
+	},
+	offsite_unit_title: 'Archivos de imagen',
+	offsite_unit_off: 'La copia externa de los archivos de imagen no está configurada en este equipo.',
+	offsite_unit_misconfigured:
+		'La copia externa de los archivos de imagen no está bien configurada en este equipo. Avisa a quien administra el equipo.',
+	offsite_unit_empty: 'Todavía no hay archivos de imagen para copiar.',
+	offsite_unit_volumes: (received: number, volumes: number) =>
+		`${received} de ${volumes} ${volumes === 1 ? 'volumen' : 'volúmenes'} con copia externa completa.`,
+	offsite_unit_files: (verified: number, total: number, pending: number) =>
+		`${verified} de ${total} archivos verificados, ${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}.`,
+	offsite_unit_refused: (refused: number): string =>
+		refused === 1 ? '1 archivo requiere atención.' : `${refused} archivos requieren atención.`,
+	offsite_cfg_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
+		if (day === 'today') return `Último archivo verificado hoy ${at}.`;
+		if (day === 'yesterday') return `Último archivo verificado ayer ${at}.`;
+		return `Último archivo verificado el ${date} ${at}.`;
+	},
+	offsite_cfg_never: 'Todavía no se ha verificado ningún archivo.',
+
 	// ── Mensajes del cliente API ─────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',
 	api_request_failed: 'Error en la solicitud'

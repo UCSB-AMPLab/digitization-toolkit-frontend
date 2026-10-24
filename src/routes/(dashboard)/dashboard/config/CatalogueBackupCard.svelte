@@ -13,8 +13,10 @@
 		dayRelation,
 		formatBackupDate,
 		formatBackupTime,
-		type BackupLevel
+		type BackupLevel,
+		MAX_ANSWER_AGE_MS
 	} from '$lib/catalogue-backup';
+	import { unitOffsiteView } from '$lib/offsite-state';
 
 	type View = {
 		level: BackupLevel;
@@ -41,6 +43,14 @@
 			return { level, headline: $m.backup_cfg_current(day, date, formatBackupTime(verifiedAt, $locale)), retry: false, object };
 		}
 		return { level, headline: $m.backup_cfg_stale(day, date), retry: true, object };
+	});
+
+	// The image files (NEH-248): the unit's totals, from `images` on the same
+	// answer. Shown only while that answer is fresh enough to classify.
+	let unitView = $derived.by(() => {
+		const { snapshot, now: nowMs } = $catalogueBackupNow;
+		if (snapshot.kind !== 'loaded' || nowMs - snapshot.receivedAt > MAX_ANSWER_AGE_MS) return null;
+		return unitOffsiteView(snapshot.status.images, new Date(nowMs), $locale, $m);
 	});
 </script>
 
@@ -74,6 +84,15 @@
 					<p class="fact"><span class="fact-label">{$m.backup_cfg_last_file}</span> · {view.object}</p>
 				{/if}
 			</div>
+		</div>
+	{/if}
+
+	{#if unitView}
+		<div class="offsite-unit level-{unitView.level}" data-level={unitView.level}>
+			<p class="offsite-unit-title">{$m.offsite_unit_title}</p>
+			{#each unitView.lines as line}
+				<p class="offsite-unit-line">{line}</p>
+			{/each}
 		</div>
 	{/if}
 
