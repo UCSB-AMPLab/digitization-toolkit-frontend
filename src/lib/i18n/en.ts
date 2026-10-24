@@ -391,6 +391,7 @@ export const en: Messages = {
 	pd_val_date_range: 'The end date cannot be earlier than the start date.',
 	pd_err_create_collection: 'Could not save the volume. Try again.',
 	pd_err_delete_collection: 'Could not delete the volume. Try again.',
+	pd_err_delete_has_subvolumes: 'This volume cannot be deleted because it still contains other volumes.',
 	pd_err_delete_not_empty: 'This volume still has records. Move them to another volume before deleting it.',
 	pd_member_implicit: 'Implicit access (cannot be removed)',
 	pd_member_remove: 'Remove collaborator',

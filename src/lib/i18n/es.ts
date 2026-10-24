@@ -412,6 +412,7 @@ export const es = {
 	pd_val_date_range: 'La fecha de fin no puede ser anterior a la fecha de inicio.',
 	pd_err_create_collection: 'No se pudo guardar el volumen. Intenta de nuevo.',
 	pd_err_delete_collection: 'No se pudo eliminar el volumen. Intenta de nuevo.',
+	pd_err_delete_has_subvolumes: 'Este volumen no se puede eliminar porque todavía contiene otros volúmenes.',
 	pd_err_delete_not_empty: 'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
 	pd_member_implicit: 'Acceso implícito (no se puede eliminar)',
 	pd_member_remove: 'Eliminar colaborador',

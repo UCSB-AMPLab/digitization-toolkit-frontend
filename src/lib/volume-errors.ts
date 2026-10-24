@@ -46,10 +46,29 @@ export function isNotEmptyRefusal(error: unknown): boolean {
 	);
 }
 
+// The counts in that detail: "... {n} sub-collection(s) and {m} record(s) remain ...".
+const NOT_EMPTY_COUNTS = /(\d+) sub-collection\(s\) and (\d+) record\(s\)/;
+
+/**
+ * The sub-volume and record counts a not-empty refusal reports, or null for
+ * any other error. Both are null-safe: a detail without parsable counts
+ * gives null, and the caller treats the refusal as one about records.
+ */
+export function notEmptyCounts(error: unknown): { subVolumes: number; records: number } | null {
+	if (!isNotEmptyRefusal(error)) return null;
+	const match = (error as Error).message.match(NOT_EMPTY_COUNTS);
+	if (!match) return null;
+	return { subVolumes: Number(match[1]), records: Number(match[2]) };
+}
+
 /** The message for a failed delete (or the move of records before it). */
 export function volumeDeleteErrorText(error: unknown, msgs: Messages): string {
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
-	if (isNotEmptyRefusal(error)) return msgs.pd_err_delete_not_empty;
+	if (isNotEmptyRefusal(error)) {
+		const counts = notEmptyCounts(error);
+		if (counts && counts.records === 0 && counts.subVolumes > 0) return msgs.pd_err_delete_has_subvolumes;
+		return msgs.pd_err_delete_not_empty;
+	}
 	return msgs.pd_err_delete_collection;
 }

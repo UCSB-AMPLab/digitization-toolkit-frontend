@@ -24,7 +24,7 @@
   import { projectsApi, collectionsApi, recordsApi, projectMembersApi,
            type Project, type Collection, type ProjectMember, type UserRead } from '$lib/api';
   import { stemProblem, stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
-  import { volumeSaveErrorText, volumeDeleteErrorText } from '$lib/volume-errors';
+  import { volumeSaveErrorText, volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
   import VolumeStemField from './VolumeStemField.svelte';
 
   // ---------------------------------------------------------------------------
@@ -434,6 +434,27 @@
         // which says why, and the delete stays disabled.
         deletingCol = { ...deletingCol, stem_reserved: true };
         await loadCollections();
+      } else if (isNotEmptyRefusal(err) && deletingCol && deleteMoveColTarget === '') {
+        // The modal opened believing the volume was empty, and it is not.
+        // When records are the reason, the count is read again so the target
+        // select appears here; sub-volumes, which this screen cannot move,
+        // get their own message.
+        console.error('[ProjectDetail] Error eliminando volumen:', err);
+        const counts = notEmptyCounts(err);
+        if (!counts || counts.records > 0) {
+          try {
+            deleteColRecordCount = await recordsApi.count({ collection_id: deletingCol.id });
+          } catch (countErr) {
+            console.error('[ProjectDetail] Error obteniendo info de colección:', countErr);
+          }
+        }
+        if (counts && counts.subVolumes > 0) {
+          // Moving the records would not be enough: the sub-volumes stay.
+          deleteColError = $m.pd_err_delete_has_subvolumes;
+        } else if (deleteColRecordCount === 0) {
+          // The count could not be read, or the records left meanwhile.
+          deleteColError = volumeDeleteErrorText(err, $m);
+        }
       } else {
         // The backend's English text goes to the console only.
         deleteColError = volumeDeleteErrorText(err, $m);

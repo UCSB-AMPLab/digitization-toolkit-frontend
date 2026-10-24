@@ -224,6 +224,45 @@ describe('project page: stems', () => {
 		expect(moveSpy).toHaveBeenCalledWith(27, 24);
 	});
 
+	it('reads the count again when a volume believed empty is refused for its records, and shows the target select', async () => {
+		const stale = vol(29, 'Tomo 32', { filename_stem: null, stem_reserved: false, record_count: 0 });
+		listSpy.mockResolvedValue([stale, other]);
+		// The project's own count is read on mount; the volume's is 0 when the
+		// modal opens and 2 when it is read again after the refusal.
+		const volumeCounts = [0, 2];
+		const countSpy = vi
+			.spyOn(recordsApi, 'count')
+			.mockImplementation(async (params) => (params?.collection_id === 29 ? (volumeCounts.shift() ?? 2) : 0));
+		const notEmpty =
+			'Cannot delete a non-empty collection: 0 sub-collection(s) and 2 record(s) remain. Move or delete them first.';
+		vi.spyOn(collectionsApi, 'delete').mockRejectedValue(new ApiError(notEmpty, undefined, 409));
+		render(ProjectPage);
+		await openRowMenu('Tomo 32');
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+		await userEvent.click(page.getByRole('button', { name: es.pd_delete_collection_title }));
+
+		await expect.element(page.getByLabelText(es.pd_move_label)).toBeInTheDocument();
+		expect(countSpy.mock.calls.filter(([p]) => p?.collection_id === 29)).toHaveLength(2);
+		expect(page.getByText(notEmpty, { exact: false }).elements()).toHaveLength(0);
+		expect(page.getByText(es.pd_err_delete_collection).elements()).toHaveLength(0);
+	});
+
+	it('says the volume still contains sub-volumes when they are what blocks the delete', async () => {
+		const parent = vol(30, 'Caja 2', { filename_stem: null, stem_reserved: false, record_count: 0 });
+		listSpy.mockResolvedValue([parent, other]);
+		vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
+		const subs =
+			'Cannot delete a non-empty collection: 2 sub-collection(s) and 0 record(s) remain. Move or delete them first.';
+		vi.spyOn(collectionsApi, 'delete').mockRejectedValue(new ApiError(subs, undefined, 409));
+		render(ProjectPage);
+		await openRowMenu('Caja 2');
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+		await userEvent.click(page.getByRole('button', { name: es.pd_delete_collection_title }));
+
+		await expect.element(page.getByText(es.pd_err_delete_has_subvolumes)).toBeInTheDocument();
+		expect(page.getByText(subs, { exact: false }).elements()).toHaveLength(0);
+	});
+
 	it('leaves the delete enabled for an empty volume', async () => {
 		const empty = vol(28, 'Tomo 31', { filename_stem: null, stem_reserved: false, record_count: 0 });
 		listSpy.mockResolvedValue([empty, other]);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
 import { en } from './i18n/en';
-import { isNotEmptyRefusal, volumeDeleteErrorText, volumeSaveErrorText } from './volume-errors';
+import { isNotEmptyRefusal, notEmptyCounts, volumeDeleteErrorText, volumeSaveErrorText } from './volume-errors';
 
 // A stand-in for api.ts's ApiError, as in volume-stem.test.ts.
 class ApiError extends Error {
@@ -48,6 +48,18 @@ describe('volumeDeleteErrorText', () => {
 		const err = new ApiError(notEmpty, undefined, 409);
 		expect(isNotEmptyRefusal(err)).toBe(true);
 		expect(volumeDeleteErrorText(err, es)).toBe(es.pd_err_delete_not_empty);
+	});
+
+	it('reads both counts from the not-empty refusal', () => {
+		expect(notEmptyCounts(new ApiError(notEmpty, undefined, 409))).toEqual({ subVolumes: 0, records: 3 });
+		expect(notEmptyCounts(new ApiError('Cannot delete a non-empty collection', undefined, 409))).toBeNull();
+		expect(notEmptyCounts(new Error('x'))).toBeNull();
+	});
+
+	it('says sub-volumes block the delete when there are no records', () => {
+		const subs =
+			'Cannot delete a non-empty collection: 2 sub-collection(s) and 0 record(s) remain. Move or delete them first.';
+		expect(volumeDeleteErrorText(new ApiError(subs, undefined, 409), es)).toBe(es.pd_err_delete_has_subvolumes);
 	});
 
 	it('maps the reserved-stem refusal', () => {
