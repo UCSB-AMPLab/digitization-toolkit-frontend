@@ -350,6 +350,30 @@ describe.each(modals)('%s — a freed image shown only by its thumbnail (NEH-248
   });
 });
 
+describe('gallery modal — a RAW preview restored on its own (NEH-248)', () => {
+  it('drops the freed panel and shows the preview once preview_freed_at is cleared', async () => {
+    const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(BROKEN);
+    const thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(freed410('preview')));
+    const freedAt = '2026-10-20T14:03:00';
+    // The master's restore failed, so it stays freed; only the preview is back.
+    const before = makeRecord([makeImage({ master_freed_at: freedAt, preview_freed_at: freedAt })]);
+    const after = makeRecord([makeImage({ master_freed_at: freedAt, preview_freed_at: null })]);
+    const screen = render(GalleryModal, { record: before, onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
+    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+
+    previewSpy.mockReturnValue(PREVIEW_URL);
+    await screen.rerender({ record: after });
+
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
+    await expect.element(screen.getByTestId('image-freed')).not.toBeInTheDocument();
+    await expect.element(screen.getByText('Vista previa (RAW)')).toBeVisible();
+    previewSpy.mockRestore();
+    thumbSpy.mockRestore();
+    fetchSpy.mockRestore();
+  });
+});
+
 describe('gallery modal — download link of a freed master (NEH-248)', () => {
   it('offers no download for a master freed from the card', async () => {
     const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);

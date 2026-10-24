@@ -53,7 +53,9 @@
 
   // Solo se vuelve a resolver si cambia la imagen, no cada vez que el padre
   // pasa un objeto nuevo con los mismos datos (p. ej. al recargar la lista).
-  const imageKey = $derived(`${image.id}|${image.format}|${image.filename}|${image.master_freed_at ?? ''}`);
+  const imageKey = $derived(
+    `${image.id}|${image.format}|${image.filename}|${image.master_freed_at ?? ''}|${image.preview_freed_at ?? ''}`,
+  );
 
   const candidates = $derived.by(() => {
     void imageKey;

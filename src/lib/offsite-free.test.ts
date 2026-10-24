@@ -10,6 +10,7 @@ import type {
 	VolumeOffsiteState
 } from '$lib/api';
 import {
+	freedAfterRead,
 	freedCountsChanged,
 	freedCountsOf,
 	freedExportCount,
@@ -451,5 +452,47 @@ describe('freedCountsOf', () => {
 	it('reads a backend without the freed counts as nothing freed', () => {
 		const s = { collection_id: 7, freed_files: undefined, freed_bytes: undefined } as unknown as VolumeOffsiteState;
 		expect(freedCountsOf(s)).toEqual({ collectionId: 7, files: 0, bytes: 0 });
+	});
+});
+
+describe('freedAfterRead', () => {
+	const counts = (collectionId: number, files: number, bytes: number) => ({ collectionId, files, bytes });
+
+	it('moves on without reloading on the first reading of a volume, or when nothing changed', async () => {
+		const reload = vi.fn(() => Promise.resolve(true));
+		expect(await freedAfterRead(null, counts(7, 4, 100), 7, reload)).toEqual(counts(7, 4, 100));
+		expect(await freedAfterRead(counts(7, 4, 100), counts(7, 4, 100), 7, reload)).toEqual(counts(7, 4, 100));
+		expect(reload).not.toHaveBeenCalled();
+	});
+
+	it('moves on once the reload after a change succeeds, and the next poll does not reload again', async () => {
+		const reload = vi.fn(() => Promise.resolve(true));
+		const last = await freedAfterRead(counts(7, 0, 0), counts(7, 4, 100), 7, reload);
+		expect(last).toEqual(counts(7, 4, 100));
+		expect(await freedAfterRead(last, counts(7, 4, 100), 7, reload)).toEqual(counts(7, 4, 100));
+		expect(reload).toHaveBeenCalledTimes(1);
+	});
+
+	it('keeps the change pending when the reload fails, so the next poll tries again', async () => {
+		const reload = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+		let last = await freedAfterRead(counts(7, 0, 0), counts(7, 4, 100), 7, reload);
+		expect(last).toEqual(counts(7, 0, 0));
+		last = await freedAfterRead(last, counts(7, 4, 100), 7, reload);
+		expect(reload).toHaveBeenCalledTimes(2);
+		expect(last).toEqual(counts(7, 4, 100));
+		await freedAfterRead(last, counts(7, 4, 100), 7, reload);
+		expect(reload).toHaveBeenCalledTimes(2);
+	});
+
+	it('keeps the change pending when the reload throws or there is nothing to reload with', async () => {
+		const throws = vi.fn(() => Promise.reject(new Error('down')));
+		expect(await freedAfterRead(counts(7, 0, 0), counts(7, 4, 100), 7, throws)).toEqual(counts(7, 0, 0));
+		expect(await freedAfterRead(counts(7, 0, 0), counts(7, 4, 100), 7, null)).toEqual(counts(7, 0, 0));
+	});
+
+	it('never reloads for a volume other than the one shown', async () => {
+		const reload = vi.fn(() => Promise.resolve(true));
+		expect(await freedAfterRead(counts(7, 0, 0), counts(8, 4, 100), 8, reload)).toEqual(counts(8, 4, 100));
+		expect(reload).not.toHaveBeenCalled();
 	});
 });

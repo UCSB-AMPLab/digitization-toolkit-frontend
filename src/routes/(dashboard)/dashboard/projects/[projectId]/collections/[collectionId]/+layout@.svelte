@@ -21,7 +21,7 @@
   import VolumeOffsiteActions from '$lib/components/VolumeOffsiteActions.svelte';
   import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
   import type { VolumeOffsiteState } from '$lib/api';
-  import { freedCountsChanged, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
+  import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
 
   let { children } = $props();
 
@@ -74,8 +74,12 @@
     if (!s) return;
     offsiteState = s;
     const next = freedCountsOf(s);
-    if (freedCountsChanged(lastFreed, next, collectionId)) topbarSlot.reloadRecords?.();
-    lastFreed = next;
+    // Advanced only once the records reloaded; a failed reload is tried
+    // again on the next poll (freedAfterRead).
+    const forId = collectionId;
+    freedAfterRead(lastFreed, next, forId, topbarSlot.reloadRecords).then((last) => {
+      if (collectionId === forId) lastFreed = last;
+    });
   }
 
   // A job's end, for the volume it was started for: ask the line again. A

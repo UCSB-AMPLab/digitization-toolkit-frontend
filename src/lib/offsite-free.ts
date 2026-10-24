@@ -375,3 +375,24 @@ export function freedCountsChanged(prev: FreedCounts | null, next: FreedCounts, 
 	if (prev === null || next.collectionId !== currentId || prev.collectionId !== next.collectionId) return false;
 	return prev.files !== next.files || prev.bytes !== next.bytes;
 }
+
+/**
+ * What the layout records as last read after reading `next`: `next`, except
+ * when the freed counts changed on the volume shown and the records could
+ * not be reloaded (`reload` resolved false, threw, or is not set yet). Then
+ * `prev` stays, so the next poll sees the change again and tries again.
+ */
+export async function freedAfterRead(
+	prev: FreedCounts | null,
+	next: FreedCounts,
+	currentId: number,
+	reload: (() => Promise<boolean>) | null | undefined
+): Promise<FreedCounts | null> {
+	if (!freedCountsChanged(prev, next, currentId)) return next;
+	if (!reload) return prev;
+	try {
+		return (await reload()) ? next : prev;
+	} catch {
+		return prev;
+	}
+}
