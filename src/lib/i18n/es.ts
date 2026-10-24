@@ -797,7 +797,7 @@ export const es = {
 	lv_err_volume_not_found: 'Este volumen ya no está en el catálogo',
 	lv_err_record_not_found: 'Este registro ya no está en el catálogo',
 	lv_err_retake_volume: 'Un registro solo se puede volver a capturar desde el volumen al que pertenece',
-	lv_err_retake_mode: (mode: 'single' | 'dual') =>
+	lv_err_retake_mode: (mode: 'single' | 'dual'): string =>
 		mode === 'dual'
 			? 'Este registro se capturó con dos cámaras; para volver a capturarlo, elige "Dos cámaras"'
 			: 'Este registro se capturó con una cámara; para volver a capturarlo, elige "Una cámara"',

@@ -169,7 +169,7 @@ describe('ImageViewerModal — retake only for a captured or rejected record', (
   });
   afterEach(() => spy.mockRestore());
 
-  function footerButtons(status: string, userRole: string) {
+  function footerButtons(status: 'captured' | 'in_review' | 'approved' | 'rejected', userRole: string) {
     const screen = render(ImageViewerModal, {
       record: makeRecord({ status }),
       onClose: vi.fn(),
@@ -182,12 +182,12 @@ describe('ImageViewerModal — retake only for a captured or rejected record', (
   }
 
   for (const role of ['operator', 'admin']) {
-    for (const status of ['captured', 'rejected']) {
+    for (const status of ['captured', 'rejected'] as const) {
       it(`offers the retake to an ${role} on a ${status} record`, () => {
         expect(footerButtons(status, role).some((t) => t.includes(es.col_retake))).toBe(true);
       });
     }
-    for (const status of ['in_review', 'approved']) {
+    for (const status of ['in_review', 'approved'] as const) {
       it(`offers no retake to an ${role} on a record ${status}`, () => {
         expect(footerButtons(status, role).some((t) => t.includes(es.col_retake))).toBe(false);
       });
