@@ -52,7 +52,8 @@
     type OwnsEventContext
   } from '$lib/capture-key';
   import { defaultRecordTitle } from '$lib/record-title';
-  import { isConflict, isFixedCaptureRefusal } from '$lib/volume-stem';
+  import { isConflict } from '$lib/volume-stem';
+  import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -550,11 +551,9 @@
       }
 
       if (!result.success) {
-        // Antes de NEH-72 este texto no se mostraba en ninguna parte, así que
-        // el literal en inglés daba igual. Ahora es lo que lee el operario en
-        // el banner cuando el backend no manda un `error` propio, y tiene que
-        // salir del catálogo.
-        throw new Error(result.error || $m.lv_capture_error);
+        // The backend's `error` is English; captureErrorText turns it into
+        // the catalogue's message below.
+        throw new CaptureFailed(result.error);
       }
 
       // El flash solo dispara cuando el backend confirmó la captura: es la
@@ -574,13 +573,9 @@
         // backend's English text is not shown.
         return;
       }
-      // The backend's fixed 409s for a capture into no volume, or a retake
-      // into another volume, are English; the operator sees the catalogue's
-      // generic capture error instead.
-      const msg = isFixedCaptureRefusal(error) || !(error instanceof Error)
-        ? $m.lv_capture_error
-        : error.message;
-      cameraStatus.reportFailure(msg);
+      // Every backend error is English; the operator sees the catalogue's
+      // message for it, and the console has the original.
+      cameraStatus.reportFailure(captureErrorText(error, $m));
     } finally {
       isCapturing = false;
     }

@@ -453,7 +453,7 @@ describe('LiveViewport — a volume without a stem', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
     await expect
       .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
-      .toContain(es.lv_capture_error);
+      .toContain(es.lv_err_no_volume);
     expect(screen.container.textContent).not.toContain(backend);
   });
 
@@ -467,11 +467,38 @@ describe('LiveViewport — a volume without a stem', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
     await expect
       .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
-      .toContain(es.lv_capture_error);
+      .toContain(es.lv_err_retake_volume);
     expect(screen.container.textContent).not.toContain(backend);
   });
 
-  it('on a 409 for another reason, reports the capture error as before', async () => {
+  it('on the no-stem 409 when the volume reads back with a stem, shows the needs-stem message', async () => {
+    const backend = 'This volume has no file name stem. Give it one before capturing into it.';
+    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+    const onStemRefused = vi.fn(async () => false);
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({ onStemRefused }));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect
+      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+      .toContain(es.lv_needs_stem);
+    expect(screen.container.textContent).not.toContain(backend);
+  });
+
+  it('on the 404 for an unknown volume, shows the catalogue error, not the backend text', async () => {
+    const backend = 'Collection 7 not found';
+    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 404));
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({}));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect
+      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+      .toContain(es.lv_err_volume_not_found);
+    expect(screen.container.textContent).not.toContain(backend);
+  });
+
+  it('on a 409 for another reason, shows the generic capture error, not the backend text', async () => {
     const backend = 'Some other conflict';
     vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, { message: backend }, 409));
     const onStemRefused = vi.fn(async () => false);
@@ -482,6 +509,19 @@ describe('LiveViewport — a volume without a stem', () => {
     await expect.poll(() => onStemRefused.mock.calls.length).toBe(1);
     await expect
       .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
-      .toContain(backend);
+      .toContain(es.lv_capture_error);
+    expect(screen.container.textContent).not.toContain(backend);
+  });
+
+  it('on a capture answered with success false, shows the catalogue message, not the backend error', async () => {
+    vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: false, error: 'Camera 0 is not connected' });
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({}));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect
+      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+      .toContain(es.lv_err_camera_not_connected(0));
+    expect(screen.container.textContent).not.toContain('Camera 0 is not connected');
   });
 });

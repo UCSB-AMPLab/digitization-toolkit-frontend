@@ -4,6 +4,8 @@
 //
 // Kept free of api.ts (like login-error.ts) so this stays a plain node test.
 
+import type { Messages } from './i18n';
+
 export type CaptureOutcome =
 	| { kind: 'ok'; seconds?: number | null; bytes?: number | null; imageUrl?: string }
 	| { kind: 'error'; detail?: string };
@@ -32,6 +34,23 @@ export function describeTestCapture(
 	};
 }
 
-export function describeCaptureFailure(thrown: unknown): CaptureOutcome {
-	return { kind: 'error', detail: thrown instanceof Error ? thrown.message : undefined };
+// What POST /cameras/test-capture/{n} (app/api/cameras.py, test_capture)
+// answers when it fails: a 404 "Camera {n} is not connected", a 504 when the
+// camera did not deliver the image before the deadline, and otherwise a 500
+// (or a 422 for a resolution the dashboard never sends) whose text is the
+// backend's.
+const CAMERA_NOT_CONNECTED = /^Camera \d+ is not connected$/;
+
+/**
+ * A failed test capture. `detail` is a catalogue message for the two failures
+ * the operator can act on, and absent for any other: the backend's English
+ * is never shown, and the caller logs the original error.
+ */
+export function describeCaptureFailure(thrown: unknown, msgs: Messages): CaptureOutcome {
+	const status = typeof thrown === 'object' && thrown !== null ? (thrown as { status?: unknown }).status : undefined;
+	if (status === 404 && thrown instanceof Error && CAMERA_NOT_CONNECTED.test(thrown.message)) {
+		return { kind: 'error', detail: msgs.dash_camera_capture_not_connected };
+	}
+	if (status === 504) return { kind: 'error', detail: msgs.dash_camera_capture_timeout };
+	return { kind: 'error' };
 }

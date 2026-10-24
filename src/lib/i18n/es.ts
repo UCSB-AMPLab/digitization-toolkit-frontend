@@ -145,6 +145,9 @@ export const es = {
 	dash_camera_capture_ok: 'Captura de prueba realizada',
 	dash_camera_capture_took: (s: string) => `en ${s} s`,
 	dash_camera_capture_error: 'No se pudo hacer la captura de prueba',
+	// Detalle tras dash_camera_capture_error y dos puntos, por eso en minúscula.
+	dash_camera_capture_not_connected: 'la cámara no está conectada',
+	dash_camera_capture_timeout: 'la cámara no entregó la imagen a tiempo',
 	dash_two_cameras: '2 cámaras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: no se detecta. Presiona el disparador hasta la mitad para despertarla o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".`,
@@ -560,8 +563,8 @@ export const es = {
 	col_record_locked: (statusLabel: string) => `Registro bloqueado (${statusLabel})`,
 	col_status_in_review_lc: 'en revisión',
 	col_status_approved_lc: 'aprobado',
-	col_retake: 'Retomar',
-	col_retake_confirm: '¿Descartar este registro y volver a capturar desde la vista en vivo?',
+	col_retake: 'Volver a capturar',
+	col_retake_confirm: '¿Volver a capturar este registro desde la pantalla de captura? Captua guardará las imágenes actuales como versiones anteriores.',
 	col_delete_record_confirm: '¿Eliminar permanentemente este registro y todas sus imágenes?',
 	badge_left: 'Izq',
 	badge_right: 'Der',
@@ -787,6 +790,23 @@ export const es = {
 	lv_capture_not_ready: 'Cargando el volumen…',
 	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
 	lv_needs_stem_link: 'Asignar la raíz',
+	// Errores de una captura o una retoma que el backend rechazó
+	// (capture-errors.ts). Sin punto final, como lv_capture_error en el
+	// aviso de la pantalla; lvm_retake_error se lo agrega.
+	lv_err_no_volume: 'Elige un volumen antes de capturar',
+	lv_err_volume_not_found: 'Este volumen ya no está en el catálogo',
+	lv_err_record_not_found: 'Este registro ya no está en el catálogo',
+	lv_err_retake_volume: 'Un registro solo se puede volver a capturar desde el volumen al que pertenece',
+	lv_err_retake_mode: (mode: 'single' | 'dual'): string =>
+		mode === 'dual'
+			? 'Este registro se capturó con dos cámaras; para volver a capturarlo, elige "Dos cámaras"'
+			: 'Este registro se capturó con una cámara; para volver a capturarlo, elige "Una cámara"',
+	lv_err_camera_not_connected: (n: number) => `La cámara ${n} no está conectada`,
+	lv_err_numbers_taken:
+		'Captua no hizo la captura: ya hay archivos en el disco con los próximos números de captura de este volumen; avisa a quien administra el equipo',
+	lv_err_retake_status: 'Solo se puede volver a capturar un registro en estado Capturado o Rechazado',
+	lv_err_resolution_in_name: 'Captua no puede incluir la resolución en el nombre de archivo de las capturas',
+	lv_err_name_too_long: 'Captua no hizo la captura: el nombre de archivo tendría más de 36 caracteres',
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
 	lv_zoom_out: 'Alejar',
@@ -797,9 +817,11 @@ export const es = {
 	tb_back: 'Volver',
 	tb_current_user: 'Usuario actual',
 	lvm_retake: 'Volver a capturar',
-	lvm_retake_confirm: '¿Eliminar imágenes actuales y volver a capturar este registro?',
+	lvm_retake_confirm: '¿Volver a capturar este registro? Captua guardará las imágenes actuales como versiones anteriores.',
 	lvm_retaking: 'Capturando imagen de reemplazo…',
-	lvm_retake_error: (message: string) => `Falló la retoma: ${message}. Se conservó la imagen original.`,
+	// `message` es una frase propia, con o sin punto final.
+	lvm_retake_error: (message: string) =>
+		`No se pudo volver a capturar el registro. ${message.endsWith('.') ? message : `${message}.`} Se conservaron las imágenes originales.`,
 
 	// ── Copia externa del catálogo (NEH-266) ─────────────────────────────────
 	// `day` dice si la copia es de hoy, de ayer o anterior, en la hora local;

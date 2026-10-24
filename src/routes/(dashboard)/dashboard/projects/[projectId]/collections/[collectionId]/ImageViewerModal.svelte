@@ -47,7 +47,9 @@
     userRole?: string | null;
   } = $props();
 
-  // Lock: in_review and approved block retake/delete for non-admins
+  // Lock: in_review and approved block delete for non-admins, and retake for
+  // everyone: the backend refuses a retake of a record that is neither
+  // captured nor rejected (409, RETAKE_STATUS_DETAIL in app/core/volume_stem.py).
   let isLocked = $derived(record.status === 'in_review' || record.status === 'approved');
 
   // ---------------------------------------------------------------------------
@@ -292,17 +294,19 @@
           <span class="material-symbols-outlined icon-sm">close</span>
           {$m.common_close}
         </button>
-        <div style="display:flex; gap:8px;">
+        <div class="img-viewer-actions">
           {#if isLocked && userRole !== 'admin'}
             <span class="img-viewer-locked-msg">
               <span class="material-symbols-outlined icon-sm">lock</span>
               {$m.col_record_locked(record.status === 'in_review' ? $m.col_status_in_review_lc : $m.col_status_approved_lc)}
             </span>
           {:else}
-            <button class="btn btn-warning" onclick={() => confirmAction = 'retake'}>
-              <span class="material-symbols-outlined icon-sm">refresh</span>
-              {$m.col_retake}
-            </button>
+            {#if !isLocked}
+              <button class="btn btn-warning" onclick={() => confirmAction = 'retake'}>
+                <span class="material-symbols-outlined icon-sm">refresh</span>
+                {$m.col_retake}
+              </button>
+            {/if}
             <button class="btn btn-danger" onclick={() => confirmAction = 'delete'}>
               <span class="material-symbols-outlined icon-sm">delete</span>
               {$m.common_delete}
@@ -395,6 +399,13 @@
   }
   .img-viewer-zoom-btn:hover { background: var(--color-primary); }
   .one-to-one-glyph { font-size: 11px; font-weight: var(--fw-bold); }
+  /* Retake and delete. They wrap onto a second row when the footer is too
+     narrow for both, instead of pushing past the modal at phone width. */
+  .img-viewer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
   .btn-warning {
     display: inline-flex;
     align-items: center;

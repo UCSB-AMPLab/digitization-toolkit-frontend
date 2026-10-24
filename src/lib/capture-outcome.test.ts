@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describeCaptureFailure, describeCaptureOutcome, describeTestCapture } from './capture-outcome';
+import { es } from './i18n/es';
+import { en } from './i18n/en';
 
 describe('describeCaptureOutcome', () => {
 	it('reports ok when the capture succeeded', () => {
@@ -45,15 +47,35 @@ describe('describeTestCapture', () => {
 });
 
 describe('describeCaptureFailure', () => {
-	it('reports the thrown Error message as the detail', () => {
-		const error = new Error('HTTP 422: project_name does not match a known project');
-		expect(describeCaptureFailure(error)).toEqual({
+	class ApiError extends Error {
+		status?: number;
+		constructor(message: string, status?: number) {
+			super(message);
+			this.status = status;
+		}
+	}
+
+	it('gives a not-connected camera and a timeout their catalogue messages', () => {
+		expect(describeCaptureFailure(new ApiError('Camera 1 is not connected', 404), es)).toEqual({
 			kind: 'error',
-			detail: 'HTTP 422: project_name does not match a known project'
+			detail: es.dash_camera_capture_not_connected
+		});
+		expect(describeCaptureFailure(new ApiError('DSLR capture failed: no image after 12s', 504), en)).toEqual({
+			kind: 'error',
+			detail: en.dash_camera_capture_timeout
 		});
 	});
 
-	it('reports no detail for a non-Error throw', () => {
-		expect(describeCaptureFailure('boom')).toEqual({ kind: 'error', detail: undefined });
+	it('gives anything else no detail, never the backend text', () => {
+		for (const thrown of [
+			new ApiError('Test capture failed', 500),
+			new ApiError('DSLR capture failed: I/O in progress', 500),
+			new ApiError('Invalid resolution: huge', 422),
+			new ApiError('Camera 1 is not connected', 500),
+			new Error('Failed to fetch'),
+			'boom'
+		]) {
+			expect(describeCaptureFailure(thrown, es)).toEqual({ kind: 'error' });
+		}
 	});
 });

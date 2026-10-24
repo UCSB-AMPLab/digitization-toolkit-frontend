@@ -133,6 +133,8 @@ export const en: Messages = {
 	dash_camera_capture_ok: 'Test capture taken',
 	dash_camera_capture_took: (s: string) => `in ${s}s`,
 	dash_camera_capture_error: 'Test capture failed',
+	dash_camera_capture_not_connected: 'the camera is not connected',
+	dash_camera_capture_timeout: 'the camera did not deliver the image in time',
 	dash_two_cameras: '2 cameras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: not detected. Half-press its shutter button to wake it, or reseat its USB cable, then press "Reconnect cameras".`,
@@ -536,7 +538,7 @@ export const en: Messages = {
 	col_status_in_review_lc: 'in review',
 	col_status_approved_lc: 'approved',
 	col_retake: 'Retake',
-	col_retake_confirm: 'Discard this record and recapture it from live view?',
+	col_retake_confirm: 'Retake this record from the capture screen? Captua keeps the current images as earlier versions.',
 	col_delete_record_confirm: 'Permanently delete this record and all its images?',
 	badge_left: 'L',
 	badge_right: 'R',
@@ -760,6 +762,20 @@ export const en: Messages = {
 	lv_capture_not_ready: 'Loading the volume…',
 	lv_needs_stem: 'This volume needs a stem before you can capture into it.',
 	lv_needs_stem_link: 'Assign the stem',
+	lv_err_no_volume: 'Choose a volume before capturing',
+	lv_err_volume_not_found: 'This volume is no longer in the catalogue',
+	lv_err_record_not_found: 'This record is no longer in the catalogue',
+	lv_err_retake_volume: 'A record can be retaken only in its own volume',
+	lv_err_retake_mode: (mode: 'single' | 'dual') =>
+		mode === 'dual'
+			? 'This record was captured with two cameras; to retake it, choose "Double Camera"'
+			: 'This record was captured with one camera; to retake it, choose "Single Camera"',
+	lv_err_camera_not_connected: (n: number) => `Camera ${n} is not connected`,
+	lv_err_numbers_taken:
+		"Captua captured nothing: files on disk already carry this volume's next capture numbers; let whoever administers the device know",
+	lv_err_retake_status: 'Only a captured or rejected record can be retaken',
+	lv_err_resolution_in_name: "Captua cannot put the resolution in a capture's file name",
+	lv_err_name_too_long: "Captua captured nothing: this capture's file name would be longer than 36 characters",
 	lv_capture_btn: 'Capture',
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',
@@ -770,9 +786,10 @@ export const en: Messages = {
 	tb_back: 'Back',
 	tb_current_user: 'Current user',
 	lvm_retake: 'Retake',
-	lvm_retake_confirm: 'Delete the current images and recapture this record?',
+	lvm_retake_confirm: 'Retake this record? Captua keeps the current images as earlier versions.',
 	lvm_retaking: 'Capturing replacement image…',
-	lvm_retake_error: (message: string) => `Retake failed: ${message}. The original image was kept.`,
+	lvm_retake_error: (message: string) =>
+		`Retake failed. ${message.endsWith('.') ? message : `${message}.`} The original images were kept.`,
 
 	// ── Offsite catalogue copy (NEH-266) ─────────────────────────────────────
 	backup_ind_current: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
