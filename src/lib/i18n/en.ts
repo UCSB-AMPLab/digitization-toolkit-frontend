@@ -407,7 +407,7 @@ export const en: Messages = {
 	pd_delete_warning: 'To delete it, first move its records to another volume.',
 	pd_move_label: 'MOVE THE RECORDS TO',
 	pd_move_none: '— Choose a volume —',
-	pd_move_hint_none: 'The volume cannot be deleted until its records are moved to another volume.',
+	pd_move_hint_none: 'Choose a target volume to delete this one.',
 	pd_move_hint_selected: 'The records will be moved to the selected volume before deleting.',
 	pd_delete_confirm_pre: 'Are you sure you want to delete the volume ',
 	pd_field_stem: 'FILE NAME STEM',
