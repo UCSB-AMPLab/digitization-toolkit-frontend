@@ -234,5 +234,70 @@ describe('VolumeOffsiteActions', () => {
 		expect(onChanged).toHaveBeenCalledWith(7);
 		expect(inFlight?.aborted).toBe(true);
 	});
+
+	describe('a dry run cancelled and started again', () => {
+		const planOf = (files: number): FreePlan => ({ ...plan, would_free: { files, bytes: files * 1_000_000 }, refused: [] });
+
+		// Dry run A is asked, the dialog closed and opened again, then dry run B.
+		async function twoPlans() {
+			const pending: Array<{ resolve: (p: FreePlan) => void; reject: (e: unknown) => void }> = [];
+			planSpy.mockImplementation(
+				() => new Promise<FreePlan>((resolve, reject) => pending.push({ resolve, reject }))
+			);
+			const screen = mount(state());
+			await openMenu(screen);
+			await screen.getByRole('button', { name: 'Liberar espacio en la tarjeta' }).click();
+			await screen.getByRole('button', { name: 'Cancelar' }).click();
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+			await openMenu(screen);
+			await screen.getByRole('button', { name: 'Liberar espacio en la tarjeta' }).click();
+			await expect.poll(() => pending.length).toBe(2);
+			const [a, b] = pending;
+			return { screen, a, b };
+		}
+		const tick = () => new Promise((r) => setTimeout(r, 50));
+
+		it('shows only B when A answers first', async () => {
+			const { screen, a, b } = await twoPlans();
+			a.resolve(planOf(111));
+			await tick();
+			await expect.element(screen.getByText('Captua está revisando qué se puede liberar…')).toBeVisible();
+			b.resolve(planOf(2));
+			await expect.element(screen.getByText('Captua quitará 2 archivos (2\u00a0MB) de la tarjeta.', { exact: false })).toBeVisible();
+			expect(document.body.textContent).not.toContain('111 archivos');
+		});
+
+		it('shows only B when A answers last', async () => {
+			const { screen, a, b } = await twoPlans();
+			b.resolve(planOf(2));
+			await expect.element(screen.getByText('Captua quitará 2 archivos (2\u00a0MB) de la tarjeta.', { exact: false })).toBeVisible();
+			a.resolve(planOf(111));
+			await tick();
+			expect(document.body.textContent).not.toContain('111 archivos');
+			await expect.element(screen.getByText('Captua quitará 2 archivos', { exact: false })).toBeVisible();
+		});
+
+		it("never shows A's refusal over B's plan", async () => {
+			const { screen, a, b } = await twoPlans();
+			b.resolve(planOf(2));
+			await expect.element(screen.getByText('Captua quitará 2 archivos', { exact: false })).toBeVisible();
+			a.reject(new ApiError('down', undefined, 503));
+			await tick();
+			await expect.element(screen.getByRole('alert')).not.toBeInTheDocument();
+			await expect.element(screen.getByText('Captua quitará 2 archivos', { exact: false })).toBeVisible();
+		});
+
+		it('leaves the dialog closed when A answers after it was closed', async () => {
+			const pending: Array<(p: FreePlan) => void> = [];
+			planSpy.mockImplementation(() => new Promise<FreePlan>((resolve) => pending.push(resolve)));
+			const screen = mount(state());
+			await openMenu(screen);
+			await screen.getByRole('button', { name: 'Liberar espacio en la tarjeta' }).click();
+			await screen.getByRole('button', { name: 'Cancelar' }).click();
+			pending[0](planOf(111));
+			await tick();
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		});
+	});
 });
 

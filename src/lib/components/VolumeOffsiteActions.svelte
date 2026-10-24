@@ -77,7 +77,13 @@
 		step = { kind: 'menu' };
 	}
 
+	// The dry run whose answer the dialog is waiting for. Each one, and every
+	// close, takes a new number, so an answer to a dry run cancelled earlier
+	// can never replace a newer one's (or open a closed dialog).
+	let planGeneration = 0;
+
 	function close() {
+		planGeneration += 1;
 		polling?.abort();
 		polling = null;
 		const wasOpen = step !== null;
@@ -88,11 +94,15 @@
 	async function startPlan() {
 		step = { kind: 'planning' };
 		focusCard();
+		const generation = ++planGeneration;
+		const current = () => generation === planGeneration && step?.kind === 'planning';
 		try {
 			const plan = await collectionsApi.planFree(collectionId);
-			if (step?.kind === 'planning') step = { kind: 'plan', plan };
+			if (!current()) return;
+			step = { kind: 'plan', plan };
 		} catch (error) {
-			if (step?.kind === 'planning') step = { kind: 'error', action: 'plan', text: offsiteActionErrorText(error, 'plan', $m) };
+			if (!current()) return;
+			step = { kind: 'error', action: 'plan', text: offsiteActionErrorText(error, 'plan', $m) };
 		}
 		focusCard();
 	}
