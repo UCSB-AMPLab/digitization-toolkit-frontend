@@ -502,6 +502,24 @@ export interface Collection {
   created_at: string;
   updated_at?: string;
   archival_metadata?: { [key: string]: any };
+  // Volume identity (exchange contract 1.1 §3), from CollectionRead.
+  // filename_stem: the lowercase slug every file name in the volume starts
+  // with; null on a volume created before stems existed, which cannot
+  // capture until an operator gives it one.
+  filename_stem?: string | null;
+  // The Fisqua reference code; written once.
+  external_id?: string | null;
+  date?: string | null;
+  date_start?: string | null;  // ISO date (YYYY-MM-DD)
+  date_end?: string | null;    // ISO date (YYYY-MM-DD)
+  sequence?: number | null;
+  custom_attributes?: string | null;  // JSON text
+  // Read-only. Raised by the backend at every capture and upload; never decreases.
+  capture_counter?: number;
+  // Read-only. True when the volume has a stem and has captured: the stem
+  // can no longer change, and DELETE refuses the volume (409) even once its
+  // records are moved out.
+  stem_reserved?: boolean;
 }
 
 export interface CollectionWithChildren extends Collection {
@@ -509,7 +527,20 @@ export interface CollectionWithChildren extends Collection {
   record_count?: number;
 }
 
-export interface CreateCollectionData {
+// The volume identity fields a create or update may carry (CollectionCreate /
+// CollectionUpdate on the backend). capture_counter and stem_reserved are
+// read-only and absent here.
+export interface VolumeIdentityData {
+  filename_stem?: string | null;
+  external_id?: string | null;
+  date?: string | null;
+  date_start?: string | null;
+  date_end?: string | null;
+  sequence?: number | null;
+  custom_attributes?: string | null;
+}
+
+export interface CreateCollectionData extends VolumeIdentityData {
   name: string;
   description?: string;
   collection_type?: string;
@@ -519,7 +550,7 @@ export interface CreateCollectionData {
   archival_metadata?: { [key: string]: any };
 }
 
-export interface UpdateCollectionData {
+export interface UpdateCollectionData extends VolumeIdentityData {
   name?: string;
   description?: string;
   collection_type?: string;
