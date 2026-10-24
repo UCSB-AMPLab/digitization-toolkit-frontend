@@ -668,8 +668,10 @@ export const collectionsApi = {
   },
 
   /**
-   * Set display order of records in a collection.
-   * ordered_ids: record IDs in the desired order (0-based sequence assigned automatically).
+   * Set the order of a volume's records.
+   * ordered_ids: every record ID of the volume, each once, in the desired
+   * order; the backend sets their sequence to 1..N. A list that leaves a
+   * record out, repeats one or names one from another volume is refused (422).
    */
   async reorderRecords(collectionId: number, ordered_ids: number[]): Promise<{ reordered: number }> {
     return apiRequest(`/collections/${collectionId}/records/reorder`, {
