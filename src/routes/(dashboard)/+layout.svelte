@@ -431,7 +431,15 @@
 			<!-- Ayuda encima del botón de fallos. En captura y en la vista de
 			     volumen no hay barra lateral: allí vive en el menú del avatar. -->
 			<button class="help-btn" onclick={() => tour.start()} title={$m.nav_help} aria-label={$m.nav_help}>
-				<span class="material-symbols-outlined icon-sm">help</span>
+				<!-- SVG y no material-symbols: la fuente de iconos va empaquetada
+				     como subconjunto de los que el proyecto ya usaba, y "help" no
+				     está en él --- se dibujaba la palabra en mayúsculas. Mismo icono
+				     que el de Ayuda en el menú del avatar. -->
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+					<circle cx="12" cy="12" r="10" />
+					<path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 3-3 3" />
+					<line x1="12" y1="17" x2="12.01" y2="17" />
+				</svg>
 				{#if expanded}<span class="help-btn-label">{$m.nav_help}</span>{/if}
 			</button>
 
