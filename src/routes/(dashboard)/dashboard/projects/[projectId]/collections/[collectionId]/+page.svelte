@@ -37,6 +37,7 @@
   import { getVolumeTopbar } from '$lib/volume-topbar';
   import { fileHoldText } from '$lib/volume-refusals';
   import { freedExportCount } from '$lib/offsite-free';
+  import { selectionAfterLoad } from '$lib/record-selection';
   import { freedFromBody } from '$lib/image-display';
 
   // ---------------------------------------------------------------------------
@@ -104,13 +105,15 @@
   let loadSeq = 0;
 
   // Devuelve si la lista quedó actualizada, para que quien recarga después
-  // de un cambio pueda avisar si no.
-  async function loadRecords(): Promise<boolean> {
+  // de un cambio pueda avisar si no. Con `inPlace` (NEH-248: lo que está
+  // liberado del volumen cambió) la vista no pasa por el estado de carga y el
+  // registro seleccionado se conserva si sigue en el volumen.
+  async function loadRecords({ inPlace = false }: { inPlace?: boolean } = {}): Promise<boolean> {
     const forId = collectionId;
     const seq = ++loadSeq;
     requestedFor = forId;
     try {
-      isLoading = true;
+      if (!inPlace) isLoading = true;
       const data = await recordsApi.listAll({ collection_id: forId });
       // Una respuesta superada por otra carga se descarta.
       if (seq !== loadSeq) return false;
@@ -121,8 +124,9 @@
         if (b.sequence == null) return -1;
         return a.sequence - b.sequence;
       });
+      // Un volumen distinto del que había nunca conserva la selección.
+      selectedRecordId = selectionAfterLoad(records, selectedRecordId, inPlace && loadedFor === forId);
       loadedFor = forId;
-      if (records.length > 0) selectedRecordId = records[0].id;
       return true;
     } catch (err) {
       console.error('[Gallery] Error cargando registros:', err);
@@ -363,7 +367,7 @@
   // records so each image's freed state is current.
   $effect(() => {
     if (!topbar) return;
-    topbar.reloadRecords = loadRecords;
+    topbar.reloadRecords = () => loadRecords({ inPlace: true });
     return () => { topbar.reloadRecords = null; };
   });
 </script>

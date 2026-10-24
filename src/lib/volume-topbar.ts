@@ -25,3 +25,8 @@ export function setVolumeTopbar(slot: VolumeTopbarSlot): void {
 export function getVolumeTopbar(): VolumeTopbarSlot | undefined {
 	return getContext<VolumeTopbarSlot | undefined>(KEY);
 }
+
+/** The context that holds `slot`, for rendering the page without its layout (tests). */
+export function volumeTopbarContext(slot: VolumeTopbarSlot): Map<symbol, VolumeTopbarSlot> {
+	return new Map([[KEY, slot]]);
+}
