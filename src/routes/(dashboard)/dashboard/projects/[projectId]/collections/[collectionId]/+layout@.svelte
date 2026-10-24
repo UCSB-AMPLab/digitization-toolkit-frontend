@@ -18,12 +18,15 @@
   import { m } from '$lib/i18n';
   import UserMenu from '$lib/components/UserMenu.svelte';
   import VolumeOffsiteIndicator from '$lib/components/VolumeOffsiteIndicator.svelte';
+  import VolumeOffsiteActions from '$lib/components/VolumeOffsiteActions.svelte';
   import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
+  import type { VolumeOffsiteState } from '$lib/api';
+  import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
 
   let { children } = $props();
 
   // Controls the page puts in the bar: send for review and take back (NEH-260).
-  const topbarSlot = $state<VolumeTopbarSlot>({ actions: null });
+  const topbarSlot = $state<VolumeTopbarSlot>({ actions: null, reloadRecords: null });
   setVolumeTopbar(topbarSlot);
 
   // ---------------------------------------------------------------------------
@@ -51,6 +54,39 @@
   let canOpenCamera = $derived(
     currentUser?.role === 'admin' || currentUser?.role === 'operator'
   );
+
+  // ---------------------------------------------------------------------------
+  // ESPACIO EN LA TARJETA (NEH-248): liberar y restaurar, solo para admin. El
+  // botón va junto al breadcrumb y a la línea de la copia externa, que es la
+  // que dice qué está liberado. El backend rechaza estas rutas a los demás.
+  // ---------------------------------------------------------------------------
+  let isAdmin = $derived(currentUser?.role === 'admin');
+  // The last state the line read: a poll that fails keeps it, so an open
+  // dialog is not closed under the admin; it is matched to the volume shown.
+  let offsiteState = $state<VolumeOffsiteState | null>(null);
+  let offsiteRefresh = $state(0);
+  // What the line last read as freed. When it changes on the volume shown, a
+  // free or a restore has moved files, whether or not its dialog was still
+  // open, so the page reloads the records and their freed state.
+  let lastFreed: FreedCounts | null = null;
+
+  function offsiteRead(s: VolumeOffsiteState | null) {
+    if (!s) return;
+    offsiteState = s;
+    const next = freedCountsOf(s);
+    // Advanced only once the records reloaded; a failed reload is tried
+    // again on the next poll (freedAfterRead).
+    const forId = collectionId;
+    freedAfterRead(lastFreed, next, forId, topbarSlot.reloadRecords).then((last) => {
+      if (collectionId === forId) lastFreed = last;
+    });
+  }
+
+  // A job's end, for the volume it was started for: ask the line again. A
+  // job of a volume no longer shown changes nothing here.
+  function offsiteChanged(forId: number) {
+    if (forId === collectionId) offsiteRefresh += 1;
+  }
 
   // ---------------------------------------------------------------------------
   // BREADCRUMB — nombres de proyecto y colección
@@ -84,8 +120,13 @@
           <span class="bc-sep">/</span>
           <span class="bc-item bc-collection">{collectionName}</span>
         </nav>
-        <VolumeOffsiteIndicator {collectionId} />
+        <VolumeOffsiteIndicator {collectionId} refresh={offsiteRefresh} onState={offsiteRead} />
       </div>
+      {#if isAdmin && offsiteState && offsiteState.collection_id === collectionId}
+        {#key collectionId}
+          <VolumeOffsiteActions {collectionId} offsite={offsiteState} onChanged={offsiteChanged} />
+        {/key}
+      {/if}
     </div>
 
     <!-- Derecha: botón cámara (solo operador/admin) + avatar -->

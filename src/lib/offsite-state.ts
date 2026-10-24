@@ -8,6 +8,11 @@
 // bucket already held another file for at its key, which only an
 // administrator can resolve, so it is shown as needing attention.
 //
+// A volume's verified objects can also be freed from the card (NEH-248,
+// app/core/offsite_free.py): `freed_files` and `freed_bytes` count them, and
+// a received volume with freed files is shown as stored offsite, with what
+// was freed. A freed file is a healthy state, never an attention one.
+//
 // The module imports only types from the API client, so the wording is tested
 // in the server project.
 
@@ -26,6 +31,7 @@ export type VolumeOffsiteSnapshot =
 
 export type VolumeOffsiteKind =
 	| 'received'
+	| 'freed'
 	| 'uploading'
 	| 'attention'
 	| 'empty'
@@ -55,6 +61,8 @@ export interface VolumeOffsiteView {
 	lastVerified: string | null;
 	/** What to do about refused files; null when there are none. */
 	help: string | null;
+	/** "412 files freed from the SD card (12.3 GB)"; null when none was freed. */
+	freed: string | null;
 }
 
 function verifiedAt(iso: string | null): Date | null {
@@ -82,14 +90,20 @@ export function volumeOffsiteView(
 	msgs: Messages
 ): VolumeOffsiteView | null {
 	if (snapshot.kind === 'loading') return null;
+	if (snapshot.kind === 'failed') {
+		return { kind: 'unknown', headline: msgs.offsite_vol_unknown, lastVerified: null, help: null, freed: null };
+	}
+	const s = snapshot.state;
+	// Absent from a backend that predates freeing.
+	const freedFiles = s.freed_files ?? 0;
+	const freed = freedFiles > 0 ? msgs.offsite_vol_freed(freedFiles, s.freed_bytes ?? 0) : null;
 	const only = (kind: VolumeOffsiteKind, headline: string): VolumeOffsiteView => ({
 		kind,
 		headline,
 		lastVerified: null,
-		help: null
+		help: null,
+		freed
 	});
-	if (snapshot.kind === 'failed') return only('unknown', msgs.offsite_vol_unknown);
-	const s = snapshot.state;
 	if (unit === 'misconfigured') return only('misconfigured', msgs.offsite_vol_misconfigured);
 	if (unit === 'off') return only('off', msgs.offsite_vol_off);
 	if (!s.uploadable) return only('no_stem', msgs.offsite_vol_no_stem);
@@ -102,11 +116,13 @@ export function volumeOffsiteView(
 			kind: 'attention',
 			headline: msgs.offsite_vol_attention(s.refused, s.verified, s.total, s.pending),
 			lastVerified,
-			help: msgs.offsite_attention_help
+			help: msgs.offsite_attention_help,
+			freed
 		};
 	}
-	if (s.received) return { kind: 'received', headline: msgs.offsite_vol_received(s.verified, s.total), lastVerified, help: null };
-	return { kind: 'uploading', headline: msgs.offsite_vol_uploading(s.verified, s.total, s.pending), lastVerified, help: null };
+	if (s.received && freed) return { kind: 'freed', headline: msgs.offsite_vol_stored, lastVerified, help: null, freed };
+	if (s.received) return { kind: 'received', headline: msgs.offsite_vol_received(s.verified, s.total), lastVerified, help: null, freed };
+	return { kind: 'uploading', headline: msgs.offsite_vol_uploading(s.verified, s.total, s.pending), lastVerified, help: null, freed };
 }
 
 export type UnitOffsiteLevel = 'received' | 'uploading' | 'attention' | 'empty' | 'off';

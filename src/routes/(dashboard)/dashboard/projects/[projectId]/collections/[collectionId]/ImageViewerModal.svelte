@@ -263,16 +263,19 @@
               <span class="one-to-one-glyph">1:1</span>
             </button>
           </div>
-          <a
-            class="img-viewer-download"
-            href={recordsApi.getImageFileUrl(img.id)}
-            download
-            title={$m.col_download_image}
-            aria-label={$m.col_download_image}
-            onclick={(e) => e.stopPropagation()}
-          >
-            <span class="material-symbols-outlined icon-sm">download</span>
-          </a>
+          <!-- NEH-248: a master freed from the card is not on the scanner to download -->
+          {#if !img.master_freed_at}
+            <a
+              class="img-viewer-download"
+              href={recordsApi.getImageFileUrl(img.id)}
+              download
+              title={$m.col_download_image}
+              aria-label={$m.col_download_image}
+              onclick={(e) => e.stopPropagation()}
+            >
+              <span class="material-symbols-outlined icon-sm">download</span>
+            </a>
+          {/if}
         </div>
       {/each}
 
