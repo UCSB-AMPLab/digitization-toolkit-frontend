@@ -117,7 +117,7 @@ describe('lvm_retake_error', () => {
 			}
 		}
 		expect(es.lvm_retake_error(es.lv_needs_stem)).toBe(
-			'Falló la retoma. Para capturar imágenes de este volumen, primero hay que asignarle una raíz. Se conservó la imagen original.'
+			'No se pudo volver a capturar el registro. Para capturar imágenes de este volumen, primero hay que asignarle una raíz. Se conservaron las imágenes originales.'
 		);
 	});
 });

@@ -796,16 +796,16 @@ export const es = {
 	lv_err_no_volume: 'Elige un volumen antes de capturar',
 	lv_err_volume_not_found: 'Este volumen ya no está en el catálogo',
 	lv_err_record_not_found: 'Este registro ya no está en el catálogo',
-	lv_err_retake_volume: 'Un registro solo se puede volver a capturar en su propio volumen',
+	lv_err_retake_volume: 'Un registro solo se puede volver a capturar desde el volumen al que pertenece',
 	lv_err_retake_mode: (mode: 'single' | 'dual') =>
 		mode === 'dual'
 			? 'Este registro se capturó con dos cámaras; para volver a capturarlo, elige "Dos cámaras"'
 			: 'Este registro se capturó con una cámara; para volver a capturarlo, elige "Una cámara"',
 	lv_err_camera_not_connected: (n: number) => `La cámara ${n} no está conectada`,
 	lv_err_numbers_taken:
-		'Captua no capturó nada: los próximos números de captura de este volumen ya están en archivos del disco; avisa a quien administra el equipo',
-	lv_err_resolution_in_name: 'Captua no puede poner la resolución en el nombre de archivo de una captura',
-	lv_err_name_too_long: 'Captua no capturó nada: el nombre de archivo de esta captura tendría más de 36 caracteres',
+		'Captua no hizo la captura: ya hay archivos en el disco con los próximos números de captura de este volumen; avisa a quien administra el equipo',
+	lv_err_resolution_in_name: 'Captua no puede incluir la resolución en el nombre de archivo de las capturas',
+	lv_err_name_too_long: 'Captua no hizo la captura: el nombre de archivo tendría más de 36 caracteres',
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
 	lv_zoom_out: 'Alejar',
@@ -816,11 +816,11 @@ export const es = {
 	tb_back: 'Volver',
 	tb_current_user: 'Usuario actual',
 	lvm_retake: 'Volver a capturar',
-	lvm_retake_confirm: '¿Volver a capturar este registro? Captua conserva las imágenes actuales como versiones anteriores.',
+	lvm_retake_confirm: '¿Volver a capturar este registro? Captua guardará las imágenes actuales como versiones anteriores.',
 	lvm_retaking: 'Capturando imagen de reemplazo…',
 	// `message` es una frase propia, con o sin punto final.
 	lvm_retake_error: (message: string) =>
-		`Falló la retoma. ${message.endsWith('.') ? message : `${message}.`} Se conservó la imagen original.`,
+		`No se pudo volver a capturar el registro. ${message.endsWith('.') ? message : `${message}.`} Se conservaron las imágenes originales.`,
 
 	// ── Copia externa del catálogo (NEH-266) ─────────────────────────────────
 	// `day` dice si la copia es de hoy, de ayer o anterior, en la hora local;
