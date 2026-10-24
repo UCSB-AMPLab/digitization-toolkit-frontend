@@ -38,6 +38,9 @@
     selectedRecordId,
     zoom,
     rotation,
+    brightness = 0,
+    contrast = 0,
+    saturation = 0,
     onPrev,
     onNext,
     onZoomChange,
@@ -48,6 +51,10 @@
     selectedRecordId: number | null;
     zoom: number;
     rotation: number;
+    // Ajustes de previsualización, de -100 a 100 (ver LeftSidebar).
+    brightness?: number;
+    contrast?: number;
+    saturation?: number;
     onPrev: () => void;
     onNext: () => void;
     onZoomChange: (z: number) => void;
@@ -213,6 +220,22 @@
     dragPointerId = null;
   }
 
+  // Los tres deslizadores del panel, traducidos a un filtro CSS. Es sólo
+  // previsualización: no toca el archivo.
+  //
+  // El mapeo es el mismo para los tres, -100..100 a 0..2, y el 0 da la
+  // identidad para que soltarlos devuelva la imagen tal como la entregó la
+  // cámara. Se eligió simétrico y predecible a propósito: esto no sirve para
+  // retocar una foto sino para sacarle detalle a un folio velado o de tinta
+  // desvaída, y el rango correcto para eso sólo se sabe mirando escaneos de
+  // verdad. El cuarto inferior del brillo es casi negro y poco útil; se deja
+  // alcanzable en vez de meter una curva que nadie pueda razonar después.
+  let filtro = $derived(
+    brightness === 0 && contrast === 0 && saturation === 0
+      ? ''
+      : `filter: brightness(${1 + brightness / 100}) contrast(${1 + contrast / 100}) saturate(${1 + saturation / 100});`
+  );
+
   function spreadImageStyle(rotation: number, scale: number, pixelPan: Pan, containerW: number, containerH: number): string {
     const transition = dragSide === null ? 'transition: transform 0.15s ease;' : '';
     const transformStr = transformFor(pixelPan, scale, rotation);
@@ -220,9 +243,9 @@
       // La caja intercambiada (containerH x containerW) es más ancha que el
       // 100% del panel sin rotar — hay que anular max-width/max-height
       // (heredados de .spread-image) o los recortan de vuelta.
-      return `${transition} position: absolute; top: 50%; left: 50%; width: ${containerH}px; height: ${containerW}px; max-width: none; max-height: none; transform: translate(-50%, -50%) ${transformStr};`;
+      return `${transition} ${filtro} position: absolute; top: 50%; left: 50%; width: ${containerH}px; height: ${containerW}px; max-width: none; max-height: none; transform: translate(-50%, -50%) ${transformStr};`;
     }
-    return `${transition} transform: ${transformStr};`;
+    return `${transition} ${filtro} transform: ${transformStr};`;
   }
 </script>
 

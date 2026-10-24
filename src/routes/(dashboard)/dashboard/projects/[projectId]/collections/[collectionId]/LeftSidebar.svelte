@@ -38,6 +38,9 @@
     currentIndex,
     totalRecords,
     userRole = null,
+    brightness = $bindable(0),
+    contrast = $bindable(0),
+    saturation = $bindable(0),
     onRotateLeft,
     onRotateRight,
     onRecordUpdated,
@@ -48,6 +51,13 @@
     currentIndex: number;
     totalRecords: number;
     userRole?: string | null;
+    // Ajustes de previsualización, de -100 a 100. Son del padre porque el
+    // visor también los necesita: el panel sólo los mueve. No tocan el
+    // archivo — se aplican como filtro CSS sobre la imagen en pantalla,
+    // igual que rotar.
+    brightness?: number;
+    contrast?: number;
+    saturation?: number;
     onRotateLeft: () => void;
     onRotateRight: () => void;
     // Puede ser async (loadRecords lo es) — confirmPendingAction lo espera
@@ -85,9 +95,6 @@
   }
 
   // Valores de sliders de Preview Controls (-100 a 100)
-  let brightness = $state(0);
-  let contrast = $state(0);
-  let saturation = $state(0);
 
   // Anotaciones: persistidas en el backend, escopadas al record actual
   let annotations = $state<RecordAnnotation[]>([]);
@@ -629,7 +636,14 @@
                   </svg>
                   <span>{$m.col_brightness}</span>
                 </div>
-                <span class="slider-val">{brightness > 0 ? `+${brightness}` : brightness}</span>
+                <button
+                  class="slider-val"
+                  class:is-set={brightness !== 0}
+                  disabled={brightness === 0}
+                  onclick={() => (brightness = 0)}
+                  title={$m.col_slider_reset}
+                  aria-label={$m.col_slider_reset}
+                >{brightness > 0 ? `+${brightness}` : brightness}</button>
               </div>
               <!-- El gradiente del slider refleja el porcentaje actual -->
               <input type="range" min="-100" max="100" bind:value={brightness}
@@ -646,7 +660,14 @@
                   </svg>
                   <span>{$m.col_contrast}</span>
                 </div>
-                <span class="slider-val">{contrast > 0 ? `+${contrast}` : contrast}</span>
+                <button
+                  class="slider-val"
+                  class:is-set={contrast !== 0}
+                  disabled={contrast === 0}
+                  onclick={() => (contrast = 0)}
+                  title={$m.col_slider_reset}
+                  aria-label={$m.col_slider_reset}
+                >{contrast > 0 ? `+${contrast}` : contrast}</button>
               </div>
               <input type="range" min="-100" max="100" bind:value={contrast}
                 style="background: linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) {((contrast+100)/200)*100}%, var(--color-surface) {((contrast+100)/200)*100}%, var(--color-surface) 100%)"
@@ -662,7 +683,14 @@
                   </svg>
                   <span>{$m.col_saturation}</span>
                 </div>
-                <span class="slider-val">{saturation > 0 ? `+${saturation}` : saturation}</span>
+                <button
+                  class="slider-val"
+                  class:is-set={saturation !== 0}
+                  disabled={saturation === 0}
+                  onclick={() => (saturation = 0)}
+                  title={$m.col_slider_reset}
+                  aria-label={$m.col_slider_reset}
+                >{saturation > 0 ? `+${saturation}` : saturation}</button>
               </div>
               <input type="range" min="-100" max="100" bind:value={saturation}
                 style="background: linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) {((saturation+100)/200)*100}%, var(--color-surface) {((saturation+100)/200)*100}%, var(--color-surface) 100%)"
@@ -1134,12 +1162,33 @@
     color: var(--color-light-grey);
   }
 
+  /* La cifra es el botón de reiniciar ese deslizador: tocarla lo devuelve a
+     cero. Se hizo así y no con un botón aparte porque son tres, el panel es
+     angosto y en el táctil cada botón propio costaría 44px de alto. Mientras
+     el deslizador está en cero no hay nada que reiniciar y queda inerte. */
   .slider-val {
+    min-width: 44px;
+    min-height: 32px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: none;
+    font-family: monospace;
     font-size: var(--text-xs);
     color: var(--color-light-grey);
-    font-family: monospace;
-    min-width: 28px;
     text-align: right;
+    cursor: default;
+    transition: all var(--transition-fast);
+  }
+  .slider-val.is-set {
+    cursor: pointer;
+    color: var(--color-light);
+    border-color: var(--border-color);
+  }
+  .slider-val.is-set:hover,
+  .slider-val.is-set:focus-visible {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
   }
 
   .slider-group input[type="range"] {

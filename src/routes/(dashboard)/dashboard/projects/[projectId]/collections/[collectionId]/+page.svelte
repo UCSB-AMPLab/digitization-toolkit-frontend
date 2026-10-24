@@ -52,6 +52,13 @@
   let records          = $state<Record[]>([]);
   let zoom             = $state(1);
   let rotation         = $state(0);
+  // Ajustes de previsualización del panel izquierdo, de -100 a 100. Viven
+  // aquí y no en el panel porque el visor también los necesita; el panel
+  // sólo los mueve. No alteran el archivo: el visor los aplica como filtro
+  // CSS sobre la imagen, igual que la rotación.
+  let brightness       = $state(0);
+  let contrast         = $state(0);
+  let saturation       = $state(0);
   let isLoading        = $state(true);
   // Primera carga terminada. Las recargas vuelven a poner isLoading, y los
   // controles de envío no deben desmontarse a mitad de un envío.
@@ -147,6 +154,20 @@
   }
 
   function handleSelect(id: number) { selectedRecordId = id; }
+
+  // Al pasar de folio se endereza la vista, y sólo eso. Rotar es del folio:
+  // una página concreta puede haber quedado de lado y la siguiente no. La
+  // exposición, en cambio, es de la sesión --- la misma lámpara y los mismos
+  // ajustes durante toda la jornada --- así que un volumen parejo de oscuro
+  // se corrige una vez y se revisa entero así, sin tocar nada más.
+  //
+  // Va en un efecto y no en handlePrev/handleNext/handleSelect porque la
+  // selección también cambia desde la cuadrícula y desde la lista, y repartir
+  // el reinicio en cinco sitios es cómo se consigue que uno se olvide.
+  $effect(() => {
+    selectedRecordId;
+    rotation = 0;
+  });
 
   function handleViewModeChange(mode: 'list' | 'spread' | 'grid') {
     viewMode = mode;
@@ -365,6 +386,9 @@
         currentIndex={selectedIndex}
         totalRecords={records.length}
         userRole={$userRole}
+        bind:brightness
+        bind:contrast
+        bind:saturation
         onRotateLeft={handleRotateLeft}
         onRotateRight={handleRotateRight}
         onRecordUpdated={async () => { await loadRecords(); }}
@@ -408,6 +432,9 @@
           {selectedRecordId}
           {zoom}
           {rotation}
+          {brightness}
+          {contrast}
+          {saturation}
           onPrev={handlePrev}
           onNext={handleNext}
           onZoomChange={(z) => zoom = z}

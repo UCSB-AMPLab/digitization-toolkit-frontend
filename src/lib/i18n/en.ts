@@ -621,6 +621,7 @@ export const en: Messages = {
 	col_rotate: 'Rotate',
 	col_rotate_left: 'Left',
 	col_rotate_right: 'Right',
+	col_slider_reset: 'Reset to zero',
 	col_brightness: 'Brightness',
 	col_contrast: 'Contrast',
 	col_saturation: 'Saturation',

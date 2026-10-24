@@ -542,7 +542,7 @@
     </button>
   </div>
 
-  <!-- Búsqueda + Filtros -->
+  <!-- Búsqueda -->
   <div class="toolbar">
     <div class="search-wrapper">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
@@ -550,12 +550,6 @@
       </svg>
       <input type="text" placeholder={$m.proj_search_placeholder} bind:value={searchQuery} class="search-input" />
     </div>
-    <button class="btn-ghost">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-      </svg>
-      {$m.common_filters}
-    </button>
   </div>
 
   <!-- Tabla de colecciones -->
