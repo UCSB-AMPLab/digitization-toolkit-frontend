@@ -109,4 +109,3 @@ describe('collection page: reload after a change in what is freed', () => {
 		await expect.poll(() => screen.container.ownerDocument.querySelector('.img-viewer-title')).toBeNull();
 	});
 });
-
