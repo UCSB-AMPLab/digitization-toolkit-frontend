@@ -43,7 +43,7 @@
 	});
 
 	$effect(() => {
-		if (refresh > 0) untrack(() => poller?.pollNow());
+		if (refresh > 0) untrack(() => poller?.pollFresh());
 	});
 
 	$effect(() => {

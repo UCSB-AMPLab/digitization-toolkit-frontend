@@ -563,4 +563,35 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await expect.poll(() => cards().length).toBe(0);
 		deleteSpy.mockRestore();
 	});
+	// After a free or a restore the page reloads its records in place
+	// (NEH-248), so the sidebar receives a new object for the same record.
+	it('a refresh that hands over the same record as a new object keeps an unsaved note and selected reasons', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ id: 1 }) }));
+		await openAnnotationsTab(screen);
+		await openNoteCard(screen);
+		await screen.getByPlaceholder('Agrega un comentario (opcional)...').fill('a medio escribir');
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+
+		await screen.rerender(baseProps({ currentRecord: makeRecord({ id: 1 }) }));
+		await new Promise((r) => setTimeout(r, 0));
+
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).toHaveValue('a medio escribir');
+		for (const listo of screen.getByRole('button', { name: 'Listo' }).all()) {
+			await expect.element(listo).not.toBeDisabled();
+		}
+		expect(getAnnotationsSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it('moving to another record still clears the unsaved note', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ id: 1 }) }));
+		await openAnnotationsTab(screen);
+		await openNoteCard(screen);
+		await screen.getByPlaceholder('Agrega un comentario (opcional)...').fill('a medio escribir');
+
+		await screen.rerender(baseProps({ currentRecord: makeRecord({ id: 2 }) }));
+
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).not.toBeInTheDocument();
+		await expect.poll(() => getAnnotationsSpy.mock.calls.length).toBe(2);
+	});
 });

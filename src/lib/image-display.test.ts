@@ -8,6 +8,7 @@ import {
   freedFromMetadata,
   isBrowserDisplayable,
   isRawImage,
+  previewFreedByMetadata,
   probeFreed,
   type ImageUrlSource,
 } from './image-display';
@@ -236,5 +237,22 @@ describe('freedFromMetadata', () => {
   it('is null for a format with a preview: the 410 of /preview decides there', () => {
     expect(freedFromMetadata({ format: 'jpg', filename: 'a.jpg', master_freed_at: '2026-10-20T14:03:00' })).toBeNull();
     expect(freedFromMetadata({ format: 'cr2', filename: 'a.cr2', master_freed_at: '2026-10-20T14:03:00', preview_freed_at: '2026-10-20T14:03:00' })).toBeNull();
+  });
+});
+
+describe('previewFreedByMetadata', () => {
+  const t = '2026-10-20T14:03:00';
+  it('a JPEG, PNG or WebP whose master is freed: its /preview is the master', () => {
+    expect(previewFreedByMetadata({ format: 'jpg', filename: 'a.jpg', master_freed_at: t })).toBe(true);
+    expect(previewFreedByMetadata({ format: 'webp', filename: 'a.webp', master_freed_at: null })).toBe(false);
+  });
+
+  it('a RAW: only a freed preview, not a freed master alone', () => {
+    expect(previewFreedByMetadata({ format: 'cr2', filename: 'a.cr2', preview_freed_at: t })).toBe(true);
+    expect(previewFreedByMetadata({ format: 'cr2', filename: 'a.cr2', master_freed_at: t })).toBe(false);
+  });
+
+  it('a format with no preview, such as TIFF: never', () => {
+    expect(previewFreedByMetadata({ format: 'tif', filename: 'a.tif', master_freed_at: t })).toBe(false);
   });
 });

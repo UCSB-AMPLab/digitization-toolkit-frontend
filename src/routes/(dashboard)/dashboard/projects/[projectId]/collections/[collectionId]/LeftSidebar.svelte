@@ -144,8 +144,13 @@
     return merged.filter(a => !deletedIds.has(a.id)).sort(byNewest);
   }
 
+  // Keyed on the id, not the object: after a free or a restore (NEH-248) the
+  // page reloads its records in place and passes a new object for the same
+  // record, which must not erase a note or reasons the operator has not saved.
+  const currentRecordId = $derived(currentRecord?.id ?? null);
+
   $effect(() => {
-    const recordId = currentRecord?.id ?? null;
+    const recordId = currentRecordId;
     annotations = [];
     annotationsError = null;
     noteText = '';

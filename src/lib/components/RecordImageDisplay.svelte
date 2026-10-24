@@ -37,6 +37,7 @@
     isBrowserDisplayable,
     isRawImage,
     freedFromMetadata,
+    previewFreedByMetadata,
     probeFreed,
     type FreedFile,
     type MasterCheck,
@@ -45,10 +46,14 @@
   let {
     image,
     children,
+    onMasterFreed,
   }: {
     image: Pick<RecordImage, 'id' | 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>;
     /** Pinta el <img>: recibe la URL a mostrar y el handler de error. */
     children: Snippet<[string, () => void]>;
+    /** Told whether a 410 has said the master itself is freed, whatever the
+     *  record's master_freed_at says; a freed RAW preview does not count. */
+    onMasterFreed?: (freed: boolean) => void;
   } = $props();
 
   // Solo se vuelve a resolver si cambia la imagen, no cada vez que el padre
@@ -92,6 +97,27 @@
   });
 
   $effect(() => () => probes?.abort());
+
+  // When the record says /preview is freed but the <img> may still hold the
+  // preview it loaded (the URL does not change on an in-place reload), ask
+  // /preview again past the browser's cache, and on its 410 move on to the
+  // thumbnail. The 410 decides, as in handleError.
+  $effect(() => {
+    const first = candidates[0];
+    if (!first || first.kind === 'thumbnail' || !untrack(() => previewFreedByMetadata(image))) return;
+    probes ??= new AbortController();
+    const signal = probes.signal;
+    const noStore: typeof fetch = (u, init) => fetch(u, { ...init, cache: 'no-store' });
+    probeFreed(first.url, noStore, signal).then((f) => {
+      if (!f || signal.aborted) return;
+      freed = f;
+      if (index === 0) index = 1;
+    });
+  });
+
+  $effect(() => {
+    onMasterFreed?.(freed?.kind === 'capture' || master === 'freed');
+  });
 
   const current = $derived(index < candidates.length ? candidates[index] : null);
 

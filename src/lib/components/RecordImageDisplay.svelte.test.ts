@@ -387,3 +387,96 @@ describe('gallery modal — download link of a freed master (NEH-248)', () => {
     previewSpy.mockRestore();
   });
 });
+
+// An in-place reload after a free (NEH-248) marks an image freed while its
+// /preview is already on screen. The URL does not change, so the <img> keeps
+// the image it loaded and fires no error: /preview has to be asked again.
+describe('gallery modal — a displayed preview freed by an in-place reload (NEH-248)', () => {
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  let thumbSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  const freedAt = '2026-10-20T14:03:00';
+
+  beforeEach(() => {
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
+  });
+  afterEach(() => {
+    previewSpy.mockRestore();
+    thumbSpy.mockRestore();
+    fetchSpy.mockRestore();
+  });
+
+  async function freeInPlace(before: RecordImage, after: RecordImage, kind: 'capture' | 'preview') {
+    const screen = render(GalleryModal, { record: makeRecord([before]), onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
+    fetchSpy.mockImplementation(() => Promise.resolve(freed410(kind)));
+    await screen.rerender({ record: makeRecord([after]) });
+    return screen;
+  }
+
+  it('a JPEG master: moves to the thumbnail with the panel, asking /preview past the cache', async () => {
+    const jpg = { format: 'jpg', filename: 'f.jpg' };
+    const screen = await freeInPlace(makeImage(jpg), makeImage({ ...jpg, master_freed_at: freedAt }), 'capture');
+
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
+    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+    expect(fetchSpy).toHaveBeenCalledWith(PREVIEW_URL, expect.objectContaining({ cache: 'no-store' }));
+    expect(screen.container.querySelector('a.img-viewer-download')).toBeNull();
+  });
+
+  it('a RAW preview: moves to the thumbnail with the panel, and keeps the master download', async () => {
+    const screen = await freeInPlace(makeImage(), makeImage({ preview_freed_at: freedAt }), 'preview');
+
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
+    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+    expect(screen.container.querySelector('a.img-viewer-download')).not.toBeNull();
+  });
+
+  it('a RAW master freed with its preview kept: the preview stays, no panel', async () => {
+    const screen = await freeInPlace(makeImage(), makeImage({ master_freed_at: freedAt }), 'capture');
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
+    expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
+  });
+});
+
+// The records can be older than a free (one run elsewhere, say), so the 410
+// can say a master is freed while the cached master_freed_at does not.
+describe('gallery modal — download of a master the 410 says is freed (NEH-248)', () => {
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  let thumbSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(BROKEN);
+    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+  });
+  afterEach(() => {
+    previewSpy.mockRestore();
+    thumbSpy.mockRestore();
+    fetchSpy.mockRestore();
+  });
+
+  function renderWith(kind: 'capture' | 'preview', image: RecordImage) {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(freed410(kind)));
+    return render(GalleryModal, { record: makeRecord([image]), onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
+  }
+
+  it('a JPEG whose /preview answers a master 410: the panel, and no download', async () => {
+    const screen = renderWith('capture', makeImage({ format: 'jpg', filename: 'f.jpg' }));
+
+    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+    await expect.poll(() => screen.container.querySelector('a.img-viewer-download')).toBeNull();
+  });
+
+  it('a RAW whose /preview answers a preview 410: the panel, and the master download stays', async () => {
+    const screen = renderWith('preview', makeImage());
+
+    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.container.querySelector('a.img-viewer-download')).not.toBeNull();
+  });
+});
