@@ -415,8 +415,8 @@ export const es = {
 	pd_err_delete_has_subvolumes: 'Este volumen no se puede eliminar porque todavía contiene otros volúmenes.',
 	pd_err_move_under_review: (n: number) =>
 		n === 1
-			? 'Un registro de este volumen está en revisión, así que no se puede mover. Primero retira el volumen de revisión con "Retirar de revisión".'
-			: `${n} registros de este volumen están en revisión, así que no se pueden mover. Primero retira el volumen de revisión con "Retirar de revisión".`,
+			? 'Un registro de este volumen está en revisión, así que no se puede mover. Primero retira el volumen con "Retirar de revisión".'
+			: `Hay ${n} registros de este volumen en revisión, así que no se pueden mover. Primero retira el volumen con "Retirar de revisión".`,
 	pd_err_delete_not_empty: 'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
 	pd_member_implicit: 'Acceso implícito (no se puede eliminar)',
 	pd_member_remove: 'Eliminar colaborador',
