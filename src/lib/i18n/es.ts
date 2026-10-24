@@ -813,7 +813,7 @@ export const es = {
 	tb_back: 'Volver',
 	tb_current_user: 'Usuario actual',
 	lvm_retake: 'Volver a capturar',
-	lvm_retake_confirm: '¿Eliminar imágenes actuales y volver a capturar este registro?',
+	lvm_retake_confirm: '¿Volver a capturar este registro? Captua conserva las imágenes actuales como versiones anteriores.',
 	lvm_retaking: 'Capturando imagen de reemplazo…',
 	lvm_retake_error: (message: string) => `Falló la retoma: ${message}. Se conservó la imagen original.`,
 

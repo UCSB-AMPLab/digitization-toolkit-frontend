@@ -783,7 +783,7 @@ export const en: Messages = {
 	tb_back: 'Back',
 	tb_current_user: 'Current user',
 	lvm_retake: 'Retake',
-	lvm_retake_confirm: 'Delete the current images and recapture this record?',
+	lvm_retake_confirm: 'Retake this record? Captua keeps the current images as earlier versions.',
 	lvm_retaking: 'Capturing replacement image…',
 	lvm_retake_error: (message: string) => `Retake failed: ${message}. The original image was kept.`,
 
