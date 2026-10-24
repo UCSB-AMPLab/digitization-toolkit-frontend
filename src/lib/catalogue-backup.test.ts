@@ -324,6 +324,53 @@ describe('startPolling', () => {
 		stop();
 	});
 
+	it('pollFresh while a request is in flight asks again as soon as it settles', async () => {
+		let resolveFirst!: (s: CatalogueBackupStatus) => void;
+		const fetcher = vi
+			.fn<(signal: AbortSignal) => Promise<CatalogueBackupStatus>>()
+			.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)))
+			.mockResolvedValue(status(2 * HOUR));
+		const onResult = vi.fn();
+		const stop = startPolling(fetcher, onResult);
+		stop.pollFresh();
+		stop.pollFresh();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+
+		resolveFirst(status(HOUR));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		expect(onResult).toHaveBeenLastCalledWith({ ok: true, status: status(2 * HOUR) });
+
+		// Then back on the interval, with no third request queued.
+		await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS - 1);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(fetcher).toHaveBeenCalledTimes(3);
+		stop();
+	});
+
+	it('pollFresh when idle asks at once, like pollNow', async () => {
+		const fetcher = vi.fn().mockResolvedValue(status(HOUR));
+		const stop = startPolling(fetcher, vi.fn());
+		await vi.advanceTimersByTimeAsync(60 * SECOND);
+		stop.pollFresh();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		stop();
+	});
+
+	it('a pollFresh queued behind a request is dropped when polling stops', async () => {
+		let resolveFirst!: (s: CatalogueBackupStatus) => void;
+		const fetcher = vi.fn(() => new Promise<CatalogueBackupStatus>((r) => (resolveFirst = r)));
+		const stop = startPolling(fetcher, vi.fn());
+		stop.pollFresh();
+		stop();
+		resolveFirst(status(HOUR));
+		await vi.advanceTimersByTimeAsync(10 * POLL_INTERVAL_MS);
+		expect(fetcher).toHaveBeenCalledTimes(1);
+	});
+
 	it('pollNow does nothing once stopped', async () => {
 		const fetcher = vi.fn().mockResolvedValue(status(HOUR));
 		const stop = startPolling(fetcher, vi.fn());

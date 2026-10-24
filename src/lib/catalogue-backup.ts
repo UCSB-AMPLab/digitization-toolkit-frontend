@@ -154,7 +154,9 @@ export type PollResult<T = CatalogueBackupStatus> = { ok: true; status: T } | { 
  * The returned function's `pollNow()` asks at once instead of waiting for the
  * timer (after the machine wakes, when the timer may be far off). It does
  * nothing while a request is in flight or after polling has stopped, and the
- * interval restarts from that request's answer.
+ * interval restarts from that request's answer. `pollFresh()` is for a caller
+ * that knows the state has just changed: while a request is in flight it asks
+ * again as soon as that one settles, instead of doing nothing.
  */
 export function startPolling<T = CatalogueBackupStatus>(
 	fetcher: (signal: AbortSignal) => Promise<T>,
@@ -162,10 +164,12 @@ export function startPolling<T = CatalogueBackupStatus>(
 	intervalMs: number = POLL_INTERVAL_MS,
 	shouldStop: (error: unknown) => boolean = () => false,
 	timeoutMs: number = REQUEST_TIMEOUT_MS
-): (() => void) & { pollNow: () => void } {
+): (() => void) & { pollNow: () => void; pollFresh: () => void } {
 	let stopped = false;
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	let inFlight: AbortController | null = null;
+	// A pollFresh made while a request was in flight: ask again once it settles.
+	let freshQueued = false;
 
 	const tick = async () => {
 		timer = null;
@@ -198,6 +202,11 @@ export function startPolling<T = CatalogueBackupStatus>(
 			stopped = true;
 			return;
 		}
+		if (freshQueued) {
+			freshQueued = false;
+			tick();
+			return;
+		}
 		timer = setTimeout(tick, intervalMs);
 	};
 
@@ -213,5 +222,16 @@ export function startPolling<T = CatalogueBackupStatus>(
 		if (timer !== null) clearTimeout(timer);
 		tick();
 	};
-	return Object.assign(stop, { pollNow });
+	// Like pollNow, but an answer to a request already in flight may predate
+	// what the caller knows changed (a job that just ended), so the request is
+	// made again once that one settles instead of being skipped.
+	const pollFresh = () => {
+		if (stopped) return;
+		if (inFlight !== null) {
+			freshQueued = true;
+			return;
+		}
+		pollNow();
+	};
+	return Object.assign(stop, { pollNow, pollFresh });
 }
