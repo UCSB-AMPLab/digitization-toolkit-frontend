@@ -991,7 +991,7 @@ export const en: Messages = {
 	offsite_err_no_read_remote:
 		'This scanner is not set up to restore: it needs read access to the offsite copy. Ask whoever installed the scanner to set it up.',
 	offsite_err_not_in_own_folder:
-		"Some of this volume's files are not yet in the volume's own folder, so Captua cannot free or restore them. Captua moves them there at startup: restart the scanner and try again. If Captua still cannot free or restore them after the restart, the reason is in the backend's log.",
+		"Some of this volume's files are not yet in the volume's own folder, so Captua cannot free or restore them. Captua moves them there at startup: restart the scanner and try again. If Captua still cannot free or restore them after the restart, tell an administrator.",
 	offsite_err_job_running: 'Captua is already freeing or restoring files of this volume. Wait for it to finish.',
 	offsite_err_drive_unavailable:
 		'The storage drive set for projects is not available. Connect and activate it, or go back to internal storage, then try again.',
