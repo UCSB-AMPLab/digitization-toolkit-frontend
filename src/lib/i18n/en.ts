@@ -410,7 +410,7 @@ export const en: Messages = {
 	pd_move_hint_selected: 'The records will be moved to the selected volume before deleting.',
 	pd_delete_confirm_pre: 'Are you sure you want to delete the volume ',
 	pd_field_stem: 'FILE NAME STEM',
-	pd_ph_stem: 'e.g. co-ahr-con-t055',
+	pd_ph_stem: 'e.g. co-ahrb-aht-003',
 	pd_stem_help:
 		"The start of every file name in this volume, normally the volume's Fisqua reference code. It cannot be changed once images have been captured.",
 	pd_stem_locked:

@@ -431,7 +431,7 @@ export const es = {
 	pd_move_hint_selected: 'Los registros se moverán al volumen seleccionado antes de eliminar.',
 	pd_delete_confirm_pre: '¿Estás seguro de que quieres eliminar el volumen ',
 	pd_field_stem: 'RAÍZ',
-	pd_ph_stem: 'Ej: co-ahr-con-t055',
+	pd_ph_stem: 'Ej: co-ahrb-aht-003',
 	pd_stem_help:
 		'Es el comienzo del nombre de cada archivo de este volumen. Por lo general es el código de referencia del volumen en Fisqua. No se puede cambiar después de capturar imágenes.',
 	pd_stem_locked:
