@@ -6,7 +6,7 @@
 // Same requirements as book-view-approve-reject.test.ts: an admin account
 // in the target backend (E2E_USERNAME, E2E_PASSWORD), since the controls
 // are offered to operators and admins.
-import { test, expect, type APIRequestContext, type Page } from './fixtures';
+import { test, expect, testStem, type APIRequestContext, type Page } from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh209';
@@ -72,8 +72,8 @@ async function setup(request: APIRequestContext): Promise<Ctx> {
 	const token = await login(request);
 	const suffix = Date.now();
 	const project = await post<{ id: number }>(request, token, '/projects/', { name: `NEH-260 handover e2e ${suffix}` });
-	const ready = await post<{ id: number }>(request, token, '/collections/', { name: `Ready ${suffix}`, project_id: project.id });
-	const blocked = await post<{ id: number }>(request, token, '/collections/', { name: `Blocked ${suffix}`, project_id: project.id });
+	const ready = await post<{ id: number }>(request, token, '/collections/', { name: `Ready ${suffix}`, project_id: project.id, filename_stem: testStem() });
+	const blocked = await post<{ id: number }>(request, token, '/collections/', { name: `Blocked ${suffix}`, project_id: project.id, filename_stem: testStem() });
 	const readyRecordIds = [
 		await createRecord(request, token, ready.id, 'Folio 1', true),
 		await createRecord(request, token, ready.id, 'Folio 2', true)

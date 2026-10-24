@@ -23,6 +23,9 @@
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, projectMembersApi,
            type Project, type Collection, type ProjectMember, type UserRead } from '$lib/api';
+  import { stemProblem, stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
+  import { volumeSaveErrorText, volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
+  import VolumeStemField from './VolumeStemField.svelte';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -81,6 +84,10 @@
   let colDateEnd      = $state('');
   let colCreator      = $state('');
   let colSignatura    = $state('');
+  // The stem ("raíz", filename_stem). Required on a new volume; on an
+  // existing one it can be given once while empty, and is read-only once
+  // the volume reserves it (stem_reserved).
+  let colStem         = $state('');
   let isCreating        = $state(false);
   let createError       = $state('');
   let editingCollection = $state<Collection | null>(null);
@@ -106,6 +113,13 @@
     return false;
   }
 
+  let stemLocked = $derived(!!editingCollection?.stem_reserved);
+  // Required on a new volume and on one that already has a stem: a stem can
+  // be changed before the first capture, but never blanked. Only a volume
+  // that has never had one may be saved without it.
+  let stemRequired = $derived(!editingCollection || !!editingCollection.filename_stem);
+  let stemInvalid = $derived(!stemLocked && stemProblem(colStem, stemRequired) !== null);
+
   let dateError = $derived(
     (colDateStart && !isValidISODate(colDateStart))
       ? $m.pd_val_start_date
@@ -121,6 +135,13 @@
   // ---------------------------------------------------------------------------
   onMount(async () => {
     await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
+    // ?editVolume=<id> opens that volume's form: the capture screen links
+    // here when the volume has no stem yet.
+    const editId = Number($page.url.searchParams.get('editVolume')) || 0;
+    if (editId && canCreate) {
+      const target = collections.find(c => c.id === editId);
+      if (target) openEditCollection(target);
+    }
   });
 
   async function loadProject() {
@@ -226,7 +247,7 @@
   // Modo real: llama a collectionsApi.create() y recarga la lista.
   // ---------------------------------------------------------------------------
   async function handleCreateCollection() {
-    if (!colName.trim()) return;
+    if (!colName.trim() || stemInvalid) return;
     isCreating = true;
     createError = '';
 
@@ -238,12 +259,17 @@
       if (colSignatura.trim()) archMeta.signatura  = colSignatura.trim();
       const archivalMetadata = Object.keys(archMeta).length > 0 ? archMeta : undefined;
 
+      const stem = colStem.trim();
       if (editingCollection) {
-        // Modo edición: actualizar colección existente
+        // Modo edición: actualizar colección existente. The stem is sent
+        // only when it changed to a non-empty value, and never once it is
+        // reserved; null is never sent.
+        const stemChanged = !stemLocked && stem !== '' && stem !== (editingCollection.filename_stem ?? '');
         await collectionsApi.update(editingCollection.id, {
           name: colName.trim(),
           description: colDesc.trim() || undefined,
           archival_metadata: archivalMetadata,
+          ...(stemChanged ? { filename_stem: stem } : {}),
         });
         await loadCollections();
       } else if ($authStore.token === 'demo-token') {
@@ -257,6 +283,7 @@
           created_by: $authStore.user?.username,
           record_count: 0,
           archival_metadata: archivalMetadata,
+          filename_stem: stem,
         } as any;
         collections = [...collections, mockCollection];
       } else {
@@ -267,6 +294,7 @@
           project_id: projectId,
           created_by: $authStore.user?.username,
           archival_metadata: archivalMetadata,
+          filename_stem: stem,
         });
         await loadCollections();
       }
@@ -276,10 +304,12 @@
       colName = ''; colDesc = '';
       colDateStart = ''; colDateEnd = '';
       colCreator = ''; colSignatura = '';
+      colStem = '';
 
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      createError = $m.pd_err_create_collection(msg);
+      // Known cases have their own message, anything else a generic one; the
+      // backend's English text goes to the console only.
+      createError = volumeSaveErrorText(err, $m);
       console.error('[ProjectDetail] Error creando colección:', err);
     } finally {
       isCreating = false;
@@ -293,6 +323,7 @@
     colName = ''; colDesc = '';
     colDateStart = ''; colDateEnd = '';
     colCreator = ''; colSignatura = '';
+    colStem = '';
   }
 
   // ---------------------------------------------------------------------------
@@ -315,6 +346,10 @@
   let isDeletingCol          = $state(false);
   let deleteColError         = $state('');
   let isLoadingDeleteColInfo = $state(false);
+  // Set when the backend refused the delete because the volume still holds
+  // sub-volumes. This screen cannot move those, so the modal offers no
+  // target, the delete stays disabled, and records are never moved.
+  let deleteBlockedBySubvolumes = $state(false);
 
   $effect(() => {
     if (openColMenuId !== null) {
@@ -331,8 +366,14 @@
 
   function startEditCollection(e: MouseEvent, col: Collection) {
     e.stopPropagation();
+    openEditCollection(col);
+  }
+
+  function openEditCollection(col: Collection) {
     openColMenuId = null;
+    createError = '';
     editingCollection = col;
+    colStem      = col.filename_stem ?? '';
     colName      = col.name;
     colDesc      = col.description ?? '';
     colSignatura = col.archival_metadata?.signatura ?? '';
@@ -349,6 +390,7 @@
     deleteMoveColTarget = '';
     deleteColError = '';
     deleteColRecordCount = 0;
+    deleteBlockedBySubvolumes = false;
     showDeleteColModal = true;
     isLoadingDeleteColInfo = true;
     try {
@@ -365,23 +407,68 @@
     deletingCol = null;
     deleteMoveColTarget = '';
     deleteColError = '';
+    deleteBlockedBySubvolumes = false;
     isDeletingCol = false;
   }
 
   async function executeDeleteCol() {
-    if (!deletingCol) return;
+    if (!deletingCol || deleteRefused(deletingCol) || deleteBlockedBySubvolumes) return;
     isDeletingCol = true;
     deleteColError = '';
     try {
       if (deleteMoveColTarget !== '') {
+        // The list may be older than the volume's last capture. Moving the
+        // records out of a volume the backend then refuses to delete would
+        // leave them moved and the volume still there, so the volume is read
+        // again first and the move is skipped once it reserves its stem.
+        const fresh = await collectionsApi.get(deletingCol.id);
+        if (deleteRefused(fresh)) {
+          deletingCol = fresh;
+          isDeletingCol = false;
+          await loadCollections();
+          return;
+        }
         await collectionsApi.moveRecords(deletingCol.id, Number(deleteMoveColTarget));
       }
       await collectionsApi.delete(deletingCol.id);
       await loadCollections();
       closeDeleteColModal();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      deleteColError = $m.pd_err_delete_collection(msg);
+      const conflict = stemConflict(err);
+      if (conflict === 'stem_reserved' && deletingCol) {
+        // The backend refused: the modal switches to the reserved notice,
+        // which says why, and the delete stays disabled.
+        deletingCol = { ...deletingCol, stem_reserved: true };
+        await loadCollections();
+      } else if (isNotEmptyRefusal(err) && deletingCol) {
+        console.error('[ProjectDetail] Error eliminando volumen:', err);
+        const counts = notEmptyCounts(err);
+        if (counts && counts.subVolumes > 0) {
+          // Sub-volumes block the delete, with or without records: moving
+          // the records would not be enough, so no target is offered.
+          deleteBlockedBySubvolumes = true;
+          deleteMoveColTarget = '';
+          deleteColError = $m.pd_err_delete_has_subvolumes;
+        } else if (deleteMoveColTarget === '') {
+          // The modal opened believing the volume was empty, and it is not.
+          // The count is read again so the target select appears here.
+          try {
+            deleteColRecordCount = await recordsApi.count({ collection_id: deletingCol.id });
+          } catch (countErr) {
+            console.error('[ProjectDetail] Error obteniendo info de colección:', countErr);
+          }
+          if (deleteColRecordCount === 0) {
+            // The count could not be read, or the records left meanwhile.
+            deleteColError = volumeDeleteErrorText(err, $m);
+          }
+        } else {
+          deleteColError = volumeDeleteErrorText(err, $m);
+        }
+      } else {
+        // The backend's English text goes to the console only.
+        deleteColError = volumeDeleteErrorText(err, $m);
+        console.error('[ProjectDetail] Error eliminando volumen:', err);
+      }
       isDeletingCol = false;
     }
   }
@@ -512,8 +599,25 @@
                     </svg>
                   </div>
                   <div>
-                    <p class="col-name">{col.name}</p>
-                    <p class="col-code">{col.archival_metadata?.signatura ?? (project?.signatura ? `${project.signatura}-${String(i+1).padStart(3,'0')}` : String(i+1).padStart(3,'0'))}</p>
+                    <p class="col-name">
+                      {col.name}
+                      {#if needsStem(col)}
+                        {#if canCreate}
+                          <button
+                            type="button"
+                            class="no-stem-badge"
+                            title={$m.pd_no_stem_title}
+                            onclick={(e) => startEditCollection(e, col)}
+                          >{$m.pd_no_stem_badge}</button>
+                        {:else}
+                          <span class="no-stem-badge" title={$m.pd_no_stem_title}>{$m.pd_no_stem_badge}</span>
+                        {/if}
+                      {/if}
+                    </p>
+                    <!-- Only a signatura the volume has: no code is built from the project's or the row number. -->
+                    {#if col.archival_metadata?.signatura}
+                      <p class="col-code">{col.archival_metadata.signatura}</p>
+                    {/if}
                   </div>
                 </div>
               </td>
@@ -614,6 +718,9 @@
           />
         </div>
 
+        <!-- Raíz (filename_stem) -->
+        <VolumeStemField bind:value={colStem} locked={stemLocked} required={stemRequired} />
+
         <!-- Signatura -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_refcode}</label>
@@ -694,7 +801,7 @@
         <button
           class="btn-crear"
           onclick={handleCreateCollection}
-          disabled={isCreating || !colName.trim() || dateError !== ''}
+          disabled={isCreating || !colName.trim() || dateError !== '' || stemInvalid}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -819,7 +926,17 @@
         </button>
       </div>
 
-      {#if isLoadingDeleteColInfo}
+      {#if deleteRefused(deletingCol)}
+        <!-- The backend refuses this delete (409); nothing is moved first. -->
+        <div class="delete-warning" role="note">
+          <div class="delete-warning-icon">
+            <span class="material-symbols-outlined icon-md">lock</span>
+          </div>
+          <p class="delete-warning-body">{$m.pd_delete_stem_reserved}</p>
+        </div>
+      {:else if deleteBlockedBySubvolumes}
+        <!-- No target select: the error below says why the delete is refused. -->
+      {:else if isLoadingDeleteColInfo}
         <div class="delete-loading">
           <div class="spinner"></div>
           {$m.pd_delete_loading}
@@ -839,9 +956,11 @@
         </div>
 
         <div class="delete-move-section">
-          <label class="field-label">{$m.pd_move_label}</label>
-          <select class="field-input" bind:value={deleteMoveColTarget}>
-            <option value="">{$m.pd_move_none}</option>
+          <!-- The backend refuses to delete a volume that still has records,
+               so a target is required and the empty option is a placeholder. -->
+          <label class="field-label" for="delete-move-target">{$m.pd_move_label}</label>
+          <select id="delete-move-target" class="field-input" bind:value={deleteMoveColTarget} required aria-required="true">
+            <option value="" disabled>{$m.pd_move_none}</option>
             {#each collections.filter(c => c.id !== deletingCol!.id) as c}
               <option value={c.id}>{c.name}</option>
             {/each}
@@ -872,7 +991,9 @@
         <button
           class="btn-danger"
           onclick={executeDeleteCol}
-          disabled={isDeletingCol || isLoadingDeleteColInfo}
+          disabled={isDeletingCol || isLoadingDeleteColInfo || deleteRefused(deletingCol)
+            || deleteBlockedBySubvolumes
+            || (deleteColRecordCount > 0 && deleteMoveColTarget === '')}
         >
           <span class="material-symbols-outlined icon-sm">delete</span>
           {isDeletingCol ? $m.common_deleting : (deleteMoveColTarget !== '' ? $m.proj_move_and_delete : $m.pd_delete_collection_title)}
@@ -1085,6 +1206,21 @@
 
   .col-name { font-weight: var(--fw-semibold); color: var(--color-light); margin: 0 0 2px; }
   .col-code { font-size: 11px; color: var(--color-light-grey); margin: 0; }
+  .no-stem-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    font-family: var(--font-family);
+    font-size: 11px;
+    font-weight: var(--fw-bold);
+    color: var(--color-highlight);
+    background: rgba(225, 183, 120, 0.12);
+    border: 1px solid rgba(225, 183, 120, 0.4);
+    border-radius: var(--radius-md);
+    vertical-align: middle;
+  }
+  button.no-stem-badge { cursor: pointer; }
+  button.no-stem-badge:hover { background: rgba(225, 183, 120, 0.22); }
 
   .status-badge {
     display: inline-block;

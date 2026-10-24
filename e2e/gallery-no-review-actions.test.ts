@@ -8,7 +8,7 @@
 // target backend. Configure via env vars (falls back to the throwaway
 // `e2e_neh210` account provisioned in this dev environment):
 //   E2E_USERNAME, E2E_PASSWORD
-import { test, expect, type APIRequestContext, type Page } from './fixtures';
+import { test, expect, testStem, type APIRequestContext, type Page } from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh210';
@@ -53,7 +53,7 @@ async function setup(request: APIRequestContext): Promise<SetupResult> {
 
 	const colResp = await request.post(`${API_BASE}/collections/`, {
 		headers: authHeaders,
-		data: { name: `Gallery ${suffix}`, project_id: project.id }
+		data: { name: `Gallery ${suffix}`, project_id: project.id, filename_stem: testStem() }
 	});
 	expect(colResp.ok(), await colResp.text()).toBeTruthy();
 	const collection = await colResp.json();

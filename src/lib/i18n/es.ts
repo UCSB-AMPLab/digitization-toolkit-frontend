@@ -410,12 +410,18 @@ export const es = {
 	pd_val_end_date:
 		'Fecha de fin inválida. Acepta año (AAAA), año-mes (AAAA-MM) o fecha completa (AAAA-MM-DD).',
 	pd_val_date_range: 'La fecha de fin no puede ser anterior a la fecha de inicio.',
-	pd_err_create_collection: (msg: string) => `No se pudo crear el volumen: ${msg}`,
-	pd_err_delete_collection: (msg: string) => `No se pudo eliminar el volumen: ${msg}`,
+	pd_err_create_collection: 'No se pudo guardar el volumen. Intenta de nuevo.',
+	pd_err_delete_collection: 'No se pudo eliminar el volumen. Intenta de nuevo.',
+	pd_err_delete_has_subvolumes: 'Este volumen no se puede eliminar porque todavía contiene otros volúmenes.',
+	pd_err_move_under_review: (n: number) =>
+		n === 1
+			? 'Un registro de este volumen está en revisión, así que no se puede mover. Primero retira el volumen con "Retirar de revisión".'
+			: `Hay ${n} registros de este volumen en revisión, así que no se pueden mover. Primero retira el volumen con "Retirar de revisión".`,
+	pd_err_delete_not_empty: 'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
 	pd_member_implicit: 'Acceso implícito (no se puede eliminar)',
 	pd_member_remove: 'Eliminar colaborador',
 	pd_member_add: 'Añadir colaborador',
-	pd_member_select: '— Seleccionar usuario —',
+	pd_member_select: '— Elige un usuario —',
 	pd_member_adding: 'Añadiendo…',
 	pd_member_add_btn: 'Añadir',
 	pd_err_member_add: 'Error al añadir colaborador',
@@ -424,12 +430,28 @@ export const es = {
 	pd_delete_loading: 'Cargando información…',
 	pd_col_not_empty: 'Este volumen no está vacío',
 	pd_records_count: (n: number) => (n === 1 ? '1 registro' : `${n} registros`),
-	pd_delete_warning: 'Las imágenes asociadas se eliminarán permanentemente si no se mueven.',
-	pd_move_label: 'MOVER REGISTROS ANTES DE ELIMINAR (OPCIONAL)',
-	pd_move_none: '— Eliminar registros definitivamente —',
-	pd_move_hint_none: 'Los registros e imágenes se perderán permanentemente.',
-	pd_move_hint_selected: 'Los registros se moverán al volumen seleccionado antes de eliminar.',
+	pd_delete_warning: 'Para eliminarlo, primero muévelos a otro volumen.',
+	pd_move_label: 'MOVER LOS REGISTROS A',
+	pd_move_none: '— Elige un volumen —',
+	pd_move_hint_none: 'Elige un volumen de destino para poder eliminar este.',
+	pd_move_hint_selected: 'Los registros se moverán al volumen seleccionado antes de eliminar este volumen.',
 	pd_delete_confirm_pre: '¿Estás seguro de que quieres eliminar el volumen ',
+	pd_field_stem: 'RAÍZ',
+	pd_ph_stem: 'Ej: co-ahrb-aht-003',
+	pd_stem_help:
+		'El nombre de cada archivo de este volumen empieza con la raíz. Por lo general, es el código de referencia del volumen en Fisqua. No se puede cambiar después de capturar imágenes.',
+	pd_stem_locked:
+		'Ya se capturaron imágenes de este volumen con esta raíz, así que ya no se puede cambiar.',
+	pd_val_stem_required: 'La raíz es obligatoria.',
+	pd_val_stem_too_long: (max: number) => `La raíz no puede tener más de ${max} caracteres.`,
+	pd_val_stem_pattern:
+		'Usa solo minúsculas sin tildes ni eñe (a–z) y números. Puedes separar partes con un guion, pero sin dos guiones seguidos ni guion al comienzo o al final.',
+	pd_err_stem_taken: 'Otro volumen ya usa esta raíz.',
+	pd_err_stem_fixed: 'Ya se capturaron imágenes de este volumen, así que ya no se puede cambiar la raíz.',
+	pd_no_stem_badge: 'Sin raíz',
+	pd_no_stem_title: 'Este volumen no tiene raíz. Asígnale una antes de capturar.',
+	pd_delete_stem_reserved:
+		'Este volumen no se puede eliminar porque tiene raíz y ya tiene imágenes capturadas. Captua lo conserva para que esa raíz nunca se le asigne a otro volumen.',
 
 	// ── Espacio de trabajo de volumen (revisión) ───────────────────
 	col_back_to_project: 'Volver al proyecto',
@@ -762,7 +784,9 @@ export const es = {
 	lv_capture_key_unbindable: 'El dispositivo envió una tecla que no se puede asignar a la captura. Intenta de nuevo.',
 	lv_capture_key_space: 'Espacio',
 	lv_capture_error: 'Error al capturar',
-	lv_capture_not_ready: 'Cargando la colección…',
+	lv_capture_not_ready: 'Cargando el volumen…',
+	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
+	lv_needs_stem_link: 'Asignar la raíz',
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
 	lv_zoom_out: 'Alejar',

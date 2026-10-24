@@ -18,8 +18,10 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import '../../app.css';
 
 import LiveViewport from './LiveViewport.svelte';
-import { camerasApi, type CaptureResponse } from '$lib/api';
+import { ApiError, camerasApi, type CaptureResponse } from '$lib/api';
 import { locale } from '$lib/i18n';
+import { es } from '$lib/i18n/es';
+import { cameraStatus } from '$lib/stores/cameras';
 import { clearChord, writeChord } from '$lib/capture-key';
 
 afterEach(() => {
@@ -390,4 +392,96 @@ describe('LiveViewport — default record title (NEH-181)', () => {
       expect(dualSpy.mock.calls[0][0].record_title).toMatch(ISO_LOCAL);
     });
   }
+});
+
+describe('LiveViewport — a volume without a stem', () => {
+  beforeEach(() => {
+    locale.set('es');
+    cameraStatus.reportSuccess();
+  });
+
+  afterEach(() => {
+    clearChord();
+    cameraStatus.reportSuccess();
+    locale.set('en');
+  });
+
+  it('disables capture, says why and links to the volume form', async () => {
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({
+      needsStem: true,
+      stemFormHref: '/dashboard/projects/1?editVolume=1',
+    }));
+
+    const button = screen.container.querySelector('.capture-btn') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.title).toBe(es.lv_needs_stem);
+    const banner = screen.container.querySelector('.needs-stem-banner') as HTMLElement;
+    expect(banner.textContent).toContain(es.lv_needs_stem);
+    const link = banner.querySelector('a') as HTMLAnchorElement;
+    expect(link.textContent?.trim()).toBe(es.lv_needs_stem_link);
+    expect(link.getAttribute('href')).toBe('/dashboard/projects/1?editVolume=1');
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+    await tick();
+    expect(captureSpy).not.toHaveBeenCalled();
+  });
+
+  it('on a 409 for a volume without a stem, shows no backend text in the error banner', async () => {
+    const backend = 'This volume has no file name stem. Give it one before capturing into it.';
+    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+    const onStemRefused = vi.fn(async () => true);
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({ onStemRefused }));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect.poll(() => onStemRefused.mock.calls.length).toBe(1);
+    await tick();
+    expect(screen.container.querySelector('.capture-error-banner')).toBeNull();
+    expect(screen.container.textContent).not.toContain(backend);
+  });
+
+  it('on the 409 for a capture that names no volume, shows the catalogue error, not the backend text', async () => {
+    const backend = 'Captures must go into a volume.';
+    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+    const onStemRefused = vi.fn(async () => false);
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({ onStemRefused }));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect
+      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+      .toContain(es.lv_capture_error);
+    expect(screen.container.textContent).not.toContain(backend);
+  });
+
+  it('on the 409 for a retake into another volume, shows the catalogue error, not the backend text', async () => {
+    const backend = "A retake must go into the record's own volume.";
+    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+    const onStemRefused = vi.fn(async () => false);
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({ onStemRefused }));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect
+      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+      .toContain(es.lv_capture_error);
+    expect(screen.container.textContent).not.toContain(backend);
+  });
+
+  it('on a 409 for another reason, reports the capture error as before', async () => {
+    const backend = 'Some other conflict';
+    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, { message: backend }, 409));
+    const onStemRefused = vi.fn(async () => false);
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({ onStemRefused }));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect.poll(() => onStemRefused.mock.calls.length).toBe(1);
+    await expect
+      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+      .toContain(backend);
+  });
 });

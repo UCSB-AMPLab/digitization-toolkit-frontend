@@ -24,6 +24,7 @@
   import { cameraStatus } from '$lib/stores/cameras';
   import { m } from '$lib/i18n';
   import { seedRotation, createOrientationSaver } from '$lib/camera-orientation';
+  import { isConflict, isFixedCaptureRefusal, needsStem } from '$lib/volume-stem';
 
   import TopBar from './TopBar.svelte';
   import CameraControls from './CameraControls.svelte';
@@ -99,6 +100,14 @@
   // está guardando, y un volumen equivocado sólo se descubre después.
   let collectionName = $state<string>('');
 
+  // Whether the volume has no stem (filename_stem). The backend refuses
+  // every capture into such a volume, so the viewport disables capture and
+  // links to the volume's form, where an operator gives it one.
+  let volumeNeedsStem = $state(false);
+  let stemFormHref = $derived(projectId && collectionId
+    ? `/dashboard/projects/${projectId}?editVolume=${collectionId}`
+    : '');
+
   // Lista de registros/imágenes capturadas en esta colección
   let records = $state<ApiRecord[]>([]);
   let selectedRecordId = $state<number | null>(null);
@@ -137,7 +146,7 @@
       tasks.push(loadRecords());
       tasks.push(
         collectionsApi.get(collectionId)
-          .then(c => { collectionName = c.name; })
+          .then(c => { collectionName = c.name; volumeNeedsStem = needsStem(c); })
           .catch(e => console.error('[LivePreview] Error cargando volumen:', e))
       );
     }
@@ -211,6 +220,18 @@
     }
   }
 
+  // Reads the volume again after a capture 409, and records whether it has
+  // no stem. Resolves true when that is why the backend refused.
+  async function recheckStem(): Promise<boolean> {
+    try {
+      const c = await collectionsApi.get(collectionId);
+      volumeNeedsStem = needsStem(c);
+    } catch (e) {
+      console.error('[LivePreview] Error cargando volumen:', e);
+    }
+    return volumeNeedsStem;
+  }
+
   // ---------------------------------------------------------------------------
   // HANDLER: Retoma de un registro desde el modal de imagen
   // El backend (cameras.py, NEH-208) ya se encarga de conservar la(s)
@@ -222,6 +243,18 @@
   // auditoría — bug corregido en NEH-209).
   // ---------------------------------------------------------------------------
   async function handleRetake(record: ApiRecord) {
+    // The modal shows a thrown error's message; this one is the catalogue's.
+    if (volumeNeedsStem) throw new Error($m.lv_needs_stem);
+    try {
+      await retake(record);
+    } catch (error) {
+      if (isConflict(error) && (await recheckStem())) throw new Error($m.lv_needs_stem);
+      if (isFixedCaptureRefusal(error)) throw new Error($m.lv_capture_error);
+      throw error;
+    }
+  }
+
+  async function retake(record: ApiRecord) {
     let result;
     if (cameraMode === 'double') {
       result = await camerasApi.captureDual({
@@ -341,6 +374,9 @@
         onCaptureDone={handleCaptureDone}
         onRotateDegChange={handleRotateDegChange}
         otherModalOpen={inspectedRecord !== null}
+        needsStem={volumeNeedsStem}
+        {stemFormHref}
+        onStemRefused={recheckStem}
       />
 
       <!-- Tira de miniaturas inferior -->
