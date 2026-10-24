@@ -30,7 +30,6 @@
 
 	let username = $state(''); // valor del campo Usuario
 	let password = $state(''); // valor del campo Contraseña
-	let rememberMe = $state(false); // checkbox "Recuérdame"
 	let showPassword = $state(false); // toggle mostrar/ocultar contraseña
 
 	// ---------------------------------------------------------------------------
@@ -319,12 +318,8 @@
 				</div>
 			</div>
 
-			<!-- FILA: Recuérdame + ¿Olvidaste tu contraseña? -->
+			<!-- FILA: ¿Olvidaste tu contraseña? -->
 			<div class="row-options">
-				<label class="remember-label">
-					<input type="checkbox" class="checkbox" bind:checked={rememberMe} disabled={isLoading} />
-					<span>{$m.login_remember_me}</span>
-				</label>
 				<!-- Al hacer click abre el popup — ver handleForgotPassword() arriba -->
 				<button
 					type="button"
@@ -594,22 +589,16 @@
 	}
 
 	/* Fila recuérdame + ¿olvidaste? */
+	/* Antes esta fila tenía la casilla "Recuérdame" a la izquierda y el enlace
+	   a la derecha. La casilla se retiró porque no hacía nada (NEH-152): la
+	   sesión se guardaba igual, estuviera marcada o no. Queda sólo el enlace. */
 	.row-options {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: flex-end;
 		gap: 8px;
 	}
 
-	.remember-label {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-size: var(--text-sm);
-		color: var(--color-light-grey);
-		cursor: pointer;
-		user-select: none;
-	}
 
 	/* Link ¿Olvidaste? — abre el popup al hacer click */
 	.forgot-link {

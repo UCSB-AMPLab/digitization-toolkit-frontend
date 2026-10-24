@@ -651,6 +651,7 @@ export const es = {
 	col_rotate: 'Girar',
 	col_rotate_left: 'Izquierda',
 	col_rotate_right: 'Derecha',
+	col_slider_reset: 'Volver a cero',
 	col_brightness: 'Brillo',
 	col_contrast: 'Contraste',
 	col_saturation: 'Saturación',
