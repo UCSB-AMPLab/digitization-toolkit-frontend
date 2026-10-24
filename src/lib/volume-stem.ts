@@ -90,6 +90,16 @@ export function stemConflictText(conflict: StemConflict, msgs: Messages): string
 	}
 }
 
+// The 409 a capture or upload gets when it names no volume, identical to
+// VOLUME_REQUIRED_DETAIL in the backend's app/core/volume_stem.py. A plain
+// string detail, so ApiError carries it as its message.
+const VOLUME_REQUIRED_DETAIL = 'Captures must go into a volume.';
+
+/** Whether a capture was refused because it named no volume. */
+export function isVolumeRequired(error: unknown): boolean {
+	return isConflict(error) && error instanceof Error && error.message === VOLUME_REQUIRED_DETAIL;
+}
+
 /** Whether an error is an HTTP 409, matched by shape (ApiError carries `status`). */
 export function isConflict(error: unknown): boolean {
 	return (

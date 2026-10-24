@@ -5,6 +5,7 @@ import {
 	FILENAME_STEM_MAX_LENGTH,
 	deleteRefused,
 	isConflict,
+	isVolumeRequired,
 	needsStem,
 	stemConflict,
 	stemConflictText,
@@ -138,5 +139,18 @@ describe('isConflict, needsStem and deleteRefused', () => {
 		expect(deleteRefused({ stem_reserved: false })).toBe(false);
 		expect(deleteRefused({})).toBe(false);
 		expect(deleteRefused(null)).toBe(false);
+	});
+});
+
+describe('isVolumeRequired', () => {
+	it('recognises the 409 for a capture that names no volume by its exact text', () => {
+		expect(isVolumeRequired(new ApiError('Captures must go into a volume.', undefined, 409))).toBe(true);
+	});
+
+	it('does not take the no-stem 409 or other errors for it', () => {
+		const noStem = 'This volume has no file name stem. Give it one before capturing into it.';
+		expect(isVolumeRequired(new ApiError(noStem, undefined, 409))).toBe(false);
+		expect(isVolumeRequired(new ApiError('Captures must go into a volume.', undefined, 422))).toBe(false);
+		expect(isVolumeRequired(null)).toBe(false);
 	});
 });

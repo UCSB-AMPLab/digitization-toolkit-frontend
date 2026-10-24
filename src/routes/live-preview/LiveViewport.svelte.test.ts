@@ -430,8 +430,8 @@ describe('LiveViewport — a volume without a stem', () => {
   });
 
   it('on a 409 for a volume without a stem, shows no backend text in the error banner', async () => {
-    const backend = 'This volume has no file name stem.';
-    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, { message: backend }, 409));
+    const backend = 'This volume has no file name stem. Give it one before capturing into it.';
+    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
     const onStemRefused = vi.fn(async () => true);
     stubPreviewFetch({});
     const screen = renderViewport(baseProps({ onStemRefused }));
@@ -440,6 +440,20 @@ describe('LiveViewport — a volume without a stem', () => {
     await expect.poll(() => onStemRefused.mock.calls.length).toBe(1);
     await tick();
     expect(screen.container.querySelector('.capture-error-banner')).toBeNull();
+    expect(screen.container.textContent).not.toContain(backend);
+  });
+
+  it('on the 409 for a capture that names no volume, shows the catalogue error, not the backend text', async () => {
+    const backend = 'Captures must go into a volume.';
+    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+    const onStemRefused = vi.fn(async () => false);
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({ onStemRefused }));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect
+      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+      .toContain(es.lv_capture_error);
     expect(screen.container.textContent).not.toContain(backend);
   });
 
