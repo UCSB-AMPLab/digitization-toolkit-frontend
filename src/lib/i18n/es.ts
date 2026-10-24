@@ -433,19 +433,19 @@ export const es = {
 	pd_field_stem: 'RAÍZ',
 	pd_ph_stem: 'Ej: co-ahrb-aht-003',
 	pd_stem_help:
-		'Es el comienzo del nombre de cada archivo de este volumen. Por lo general es el código de referencia del volumen en Fisqua. No se puede cambiar después de capturar imágenes.',
+		'El nombre de cada archivo de este volumen empieza con la raíz. Por lo general, es el código de referencia del volumen en Fisqua. No se puede cambiar después de capturar imágenes.',
 	pd_stem_locked:
-		'Ya se capturaron imágenes en este volumen con esta raíz, así que la raíz no se puede cambiar.',
+		'Ya se capturaron imágenes de este volumen con esta raíz, así que ya no se puede cambiar.',
 	pd_val_stem_required: 'La raíz es obligatoria.',
 	pd_val_stem_too_long: (max: number) => `La raíz no puede tener más de ${max} caracteres.`,
 	pd_val_stem_pattern:
-		'Usa solo letras minúsculas de la a a la z y dígitos, separados por un solo guion, sin guion al comienzo ni al final.',
+		'Usa solo minúsculas sin tildes ni eñe (a–z) y números. Puedes separar partes con un guion, pero sin dos guiones seguidos ni guion al comienzo o al final.',
 	pd_err_stem_taken: 'Otro volumen ya usa esta raíz.',
-	pd_err_stem_fixed: 'Ya se capturaron imágenes en este volumen, así que su raíz no se puede cambiar.',
+	pd_err_stem_fixed: 'Ya se capturaron imágenes de este volumen, así que ya no se puede cambiar la raíz.',
 	pd_no_stem_badge: 'Sin raíz',
-	pd_no_stem_title: 'Este volumen no tiene raíz. Asígnale una para poder capturar.',
+	pd_no_stem_title: 'Este volumen no tiene raíz. Asígnale una antes de capturar.',
 	pd_delete_stem_reserved:
-		'Este volumen no se puede eliminar: tiene raíz y ya se capturaron imágenes en él. Captua lo conserva para que esa raíz no se le asigne a otro volumen.',
+		'Este volumen no se puede eliminar porque tiene raíz y ya tiene imágenes capturadas. Captua lo conserva para que esa raíz nunca se le asigne a otro volumen.',
 
 	// ── Espacio de trabajo de volumen (revisión) ───────────────────
 	col_back_to_project: 'Volver al proyecto',
@@ -779,7 +779,7 @@ export const es = {
 	lv_capture_key_space: 'Espacio',
 	lv_capture_error: 'Error al capturar',
 	lv_capture_not_ready: 'Cargando el volumen…',
-	lv_needs_stem: 'Este volumen necesita una raíz antes de capturar.',
+	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
 	lv_needs_stem_link: 'Asignar la raíz',
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
