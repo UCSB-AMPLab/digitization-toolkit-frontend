@@ -52,6 +52,7 @@
     type OwnsEventContext
   } from '$lib/capture-key';
   import { defaultRecordTitle } from '$lib/record-title';
+  import { isConflict } from '$lib/volume-stem';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -69,6 +70,9 @@
     rotateDeg = {},
     onRotateDegChange,
     otherModalOpen = false,
+    needsStem = false,
+    stemFormHref = '',
+    onStemRefused,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -86,6 +90,15 @@
     // not by this component, so its openness arrives as a prop instead of
     // local state — the capture key must not fire while it's up.
     otherModalOpen?: boolean;
+    // True while the volume has no stem (filename_stem): the backend refuses
+    // every capture into it (409), so the button is disabled and a banner
+    // links to the volume's form at stemFormHref.
+    needsStem?: boolean;
+    stemFormHref?: string;
+    // Called on a 409 from a capture. Reads the volume again and resolves
+    // true when it has no stem, in which case the page sets needsStem and the
+    // banner replaces the generic capture error.
+    onStemRefused?: () => Promise<boolean>;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -178,6 +191,8 @@
   // Listo para capturar: solo cuando projectId/collectionId ya se resolvieron
   // (evita disparar una captura desde una URL vacía/mal formada).
   const captureReady = $derived(projectId > 0 && collectionId > 0);
+  // Listo y con raíz: lo único que habilita el botón y la tecla de captura.
+  const canCapture = $derived(captureReady && !needsStem);
 
   // Referencia al contenedor del viewport (para calcular posición de guías)
   let viewportEl = $state<HTMLElement | null>(null);
@@ -512,7 +527,7 @@
   // CAPTURA
   // ---------------------------------------------------------------------------
   async function handleCapture() {
-    if (isCapturing || !captureReady) return;
+    if (isCapturing || !canCapture) return;
     isCapturing = true;
 
     try {
@@ -553,9 +568,14 @@
       onCaptureDone();
 
     } catch (error) {
+      console.error('[LiveViewport] Capture error:', error);
+      if (isConflict(error) && onStemRefused && (await onStemRefused())) {
+        // The needs-stem banner says why, in the catalogue's words; the
+        // backend's English text is not shown.
+        return;
+      }
       const msg = error instanceof Error ? error.message : $m.lv_capture_error;
       cameraStatus.reportFailure(msg);
-      console.error('[LiveViewport] Capture error:', error);
     } finally {
       isCapturing = false;
     }
@@ -597,7 +617,7 @@
     // verdad arranca una: si no, cada repetición después de la primera pasa
     // de largo hacia el botón enfocado (ronda 55).
     event.preventDefault();
-    if (shouldTrigger(event, { ...ctx, keyHeld: chordHeld, capturing: isCapturing, ready: captureReady })) {
+    if (shouldTrigger(event, { ...ctx, keyHeld: chordHeld, capturing: isCapturing, ready: canCapture })) {
       chordHeld = true;
       // Se guarda el `code` físico, no `chord.key`: es lo único que sigue
       // identificando esta tecla cuando el release llega con los
@@ -721,7 +741,15 @@
            hacerlo nunca se montó y después se eliminó. Se limpia solo con la
            siguiente captura buena (`reportSuccess`), así que no puede quedarse
            colgado a mitad de una secuencia. -->
-      {#if $cameraStatus.captureError}
+      {#if needsStem && captureReady}
+        <div class="needs-stem-banner" role="alert">
+          <span class="material-symbols-outlined icon-sm" aria-hidden="true">warning</span>
+          <span>{$m.lv_needs_stem}</span>
+          {#if stemFormHref}
+            <a class="needs-stem-link" href={stemFormHref}>{$m.lv_needs_stem_link}</a>
+          {/if}
+        </div>
+      {:else if $cameraStatus.captureError}
         <div class="capture-error-banner" role="alert">
           <span class="material-symbols-outlined icon-sm">error</span>
           <!-- `||` y no `??`: un mensaje vacío también tiene que caer al
@@ -996,8 +1024,8 @@
         class="capture-btn"
         class:capturing={isCapturing}
         onclick={handleCapture}
-        disabled={isCapturing || !captureReady}
-        title={captureReady ? undefined : $m.lv_capture_not_ready}
+        disabled={isCapturing || !canCapture}
+        title={!captureReady ? $m.lv_capture_not_ready : needsStem ? $m.lv_needs_stem : undefined}
         aria-label={$m.lv_capture_btn}
       >
         <div class="capture-ring outer"></div>
@@ -1116,6 +1144,33 @@
     border-radius: 20px;
     backdrop-filter: blur(4px);
     pointer-events: none;
+  }
+
+  /* Banner: el volumen no tiene raíz. A diferencia del de error, recibe
+     clics: lleva el enlace al formulario del volumen. */
+  .needs-stem-banner {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 80%;
+    padding: 8px 16px;
+    background: rgba(30, 30, 30, 0.94);
+    border: 1px solid var(--color-highlight);
+    color: #fff;
+    font-size: 0.8rem;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+  }
+  .needs-stem-link {
+    color: var(--color-highlight);
+    font-weight: var(--fw-bold);
+    text-decoration: underline;
+    white-space: nowrap;
   }
 
   /* Banner de reconexión */
