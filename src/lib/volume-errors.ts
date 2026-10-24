@@ -8,6 +8,7 @@
 
 import type { Messages } from './i18n';
 import { FILENAME_STEM_MAX_LENGTH, stemConflict, stemConflictText } from './volume-stem';
+import { fileHoldText, storedOffsiteCount } from './volume-refusals';
 
 // Constraint names app/core/db_errors.py reports in a 409's `constraint`.
 function constraintOf(error: unknown): unknown {
@@ -21,6 +22,8 @@ function constraintOf(error: unknown): unknown {
 export function volumeSaveErrorText(error: unknown, msgs: Messages): string {
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
+	const hold = fileHoldText(error, msgs);
+	if (hold) return hold;
 	switch (constraintOf(error)) {
 		case 'check_collection_date_range':
 			return msgs.pd_val_date_range;
@@ -64,10 +67,12 @@ export function notEmptyCounts(error: unknown): { subVolumes: number; records: n
 /**
  * How many records blocked a move because they were handed over for review:
  * the length of `blocking_record_ids` in the move-records 409 (NEH-260), or
- * null for any other error.
+ * null for any other error. The 409 for records stored offsite carries
+ * `blocking_record_ids` too, and is told apart by its text.
  */
 export function moveBlockedCount(error: unknown): number | null {
 	if (typeof error !== 'object' || error === null) return null;
+	if (storedOffsiteCount(error) !== null) return null;
 	const e = error as { status?: unknown; detail?: unknown };
 	if (e.status !== 409 || typeof e.detail !== 'object' || e.detail === null) return null;
 	const ids = (e.detail as { blocking_record_ids?: unknown }).blocking_record_ids;
@@ -78,6 +83,10 @@ export function moveBlockedCount(error: unknown): number | null {
 export function volumeDeleteErrorText(error: unknown, msgs: Messages): string {
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
+	const stored = storedOffsiteCount(error);
+	if (stored !== null) return msgs.vol_err_stored_offsite(stored);
+	const hold = fileHoldText(error, msgs);
+	if (hold) return hold;
 	const blocked = moveBlockedCount(error);
 	if (blocked !== null) return msgs.pd_err_move_under_review(blocked);
 	if (isNotEmptyRefusal(error)) {

@@ -135,10 +135,16 @@ describe('ActivityCalendar', () => {
 		expect(top(label('lun'))).not.toBe(top(document.querySelector('[data-date="2026-04-28"]')));
 	});
 
-	it('groups thousands in the day line', async () => {
+	it('groups thousands in the day line from five digits, as Spanish does', async () => {
+		dailySpy.mockResolvedValue(series({ '2026-10-22': { captured_images: 12345 } }));
+		const screen = render(ActivityCalendar);
+		await expect.element(screen.getByText('12.345 imágenes capturadas el 22 de octubre de 2026')).toBeVisible();
+	});
+
+	it('leaves four digits unseparated in the day line', async () => {
 		dailySpy.mockResolvedValue(series({ '2026-10-22': { captured_images: 1212 } }));
 		const screen = render(ActivityCalendar);
-		await expect.element(screen.getByText('1.212 imágenes capturadas el 22 de octubre de 2026')).toBeVisible();
+		await expect.element(screen.getByText('1212 imágenes capturadas el 22 de octubre de 2026')).toBeVisible();
 	});
 
 	it('does not announce the day line as a live region', async () => {

@@ -39,6 +39,7 @@
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
+  import { renumberErrorText, reorderErrorText } from '$lib/volume-refusals';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   // @ts-ignore — installed in Docker, not locally
   import { dndzone } from 'svelte-dnd-action';
@@ -54,6 +55,7 @@
     onFinalized,
     onFinalizeModalClosed,
     onRecordClick,
+    onReorderNotice,
   }: {
     records: Record[];
     collectionId: number;
@@ -65,6 +67,8 @@
     // al Book view (spread) de ese registro — el spread ya muestra L y R
     // juntos, así que no hace falta lógica especial para el caso de par.
     onRecordClick: (record: Record) => void;
+    // Why the last drag was not saved, or null once one is saved.
+    onReorderNotice?: (notice: string | null) => void;
   } = $props();
 
   // Local copy of records for DnD reordering
@@ -188,9 +192,12 @@
     localRecords = e.detail.items;
     try {
       await collectionsApi.reorderRecords(collectionId, localRecords.map(r => r.id));
+      onReorderNotice?.(null);
       onRecordsUpdate();
     } catch (err) {
       console.error('[GridView] Error reordenando:', err);
+      // The page holds the notice: the reload below unmounts this view.
+      onReorderNotice?.(reorderErrorText(err, $m));
       onRecordsUpdate(); // restore from server
     }
   }
@@ -203,7 +210,9 @@
       showRenumberModal = false;
       onRecordsUpdate();
     } catch (err) {
-      renumberError = err instanceof Error ? err.message : String(err);
+      // The backend's English text goes to the console only.
+      console.error('[GridView] Error renumerando:', err);
+      renumberError = renumberErrorText(err, $m);
     } finally {
       renumbering = false;
     }
@@ -469,7 +478,7 @@
       <h3 class="modal-title">{$m.col_renumber_modal_title}</h3>
       <p class="modal-subtitle">{$m.col_renumber_desc}</p>
       {#if renumberError}
-        <div class="modal-error-banner" role="alert" aria-live="polite">{$m.col_renumber_error(renumberError)}</div>
+        <div class="modal-error-banner" role="alert" aria-live="polite">{renumberError}</div>
       {/if}
       <div class="modal-actions">
         {#if renumbering}

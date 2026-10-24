@@ -690,6 +690,11 @@ export const collectionsApi = {
     return apiRequest(`/collections/${collectionId}/images/renumber`, { method: 'POST' });
   },
 
+  /** The volume's offsite state (NEH-227). `signal` lets the caller abort it. */
+  async getOffsiteState(collectionId: number, signal?: AbortSignal): Promise<VolumeOffsiteState> {
+    return apiRequest<VolumeOffsiteState>(`/collections/${collectionId}/offsite`, { signal });
+  },
+
   /**
    * Hand the collection over for review: every captured record becomes
    * in_review (NEH-260). Refuses with 422 if any of them still carries a
@@ -1582,6 +1587,56 @@ export interface CatalogueBackupStatus {
   last_verified_at: string | null;   // ISO 8601 datetime
   object:           string | null;
   detail:           string | null;
+  /** The image upload's unit-level summary (NEH-227); absent from an older backend. */
+  images?:          UnitImageUploadSummary;
+}
+
+/**
+ * `images` of GET /system/catalogue-backup: unit_upload_summary in
+ * app/core/image_upload.py, totals over every volume with a stem.
+ * `misconfigured` is the backend's English reason, never shown.
+ */
+export interface UnitImageUploadSummary {
+  enabled:          boolean;
+  tenant:           string | null;
+  misconfigured:    string | null;
+  volumes:          number;
+  volumes_received: number;
+  total:            number;
+  verified:         number;
+  pending:          number;
+  refused:          number;
+  last_verified_at: string | null;   // ISO 8601 datetime
+  last_run:         unknown;
+}
+
+/** One object of a volume refused because the bucket already held another file at its key. */
+export interface OffsiteRefusal {
+  image_id:    number;
+  kind:        'capture' | 'preview';
+  reason:      string | null;
+  key:         string;
+  local_sha1:  string | null;
+  remote_sha1: string | null;
+  refused_at:  string;
+}
+
+/**
+ * GET /collections/{id}/offsite: volume_upload_state in
+ * app/core/image_upload.py, the volume's received indicator. `received` is
+ * true when the volume has objects to upload and every one is verified.
+ */
+export interface VolumeOffsiteState {
+  collection_id:    number;
+  filename_stem:    string | null;
+  uploadable:       boolean;
+  total:            number;
+  verified:         number;
+  pending:          number;
+  refused:          number;
+  last_verified_at: string | null;   // ISO 8601 datetime
+  received:         boolean;
+  refusals:         OffsiteRefusal[];
 }
 
 // Apagado / reinicio del equipo.

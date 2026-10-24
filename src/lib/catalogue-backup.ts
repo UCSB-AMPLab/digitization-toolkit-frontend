@@ -140,10 +140,11 @@ export const REQUEST_TIMEOUT_MS = 20 * 1000;
  */
 export const RECLASSIFY_INTERVAL_MS = 60 * 1000;
 
-export type PollResult = { ok: true; status: CatalogueBackupStatus } | { ok: false; error: unknown };
+export type PollResult<T = CatalogueBackupStatus> = { ok: true; status: T } | { ok: false; error: unknown };
 
 /**
  * Fetch now, then again `intervalMs` after each answer, success or failure.
+ * The volume view polls its offsite state with it too (offsite-state.ts).
  * One request at a time: the next is scheduled only when the previous has
  * settled. Each request gets its own AbortSignal, aborted after `timeoutMs`
  * (the request then counts as failed) or when polling stops. Stops when
@@ -155,9 +156,9 @@ export type PollResult = { ok: true; status: CatalogueBackupStatus } | { ok: fal
  * nothing while a request is in flight or after polling has stopped, and the
  * interval restarts from that request's answer.
  */
-export function startPolling(
-	fetcher: (signal: AbortSignal) => Promise<CatalogueBackupStatus>,
-	onResult: (result: PollResult) => void,
+export function startPolling<T = CatalogueBackupStatus>(
+	fetcher: (signal: AbortSignal) => Promise<T>,
+	onResult: (result: PollResult<T>) => void,
 	intervalMs: number = POLL_INTERVAL_MS,
 	shouldStop: (error: unknown) => boolean = () => false,
 	timeoutMs: number = REQUEST_TIMEOUT_MS
@@ -174,7 +175,7 @@ export function startPolling(
 			() => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
 			timeoutMs
 		);
-		let result: PollResult;
+		let result: PollResult<T>;
 		try {
 			// Racing the abort, so a fetcher that ignores the signal still
 			// times out here.

@@ -17,6 +17,7 @@
   import { authStore } from '$lib/stores/auth';
   import { m } from '$lib/i18n';
   import UserMenu from '$lib/components/UserMenu.svelte';
+  import VolumeOffsiteIndicator from '$lib/components/VolumeOffsiteIndicator.svelte';
   import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
 
   let { children } = $props();
@@ -76,12 +77,15 @@
         <span class="material-symbols-outlined" style="font-size:20px">arrow_back</span>
       </button>
 
-      <!-- Breadcrumb -->
-      <nav class="breadcrumb" aria-label={$m.col_breadcrumb_nav}>
-        <span class="bc-item bc-project">{projectName}</span>
-        <span class="bc-sep">/</span>
-        <span class="bc-item bc-collection">{collectionName}</span>
-      </nav>
+      <!-- Breadcrumb y, debajo, la copia externa del volumen (NEH-248) -->
+      <div class="topbar-title">
+        <nav class="breadcrumb" aria-label={$m.col_breadcrumb_nav}>
+          <span class="bc-item bc-project">{projectName}</span>
+          <span class="bc-sep">/</span>
+          <span class="bc-item bc-collection">{collectionName}</span>
+        </nav>
+        <VolumeOffsiteIndicator {collectionId} />
+      </div>
     </div>
 
     <!-- Derecha: botón cámara (solo operador/admin) + avatar -->
@@ -142,6 +146,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
   }
 
   .topbar-right {

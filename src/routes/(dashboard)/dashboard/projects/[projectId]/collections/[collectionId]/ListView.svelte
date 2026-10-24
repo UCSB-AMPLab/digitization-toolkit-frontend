@@ -9,7 +9,9 @@
   // ============================================================================
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
+  import { formatCount } from '$lib/format-count';
+  import { reorderErrorText } from '$lib/volume-refusals';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
   // @ts-ignore — installed in Docker, not locally
@@ -23,11 +25,14 @@
     collectionId = 0,
     onRecordClick,
     onRecordsUpdate,
+    onReorderNotice,
   }: {
     records: Record[];
     collectionId?: number;
     onRecordClick: (record: Record) => void;
     onRecordsUpdate?: () => void;
+    // Why the last drag was not saved, or null once one is saved.
+    onReorderNotice?: (notice: string | null) => void;
   } = $props();
 
   // Local copy for DnD
@@ -41,9 +46,12 @@
     if (collectionId && onRecordsUpdate) {
       try {
         await collectionsApi.reorderRecords(collectionId, localRecords.map(r => r.id));
+        onReorderNotice?.(null);
         onRecordsUpdate();
       } catch (err) {
         console.error('[ListView] Error reordenando:', err);
+        // The page holds the notice: the reload below unmounts this view.
+        onReorderNotice?.(reorderErrorText(err, $m));
         onRecordsUpdate();
       }
     }
@@ -192,7 +200,7 @@
         </span>
 
         <!-- Número de imágenes -->
-        <span class="col-count row-count">{imgs.length}</span>
+        <span class="col-count row-count">{formatCount(imgs.length, $locale)}</span>
 
         <!-- Fecha de creación -->
         <span class="col-date row-date">{formatDate(record.created_at)}</span>

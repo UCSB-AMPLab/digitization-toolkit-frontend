@@ -25,7 +25,8 @@
 
   import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
   import { recordsApi } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
+  import { formatCount } from '$lib/format-count';
   import { REJECTION_REASONS } from '$lib/rejectionReasons';
 
   // ---------------------------------------------------------------------------
@@ -516,7 +517,7 @@
               <!-- Encabezado del registro -->
               <div class="record-overview">
                 <span class="overview-name">{currentRecord.title || '—'}</span>
-                <span class="overview-pos">{currentIndex} / {totalRecords}</span>
+                <span class="overview-pos">{formatCount(currentIndex, $locale)} / {formatCount(totalRecords, $locale)}</span>
               </div>
 
               {#if sortedImages.length === 0}
@@ -684,7 +685,7 @@
                 </svg>
                 <h3 class="panel-title" style="margin:0">{$m.col_tab_comments}</h3>
               </div>
-              <span class="annotation-count">{annotations.length}</span>
+              <span class="annotation-count">{formatCount(annotations.length, $locale)}</span>
             </div>
 
             {#if annotationsError}

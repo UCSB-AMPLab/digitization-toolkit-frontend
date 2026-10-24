@@ -9,8 +9,8 @@
 //   and the backend's `detail` as its message: the 409s for no volume, no
 //   stem, a retake into another volume and a retake of a record in review
 //   or approved (app/core/volume_stem.py), the
-//   409s for a name longer than a pair id and for numbers already on disk
-//   (app/core/capture_naming.py), the
+//   409s for a name longer than a pair id, for numbers already on disk and
+//   for a volume at its 9999-capture limit (app/core/capture_naming.py), the
 //   404s for an unknown volume or record, and the 422s for a retake in the
 //   wrong capture mode and for a resolution in the file name;
 // - a request answered 200 with `success: false`, which the capture screen
@@ -37,6 +37,11 @@ const NAME_TOO_LONG_DETAIL =
 // volume whose next capture numbers files on disk already carry.
 const NUMBERS_TAKEN_DETAIL =
 	'The next capture numbers of this volume are already taken by files on disk. Nothing was captured.';
+
+// CAPTURE_LIMIT_DETAIL in app/core/capture_naming.py: the 409 for a volume
+// whose next capture would pass its 9999th.
+const CAPTURE_LIMIT_DETAIL =
+	'This volume has reached the limit of 9999 captures. A new volume is needed. Nothing was captured.';
 
 // RESOLUTION_IN_FILENAME_DETAIL in app/core/capture_naming.py: the 422 for a
 // capture that asks for its resolution in the file name. The capture screen
@@ -95,6 +100,7 @@ export function captureErrorText(error: unknown, msgs: Messages): string {
 	if (status === 409 && error.message === RETAKE_STATUS_DETAIL) return msgs.lv_err_retake_status;
 	if (status === 409 && error.message === NAME_TOO_LONG_DETAIL) return msgs.lv_err_name_too_long;
 	if (status === 409 && error.message === NUMBERS_TAKEN_DETAIL) return msgs.lv_err_numbers_taken;
+	if (status === 409 && error.message === CAPTURE_LIMIT_DETAIL) return msgs.lv_err_capture_limit;
 	if (status === 404 && VOLUME_NOT_FOUND.test(error.message)) return msgs.lv_err_volume_not_found;
 	if (status === 404 && RECORD_NOT_FOUND.test(error.message)) return msgs.lv_err_record_not_found;
 	if (status === 422 && error.message === RESOLUTION_IN_FILENAME_DETAIL) return msgs.lv_err_resolution_in_name;

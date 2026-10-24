@@ -17,6 +17,7 @@
   import { goto } from '$app/navigation';
   import { activityApi, AuthError, type Collection, type CollectionActivity, type Project } from '$lib/api';
   import { m, locale } from '$lib/i18n';
+  import { formatCount } from '$lib/format-count';
   import {
     PIPELINE_STAGES, barSegments, groupByStage, parseApiDate,
     type BarStatus, type PipelineStage
@@ -178,7 +179,7 @@
   </div>
   {#if segs.length > 0}
     <span class="visually-hidden">
-      {#each segs as seg, i (seg.status)}{statusLabel[seg.status]}: {seg.count}{i < segs.length - 1 ? ', ' : ''}{/each}
+      {#each segs as seg, i (seg.status)}{statusLabel[seg.status]}: {formatCount(seg.count, $locale)}{i < segs.length - 1 ? ', ' : ''}{/each}
     </span>
   {/if}
 {/snippet}
@@ -260,7 +261,7 @@
                 <div class="col-title-row">
                   <span class="status-bar-dot seg-{stageStatus[stage]}" aria-hidden="true"></span>
                   <h3 id="stage-{stage}" class="col-title">{stageText[stage].title}</h3>
-                  <span class="col-count" aria-hidden="true">{cards.length}</span>
+                  <span class="col-count" aria-hidden="true">{formatCount(cards.length, $locale)}</span>
                   <span class="visually-hidden">{$m.proj_collections_count(cards.length)}</span>
                 </div>
                 <p class="col-desc">{stageText[stage].desc}</p>

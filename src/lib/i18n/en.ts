@@ -7,6 +7,8 @@
 
 import type { Messages } from './index';
 
+import { formatCount } from '../format-count';
+
 export const en: Messages = {
 	// ── Common (shared across screens) ───────────────────────────────────────
 	common_username_label: 'Username',
@@ -113,7 +115,7 @@ export const en: Messages = {
 	dash_view_board: 'Board',
 	dash_view_table: 'Table',
 	dash_col_progress: 'Progress',
-	dash_records_count: (n: number) => (n === 1 ? '1 record' : `${n} records`),
+	dash_records_count: (n: number) => (n === 1 ? '1 record' : `${formatCount(n, 'en')} records`),
 	dash_stage_capture: 'Capturing',
 	dash_stage_capture_desc: 'Volumes with records not yet in review.',
 	dash_stage_recapture: 'To recapture',
@@ -156,9 +158,9 @@ export const en: Messages = {
 	dash_cal_less: 'Less',
 	dash_cal_more: 'More',
 	dash_cal_day_captures: (n: number, date: string) =>
-		n === 1 ? `1 image captured on ${date}` : `${n.toLocaleString('en')} images captured on ${date}`,
+		n === 1 ? `1 image captured on ${date}` : `${formatCount(n, 'en')} images captured on ${date}`,
 	dash_cal_day_reviews: (n: number, date: string) =>
-		n === 1 ? `1 record reviewed on ${date}` : `${n.toLocaleString('en')} records reviewed on ${date}`,
+		n === 1 ? `1 record reviewed on ${date}` : `${formatCount(n, 'en')} records reviewed on ${date}`,
 	dash_cal_days_captures: 'Days with captures',
 	dash_cal_total_captures: 'Images captured',
 	dash_cal_days_reviews: 'Days with reviews',
@@ -240,7 +242,7 @@ export const en: Messages = {
 	config_cleaning: 'Cleaning…',
 	config_clean_tmp: 'Clean /tmp',
 	config_tmp_none: 'There were no leftover temporary files.',
-	config_tmp_deleted: (n: number) => (n === 1 ? '1 file deleted.' : `${n} files deleted.`),
+	config_tmp_deleted: (n: number) => (n === 1 ? '1 file deleted.' : `${formatCount(n, 'en')} files deleted.`),
 	config_err_clean: 'Could not delete the files.',
 	config_section_power: 'Power',
 	config_shutdown_label: 'Shut down the scanner',
@@ -338,9 +340,9 @@ export const en: Messages = {
 	proj_checking_contents: 'Checking contents…',
 	proj_not_empty: 'This project is not empty',
 	proj_contains_pre: 'It contains ',
-	proj_collections_count: (n: number) => (n === 1 ? '1 volume' : `${n} volumes`),
+	proj_collections_count: (n: number) => (n === 1 ? '1 volume' : `${formatCount(n, 'en')} volumes`),
 	proj_contains_mid: ' with ',
-	proj_images_count: (n: number) => (n === 1 ? '1 image' : `${n} images`),
+	proj_images_count: (n: number) => (n === 1 ? '1 image' : `${formatCount(n, 'en')} images`),
 	proj_delete_warning:
 		'If you delete it without moving them, all its contents will be permanently lost.',
 	proj_move_label: 'MOVE VOLUMES TO ANOTHER PROJECT (OPTIONAL)',
@@ -348,7 +350,7 @@ export const en: Messages = {
 	proj_move_hint: (n: number) =>
 		n === 1
 			? 'The volume will be moved before the project is deleted.'
-			: `The ${n} volumes will be moved before the project is deleted.`,
+			: `The ${formatCount(n, 'en')} volumes will be moved before the project is deleted.`,
 	proj_delete_confirm_pre: 'Are you sure you want to delete ',
 	proj_deleting_moving: 'Moving and deleting…',
 	proj_move_and_delete: 'Move and delete',
@@ -397,8 +399,27 @@ export const en: Messages = {
 	pd_err_move_under_review: (n: number) =>
 		n === 1
 			? 'One record in this volume is under review, so it cannot be moved. First withdraw the volume from review with "Withdraw from review".'
-			: `${n} records in this volume are under review, so they cannot be moved. First withdraw the volume from review with "Withdraw from review".`,
+			: `${formatCount(n, 'en')} records in this volume are under review, so they cannot be moved. First withdraw the volume from review with "Withdraw from review".`,
 	pd_err_delete_not_empty: 'This volume still has records. Move them to another volume before deleting it.',
+	// Refusals of a file change while another process reads the files
+	// (volume-refusals.ts).
+	vol_err_volume_busy:
+		'Records were being added to or removed from this volume when you asked for the change, so Captua changed nothing. Try again in a moment.',
+	vol_err_files_being_read:
+		'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.',
+	vol_err_files_being_read_project:
+		'Captua is preparing a file of a volume in this project for the offsite copy. Try again in a moment.',
+	vol_err_export_running: 'Captua is exporting this volume. Wait until the export is finished, then try again.',
+	vol_err_export_in_subtree:
+		'Captua is exporting this volume or a volume inside it. Wait until the export is finished, then try again.',
+	vol_err_export_in_project:
+		'Captua is exporting a volume of this project. Wait until the export is finished, then try again.',
+	vol_err_files_changing:
+		'Captua is moving, renaming or deleting files of this volume. Try the export again in a moment.',
+	vol_err_stored_offsite: (n: number): string =>
+		n === 1
+			? 'One record has files already stored offsite under this volume, so it cannot be moved to another volume.'
+			: `${formatCount(n, 'en')} records have files already stored offsite under this volume, so they cannot be moved to another volume.`,
 	pd_member_implicit: 'Implicit access (cannot be removed)',
 	pd_member_remove: 'Remove collaborator',
 	pd_member_add: 'Add collaborator',
@@ -410,7 +431,7 @@ export const en: Messages = {
 	pd_delete_collection_title: 'Delete volume',
 	pd_delete_loading: 'Loading details…',
 	pd_col_not_empty: 'This volume is not empty',
-	pd_records_count: (n: number) => (n === 1 ? '1 record' : `${n} records`),
+	pd_records_count: (n: number) => (n === 1 ? '1 record' : `${formatCount(n, 'en')} records`),
 	pd_delete_warning: 'To delete it, first move its records to another volume.',
 	pd_move_label: 'MOVE THE RECORDS TO',
 	pd_move_none: '— Choose a volume —',
@@ -455,13 +476,13 @@ export const en: Messages = {
 	col_review_approve_error: 'Could not approve the record. Please try again.',
 	// ── Send for review (NEH-260) ───────────────────────────────────
 	col_handover_send: 'Send for review',
-	col_handover_send_new: (n: number) => (n === 1 ? 'Send 1 new record' : `Send ${n} new records`),
+	col_handover_send_new: (n: number) => (n === 1 ? 'Send 1 new record' : `Send ${formatCount(n, 'en')} new records`),
 	col_handover_take_back: 'Withdraw from review',
 	col_handover_confirm_title: 'Send the volume for review?',
 	col_handover_confirm_body: (n: number) =>
 		n === 1
 			? 'The captured record will be in review. While it is, you cannot move it to another volume.'
-			: `The ${n} captured records will be in review. While they are, you cannot move them to another volume.`,
+			: `The ${formatCount(n, 'en')} captured records will be in review. While they are, you cannot move them to another volume.`,
 	col_handover_confirm_undo: (n: number) =>
 		n === 1
 			? 'If you make a mistake, you can withdraw it with "Withdraw from review".'
@@ -471,30 +492,30 @@ export const en: Messages = {
 	col_handover_refused_body: (n: number) =>
 		n === 1
 			? 'One record cannot be sent yet because it has no image or its image was rejected. Capture its image again and send the volume again.'
-			: `${n} records cannot be sent yet because they have no image or their image was rejected. Capture their images again and send the volume again.`,
+			: `${formatCount(n, 'en')} records cannot be sent yet because they have no image or their image was rejected. Capture their images again and send the volume again.`,
 	col_handover_refused_unchanged: 'No records were changed.',
-	col_handover_sent: (n: number) => (n === 1 ? '1 record was sent for review.' : `${n} records were sent for review.`),
+	col_handover_sent: (n: number) => (n === 1 ? '1 record was sent for review.' : `${formatCount(n, 'en')} records were sent for review.`),
 	col_handover_nothing_to_send: 'There were no captured records to send.',
 	col_handover_send_error: 'Could not send the volume for review. Please try again.',
 	col_takeback_confirm_title: 'Withdraw the volume from review?',
 	col_takeback_confirm_body: (n: number) =>
 		n === 1
 			? 'The record in review will be Captured again, and you can keep working on it.'
-			: `The ${n} records in review will be Captured again, and you can keep working on them.`,
+			: `The ${formatCount(n, 'en')} records in review will be Captured again, and you can keep working on them.`,
 	col_takeback_confirm_kept: (a: number, r: number) => {
 		if (a > 0 && r > 0) {
-			const ap = a === 1 ? 'The approved record' : `The ${a} approved records`;
-			const rp = r === 1 ? 'the rejected one' : `the ${r} rejected ones`;
+			const ap = a === 1 ? 'The approved record' : `The ${formatCount(a, 'en')} approved records`;
+			const rp = r === 1 ? 'the rejected one' : `the ${formatCount(r, 'en')} rejected ones`;
 			return `${ap} and ${rp} stay as they are, because they have already been reviewed.`;
 		}
 		const n = a > 0 ? a : r;
 		const word = a > 0 ? 'approved' : 'rejected';
 		return n === 1
 			? `The ${word} record stays as it is, because it has already been reviewed.`
-			: `The ${n} ${word} records stay as they are, because they have already been reviewed.`;
+			: `The ${formatCount(n, 'en')} ${word} records stay as they are, because they have already been reviewed.`;
 	},
 	col_takeback_confirm_submit: 'Withdraw',
-	col_takeback_done: (n: number) => (n === 1 ? '1 record was withdrawn from review.' : `${n} records were withdrawn from review.`),
+	col_takeback_done: (n: number) => (n === 1 ? '1 record was withdrawn from review.' : `${formatCount(n, 'en')} records were withdrawn from review.`),
 	col_takeback_nothing: 'There were no records in review to withdraw.',
 	col_takeback_error: 'Could not withdraw the volume from review. Please try again.',
 	col_review_not_sent_hint: 'This record is not in review. You can approve or reject it once it is sent for review.',
@@ -520,7 +541,12 @@ export const en: Messages = {
 	col_renumber_desc:
 		"Captua will number this volume's records from 1, in the order they appear now, without renaming any file.",
 	col_renumbering: 'Renumbering…',
-	col_renumber_error: (message: string) => `Could not renumber: ${message}`,
+	col_renumber_error: 'Captua could not renumber the records of this volume. Try again.',
+	col_reorder_stale:
+		'Records were added to or removed from this volume while you were reordering it, so Captua did not save the new order. Captua has loaded the saved order again.',
+	col_reorder_error: 'Captua could not save the new order. Captua has loaded the saved order again.',
+	col_delete_record_error_title: 'Could not delete the record',
+	col_delete_record_retry: 'Try again in a moment.',
 	col_finalize_title: 'Finalize Project?',
 	col_finalize_subtitle: 'This will mark the project as finished',
 	col_finalize_p1: 'Finalizing the project assumes ',
@@ -777,6 +803,7 @@ export const en: Messages = {
 	lv_err_retake_status: 'Only a captured or rejected record can be retaken',
 	lv_err_resolution_in_name: "Captua cannot put the resolution in a capture's file name",
 	lv_err_name_too_long: "Captua captured nothing: this capture's file name would be longer than 36 characters",
+	lv_err_capture_limit: 'Captua captured nothing: this volume has reached the limit of 9,999 captures; a new volume is needed',
 	lv_capture_btn: 'Capture',
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',
@@ -821,6 +848,44 @@ export const en: Messages = {
 	backup_cfg_unknown: 'Could not check the state of the offsite copy.',
 	backup_cfg_last_file: 'File of the last copy',
 	backup_cfg_locked: 'This is set up when the scanner is installed and cannot be changed here.',
+
+	// ── Offsite copy of the images (NEH-248, offsite-state.ts) ─────────────
+	offsite_vol_label: 'Offsite copy of this volume',
+	offsite_vol_received: (verified: number, total: number) =>
+		`Stored offsite: ${formatCount(verified, 'en')} of ${formatCount(total, 'en')} files verified`,
+	offsite_vol_uploading: (verified: number, total: number, pending: number) =>
+		`Uploading: ${formatCount(verified, 'en')} of ${formatCount(total, 'en')} files verified, ${formatCount(pending, 'en')} pending`,
+	offsite_vol_attention: (refused: number, verified: number, total: number, pending: number) =>
+		`${refused === 1 ? '1 file needs' : `${formatCount(refused, 'en')} files need`} attention · ${formatCount(verified, 'en')} of ${formatCount(total, 'en')} verified, ${formatCount(pending, 'en')} pending`,
+	offsite_attention_help:
+		'The offsite copy already holds a different file with the same name. Let whoever administers the scanner know.',
+	offsite_vol_empty: 'Offsite copy: no files to copy yet',
+	offsite_vol_no_stem: 'Not stored offsite: this volume has no stem',
+	offsite_vol_off: 'Offsite copy of images not configured',
+	offsite_vol_misconfigured: 'Offsite copy of images configured incorrectly',
+	offsite_vol_unknown: 'Could not check the offsite copy of this volume',
+	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		if (day === 'today') return `last verified today at ${time}`;
+		if (day === 'yesterday') return `last verified yesterday at ${time}`;
+		return `last verified on ${date} at ${time}`;
+	},
+	offsite_unit_title: 'Image files',
+	offsite_unit_off: 'The offsite copy of the image files is not configured on this scanner.',
+	offsite_unit_misconfigured:
+		'The offsite copy of the image files is not configured correctly on this scanner. Let whoever administers it know.',
+	offsite_unit_empty: 'There are no image files to copy yet.',
+	offsite_unit_volumes: (received: number, volumes: number) =>
+		`${formatCount(received, 'en')} of ${formatCount(volumes, 'en')} ${volumes === 1 ? 'volume' : 'volumes'} stored offsite in full.`,
+	offsite_unit_files: (verified: number, total: number, pending: number) =>
+		`${formatCount(verified, 'en')} of ${formatCount(total, 'en')} files verified, ${formatCount(pending, 'en')} pending.`,
+	offsite_unit_refused: (refused: number): string =>
+		refused === 1 ? '1 file needs attention.' : `${formatCount(refused, 'en')} files need attention.`,
+	offsite_cfg_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		if (day === 'today') return `Last file verified today at ${time}.`;
+		if (day === 'yesterday') return `Last file verified yesterday at ${time}.`;
+		return `Last file verified on ${date} at ${time}.`;
+	},
+	offsite_cfg_never: 'No file has been verified yet.',
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
