@@ -176,6 +176,18 @@ describe('project page: stems', () => {
 		expect(page.getByText(backend, { exact: false }).elements()).toHaveLength(0);
 	});
 
+	it('shows a generic message for an unknown create error, and keeps the backend text out', async () => {
+		const backend = 'Project 1 not found';
+		vi.spyOn(collectionsApi, 'create').mockRejectedValue(new ApiError(backend, undefined, 404));
+		render(ProjectPage);
+		await userEvent.click(page.getByRole('button', { name: es.pd_new_collection }));
+		await userEvent.type(page.getByPlaceholder(es.pd_ph_title), 'Tomo 25');
+		await userEvent.type(page.getByLabelText(es.pd_field_stem), 'co-ahr-con-t078');
+		await userEvent.click(page.getByRole('button', { name: es.pd_create_btn }));
+		await expect.element(page.getByText(es.pd_err_create_collection)).toBeInTheDocument();
+		expect(page.getByText(backend, { exact: false }).elements()).toHaveLength(0);
+	});
+
 	it('disables the delete of a volume that reserves its stem, says why, and moves nothing', async () => {
 		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 0, target_collection_id: 0 });
 		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();

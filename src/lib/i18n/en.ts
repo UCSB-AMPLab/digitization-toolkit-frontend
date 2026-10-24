@@ -389,8 +389,9 @@ export const en: Messages = {
 	pd_val_end_date:
 		'Invalid end date. Use a year (YYYY), year-month (YYYY-MM), or full date (YYYY-MM-DD).',
 	pd_val_date_range: 'The end date cannot be earlier than the start date.',
-	pd_err_create_collection: (msg: string) => `Could not create the volume: ${msg}`,
-	pd_err_delete_collection: (msg: string) => `Could not delete the volume: ${msg}`,
+	pd_err_create_collection: 'Could not save the volume. Try again.',
+	pd_err_delete_collection: 'Could not delete the volume. Try again.',
+	pd_err_delete_not_empty: 'This volume still has records. Move them to another volume before deleting it.',
 	pd_member_implicit: 'Implicit access (cannot be removed)',
 	pd_member_remove: 'Remove collaborator',
 	pd_member_add: 'Add collaborator',

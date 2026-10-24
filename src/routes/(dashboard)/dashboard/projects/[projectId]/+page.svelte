@@ -23,7 +23,8 @@
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, projectMembersApi,
            type Project, type Collection, type ProjectMember, type UserRead } from '$lib/api';
-  import { stemProblem, stemConflict, stemConflictText, needsStem, deleteRefused } from '$lib/volume-stem';
+  import { stemProblem, stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
+  import { volumeSaveErrorText, volumeDeleteErrorText } from '$lib/volume-errors';
   import VolumeStemField from './VolumeStemField.svelte';
 
   // ---------------------------------------------------------------------------
@@ -306,11 +307,9 @@
       colStem = '';
 
     } catch (err) {
-      // A stem 409 (duplicate, or fixed by a capture) has its own message;
-      // the backend's English text is never put inside the Spanish one.
-      const conflict = stemConflict(err);
-      const msg = err instanceof Error ? err.message : String(err);
-      createError = conflict ? stemConflictText(conflict, $m) : $m.pd_err_create_collection(msg);
+      // Known cases have their own message, anything else a generic one; the
+      // backend's English text goes to the console only.
+      createError = volumeSaveErrorText(err, $m);
       console.error('[ProjectDetail] Error creando colección:', err);
     } finally {
       isCreating = false;
@@ -436,8 +435,9 @@
         deletingCol = { ...deletingCol, stem_reserved: true };
         await loadCollections();
       } else {
-        const msg = err instanceof Error ? err.message : String(err);
-        deleteColError = conflict ? stemConflictText(conflict, $m) : $m.pd_err_delete_collection(msg);
+        // The backend's English text goes to the console only.
+        deleteColError = volumeDeleteErrorText(err, $m);
+        console.error('[ProjectDetail] Error eliminando volumen:', err);
       }
       isDeletingCol = false;
     }
