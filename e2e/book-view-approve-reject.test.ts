@@ -13,7 +13,7 @@
 // can do both. Configure via env vars (falls back to the throwaway
 // `e2e_neh209` account provisioned in this dev environment):
 //   E2E_USERNAME, E2E_PASSWORD
-import { test, expect, type APIRequestContext } from './fixtures';
+import { test, expect, testStem, type APIRequestContext } from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh209';
@@ -108,14 +108,14 @@ async function setup(request: APIRequestContext): Promise<SetupResult> {
 
 	const dualColResp = await request.post(`${API_BASE}/collections/`, {
 		headers: authHeaders,
-		data: { name: `Dual ${suffix}`, project_id: project.id }
+		data: { name: `Dual ${suffix}`, project_id: project.id, filename_stem: testStem() }
 	});
 	expect(dualColResp.ok(), await dualColResp.text()).toBeTruthy();
 	const dualCollection = await dualColResp.json();
 
 	const singleColResp = await request.post(`${API_BASE}/collections/`, {
 		headers: authHeaders,
-		data: { name: `Single ${suffix}`, project_id: project.id }
+		data: { name: `Single ${suffix}`, project_id: project.id, filename_stem: testStem() }
 	});
 	expect(singleColResp.ok(), await singleColResp.text()).toBeTruthy();
 	const singleCollection = await singleColResp.json();
@@ -260,7 +260,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('approve reflects immediately without a page reload, and shows the "Aprobada" tag', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `Approve ${Date.now()}`, project_id: ctx.projectId }
+			data: { name: `Approve ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
 		await createRecordWithImages(request, ctx.token, collection.id, 'Approve-me document', 'single');
@@ -281,7 +281,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('undo: approving then rejecting-to-undo brings the record back to in_review, fully interactive again', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `Undo ${Date.now()}`, project_id: ctx.projectId }
+			data: { name: `Undo ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
 		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Undo document', 'single');
@@ -318,7 +318,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('undo: rejecting then approving-to-undo brings the record back to in_review', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `Undo2 ${Date.now()}`, project_id: ctx.projectId }
+			data: { name: `Undo2 ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
 		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Undo2 document', 'single');
@@ -356,7 +356,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('cancelling the confirm popup performs no action', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `Cancel ${Date.now()}`, project_id: ctx.projectId }
+			data: { name: `Cancel ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
 		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Cancel document', 'single');
@@ -376,7 +376,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('"Marcar error" and "Agregar nota" are independent — picking two errors and adding a note create TWO separate annotation cards', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `MultiTag ${Date.now()}`, project_id: ctx.projectId }
+			data: { name: `MultiTag ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
 		await createRecordWithImages(request, ctx.token, collection.id, 'MultiTag document', 'single');
@@ -398,7 +398,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('rejecting with multiple reasons selected sends only the FIRST one to the backend', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `FirstReason ${Date.now()}`, project_id: ctx.projectId }
+			data: { name: `FirstReason ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
 		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'FirstReason document', 'single');
@@ -422,7 +422,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('"Recapturar imagen" on a rejected record navigates to live-preview with the record id', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `Recapture ${Date.now()}`, project_id: ctx.projectId }
+			data: { name: `Recapture ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
 		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Recapture document', 'single');
@@ -443,7 +443,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('regression: the old isolated rejection-comment modal never appears, and "Marcar error"/"Agregar nota" are collapsed accordions, not an always-open list', async ({ page, request }) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `Regression ${Date.now()}`, project_id: ctx.projectId }
+			data: { name: `Regression ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
 		await createRecordWithImages(request, ctx.token, collection.id, 'Regression-check document', 'single');

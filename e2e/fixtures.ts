@@ -22,3 +22,15 @@ export const test = base.extend({
 
 export { expect } from '@playwright/test';
 export type { APIRequestContext, Page } from '@playwright/test';
+
+// A unique, valid filename_stem for a throwaway volume. The backend requires
+// one at creation and refuses captures and uploads into a volume without one.
+// The `xx-test-` prefix marks it as synthetic; the rest (time, a random part
+// and a per-run counter, all base 36) keeps it unique across runs and
+// parallel workers, within the 27-character limit.
+let stemCounter = 0;
+const stemRun = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+export function testStem(): string {
+	stemCounter += 1;
+	return `xx-test-${stemRun}-${stemCounter.toString(36)}`;
+}
