@@ -127,7 +127,7 @@ export const es = {
 	dash_view_board: 'Tablero',
 	dash_view_table: 'Tabla',
 	dash_col_progress: 'Avance',
-	dash_records_count: (n: number) => (n === 1 ? '1 registro' : `${n} registros`),
+	dash_records_count: (n: number) => (n === 1 ? '1 registro' : `${formatCount(n, 'es')} registros`),
 	dash_stage_capture: 'En captura',
 	dash_stage_capture_desc: 'Volúmenes con registros que todavía no están en revisión.',
 	dash_stage_recapture: 'Por recapturar',
@@ -171,9 +171,9 @@ export const es = {
 	dash_cal_less: 'Menos',
 	dash_cal_more: 'Más',
 	dash_cal_day_captures: (n: number, date: string) =>
-		n === 1 ? `1 imagen capturada el ${date}` : `${n.toLocaleString('es-CO')} imágenes capturadas el ${date}`,
+		n === 1 ? `1 imagen capturada el ${date}` : `${formatCount(n, 'es')} imágenes capturadas el ${date}`,
 	dash_cal_day_reviews: (n: number, date: string) =>
-		n === 1 ? `1 registro revisado el ${date}` : `${n.toLocaleString('es-CO')} registros revisados el ${date}`,
+		n === 1 ? `1 registro revisado el ${date}` : `${formatCount(n, 'es')} registros revisados el ${date}`,
 	dash_cal_days_captures: 'Días con capturas',
 	dash_cal_total_captures: 'Imágenes capturadas',
 	dash_cal_days_reviews: 'Días con revisiones',
@@ -260,7 +260,7 @@ export const es = {
 	config_clean_tmp: 'Limpiar /tmp',
 	config_tmp_none: 'No había archivos temporales pendientes.',
 	config_tmp_deleted: (n: number) =>
-		n === 1 ? '1 archivo eliminado correctamente.' : `${n} archivos eliminados correctamente.`,
+		n === 1 ? '1 archivo eliminado correctamente.' : `${formatCount(n, 'es')} archivos eliminados correctamente.`,
 	config_err_clean: 'Error al limpiar los archivos.',
 	config_section_power: 'Energía',
 	config_shutdown_label: 'Apagar el equipo',
@@ -362,9 +362,9 @@ export const es = {
 	proj_checking_contents: 'Verificando contenido…',
 	proj_not_empty: 'Este proyecto no está vacío',
 	proj_contains_pre: 'Contiene ',
-	proj_collections_count: (n: number) => (n === 1 ? '1 volumen' : `${n} volúmenes`),
+	proj_collections_count: (n: number) => (n === 1 ? '1 volumen' : `${formatCount(n, 'es')} volúmenes`),
 	proj_contains_mid: ' con ',
-	proj_images_count: (n: number) => (n === 1 ? '1 imagen' : `${n} imágenes`),
+	proj_images_count: (n: number) => (n === 1 ? '1 imagen' : `${formatCount(n, 'es')} imágenes`),
 	proj_delete_warning:
 		'Si lo eliminas sin mover, todo el contenido se perderá de forma permanente.',
 	proj_move_label: 'MOVER VOLÚMENES A OTRO PROYECTO (OPCIONAL)',
@@ -372,7 +372,7 @@ export const es = {
 	proj_move_hint: (n: number) =>
 		n === 1
 			? 'El volumen se moverá antes de eliminar el proyecto.'
-			: `Los ${n} volúmenes se moverán antes de eliminar el proyecto.`,
+			: `Los ${formatCount(n, 'es')} volúmenes se moverán antes de eliminar el proyecto.`,
 	proj_delete_confirm_pre: '¿Estás seguro de que deseas eliminar ',
 	proj_deleting_moving: 'Moviendo y eliminando…',
 	proj_move_and_delete: 'Mover y eliminar',
@@ -421,7 +421,7 @@ export const es = {
 	pd_err_move_under_review: (n: number) =>
 		n === 1
 			? 'Un registro de este volumen está en revisión, así que no se puede mover. Primero retira el volumen con "Retirar de revisión".'
-			: `Hay ${n} registros de este volumen en revisión, así que no se pueden mover. Primero retira el volumen con "Retirar de revisión".`,
+			: `Hay ${formatCount(n, 'es')} registros de este volumen en revisión, así que no se pueden mover. Primero retira el volumen con "Retirar de revisión".`,
 	pd_err_delete_not_empty: 'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
 	// Rechazos de un cambio de archivos mientras otro proceso los lee
 	// (volume-refusals.ts).
@@ -454,7 +454,7 @@ export const es = {
 	pd_delete_collection_title: 'Eliminar volumen',
 	pd_delete_loading: 'Cargando información…',
 	pd_col_not_empty: 'Este volumen no está vacío',
-	pd_records_count: (n: number) => (n === 1 ? '1 registro' : `${n} registros`),
+	pd_records_count: (n: number) => (n === 1 ? '1 registro' : `${formatCount(n, 'es')} registros`),
 	pd_delete_warning: 'Para eliminarlo, primero muévelos a otro volumen.',
 	pd_move_label: 'MOVER LOS REGISTROS A',
 	pd_move_none: '— Elige un volumen —',
@@ -499,13 +499,13 @@ export const es = {
 	col_review_approve_error: 'No se pudo aprobar el registro. Intenta de nuevo.',
 	// ── Envío a revisión (NEH-260) ──────────────────────────────────
 	col_handover_send: 'Enviar a revisión',
-	col_handover_send_new: (n: number) => (n === 1 ? 'Enviar 1 registro nuevo' : `Enviar ${n} registros nuevos`),
+	col_handover_send_new: (n: number) => (n === 1 ? 'Enviar 1 registro nuevo' : `Enviar ${formatCount(n, 'es')} registros nuevos`),
 	col_handover_take_back: 'Retirar de revisión',
 	col_handover_confirm_title: '¿Enviar el volumen a revisión?',
 	col_handover_confirm_body: (n: number) =>
 		n === 1
 			? 'El registro capturado quedará en revisión. Mientras lo esté, no podrás moverlo a otro volumen.'
-			: `Los ${n} registros capturados quedarán en revisión. Mientras lo estén, no podrás moverlos a otro volumen.`,
+			: `Los ${formatCount(n, 'es')} registros capturados quedarán en revisión. Mientras lo estén, no podrás moverlos a otro volumen.`,
 	col_handover_confirm_undo: (n: number): string =>
 		n === 1
 			? 'Si te equivocas, puedes retirarlo con "Retirar de revisión".'
@@ -515,32 +515,32 @@ export const es = {
 	col_handover_refused_body: (n: number) =>
 		n === 1
 			? 'Hay un registro que todavía no se puede enviar porque le falta la imagen o la que tiene fue rechazada. Vuelve a capturar su imagen y envía el volumen de nuevo.'
-			: `Hay ${n} registros que todavía no se pueden enviar porque les falta la imagen o la que tienen fue rechazada. Vuelve a capturar sus imágenes y envía el volumen de nuevo.`,
+			: `Hay ${formatCount(n, 'es')} registros que todavía no se pueden enviar porque les falta la imagen o la que tienen fue rechazada. Vuelve a capturar sus imágenes y envía el volumen de nuevo.`,
 	col_handover_refused_unchanged: 'No se cambió el estado de ningún registro.',
-	col_handover_sent: (n: number) => (n === 1 ? 'Se envió 1 registro a revisión.' : `Se enviaron ${n} registros a revisión.`),
+	col_handover_sent: (n: number) => (n === 1 ? 'Se envió 1 registro a revisión.' : `Se enviaron ${formatCount(n, 'es')} registros a revisión.`),
 	col_handover_nothing_to_send: 'No había registros capturados para enviar.',
 	col_handover_send_error: 'No se pudo enviar el volumen a revisión. Intenta de nuevo.',
 	col_takeback_confirm_title: '¿Retirar el volumen de revisión?',
 	col_takeback_confirm_body: (n: number) =>
 		n === 1
 			? 'El registro en revisión quedará otra vez en estado Capturado y podrás seguir trabajando en él.'
-			: `Los ${n} registros en revisión quedarán otra vez en estado Capturado y podrás seguir trabajando en ellos.`,
+			: `Los ${formatCount(n, 'es')} registros en revisión quedarán otra vez en estado Capturado y podrás seguir trabajando en ellos.`,
 	// Aprobados (a) y rechazados (r) que el retiro no toca. Con a = r = 0 no
 	// se muestra; el componente no la llama en ese caso.
 	col_takeback_confirm_kept: (a: number, r: number) => {
 		if (a > 0 && r > 0) {
-			const ap = a === 1 ? 'El registro aprobado' : `Los ${a} registros aprobados`;
-			const rp = r === 1 ? 'el rechazado' : `los ${r} rechazados`;
+			const ap = a === 1 ? 'El registro aprobado' : `Los ${formatCount(a, 'es')} registros aprobados`;
+			const rp = r === 1 ? 'el rechazado' : `los ${formatCount(r, 'es')} rechazados`;
 			return `${ap} y ${rp} se quedan como están, porque ya se revisaron.`;
 		}
 		const n = a > 0 ? a : r;
 		const word = a > 0 ? 'aprobado' : 'rechazado';
 		return n === 1
 			? `El registro ${word} se queda como está, porque ya se revisó.`
-			: `Los ${n} registros ${word}s se quedan como están, porque ya se revisaron.`;
+			: `Los ${formatCount(n, 'es')} registros ${word}s se quedan como están, porque ya se revisaron.`;
 	},
 	col_takeback_confirm_submit: 'Retirar',
-	col_takeback_done: (n: number) => (n === 1 ? 'Se retiró 1 registro de revisión.' : `Se retiraron ${n} registros de revisión.`),
+	col_takeback_done: (n: number) => (n === 1 ? 'Se retiró 1 registro de revisión.' : `Se retiraron ${formatCount(n, 'es')} registros de revisión.`),
 	col_takeback_nothing: 'No había registros en revisión para retirar.',
 	col_takeback_error: 'No se pudo retirar el volumen de revisión. Intenta de nuevo.',
 	col_review_not_sent_hint: 'Este registro no está en revisión. Podrás aprobarlo o rechazarlo cuando se envíe a revisión.',

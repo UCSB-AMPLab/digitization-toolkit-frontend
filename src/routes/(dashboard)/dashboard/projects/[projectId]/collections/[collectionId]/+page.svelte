@@ -21,7 +21,8 @@
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
   import { recordsApi, collectionsApi, ApiError, type Record } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
+  import { formatCount } from '$lib/format-count';
   import JSZip from 'jszip';
 
   import LeftSidebar from './LeftSidebar.svelte';
@@ -460,7 +461,7 @@
         <h3 class="export-modal-title">{$m.col_export_generating}</h3>
         <p class="export-modal-subtitle">
           {#if exportProgress && exportProgress.total > 0}
-            {exportProgress.done} / {exportProgress.total}
+            {formatCount(exportProgress.done, $locale)} / {formatCount(exportProgress.total, $locale)}
           {:else}
             {$m.col_export_copying}
           {/if}

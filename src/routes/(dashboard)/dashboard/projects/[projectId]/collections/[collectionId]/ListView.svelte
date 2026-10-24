@@ -9,7 +9,8 @@
   // ============================================================================
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
+  import { formatCount } from '$lib/format-count';
   import { reorderErrorText } from '$lib/volume-refusals';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
@@ -199,7 +200,7 @@
         </span>
 
         <!-- Número de imágenes -->
-        <span class="col-count row-count">{imgs.length}</span>
+        <span class="col-count row-count">{formatCount(imgs.length, $locale)}</span>
 
         <!-- Fecha de creación -->
         <span class="col-date row-date">{formatDate(record.created_at)}</span>

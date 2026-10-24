@@ -17,7 +17,8 @@
   // ============================================================================
 
   import { onMount } from 'svelte';
-  import { m, roleLabel } from '$lib/i18n';
+  import { m, roleLabel, locale } from '$lib/i18n';
+  import { formatCount } from '$lib/format-count';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
@@ -521,7 +522,7 @@
     <div class="kpi-row">
       <div class="kpi-card">
         <div class="kpi-line" style="background: var(--color-primary)"></div>
-        <div class="kpi-num">{collections.length}</div>
+        <div class="kpi-num">{formatCount(collections.length, $locale)}</div>
         <div class="kpi-lbl">{$m.dash_kpi_collections}</div>
       </div>
 
@@ -536,7 +537,7 @@
       <span class="material-symbols-outlined icon-sm">group</span>
       <span>{$m.pd_members}</span>
       {#if members.length > 0}
-        <span class="member-badge">{members.length}</span>
+        <span class="member-badge">{formatCount(members.length, $locale)}</span>
       {/if}
     </button>
   </div>

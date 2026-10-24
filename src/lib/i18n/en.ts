@@ -115,7 +115,7 @@ export const en: Messages = {
 	dash_view_board: 'Board',
 	dash_view_table: 'Table',
 	dash_col_progress: 'Progress',
-	dash_records_count: (n: number) => (n === 1 ? '1 record' : `${n} records`),
+	dash_records_count: (n: number) => (n === 1 ? '1 record' : `${formatCount(n, 'en')} records`),
 	dash_stage_capture: 'Capturing',
 	dash_stage_capture_desc: 'Volumes with records not yet in review.',
 	dash_stage_recapture: 'To recapture',
@@ -158,9 +158,9 @@ export const en: Messages = {
 	dash_cal_less: 'Less',
 	dash_cal_more: 'More',
 	dash_cal_day_captures: (n: number, date: string) =>
-		n === 1 ? `1 image captured on ${date}` : `${n.toLocaleString('en')} images captured on ${date}`,
+		n === 1 ? `1 image captured on ${date}` : `${formatCount(n, 'en')} images captured on ${date}`,
 	dash_cal_day_reviews: (n: number, date: string) =>
-		n === 1 ? `1 record reviewed on ${date}` : `${n.toLocaleString('en')} records reviewed on ${date}`,
+		n === 1 ? `1 record reviewed on ${date}` : `${formatCount(n, 'en')} records reviewed on ${date}`,
 	dash_cal_days_captures: 'Days with captures',
 	dash_cal_total_captures: 'Images captured',
 	dash_cal_days_reviews: 'Days with reviews',
@@ -242,7 +242,7 @@ export const en: Messages = {
 	config_cleaning: 'Cleaning…',
 	config_clean_tmp: 'Clean /tmp',
 	config_tmp_none: 'There were no leftover temporary files.',
-	config_tmp_deleted: (n: number) => (n === 1 ? '1 file deleted.' : `${n} files deleted.`),
+	config_tmp_deleted: (n: number) => (n === 1 ? '1 file deleted.' : `${formatCount(n, 'en')} files deleted.`),
 	config_err_clean: 'Could not delete the files.',
 	config_section_power: 'Power',
 	config_shutdown_label: 'Shut down the scanner',
@@ -340,9 +340,9 @@ export const en: Messages = {
 	proj_checking_contents: 'Checking contents…',
 	proj_not_empty: 'This project is not empty',
 	proj_contains_pre: 'It contains ',
-	proj_collections_count: (n: number) => (n === 1 ? '1 volume' : `${n} volumes`),
+	proj_collections_count: (n: number) => (n === 1 ? '1 volume' : `${formatCount(n, 'en')} volumes`),
 	proj_contains_mid: ' with ',
-	proj_images_count: (n: number) => (n === 1 ? '1 image' : `${n} images`),
+	proj_images_count: (n: number) => (n === 1 ? '1 image' : `${formatCount(n, 'en')} images`),
 	proj_delete_warning:
 		'If you delete it without moving them, all its contents will be permanently lost.',
 	proj_move_label: 'MOVE VOLUMES TO ANOTHER PROJECT (OPTIONAL)',
@@ -350,7 +350,7 @@ export const en: Messages = {
 	proj_move_hint: (n: number) =>
 		n === 1
 			? 'The volume will be moved before the project is deleted.'
-			: `The ${n} volumes will be moved before the project is deleted.`,
+			: `The ${formatCount(n, 'en')} volumes will be moved before the project is deleted.`,
 	proj_delete_confirm_pre: 'Are you sure you want to delete ',
 	proj_deleting_moving: 'Moving and deleting…',
 	proj_move_and_delete: 'Move and delete',
@@ -399,7 +399,7 @@ export const en: Messages = {
 	pd_err_move_under_review: (n: number) =>
 		n === 1
 			? 'One record in this volume is under review, so it cannot be moved. First withdraw the volume from review with "Withdraw from review".'
-			: `${n} records in this volume are under review, so they cannot be moved. First withdraw the volume from review with "Withdraw from review".`,
+			: `${formatCount(n, 'en')} records in this volume are under review, so they cannot be moved. First withdraw the volume from review with "Withdraw from review".`,
 	pd_err_delete_not_empty: 'This volume still has records. Move them to another volume before deleting it.',
 	// Refusals of a file change while another process reads the files
 	// (volume-refusals.ts).
@@ -431,7 +431,7 @@ export const en: Messages = {
 	pd_delete_collection_title: 'Delete volume',
 	pd_delete_loading: 'Loading details…',
 	pd_col_not_empty: 'This volume is not empty',
-	pd_records_count: (n: number) => (n === 1 ? '1 record' : `${n} records`),
+	pd_records_count: (n: number) => (n === 1 ? '1 record' : `${formatCount(n, 'en')} records`),
 	pd_delete_warning: 'To delete it, first move its records to another volume.',
 	pd_move_label: 'MOVE THE RECORDS TO',
 	pd_move_none: '— Choose a volume —',
@@ -476,13 +476,13 @@ export const en: Messages = {
 	col_review_approve_error: 'Could not approve the record. Please try again.',
 	// ── Send for review (NEH-260) ───────────────────────────────────
 	col_handover_send: 'Send for review',
-	col_handover_send_new: (n: number) => (n === 1 ? 'Send 1 new record' : `Send ${n} new records`),
+	col_handover_send_new: (n: number) => (n === 1 ? 'Send 1 new record' : `Send ${formatCount(n, 'en')} new records`),
 	col_handover_take_back: 'Withdraw from review',
 	col_handover_confirm_title: 'Send the volume for review?',
 	col_handover_confirm_body: (n: number) =>
 		n === 1
 			? 'The captured record will be in review. While it is, you cannot move it to another volume.'
-			: `The ${n} captured records will be in review. While they are, you cannot move them to another volume.`,
+			: `The ${formatCount(n, 'en')} captured records will be in review. While they are, you cannot move them to another volume.`,
 	col_handover_confirm_undo: (n: number) =>
 		n === 1
 			? 'If you make a mistake, you can withdraw it with "Withdraw from review".'
@@ -492,30 +492,30 @@ export const en: Messages = {
 	col_handover_refused_body: (n: number) =>
 		n === 1
 			? 'One record cannot be sent yet because it has no image or its image was rejected. Capture its image again and send the volume again.'
-			: `${n} records cannot be sent yet because they have no image or their image was rejected. Capture their images again and send the volume again.`,
+			: `${formatCount(n, 'en')} records cannot be sent yet because they have no image or their image was rejected. Capture their images again and send the volume again.`,
 	col_handover_refused_unchanged: 'No records were changed.',
-	col_handover_sent: (n: number) => (n === 1 ? '1 record was sent for review.' : `${n} records were sent for review.`),
+	col_handover_sent: (n: number) => (n === 1 ? '1 record was sent for review.' : `${formatCount(n, 'en')} records were sent for review.`),
 	col_handover_nothing_to_send: 'There were no captured records to send.',
 	col_handover_send_error: 'Could not send the volume for review. Please try again.',
 	col_takeback_confirm_title: 'Withdraw the volume from review?',
 	col_takeback_confirm_body: (n: number) =>
 		n === 1
 			? 'The record in review will be Captured again, and you can keep working on it.'
-			: `The ${n} records in review will be Captured again, and you can keep working on them.`,
+			: `The ${formatCount(n, 'en')} records in review will be Captured again, and you can keep working on them.`,
 	col_takeback_confirm_kept: (a: number, r: number) => {
 		if (a > 0 && r > 0) {
-			const ap = a === 1 ? 'The approved record' : `The ${a} approved records`;
-			const rp = r === 1 ? 'the rejected one' : `the ${r} rejected ones`;
+			const ap = a === 1 ? 'The approved record' : `The ${formatCount(a, 'en')} approved records`;
+			const rp = r === 1 ? 'the rejected one' : `the ${formatCount(r, 'en')} rejected ones`;
 			return `${ap} and ${rp} stay as they are, because they have already been reviewed.`;
 		}
 		const n = a > 0 ? a : r;
 		const word = a > 0 ? 'approved' : 'rejected';
 		return n === 1
 			? `The ${word} record stays as it is, because it has already been reviewed.`
-			: `The ${n} ${word} records stay as they are, because they have already been reviewed.`;
+			: `The ${formatCount(n, 'en')} ${word} records stay as they are, because they have already been reviewed.`;
 	},
 	col_takeback_confirm_submit: 'Withdraw',
-	col_takeback_done: (n: number) => (n === 1 ? '1 record was withdrawn from review.' : `${n} records were withdrawn from review.`),
+	col_takeback_done: (n: number) => (n === 1 ? '1 record was withdrawn from review.' : `${formatCount(n, 'en')} records were withdrawn from review.`),
 	col_takeback_nothing: 'There were no records in review to withdraw.',
 	col_takeback_error: 'Could not withdraw the volume from review. Please try again.',
 	col_review_not_sent_hint: 'This record is not in review. You can approve or reject it once it is sent for review.',
