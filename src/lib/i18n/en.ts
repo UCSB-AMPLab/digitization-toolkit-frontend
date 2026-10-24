@@ -803,7 +803,7 @@ export const en: Messages = {
 	lv_err_retake_status: 'Only a captured or rejected record can be retaken',
 	lv_err_resolution_in_name: "Captua cannot put the resolution in a capture's file name",
 	lv_err_name_too_long: "Captua captured nothing: this capture's file name would be longer than 36 characters",
-	lv_err_capture_limit: 'Captua captured nothing: this volume has reached the limit of 9999 captures; a new volume is needed',
+	lv_err_capture_limit: 'Captua captured nothing: this volume has reached the limit of 9,999 captures; a new volume is needed',
 	lv_capture_btn: 'Capture',
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',
