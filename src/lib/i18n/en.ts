@@ -516,8 +516,9 @@ export const en: Messages = {
 	col_clear_filter: '× Clear',
 	col_filters_disabled_reorder: 'Filters are disabled while reordering to avoid corrupting the sequence',
 	col_image_n: (i: number) => `Image ${i}`,
-	col_renumber_modal_title: 'Renumber images',
-	col_renumber_desc: 'All images will be renumbered starting from 1.',
+	col_renumber_modal_title: 'Renumber records',
+	col_renumber_desc:
+		"Captua will number this volume's records from 1, in the order they appear now. File names do not change.",
 	col_renumbering: 'Renumbering…',
 	col_renumber_error: (message: string) => `Could not renumber: ${message}`,
 	col_finalize_title: 'Finalize Project?',
