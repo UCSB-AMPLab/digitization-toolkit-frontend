@@ -22,6 +22,8 @@ const RETAKE_VOLUME = "A retake must go into the record's own volume.";
 const MODE_DUAL = "Record 12 was captured in 'dual' mode; use the dual-capture endpoint to recapture it.";
 const NAME_TOO_LONG =
 	"This capture's file name would be longer than the 36 characters a pair id holds. Nothing was captured.";
+const NUMBERS_TAKEN =
+	'The next capture numbers of this volume are already taken by files on disk. Nothing was captured.';
 const MODE_SINGLE = "Record 12 was captured in 'single' mode; use the single-capture endpoint to recapture it.";
 
 describe('captureErrorText', () => {
@@ -35,7 +37,8 @@ describe('captureErrorText', () => {
 			[new ApiError(MODE_DUAL, undefined, 422), es.lv_err_retake_mode('dual')],
 			[new ApiError(MODE_SINGLE, undefined, 422), es.lv_err_retake_mode('single')],
 			[new CaptureFailed('Camera 1 is not connected'), es.lv_err_camera_not_connected(1)],
-			[new ApiError(NAME_TOO_LONG, undefined, 409), es.lv_err_name_too_long]
+			[new ApiError(NAME_TOO_LONG, undefined, 409), es.lv_err_name_too_long],
+			[new ApiError(NUMBERS_TAKEN, undefined, 409), es.lv_err_numbers_taken]
 		];
 		for (const [error, text] of cases) expect(captureErrorText(error, es)).toBe(text);
 	});
@@ -92,7 +95,8 @@ describe('the capture error strings', () => {
 				msgs.lv_err_retake_mode('dual'),
 				msgs.lv_err_retake_mode('single'),
 				msgs.lv_err_camera_not_connected(0),
-				msgs.lv_err_name_too_long
+				msgs.lv_err_name_too_long,
+				msgs.lv_err_numbers_taken
 			]) {
 				expect(text.endsWith('.')).toBe(false);
 			}

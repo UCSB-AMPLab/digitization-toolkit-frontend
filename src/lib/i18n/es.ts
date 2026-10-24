@@ -799,6 +799,8 @@ export const es = {
 			? 'Este registro se capturó con dos cámaras; para volver a capturarlo, elige "Dos cámaras"'
 			: 'Este registro se capturó con una cámara; para volver a capturarlo, elige "Una cámara"',
 	lv_err_camera_not_connected: (n: number) => `La cámara ${n} no está conectada`,
+	lv_err_numbers_taken:
+		'Captua no capturó nada: los próximos números de captura de este volumen ya están en archivos del disco; avisa a quien administra el equipo',
 	lv_err_name_too_long: 'Captua no capturó nada: el nombre de archivo de esta captura tendría más de 36 caracteres',
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
