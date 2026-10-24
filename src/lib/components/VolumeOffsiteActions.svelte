@@ -111,7 +111,7 @@
 		const outcome = await runOffsiteJob(
 			action,
 			() => (action === 'free' ? collectionsApi.startFree(forId) : collectionsApi.startRestore(forId)),
-			(jobId) => collectionsApi.getOffsiteJob(forId, jobId),
+			(jobId, signal) => collectionsApi.getOffsiteJob(forId, jobId, signal),
 			{ intervalMs: POLL_INTERVAL_MS, signal: controller.signal },
 			$m
 		);

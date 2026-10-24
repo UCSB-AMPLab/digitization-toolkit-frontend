@@ -116,7 +116,7 @@ describe('VolumeOffsiteActions', () => {
 		expect(freeSpy).toHaveBeenCalledWith(7);
 		await expect.element(dialog.getByText('Captua terminó de liberar espacio'), { timeout: 6000 }).toBeVisible();
 		await expect.element(dialog.getByText('Captua quitó 9 archivos (270 MB) de la tarjeta.')).toBeVisible();
-		expect(jobSpy).toHaveBeenCalledWith(7, 'j1');
+		expect(jobSpy).toHaveBeenCalledWith(7, 'j1', expect.any(AbortSignal));
 		expect(onChanged).toHaveBeenCalledWith(7);
 	});
 
@@ -170,7 +170,7 @@ describe('VolumeOffsiteActions', () => {
 		await expect.element(dialog.getByText('Captua terminó de restaurar el volumen'), { timeout: 6000 }).toBeVisible();
 		await expect.element(dialog.getByText('Captua restauró 3 archivos (90 MB) en la tarjeta.')).toBeVisible();
 		await expect.element(dialog.getByText('Captua no pudo traer 1 archivo de la copia externa.')).toBeVisible();
-		expect(jobSpy).toHaveBeenCalledWith(7, 'j2');
+		expect(jobSpy).toHaveBeenCalledWith(7, 'j2', expect.any(AbortSignal));
 	});
 
 	it('restore: maps the 409 of a unit with no read access', async () => {
@@ -214,6 +214,25 @@ describe('VolumeOffsiteActions', () => {
 		await settle();
 		expect(jobSpy.mock.calls.length).toBe(calls);
 		for (const [id] of onChanged.mock.calls) expect(id).toBe(7);
+	});
+
+	it('closing the dialog settles a run whose poll request hangs', async () => {
+		restoreSpy.mockResolvedValue({ job_id: 'j4', state: 'queued', action: 'restore', status_url: '/collections/7/offsite/jobs/j4' });
+		let inFlight: AbortSignal | undefined;
+		jobSpy.mockImplementation((_c: number, _j: string, signal?: AbortSignal) => {
+			inFlight = signal;
+			return new Promise<OffsiteJobStatus>(() => {});
+		});
+		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000 }));
+		await openMenu(screen);
+		await screen.getByRole('button', { name: 'Restaurar en la tarjeta' }).click();
+		await screen.getByRole('button', { name: 'Restaurar', exact: true }).click();
+		await expect.poll(() => jobSpy.mock.calls.length, { timeout: 6000 }).toBeGreaterThan(0);
+
+		await screen.getByRole('button', { name: 'Cerrar' }).click();
+		await expect.poll(() => onChanged.mock.calls.length).toBeGreaterThan(0);
+		expect(onChanged).toHaveBeenCalledWith(7);
+		expect(inFlight?.aborted).toBe(true);
 	});
 });
 

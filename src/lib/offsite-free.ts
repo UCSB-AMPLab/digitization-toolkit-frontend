@@ -16,6 +16,7 @@
 // so the tests run in plain node.
 
 import type { Messages } from './i18n';
+import { REQUEST_TIMEOUT_MS } from './catalogue-backup';
 import type {
 	FreePlan,
 	OffsiteFileEntry,
@@ -220,6 +221,8 @@ export interface PollOptions {
 	signal?: AbortSignal;
 	/** Failed requests in a row before giving up; a 404 gives up at once. */
 	maxFailures?: number;
+	/** A request with no answer after this long is aborted and counts as failed, as in startPolling. */
+	requestTimeoutMs?: number;
 }
 
 function abortError(): DOMException {
@@ -229,14 +232,45 @@ function abortError(): DOMException {
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
+ * `request` with a signal of its own, aborted when `signal` aborts or after
+ * `timeoutMs`. Settles at either even if `request` ignores its signal: an
+ * AbortError for the caller's abort, a TimeoutError for the timeout.
+ */
+async function bounded<T>(
+	request: (signal: AbortSignal) => Promise<T>,
+	signal: AbortSignal | undefined,
+	timeoutMs: number | null
+): Promise<T> {
+	const controller = new AbortController();
+	const onAbort = () => controller.abort(abortError());
+	if (signal?.aborted) throw abortError();
+	signal?.addEventListener('abort', onAbort, { once: true });
+	const timer =
+		timeoutMs === null
+			? null
+			: setTimeout(() => controller.abort(new DOMException('The request timed out', 'TimeoutError')), timeoutMs);
+	try {
+		return await Promise.race([
+			request(controller.signal),
+			new Promise<never>((_resolve, reject) =>
+				controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true })
+			)
+		]);
+	} finally {
+		if (timer !== null) clearTimeout(timer);
+		signal?.removeEventListener('abort', onAbort);
+	}
+}
+
+/**
  * Ask for the job's state every `intervalMs` until it is done or failed, and
  * return that last state. A request that fails is tried again, up to
  * `maxFailures` in a row (the unit's link can drop for a moment while the
  * job runs); then, or at once for a 404, the error is thrown.
  */
 export async function pollOffsiteJob(
-	fetchStatus: () => Promise<OffsiteJobStatus>,
-	{ intervalMs, wait = sleep, signal, maxFailures = 5 }: PollOptions
+	fetchStatus: (signal: AbortSignal) => Promise<OffsiteJobStatus>,
+	{ intervalMs, wait = sleep, signal, maxFailures = 5, requestTimeoutMs = REQUEST_TIMEOUT_MS }: PollOptions
 ): Promise<OffsiteJobStatus> {
 	let failures = 0;
 	for (;;) {
@@ -245,8 +279,9 @@ export async function pollOffsiteJob(
 		if (signal?.aborted) throw abortError();
 		let status: OffsiteJobStatus;
 		try {
-			status = await fetchStatus();
+			status = await bounded(fetchStatus, signal, requestTimeoutMs);
 		} catch (error) {
+			if (signal?.aborted) throw abortError();
 			failures += 1;
 			if (isJobLost(error) || failures >= maxFailures) throw error;
 			continue;
@@ -332,19 +367,22 @@ function isAbort(error: unknown): boolean {
 export async function runOffsiteJob(
 	action: 'free' | 'restore',
 	start: () => Promise<OffsiteJobStart>,
-	getJob: (jobId: string) => Promise<OffsiteJobStatus>,
+	getJob: (jobId: string, signal: AbortSignal) => Promise<OffsiteJobStatus>,
 	options: PollOptions,
 	msgs: Messages
 ): Promise<OffsiteOutcome> {
 	if (options.signal?.aborted) return { kind: 'aborted' };
 	let started: OffsiteJobStart;
 	try {
-		started = await start();
+		// Not given the signal: the backend may already have taken the request,
+		// so only the waiting stops when the caller aborts.
+		started = await bounded(() => start(), options.signal, null);
 	} catch (error) {
+		if (options.signal?.aborted) return { kind: 'aborted' };
 		return { kind: 'error', text: offsiteActionErrorText(error, action, msgs) };
 	}
 	try {
-		const final = await pollOffsiteJob(() => getJob(started.job_id), options);
+		const final = await pollOffsiteJob((signal) => getJob(started.job_id, signal), options);
 		if (final.state === 'failed') return { kind: 'error', text: offsiteJobErrorText(final.error, action, msgs) };
 		return { kind: 'done', result: final.result };
 	} catch (error) {

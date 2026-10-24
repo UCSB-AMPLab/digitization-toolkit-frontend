@@ -37,7 +37,7 @@
   import { getVolumeTopbar } from '$lib/volume-topbar';
   import { fileHoldText } from '$lib/volume-refusals';
   import { freedExportCount } from '$lib/offsite-free';
-  import { selectionAfterLoad } from '$lib/record-selection';
+  import { reconcileInspected, selectionAfterLoad } from '$lib/record-selection';
   import { freedFromBody } from '$lib/image-display';
 
   // ---------------------------------------------------------------------------
@@ -126,6 +126,9 @@
       });
       // Un volumen distinto del que había nunca conserva la selección.
       selectedRecordId = selectionAfterLoad(records, selectedRecordId, inPlace && loadedFor === forId);
+      // El modal de inspección abierto pasa a la copia recargada de su
+      // registro, o se cierra si el registro ya no está en el volumen.
+      if (inPlace) inspectedRecord = reconcileInspected(inspectedRecord, records);
       loadedFor = forId;
       return true;
     } catch (err) {

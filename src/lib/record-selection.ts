@@ -13,3 +13,14 @@ export function selectionAfterLoad(
 	if (keepSelection && selectedId !== null && records.some((r) => r.id === selectedId)) return selectedId;
 	return records[0].id;
 }
+
+/**
+ * The record an open inspection modal should show after the records were
+ * reloaded: the reloaded copy with the same id, so the modal sees its new
+ * state (freed timestamps among it), or null, which closes the modal, when
+ * the record is no longer in the volume.
+ */
+export function reconcileInspected<T extends { id: number }>(inspected: T | null, records: ReadonlyArray<T>): T | null {
+	if (inspected === null) return null;
+	return records.find((r) => r.id === inspected.id) ?? null;
+}

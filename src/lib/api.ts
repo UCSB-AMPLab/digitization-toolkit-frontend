@@ -715,8 +715,8 @@ export const collectionsApi = {
   },
 
   /** The state of a free or restore job, with its result once done. Admin only. */
-  async getOffsiteJob(collectionId: number, jobId: string): Promise<OffsiteJobStatus> {
-    return apiRequest<OffsiteJobStatus>(`/collections/${collectionId}/offsite/jobs/${jobId}`);
+  async getOffsiteJob(collectionId: number, jobId: string, signal?: AbortSignal): Promise<OffsiteJobStatus> {
+    return apiRequest<OffsiteJobStatus>(`/collections/${collectionId}/offsite/jobs/${jobId}`, { signal });
   },
 
   /**

@@ -391,7 +391,7 @@ describe('runOffsiteJob', () => {
 		const done = job('done', { result: { collection_id: 7, filename_stem: 'co-x', freed: { files: 1, bytes: 9 }, files: [], refused: [], manifest: null } });
 		const getJob = vi.fn(() => Promise.resolve(done));
 		const outcome = await runOffsiteJob('free', start, getJob, opts, es);
-		expect(getJob).toHaveBeenCalledWith('j1');
+		expect(getJob).toHaveBeenCalledWith('j1', expect.any(AbortSignal));
 		expect(outcome).toEqual({ kind: 'done', result: done.result });
 	});
 
@@ -494,5 +494,73 @@ describe('freedAfterRead', () => {
 		const reload = vi.fn(() => Promise.resolve(true));
 		expect(await freedAfterRead(counts(7, 0, 0), counts(8, 4, 100), 8, reload)).toEqual(counts(8, 4, 100));
 		expect(reload).not.toHaveBeenCalled();
+	});
+});
+
+describe('pollOffsiteJob, with a request that never answers', () => {
+	const noWait = () => Promise.resolve();
+	const hung = () => new Promise<OffsiteJobStatus>(() => {});
+
+	it('times each request out and counts the timeout as a failure', async () => {
+		const signals: AbortSignal[] = [];
+		const fetchStatus = vi.fn((signal: AbortSignal) => {
+			signals.push(signal);
+			return hung();
+		});
+		await expect(
+			pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, maxFailures: 2, requestTimeoutMs: 20 })
+		).rejects.toMatchObject({ name: 'TimeoutError' });
+		expect(fetchStatus).toHaveBeenCalledTimes(2);
+		// The request itself is aborted, not only abandoned.
+		expect(signals.every((s) => s.aborted)).toBe(true);
+	});
+
+	it('asks again after a timed-out request and returns the answer that follows', async () => {
+		const done: OffsiteJobStatus = { job_id: 'j', collection_id: 7, action: 'free', state: 'done', result: null, error: null };
+		const answers = [hung, () => Promise.resolve(done)];
+		const fetchStatus = vi.fn(() => answers.shift()!());
+		expect(await pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, requestTimeoutMs: 20 })).toBe(done);
+	});
+
+	it("passes the caller's abort to the request in flight and stops at once", async () => {
+		const controller = new AbortController();
+		let inFlight: AbortSignal | undefined;
+		const fetchStatus = vi.fn((signal: AbortSignal) => {
+			inFlight = signal;
+			setTimeout(() => controller.abort(), 5);
+			return hung();
+		});
+		await expect(
+			pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, signal: controller.signal, requestTimeoutMs: 60_000 })
+		).rejects.toMatchObject({ name: 'AbortError' });
+		expect(inFlight?.aborted).toBe(true);
+	});
+});
+
+describe('runOffsiteJob, closed while a request hangs', () => {
+	const opts = { intervalMs: 10, wait: () => Promise.resolve(), requestTimeoutMs: 60_000 };
+	const started = (): Promise<OffsiteJobStart> =>
+		Promise.resolve({ job_id: 'j1', state: 'queued', action: 'restore', status_url: '/collections/7/offsite/jobs/j1' });
+
+	it('settles as aborted when the poll request hangs', async () => {
+		const controller = new AbortController();
+		const getJob = vi.fn(() => {
+			setTimeout(() => controller.abort(), 5);
+			return new Promise<OffsiteJobStatus>(() => {});
+		});
+		expect(await runOffsiteJob('restore', started, getJob, { ...opts, signal: controller.signal }, es)).toEqual({
+			kind: 'aborted'
+		});
+	});
+
+	it('settles as aborted when the start request hangs', async () => {
+		const controller = new AbortController();
+		const start = vi.fn(() => {
+			setTimeout(() => controller.abort(), 5);
+			return new Promise<OffsiteJobStart>(() => {});
+		});
+		expect(await runOffsiteJob('free', start, vi.fn(), { ...opts, signal: controller.signal }, es)).toEqual({
+			kind: 'aborted'
+		});
 	});
 });
