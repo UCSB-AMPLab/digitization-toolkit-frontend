@@ -773,7 +773,7 @@ export const en: Messages = {
 	lv_err_camera_not_connected: (n: number) => `Camera ${n} is not connected`,
 	lv_err_numbers_taken:
 		"Captua captured nothing: files on disk already carry this volume's next capture numbers; let whoever administers the device know",
-	lv_err_retake_status: 'A record can be retaken only while it is not in review or approved',
+	lv_err_retake_status: 'Only a captured or rejected record can be retaken',
 	lv_err_resolution_in_name: "Captua cannot put the resolution in a capture's file name",
 	lv_err_name_too_long: "Captua captured nothing: this capture's file name would be longer than 36 characters",
 	lv_capture_btn: 'Capture',
