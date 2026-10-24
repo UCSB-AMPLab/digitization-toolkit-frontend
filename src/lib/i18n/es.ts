@@ -145,6 +145,9 @@ export const es = {
 	dash_camera_capture_ok: 'Captura de prueba realizada',
 	dash_camera_capture_took: (s: string) => `en ${s} s`,
 	dash_camera_capture_error: 'No se pudo hacer la captura de prueba',
+	// Detalle tras dash_camera_capture_error y dos puntos, por eso en minúscula.
+	dash_camera_capture_not_connected: 'la cámara no está conectada',
+	dash_camera_capture_timeout: 'la cámara no entregó la imagen a tiempo',
 	dash_two_cameras: '2 cámaras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: no se detecta. Presiona el disparador hasta la mitad para despertarla o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".`,

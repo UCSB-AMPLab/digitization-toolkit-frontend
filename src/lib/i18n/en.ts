@@ -133,6 +133,8 @@ export const en: Messages = {
 	dash_camera_capture_ok: 'Test capture taken',
 	dash_camera_capture_took: (s: string) => `in ${s}s`,
 	dash_camera_capture_error: 'Test capture failed',
+	dash_camera_capture_not_connected: 'the camera is not connected',
+	dash_camera_capture_timeout: 'the camera did not deliver the image in time',
 	dash_two_cameras: '2 cameras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: not detected. Half-press its shutter button to wake it, or reseat its USB cable, then press "Reconnect cameras".`,

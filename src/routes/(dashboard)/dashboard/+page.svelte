@@ -340,7 +340,8 @@
       }
     } catch (e) {
       if (seq === captureSeq[side]) {
-        captureStatus = { ...captureStatus, [side]: describeCaptureFailure(e) };
+        console.error('[Dashboard] Error en la captura de prueba:', e);
+        captureStatus = { ...captureStatus, [side]: describeCaptureFailure(e, $m) };
       }
     } finally {
       captureInFlight = { ...captureInFlight, [side]: false };
