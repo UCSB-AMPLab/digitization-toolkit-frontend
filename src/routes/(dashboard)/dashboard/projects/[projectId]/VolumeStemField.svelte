@@ -22,12 +22,14 @@
   const helpId = 'volume-stem-help';
   const errorId = 'volume-stem-error';
 
-  // An empty required field is reported only after the operator has typed
-  // in it or left it, so the form does not open with an error showing.
+  // An empty required field shows its message from the start, since it is
+  // why the form's save button is disabled. It is announced (role="alert")
+  // only once the operator has typed in the field or left it, so opening
+  // the form does not interrupt a screen reader.
   let touched = $state(false);
 
-  let problem = $derived(locked ? null : stemProblem(value, required));
-  let shownProblem = $derived(problem === 'required' && !touched ? null : problem);
+  let shownProblem = $derived(locked ? null : stemProblem(value, required));
+  let announce = $derived(shownProblem !== 'required' || touched);
 </script>
 
 <div class="form-field">
@@ -38,14 +40,16 @@
   <input
     id={inputId}
     class="field-input"
-    class:field-input--error={shownProblem !== null}
+    class:field-input--error={shownProblem !== null && announce}
     class:field-input--locked={locked}
     type="text"
     placeholder={locked ? undefined : $m.pd_ph_stem}
     bind:value
     readonly={locked}
     aria-readonly={locked}
-    aria-invalid={shownProblem !== null}
+    required={required && !locked}
+    aria-required={required && !locked}
+    aria-invalid={shownProblem !== null && announce}
     aria-describedby={shownProblem ? `${helpId} ${errorId}` : helpId}
     autocomplete="off"
     autocapitalize="off"
@@ -62,7 +66,7 @@
     <p class="stem-note" id={helpId}>{$m.pd_stem_help}</p>
   {/if}
   {#if shownProblem}
-    <p class="stem-error" id={errorId} role="alert">{stemProblemText(shownProblem, $m)}</p>
+    <p class="stem-error" id={errorId} role={announce ? 'alert' : undefined}>{stemProblemText(shownProblem, $m)}</p>
   {/if}
 </div>
 

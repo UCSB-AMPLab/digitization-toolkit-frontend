@@ -154,6 +154,8 @@ describe('project page: stems', () => {
 		await userEvent.type(page.getByPlaceholder(es.pd_ph_title), 'Tomo 25');
 		const create = page.getByRole('button', { name: es.pd_create_btn });
 		await expect.element(create).toBeDisabled();
+		// The reason the button is disabled is on screen.
+		await expect.element(page.getByText(es.pd_val_stem_required)).toBeInTheDocument();
 
 		await userEvent.type(page.getByLabelText(es.pd_field_stem), 'co-ahr-con-t078');
 		await expect.element(create).toBeEnabled();

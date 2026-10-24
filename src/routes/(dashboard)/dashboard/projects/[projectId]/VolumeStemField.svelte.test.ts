@@ -10,9 +10,13 @@ import { es } from '$lib/i18n/es';
 import VolumeStemField from './VolumeStemField.svelte';
 
 describe('VolumeStemField', () => {
-	it('shows the help line and no error on an empty new volume', async () => {
+	it('marks the field required on a new volume and says so, without announcing it on open', async () => {
 		render(VolumeStemField, { value: '', required: true });
+		const input = page.getByRole('textbox');
+		await expect.element(input).toHaveAttribute('required');
+		await expect.element(input).toHaveAttribute('aria-required', 'true');
 		await expect.element(page.getByText(es.pd_stem_help)).toBeInTheDocument();
+		await expect.element(page.getByText(es.pd_val_stem_required)).toBeInTheDocument();
 		expect(page.getByRole('alert').elements()).toHaveLength(0);
 	});
 
@@ -46,6 +50,8 @@ describe('VolumeStemField', () => {
 	it('does not require a stem on an existing volume', async () => {
 		render(VolumeStemField, { value: '', required: false });
 		const input = page.getByRole('textbox');
+		await expect.element(input).not.toHaveAttribute('required');
+		await expect.element(input).toHaveAttribute('aria-required', 'false');
 		await userEvent.type(input, 'a');
 		await userEvent.clear(input);
 		expect(page.getByRole('alert').elements()).toHaveLength(0);
