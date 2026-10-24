@@ -510,9 +510,22 @@
   // ---------------------------------------------------------------------------
   // GUÍAS ARRASTRABLES
   // ---------------------------------------------------------------------------
-  function startDrag(guide: 'v' | 'h') { dragging = guide; }
+  // Eventos de puntero y no de ratón: el aparato se opera con el dedo y
+  // onmousedown/onmousemove no existen ahí, así que las guías no se podían
+  // mover en el equipo para el que están hechas (NEH-156). Pointer cubre
+  // dedo, lápiz y ratón con el mismo código.
+  //
+  // La guía captura el puntero al agarrarla, así que el arrastre sigue aunque
+  // el dedo se salga de la franja de 24px --- que es lo normal al arrastrar.
+  // Por eso los manejadores de movimiento y de soltar viven en la guía misma
+  // y no en el visor, y por eso ya no hace falta el onmouseleave que antes
+  // cancelaba el arrastre cuando el cursor se iba del área.
+  function startDrag(guide: 'v' | 'h', e: PointerEvent) {
+    dragging = guide;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
 
-  function handleMouseMove(e: MouseEvent) {
+  function handleGuideMove(e: PointerEvent) {
     if (!dragging || !viewportEl) return;
     const rect = viewportEl.getBoundingClientRect();
     if (dragging === 'v') {
@@ -731,9 +744,6 @@
       class:flash={captureFlash}
       bind:this={viewportEl}
       style={viewportBox.w && viewportBox.h ? `width: ${viewportBox.w}px; height: ${viewportBox.h}px` : undefined}
-      onmousemove={handleMouseMove}
-      onmouseup={stopDrag}
-      onmouseleave={stopDrag}
     >
 
       <!-- Banner: la última captura falló (NEH-72). `cameraStatus` ya
@@ -939,11 +949,25 @@
       <!-- ── GUÍAS ARRASTRABLES (líneas rojas) ── -->
       {#if showGuides}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="guide vertical" style="left: {guideV}%" onmousedown={() => startDrag('v')}>
+        <div
+          class="guide vertical"
+          style="left: {guideV}%"
+          onpointerdown={(e) => startDrag('v', e)}
+          onpointermove={handleGuideMove}
+          onpointerup={stopDrag}
+          onpointercancel={stopDrag}
+        >
           <div class="guide-line"></div>
         </div>
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="guide horizontal" style="top: {guideH}%" onmousedown={() => startDrag('h')}>
+        <div
+          class="guide horizontal"
+          style="top: {guideH}%"
+          onpointerdown={(e) => startDrag('h', e)}
+          onpointermove={handleGuideMove}
+          onpointerup={stopDrag}
+          onpointercancel={stopDrag}
+        >
           <div class="guide-line"></div>
         </div>
       {/if}
@@ -1338,10 +1362,17 @@
   .guide {
     position: absolute;
     z-index: 30;
+    /* Sin esto el navegador interpreta el gesto como desplazamiento y se lo
+       queda: los eventos de puntero dejan de llegar a mitad del arrastre. */
+    touch-action: none;
   }
 
-  .guide.vertical   { top: 0; bottom: 0; width: 16px; margin-left: -8px; cursor: ew-resize; }
-  .guide.horizontal { left: 0; right: 0; height: 16px; margin-top: -8px; cursor: ns-resize; }
+  /* 24px y no 16: la franja hay que agarrarla con el dedo. No llega a los 44
+     del mínimo táctil a propósito --- una guía vertical de 44px taparía una
+     columna entera de la imagen que se está encuadrando, y a diferencia de un
+     botón, esto se ve antes de agarrarlo y se arrastra, no se acierta. */
+  .guide.vertical   { top: 0; bottom: 0; width: 24px; margin-left: -12px; cursor: ew-resize; }
+  .guide.horizontal { left: 0; right: 0; height: 24px; margin-top: -12px; cursor: ns-resize; }
 
   .guide-line {
     position: absolute;
