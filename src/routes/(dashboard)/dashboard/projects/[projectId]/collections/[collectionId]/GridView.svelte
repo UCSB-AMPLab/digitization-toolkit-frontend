@@ -80,7 +80,11 @@
   // ---------------------------------------------------------------------------
 
   // Número de columnas del grid (slider: 2 = grande, 6 = pequeño)
-  let columns = $state(4);
+  // Tamaño de miniatura, 2 (pequeña) a 6 (grande): es lo que el deslizador
+  // mueve. Las columnas son su inverso — más columnas, miniaturas más chicas —
+  // y por eso se derivan en vez de atarse directo al control.
+  let thumbSize = $state(4);
+  let columns = $derived(8 - thumbSize);
 
   // Modo reordenamiento
   let isReorderMode = $state(false);
@@ -290,16 +294,17 @@
     <div class="toolbar-right">
       <!-- Slider de columnas -->
       <!--
-        Izquierda (2) = menos columnas = thumbnails más grandes (como screenshot 3)
-        Derecha   (6) = más columnas   = thumbnails más pequeños (como screenshot 2)
-        Para cambiar el rango, modifica min y max
+        El deslizador mide TAMAÑO, no columnas: a la izquierda, miniaturas
+        pequeñas; a la derecha, grandes. Eso es lo que espera quien lo arrastra.
+        Las columnas van al revés que el tamaño, así que se derivan invertidas
+        (ver `columns` en el script). Para cambiar el rango, modifica min y max.
       -->
       <input
         type="range"
         min="2"
         max="6"
         step="1"
-        bind:value={columns}
+        bind:value={thumbSize}
         class="columns-slider"
         title={$m.col_thumb_size}
         aria-label={$m.col_columns_aria}
@@ -651,11 +656,13 @@
 
   /* ── Grid ── */
   .image-grid {
-    /* Compartida con .pair-thumbs (NEH-211): el gap interno del par debe
-       ser idéntico al gap del grid para que cada miniatura L/R mida
-       exactamente lo mismo que una miniatura de documento simple —
-       ver comentario en .grid-pair más abajo. */
-    --grid-gap: 16px;
+    /* Dos huecos distintos, y la diferencia entre ellos es lo que agrupa:
+       --grid-gap separa registros, --pair-gap separa las dos mitades de un
+       mismo folio. Antes eran el mismo valor y el par se marcaba con un
+       marco verde; ahora lo marca la cercanía. Si tocas uno, mira el
+       relleno de .grid-pair, que depende de los dos. */
+    --grid-gap: 24px;
+    --pair-gap: 6px;
     flex: 1;
     overflow-y: auto;
     padding: 16px 20px;
@@ -735,6 +742,14 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    /* El par se lee como unidad por cercanía, no por un marco: las dos
+       mitades casi se tocan (--pair-gap) y el relleno lateral empuja los
+       grupos vecinos lejos. El relleno vale (--grid-gap - --pair-gap) / 2
+       justamente para que cada mitad siga midiendo lo mismo que una
+       miniatura simple, que es la garantía de NEH-211 (ver el álgebra
+       arriba); lo que sobra del hueco se va a los costados en vez de al
+       medio. Separación entre grupos: --grid-gap + 2·relleno. */
+    padding: 0 calc((var(--grid-gap) - var(--pair-gap)) / 2);
     transition: transform var(--transition-base);
     cursor: pointer;
   }
@@ -746,19 +761,7 @@
   .pair-thumbs {
     position: relative;
     display: flex;
-    gap: var(--grid-gap);
-    border-radius: var(--radius-md);
-    outline: 1px solid var(--color-primary);
-    outline-offset: 3px;
-  }
-
-  .pair-thumbs::before {
-    content: '';
-    position: absolute;
-    inset: -8px;
-    border-radius: var(--radius-md);
-    background-color: rgba(90, 140, 98, 0.16);
-    pointer-events: none;
+    gap: var(--pair-gap);
   }
 
   /* Reutiliza .card-image-wrapper (mismo aspect-ratio/border/radius que un
