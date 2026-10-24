@@ -5,7 +5,6 @@ import {
 	FILENAME_STEM_MAX_LENGTH,
 	deleteRefused,
 	isConflict,
-	isFixedCaptureRefusal,
 	isVolumeRequired,
 	isWrongRetakeVolume,
 	needsStem,
@@ -157,20 +156,12 @@ describe('isVolumeRequired', () => {
 	});
 });
 
-describe('isWrongRetakeVolume and isFixedCaptureRefusal', () => {
+describe('isWrongRetakeVolume', () => {
 	const retake = "A retake must go into the record's own volume.";
 
 	it('recognises the 409 for a retake into another volume by its exact text', () => {
 		expect(isWrongRetakeVolume(new ApiError(retake, undefined, 409))).toBe(true);
 		expect(isWrongRetakeVolume(new ApiError(retake, undefined, 400))).toBe(false);
 		expect(isWrongRetakeVolume(new ApiError('Captures must go into a volume.', undefined, 409))).toBe(false);
-	});
-
-	it('covers the no-volume and wrong-volume 409s, and not the no-stem one', () => {
-		expect(isFixedCaptureRefusal(new ApiError(retake, undefined, 409))).toBe(true);
-		expect(isFixedCaptureRefusal(new ApiError('Captures must go into a volume.', undefined, 409))).toBe(true);
-		const noStem = 'This volume has no file name stem. Give it one before capturing into it.';
-		expect(isFixedCaptureRefusal(new ApiError(noStem, undefined, 409))).toBe(false);
-		expect(isFixedCaptureRefusal(new Error(retake))).toBe(false);
 	});
 });

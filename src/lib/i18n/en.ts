@@ -760,6 +760,15 @@ export const en: Messages = {
 	lv_capture_not_ready: 'Loading the volume…',
 	lv_needs_stem: 'This volume needs a stem before you can capture into it.',
 	lv_needs_stem_link: 'Assign the stem',
+	lv_err_no_volume: 'Choose a volume before capturing',
+	lv_err_volume_not_found: 'This volume is no longer in the catalogue',
+	lv_err_record_not_found: 'This record is no longer in the catalogue',
+	lv_err_retake_volume: 'A record can be retaken only in its own volume',
+	lv_err_retake_mode: (mode: 'single' | 'dual') =>
+		mode === 'dual'
+			? 'This record was captured with two cameras; to retake it, choose "Double Camera"'
+			: 'This record was captured with one camera; to retake it, choose "Single Camera"',
+	lv_err_camera_not_connected: (n: number) => `Camera ${n} is not connected`,
 	lv_capture_btn: 'Capture',
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',

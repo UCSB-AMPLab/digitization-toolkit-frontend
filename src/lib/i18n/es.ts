@@ -787,6 +787,18 @@ export const es = {
 	lv_capture_not_ready: 'Cargando el volumen…',
 	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
 	lv_needs_stem_link: 'Asignar la raíz',
+	// Errores de una captura o una retoma que el backend rechazó
+	// (capture-errors.ts). Sin punto final: lvm_retake_error los incluye en
+	// una frase.
+	lv_err_no_volume: 'Elige un volumen antes de capturar',
+	lv_err_volume_not_found: 'Este volumen ya no está en el catálogo',
+	lv_err_record_not_found: 'Este registro ya no está en el catálogo',
+	lv_err_retake_volume: 'Un registro solo se puede volver a capturar en su propio volumen',
+	lv_err_retake_mode: (mode: 'single' | 'dual') =>
+		mode === 'dual'
+			? 'Este registro se capturó con dos cámaras; para volver a capturarlo, elige "Dos cámaras"'
+			: 'Este registro se capturó con una cámara; para volver a capturarlo, elige "Una cámara"',
+	lv_err_camera_not_connected: (n: number) => `La cámara ${n} no está conectada`,
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
 	lv_zoom_out: 'Alejar',

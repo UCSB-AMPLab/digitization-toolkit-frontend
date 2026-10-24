@@ -24,7 +24,8 @@
   import { cameraStatus } from '$lib/stores/cameras';
   import { m } from '$lib/i18n';
   import { seedRotation, createOrientationSaver } from '$lib/camera-orientation';
-  import { isConflict, isFixedCaptureRefusal, needsStem } from '$lib/volume-stem';
+  import { isConflict, needsStem } from '$lib/volume-stem';
+  import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
 
   import TopBar from './TopBar.svelte';
   import CameraControls from './CameraControls.svelte';
@@ -248,9 +249,10 @@
     try {
       await retake(record);
     } catch (error) {
+      console.error('[LivePreview] Error en la retoma:', error);
       if (isConflict(error) && (await recheckStem())) throw new Error($m.lv_needs_stem);
-      if (isFixedCaptureRefusal(error)) throw new Error($m.lv_capture_error);
-      throw error;
+      // The backend's text is English; the modal shows the catalogue's.
+      throw new Error(captureErrorText(error, $m));
     }
   }
 
@@ -275,7 +277,7 @@
     }
 
     if (!result.success) {
-      throw new Error(result.error || $m.lv_capture_error);
+      throw new CaptureFailed(result.error);
     }
 
     inspectedRecord = null;
