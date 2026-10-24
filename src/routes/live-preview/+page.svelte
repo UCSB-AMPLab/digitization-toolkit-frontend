@@ -24,7 +24,7 @@
   import { cameraStatus } from '$lib/stores/cameras';
   import { m } from '$lib/i18n';
   import { seedRotation, createOrientationSaver } from '$lib/camera-orientation';
-  import { isConflict, isVolumeRequired, needsStem } from '$lib/volume-stem';
+  import { isConflict, isFixedCaptureRefusal, needsStem } from '$lib/volume-stem';
 
   import TopBar from './TopBar.svelte';
   import CameraControls from './CameraControls.svelte';
@@ -249,7 +249,7 @@
       await retake(record);
     } catch (error) {
       if (isConflict(error) && (await recheckStem())) throw new Error($m.lv_needs_stem);
-      if (isVolumeRequired(error)) throw new Error($m.lv_capture_error);
+      if (isFixedCaptureRefusal(error)) throw new Error($m.lv_capture_error);
       throw error;
     }
   }

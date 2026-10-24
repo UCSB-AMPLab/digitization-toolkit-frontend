@@ -457,6 +457,20 @@ describe('LiveViewport — a volume without a stem', () => {
     expect(screen.container.textContent).not.toContain(backend);
   });
 
+  it('on the 409 for a retake into another volume, shows the catalogue error, not the backend text', async () => {
+    const backend = "A retake must go into the record's own volume.";
+    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+    const onStemRefused = vi.fn(async () => false);
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({ onStemRefused }));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect
+      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+      .toContain(es.lv_capture_error);
+    expect(screen.container.textContent).not.toContain(backend);
+  });
+
   it('on a 409 for another reason, reports the capture error as before', async () => {
     const backend = 'Some other conflict';
     vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, { message: backend }, 409));

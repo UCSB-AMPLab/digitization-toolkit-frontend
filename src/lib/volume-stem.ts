@@ -100,6 +100,24 @@ export function isVolumeRequired(error: unknown): boolean {
 	return isConflict(error) && error instanceof Error && error.message === VOLUME_REQUIRED_DETAIL;
 }
 
+// The 409 a retake gets when it names a volume other than its record's,
+// identical to RETAKE_VOLUME_DETAIL in the backend's app/core/volume_stem.py.
+const RETAKE_VOLUME_DETAIL = "A retake must go into the record's own volume.";
+
+/** Whether a retake was refused because it named a volume other than its record's. */
+export function isWrongRetakeVolume(error: unknown): boolean {
+	return isConflict(error) && error instanceof Error && error.message === RETAKE_VOLUME_DETAIL;
+}
+
+/**
+ * Whether a capture got one of the backend's fixed 409s that the capture
+ * screen shows as lv_capture_error: no volume named, or a retake into
+ * another volume. The no-stem 409 is handled apart, by reading the volume.
+ */
+export function isFixedCaptureRefusal(error: unknown): boolean {
+	return isVolumeRequired(error) || isWrongRetakeVolume(error);
+}
+
 /** Whether an error is an HTTP 409, matched by shape (ApiError carries `status`). */
 export function isConflict(error: unknown): boolean {
 	return (

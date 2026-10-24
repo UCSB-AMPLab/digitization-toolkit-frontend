@@ -52,7 +52,7 @@
     type OwnsEventContext
   } from '$lib/capture-key';
   import { defaultRecordTitle } from '$lib/record-title';
-  import { isConflict, isVolumeRequired } from '$lib/volume-stem';
+  import { isConflict, isFixedCaptureRefusal } from '$lib/volume-stem';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -574,9 +574,10 @@
         // backend's English text is not shown.
         return;
       }
-      // A capture that names no volume is refused with an English 409; the
-      // operator sees the catalogue's generic capture error instead.
-      const msg = isVolumeRequired(error) || !(error instanceof Error)
+      // The backend's fixed 409s for a capture into no volume, or a retake
+      // into another volume, are English; the operator sees the catalogue's
+      // generic capture error instead.
+      const msg = isFixedCaptureRefusal(error) || !(error instanceof Error)
         ? $m.lv_capture_error
         : error.message;
       cameraStatus.reportFailure(msg);
