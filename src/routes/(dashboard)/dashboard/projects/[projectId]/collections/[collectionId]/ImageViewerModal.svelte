@@ -235,7 +235,7 @@
 
           <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su miniatura,
                nunca como imagen rota -->
-          <RecordImageDisplay image={img} bind:masterFreed={masterFreedById[img.id]}>
+          <RecordImageDisplay image={img} onMasterFreed={(f) => (masterFreedById[img.id] = f)}>
             {#snippet children(src, onerror)}
               <img
                 {src}

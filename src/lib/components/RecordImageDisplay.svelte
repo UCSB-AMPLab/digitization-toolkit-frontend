@@ -46,14 +46,14 @@
   let {
     image,
     children,
-    masterFreed = $bindable(),
+    onMasterFreed,
   }: {
     image: Pick<RecordImage, 'id' | 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>;
     /** Pinta el <img>: recibe la URL a mostrar y el handler de error. */
     children: Snippet<[string, () => void]>;
-    /** Whether a 410 has said the master itself is freed, whatever the
+    /** Told whether a 410 has said the master itself is freed, whatever the
      *  record's master_freed_at says; a freed RAW preview does not count. */
-    masterFreed?: boolean;
+    onMasterFreed?: (freed: boolean) => void;
   } = $props();
 
   // Solo se vuelve a resolver si cambia la imagen, no cada vez que el padre
@@ -116,7 +116,7 @@
   });
 
   $effect(() => {
-    masterFreed = freed?.kind === 'capture' || master === 'freed';
+    onMasterFreed?.(freed?.kind === 'capture' || master === 'freed');
   });
 
   const current = $derived(index < candidates.length ? candidates[index] : null);
