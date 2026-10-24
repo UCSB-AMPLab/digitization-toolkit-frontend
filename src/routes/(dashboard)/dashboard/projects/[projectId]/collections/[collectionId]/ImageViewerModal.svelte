@@ -47,7 +47,9 @@
     userRole?: string | null;
   } = $props();
 
-  // Lock: in_review and approved block retake/delete for non-admins
+  // Lock: in_review and approved block delete for non-admins, and retake for
+  // everyone: the backend refuses a retake of a record that is neither
+  // captured nor rejected (409, RETAKE_STATUS_DETAIL in app/core/volume_stem.py).
   let isLocked = $derived(record.status === 'in_review' || record.status === 'approved');
 
   // ---------------------------------------------------------------------------
@@ -299,10 +301,12 @@
               {$m.col_record_locked(record.status === 'in_review' ? $m.col_status_in_review_lc : $m.col_status_approved_lc)}
             </span>
           {:else}
-            <button class="btn btn-warning" onclick={() => confirmAction = 'retake'}>
-              <span class="material-symbols-outlined icon-sm">refresh</span>
-              {$m.col_retake}
-            </button>
+            {#if !isLocked}
+              <button class="btn btn-warning" onclick={() => confirmAction = 'retake'}>
+                <span class="material-symbols-outlined icon-sm">refresh</span>
+                {$m.col_retake}
+              </button>
+            {/if}
             <button class="btn btn-danger" onclick={() => confirmAction = 'delete'}>
               <span class="material-symbols-outlined icon-sm">delete</span>
               {$m.common_delete}
