@@ -1175,7 +1175,6 @@ canvas, button, a, div {
    evenly regardless of content. */
 .image-grid { grid-template-columns: repeat(var(--grid-cols, 4), minmax(0, 1fr)); }
 
-.grid-card.selected { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .card-status-row { margin-top: 4px; }
 
 /* ImageViewerModal header group + locked state */
