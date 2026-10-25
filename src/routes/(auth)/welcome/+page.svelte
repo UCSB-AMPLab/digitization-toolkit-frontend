@@ -1,13 +1,7 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Welcome / Splash Screen
-  // Ruta: /welcome
-  //
-  // Pantalla de bienvenida con logo y botón "Comenzar".
-  // El botón consulta si es primera instalación (sin usuarios registrados):
-  //   Sí → /setup  (crear cuenta de administrador)
-  //   No → /login  (flujo normal)
-  // ============================================================================
+  // Splash screen. Its start button asks `/auth/setup/status` whether this is
+  // a first install: if setup is needed it goes to `/setup` to create the
+  // administrator account, otherwise — or when the check fails — to `/login`.
 
   import { goto } from '$app/navigation';
   import { authApi } from '$lib/api';
@@ -21,7 +15,6 @@
 
   let isChecking = $state(false);
 
-  // Botón "Comenzar" → decide entre /setup y /login según haya usuarios
   async function handleComenzar() {
     if (isChecking) return;
     isChecking = true;
@@ -38,7 +31,6 @@
 
 <div class="splash">
 
-  <!-- Logo + nombre del sistema -->
   <div class="header">
     	<div class="card-logo-area">
 			<img src={logo} alt="Captua" class="brand-logo-xl" />
@@ -46,10 +38,8 @@
 
   </div>
 
-  <!-- Título de bienvenida -->
   <h1 class="title">{$m.welcome_title}</h1>
 
-  <!-- Botón de entrada — llama a handleComenzar() -->
   <button class="btn" onclick={handleComenzar} disabled={isChecking} aria-busy={isChecking}>
     {$m.welcome_start}
   </button>
@@ -57,7 +47,6 @@
 </div>
 
 <style>
-  /* Pantalla completa centrada con fondo oscuro del design system */
   .splash {
     display: flex;
     flex-direction: column;
@@ -67,7 +56,7 @@
     background-color: var(--color-bg);
   }
 
-  /* Grupo logo + nombre, desplazado hacia arriba del centro visual */
+  /* The bottom margin lifts the logo above the visual center */
   .header {
     display: flex;
     flex-direction: column;
@@ -76,7 +65,6 @@
     margin-bottom: 80px;
   }
 
-  /* Círculo verde que contiene el ícono */
   .logo {
     width: 56px; height: 56px;
     border-radius: 50%;
@@ -85,13 +73,11 @@
     box-shadow: 0 4px 16px rgba(90,140,98,0.4);
   }
 
-  /* Ícono SVG invertido a blanco sobre fondo verde */
   .logo-img {
     width: 28px; height: 28px;
     filter: brightness(0) invert(1);
   }
 
-  /* Nombre del sistema en verde primario */
   .name {
     font-family: var(--font-family);
     font-size: var(--text-lead);
@@ -100,7 +86,6 @@
     margin: 0;
   }
 
-  /* Título "Bienvenido" */
   .title {
     font-family: var(--font-family);
     font-size: var(--text-h2);
@@ -110,7 +95,6 @@
     text-align: center;
   }
 
-  /* Botón ghost con borde azul secundario */
   .btn {
     font-family: var(--font-family);
     font-size: var(--text-base);

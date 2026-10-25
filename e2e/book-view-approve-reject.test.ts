@@ -1,10 +1,8 @@
 // NEH-209: Approve/Reject from Book view, end to end against a real
-// running backend (docker compose stack — see README/CLAUDE.md for how to
-// start it). Test data (project/collection/records/images) is created and
-// torn down via direct API calls in beforeAll/afterAll, the same
-// create-then-delete-throwaway-fixtures pattern used elsewhere in this
-// project's manual verification passes — there's no seed/fixture script in
-// this repo yet.
+// running backend (the docker compose dev stack, which the superproject's
+// `scripts/start-dev.sh` starts). Test data (project/collection/records/images)
+// is created and torn down via direct API calls in beforeAll/afterAll, since
+// this repo has no seed script.
 //
 // Requires an admin-role account to already exist in the target backend.
 // A reviewer is not enough: the backend creates records as 'captured', and
@@ -187,8 +185,8 @@ async function openBookView(page: import('@playwright/test').Page, ctx: SetupRes
 		await page.getByTitle('Vista libro').click();
 		await expect(page.getByRole('button', { name: 'Anotaciones' })).toBeVisible({ timeout: 1000 });
 	}).toPass({ timeout: 15000 });
-	// Approve/Reject live in the left panel's "Anotaciones" tab (NEH-209
-	// correction) — collapsed by default, open it.
+	// Approve/Reject live in the left panel's "Anotaciones" tab (NEH-209),
+	// which is collapsed by default, so open it.
 	await page.getByRole('button', { name: 'Anotaciones' }).click();
 	// Wait for the panel to actually be interactive before any test starts
 	// clicking inside it — avoids a race where a click lands before the
@@ -450,8 +448,8 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 
 		await openBookView(page, ctx, collection.id);
 
-		// The removed ActionBar modal used to render as a dialog with this
-		// heading and a plain textarea with no reason picker.
+		// Rejection must not open a standalone dialog with this heading and a
+		// plain textarea that has no reason picker.
 		await expect(page.getByText('Rechazar registros')).toHaveCount(0);
 		await expect(page.getByPlaceholder('Describe el motivo del rechazo…')).toHaveCount(0);
 		// Collapsed by default: neither the error rows nor the comment box

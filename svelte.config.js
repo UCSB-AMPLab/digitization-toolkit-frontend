@@ -6,11 +6,13 @@ const config = {
     preprocess: vitePreprocess(),
 
     kit: {
-        // Tu adaptador de Node para el despliegue
         adapter: adapter()
     },
 
-    // Filtramos las alertas de accesibilidad (porque no es para escritorio sino tablet)
+    // Meant to silence accessibility warnings because the UI targets a tablet
+    // rather than a desktop. The codes below are in Svelte 4's hyphenated form;
+    // Svelte 5 reports them with underscores (`a11y_click_events_have_key_events`),
+    // so none of them match and the warnings still appear.
     onwarn: (warning, handler) => {
         const ignoreRules = [
             'a11y-click-events-have-key-events',
