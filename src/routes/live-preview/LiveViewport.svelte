@@ -1,34 +1,12 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: LiveViewport
-  // Archivo: src/routes/live-preview/LiveViewport.svelte
+  // The capture page's central area: the live preview of one or two cameras,
+  // the framing guides and grid, the capture button and capture key, and the
+  // grid settings modal.
   //
-  // Área central de la interfaz de captura.
-  // Contiene:
-  //   - Vista en vivo de una o dos cámaras (polling cada PREVIEW_INTERVAL_MS ms)
-  //   - Líneas de guía arrastrables (rojas)
-  //   - Líneas de grilla (cian)
-  //   - Botón de captura (círculo blanco)
-  //   - Panel flotante: zoom + configurar grilla
-  //   - Barra de metadatos inferior (ISO, shutter, aperture)
-  //   - Modal de configuración de grilla
-  //
-  // ── CÓMO FUNCIONA EL PREVIEW ────────────────────────────────────────────────
-  // El backend NO tiene streaming MJPEG. En su lugar, el frontend hace polling:
-  // cada PREVIEW_INTERVAL_MS ms llama a GET /cameras/preview/{index} que captura
-  // un frame en resolución "low" y lo devuelve como JPEG (sin guardar en BD).
-  //
-  // Para sustituir el polling por streaming real:
-  //   1. Agrega un endpoint MJPEG al backend (ej: /cameras/stream/{index})
-  //   2. En el bloque marcado "STREAM DE CÁMARA" abajo, reemplaza el <img>
-  //      que usa previewUrls[n] por:
-  //      <img src="{getApiBase()}/cameras/stream/{n}?token={token}" ... />
-  //   3. Elimina todo el bloque "POLLING DEL PREVIEW" del <script>
-  //   4. Elimina los imports de onDestroy y browser
-  //
-  // Para cambiar la frecuencia del polling, modifica PREVIEW_INTERVAL_MS.
-  // Para cambiar la resolución del preview, modifica el endpoint en cameras.py.
-  // ============================================================================
+  // The backend has no MJPEG stream, so the live preview is polled: every
+  // PREVIEW_INTERVAL_MS this component fetches GET /cameras/preview/{index},
+  // a single JPEG frame. The frame's resolution is the backend's default for
+  // that endpoint, since no `resolution` parameter is sent from here.
 
   import { onMount, onDestroy } from 'svelte';
   import { m } from '$lib/i18n';
@@ -55,9 +33,6 @@
   import { isConflict } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     cameraMode,
     shutterSpeed,
@@ -108,21 +83,16 @@
     onRotateDegChange?.(camIdx, next);
   }
 
-  // ---------------------------------------------------------------------------
-  // ESTADO LOCAL: Viewport
-  // ---------------------------------------------------------------------------
-
-  let zoom = $state(1);          // Zoom del viewport CSS (1 = 100%)
-  let guideV = $state(50);       // Guía vertical (% desde izquierda)
-  let guideH = $state(50);       // Guía horizontal (% desde arriba)
+  let zoom = $state(1);          // CSS zoom of the viewport (1 = 100%)
+  let guideV = $state(50);       // Vertical guide (% from the left)
+  let guideH = $state(50);       // Horizontal guide (% from the top)
   let dragging = $state<'v' | 'h' | null>(null);
 
-  // Orientación de cámaras: swapped=true → cámara 1 a la izquierda, 0 a la derecha
+  // swapped = true puts camera 1 on the left and camera 0 on the right.
   let swapped = $state(false);
   let leftIdx  = $derived(swapped ? 1 : 0);
   let rightIdx = $derived(swapped ? 0 : 1);
 
-  // Configuración de la grilla
   let gridRows = 3;
   let gridCols = 3;
   let showGrid = $state(false);
@@ -130,127 +100,110 @@
   let showGridModal = $state(false);
 
   // ---------------------------------------------------------------------------
-  // TECLA DE CAPTURA (NEH-228)
-  // El pedal USB de digitalización se comporta como un teclado que emite una
-  // sola tecla, distinta por dispositivo. En vez de exigir configuración
-  // manual, quien opera la asigna presionando el pedal una vez en el control
-  // de abajo, y queda guardada en ese navegador. Por defecto es la barra
-  // espaciadora, así que un teclado normal funciona sin tocar nada.
+  // CAPTURE KEY (NEH-228)
+  // A USB digitization pedal behaves as a keyboard that sends a single key,
+  // different for each device. Instead of manual configuration, the operator
+  // assigns it by pressing the pedal once in the control in the grid settings
+  // modal, and the key is stored in that browser. The default is the space
+  // bar, so an ordinary keyboard works without any setup.
   // ---------------------------------------------------------------------------
   let chord = $state<CaptureChord>(readChord());
 
-  // Seguro de "tecla sostenida": se activa cuando una pulsación arranca una
-  // captura y se libera en el keyup correspondiente. Si el keyup nunca llega
-  // (la ventana perdió el foco a mitad de la pulsación), blur y
-  // visibilitychange lo liberan igual — si no, un pedal soltado fuera de
-  // foco dejaría la captura bloqueada hasta recargar la página (ronda 55).
+  // Held-key latch: set when a key press starts a capture and released on the
+  // matching keyup. If the keyup never arrives (the window lost focus in the
+  // middle of the press), blur and visibilitychange release it as well —
+  // otherwise a pedal released out of focus would block capture until the
+  // page is reloaded (round 55).
   let chordHeld = $state(false);
-  // El release se compara contra el `code` físico de la tecla que armó el
-  // seguro, nunca contra `chord.key`: soltar el modificador antes que la
-  // tecla cambia lo que esa tecla reporta (Shift+2 arma con key "@" y suelta
-  // con key "2"), y `code` no cambia con los modificadores. null cuando no
-  // hay seguro armado, o cuando el dispositivo no reportó un `code`
-  // utilizable al presionar.
+  // The release is compared against the physical `code` of the key that set
+  // the latch, never against `chord.key`: releasing the modifier before the
+  // key changes what that key reports (Shift+2 sets the latch with key "@"
+  // and releases with key "2"), and `code` does not change with modifiers.
+  // null when the latch is not set, or when the device reported no usable
+  // `code` on the press.
   //
-  // El seguro nunca puede sobrevivir a un release que sí llega: se libera
-  // cuando los dos `code` (el de la pulsación y el del release) coinciden,
-  // pero también cuando a cualquiera de los dos le falta un `code`
-  // utilizable — un release sin `code` identificable sigue siendo un
-  // release. Es una guarda deliberadamente débil, la tercera de tres: la
-  // bandera de captura en curso y el flag de repeat ya impiden una segunda
-  // captura real; este seguro solo evita que una repetición del sistema
-  // operativo cuele una captura extra entre el keydown y su keyup. Dejarlo
-  // trabado por falta de `code` es peor que soltarlo de más.
+  // A release that does arrive always clears the latch: it clears when the
+  // two `code`s (the press's and the release's) match, and also when either
+  // of them lacks a usable `code` — a release without an identifiable `code`
+  // is still a release. This is deliberately a weak guard, the third of
+  // three: the capture-in-progress flag and the repeat flag already prevent
+  // a second real capture; this latch only keeps an operating-system key
+  // repeat from slipping an extra capture in between the keydown and its
+  // keyup. A latch stuck for lack of a `code` is worse than one released too
+  // early.
   let heldCode = $state<string | null>(null);
 
-  // Estado del control para asignar la tecla: mientras `learning` es true,
-  // el próximo keydown de la ventana no dispara una captura — se le entrega
-  // a learnFromEvent en su lugar.
+  // While `learning` is true, the window's next keydown does not start a
+  // capture — it goes to `learnFromEvent` instead.
   let learning = $state(false);
-  // Un modificador solo (Control/Alt/Shift/Meta) llegó mientras se asignaba
-  // la tecla, a la espera de que junto con él llegue la tecla que arma la
-  // combinación. Si en cambio se suelta sin que llegue nada más, keyup lo
-  // reporta como un dispositivo que solo emite el modificador, en vez de
-  // quedarse "asignando" para siempre.
+  // A bare modifier (Control/Alt/Shift/Meta) arrived while the key was being
+  // assigned, and the key that completes the combination is still expected.
+  // If the modifier is released with nothing else arriving, keyup reports a
+  // device that sends only the modifier, instead of staying in "assigning"
+  // forever.
   let pendingModifier = $state<'Control' | 'Alt' | 'Shift' | 'Meta' | null>(null);
   let learnMessage = $state<string | null>(null);
 
-  // Los ajustes de cuadrícula ya deciden cuándo el teclado no le pertenece a
-  // la captura; el modal de inspección de imagen vive en la página
-  // (+page.svelte) y llega como prop, así que ambos se combinan acá.
+  // Either modal takes the keyboard away from capture. The grid settings modal
+  // is local; the image-inspection modal lives in the page (+page.svelte) and
+  // arrives as a prop, so the two are combined here.
   let modalOpen = $derived(showGridModal || otherModalOpen);
 
-  // Panel de controles plegable. Abierto por defecto; plegado devuelve al feed
-  // el espacio que el panel le quita. El botón de plegar es siempre visible:
-  // en la pantalla táctil del Pi no hay hover que pueda revelarlo.
+  // Collapsible controls panel, open by default; collapsing it gives the feed
+  // back the space the panel covers. The collapse button is always visible:
+  // the Pi's touchscreen has no hover that could reveal it.
   let controlsOpen = $state(true);
 
-  // Estado de la captura
   let isCapturing = $state(false);
   let captureFlash = $state(false);
 
-  // Listo para capturar: solo cuando projectId/collectionId ya se resolvieron
-  // (evita disparar una captura desde una URL vacía/mal formada).
+  // Ready only once projectId and collectionId have resolved, so no capture
+  // starts from an empty or malformed URL.
   const captureReady = $derived(projectId > 0 && collectionId > 0);
-  // Listo y con raíz: lo único que habilita el botón y la tecla de captura.
+  // Ready and with a stem: the only state that enables the capture button
+  // and the capture key.
   const canCapture = $derived(captureReady && !needsStem);
 
-  // Referencia al contenedor del viewport (para calcular posición de guías)
+  // Its rect turns pointer positions into guide percentages.
   let viewportEl = $state<HTMLElement | null>(null);
 
-  // ===========================================================================
-  // POLLING DEL PREVIEW
-  // ===========================================================================
-  // Este bloque maneja la vista en vivo de las cámaras mediante polling periódico.
-  //
-  // ── PARA SUSTITUIR POR STREAMING REAL ──────────────────────────────────────
-  // Si en el futuro el backend implementa MJPEG streaming:
-  //   1. Elimina todo este bloque (desde "POLLING DEL PREVIEW" hasta "FIN POLLING")
-  //   2. En el HTML abajo, reemplaza el <img src={previewUrls[n]}> por:
-  //      <img src="{getApiBase()}/cameras/stream/{n}" class="feed-img" />
-  //   3. Agrega el token de auth como query param si el backend lo requiere:
-  //      <img src="{getApiBase()}/cameras/stream/{n}?token={getToken()}" ... />
-  // ===========================================================================
-
-  // Frecuencia de actualización del preview en milisegundos.
-  // Aumentar si el Pi tiene problemas de rendimiento (ej: 3000 = 3s).
-  // Disminuir para más fluidez si el hardware lo permite (ej: 1000 = 1s).
+  // Preview refresh interval in milliseconds. Raise it if the Pi struggles
+  // (e.g. 3000 = 3 s); lower it for a smoother preview if the hardware allows
+  // (e.g. 1000 = 1 s).
   const PREVIEW_INTERVAL_MS = 2000;
 
-  // URLs de objeto de las últimas imágenes capturadas por cada cámara.
-  // Key = índice de cámara (0 = izquierda, 1 = derecha).
-  // Se actualizan con cada ciclo de polling.
+  // Object URLs of the latest preview frame from each camera, keyed by camera
+  // index. Which index shows on the left depends on `swapped`.
   let previewUrls = $state<Record<number, string>>({});
 
   // References to the live preview <img> elements for pixel sampling.
   let imgEl0: HTMLImageElement | null = $state(null);
   let imgEl1: HTMLImageElement | null = $state(null);
 
-  // Tamaño medido de cada panel .camera-feed (px), usado para que la imagen
-  // rotada no se recorte contra el overflow:hidden del panel — ver
-  // feedRotateStyle más abajo.
+  // Measured size of each `.camera-feed` panel (px), so the rotated image is
+  // not clipped by the panel's overflow: hidden — see `feedRotateStyle` below.
   let feedW0 = $state(0);
   let feedH0 = $state(0);
   let feedW1 = $state(0);
   let feedH1 = $state(0);
 
-  // NEH-222: tamaño natural del frame de cada cámara (px). El viewport toma
-  // su forma de estos frames en vez de un 4:3 fijo — ver viewportAspect y
-  // fitBox más abajo.
+  // NEH-222: natural size (px) of the frame shown in each panel (0 = left,
+  // 1 = right). The viewport takes its shape from these frames rather than
+  // from a fixed 4:3 — see `viewportAspect` and `fitBox` below.
   let naturalW0 = $state(0);
   let naturalH0 = $state(0);
   let naturalW1 = $state(0);
   let naturalH1 = $state(0);
 
-  // Tamaño medido del tablero (.mat-board): el viewport se dimensiona en
-  // píxeles dentro de este tamaño (R39-3: un width:100% fijo le gana a
-  // aspect-ratio cuando el alto es el límite, así que el viewport recibe
-  // dimensiones explícitas en vez de depender de CSS para derivarlas).
+  // Measured size of the board (`.mat-board`): the viewport is sized in
+  // pixels within it (R39-3: a definite width: 100% defeats aspect-ratio
+  // when height is the limit, so the viewport gets explicit dimensions
+  // instead of relying on CSS to derive them).
   let boardW = $state(0);
   let boardH = $state(0);
 
-  // Forma del viewport: la del frame en modo single; en modo double, la
-  // suma de los anchos de los dos paneles a una altura común (R39-2).
+  // Viewport shape: the frame's in single mode; in double mode, the sum of
+  // the two panels' widths at a common height (R39-2).
   let viewportAspect = $derived(computeViewportAspect(
     [
       naturalW0 && naturalH0 ? { w: naturalW0, h: naturalH0, rotation: rotateDeg[leftIdx] ?? 0 } : null,
@@ -261,14 +214,14 @@
     cameraMode
   ));
 
-  // Caja en píxeles que le da al viewport esa forma dentro del tablero medido.
+  // Pixel box that gives the viewport that shape within the measured board.
   let viewportBox = $derived(fitBox(viewportAspect, boardW, boardH));
 
-  // R39-2: factor de crecimiento de cada panel en modo double — la forma
-  // propia de su frame, para que ningún panel quede recortado aunque solo
-  // uno esté rotado. Si un panel todavía no tiene frame propio (sin señal,
-  // o esperando el primer frame), toma prestada la forma del otro panel en
-  // vez de un 1:1 parejo — solo cae a 1 cuando ninguno de los dos la tiene.
+  // R39-2: each panel's flex-grow factor in double mode is its own frame's
+  // shape, so no panel is clipped even when only one is rotated. A panel
+  // with no frame yet (no signal, or waiting for the first frame) borrows the
+  // other panel's shape instead of an even 1:1 — it falls back to 1 only when
+  // neither has one.
   let leftFrameAspect = $derived(
     frameAspect({ w: naturalW0, h: naturalH0, rotation: rotateDeg[leftIdx] ?? 0 })
   );
@@ -278,16 +231,14 @@
   let leftFeedAspect = $derived(panelGrowFactor(leftFrameAspect, rightFrameAspect));
   let rightFeedAspect = $derived(panelGrowFactor(rightFrameAspect, leftFrameAspect));
 
-  // Un simple `transform: rotate()` sobre una caja del mismo tamaño del
-  // panel se recorta en 90°/270°, porque el panel es rectangular
-  // (landscape) y la imagen rotada pasa a ser portrait (o viceversa): el
-  // rectángulo rotado ya no calza en el rectángulo original y
-  // overflow:hidden le corta las puntas.
+  // A plain `transform: rotate()` on a box the size of the panel is clipped
+  // at 90°/270°: the panel is a rectangle (landscape) and the rotated image
+  // becomes portrait (or the reverse), so the rotated rectangle no longer
+  // fits the original one and overflow: hidden cuts off its corners.
   //
-  // El arreglo: antes de rotar, le damos a la imagen el tamaño del panel
-  // con ancho/alto intercambiados, centrada de forma absoluta. Rotada
-  // 90°/270°, esa caja intercambiada vuelve a calzar exacto en el panel.
-  // 180° no cambia de orientación, así que no necesita este ajuste.
+  // Before rotating, the image gets the panel's size with width and height
+  // swapped, absolutely centered. Rotated 90°/270°, that swapped box fits
+  // the panel exactly. 180° keeps the orientation, so it needs no adjustment.
   function feedRotateStyle(rotation: number, containerW: number, containerH: number): string {
     if (rotation === 90 || rotation === 270) {
       if (!containerW || !containerH) return `transform: rotate(${rotation}deg);`;
@@ -342,49 +293,45 @@
     wbSamplingStore.set({ active: false, cameraIndex: 0, onSample: null });
   }
 
-  // Handle del intervalo de polling (null cuando está pausado)
+  // null while polling is paused.
   let previewInterval: ReturnType<typeof setInterval> | null = null;
 
-  // true cuando la pestaña es visible — se pausa el polling si el usuario
-  // cambia de pestaña para ahorrar recursos en el Raspberry Pi.
+  // true while the tab is visible — polling pauses when the user switches
+  // tabs, to save resources on the Raspberry Pi.
   let previewActive = $state(true);
 
-  // Indica si ya hay un fetch en curso para evitar requests solapados
+  // One fetch in flight per camera, so requests never overlap.
   let fetchingPreview: Record<number, boolean> = { 0: false, 1: false };
 
-  // Contador de errores consecutivos de preview — muestra banner tras 3 fallos
+  // Consecutive preview errors — the reconnect banner shows after 3.
   let previewErrorCount = $state(0);
   let previewConnectError = $derived(previewErrorCount >= 3);
 
-  // Cámara individual ausente (404 en su último fetch de preview, NEH-229).
-  // Distinto de previewConnectError: 404 se excluye deliberadamente del
-  // contador de errores porque significa "cámara no conectada", no "backend
-  // caído" — pero sigue siendo información útil por cámara para mostrar un
-  // overlay sobre su feed.
+  // A single missing camera (404 on its last preview fetch, NEH-229).
+  // Separate from previewConnectError: 404 is deliberately left out of the
+  // error counter because the backend returns it when the camera is not
+  // connected or its frame could not be captured, not when the backend is
+  // down — but per camera it still drives an overlay on that camera's feed.
   // This overlay follows continuous polling, outside cameraRefresh. A 404
   // from before reconnect can briefly restore it after reconnect succeeds;
   // the next successful frame clears it. Unlike the dashboard, a 404 here
   // does not stop polling.
   let cameraMissing = $state<Record<number, boolean>>({});
 
-  // ── Helper: URL base de la API ─────────────────────────────────────────────
   function getApiBase(): string {
     if (!browser) return 'http://localhost:8000';
     return env.PUBLIC_API_BASE || 'http://localhost:8000';
   }
 
-  // ── Helper: cabecera de autenticación ──────────────────────────────────────
   function getAuthHeader(): HeadersInit {
     const token = tokenStore.get();
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
-  // ── Fetch de un frame de preview para una cámara ───────────────────────────
-  // Llama a GET /cameras/preview/{cameraIndex} (endpoint en cameras.py).
-  // Si la cámara no está conectada, el backend devuelve 404 — falla silenciosamente.
-  // La URL de objeto anterior se libera para evitar memory leaks.
+  // Calls GET /cameras/preview/{cameraIndex} (the endpoint is in the
+  // backend's cameras.py). A 404 does not count toward the reconnect banner.
+  // The previous object URL is revoked so frames do not leak memory.
   async function fetchPreview(cameraIndex: number) {
-    // Evitar requests solapados para la misma cámara
     if (fetchingPreview[cameraIndex] || !previewActive) return;
 
     fetchingPreview[cameraIndex] = true;
@@ -398,7 +345,6 @@
         const blob = await response.blob();
         const newUrl = URL.createObjectURL(blob);
 
-        // Liberar la URL anterior para no acumular memoria
         if (previewUrls[cameraIndex]) {
           URL.revokeObjectURL(previewUrls[cameraIndex]);
         }
@@ -409,83 +355,77 @@
           cameraMissing = { ...cameraMissing, [cameraIndex]: false };
         }
       } else if (response.status === 404) {
-        // 404 = cámara no conectada → falla silencioso para el contador de
-        // errores, pero se refleja en el overlay por cámara (NEH-229).
+        // 404: the camera is not connected or its frame could not be
+        // captured. It does not count as an error, but it shows in the
+        // per-camera overlay (NEH-229).
         cameraMissing = { ...cameraMissing, [cameraIndex]: true };
       } else {
-        // Otros errores (500, etc.) cuentan para el banner
+        // Other errors (500, etc.) count toward the banner.
         previewErrorCount += 1;
       }
     } catch {
-      // Error de red — cuenta para el banner de reconexión
+      // A network error counts toward the reconnect banner.
       previewErrorCount += 1;
     } finally {
       fetchingPreview[cameraIndex] = false;
     }
   }
 
-  // ── Inicia o reinicia el polling ───────────────────────────────────────────
-  // Se llama al montar el componente y cada vez que cambia cameraMode.
-  // Cancela el intervalo anterior antes de crear uno nuevo.
+  // Called by the `$effect` below (on mount and whenever cameraMode changes)
+  // and when the tab becomes visible again. Clears the previous interval
+  // before creating a new one.
   function startPreviewPolling() {
     if (previewInterval) {
       clearInterval(previewInterval);
       previewInterval = null;
     }
 
-    // Fetch inmediato al arrancar (no esperar el primer intervalo)
+    // Fetch at once rather than waiting for the first interval.
     fetchPreview(0);
     if (cameraMode === 'double') fetchPreview(1);
 
-    // Polling periódico
     previewInterval = setInterval(() => {
       fetchPreview(0);
       if (cameraMode === 'double') fetchPreview(1);
     }, PREVIEW_INTERVAL_MS);
   }
 
-  // ── Pausa el polling cuando la pestaña pierde el foco ─────────────────────
-  // Esto ahorra recursos en el Raspberry Pi cuando el usuario no está mirando.
+  // Polling pauses while the tab is hidden, to save resources on the
+  // Raspberry Pi.
   function handleVisibilityChange() {
     previewActive = !document.hidden;
     if (previewActive) {
-      // Pestaña visible de nuevo → reiniciar polling
       startPreviewPolling();
     } else {
-      // Pestaña oculta → pausar polling
       if (previewInterval) {
         clearInterval(previewInterval);
         previewInterval = null;
       }
-      // NEH-228: también libera el seguro de tecla sostenida — es una de
-      // las dos rutas de recuperación de un keyup que nunca llega (ronda 55).
+      // NEH-228: also releases the held-key latch — one of the two recovery
+      // paths for a keyup that never arrives (round 55).
       clearChordLatch();
     }
   }
 
-  // ── Ciclo de vida ──────────────────────────────────────────────────────────
   onMount(() => {
-    // Solo registrar el listener de visibilidad aquí.
-    // startPreviewPolling() se llama desde el $effect de abajo,
-    // que ya corre en el montaje inicial. Tenerlo en ambos lanzaba
-    // dos ciclos de polling al montar el componente.
+    // Only the visibility listener is registered here. startPreviewPolling()
+    // is called from the `$effect` below, which also runs on mount; calling
+    // it here as well would start two polling cycles.
     if (browser) {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
   });
 
-  // Reactivo: reiniciar polling cuando cambia el modo de cámara
-  // (ej: de single a double → empezar a pedir también camera 1)
+  // Restart polling when the camera mode changes (e.g. from single to double,
+  // so camera 1 is fetched as well).
   $effect(() => {
-    const _mode = cameraMode; // suscribirse al cambio
+    const _mode = cameraMode; // read to subscribe the effect to cameraMode
     startPreviewPolling();
   });
 
   onDestroy(() => {
-    // Limpiar el intervalo al desmontar el componente
     if (previewInterval) clearInterval(previewInterval);
 
-    // Liberar todas las URLs de objeto para evitar memory leaks
     Object.values(previewUrls).forEach(url => {
       try { URL.revokeObjectURL(url); } catch {}
     });
@@ -495,31 +435,25 @@
     }
   });
 
-  // ===========================================================================
-  // FIN POLLING DEL PREVIEW
-  // ===========================================================================
-
-  // ---------------------------------------------------------------------------
-  // ZOOM (CSS transform del wrapper — ajuste visual del viewport, no afecta la cámara)
-  // Para zoom de cámara (ScalerCrop) usa el slider de Zoom en CameraControls.
-  // ---------------------------------------------------------------------------
+  // Zoom is a CSS transform on the feeds wrapper — a visual adjustment of the
+  // viewport that does not affect the camera. Camera zoom (ScalerCrop) is the
+  // Zoom slider in CameraControls.
   function zoomIn()    { zoom = Math.min(zoom + 0.2, 3); }
   function zoomOut()   { zoom = Math.max(zoom - 0.2, 0.5); }
   function resetZoom() { zoom = 1; }
 
   // ---------------------------------------------------------------------------
-  // GUÍAS ARRASTRABLES
+  // DRAGGABLE GUIDES
   // ---------------------------------------------------------------------------
-  // Eventos de puntero y no de ratón: el aparato se opera con el dedo y
-  // onmousedown/onmousemove no existen ahí, así que las guías no se podían
-  // mover en el equipo para el que están hechas (NEH-156). Pointer cubre
-  // dedo, lápiz y ratón con el mismo código.
+  // Pointer events, not mouse events: the device is operated by finger, and a
+  // finger drag fires no mousedown/mousemove, so mouse handlers cannot move
+  // the guides on the hardware they are made for (NEH-156). Pointer events
+  // cover finger, stylus and mouse with the same code.
   //
-  // La guía captura el puntero al agarrarla, así que el arrastre sigue aunque
-  // el dedo se salga de la franja de 24px --- que es lo normal al arrastrar.
-  // Por eso los manejadores de movimiento y de soltar viven en la guía misma
-  // y no en el visor, y por eso ya no hace falta el onmouseleave que antes
-  // cancelaba el arrastre cuando el cursor se iba del área.
+  // The guide captures the pointer when grabbed, so the drag continues even
+  // when the finger leaves the 24px strip — which is normal while dragging.
+  // That is why the move and release handlers live on the guide itself, not
+  // on the viewport.
   function startDrag(guide: 'v' | 'h', e: PointerEvent) {
     dragging = guide;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -537,9 +471,6 @@
 
   function stopDrag() { dragging = null; }
 
-  // ---------------------------------------------------------------------------
-  // CAPTURA
-  // ---------------------------------------------------------------------------
   async function handleCapture() {
     if (isCapturing || !canCapture) return;
     isCapturing = true;
@@ -569,10 +500,10 @@
         throw new CaptureFailed(result.error);
       }
 
-      // El flash solo dispara cuando el backend confirmó la captura: es la
-      // única señal de éxito que ve el operador, y si dispara siempre, una
-      // captura fallida se ve idéntica a una buena y la página se pierde
-      // sin que nadie se entere hasta la revisión o la exportación (NEH-72).
+      // The flash fires only once the backend has confirmed the capture: it
+      // is the only success signal the operator sees, and if it always fired,
+      // a failed capture would look identical to a good one and the page
+      // would be lost unnoticed until review or export (NEH-72).
       captureFlash = true;
       setTimeout(() => { captureFlash = false; }, 150);
 
@@ -595,15 +526,15 @@
   }
 
   // ---------------------------------------------------------------------------
-  // TECLA DE CAPTURA — manejo de teclado (NEH-228)
+  // CAPTURE KEY — keyboard handling (NEH-228)
   //
-  // ownsEvent y shouldTrigger responden preguntas distintas y se llaman por
-  // separado (ronda 55): ownsEvent decide si el evento le pertenece a la
-  // captura (y por lo tanto si hay que llamar a preventDefault), sin importar
-  // si esta pulsación en particular debe arrancar una captura. Confundirlas
-  // deja pasar las repeticiones de un pedal sostenido hacia lo que tenga
-  // foco — la primera pulsación se cancela, pero cada repetición después de
-  // esa activa el botón enfocado en vez de la cámara.
+  // ownsEvent and shouldTrigger answer different questions and are called
+  // separately (round 55): ownsEvent decides whether the event belongs to
+  // capture (and therefore whether preventDefault is called), regardless of
+  // whether this particular press should start a capture. Conflating them
+  // lets a held pedal's repeats through to whatever has focus — the first
+  // press is cancelled, but every repeat after it activates the focused
+  // button instead of the camera.
   // ---------------------------------------------------------------------------
 
   function ownsEventContext(): OwnsEventContext {
@@ -626,16 +557,16 @@
     }
     const ctx = ownsEventContext();
     if (!ownsEvent(event, ctx)) return;
-    // Siempre que el evento le pertenece a la captura, no a solo cuando de
-    // verdad arranca una: si no, cada repetición después de la primera pasa
-    // de largo hacia el botón enfocado (ronda 55).
+    // Whenever the event belongs to capture, not only when it actually
+    // starts one: otherwise every repeat after the first goes through to the
+    // focused button (round 55).
     event.preventDefault();
     if (shouldTrigger(event, { ...ctx, keyHeld: chordHeld, capturing: isCapturing, ready: canCapture })) {
       chordHeld = true;
-      // Se guarda el `code` físico, no `chord.key`: es lo único que sigue
-      // identificando esta tecla cuando el release llega con los
-      // modificadores ya sueltos. Si el evento no trae un `code` utilizable,
-      // heldCode queda en null y el seguro depende de blur/visibilitychange.
+      // The physical `code` is stored, not `chord.key`: it is the only thing
+      // that still identifies this key when the release arrives with the
+      // modifiers already up. If the event carries no usable `code`,
+      // heldCode stays null and the next keyup of any key releases the latch.
       heldCode = event.code || null;
       handleCapture();
     }
@@ -643,24 +574,18 @@
 
   function handleWindowKeyup(event: KeyboardEvent) {
     if (learning) {
-      // El dispositivo solo mandó un modificador y ahora lo suelta sin que
-      // haya llegado ninguna otra tecla junto con él: se lo decimos a quien
-      // opera en vez de dejar el control "asignando" para siempre.
+      // The device sent only a modifier and is now releasing it with no
+      // other key having arrived with it: tell the operator instead of
+      // leaving the control in "assigning" forever.
       if (pendingModifier && event.key === pendingModifier) {
         learnMessage = $m.lv_capture_key_modifier_only(pendingModifier);
         pendingModifier = null;
       }
       return;
     }
-    // El release se compara contra el `code` físico que armó el seguro, no
-    // contra la tecla del chord: soltar un modificador antes que la tecla
-    // cambia lo que esa tecla reporta como `key`, pero no su `code`. Se
-    // libera cuando los dos `code` coinciden, y también cuando a cualquiera
-    // de los dos lados le falta un `code` utilizable — un release sin
-    // `code` identificable sigue siendo un release, y dejar el seguro
-    // trabado por falta de dato es peor que soltarlo de más: la captura en
-    // curso y el flag de repeat son las guardas que de verdad impiden una
-    // segunda captura, este seguro es solo la tercera.
+    // Compared against the physical `code` that set the latch, not the
+    // chord's key; the latch also clears when either side lacks a usable
+    // `code`. See the comments on `chordHeld` and `heldCode` above.
     if (!heldCode || !event.code || event.code === heldCode) {
       clearChordLatch();
     }
@@ -682,7 +607,8 @@
       learnMessage = null;
       return;
     }
-    // 'unbindable': Dead, Unidentified, o un evento a mitad de composición.
+    // 'unbindable': Dead, Unidentified, or an event in the middle of IME
+    // composition.
     learnMessage = $m.lv_capture_key_unbindable;
   }
 
@@ -692,8 +618,8 @@
     learnMessage = null;
   }
 
-  // Cancelar es siempre un botón visible, nunca una tecla — si no, un pedal
-  // que emite Escape no se podría asignar nunca.
+  // Cancelling is always a visible button, never a key — otherwise a pedal
+  // that sends Escape could never be assigned.
   function cancelLearningChord() {
     learning = false;
     pendingModifier = null;
@@ -708,19 +634,12 @@
 
   function closeGridModal() {
     showGridModal = false;
-    // Cerrar los ajustes de cuadrícula a mitad de la asignación no debe
-    // dejar el próximo keydown de la ventana secuestrado por un control ya
-    // invisible.
+    // Closing the grid settings in the middle of an assignment must not
+    // leave the window's next keydown captured by a control that is no
+    // longer visible.
     cancelLearningChord();
   }
 
-  // ---------------------------------------------------------------------------
-  // MODAL DE GRILLA
-  // ---------------------------------------------------------------------------
-
-  // ---------------------------------------------------------------------------
-  // HELPER: etiqueta de cámara con índice
-  // ---------------------------------------------------------------------------
   function cameraLabel(idx: number): string {
     const dev = devices.find(d => d.index === idx);
     return `${dev?.label || dev?.model || $m.cam_fallback_name} [${idx}]`;
@@ -729,15 +648,9 @@
 
 <svelte:window onkeydown={handleWindowKeydown} onkeyup={handleWindowKeyup} onblur={clearChordLatch} />
 
-<!-- ============================================================
-     VIEWPORT PRINCIPAL
-     ============================================================ -->
 <div class="viewport-outer">
   <div class="mat-board" bind:clientWidth={boardW} bind:clientHeight={boardH}>
 
-    <!-- ══════════════════════════════════════════════════════════
-         ÁREA DE CÁMARAS
-         ══════════════════════════════════════════════════════════ -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="camera-viewport"
@@ -746,11 +659,10 @@
       style={viewportBox.w && viewportBox.h ? `width: ${viewportBox.w}px; height: ${viewportBox.h}px` : undefined}
     >
 
-      <!-- Banner: la última captura falló (NEH-72). `cameraStatus` ya
-           registraba el fallo, pero nada lo mostraba: el componente que iba a
-           hacerlo nunca se montó y después se eliminó. Se limpia solo con la
-           siguiente captura buena (`reportSuccess`), así que no puede quedarse
-           colgado a mitad de una secuencia. -->
+      <!-- Banners: the volume has no stem, or the last capture failed
+           (NEH-72). The capture-error banner clears on the next good capture
+           (`reportSuccess`), so it cannot stay up in the middle of a
+           sequence. -->
       {#if needsStem && captureReady}
         <div class="needs-stem-banner" role="alert">
           <span class="material-symbols-outlined icon-sm" aria-hidden="true">warning</span>
@@ -762,13 +674,12 @@
       {:else if $cameraStatus.captureError}
         <div class="capture-error-banner" role="alert">
           <span class="material-symbols-outlined icon-sm">error</span>
-          <!-- `||` y no `??`: un mensaje vacío también tiene que caer al
-               catálogo, o el banner sale sin texto. -->
+          <!-- `||`, not `??`: an empty message must also fall back to the
+               catalogue, or the banner shows no text. -->
           {$cameraStatus.errorMessage || $m.lv_capture_error}
         </div>
       {/if}
 
-      <!-- Banner: reconectando tras errores consecutivos de preview -->
       {#if previewConnectError}
         <div class="reconnect-banner" class:stacked={$cameraStatus.captureError}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -778,40 +689,10 @@
         </div>
       {/if}
 
-      <!-- ══════════════════════════════════════════════════════
-           STREAM DE CÁMARA
-           ══════════════════════════════════════════════════════
-           Este bloque muestra el feed en vivo de una o dos cámaras.
-
-           ESTADO ACTUAL: usa previewUrls[n] que se actualiza via polling.
-           previewUrls[n] es una Object URL que apunta al último frame JPEG
-           capturado por /cameras/preview/{n} en el backend.
-
-           ── PARA SUSTITUIR POR STREAMING REAL ──────────────────
-           Cuando el backend tenga MJPEG streaming, reemplaza cada:
-
-             {#if previewUrls[n]}
-               <img src={previewUrls[n]} ... />
-             {:else}
-               <div class="no-stream">...</div>
-             {/if}
-
-           Por simplemente:
-
-             <img
-               src="{getApiBase()}/cameras/stream/{n}"
-               class="feed-img"
-               alt="Camera {n}"
-             />
-
-           Y elimina el bloque "POLLING DEL PREVIEW" del <script>.
-           ══════════════════════════════════════════════════════ -->
       <div class="camera-feeds-wrapper" style="transform: scale({zoom})">
 
-        <!-- Cámara izquierda (leftIdx) — siempre visible -->
         <div class="camera-feed" bind:clientWidth={feedW0} bind:clientHeight={feedH0} style="flex-grow: {leftFeedAspect}">
           {#if previewUrls[leftIdx]}
-            <!-- Frame en vivo del polling — se actualiza cada PREVIEW_INTERVAL_MS -->
             <img
               bind:this={imgEl0}
               bind:naturalWidth={naturalW0}
@@ -833,10 +714,10 @@
               ></div>
             {/if}
           {:else if !cameraMissing[leftIdx]}
-            <!-- Placeholder: sin señal o esperando primer frame.
-                 Se omite cuando la cámara ya está marcada como ausente: en ese
-                 caso el aviso de NEH-229 dice lo mismo pero con la instrucción
-                 concreta, y los dos se montaban en el centro del feed. -->
+            <!-- No signal yet, or waiting for the first frame. Omitted when
+                 the camera is marked missing: the NEH-229 notice says the same
+                 with the concrete instruction, and both would sit in the
+                 center of the feed. -->
             <div class="no-stream">
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -846,11 +727,10 @@
               <small>{$m.lv_check_hw}</small>
             </div>
           {/if}
-          <!-- Overlay: la cámara respondió 404 en el último fetch (NEH-229) -->
+          <!-- The camera returned 404 on its last fetch (NEH-229). -->
           {#if cameraMissing[leftIdx]}
             <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
           {/if}
-          <!-- Badge identificador de cámara -->
           <div class="feed-label">{cameraLabel(leftIdx)}</div>
           <!-- Floating rotation overlay -->
           <div class="feed-rotate-overlay">
@@ -870,11 +750,9 @@
           </div>
         </div>
 
-        <!-- Cámara derecha (rightIdx) — solo en modo double -->
         {#if cameraMode === 'double'}
           <div class="camera-feed" bind:clientWidth={feedW1} bind:clientHeight={feedH1} style="flex-grow: {rightFeedAspect}">
             {#if previewUrls[rightIdx]}
-              <!-- Frame en vivo del polling -->
               <img
                 bind:this={imgEl1}
                 bind:naturalWidth={naturalW1}
@@ -895,10 +773,10 @@
                 ></div>
               {/if}
             {:else if !cameraMissing[rightIdx]}
-              <!-- Placeholder: sin señal o esperando primer frame.
-                   Se omite cuando la cámara ya está marcada como ausente: en
-                   ese caso el aviso de NEH-229 dice lo mismo pero con la
-                   instrucción concreta, y los dos se montaban en el centro. -->
+              <!-- No signal yet, or waiting for the first frame. Omitted when
+                   the camera is marked missing: the NEH-229 notice says the
+                   same with the concrete instruction, and both would sit in
+                   the center of the feed. -->
               <div class="no-stream">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -908,11 +786,10 @@
                 <small>{$m.lv_check_hw}</small>
               </div>
             {/if}
-            <!-- Overlay: la cámara respondió 404 en el último fetch (NEH-229) -->
+            <!-- The camera returned 404 on its last fetch (NEH-229). -->
             {#if cameraMissing[rightIdx]}
               <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
             {/if}
-            <!-- Badge identificador de cámara -->
             <div class="feed-label right">{cameraLabel(rightIdx)}</div>
             <!-- Floating rotation overlay -->
             <div class="feed-rotate-overlay">
@@ -934,9 +811,7 @@
         {/if}
 
       </div>
-      <!-- ══ FIN STREAM DE CÁMARA ══ -->
 
-      <!-- ── GRILLA (líneas cian, no arrastrables) ── -->
       {#if showGrid}
         {#each Array.from({length: gridCols - 1}, (_, i) => i) as i}
           <div class="grid-line vertical" style="left: {(i+1) * (100/gridCols)}%"></div>
@@ -946,7 +821,6 @@
         {/each}
       {/if}
 
-      <!-- ── GUÍAS ARRASTRABLES (líneas rojas) ── -->
       {#if showGuides}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
@@ -972,7 +846,6 @@
         </div>
       {/if}
 
-      <!-- ── BARRA DE METADATOS ── -->
       <div class="metadata-bar">
         <div class="metadata-values">
           <span>ISO {iso}</span>
@@ -984,7 +857,6 @@
 
     </div><!-- /camera-viewport -->
 
-    <!-- ── PANEL FLOTANTE: zoom + grilla ── -->
     <div class="floating-controls" class:collapsed={!controlsOpen}>
       <button
         class="float-btn float-btn-toggle"
@@ -1042,7 +914,6 @@
       {/if}
     </div>
 
-    <!-- ── BOTÓN DE CAPTURA ── -->
     <div class="capture-btn-wrapper">
       <button
         class="capture-btn"
@@ -1061,9 +932,6 @@
   </div><!-- /mat-board -->
 </div><!-- /viewport-outer -->
 
-<!-- ============================================================
-     MODAL: Configuración de Grilla
-     ============================================================ -->
 {#if showGridModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1091,8 +959,8 @@
           </button>
         </div>
 
-        <!-- NEH-228: la tecla de captura — se asigna una vez y queda
-             guardada en este navegador. -->
+        <!-- NEH-228: the capture key — assigned once and stored in this
+             browser. -->
         <div class="modal-toggle-row capture-key-row">
           <div>
             <p class="modal-toggle-title">{$m.lv_capture_key_current(describeChord(chord, $m.lv_capture_key_space))}</p>
@@ -1146,11 +1014,11 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Banner de captura fallida — mismo lenguaje visual que el de reconexión,
-     pero opaco y sin pulso: es un estado que exige acción, no una espera.
-     z-index 60 lo deja por encima de todo lo que se dibuja en el viewport
-     (guías y overlays llegan hasta 50), para que no quede tapado justo
-     cuando el operador tiene las guías de encuadre puestas. */
+  /* Failed-capture banner — the same visual language as the reconnect
+     banner, but opaque and without the pulse: it is a state that calls for
+     action, not a wait. z-index 60 puts it above everything drawn in the
+     viewport (guides and overlays go up to 50), so it is not hidden while
+     the operator has the framing guides on. */
   .capture-error-banner {
     position: absolute;
     top: 10px;
@@ -1170,8 +1038,8 @@
     pointer-events: none;
   }
 
-  /* Banner: el volumen no tiene raíz. A diferencia del de error, recibe
-     clics: lleva el enlace al formulario del volumen. */
+  /* Banner: the volume has no stem. Unlike the error banner, it receives
+     clicks: it carries the link to the volume's form. */
   .needs-stem-banner {
     position: absolute;
     top: 10px;
@@ -1197,7 +1065,6 @@
     white-space: nowrap;
   }
 
-  /* Banner de reconexión */
   .reconnect-banner {
     position: absolute;
     top: 10px;
@@ -1217,9 +1084,9 @@
     animation: pulse-opacity 1.5s ease-in-out infinite;
   }
 
-  /* Una cámara caída dispara los dos banners a la vez, y ambos se centran
-     arriba: cuando eso pasa, el de reconexión baja para no quedar debajo
-     del de captura fallida. */
+  /* A failed capture and a lost preview connection can show both banners at
+     once, both centered at the top: the reconnect banner then moves down so
+     it is not hidden under the failed-capture banner. */
   .reconnect-banner.stacked { top: 52px; }
 
   @keyframes pulse-opacity {
@@ -1227,13 +1094,12 @@
     50%       { opacity: 0.6; }
   }
 
-  /* ── Viewport negro interno ── */
-  /* width/aspect-ratio son el respaldo antes de que el tablero (.mat-board)
-     se mida por primera vez — viewportBox llega en 0x0 en ese primer tick
-     y el elemento no tiene todavía un tamaño en línea, así que sin esto se
-     colapsaría a 0. En cuanto viewportBox deja de ser 0x0, el tamaño en
-     línea (width/height en px) pisa a estas dos reglas. max-height:100% NO
-     va aquí a propósito — es justo lo que R39-3 eliminó. */
+  /* width/aspect-ratio are the fallback until the board (.mat-board) is
+     first measured — viewportBox is 0x0 on that first tick and the element
+     has no inline size yet, so without them it would collapse to 0. Once
+     viewportBox is no longer 0x0, the inline size (width/height in px)
+     overrides these two rules. max-height: 100% is deliberately absent
+     (R39-3). */
   .camera-viewport {
     position: relative;
     width: 100%;
@@ -1245,7 +1111,6 @@
     cursor: crosshair;
   }
 
-  /* Efecto flash al capturar */
   .camera-viewport.flash::after {
     content: '';
     position: absolute;
@@ -1258,12 +1123,9 @@
 
   @keyframes flash { 0% { opacity: 0.3; } 100% { opacity: 0; } }
 
-  /* ══════════════════════════════════════════════════════════════
-     FEEDS DE CÁMARA
-     Wrapper flex que contiene los paneles L y R lado a lado.
-     En modo single: solo aparece el feed izquierdo (flex: 1).
-     En modo double: dos feeds iguales dividiendo el espacio.
-     ══════════════════════════════════════════════════════════════ */
+  /* Holds the left and right panels side by side. In double mode each
+     panel's flex-grow is set inline from its frame's shape (leftFeedAspect,
+     rightFeedAspect). */
   .camera-feeds-wrapper {
     display: flex;
     width: 100%;
@@ -1271,7 +1133,6 @@
     transition: transform 0.3s ease;
   }
 
-  /* Cada panel de cámara */
   .camera-feed {
     flex: 1 1 0;
     display: flex;
@@ -1279,13 +1140,12 @@
     justify-content: center;
     position: relative;
     overflow: hidden;
-    /* Línea divisoria entre L y R */
     border-right: 1px solid rgba(255,255,255,0.06);
   }
 
   .camera-feed:last-child { border-right: none; }
 
-  /* Overlay: cámara ausente (404 en el último fetch de preview, NEH-229) */
+  /* Missing camera (404 on its last preview fetch, NEH-229) */
   .camera-missing {
     position: absolute;
     top: 50%;
@@ -1305,7 +1165,6 @@
     pointer-events: none;
   }
 
-  /* Imagen del stream / polling */
   .feed-img {
     width: 100%;
     height: 100%;
@@ -1313,7 +1172,6 @@
     display: block;
   }
 
-  /* Badge L / R en la esquina del feed */
   .feed-label {
     position: absolute;
     top: 8px;
@@ -1332,7 +1190,6 @@
 
   .feed-label.right { left: auto; right: 8px; }
 
-  /* Placeholder sin señal */
   .no-stream {
     display: flex;
     flex-direction: column;
@@ -1347,7 +1204,6 @@
   .no-stream span  { font-size: var(--text-base); font-weight: var(--fw-medium); }
   .no-stream small { font-size: var(--text-sm); }
 
-  /* ── Grilla (cian) ── */
   .grid-line {
     position: absolute;
     pointer-events: none;
@@ -1358,19 +1214,18 @@
   .grid-line.vertical   { top: 0; bottom: 0; width: 1px; }
   .grid-line.horizontal { left: 0; right: 0; height: 1px; }
 
-  /* ── Guías arrastrables (rojo) ── */
   .guide {
     position: absolute;
     z-index: 30;
-    /* Sin esto el navegador interpreta el gesto como desplazamiento y se lo
-       queda: los eventos de puntero dejan de llegar a mitad del arrastre. */
+    /* Without this the browser treats the gesture as a scroll and takes it
+       over: pointer events stop arriving in the middle of the drag. */
     touch-action: none;
   }
 
-  /* 24px y no 16: la franja hay que agarrarla con el dedo. No llega a los 44
-     del mínimo táctil a propósito --- una guía vertical de 44px taparía una
-     columna entera de la imagen que se está encuadrando, y a diferencia de un
-     botón, esto se ve antes de agarrarlo y se arrastra, no se acierta. */
+  /* 24px, not 16: the strip has to be grabbed with a finger. It stays below
+     the 44px touch minimum on purpose — a 44px vertical guide would cover a
+     whole column of the image being framed, and unlike a button, a guide is
+     visible before it is grabbed and is dragged rather than tapped. */
   .guide.vertical   { top: 0; bottom: 0; width: 24px; margin-left: -12px; cursor: ew-resize; }
   .guide.horizontal { left: 0; right: 0; height: 24px; margin-top: -12px; cursor: ns-resize; }
 
@@ -1384,7 +1239,6 @@
   .guide.horizontal .guide-line { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-50%); }
   .guide:hover .guide-line { background-color: rgba(255,80,80,1); }
 
-  /* ── Barra de metadatos ── */
   .metadata-bar {
     position: absolute;
     bottom: 0; left: 0; right: 0;
@@ -1411,7 +1265,6 @@
     color: var(--color-light-grey);
   }
 
-  /* ── Panel flotante ── */
   .floating-controls {
     position: absolute;
     top: 75px; right: 1px;
@@ -1426,13 +1279,13 @@
     gap: 4px;
     width: 56px;
     align-items: center;
-    /* Sin scroll a propósito: el panel se dimensiona por su contenido. Vive
-       dentro del visor, que recorta lo que se sale, así que si algún día se
-       agrega otro control hay que revisar que el conjunto siga cabiendo. */
+    /* No scroll on purpose: the panel is sized by its content. It sits inside
+       the viewport, which clips any overflow, so any added control has to be
+       checked against the space available. */
     transition: width var(--transition-base);
   }
 
-  /* Plegado: solo el botón de alternar, para devolverle el área al feed */
+  /* Collapsed: only the toggle button, to give the area back to the feed */
   .floating-controls.collapsed {
     background-color: rgba(26,24,21,0.6);
   }
@@ -1440,8 +1293,8 @@
   .float-btn-toggle { color: var(--color-light); }
 
   .float-btn {
-    /* 44px, no 64: el riel de la vista de colección puede permitirse 64 porque
-       es una barra de altura completa; aquí el panel vive dentro del visor. */
+    /* 44px, not 64: the collection view's rail can afford 64 because it is a
+       full-height bar; this panel sits inside the viewport. */
     width: var(--touch-target-min); height: var(--touch-target-min);
     display: flex;
     align-items: center;
@@ -1459,7 +1312,6 @@
 
   .float-divider { width: 32px; height: 1px; background-color: var(--border-color); }
 
-  /* ── Botón de captura ── */
   .capture-btn-wrapper {
     position: absolute;
     bottom: 24px;
@@ -1603,8 +1455,8 @@
 
   .toggle-thumb.on { transform: translateX(24px); background-color: white; }
 
-  /* NEH-228: fila de la tecla de captura — igual que .modal-toggle-row, pero
-     con dos botones en vez de un toggle a la derecha. */
+  /* NEH-228: the capture key row — like .modal-toggle-row, but with two
+     buttons instead of a toggle on the right. */
   .capture-key-buttons { display: flex; gap: 8px; flex-shrink: 0; }
 
   .capture-key-btn {

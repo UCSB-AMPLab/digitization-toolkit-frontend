@@ -1,29 +1,18 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: ThumbnailStrip
-  // Archivo: src/routes/live-preview/ThumbnailStrip.svelte
+  // Horizontal strip of thumbnails along the bottom of the live preview,
+  // showing the records captured in the current volume.
   //
-  // Tira horizontal de miniaturas en la parte inferior de la interfaz.
-  // Muestra los registros capturados en la colección actual.
-  //
-  // Una unidad por REGISTRO, no por imagen (NEH-236). Un folio capturado con
-  // dos cámaras tiene dos imágenes y es una sola cosa; mostrarlas sueltas, con
-  // el título repetido debajo de cada mitad, decía lo contrario. Se agrupan por
-  // cercanía como en la galería y en la cuadrícula, y el marco claro rodea el
-  // folio entero en vez de cada mitad.
-  //
-  // Comportamiento según cameraMode:
-  //   'single' → una imagen por registro (la primera); el grupo tiene una sola
-  //              mitad y queda igual que antes
-  //   'double' → las dos imágenes del folio, juntas, con badge L/R
-  // ============================================================================
+  // The unit is the RECORD, not the image (NEH-236). A folio captured with two
+  // cameras has two images and is one thing; showing them apart, with the
+  // title repeated under each half, would say otherwise. The halves are
+  // grouped by proximity, as in the gallery and the grid, and the selection
+  // frame surrounds the whole folio rather than each half. In `single` mode
+  // each record shows its first image; in `double` mode both images of the
+  // folio sit together with an L/R badge.
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     records,
     selectedRecordId,
@@ -36,11 +25,8 @@
     onSelect: (record: Record) => void;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // TIPO: item individual de la tira
-  // En modo 'single' → un item por registro (primera imagen)
-  // En modo 'double' → un item por imagen dentro de cada registro
-  // ---------------------------------------------------------------------------
+  // One image within a strip unit. In `single` mode a record has one item
+  // (its first image); in `double` mode, one item per image.
   interface ThumbItem {
     record: Record;
     image: RecordImage | null;
@@ -60,16 +46,13 @@
     return recordsApi.getImageThumbnailUrl(img.id);
   }
 
-  // ---------------------------------------------------------------------------
-  // ORDEN: la tira no depende del orden en que llegan los registros (NEH-159:
-  // el backend no garantiza un ORDER BY, así que el orden de llegada puede
-  // variar). Se ordena con el mismo criterio que la galería — sequence
-  // ascendente (nulls al final), luego id — en orden cronológico de lectura:
-  // lo más antiguo a la izquierda y la captura más reciente en el extremo
-  // DERECHO (convención acordada, NEH-159/NEH-183 — no invertir). Cuando
-  // NEH-122 haga que la captura asigne sequence, este criterio lo recoge
-  // sin cambios.
-  // ---------------------------------------------------------------------------
+  // The strip does not depend on the order in which the records arrive
+  // (NEH-159: the backend guarantees no ORDER BY, so that order can vary). It
+  // sorts by the same criterion as the gallery — `sequence` ascending (nulls
+  // last), then `id` — in chronological reading order: oldest on the left and
+  // the most recent capture at the RIGHT end (agreed convention,
+  // NEH-159/NEH-183 — do not invert). When capture assigns `sequence`
+  // (NEH-122), this criterion applies unchanged.
   function archivalOrder(a: Record, b: Record): number {
     if (a.sequence == null && b.sequence == null) return a.id - b.id;
     if (a.sequence == null) return 1;
@@ -79,9 +62,6 @@
 
   let orderedRecords = $derived([...records].sort(archivalOrder));
 
-  // ---------------------------------------------------------------------------
-  // DERIVADO: un grupo por registro, con sus imágenes dentro
-  // ---------------------------------------------------------------------------
   interface ThumbGroup {
     record: Record;
     items: ThumbItem[];
@@ -117,14 +97,10 @@
   );
 </script>
 
-<!-- ============================================================
-     TIRA DE MINIATURAS: barra horizontal con scroll
-     ============================================================ -->
 <div class="thumbnail-strip">
   <div class="strip-scroll">
 
     {#if thumbGroups.length === 0}
-      <!-- Estado vacío: no hay capturas aún -->
       <div class="empty-state">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -133,7 +109,6 @@
         <span>{$m.lv_thumb_empty}</span>
       </div>
     {:else}
-      <!-- Lista de miniaturas -->
       {#each thumbGroups as group, i}
         {@const isSelected = group.record.id === selectedRecordId}
 
@@ -143,8 +118,8 @@
           onclick={() => onSelect(group.record)}
         >
 
-          <!-- Las mitades del folio, juntas. El marco de seleccionado va aquí
-               y no en cada imagen: lo que se elige es el folio (NEH-236). -->
+          <!-- The halves of the folio, together. The selection frame goes here
+               and not on each image: the operator selects the folio (NEH-236). -->
           <div class="thumb-pair" class:selected={isSelected}>
             {#each group.items as item, j}
               <div class="thumb-image-wrapper" class:alt-bg={j % 2 !== 0}>
@@ -163,7 +138,6 @@
                   </div>
                 {/if}
 
-                <!-- Badge L/R en modo doble cámara -->
                 {#if cameraMode === 'double' && item.role}
                   <div class="thumb-badge" class:right={item.role === 'R'}>
                     {item.role}
@@ -173,7 +147,7 @@
             {/each}
           </div>
 
-          <!-- Nombre del folio, una sola vez -->
+          <!-- The folio name, once for the whole folio -->
           <div class="thumb-info">
             <span class="thumb-name" title={group.record.title}>
               {group.record.title || `Cap. ${String(i + 1).padStart(3, '0')}`}
@@ -188,7 +162,6 @@
 </div>
 
 <style>
-  /* Contenedor principal de la tira */
   .thumbnail-strip {
     width: 100%;
     height: 100%;
@@ -202,9 +175,8 @@
     flex-shrink: 0;
   }
 
-  /* Área de scroll horizontal */
-  /* 18px entre folios contra los 4 de --pair-gap: lo que agrupa es esa
-     diferencia, no el valor. Si se cambia uno, mirar el otro. */
+  /* 18px between folios against the 4px of `--pair-gap`: the difference does
+     the grouping, not the values. A change to one needs a look at the other. */
   .strip-scroll {
     flex: 1;
     display: flex;
@@ -216,11 +188,9 @@
     min-height: 0;
   }
 
-  /* Scrollbar mínimo */
   .strip-scroll::-webkit-scrollbar { height: 3px; }
   .strip-scroll::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 999px; }
 
-  /* Estado vacío */
   .empty-state {
     flex: 1;
     display: flex;
@@ -235,9 +205,9 @@
   }
 
   /* ── Folio ──
-     El ancho lo deciden las mitades: en modo de una cámara mide 100px y en
-     modo doble el doble más el hueco interno, así que cada mitad conserva el
-     tamaño de siempre. */
+     The halves set the width: 100px in single-camera mode, and in double
+     mode twice that plus the inner gap, so each half is the same size in
+     both modes. */
   .thumbnail-item {
     --pair-gap: 4px;
     display: flex;
@@ -256,7 +226,7 @@
   .thumbnail-item:hover { opacity: 1; }
   .thumbnail-item.selected { opacity: 1; }
 
-  /* El marco de seleccionado rodea el folio entero, no cada mitad. */
+  /* The selection frame surrounds the whole folio, not each half. */
   .thumb-pair {
     display: flex;
     gap: var(--pair-gap);
@@ -273,7 +243,6 @@
     box-shadow: var(--selected-ring);
   }
 
-  /* Contenedor de la imagen */
   .thumb-image-wrapper {
     position: relative;
     width: 100px;
@@ -285,12 +254,11 @@
     padding: 4px;
   }
 
-  /* Fondo alternado para diferenciar L/R */
+  /* Alternate background to tell L from R */
   .thumb-image-wrapper.alt-bg {
     background-color: var(--color-surface);
   }
 
-  /* Imagen de miniatura */
   .thumb-img {
     width: 100%;
     height: 100%;
@@ -299,7 +267,6 @@
     display: block;
   }
 
-  /* Placeholder sin imagen */
   .thumb-placeholder {
     width: 100%;
     height: 100%;
@@ -310,7 +277,6 @@
     opacity: 0.4;
   }
 
-  /* Badge L/R */
   .thumb-badge {
     position: absolute;
     top: 4px;
@@ -326,18 +292,14 @@
     line-height: 1.4;
   }
 
-  /* Badge R (derecha, se posiciona a la derecha) */
   .thumb-badge.right {
     left: auto;
     right: 4px;
   }
 
-  /* Info del registro */
-  /* Antes esta caja llevaba el nombre y, debajo, un icono de estado escrito a
-     mano que mostraba siempre un reloj: no leía nada, decía "pendiente" para
-     todos los folios y en cualquier situación. Se retiró — en captura todo
-     acaba de nacer capturado y no había nada que informar. El estado real sí
-     se pinta donde importa, con StatusBadge, en la lista y en la cuadrícula. */
+  /* The box holds only the name, with no status icon: during capture every
+     record has just been captured, so there is no status to report. The list
+     and grid views show the record status with `StatusBadge`. */
   .thumb-info {
     flex-shrink: 0;
     display: flex;
