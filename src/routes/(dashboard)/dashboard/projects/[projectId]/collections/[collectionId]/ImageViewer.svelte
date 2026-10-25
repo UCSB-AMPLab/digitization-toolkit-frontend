@@ -37,7 +37,6 @@
     saturation = 0,
     onPrev,
     onNext,
-    onZoomChange,
     onOneToOneChange,
   }: {
     viewMode: 'spread';
@@ -51,7 +50,6 @@
     saturation?: number;
     onPrev: () => void;
     onNext: () => void;
-    onZoomChange: (z: number) => void;
     onOneToOneChange?: (z: number) => void;
   } = $props();
 

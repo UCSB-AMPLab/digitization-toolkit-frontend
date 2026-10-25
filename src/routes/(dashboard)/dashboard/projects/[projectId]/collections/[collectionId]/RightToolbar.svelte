@@ -14,8 +14,6 @@
     canExport = false,
     onViewModeChange,
     onZoomChange,
-    onRotateLeft,
-    onRotateRight,
     onExport,
   }: {
     viewMode: 'list' | 'spread' | 'grid';
@@ -24,8 +22,6 @@
     canExport?: boolean;
     onViewModeChange: (mode: 'list' | 'spread' | 'grid') => void;
     onZoomChange: (zoom: number) => void;
-    onRotateLeft: () => void;
-    onRotateRight: () => void;
     onExport?: () => void;
   } = $props();
 

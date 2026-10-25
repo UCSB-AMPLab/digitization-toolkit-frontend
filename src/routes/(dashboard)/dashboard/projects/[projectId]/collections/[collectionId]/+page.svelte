@@ -464,7 +464,6 @@
           {saturation}
           onPrev={handlePrev}
           onNext={handleNext}
-          onZoomChange={(z) => zoom = z}
           onOneToOneChange={(z) => oneToOne = z}
         />
         <div class="thumbnail-area">
@@ -486,8 +485,6 @@
       {canExport}
       onViewModeChange={handleViewModeChange}
       onZoomChange={(z) => zoom = z}
-      onRotateLeft={handleRotateLeft}
-      onRotateRight={handleRotateRight}
       onExport={() => showChooserModal = true}
     />
 
