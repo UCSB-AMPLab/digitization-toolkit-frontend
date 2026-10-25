@@ -164,7 +164,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="handover-backdrop" onclick={(e) => { if (e.target === e.currentTarget) closeDialog(); }}>
     <div
-      class="handover-card"
+      class="handover-card dialog-fit"
       role="dialog"
       aria-modal="true"
       aria-labelledby="handover-title"

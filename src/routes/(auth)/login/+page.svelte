@@ -347,7 +347,7 @@
 		aria-modal="true"
 		aria-label={$m.login_forgot_dialog_aria}
 	>
-		<div class="popup-card">
+		<div class="popup-card dialog-fit">
 			<div class="popup-icon-wrapper">
 				<svg
 					viewBox="0 0 24 24"

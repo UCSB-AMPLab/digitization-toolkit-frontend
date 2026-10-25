@@ -8,6 +8,7 @@
   import { usersApi, type UserRead } from '$lib/api';
   import { m, locale, roleLabel } from '$lib/i18n';
   import { normalizeEmail, emailFormatError } from '$lib/email-field';
+  import { dismissible } from '$lib/dialog';
 
   type UserRole   = 'operator' | 'reviewer' | 'admin';
   type UserStatus = 'active'   | 'inactive';
@@ -413,7 +414,8 @@
       showUserModal = false;
     }
   }}>
-    <div class="modal-card">
+    <!-- No Escape: it would throw away what was typed. -->
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
 
       <div class="modal-header">
         <div>
@@ -593,16 +595,10 @@
 {/if}
 
 {#if showDeleteModal && deletingUser}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => {
-    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) {
-      showDeleteModal = false;
-    }
-  }}>
-    <div class="modal-card modal-confirm">
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: () => showDeleteModal = false, escape: !isDeleting, backdrop: !isDeleting }}>
+    <div class="modal-card modal-confirm dialog-fit" role="dialog" aria-modal="true" aria-labelledby="user-delete-title">
 
-      <h3 class="confirm-title">{$m.users_delete_title}</h3>
+      <h3 class="confirm-title" id="user-delete-title">{$m.users_delete_title}</h3>
 
       <p class="confirm-desc">
         {$m.users_delete_confirm_pre}
@@ -842,7 +838,6 @@
     width: 100%; max-width: 420px;
     box-shadow: var(--shadow-lg);
     display: flex; flex-direction: column; gap: 16px;
-    max-height: 90vh; overflow-y: auto;
   }
 
   .modal-card::-webkit-scrollbar { width: 3px; }

@@ -20,6 +20,7 @@
   import { formatCount } from '$lib/format-count';
   import { REJECTION_REASONS } from '$lib/rejectionReasons';
   import { REJECTION_COMMENT_MAX_LENGTH, isCommentTooLong, showsCommentCount } from '$lib/rejection-comment';
+  import { dismissible } from '$lib/dialog';
 
   let {
     viewMode,
@@ -899,10 +900,8 @@
 
 <!-- Confirmation popup for Approve/Reject, undo included (NEH-209) -->
 {#if pendingAction}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="confirm-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('confirm-backdrop')) cancelPendingAction(); }}>
-    <div class="confirm-card" role="dialog" aria-modal="true">
+  <div class="confirm-backdrop" use:dismissible={{ onDismiss: cancelPendingAction }}>
+    <div class="confirm-card dialog-fit" role="dialog" aria-modal="true">
       <p class="confirm-message">{pendingActionMessage}</p>
       <div class="confirm-actions">
         <button class="modal-btn cancel" onclick={cancelPendingAction}>{$m.common_cancel}</button>
@@ -914,10 +913,8 @@
 
 <!-- Popup: rejecting needs a saved error reason first -->
 {#if showNoReasonPopup}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="confirm-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('confirm-backdrop')) closeNoReasonPopup(); }}>
-    <div class="confirm-card" role="dialog" aria-modal="true">
+  <div class="confirm-backdrop" use:dismissible={{ onDismiss: closeNoReasonPopup }}>
+    <div class="confirm-card dialog-fit" role="dialog" aria-modal="true">
       <p class="confirm-message">{$m.col_reject_needs_reason}</p>
       <div class="confirm-actions">
         <button class="modal-btn confirm" onclick={closeNoReasonPopup}>{$m.common_close}</button>

@@ -18,6 +18,7 @@
   import { stemProblem, stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
   import { volumeSaveErrorText, volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
   import VolumeStemField from './VolumeStemField.svelte';
+  import { dismissible } from '$lib/dialog';
 
   let projectId = $derived(Number($page.params.projectId) || 0);
 
@@ -614,7 +615,8 @@
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal(); }}>
-    <div class="modal-card">
+    <!-- No Escape: it would throw away what was typed. -->
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
 
       <div class="modal-header">
         <div>
@@ -731,10 +733,8 @@
 {/if}
 
 {#if showMembersModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) { showMembersModal = false; } }}>
-    <div class="modal-card modal-card--wide">
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: () => showMembersModal = false }}>
+    <div class="modal-card modal-card--wide dialog-fit" role="dialog" aria-modal="true">
 
       <div class="modal-header">
         <div>
@@ -818,10 +818,8 @@
 {/if}
 
 {#if showDeleteColModal && deletingCol}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeDeleteColModal(); }}>
-    <div class="modal-card delete-modal-card">
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeDeleteColModal, escape: !isDeletingCol, backdrop: !isDeletingCol }}>
+    <div class="modal-card delete-modal-card dialog-fit" role="dialog" aria-modal="true">
 
       <div class="modal-header">
         <div>

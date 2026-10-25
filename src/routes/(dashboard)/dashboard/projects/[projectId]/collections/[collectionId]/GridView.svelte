@@ -13,6 +13,7 @@
   import { m } from '$lib/i18n';
   import { renumberErrorText, reorderErrorText } from '$lib/volume-refusals';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
+  import { dismissible } from '$lib/dialog';
   // @ts-ignore — installed in Docker, not locally
   import { dndzone } from 'svelte-dnd-action';
 
@@ -380,11 +381,9 @@
 {/snippet}
 
 {#if showRenumberModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) handleCloseRenumberModal(); }}>
-    <div class="modal-card">
-      <h3 class="modal-title">{$m.col_renumber_modal_title}</h3>
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: handleCloseRenumberModal }}>
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="renumber-title">
+      <h3 class="modal-title" id="renumber-title">{$m.col_renumber_modal_title}</h3>
       <p class="modal-subtitle">{$m.col_renumber_desc}</p>
       {#if renumberError}
         <div class="modal-error-banner" role="alert" aria-live="polite">{renumberError}</div>

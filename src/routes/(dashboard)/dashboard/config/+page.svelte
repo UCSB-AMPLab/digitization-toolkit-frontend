@@ -27,6 +27,7 @@
   } from '$lib/api';
   // The overview's banner reads the figures the same way and uses the same threshold.
   import { formatStorage, storageUsage, STORAGE_ALERT_THRESHOLD } from '$lib/storage-usage';
+  import { dismissible } from '$lib/dialog';
 
   let storageInfo    = $state<StorageInfo | null>(null);
   let storageLoading = $state(true);
@@ -704,15 +705,9 @@
 <!-- Shutdown/reboot confirmation, styled like the confirmations on the
      Users page, so that a single click cannot power the unit off. -->
 {#if pendingPowerAction}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => {
-    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) {
-      cancelPower();
-    }
-  }}>
-    <div class="modal-card modal-confirm">
-      <h3 class="confirm-title">{confirmTitle}</h3>
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: cancelPower }}>
+    <div class="modal-card modal-confirm dialog-fit" role="dialog" aria-modal="true" aria-labelledby="power-confirm-title">
+      <h3 class="confirm-title" id="power-confirm-title">{confirmTitle}</h3>
       <p class="confirm-desc">{confirmDesc}</p>
 
       <div class="modal-actions">
@@ -1102,7 +1097,6 @@
     width: 100%; max-width: 420px;
     box-shadow: var(--shadow-lg);
     display: flex; flex-direction: column; gap: 16px;
-    max-height: 90vh; overflow-y: auto;
   }
 
   .modal-confirm { max-width: 440px; gap: 12px; }
