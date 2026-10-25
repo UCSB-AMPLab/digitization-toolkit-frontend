@@ -170,6 +170,8 @@ export const en: Messages = {
 	dash_camera_capture_error: 'Test capture failed',
 	dash_camera_capture_not_connected: 'the camera is not connected',
 	dash_camera_capture_timeout: 'the camera did not deliver the image in time',
+	dash_camera_focus_error: 'Could not focus',
+	dash_camera_preview_error: 'Could not get the live preview',
 	dash_two_cameras: '2 cameras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: not detected. Half-press its shutter button to wake it, or reseat its USB cable, then press "Reconnect cameras".`,
@@ -830,6 +832,7 @@ export const en: Messages = {
 	cam_section_settings: 'Colour and exposure',
 	cam_section_settings_info: 'Adjust so the document looks the colour it really is.',
 	cam_live_controls_unavailable: 'Appear when a connected camera supports them.',
+	cam_capabilities_failed: 'The capture system is not available, so these controls cannot be shown. Tap Reconnect cameras; if nothing changes, restart the unit.',
 	cam_orientation: 'Orientation',
 	cam_rotate_ccw: 'Rotate 90° CCW',
 	cam_rotate_cw: 'Rotate 90° CW',

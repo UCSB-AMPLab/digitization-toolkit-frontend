@@ -185,6 +185,8 @@ export const es = {
 	// Detalle tras dash_camera_capture_error y dos puntos, por eso en minúscula.
 	dash_camera_capture_not_connected: 'la cámara no está conectada',
 	dash_camera_capture_timeout: 'la cámara no entregó la imagen a tiempo',
+	dash_camera_focus_error: 'No se pudo enfocar',
+	dash_camera_preview_error: 'No se pudo obtener la previsualización',
 	dash_two_cameras: '2 cámaras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: no se detecta. Presiona el disparador hasta la mitad para despertarla o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".`,
@@ -858,6 +860,7 @@ export const es = {
 	cam_section_settings: 'Color y exposición',
 	cam_section_settings_info: 'Ajusta el color y la exposición para que el documento se vea con sus colores reales.',
 	cam_live_controls_unavailable: 'Estos controles se muestran cuando hay conectada una cámara que los admite.',
+	cam_capabilities_failed: 'El sistema de captura no está disponible y no se pueden mostrar estos controles. Toca Reconectar cámaras y, si sigue igual, reinicia el equipo.',
 	cam_orientation: 'Orientación',
 	cam_rotate_ccw: 'Girar 90° a la izquierda',
 	cam_rotate_cw: 'Girar 90° a la derecha',

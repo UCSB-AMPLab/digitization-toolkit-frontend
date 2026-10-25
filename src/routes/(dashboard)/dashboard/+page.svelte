@@ -138,6 +138,23 @@
   // obsoleta y no debe escribir en captureStatus. Guarda de refuerzo — con el
   // botón deshabilitado durante la petición no debería llegar a activarse.
   let captureSeq: Record<'left' | 'right', number> = { left: 0, right: 0 };
+  // A failed focus or preview request per camera, shown on the same status
+  // line as the test capture. The latest event owns the line: a new issue
+  // clears an older capture result, and a new capture result hides the
+  // issue. The preview poll repeats the same issue every few seconds, so
+  // only a change of issue counts as new.
+  let cameraIssue = $state<Record<'left' | 'right', { kind: 'focus' | 'preview'; text: string } | null>>({ left: null, right: null });
+  function setIssue(side: 'left' | 'right', issue: { kind: 'focus' | 'preview'; text: string } | null) {
+    const current = cameraIssue[side];
+    if (issue && (current?.kind !== issue.kind || current.text !== issue.text) && captureStatus[side]) {
+      if (captureClearTimers[side]) {
+        clearTimeout(captureClearTimers[side]!);
+        captureClearTimers[side] = null;
+      }
+      captureStatus = { ...captureStatus, [side]: null };
+    }
+    cameraIssue = { ...cameraIssue, [side]: issue };
+  }
 
   // Frecuencia del polling (ms) — para cambiar, modifica este valor
   const PREVIEW_INTERVAL_MS = 2500;
@@ -252,6 +269,7 @@
 
   function stopStream(side: 'left' | 'right') {
     streamActive = { ...streamActive, [side]: false };
+    if (cameraIssue[side]?.kind === 'preview') setIssue(side, null);
     if (previewIntervals[side]) { clearInterval(previewIntervals[side]); delete previewIntervals[side]; }
     if (previewUrls[side]) { URL.revokeObjectURL(previewUrls[side]); previewUrls = { ...previewUrls, [side]: '' }; }
   }
@@ -264,6 +282,11 @@
     if (isFetchingPreview[side]) return;
     isFetchingPreview[side] = true;
     const token = cameraRefresh.previewToken();
+    // A failure from before or during a reconnect says nothing about the
+    // camera now. Read-only check: acceptPreview would count it as a
+    // status observation.
+    const failureCounts = () =>
+      streamActive[side as 'left' | 'right'] && token !== null && cameraRefresh.previewToken() === token;
     try {
       const res = await fetch(`${getApiBase()}/cameras/preview/${index}`, { headers: getAuthHeader() });
       if (res.status === 404) {
@@ -274,12 +297,19 @@
         }
         return;
       }
+      if (!res.ok) {
+        if (failureCounts()) {
+          setIssue(side as 'left' | 'right', { kind: 'preview', text: $m.dash_camera_preview_error });
+        }
+        return;
+      }
       if (res.ok) {
         // A good frame is evidence the body is there, whether the badge said
         // not-found or was still unknown while the device list loaded.
         if (cameraStatus[side] !== 'ok') {
           applyPreviewStatus(token, side, 'ok');
         }
+        if (cameraIssue[side as 'left' | 'right']?.kind === 'preview') setIssue(side as 'left' | 'right', null);
         const blob = await res.blob();
         // Si el operador detuvo el stream mientras esta petición estaba en
         // vuelo, el frame llega tarde: no publicarlo, porque ya no hay
@@ -291,12 +321,24 @@
         if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
         previewUrls = { ...previewUrls, [side]: url };
       }
-    } catch {}
+    } catch (e) {
+      console.error('[Dashboard] Preview request failed:', e);
+      if (failureCounts()) {
+        setIssue(side as 'left' | 'right', { kind: 'preview', text: $m.dash_camera_preview_error });
+      }
+    }
     finally { isFetchingPreview[side] = false; }
   }
 
   async function handleFocus(side: 'left' | 'right') {
-    try { await camerasApi.calibrate({ camera_index: side === 'left' ? 0 : 1 }); } catch {}
+    if (cameraIssue[side]?.kind === 'focus') setIssue(side, null);
+    try {
+      await camerasApi.calibrate({ camera_index: side === 'left' ? 0 : 1 });
+    } catch (e) {
+      if (e instanceof AuthError && e.status === 401) return;
+      console.error('[Dashboard] Focus failed:', e);
+      setIssue(side, { kind: 'focus', text: $m.dash_camera_focus_error });
+    }
   }
 
   async function handleCapture(side: 'left' | 'right') {
@@ -316,6 +358,8 @@
       captureClearTimers[side] = null;
     }
     captureStatus = { ...captureStatus, [side]: null };
+    // An old focus failure would come back once a good capture's line clears.
+    if (cameraIssue[side]?.kind === 'focus') setIssue(side, null);
     try {
       const index = side === 'left' ? 0 : 1;
       const result = await camerasApi.testCapture(index);
@@ -511,6 +555,9 @@
                     {$m.common_capture}
                   </button>
                 </div>
+                {#if !captureStatus[side] && cameraIssue[side]}
+                  <p class="capture-status is-error" role="status">{cameraIssue[side].text}</p>
+                {/if}
                 {#if captureStatus[side]}
                   <p
                     class="capture-status"

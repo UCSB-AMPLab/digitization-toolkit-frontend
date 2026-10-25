@@ -98,6 +98,11 @@
 
   // Backend capabilities (loaded on mount alongside devices)
   let capabilities = $state<CameraCapabilities | null>(null);
+  // Set when the capabilities request fails, typically a 503 while the
+  // capture system is down. Without capabilities the panel cannot tell a
+  // DSLR rig from a picamera2 one, so it shows the failure in place of the
+  // controls rather than guessing and offering the wrong options.
+  let capabilitiesFailed = $state(false);
 
   // Derived capability flags
   const isDSLR          = $derived(capabilities?.dslr_settings === true);
@@ -472,8 +477,27 @@
   // ---------------------------------------------------------------------------
   // Cargar dispositivos reales al montar
   // ---------------------------------------------------------------------------
+  // Only the latest request writes: a slow mount-time failure must not
+  // undo the answer that came after a successful reconnect.
+  let capabilitiesSeq = 0;
+  async function loadCapabilities() {
+    const seq = ++capabilitiesSeq;
+    try {
+      const caps = await camerasApi.getCapabilities();
+      if (seq !== capabilitiesSeq) return;
+      capabilities = caps;
+      capabilitiesFailed = false;
+    } catch (err) {
+      if (seq !== capabilitiesSeq) return;
+      // A dead session already sends the operator to the login screen.
+      if (err instanceof AuthError && err.status === 401) return;
+      capabilities = null;
+      capabilitiesFailed = true;
+    }
+  }
+
   onMount(() => {
-    void camerasApi.getCapabilities().then(caps => { capabilities = caps; }).catch(() => {});
+    void loadCapabilities();
     void cameraRefresh.read(() => camerasApi.listDevices());
   });
 
@@ -491,6 +515,9 @@
     try {
       await cameraRefresh.reconnect(() => camerasApi.rescan());
       rescanError = null;
+      // Reconnecting is the remedy the failure message offers, so the
+      // capabilities are asked for again once the cameras are back.
+      await loadCapabilities();
     } catch (err) {
       if (err instanceof AuthError && err.status === 401) return;
       rescanError = err instanceof Error ? err.message : String(err);
@@ -723,6 +750,9 @@
             </div>
           </div>
 
+          {#if capabilitiesFailed}
+          <p class="controls-unavailable" role="alert">{$m.cam_capabilities_failed}</p>
+          {:else if capabilities}
           <!-- Fila: Shutter Speed -->
           <div class="control-row">
             <span class="control-label">{$m.cam_shutter}</span>
@@ -795,6 +825,7 @@
             </button>
           </div>
           {/if}
+          {/if}
 
         </div>
       {/if}
@@ -821,7 +852,9 @@
 
       {#if openSections.includes('focus')}
         <div class="accordion-content">
-          {#if hasFocusControl}
+          {#if capabilitiesFailed}
+          <p class="controls-unavailable" role="alert">{$m.cam_capabilities_failed}</p>
+          {:else if hasFocusControl}
           <!-- Autofocus -->
           <button class="btn-autofocus" onclick={handleAutoFocus} disabled={isFocusing}>
             {#if isFocusing}
@@ -929,7 +962,9 @@
 
       {#if openSections.includes('settings')}
         <div class="accordion-content settings-content">
-          {#if hasLiveControls}
+          {#if capabilitiesFailed}
+          <p class="controls-unavailable" role="alert">{$m.cam_capabilities_failed}</p>
+          {:else if hasLiveControls}
 
           <!-- White Balance -->
           <div class="settings-block">
@@ -1047,12 +1082,9 @@
             </div>
           </div>
           {:else}
-            <!-- Sin esto la sección se abría vacía: un bloque que no dice
-                 nada es lo mismo que señalaba NEH-152. El texto no afirma
-                 la causa a propósito --- getCapabilities puede haber
-                 fallado por otra razón, y el .catch de arriba se la traga
-                 en silencio --- así que dice cuándo aparecen los controles,
-                 no por qué faltan. -->
+            <!-- An empty section is what NEH-152 reported. A failed
+                 capabilities request has its own message above; this one
+                 covers a camera that lacks the controls. -->
             <p class="controls-unavailable">{$m.cam_live_controls_unavailable}</p>
           {/if}
 

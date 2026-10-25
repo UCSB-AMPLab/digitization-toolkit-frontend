@@ -118,6 +118,60 @@ describe('reconnect screen wiring', () => {
     await expect.element(screen.getByRole('status')).not.toBeInTheDocument();
   });
 
+  it('dashboard reports a failed focus on the camera status line', async () => {
+    vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
+    vi.spyOn(camerasApi, 'calibrate').mockRejectedValue(new Error('Capture system not available'));
+    const screen = render(Dashboard);
+    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: 'Focus', exact: true }).click();
+    await expect.element(screen.getByRole('status')).toHaveTextContent('Could not focus');
+  });
+
+  it('dashboard ignores a preview failure requested during reconnect', async () => {
+    vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
+    const rescan = deferred<CameraDevice[]>();
+    vi.spyOn(camerasApi, 'rescan').mockReturnValue(rescan.promise);
+    const preview = deferred<Response>();
+    vi.stubGlobal('fetch', vi.fn(() => preview.promise));
+    const screen = render(Dashboard);
+    await expect.element(screen.getByText('Recovered left', { exact: true })).toBeVisible();
+    await screen.getByRole('button', { name: 'Reconnect cameras' }).click();
+    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: 'Test', exact: true }).click();
+    rescan.resolve(devices);
+    await expect.element(screen.getByRole('button', { name: 'Reconnect cameras' })).toBeEnabled();
+    preview.resolve(new Response('', { status: 503 }));
+    await preview.promise;
+    await tick();
+    // Well inside the 2.5 s poll, so no fresh request has answered yet.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.getByText('Could not get the live preview').elements()).toHaveLength(0);
+  });
+
+  it('a focus failure after a failed test capture replaces it on the status line', async () => {
+    vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
+    vi.spyOn(camerasApi, 'testCapture').mockRejectedValue(new Error('boom'));
+    vi.spyOn(camerasApi, 'calibrate').mockRejectedValue(new Error('Capture system not available'));
+    const screen = render(Dashboard);
+    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: 'Capture', exact: true }).click();
+    await expect.element(screen.getByRole('status')).toHaveTextContent('Test capture failed');
+    await screen.getByRole('button', { name: 'Focus', exact: true }).click();
+    await expect.element(screen.getByRole('status')).toHaveTextContent('Could not focus');
+  });
+
+  it('dashboard reports a failed preview and clears it when a frame arrives', async () => {
+    vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
+    const fetchMock = vi.fn(async () => new Response('', { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const screen = render(Dashboard);
+    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: 'Test', exact: true }).click();
+    await expect.element(screen.getByRole('status')).toHaveTextContent('Could not get the live preview');
+    await screen.getByRole('button', { name: 'Stop', exact: true }).click();
+    await expect.element(screen.getByRole('status')).not.toBeInTheDocument();
+  });
+
   it.each(['initial-first', 'reconnect-first'])('controls publish reconnect to the parent: %s', async (order) => {
     const initial = deferred<CameraDevice[]>();
     const rescan = deferred<CameraDevice[]>();
