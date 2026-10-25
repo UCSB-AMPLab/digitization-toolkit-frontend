@@ -614,6 +614,12 @@ export const es = {
 		'Captua numerará los registros de este volumen a partir de 1, en el orden en que aparecen ahora, sin cambiar el nombre de ningún archivo.',
 	col_renumbering: 'Renumerando…',
 	col_renumber_error: 'Captua no pudo renumerar los registros de este volumen. Intenta de nuevo.',
+	col_renumber_done: (n: number) =>
+		n === 0
+			? 'Este volumen no tiene registros para renumerar.'
+			: n === 1
+				? 'Se renumeró 1 registro.'
+				: `Se renumeraron ${formatCount(n, 'es')} registros.`,
 	col_reorder_stale:
 		'Mientras reordenabas, se agregaron o se quitaron registros en este volumen, así que Captua no guardó el orden nuevo. Captua volvió a cargar el orden guardado.',
 	col_reorder_error: 'Captua no pudo guardar el orden nuevo. Captua volvió a cargar el orden guardado.',

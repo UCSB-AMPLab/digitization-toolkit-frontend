@@ -586,6 +586,12 @@ export const en: Messages = {
 		"Captua will number this volume's records from 1, in the order they appear now, without renaming any file.",
 	col_renumbering: 'Renumbering…',
 	col_renumber_error: 'Captua could not renumber the records of this volume. Try again.',
+	col_renumber_done: (n: number) =>
+		n === 0
+			? 'This volume has no records to renumber.'
+			: n === 1
+				? '1 record renumbered.'
+				: `${formatCount(n, 'en')} records renumbered.`,
 	col_reorder_stale:
 		'Records were added to or removed from this volume while you were reordering it, so Captua did not save the new order. Captua has loaded the saved order again.',
 	col_reorder_error: 'Captua could not save the new order. Captua has loaded the saved order again.',

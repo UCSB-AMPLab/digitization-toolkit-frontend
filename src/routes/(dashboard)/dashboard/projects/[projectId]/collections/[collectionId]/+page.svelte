@@ -146,7 +146,7 @@
   // Al pasar a otro volumen sin desmontar la página, cargar los suyos.
   $effect(() => {
     const id = collectionId;
-    if (requestedFor !== 0 && id !== requestedFor) untrack(() => { reorderNotice = null; loadRecords(); });
+    if (requestedFor !== 0 && id !== requestedFor) untrack(() => { reorderNotice = null; renumberedCount = null; loadRecords(); });
   });
 
   // ---------------------------------------------------------------------------
@@ -208,6 +208,10 @@
   // Vive acá y no en la vista porque la recarga que sigue al rechazo pone
   // isLoading, y eso desmonta la vista que lo mostraría.
   let reorderNotice = $state<string | null>(null);
+
+  // How many records the last renumber touched, held here for the same
+  // reason as reorderNotice; null when there is nothing to report.
+  let renumberedCount = $state<number | null>(null);
 
   // Por qué no se pudo eliminar el último registro; null si no hay aviso.
   let deleteRecordError = $state<string | null>(null);
@@ -429,6 +433,15 @@
     </div>
   {/if}
 
+  {#if renumberedCount !== null}
+    <div class="action-notice is-success" role="status">
+      <span class="action-notice-text">{$m.col_renumber_done(renumberedCount)}</span>
+      <button class="action-notice-close" onclick={() => (renumberedCount = null)} aria-label={$m.common_close}>
+        <span class="material-symbols-outlined icon-sm">close</span>
+      </button>
+    </div>
+  {/if}
+
   <div class="content-area">
 
     <!-- Panel lateral: solo en spread (vista libro) -->
@@ -463,6 +476,7 @@
           {collectionId}
           onRecordsUpdate={loadRecords}
           onReorderNotice={(n) => (reorderNotice = n)}
+          onRenumbered={(id, n) => { if (id === collectionId) renumberedCount = n; }}
           onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
         />
 

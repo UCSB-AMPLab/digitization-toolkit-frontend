@@ -1379,6 +1379,10 @@ tr:hover .drag-handle { opacity: 1; }
   font-size: var(--text-sm);
   line-height: 1.5;
 }
+.action-notice.is-success {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+}
 .action-notice-text { flex: 1; min-width: 0; }
 .action-notice-close {
   display: flex;
