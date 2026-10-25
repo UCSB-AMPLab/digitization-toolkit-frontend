@@ -93,6 +93,20 @@ describe('VolumeFisquaLine', () => {
 		expect(offsiteSpy).toHaveBeenCalledTimes(1);
 	});
 
+	it.each([
+		['retakes_requested', 'fisqua-attention', 'fisqua_st_retakes_requested'],
+		['approved', 'fisqua-ok', 'fisqua_st_approved'],
+		['preparing_review', 'fisqua-progress', 'fisqua_st_preparing_review'],
+		['in_capture_qc', 'fisqua-progress', 'fisqua_st_in_capture_qc']
+	] as const)("shows Fisqua's status %s with the %s style", async (st, cls, key) => {
+		const screen = await shown(
+			offsite(fisqua({ status: { status: st, status_at: null, status_checked_at: '2026-10-24T15:00:00', problems: null, manifest_id: MID } }))
+		);
+		const line = screen.container.querySelector('[data-fisqua]') as HTMLElement;
+		expect(line.classList.contains(cls)).toBe(true);
+		expect(line.textContent).toContain(es[key]);
+	});
+
 	it('shows a waiting manifest', async () => {
 		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'waiting_for_upload', attempts: 0, delivered_at: null, response: null, external_id: null })] })));
 		expect(screen.container.querySelector('[data-fisqua]')!.textContent).toContain(es.fisqua_out_waiting);

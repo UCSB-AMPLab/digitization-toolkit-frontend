@@ -67,10 +67,20 @@ export interface VolumeFisquaView {
 	history: FisquaHistoryItem[];
 }
 
-/** STATES in app/core/fisqua_contract.py. */
+/**
+ * STATES in app/core/fisqua_contract.py (contract §9.3): received → registered
+ * → preparing_review (Fisqua tiles the previews for capture QC) →
+ * in_capture_qc → retakes_requested or approved → queued → running →
+ * review_pending (review of the processed output) → published. A volume
+ * whose retakes come back goes through preparing_review again.
+ */
 const FISQUA_STATES = [
 	'received',
 	'registered',
+	'preparing_review',
+	'in_capture_qc',
+	'retakes_requested',
+	'approved',
 	'queued',
 	'running',
 	'review_pending',
@@ -85,6 +95,11 @@ type FisquaStatusName = (typeof FISQUA_STATES)[number];
 const STATUS_TONE: Record<FisquaStatusName, FisquaTone> = {
 	received: 'progress',
 	registered: 'progress',
+	preparing_review: 'progress',
+	in_capture_qc: 'progress',
+	// Someone has to capture records again.
+	retakes_requested: 'attention',
+	approved: 'ok',
 	queued: 'progress',
 	running: 'progress',
 	review_pending: 'progress',
@@ -102,6 +117,14 @@ function statusLabel(name: FisquaStatusName, msgs: Messages): string {
 			return msgs.fisqua_st_received;
 		case 'registered':
 			return msgs.fisqua_st_registered;
+		case 'preparing_review':
+			return msgs.fisqua_st_preparing_review;
+		case 'in_capture_qc':
+			return msgs.fisqua_st_in_capture_qc;
+		case 'retakes_requested':
+			return msgs.fisqua_st_retakes_requested;
+		case 'approved':
+			return msgs.fisqua_st_approved;
 		case 'queued':
 			return msgs.fisqua_st_queued;
 		case 'running':

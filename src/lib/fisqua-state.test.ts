@@ -142,6 +142,10 @@ describe('volumeFisquaView', () => {
 	const labels: Record<string, string> = {
 		received: en.fisqua_st_received,
 		registered: en.fisqua_st_registered,
+		preparing_review: en.fisqua_st_preparing_review,
+		in_capture_qc: en.fisqua_st_in_capture_qc,
+		retakes_requested: en.fisqua_st_retakes_requested,
+		approved: en.fisqua_st_approved,
 		queued: en.fisqua_st_queued,
 		running: en.fisqua_st_running,
 		review_pending: en.fisqua_st_review_pending,
@@ -157,6 +161,24 @@ describe('volumeFisquaView', () => {
 		expect(view.kind).toBe(`status_${st}`);
 		expect(view.label).toBe(labels[st]);
 		expect(view.detail).toBe(en.fisqua_checked('today', formatBackupDate(TODAY_0930, NOW, 'en'), formatBackupTime(TODAY_0930, 'en')));
+	});
+
+	it.each([
+		['received', 'progress'],
+		['registered', 'progress'],
+		['preparing_review', 'progress'],
+		['in_capture_qc', 'progress'],
+		['retakes_requested', 'attention'],
+		['approved', 'ok'],
+		['queued', 'progress'],
+		['running', 'progress'],
+		['review_pending', 'progress'],
+		['published', 'ok'],
+		['refused', 'attention'],
+		['failed', 'attention']
+	] as const)("gives Fisqua's status %s the %s tone", (st, tone) => {
+		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: st }) }), NOW, 'en', en)!;
+		expect(view.tone).toBe(tone);
 	});
 
 	it('gives every status a distinct label, in both languages', () => {
