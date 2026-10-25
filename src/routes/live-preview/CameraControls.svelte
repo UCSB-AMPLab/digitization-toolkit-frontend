@@ -246,7 +246,7 @@
       if (result.success && result.lens_position != null) {
         lensPosition = result.lens_position;
         cameraStatus.reportSuccess();
-        showFocusResult(true, $m.cam_focus_result(result.lens_position.toFixed(2)));
+        showFocusResult(true, $m.cam_focus_result(result.lens_position));
       } else {
         const msg = result.error ?? $m.cam_af_failed;
         cameraStatus.reportFailure(msg);
