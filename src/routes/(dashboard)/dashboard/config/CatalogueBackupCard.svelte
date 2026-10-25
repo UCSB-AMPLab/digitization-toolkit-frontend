@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Configuración → Copia externa (NEH-266). Read-only: the destination is
+	// Settings → Offsite copy (NEH-266). Read-only: the destination is
 	// set when the appliance is installed, and nothing here changes it.
 	//
 	// Shows the one box that matches the state classifySnapshot gives for the

@@ -1,41 +1,21 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Gestión de Usuarios
-  // Ruta: /dashboard/users
-  // Archivo: src/routes/(dashboard)/dashboard/users/+page.svelte
-  //
-  // Solo visible para administradores (el layout redirige a los roles
-  // sin acceso — ver el guard de rol en (dashboard)/+layout.svelte).
-  //
-  // Funcionalidades:
-  //   - Tabla de usuarios: avatar, username, email, rol, estado, registrado, acciones
-  //   - Búsqueda por username o email
-  //   - Filtro por Rol y por Estado
-  //   - Menú de acciones (···) con opciones: Editar | Eliminar
-  //   - Modal "Crear nuevo usuario": username, email, contraseña, rol
-  //   - Modal "Editar usuario": cambiar rol y estado activo
-  //   - Modal "Eliminar" — confirmación antes de borrar
-  // ============================================================================
+  // User management (/dashboard/users), admin only: the role guard in
+  // `(dashboard)/+layout.svelte` redirects every other role. Search and
+  // filters run client-side over the full list. Editing a user changes only
+  // the role and the active flag; username and email are fixed at creation.
 
   import { onMount } from 'svelte';
   import { usersApi, type UserRead } from '$lib/api';
   import { m, locale, roleLabel } from '$lib/i18n';
   import { normalizeEmail, emailFormatError } from '$lib/email-field';
 
-  // ---------------------------------------------------------------------------
-  // TIPOS LOCALES
-  // ---------------------------------------------------------------------------
   type UserRole   = 'operator' | 'reviewer' | 'admin';
   type UserStatus = 'active'   | 'inactive';
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: lista de usuarios
-  // ---------------------------------------------------------------------------
   let users       = $state<UserRead[]>([]);
   let isLoading   = $state(true);
   let loadError   = $state('');
 
-  // Filtros
   let searchQuery  = $state('');
   let filterRole   = $state<UserRole | ''>('');
   let filterStatus = $state<UserStatus | ''>('');
@@ -50,9 +30,6 @@
     return matchSearch && matchRole && matchStatus;
   }));
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: menú de acciones (···)
-  // ---------------------------------------------------------------------------
   let openMenuId  = $state<number | null>(null);
   let dropdownPos = $state({ top: 0, right: 0 });
 
@@ -63,14 +40,10 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Modal de crear/editar usuario
-  // ---------------------------------------------------------------------------
   let showUserModal = $state(false);
   let isEditMode    = $state(false);
   let editingUserId = $state<number | null>(null);
 
-  // Campos del formulario
   let formUsername  = $state('');
   let formEmail     = $state('');
   let formPassword  = $state('');
@@ -78,33 +51,21 @@
   let formRole      = $state<UserRole>('reviewer');
   let formIsActive  = $state(true);
 
-  // Visibilidad de contraseñas
   let showPassword  = $state(false);
   let showConfirm   = $state(false);
 
-  // Estado del formulario
   let formError     = $state('');
   let isSaving      = $state(false);
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Modal de eliminar usuario
-  // ---------------------------------------------------------------------------
   let showDeleteModal = $state(false);
   let deletingUser    = $state<UserRead | null>(null);
   let isDeleting      = $state(false);
 
-  // ---------------------------------------------------------------------------
-  // AL MONTAR
-  // ---------------------------------------------------------------------------
   onMount(() => {
     document.addEventListener('click', handleOutsideClick);
     loadUsers();
     return () => document.removeEventListener('click', handleOutsideClick);
   });
-
-  // ---------------------------------------------------------------------------
-  // FUNCIONES
-  // ---------------------------------------------------------------------------
 
   async function loadUsers() {
     try {
@@ -113,7 +74,7 @@
       users = await usersApi.list();
     } catch (err) {
       loadError = err instanceof Error ? err.message : $m.users_err_load;
-      console.error('[Users] Error cargando:', err);
+      console.error('[Users] Error loading:', err);
     } finally {
       isLoading = false;
     }
@@ -208,15 +169,11 @@
       showDeleteModal = false;
       deletingUser    = null;
     } catch (err) {
-      console.error('[Users] Error eliminando:', err);
+      console.error('[Users] Error deleting:', err);
     } finally {
       isDeleting = false;
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // HELPERS DE UI
-  // ---------------------------------------------------------------------------
 
   function roleBadgeStyle(role: string): string {
     const styles: Record<string, string> = {
@@ -252,9 +209,6 @@
   ]);
 </script>
 
-<!-- ============================================================
-     PÁGINA DE GESTIÓN DE USUARIOS
-     ============================================================ -->
 <div class="page">
 
   <!-- Header -->
@@ -263,7 +217,6 @@
       <h1 class="page-title">{$m.users_title}</h1>
       <p class="page-subtitle">{$m.users_subtitle}</p>
     </div>
-    <!-- Botón "Nuevo Usuario" — siempre visible para el admin -->
     <button class="btn-primary" onclick={openCreateModal}>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -272,9 +225,7 @@
     </button>
   </div>
 
-  <!-- ── Barra de búsqueda y filtros ── -->
   <div class="toolbar">
-    <!-- Búsqueda por nombre o username -->
     <div class="search-wrapper">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -287,7 +238,6 @@
       />
     </div>
 
-    <!-- Filtro por Rol -->
     <div class="filter-group">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
@@ -300,7 +250,6 @@
       </select>
     </div>
 
-    <!-- Filtro por Estado -->
     <div class="filter-group">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -313,7 +262,6 @@
     </div>
   </div>
 
-  <!-- ── Tabla de usuarios ── -->
   {#if isLoading}
     <div class="loading-state">
       <div class="spinner"></div>
@@ -358,7 +306,6 @@
           {#each filteredUsers as user}
             <tr class="table-row">
 
-              <!-- Avatar + username + email -->
               <td>
                 <div class="user-cell">
                   <div class="avatar" style="background: {avatarBg(user.role)}">
@@ -373,14 +320,12 @@
                 </div>
               </td>
 
-              <!-- Badge de rol -->
               <td>
                 <span class="role-badge" style={roleBadgeStyle(user.role)}>
                   {$roleLabel(user.role)}
                 </span>
               </td>
 
-              <!-- Estado: punto de color + texto -->
               <td>
                 <div class="status-cell">
                   <div class="status-dot" class:active={user.is_active}></div>
@@ -390,13 +335,10 @@
                 </div>
               </td>
 
-              <!-- Fecha de registro -->
               <td class="meta-cell">{formatDate(user.created_at)}</td>
 
-              <!-- Menú de acciones (···) -->
               <td class="col-actions">
                 <div class="actions-menu-wrapper">
-                  <!-- Botón de los tres puntos -->
                   <button
                     class="btn-actions"
                     onclick={(e) => {
@@ -404,18 +346,17 @@
                       if (openMenuId === user.id) {
                         openMenuId = null;
                       } else {
-                        // Calcular posición del botón para anclar el dropdown con position:fixed
-                        // Esto evita que se corte cuando el botón está cerca del borde inferior
+                        // The dropdown is position:fixed and anchored to the button's
+                        // rect, so the container cannot clip it; near the bottom edge
+                        // it opens upwards.
                         const btn = (e.currentTarget as HTMLElement).getBoundingClientRect();
                         const viewportHeight = window.innerHeight;
-                        const dropdownHeight = 90; // altura estimada del dropdown
+                        const dropdownHeight = 90; // estimated dropdown height (px)
                         const spaceBelow = viewportHeight - btn.bottom;
 
                         if (spaceBelow < dropdownHeight) {
-                          // No hay espacio abajo → abrir hacia arriba
                           dropdownPos = { top: btn.top - dropdownHeight - 4, right: window.innerWidth - btn.right };
                         } else {
-                          // Hay espacio abajo → abrir hacia abajo (comportamiento normal)
                           dropdownPos = { top: btn.bottom + 4, right: window.innerWidth - btn.right };
                         }
                         openMenuId = user.id;
@@ -430,12 +371,9 @@
                     </svg>
                   </button>
 
-                  <!-- Dropdown del menú -->
                   {#if openMenuId === user.id}
-                    <!-- Dropdown con position:fixed para no cortarse por el borde del contenedor -->
                     <div class="actions-dropdown"
                       style="top: {dropdownPos.top}px; right: {dropdownPos.right}px;">
-                      <!-- Editar: abre el modal con datos pre-cargados -->
                       <button class="dropdown-item" onclick={() => openEditModal(user)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -443,9 +381,7 @@
                         </svg>
                         {$m.common_edit}
                       </button>
-                      <!-- Separador -->
                       <div class="dropdown-sep"></div>
-                      <!-- Eliminar: abre modal de confirmación -->
                       <button class="dropdown-item danger" onclick={() => openDeleteModal(user)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <polyline points="3 6 5 6 21 6"/>
@@ -469,11 +405,6 @@
 
 </div>
 
-<!-- ============================================================
-     MODAL: Crear / Editar Usuario
-     isEditMode = false → "Crear nuevo usuario"
-     isEditMode = true  → "Editar usuario"
-     ============================================================ -->
 {#if showUserModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -484,7 +415,6 @@
   }}>
     <div class="modal-card">
 
-      <!-- Cabecera del modal -->
       <div class="modal-header">
         <div>
           <h3 class="modal-title">
@@ -501,10 +431,8 @@
         </button>
       </div>
 
-      <!-- Campos del formulario -->
       <div class="modal-body">
 
-        <!-- Nombre de usuario (readonly en edit) -->
         <div class="form-field">
           <label class="field-label">{$m.users_field_username}</label>
           <input
@@ -517,7 +445,6 @@
           />
         </div>
 
-        <!-- Email (readonly en edit) -->
         <div class="form-field">
           <label class="field-label">{$m.common_email}</label>
           <input
@@ -530,7 +457,6 @@
           />
         </div>
 
-        <!-- Contraseña (solo en create) -->
         {#if !isEditMode}
           <div class="form-field">
             <label class="field-label">{$m.common_password_label}</label>
@@ -583,7 +509,6 @@
           </div>
         {/if}
 
-        <!-- Estado activo (solo en edit) -->
         {#if isEditMode}
           <div class="form-field">
             <label class="field-label">{$m.users_field_account_status}</label>
@@ -600,7 +525,6 @@
           </div>
         {/if}
 
-        <!-- Asignar rol — radio buttons estilizados como cards -->
         <div class="form-field">
           <label class="field-label">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -631,7 +555,6 @@
                   <span class="role-option-label">{roleOpt.label}</span>
                   <span class="role-option-desc">{roleOpt.desc}</span>
                 </div>
-                <!-- Radio visual -->
                 <div class="radio-circle" class:selected={formRole === roleOpt.value}>
                   {#if formRole === roleOpt.value}
                     <div class="radio-dot"></div>
@@ -642,7 +565,6 @@
           </div>
         </div>
 
-        <!-- Error de formulario -->
         {#if formError}
           <div class="form-error">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -656,7 +578,6 @@
 
       </div><!-- /modal-body -->
 
-      <!-- Botones del modal -->
       <div class="modal-actions">
         <button class="btn-ghost" onclick={() => showUserModal = false}>{$m.common_cancel}</button>
         <button class="btn-crear" onclick={handleSaveUser} disabled={isSaving}>
@@ -671,10 +592,6 @@
   </div>
 {/if}
 
-<!-- ============================================================
-     MODAL: Confirmar eliminación
-     Aparece cuando el usuario elige "Eliminar" en el menú de acciones
-     ============================================================ -->
 {#if showDeleteModal && deletingUser}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -683,20 +600,16 @@
       showDeleteModal = false;
     }
   }}>
-    <!-- Modal de confirmación — mismo estilo que el popup "Retomar la foto" de Gallery -->
     <div class="modal-card modal-confirm">
 
-      <!-- Título alineado a la izquierda -->
       <h3 class="confirm-title">{$m.users_delete_title}</h3>
 
-      <!-- Descripción con el nombre del usuario destacado -->
       <p class="confirm-desc">
         {$m.users_delete_confirm_pre}
         <strong>{deletingUser.username}</strong>{#if deletingUser.email} ({deletingUser.email}){/if}?
         {$m.common_irreversible}
       </p>
 
-      <!-- Botones: Cancelar (ghost) + Sí, eliminar (rojo) -->
       <div class="modal-actions">
         <button class="btn-ghost" onclick={() => showDeleteModal = false} disabled={isDeleting}>
           {$m.common_cancel}
@@ -785,7 +698,6 @@
     padding: 9px 0; min-height: 0;
   }
 
-  /* ── Estados de carga / vacío ── */
   .loading-state, .empty-state {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
@@ -803,7 +715,6 @@
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Tabla ── */
   .table-wrapper {
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
@@ -832,7 +743,6 @@
   .table-row { transition: background-color var(--transition-fast); }
   .table-row:hover { background-color: rgba(255,255,255,0.02); }
 
-  /* Avatar + nombre */
   .user-cell { display: flex; align-items: center; gap: 12px; }
 
   .avatar {
@@ -847,7 +757,6 @@
   .user-fullname { font-weight: var(--fw-semibold); color: var(--color-light); }
   .user-username { font-size: 11px; color: var(--color-light-grey); }
 
-  /* Badge de rol */
   .role-badge {
     display: inline-block;
     padding: 4px 12px;
@@ -857,7 +766,6 @@
     white-space: nowrap;
   }
 
-  /* Estado */
   .status-cell { display: flex; align-items: center; gap: 8px; color: var(--color-light-grey); }
 
   .status-dot {
@@ -875,10 +783,8 @@
 
   .performance { font-weight: var(--fw-bold); font-size: var(--text-sm); }
 
-  /* Columna de acciones */
   .col-actions { text-align: center; width: 80px; }
 
-  /* ── Menú de acciones (···) ── */
   .actions-menu-wrapper { position: relative; display: inline-flex; justify-content: center; }
 
   .btn-actions {
@@ -893,10 +799,9 @@
 
   .btn-actions:hover { border-color: var(--color-primary); color: var(--color-light); }
 
-  /* Dropdown del menú */
   .actions-dropdown {
-    /* position:fixed para no cortarse con el borde del contenedor */
-    /* Las coordenadas top/right se calculan dinámicamente en el onclick */
+    /* position:fixed so the container edge cannot clip it; top/right are
+       computed in the actions button's onclick. */
     position: fixed;
     background-color: var(--color-surface-alt);
     border: 1px solid var(--border-color);
@@ -923,7 +828,6 @@
 
   .dropdown-sep { height: 1px; background-color: var(--border-color); margin: 4px 0; }
 
-  /* ══ MODALES ══ */
   .modal-backdrop {
     position: fixed; inset: 0;
     background-color: rgba(0,0,0,0.65);
@@ -946,7 +850,6 @@
   .modal-card::-webkit-scrollbar { width: 3px; }
   .modal-card::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 999px; }
 
-  /* Modal de confirmación — mismo estilo que popup "Retomar la foto" */
   .modal-confirm {
     max-width: 440px;
     gap: 12px;
@@ -992,7 +895,6 @@
   .field-input:focus { border-color: var(--color-primary); }
   .field-input::placeholder { color: var(--color-light-grey); opacity: 0.5; }
 
-  /* Campo contraseña con ícono de ojo */
   .password-wrapper { position: relative; }
   .password-wrapper .field-input { padding-right: 40px; }
 
@@ -1007,7 +909,6 @@
 
   .eye-btn:hover { color: var(--color-light); }
 
-  /* Opciones de rol */
   .roles-list { display: flex; flex-direction: column; gap: 8px; }
 
   .role-option {
@@ -1036,7 +937,6 @@
   .role-option-label { font-size: var(--text-sm); font-weight: var(--fw-bold); color: var(--color-light); }
   .role-option-desc  { font-size: 11px; color: var(--color-light-grey); }
 
-  /* Radio visual */
   .radio-circle {
     width: 18px; height: 18px;
     border-radius: 50%;
@@ -1053,7 +953,6 @@
     background-color: var(--color-primary);
   }
 
-  /* Error de formulario */
   .form-error {
     display: flex; align-items: center; gap: 8px;
     padding: 10px 14px;
@@ -1063,7 +962,6 @@
     font-size: var(--text-sm); color: var(--color-error); line-height: 1.4;
   }
 
-  /* Acciones del modal */
   .modal-actions {
     display: flex; gap: 12px;
     padding-top: 4px;
@@ -1082,7 +980,6 @@
   .btn-crear:hover    { background-color: var(--color-primary-hover); }
   .btn-crear:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Título del modal de confirmación */
   .confirm-title {
     font-size: var(--text-h3);
     font-weight: var(--fw-bold);
@@ -1090,7 +987,6 @@
     margin: 0;
   }
 
-  /* Descripción del modal de confirmación */
   .confirm-desc {
     font-size: var(--text-sm);
     color: var(--color-light-grey);
@@ -1100,7 +996,6 @@
 
   .confirm-desc strong { color: var(--color-light); }
 
-  /* Botón eliminar — rojo */
   .btn-delete {
     flex: 1; height: 44px;
     background-color: var(--color-error); color: white;
@@ -1112,14 +1007,12 @@
   .btn-delete:hover    { opacity: 0.85; }
   .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Campo readonly en edit mode */
   .field-readonly {
     opacity: 0.6;
     cursor: default;
     background-color: var(--color-surface-alt, rgba(255,255,255,0.03));
   }
 
-  /* Toggle activo/inactivo */
   .active-toggle {
     display: flex; align-items: center; gap: 10px;
     background: none; border: 1px solid var(--border-color);
@@ -1150,7 +1043,6 @@
 
   .active-toggle.active .toggle-thumb { transform: translateX(16px); }
 
-  /* Error de carga */
   .load-error {
     display: flex; align-items: center; gap: 10px;
     padding: 14px 18px;

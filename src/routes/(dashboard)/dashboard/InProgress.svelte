@@ -26,8 +26,7 @@
   let { collections, projects }: { collections: Collection[]; projects: Project[] } = $props();
 
   // ---------------------------------------------------------------------------
-  // View switch, remembered per browser. Tabla is the default so that the
-  // existing view is what people see first.
+  // View switch, remembered per browser. Tabla is the default.
   // ---------------------------------------------------------------------------
   type View = 'board' | 'table';
   const VIEW_STORAGE_KEY = 'dtk_dashboard_in_progress_view';

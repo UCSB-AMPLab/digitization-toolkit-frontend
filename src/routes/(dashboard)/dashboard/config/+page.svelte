@@ -1,31 +1,15 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Configuración del Sistema
-  // Ruta: /dashboard/config
-  // Archivo: src/routes/(dashboard)/dashboard/config/+page.svelte
-  //
-  // Solo visible para administradores (el layout redirige a los roles
-  // sin acceso — ver el guard de rol en (dashboard)/+layout.svelte).
-  //
-  // Secciones:
-  //   1. Almacenamiento
-  //      - Barra de uso (usado / total)
-  //      - Almacenamiento primario (ruta local del sistema)
-  //      - Alerta automática cuando el uso supera el 85%
-  //
-  //   2. Seguridad & Acceso
-
-  //
-  // MODO DEMO: los valores son locales — no se envían al backend.
-  // Para conectar con el backend cuando esté disponible, busca los
-  // comentarios "TODO: backend" y reemplaza con las llamadas a la API.
-  // ============================================================================
+  // Settings page (/dashboard/config), admin only: the role guard in
+  // `(dashboard)/+layout.svelte` redirects every other role. Sections:
+  // language, storage (usage, primary path, external drive), the catalogue's
+  // off-site copy, diagnostics, maintenance, and power. Everything except the
+  // language choice acts on the appliance through the backend.
 
   import { onMount } from 'svelte';
   import { m, locale, setLanguage, type Locale } from '$lib/i18n';
   import CatalogueBackupCard from './CatalogueBackupCard.svelte';
-  // Idiomas disponibles. El catálogo vive en $lib/i18n; esta lista solo les
-  // pone nombre para el selector.
+  // Available languages. The catalogue lives in `$lib/i18n`; this list only
+  // names them for the selector.
   const LANGUAGES: { code: Locale; label: string }[] = [
     { code: 'es', label: 'Español' },
     { code: 'en', label: 'English' },
@@ -42,20 +26,13 @@
     type PowerAction
   } from '$lib/api';
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Almacenamiento — info del disco actual
-  // ---------------------------------------------------------------------------
   let storageInfo    = $state<StorageInfo | null>(null);
   let storageLoading = $state(true);
 
-  // Derived values replace the old mock literals
   let storageUsedGB  = $derived(storageInfo ? storageInfo.used_bytes  / (1024 ** 3) : 0);
   let storageTotalGB = $derived(storageInfo ? storageInfo.total_bytes / (1024 ** 3) : 1);
   let storagePrimaryPath = $derived(storageInfo?.projects_path ?? '…');
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Almacenamiento — selector de dispositivo externo
-  // ---------------------------------------------------------------------------
   let devicesExpanded  = $state(false);
   let devices          = $state<StorageDevice[]>([]);
   let devicesLoading   = $state(false);
@@ -67,26 +44,21 @@
   let storageOpSuccess = $state<string | null>(null);
   let resettingStorage = $state(false);
 
-  // Porcentaje de uso calculado
   let storagePercent = $derived(
     Math.min(100, Math.round((storageUsedGB / storageTotalGB) * 100))
   );
 
-  // Alerta cuando el uso supera este umbral (%)
-  // Para cambiar el umbral, edita este valor
+  // Percent. The overview page applies the same threshold.
   const STORAGE_ALERT_THRESHOLD = 85;
 
-  // true cuando el almacenamiento está por completarse
   let storageAlert = $derived(storagePercent >= STORAGE_ALERT_THRESHOLD);
 
-  // Formato legible del almacenamiento (GB → TB si es >= 1000)
   function formatStorage(gb: number): string {
     if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
     return `${gb.toFixed(0)} GB`;
   }
 
-  // Color de la barra de almacenamiento según el porcentaje
-  // Verde normal → amarillo de advertencia → rojo crítico
+  // Green below 70%, warning from 70%, error from the alert threshold.
   let storageBarColor = $derived(
     storagePercent >= STORAGE_ALERT_THRESHOLD
       ? 'var(--color-error)'
@@ -95,9 +67,6 @@
         : 'var(--color-primary)'
   );
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Mantenimiento — limpieza de archivos temporales
-  // ---------------------------------------------------------------------------
   let flushingPreview    = $state(false);
   let flushPreviewResult = $state<string | null>(null);
   let flushPreviewError  = $state<string | null>(null);
@@ -120,23 +89,19 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Energía — apagar / reiniciar el equipo
+  // Power: shut down or reboot the unit, so that nobody has to pull the
+  // plug, which corrupts the SD card. The backend performs the real shutdown
+  // or reboot and stops responding seconds later, so the UI enters a blocking
+  // state.
   //
-  // Reemplaza el hábito de desconectar la corriente directamente, que corrompe
-  // la tarjeta SD. El backend ejecuta el apagado o reinicio real; segundos
-  // después deja de responder, así que la UI entra en un estado bloqueante.
-  //
-  //   200 → apagado/reinicio en curso (el backend se va enseguida)
-  //   501 → control de energía no disponible (equipo de desarrollo)
-  //   401 → sesión expirada
-  // ---------------------------------------------------------------------------
-  let pendingPowerAction = $state<PowerAction | null>(null);   // acción esperando confirmación
-  let sendingPower = $state(false);                            // petición en curso (diálogo abierto)
+  //   200 → shutdown/reboot under way (the backend goes away at once)
+  //   501 → power control unavailable (development machine)
+  //   401 → session expired
+  let pendingPowerAction = $state<PowerAction | null>(null);   // action awaiting confirmation
+  let sendingPower = $state(false);                            // request in flight (dialog open)
   let powerPhase = $state<'idle' | 'poweroff' | 'reboot'>('idle');
   let powerError = $state<string | null>(null);
 
-  // Texto del diálogo de confirmación según la acción elegida
   let confirmTitle = $derived(
     pendingPowerAction === 'reboot' ? $m.config_confirm_reboot_title : $m.config_confirm_shutdown_title
   );
@@ -152,7 +117,7 @@
   }
 
   function cancelPower() {
-    if (sendingPower) return; // no cancelar una orden ya enviada
+    if (sendingPower) return; // an order already sent cannot be cancelled
     pendingPowerAction = null;
   }
 
@@ -160,13 +125,12 @@
     const action = pendingPowerAction;
     if (!action || sendingPower) return;
     powerError = null;
-    // El diálogo permanece abierto con los botones deshabilitados mientras
-    // la petición está en vuelo. El estado bloqueante solo se muestra
-    // cuando el backend confirma (200) — un 501/401 no debe bloquear la página.
+    // The dialog stays open with its buttons disabled while the request is
+    // in flight. The blocking state appears only once the backend confirms
+    // (200) — a 501/401 must not block the page.
     sendingPower = true;
     try {
       await systemApi.powerControl(action);
-      // El backend aceptó la orden; entramos en el estado bloqueante.
       powerPhase = action === 'reboot' ? 'reboot' : 'poweroff';
       if (action === 'reboot') pollForRecovery();
     } catch (e: unknown) {
@@ -183,10 +147,10 @@
     }
   }
 
-  // Tras un reinicio, el backend se cae y vuelve. Cuando /health responde de
-  // nuevo, recargamos la aplicación para retomar una sesión limpia.
+  // After a reboot the backend goes down and comes back. Once /health
+  // responds again, the app is reloaded to start from a clean session.
   async function pollForRecovery() {
-    // Damos margen a que el backend empiece a apagarse antes de sondear.
+    // Gives the backend time to start shutting down before polling.
     await new Promise((r) => setTimeout(r, 8000));
     while (powerPhase === 'reboot') {
       try {
@@ -194,26 +158,16 @@
         window.location.reload();
         return;
       } catch {
-        // Aún no responde — reintentar.
         await new Promise((r) => setTimeout(r, 3000));
       }
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Seguridad & Acceso
-  // ---------------------------------------------------------------------------
 
 
-  // ---------------------------------------------------------------------------
-  // CICLO DE VIDA
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // ESTADO: Backend de cámara activo (NEH-188)
-  // Se muestra tal cual lo reporta el backend ('picamera2', 'gphoto2', 'chdk'…):
-  // es el identificador que sirve para dar soporte a un equipo en campo. No se
-  // traduce ni se le inventa un nombre comercial.
-  // ---------------------------------------------------------------------------
+  // Active camera backend (NEH-188), shown exactly as the backend reports it
+  // ('picamera2', 'gphoto2', 'chdk'…): that identifier is what supporting a
+  // unit in the field needs. It is neither translated nor given a trade name.
   let cameraBackend = $state<string | null>(null);
 
   onMount(async () => {
@@ -228,13 +182,10 @@
     try {
       cameraBackend = (await camerasApi.getCapabilities()).backend;
     } catch {
-      // Sin captura disponible la fila muestra "no disponible".
+      // With no capture backend available the row shows "not available".
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // ACCIONES: Almacenamiento externo
-  // ---------------------------------------------------------------------------
   async function toggleDevices() {
     devicesExpanded = !devicesExpanded;
     if (devicesExpanded && devices.length === 0 && !devicesLoading) {
@@ -317,9 +268,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Diagnóstico — logs del sistema
-  // ---------------------------------------------------------------------------
   let logsExpanded = $state(false);
   let logs         = $state<SystemLogEntry[]>([]);
   let logsLoading  = $state(false);
@@ -373,9 +321,6 @@
 
 </script>
 
-<!-- ============================================================
-     PÁGINA DE CONFIGURACIÓN
-     ============================================================ -->
 <div class="page">
 
   <!-- Header -->
@@ -386,12 +331,9 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN: IDIOMA
-       Va primero porque es lo único de esta página que es una preferencia de
-       quien usa la app; el resto son operaciones sobre el aparato.
-       setLanguage escribe una cookie y recarga: no toca la sesión.
-       ══════════════════════════════════════════════════════════ -->
+  <!-- Language comes first because it is the only personal preference on
+       this page; the rest are operations on the appliance. `setLanguage`
+       writes a cookie and reloads: it does not touch the session. -->
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_language}</h2>
     <div class="config-card">
@@ -420,17 +362,10 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 1: ALMACENAMIENTO
-       Muestra el uso actual del disco y la ruta de almacenamiento.
-       La alerta se activa cuando el uso supera STORAGE_ALERT_THRESHOLD.
-       ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_storage}</h2>
     <div class="config-card">
 
-      <!-- Alerta de almacenamiento casi lleno -->
-      <!-- Esta misma lógica se replica en el dashboard de Resumen -->
       {#if storageAlert}
         <div class="storage-alert">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -444,7 +379,6 @@
         </div>
       {/if}
 
-      <!-- Fila: Almacenamiento usado + barra de progreso -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_storage_used}</span>
@@ -458,7 +392,6 @@
         {/if}
       </div>
 
-      <!-- Barra de progreso de almacenamiento -->
       <div class="storage-bar-bg">
         <div
           class="storage-bar-fill"
@@ -468,7 +401,6 @@
 
       <div class="section-divider"></div>
 
-      <!-- Fila: Almacenamiento primario (ruta del disco) -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_storage_primary}</span>
@@ -495,7 +427,6 @@
 
       <div class="section-divider"></div>
 
-      <!-- ── Selector de unidad externa (expandible) ── -->
       <button class="config-row logs-expand-row" onclick={toggleDevices}>
         <div class="row-info">
           <span class="row-label">{$m.config_storage_device} <span class="badge-experimental">{$m.config_badge_experimental}</span></span>
@@ -511,7 +442,6 @@
         <div class="section-divider"></div>
         <div class="devices-panel">
 
-          <!-- Banner: override activo -->
           {#if storageInfo?.is_override}
             <div class="storage-override-banner">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -524,7 +454,6 @@
             </div>
           {/if}
 
-          <!-- Aviso experimental -->
           <div class="devices-notice devices-notice-warning">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -534,7 +463,6 @@
             <span><strong>{$m.config_experimental_lead}</strong> {$m.config_experimental_body}</span>
           </div>
 
-          <!-- Alerta de advertencia sobre proyectos existentes -->
           <div class="devices-notice">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px">
               <circle cx="12" cy="12" r="10"/>
@@ -544,7 +472,6 @@
             <span>{$m.config_new_projects_note}</span>
           </div>
 
-          <!-- Mensajes de operación -->
           {#if storageOpError}
             <div class="devices-op-msg devices-op-error">{storageOpError}</div>
           {/if}
@@ -552,7 +479,6 @@
             <div class="devices-op-msg devices-op-success">{storageOpSuccess}</div>
           {/if}
 
-          <!-- Lista de dispositivos -->
           {#if devicesLoading}
             <p class="logs-status">{$m.config_detecting_devices}</p>
           {:else if devicesError}
@@ -610,7 +536,6 @@
             {/each}
           {/if}
 
-          <!-- Actualizar lista -->
           <button class="btn-refresh-devices" onclick={refreshDevices} disabled={devicesLoading}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="23 4 23 10 17 10"/>
@@ -625,26 +550,18 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN: COPIA EXTERNA DEL CATÁLOGO (NEH-266)
-       Solo lectura: el destino se configura al instalar el equipo.
-       El indicador de la sidebar enlaza a #offsite-copy.
-       ══════════════════════════════════════════════════════════ -->
+  <!-- The catalogue's off-site copy (NEH-266). Read-only: the destination is
+       set when the unit is installed. The sidebar indicator links to
+       #offsite-copy. -->
   <div class="config-section" id="offsite-copy">
     <h2 class="section-title">{$m.backup_section_title}</h2>
     <CatalogueBackupCard />
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 2: DIAGNÓSTICO DEL SISTEMA
-       Logs de actividad reciente. Ocultos por defecto, expandibles.
-       Solo administradores (el layout redirige a los roles sin acceso).
-       ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_diagnostics}</h2>
     <div class="config-card">
 
-      <!-- Fila: backend de cámara activo (NEH-188) -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_camera_backend}</span>
@@ -655,7 +572,6 @@
 
       <div class="section-divider"></div>
 
-      <!-- Fila expandible: click para mostrar/ocultar logs -->
       <button class="config-row logs-expand-row" onclick={toggleLogs}>
         <div class="row-info">
           <span class="row-label">{$m.config_system_logs}</span>
@@ -698,14 +614,10 @@
 
 
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 3: MANTENIMIENTO
-       ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_maintenance}</h2>
     <div class="config-card">
 
-      <!-- Fila: Limpiar archivos temporales de previsualización -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_tmp_files}</span>
@@ -736,16 +648,10 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 4: ENERGÍA
-       Apagar o reiniciar el equipo de forma segura. Reemplaza el
-       hábito de desconectar la corriente, que corrompe la tarjeta SD.
-       ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_power}</h2>
     <div class="config-card">
 
-      <!-- Fila: Apagar el equipo -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_shutdown_label}</span>
@@ -762,7 +668,6 @@
         </button>
       </div>
 
-      <!-- Fila: Reiniciar el equipo -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_reboot_label}</span>
@@ -789,7 +694,6 @@
     </div>
   </div>
 
-  <!-- Nota informativa sobre el contexto offline -->
   <p class="info-note">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="12" cy="12" r="10"/>
@@ -801,11 +705,8 @@
 
 </div>
 
-<!-- ============================================================
-     MODAL DE CONFIRMACIÓN — Apagar / Reiniciar
-     Mismo estilo que el resto de confirmaciones (ver Usuarios).
-     Evita apagados accidentales con un solo clic.
-     ============================================================ -->
+<!-- Shutdown/reboot confirmation, styled like the confirmations on the
+     Users page, so that a single click cannot power the unit off. -->
 {#if pendingPowerAction}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -834,11 +735,9 @@
   </div>
 {/if}
 
-<!-- ============================================================
-     ESTADO BLOQUEANTE — el backend se está apagando o reiniciando
-     No hay botones: la única salida es que el equipo se apague
-     (poweroff) o que la app se recargue sola (reboot).
-     ============================================================ -->
+<!-- Blocking state while the backend shuts down or reboots. No buttons: it
+     ends only when the unit powers off (poweroff) or the app reloads itself
+     (reboot). -->
 {#if powerPhase === 'poweroff' || powerPhase === 'reboot'}
   <div class="power-overlay">
     <div class="power-overlay-card">
@@ -870,7 +769,6 @@
   .page-title    { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
 
-  /* Botón guardar */
   .btn-save {
     display: flex; align-items: center; gap: 8px;
     background-color: var(--color-primary); color: white;
@@ -893,7 +791,6 @@
 
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Toast de éxito */
   .toast-success {
     display: flex; align-items: center; gap: 8px;
     padding: 12px 16px;
@@ -908,7 +805,6 @@
 
   @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
-  /* Secciones */
   .config-section { margin-bottom: 32px; }
 
   .section-title {
@@ -916,7 +812,6 @@
     color: var(--color-light); margin: 0 0 14px;
   }
 
-  /* Card de configuración */
   .config-card {
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
@@ -924,7 +819,6 @@
     overflow: hidden;
   }
 
-  /* Alerta de almacenamiento */
   .storage-alert {
     display: flex; align-items: flex-start; gap: 10px;
     padding: 14px 20px;
@@ -936,7 +830,6 @@
 
   .storage-alert strong { font-weight: var(--fw-bold); }
 
-  /* Fila de configuración */
   .config-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 20px; gap: 20px;
@@ -951,8 +844,8 @@
   .row-label { font-size: var(--text-base); color: var(--color-light); font-weight: var(--fw-medium); }
   .row-desc  { font-size: var(--text-sm); color: var(--color-light-grey); }
 
-  /* Selector de idioma: botones con estado, no un desplegable — dos opciones
-     caben a la vista y así el actual se lee sin abrir nada. */
+  /* Language selector: toggle buttons, not a dropdown — two options fit on
+     screen, so the current one can be read without opening anything. */
   .lang-options { display: flex; gap: 8px; flex-shrink: 0; }
 
   .lang-option {
@@ -984,7 +877,6 @@
   .row-value.muted { color: var(--color-light-grey); font-weight: var(--fw-regular); }
   .row-value.alert-text { color: var(--color-error); }
 
-  /* Barra de almacenamiento */
   .storage-bar-bg {
     height: 6px;
     background-color: var(--color-surface-alt-2);
@@ -999,7 +891,6 @@
     transition: width 0.5s ease, background-color 0.3s ease;
   }
 
-  /* Separador dentro de la card */
   .section-divider { height: 1px; background-color: var(--border-color); }
 
   /* Toggle switch */
@@ -1027,14 +918,12 @@
 
   .toggle-knob.on { transform: translateX(22px); background-color: white; }
 
-  /* Nota informativa */
   .info-note {
     display: flex; align-items: center; gap: 8px;
     font-size: var(--text-sm); color: var(--color-light-grey);
     opacity: 0.6; margin-top: 8px;
   }
 
-  /* Logs expandibles (sección Diagnóstico) */
   .logs-expand-row {
     width: 100%; background: none; border: none; cursor: pointer;
     text-align: left; font-family: var(--font-family);
@@ -1201,7 +1090,6 @@
   .btn-refresh-devices:hover:not(:disabled) { color: var(--color-light); }
   .btn-refresh-devices:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* ── Mantenimiento ──────────────────────────────────────── */
   .btn-flush {
     font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-semibold);
     color: var(--color-light-grey);
@@ -1236,7 +1124,6 @@
     padding: 1px 4px;
   }
 
-  /* ── Energía ────────────────────────────────────────────── */
   .btn-power {
     display: flex; align-items: center; gap: 8px;
     font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-semibold);
@@ -1262,7 +1149,7 @@
 
   .power-error-row { padding: 10px 20px 14px; }
 
-  /* ── Modal de confirmación (mismo estilo que Usuarios) ──── */
+  /* Confirmation modal: same styles as the Users page. */
   .modal-backdrop {
     position: fixed; inset: 0;
     background-color: rgba(0,0,0,0.65);
@@ -1313,7 +1200,6 @@
   .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
   .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Botón destructivo — rojo (apagar) */
   .btn-delete {
     flex: 1; height: 44px;
     background-color: var(--color-error); color: white;
@@ -1324,7 +1210,7 @@
   .btn-delete:hover    { opacity: 0.85; }
   .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Botón confirmar reinicio — verde primario (no destructivo) */
+  /* Reboot is not destructive, so its confirm button is primary green. */
   .btn-confirm-power {
     flex: 1; height: 44px;
     background-color: var(--color-primary); color: white;
@@ -1335,7 +1221,6 @@
   .btn-confirm-power:hover    { background-color: var(--color-primary-hover); }
   .btn-confirm-power:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* ── Estado bloqueante (apagando / reiniciando) ─────────── */
   .power-overlay {
     position: fixed; inset: 0;
     background-color: rgba(19,17,16,0.92);

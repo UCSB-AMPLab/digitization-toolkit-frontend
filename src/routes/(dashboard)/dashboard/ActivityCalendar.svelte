@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Calendario de actividad: imágenes capturadas o registros revisados por día,
-  // de los últimos seis meses (GET /activity/daily).
+  // Activity calendar: images captured or records reviewed per day over the
+  // last six months (182 days, GET /activity/daily).
   import { onMount, tick } from 'svelte';
   import { activityApi, browserTimeZone, type DailyActivity } from '$lib/api';
   import { m, locale } from '$lib/i18n';
