@@ -507,6 +507,8 @@ export const es = {
 	pd_val_stem_too_long: (max: number) => `La raíz no puede tener más de ${max} caracteres.`,
 	pd_val_stem_pattern:
 		'Usa solo minúsculas sin tildes ni eñe (a–z) y números. Puedes separar partes con un guion, pero sin dos guiones seguidos ni guion al comienzo o al final.',
+	pd_err_stem_differs_from_reference_code: (externalId: string, stem: string): string =>
+		`La raíz tiene que ser el código de referencia del volumen en Fisqua, "${externalId}"; "${stem}" es distinto. Usa "${externalId}" como raíz.`,
 	pd_err_stem_taken: 'Otro volumen ya usa esta raíz.',
 	pd_err_stem_fixed: 'Ya se capturaron imágenes de este volumen, así que ya no se puede cambiar la raíz.',
 	pd_no_stem_badge: 'Sin raíz',
@@ -533,6 +535,10 @@ export const es = {
 	col_reject_error: 'No se pudo rechazar el registro. Intenta de nuevo.',
 	col_reject_needs_reason: 'Debes seleccionar al menos un error.',
 	col_reject_other_needs_note: 'Para rechazar por "Otro" hace falta una nota. Usa "Agregar nota" para describir el problema.',
+	col_reject_comment_too_long: (max: number): string =>
+		`No se pudo rechazar el registro: la nota puede tener como máximo ${formatCount(max, 'es')} caracteres, que es lo que guarda Fisqua. Acórtala y vuelve a intentarlo.`,
+	col_annotation_note_count: (n: number, max: number): string =>
+		`${formatCount(n, 'es')} de ${formatCount(max, 'es')} caracteres`,
 	col_reject_other_note_error: 'No se pudo rechazar el registro: si eliges "Otro", debes agregar una nota que describa el problema.',
 	col_review_approve_error: 'No se pudo aprobar el registro. Intenta de nuevo.',
 	// ── Envío a revisión (NEH-260) ──────────────────────────────────
@@ -1087,6 +1093,12 @@ export const es = {
 	},
 	fisqua_problems: (n: number): string => (n === 1 ? '1 problema' : `${formatCount(n, 'es')} problemas`),
 	// El texto de Fisqua, tal como lo envió.
+	fisqua_notes: (n: number): string => (n === 1 ? '1 nota' : `${formatCount(n, 'es')} notas`),
+	fisqua_more: (n: number): string => `y ${formatCount(n, 'es')} más`,
+	fisqua_note_unlisted_object: (key: string): string =>
+		`La copia externa tiene un archivo que el manifiesto de captura no nombra: ${key}`,
+	fisqua_rule_bad_request: 'Fisqua rechazó el manifiesto de captura por estar mal formado, sin indicar ningún problema.',
+	fisqua_rule_payload_too_large: 'Fisqua rechazó el manifiesto de captura por ser demasiado grande, sin indicar ningún problema.',
 	fisqua_problem_from_fisqua: (message: string): string => `Mensaje de Fisqua: ${message}`,
 	fisqua_incident_object_missing:
 		'Fisqua no encontró en la copia externa algunos archivos que Captua ya había verificado allí. Avisa al administrador: tiene que revisar la copia externa y averiguar qué pasó con ellos. Abajo aparece la lista de los archivos que faltan.',
@@ -1100,6 +1112,8 @@ export const es = {
 		'Fisqua no reconoce la dirección configurada en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL o DTK_OFFSITE_TENANT y reiniciar Captua.',
 	fisqua_cfg_redirect:
 		'La dirección de Fisqua configurada en este equipo redirige a otra. Captua no sigue esa redirección, para que el token no llegue a otro sitio, y dejó de enviarle volúmenes a Fisqua y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_ENV o DTK_FISQUA_BASE_URL y reiniciar Captua.',
+	fisqua_cfg_version:
+		'Fisqua no lee los manifiestos de captura que escribe esta versión de Captua, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: hay que actualizar Captua o Fisqua. Los volúmenes que Fisqua rechazó por este motivo hay que retirarlos de revisión y volver a enviarlos a revisión.',
 	fisqua_cfg_other:
 		'Fisqua no acepta la configuración de este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que revisar la configuración de Fisqua y reiniciar Captua.',
 	fisqua_unit_title: 'Fisqua',

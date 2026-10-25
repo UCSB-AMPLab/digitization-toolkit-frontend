@@ -20,6 +20,8 @@
 
 	let view = $derived(volumeFisquaView(fisqua, new Date(now), $locale, $m));
 	let icon = $derived(view ? icons[view.tone] : undefined);
+	let problemTotal = $derived(view ? view.problems.length + view.omitted : 0);
+	let hasProblems = $derived(problemTotal > 0);
 	let fullText = $derived(view ? [view.label, view.detail].filter((part) => part !== null).join(' · ') : '');
 </script>
 
@@ -51,17 +53,22 @@
 		{#if view.configError}
 			<p class="fisqua-config-error">{view.configError}</p>
 		{/if}
-		{#if view.problems.length > 0 || view.history.length > 0}
+		{#if hasProblems || view.history.length > 0}
 			<div class="fisqua-more">
-				{#if view.problems.length > 0}
-					<details class="fisqua-problems">
-						<summary>{$m.fisqua_problems(view.problems.length)}</summary>
+				{#if hasProblems}
+					<details class="fisqua-problems" data-problems-kind={view.problemsKind}>
+						<summary>
+							{view.problemsKind === 'notes' ? $m.fisqua_notes(problemTotal) : $m.fisqua_problems(problemTotal)}
+						</summary>
 						<ul>
 							{#each view.problems as problem, i (i)}
 								<li data-source={problem.fromFisqua ? 'fisqua' : 'captua'}>
 									{problem.text}{#if problem.records}<span class="fisqua-problem-records"> {problem.records}</span>{/if}
 								</li>
 							{/each}
+							{#if view.omitted > 0}
+								<li class="fisqua-problems-omitted">{$m.fisqua_more(view.omitted)}</li>
+							{/if}
 						</ul>
 					</details>
 				{/if}

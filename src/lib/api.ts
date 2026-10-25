@@ -1740,7 +1740,8 @@ export interface FisquaVolumeStatus {
 export interface FisquaConfigError {
   at:                 string | null;
   status_code:        number | null;
-  reason:             'token' | 'not_found' | 'redirect' | string | null;
+  /** `version`: Fisqua does not read the manifests this version of Captua writes. */
+  reason:             'token' | 'not_found' | 'redirect' | 'version' | string | null;
   config_fingerprint: string;
 }
 

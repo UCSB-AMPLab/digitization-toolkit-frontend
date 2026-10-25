@@ -18,8 +18,26 @@ function constraintOf(error: unknown): unknown {
 	return (e.detail as { constraint?: unknown }).constraint;
 }
 
+/**
+ * A volume's reference code and stem that would differ: the backend's 409
+ * (ReferenceCodeDiffersFromStemError, app/main.py) carries both values in
+ * its detail, {message, reason, external_id, filename_stem}. Null for any
+ * other error.
+ */
+export function referenceCodeDiffers(error: unknown): { externalId: string; stem: string } | null {
+	if (typeof error !== 'object' || error === null) return null;
+	const e = error as { status?: unknown; detail?: unknown };
+	if (e.status !== 409 || typeof e.detail !== 'object' || e.detail === null) return null;
+	const d = e.detail as { reason?: unknown; external_id?: unknown; filename_stem?: unknown };
+	if (d.reason !== 'reference_code_differs_from_stem') return null;
+	if (typeof d.external_id !== 'string' || typeof d.filename_stem !== 'string') return null;
+	return { externalId: d.external_id, stem: d.filename_stem };
+}
+
 /** The message for a failed create or update of a volume. */
 export function volumeSaveErrorText(error: unknown, msgs: Messages): string {
+	const differs = referenceCodeDiffers(error);
+	if (differs) return msgs.pd_err_stem_differs_from_reference_code(differs.externalId, differs.stem);
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
 	const hold = fileHoldText(error, msgs);

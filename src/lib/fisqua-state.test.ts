@@ -122,14 +122,14 @@ describe('volumeFisquaView', () => {
 	it("lists a refusal by Fisqua in Fisqua's own words, marked as Fisqua's", () => {
 		const problems = [
 			{ rule: 'run-started', message: 'A run has started on the older manifest.', recordIds: [1] },
-			{ rule: 'payload-too-large' }
+			{ rule: 'description' }
 		];
 		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }), NOW, 'en', en)!;
 		expect(view.kind).toBe('refused_by_fisqua');
 		expect(view.label).toBe(en.fisqua_out_refused_by_fisqua);
 		expect(view.problems).toEqual([
 			{ text: en.fisqua_problem_from_fisqua('A run has started on the older manifest.'), records: null, fromFisqua: true },
-			{ text: en.fisqua_problem_from_fisqua('payload-too-large'), records: null, fromFisqua: true }
+			{ text: en.fisqua_problem_from_fisqua('description'), records: null, fromFisqua: true }
 		]);
 	});
 
@@ -150,6 +150,51 @@ describe('volumeFisquaView', () => {
 		});
 		// The other rules stay Fisqua's messages; object-missing is not repeated among them.
 		expect(view.problems).toEqual([{ text: en.fisqua_problem_from_fisqua('A run has started.'), records: null, fromFisqua: true }]);
+	});
+
+	it.each([
+		['bad-request', 'Fisqua refused the manifest as malformed.', 'fisqua_rule_bad_request'],
+		['payload-too-large', 'Fisqua refused the manifest as too large.', 'fisqua_rule_payload_too_large']
+	] as const)("words Captua's own %s problem in the catalogue, not as Fisqua's", (rule, message, key) => {
+		const view = volumeFisquaView(
+			fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems: [{ rule, message }], attempts: 1 })] }),
+			NOW,
+			'en',
+			en
+		)!;
+		expect(view.problems).toEqual([{ text: en[key], records: null, fromFisqua: false }]);
+		expect(JSON.stringify(view)).not.toContain(message);
+	});
+
+	it("counts a truncated refusal's omitted problems, without listing the truncation as one", () => {
+		const problems = [
+			{ rule: 'capture-key', message: 'a' },
+			{ rule: 'problems-truncated', message: '42 more problems are not listed', omitted: 42 }
+		];
+		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }), NOW, 'en', en)!;
+		expect(view.problems).toEqual([{ text: en.fisqua_problem_from_fisqua('a'), records: null, fromFisqua: true }]);
+		expect(view.omitted).toBe(42);
+		expect(view.problemsKind).toBe('problems');
+	});
+
+	it('calls the status entries notes on a volume Fisqua has not refused, with unlisted-object in neutral words', () => {
+		const problems = [
+			{ rule: 'unlisted-object', message: 'x is in the masters bucket and not in the manifest', stem: 'co-x', objectKey: 'rionegro/co-x/stray.jpg', size: 10 },
+			{ rule: 'problems-truncated', message: '1000 more problems are not listed', omitted: 1000 }
+		];
+		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'registered', problems }) }), NOW, 'en', en)!;
+		expect(view.problemsKind).toBe('notes');
+		expect(view.problems).toEqual([
+			{ text: en.fisqua_note_unlisted_object('rionegro/co-x/stray.jpg'), records: null, fromFisqua: false }
+		]);
+		expect(view.omitted).toBe(1000);
+		expect(view.tone).toBe('progress');
+	});
+
+	it("keeps them problems when Fisqua's status is refused", () => {
+		const problems = [{ rule: 'capture-key', message: 'a' }];
+		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'refused', problems }) }), NOW, 'en', en)!;
+		expect(view.problemsKind).toBe('problems');
 	});
 
 	it('has no incident for other Fisqua refusals', () => {
@@ -263,6 +308,7 @@ describe('volumeFisquaView', () => {
 		['token', 403, 'fisqua_cfg_token'],
 		['not_found', 404, 'fisqua_cfg_not_found'],
 		['redirect', 302, 'fisqua_cfg_redirect'],
+		['version', 422, 'fisqua_cfg_version'],
 		['something_else', 401, 'fisqua_cfg_other']
 	] as const)('warns that sending is stopped for a configuration error (%s)', (reason, code, key) => {
 		const config_error = { at: naiveUtc(TODAY_0930), status_code: code, reason, config_fingerprint: 'ab12cd34' };

@@ -481,6 +481,8 @@ export const en: Messages = {
 	pd_val_stem_too_long: (max: number) => `The stem can be at most ${max} characters long.`,
 	pd_val_stem_pattern:
 		'Use only lowercase letters a to z and digits, separated by single hyphens, with no hyphen at the start or end.',
+	pd_err_stem_differs_from_reference_code: (externalId: string, stem: string): string =>
+		`The stem has to be the volume's Fisqua reference code, "${externalId}"; "${stem}" is different. Use "${externalId}" as the stem.`,
 	pd_err_stem_taken: 'Another volume already uses this stem.',
 	pd_err_stem_fixed: 'Images have already been captured into this volume, so its stem cannot be changed.',
 	pd_no_stem_badge: 'No stem',
@@ -507,6 +509,10 @@ export const en: Messages = {
 	col_reject_error: 'Could not reject the record. Please try again.',
 	col_reject_needs_reason: 'You must select at least one error.',
 	col_reject_other_needs_note: 'A rejection for "Other" needs a note. Describe the problem in Add note.',
+	col_reject_comment_too_long: (max: number): string =>
+		`Could not reject the record: the note can be at most ${formatCount(max, 'en')} characters long, which is what Fisqua keeps. Shorten it and try again.`,
+	col_annotation_note_count: (n: number, max: number): string =>
+		`${formatCount(n, 'en')} of ${formatCount(max, 'en')} characters`,
 	col_reject_other_note_error: 'Could not reject the record: a rejection for "Other" needs a note that describes the problem.',
 	col_review_approve_error: 'Could not approve the record. Please try again.',
 	// ── Send for review (NEH-260) ───────────────────────────────────
@@ -1043,6 +1049,12 @@ export const en: Messages = {
 	},
 	fisqua_problems: (n: number): string => (n === 1 ? '1 problem' : `${formatCount(n, 'en')} problems`),
 	// Fisqua's own text, as it sent it.
+	fisqua_notes: (n: number): string => (n === 1 ? '1 note' : `${formatCount(n, 'en')} notes`),
+	fisqua_more: (n: number): string => `and ${formatCount(n, 'en')} more`,
+	fisqua_note_unlisted_object: (key: string): string =>
+		`The offsite copy holds a file the capture manifest does not name: ${key}`,
+	fisqua_rule_bad_request: 'Fisqua refused the capture manifest as malformed, without naming a problem.',
+	fisqua_rule_payload_too_large: 'Fisqua refused the capture manifest as too large, without naming a problem.',
 	fisqua_problem_from_fisqua: (message: string): string => `From Fisqua: ${message}`,
 	fisqua_incident_object_missing:
 		'Fisqua could not find some files in the offsite copy that Captua had already verified there. This needs investigating: ask whoever manages the scanner to check the offsite copy. The missing files are listed below.',
@@ -1056,6 +1068,8 @@ export const en: Messages = {
 		'Fisqua does not recognise the address configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL or DTK_OFFSITE_TENANT and restart Captua.',
 	fisqua_cfg_redirect:
 		'The Fisqua address configured on this scanner redirects to another address. Captua does not follow it, so that the token is not sent elsewhere, and has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_ENV or DTK_FISQUA_BASE_URL and restart Captua.',
+	fisqua_cfg_version:
+		'Fisqua does not read the capture manifests this version of Captua writes, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to update Captua or Fisqua. Volumes Fisqua refused for this have to be withdrawn from review and sent for review again.',
 	fisqua_cfg_other:
 		"Fisqua does not accept this scanner's configuration, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to check its Fisqua settings and restart Captua.",
 	fisqua_unit_title: 'Fisqua',

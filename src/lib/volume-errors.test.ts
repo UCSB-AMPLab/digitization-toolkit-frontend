@@ -19,6 +19,21 @@ const notEmpty =
 	'Cannot delete a non-empty collection: 0 sub-collection(s) and 3 record(s) remain. Move or delete them first.';
 
 describe('volumeSaveErrorText', () => {
+	it('names both values when the stem differs from the reference code', () => {
+		const detail = {
+			message: "The reference code 'co-a' is not the file name stem 'co-b'; a volume's reference code is its file name stem.",
+			reason: 'reference_code_differs_from_stem',
+			external_id: 'co-a',
+			filename_stem: 'co-b'
+		};
+		const err = new ApiError(detail.message, detail, 409);
+		expect(volumeSaveErrorText(err, es)).toBe(es.pd_err_stem_differs_from_reference_code('co-a', 'co-b'));
+		expect(volumeSaveErrorText(err, en)).toBe(en.pd_err_stem_differs_from_reference_code('co-a', 'co-b'));
+		expect(volumeSaveErrorText(err, en)).toContain('co-a');
+		expect(volumeSaveErrorText(err, en)).toContain('co-b');
+		expect(volumeSaveErrorText(err, en)).not.toContain('file name stem');
+	});
+
 	it('maps the stem and constraint 409s to their messages', () => {
 		const dup = new ApiError('x', { message: 'x', constraint: 'collections_filename_stem_key' }, 409);
 		expect(volumeSaveErrorText(dup, es)).toBe(es.pd_err_stem_taken);

@@ -61,6 +61,13 @@ export interface VolumeFisquaView {
 	/** "checked today at 09:30" for Fisqua's status; null otherwise. */
 	detail: string | null;
 	problems: FisquaProblemView[];
+	/**
+	 * `problems` on a refusal; `notes` for Fisqua's status entries on a volume
+	 * it has not refused (e.g. `unlisted-object`), which do not refuse it.
+	 */
+	problemsKind: 'problems' | 'notes';
+	/** How many more Fisqua left out of the list (`problems-truncated`). */
+	omitted: number;
 	/** The unit-level stop, as a warning; null when there is none. */
 	configError: string | null;
 	/** The volume's other manifests, newest first. */
@@ -93,6 +100,29 @@ export interface FisquaIncidentView {
  * those objects, so it is shown as an incident, not as Fisqua's message.
  */
 const RULE_OBJECT_MISSING = 'object-missing';
+
+/**
+ * Written by Captua's backend, not by Fisqua, for a 400 or 413 whose answer
+ * named no problems (read_send_answer in app/core/fisqua_http.py), so never
+ * shown as Fisqua's text.
+ */
+const RULE_BAD_REQUEST = 'bad-request';
+const RULE_TOO_LARGE = 'payload-too-large';
+/** Ends a list Fisqua cut, with `omitted`, the number left out (contract §9.2). */
+const RULE_TRUNCATED = 'problems-truncated';
+/** A note: an object under the volume's prefix that the manifest does not name. */
+const RULE_UNLISTED_OBJECT = 'unlisted-object';
+
+/** The sum of the `omitted` counts of the list's `problems-truncated` entries. */
+function omittedOf(problems: FisquaProblem[] | null | undefined): number {
+	if (!Array.isArray(problems)) return 0;
+	let omitted = 0;
+	for (const p of problems) {
+		if (typeof p !== 'object' || p === null || p.rule !== RULE_TRUNCATED) continue;
+		if (typeof p.omitted === 'number' && Number.isInteger(p.omitted) && p.omitted > 0) omitted += p.omitted;
+	}
+	return omitted;
+}
 
 function roleLabel(role: unknown, msgs: Messages): string | null {
 	if (typeof role !== 'string' || !role) return null;
@@ -221,6 +251,19 @@ function fisquaProblemViews(problems: FisquaProblem[] | null | undefined, msgs: 
 	const views: FisquaProblemView[] = [];
 	for (const p of problems) {
 		if (typeof p !== 'object' || p === null) continue;
+		if (p.rule === RULE_TRUNCATED) continue;
+		if (p.rule === RULE_BAD_REQUEST) {
+			views.push({ text: msgs.fisqua_rule_bad_request, records: null, fromFisqua: false });
+			continue;
+		}
+		if (p.rule === RULE_TOO_LARGE) {
+			views.push({ text: msgs.fisqua_rule_payload_too_large, records: null, fromFisqua: false });
+			continue;
+		}
+		if (p.rule === RULE_UNLISTED_OBJECT && typeof p.objectKey === 'string' && p.objectKey) {
+			views.push({ text: msgs.fisqua_note_unlisted_object(p.objectKey), records: null, fromFisqua: false });
+			continue;
+		}
 		const text =
 			typeof p.message === 'string' && p.message.trim()
 				? p.message.trim()
@@ -275,6 +318,8 @@ export function fisquaConfigErrorText(error: FisquaConfigError | null | undefine
 			return msgs.fisqua_cfg_not_found;
 		case 'redirect':
 			return msgs.fisqua_cfg_redirect;
+		case 'version':
+			return msgs.fisqua_cfg_version;
 		default:
 			return msgs.fisqua_cfg_other;
 	}
@@ -308,6 +353,8 @@ export function volumeFisquaView(
 	let detail: string | null = null;
 	let problems: FisquaProblemView[] = [];
 	let incident: FisquaIncidentView | null = null;
+	let problemsKind: 'problems' | 'notes' = 'problems';
+	let omitted = 0;
 
 	if (current) {
 		({ kind, tone, label } = outboxLine(current, now, locale, msgs));
@@ -318,6 +365,7 @@ export function volumeFisquaView(
 					? current.problems.filter((p) => !(typeof p === 'object' && p !== null && p.rule === RULE_OBJECT_MISSING))
 					: null;
 				problems = fisquaProblemViews(others, msgs);
+				omitted = omittedOf(others);
 			} else {
 				problems = captuaProblemViews(current.problems, msgs);
 			}
@@ -338,11 +386,13 @@ export function volumeFisquaView(
 			const args = whenArgs(status.status_checked_at, now, locale);
 			if (kind.startsWith('status_') && args) detail = msgs.fisqua_checked(...args);
 			problems = fisquaProblemViews(status.problems, msgs);
+			omitted = omittedOf(status.problems);
+			if (status.status !== 'refused') problemsKind = 'notes';
 		}
 	}
 
 	if (configError) tone = 'attention';
-	return { kind, tone, label, detail, problems, configError, history, incident };
+	return { kind, tone, label, detail, problems, problemsKind, omitted, configError, history, incident };
 }
 
 export type UnitFisquaLevel = 'on' | 'off' | 'attention';

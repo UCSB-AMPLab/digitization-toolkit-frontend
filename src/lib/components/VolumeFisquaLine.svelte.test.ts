@@ -158,6 +158,23 @@ describe('VolumeFisquaLine', () => {
 		expect(screen.container.querySelector('.fisqua-problems')).toBeNull();
 	});
 
+	it("heads Fisqua's status entries as notes, counting the ones it left out, with 'and N more'", async () => {
+		const problems = [
+			{ rule: 'unlisted-object', message: 'x', stem: 'co-ahrb-aht-003', objectKey: 'rionegro/co-ahrb-aht-003/stray.jpg', size: 3 },
+			{ rule: 'problems-truncated', message: '7 more problems are not listed', omitted: 7 }
+		];
+		const screen = await shown(
+			offsite(fisqua({ status: { status: 'registered', status_at: null, status_checked_at: '2026-10-24T15:00:00', problems, manifest_id: MID } }))
+		);
+		const block = screen.container.querySelector('.fisqua-problems') as HTMLElement;
+		expect(block.dataset.problemsKind).toBe('notes');
+		expect(block.querySelector('summary')!.textContent).toContain(es.fisqua_notes(8));
+		const items = [...block.querySelectorAll('li')].map((li) => li.textContent ?? '');
+		expect(items).toHaveLength(2);
+		expect(items[0]).toContain(es.fisqua_note_unlisted_object('rionegro/co-ahrb-aht-003/stray.jpg'));
+		expect(items[1]).toContain(es.fisqua_more(7));
+	});
+
 	it('warns that sending is stopped while Fisqua refuses the configuration', async () => {
 		const screen = await shown(
 			offsite(fisqua({ config_error: { at: '2026-10-24T09:30:00', status_code: 401, reason: 'token', config_fingerprint: 'ab12cd34' } }))

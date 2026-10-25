@@ -754,6 +754,37 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 			expect(rejectSpy).toHaveBeenCalledWith(1, { predefined_reason: 'blur', comment: 'escrita' });
 		});
 
+		it("the backend's 422 for a comment over 2,000 characters is shown in the interface's words", async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 2, note: 'n'.repeat(2500), created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-01-01' })
+			]);
+			const detail = [{ type: 'value_error', loc: ['body', 'comment'], msg: 'Value error, A rejection comment can be at most 2,000 characters long.' }];
+			rejectSpy.mockRejectedValue(new ApiError(JSON.stringify(detail), detail, 422));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.element(screen.getByText(es.col_reject_comment_too_long(2000))).toBeVisible();
+		});
+
+		it('the note field stops at 2,000 characters and shows its count near the limit', async () => {
+			getAnnotationsSpy.mockResolvedValue([makeAnnotation({ error_types: ['blur'] })]);
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+			await openNoteCard(screen);
+			const field = screen.getByPlaceholder(es.col_annotation_comment_placeholder);
+			await expect.element(field).toHaveAttribute('maxlength', '2000');
+
+			await field.fill('corta');
+			await expect.element(screen.getByText(es.col_annotation_note_count(5, 2000))).not.toBeInTheDocument();
+
+			await field.fill('x'.repeat(1900));
+			await expect.element(screen.getByText(es.col_annotation_note_count(1900, 2000))).toBeVisible();
+		});
+
 		it("the backend's 422 for other without a note is shown in the interface's words", async () => {
 			getAnnotationsSpy.mockResolvedValue([
 				makeAnnotation({ id: 2, note: 'nota', created_at: '2026-01-02' }),
