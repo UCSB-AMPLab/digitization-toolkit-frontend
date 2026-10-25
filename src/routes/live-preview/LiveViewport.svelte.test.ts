@@ -145,7 +145,7 @@ describe('LiveViewport — the viewport takes its shape from the frames (NEH-222
     expect(isInside(viewportRect, boardRect)).toBe(true);
   });
 
-  it('single mode, rotation 90: the same 16:9 frame inverts and is width-limited (337.5x600, R39-3)', async () => {
+  it('single mode, rotation 90: the same 16:9 frame inverts and is width-limited (337.5x600)', async () => {
     stubPreviewFetch({ 0: { w: 1600, h: 900 } });
     const screen = renderViewport(baseProps({ cameraMode: 'single', rotateDeg: { 0: 90 } }));
 

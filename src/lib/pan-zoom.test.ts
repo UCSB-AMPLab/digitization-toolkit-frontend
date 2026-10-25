@@ -168,7 +168,7 @@ describe('effectiveOneToOne', () => {
   });
 });
 
-describe('pageScale (R34-1, R35-1: 1:1 never shrinks a page below fit)', () => {
+describe('pageScale (1:1 never shrinks a page below fit)', () => {
   // pageScale expects both arguments already clamped through
   // effectiveOneToOne (>= 1) and `oneToOneRef` to be the MAX effective
   // oneToOne among the pages being shown — callers, not pageScale, do the
