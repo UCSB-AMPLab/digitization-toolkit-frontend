@@ -92,8 +92,8 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 
 		await expect.element(screen.getByRole('button', { name: 'Marcar error' })).toBeVisible();
 		await expect.element(screen.getByRole('button', { name: 'Agregar nota' })).toBeVisible();
-		await expect.element(screen.getByRole('button', { name: 'Imagen Borrosa', exact: true })).not.toBeInTheDocument();
-		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Imagen borrosa', exact: true })).not.toBeInTheDocument();
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).not.toBeInTheDocument();
 	});
 
 	it('tapping "Marcar error" expands all 9 error rows; tapping it again collapses without saving', async () => {
@@ -101,14 +101,14 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await openAnnotationsTab(screen);
 		await openReasonCard(screen);
 
-		for (const label of ['Imagen Borrosa', 'Reflejo/Brillo', 'Sombras', 'Fuera de Foco', 'Exposición', 'Impurezas en superficie', es.col_err_framing, es.col_err_obstruction, es.col_err_other]) {
+		for (const label of ['Imagen borrosa', 'Reflejo/Brillo', 'Sombras', 'Fuera de foco', 'Exposición', 'Impurezas en superficie', es.col_err_framing, es.col_err_obstruction, es.col_err_other]) {
 			await expect.element(screen.getByRole('button', { name: label, exact: true })).toBeVisible();
 		}
 
-		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Imagen borrosa', exact: true }).click();
 		await openReasonCard(screen); // tap the header again — collapses
 
-		await expect.element(screen.getByRole('button', { name: 'Imagen Borrosa', exact: true })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Imagen borrosa', exact: true })).not.toBeInTheDocument();
 		expect(addAnnotationSpy).not.toHaveBeenCalled();
 	});
 
@@ -120,10 +120,10 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 
 		await expect.element(screen.getByRole('button', { name: 'Listo' })).toBeDisabled();
 
-		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Imagen borrosa', exact: true }).click();
 		await screen.getByRole('button', { name: 'Reflejo/Brillo', exact: true }).click();
-		// Untap "Imagen Borrosa" — only "Reflejo/Brillo" should remain selected.
-		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		// Untap "Imagen borrosa" — only "Reflejo/Brillo" should remain selected.
+		await screen.getByRole('button', { name: 'Imagen borrosa', exact: true }).click();
 		await expect.element(screen.getByRole('button', { name: 'Listo' })).not.toBeDisabled();
 
 		await screen.getByRole('button', { name: 'Listo' }).click();
@@ -137,7 +137,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await openAnnotationsTab(screen);
 		await openReasonCard(screen);
 
-		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Imagen borrosa', exact: true }).click();
 		await screen.getByRole('button', { name: 'Reflejo/Brillo', exact: true }).click();
 		await screen.getByRole('button', { name: 'Listo' }).click();
 
@@ -145,7 +145,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		expect(addAnnotationSpy).toHaveBeenCalledWith(1, { error_types: ['blur', 'glare'], note: undefined });
 
 		// Collapsed again: the error rows are gone, only the toggle button remains.
-		await expect.element(screen.getByRole('button', { name: 'Imagen Borrosa', exact: true })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Imagen borrosa', exact: true })).not.toBeInTheDocument();
 		await expect.element(screen.getByRole('button', { name: 'Marcar error' })).toBeVisible();
 	});
 
@@ -157,13 +157,13 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 
 		await expect.element(screen.getByRole('button', { name: 'Listo' })).toBeDisabled();
 
-		await screen.getByPlaceholder('Agrega un comentario (opcional)...').fill('una nota suelta');
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('una nota suelta');
 		await expect.element(screen.getByRole('button', { name: 'Listo' })).not.toBeDisabled();
 		await screen.getByRole('button', { name: 'Listo' }).click();
 
 		await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
 		expect(addAnnotationSpy).toHaveBeenCalledWith(1, { error_types: [], note: 'una nota suelta' });
-		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).not.toBeInTheDocument();
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).not.toBeInTheDocument();
 	});
 
 	it('in_review with no saved error annotations yet: Aprobar enabled; Rechazar is clickable but shows a popup asking for a reason instead of confirming', async () => {
@@ -205,7 +205,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await openAnnotationsTab(screen);
 		await openNoteCard(screen);
 
-		await screen.getByPlaceholder('Agrega un comentario (opcional)...').fill('solo comentario');
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('solo comentario');
 		await screen.getByRole('button', { name: 'Listo' }).click();
 		await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
 
@@ -287,13 +287,13 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }), onRecordUpdated }));
 		await openAnnotationsTab(screen);
 		await openNoteCard(screen);
-		await screen.getByPlaceholder('Agrega un comentario (opcional)...').fill('a medio escribir');
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('a medio escribir');
 
 		await screen.getByRole('button', { name: 'Rechazar' }).click();
 		await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
 
 		await expect.poll(() => rejectSpy.mock.calls.length).toBe(1);
-		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).not.toBeInTheDocument();
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).not.toBeInTheDocument();
 	});
 
 	it('rejected + admin: "Recapturar imagen" replaces Rechazar, Aprobar (undo) also available, and clicking it calls onRecapture', async () => {
@@ -419,14 +419,14 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		const screen = render(LeftSidebar, baseProps());
 		await openAnnotationsTab(screen);
 		await openReasonCard(screen);
-		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Imagen borrosa', exact: true }).click();
 		await screen.getByRole('button', { name: 'Listo' }).click();
 
 		resolveLoad([created]);
 		await new Promise((r) => setTimeout(r, 0));
 		resolveAdd(created);
 
-		await expect.element(screen.getByText('Imagen Borrosa').first()).toBeVisible();
+		await expect.element(screen.getByText('Imagen borrosa').first()).toBeVisible();
 		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
 	});
 
@@ -438,7 +438,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		const screen = render(LeftSidebar, baseProps());
 		await openAnnotationsTab(screen);
 		await openReasonCard(screen);
-		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Imagen borrosa', exact: true }).click();
 		await screen.getByRole('button', { name: 'Listo' }).click();
 		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
 
@@ -464,7 +464,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 
 		const screen = render(LeftSidebar, baseProps());
 		await openAnnotationsTab(screen);
-		await flag(screen, 'Imagen Borrosa');
+		await flag(screen, 'Imagen borrosa');
 		resolveLoad([b, a]);
 		await new Promise((r) => setTimeout(r, 0));
 		resolveAdd(a);
@@ -472,7 +472,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await expect.poll(() => cards().length).toBe(2);
 		// The oldest, which supplies the rejection reason, stays last.
 		expect(cards()[0]).toContain('Reflejo/Brillo');
-		expect(cards()[1]).toContain('Imagen Borrosa');
+		expect(cards()[1]).toContain('Imagen borrosa');
 	});
 
 	it('an annotation deleted while the first load is in flight does not come back with it', async () => {
@@ -484,7 +484,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 
 		const screen = render(LeftSidebar, baseProps());
 		await openAnnotationsTab(screen);
-		await flag(screen, 'Imagen Borrosa');
+		await flag(screen, 'Imagen borrosa');
 		await expect.poll(() => cards().length).toBe(1);
 		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
 		await expect.poll(() => cards().length).toBe(0);
@@ -514,7 +514,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		rejectDelete(new Error('network'));
 		await expect.poll(() => cards().length).toBe(2);
 		expect(cards()[0]).toContain('Reflejo/Brillo');
-		expect(cards()[1]).toContain('Imagen Borrosa');
+		expect(cards()[1]).toContain('Imagen borrosa');
 		deleteSpy.mockRestore();
 	});
 
@@ -528,7 +528,7 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 
 		const screen = render(LeftSidebar, baseProps());
 		await openAnnotationsTab(screen);
-		await flag(screen, 'Imagen Borrosa');
+		await flag(screen, 'Imagen borrosa');
 		resolveLoad([a]);
 		await expect.poll(() => cards().length).toBe(1);
 		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
@@ -570,14 +570,14 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ id: 1 }) }));
 		await openAnnotationsTab(screen);
 		await openNoteCard(screen);
-		await screen.getByPlaceholder('Agrega un comentario (opcional)...').fill('a medio escribir');
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('a medio escribir');
 		await openReasonCard(screen);
-		await screen.getByRole('button', { name: 'Imagen Borrosa', exact: true }).click();
+		await screen.getByRole('button', { name: 'Imagen borrosa', exact: true }).click();
 
 		await screen.rerender(baseProps({ currentRecord: makeRecord({ id: 1 }) }));
 		await new Promise((r) => setTimeout(r, 0));
 
-		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).toHaveValue('a medio escribir');
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).toHaveValue('a medio escribir');
 		for (const listo of screen.getByRole('button', { name: 'Listo' }).all()) {
 			await expect.element(listo).not.toBeDisabled();
 		}
@@ -588,11 +588,11 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ id: 1 }) }));
 		await openAnnotationsTab(screen);
 		await openNoteCard(screen);
-		await screen.getByPlaceholder('Agrega un comentario (opcional)...').fill('a medio escribir');
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('a medio escribir');
 
 		await screen.rerender(baseProps({ currentRecord: makeRecord({ id: 2 }) }));
 
-		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).not.toBeInTheDocument();
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).not.toBeInTheDocument();
 		await expect.poll(() => getAnnotationsSpy.mock.calls.length).toBe(2);
 	});
 

@@ -220,10 +220,10 @@ async function flagErrors(page: import('@playwright/test').Page, labels: string[
 // (no error types) via its own "Listo".
 async function addNote(page: import('@playwright/test').Page, text: string) {
 	await page.getByRole('button', { name: 'Agregar nota' }).click();
-	await page.getByPlaceholder('Agrega un comentario (opcional)...').fill(text);
+	await page.getByPlaceholder('Agrega un comentario (opcional)…').fill(text);
 	await page.getByRole('button', { name: 'Listo', exact: true }).click();
 	// As in flagErrors: the card collapses once the note has been saved.
-	await expect(page.getByPlaceholder('Agrega un comentario (opcional)...')).toBeHidden();
+	await expect(page.getByPlaceholder('Agrega un comentario (opcional)…')).toBeHidden();
 }
 
 test.describe('Book view — approve/reject (NEH-209)', () => {
@@ -240,7 +240,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('dual-camera document: reject shows both images pending recapture', async ({ page }) => {
 		await openBookView(page, ctx, ctx.dualCollectionId);
 
-		await flagErrors(page, ['Imagen Borrosa']);
+		await flagErrors(page, ['Imagen borrosa']);
 		await page.getByRole('button', { name: 'Rechazar' }).click();
 		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
 
@@ -250,7 +250,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 	test('single-camera document: reject shows exactly one image pending recapture', async ({ page }) => {
 		await openBookView(page, ctx, ctx.singleCollectionId);
 
-		await flagErrors(page, ['Imagen Borrosa']);
+		await flagErrors(page, ['Imagen borrosa']);
 		await page.getByRole('button', { name: 'Rechazar' }).click();
 		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
 
@@ -326,7 +326,7 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await openBookView(page, ctx, collection.id);
 
 		// Reject it.
-		await flagErrors(page, ['Imagen Borrosa']);
+		await flagErrors(page, ['Imagen borrosa']);
 		await page.getByRole('button', { name: 'Rechazar' }).click();
 		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
 		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
@@ -383,14 +383,14 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 
 		await openBookView(page, ctx, collection.id);
 
-		await flagErrors(page, ['Imagen Borrosa', 'Reflejo/Brillo']);
+		await flagErrors(page, ['Imagen borrosa', 'Reflejo/Brillo']);
 		await addNote(page, 'nota independiente');
 
 		await expect(page.getByText('nota independiente')).toBeVisible();
 		const noteCard = page.locator('.annotation-card', { hasText: 'nota independiente' });
-		await expect(noteCard.getByText('Imagen Borrosa')).toHaveCount(0);
+		await expect(noteCard.getByText('Imagen borrosa')).toHaveCount(0);
 
-		const errorCard = page.locator('.annotation-card', { has: page.getByText('Imagen Borrosa') });
+		const errorCard = page.locator('.annotation-card', { has: page.getByText('Imagen borrosa') });
 		await expect(errorCard.getByText('Reflejo/Brillo')).toBeVisible();
 		await expect(errorCard.getByText('nota independiente')).toHaveCount(0);
 	});
@@ -405,9 +405,9 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 
 		await openBookView(page, ctx, collection.id);
 
-		// Pick "Reflejo/Brillo" (glare) first, then "Imagen Borrosa" (blur) —
+		// Pick "Reflejo/Brillo" (glare) first, then "Imagen borrosa" (blur) —
 		// saved as one annotation, so the reject sends the first of the two.
-		await flagErrors(page, ['Reflejo/Brillo', 'Imagen Borrosa']);
+		await flagErrors(page, ['Reflejo/Brillo', 'Imagen borrosa']);
 		await page.getByRole('button', { name: 'Rechazar' }).click();
 		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
 
@@ -456,12 +456,12 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await expect(page.getByPlaceholder('Describe el motivo del rechazo…')).toHaveCount(0);
 		// Collapsed by default: neither the error rows nor the comment box
 		// are visible until their own accordion button is tapped.
-		await expect(page.getByRole('button', { name: 'Imagen Borrosa', exact: true })).toHaveCount(0);
-		await expect(page.getByPlaceholder('Agrega un comentario (opcional)...')).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Imagen borrosa', exact: true })).toHaveCount(0);
+		await expect(page.getByPlaceholder('Agrega un comentario (opcional)…')).toHaveCount(0);
 		await expect(page.getByRole('button', { name: 'Marcar error' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Agregar nota' })).toBeVisible();
 		await page.getByRole('button', { name: 'Marcar error' }).click();
-		await expect(page.getByRole('button', { name: 'Imagen Borrosa', exact: true })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Imagen borrosa', exact: true })).toBeVisible();
 		// Rechazar/Aprobar are inline in the panel, no dialog/modal involved
 		// until a click actually requests confirmation.
 		await expect(page.locator('[role="dialog"]')).toHaveCount(0);
