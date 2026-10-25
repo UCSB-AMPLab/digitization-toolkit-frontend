@@ -102,6 +102,13 @@ describe('captureManifestRefusal', () => {
 		}
 	});
 
+	it("has a catalogue text for the outbox's no_reference_code, in both languages", () => {
+		for (const msgs of [en, es]) {
+			const view = captureManifestRefusal(refused([{ rule: 'no_reference_code', message: 'x', record_ids: [], image_ids: [] }]), msgs)!;
+			expect(view.problems[0].text).toBe(msgs.col_manifest_rule_no_reference_code);
+		}
+	});
+
 	it('skips malformed problem entries', () => {
 		const error = new ApiError('x', { message: 'x', problems: [null, 'x', { rule: 'no_stem' }] }, 409);
 		const view = captureManifestRefusal(error, en)!;

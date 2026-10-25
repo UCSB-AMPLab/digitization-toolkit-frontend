@@ -744,6 +744,8 @@ export const en: Messages = {
 		'No SHA-256 checksum is recorded for the previews of some RAW images, which were captured before Captua recorded it. Ask whoever manages the scanner to run backfill-preview-digests for this volume on the scanner, then export again.',
 	col_manifest_rule_no_pages:
 		'No record sent for review or approved has an image, so Fisqua has no page to register. Send records with images for review.',
+	col_manifest_rule_no_reference_code:
+		'The volume has no Fisqua reference code, so Captua does not send it to Fisqua. Ask whoever manages the scanner to give the volume its reference code, then withdraw the volume from review and send it for review again.',
 	col_manifest_rule_other: 'Fisqua would refuse the file for another reason.',
 	col_manifest_err_title: 'Could not download the capture manifest',
 	col_manifest_err_not_found: 'Captua could not find this volume. Go back to the project and open it again.',
@@ -981,6 +983,75 @@ export const en: Messages = {
 		return `Last file verified on ${date} at ${time}.`;
 	},
 	offsite_cfg_never: 'No file has been verified yet.',
+
+	// ── Delivery to Fisqua (fisqua-state.ts) ──────────────────────────────
+	// `day`, `date` and `time` as in offsite_last_verified.
+	fisqua_vol_label: 'Delivery of this volume to Fisqua',
+	fisqua_when: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		if (day === 'today') return `today at ${time}`;
+		if (day === 'yesterday') return `yesterday at ${time}`;
+		return `on ${date} at ${time}`;
+	},
+	fisqua_out_none: 'Not sent to Fisqua yet',
+	fisqua_out_waiting: 'Waiting for the complete offsite copy before sending to Fisqua',
+	fisqua_out_sending: 'Captua is sending the capture manifest to Fisqua',
+	fisqua_out_failed: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		const when = day === 'today' ? `today at ${time}` : day === 'yesterday' ? `yesterday at ${time}` : `on ${date} at ${time}`;
+		return `Captua could not send the capture manifest to Fisqua; it will try again ${when}`;
+	},
+	fisqua_out_failed_no_time: 'Captua could not send the capture manifest to Fisqua; it will try again',
+	fisqua_out_not_exportable: 'Not sent to Fisqua: Captua cannot build the capture manifest',
+	fisqua_out_refused_by_fisqua: 'Fisqua refused the capture manifest',
+	fisqua_out_delivered: 'Sent to Fisqua; waiting for its status',
+	fisqua_out_superseded: 'Not sent: a later send for review replaced it',
+	fisqua_out_withdrawn: 'Not sent: the volume was withdrawn from review',
+	fisqua_st_received: 'Fisqua received the volume',
+	fisqua_st_registered: 'Fisqua registered the volume',
+	fisqua_st_queued: 'Queued in Fisqua',
+	fisqua_st_running: 'Fisqua is processing the volume',
+	fisqua_st_review_pending: 'In review in Fisqua',
+	fisqua_st_published: 'Published in Fisqua',
+	fisqua_st_refused: 'Fisqua refused the volume',
+	fisqua_st_superseded: 'Fisqua replaced this manifest with a later one',
+	fisqua_st_failed: 'Fisqua could not process the volume',
+	fisqua_st_unknown: 'Fisqua does not know this volume yet',
+	fisqua_st_other: 'Fisqua reports a status this version of Captua does not know',
+	fisqua_checked: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		if (day === 'today') return `checked today at ${time}`;
+		if (day === 'yesterday') return `checked yesterday at ${time}`;
+		return `checked on ${date} at ${time}`;
+	},
+	fisqua_problems: (n: number): string => (n === 1 ? '1 problem' : `${formatCount(n, 'en')} problems`),
+	// Fisqua's own text, as it sent it.
+	fisqua_problem_from_fisqua: (message: string): string => `From Fisqua: ${message}`,
+	fisqua_history: (n: number): string => `Earlier sends (${formatCount(n, 'en')})`,
+	fisqua_cfg_token:
+		'Fisqua does not accept the token configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_TOKEN and restart Captua.',
+	fisqua_cfg_not_found:
+		'Fisqua does not recognise the address configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL or DTK_OFFSITE_TENANT and restart Captua.',
+	fisqua_cfg_redirect:
+		'The Fisqua address configured on this scanner redirects to another address. Captua does not follow it, so that the token is not sent elsewhere, and has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_ENV or DTK_FISQUA_BASE_URL and restart Captua.',
+	fisqua_cfg_other:
+		"Fisqua does not accept this scanner's configuration, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to check its Fisqua settings and restart Captua.",
+	fisqua_unit_title: 'Fisqua',
+	fisqua_unit_off: 'Sending to Fisqua is not configured on this scanner.',
+	fisqua_unit_env_production:
+		"Captua sends each volume's capture manifest to Fisqua once the volume is in review and its offsite copy is complete.",
+	fisqua_unit_env_staging:
+		"Captua sends each volume's capture manifest to Fisqua's test service (staging) once the volume is in review and its offsite copy is complete.",
+	fisqua_unit_send_none: 'Captua has not sent anything to Fisqua since the last restart.',
+	fisqua_unit_send_done: (delivered: number, refused: number, failed: number, waiting: number): string =>
+		`Last send: ${formatCount(delivered, 'en')} delivered, ${formatCount(refused, 'en')} refused, ${formatCount(failed, 'en')} to try again, ${formatCount(waiting, 'en')} waiting for the offsite copy.`,
+	fisqua_unit_send_config_error: 'Last send: stopped by the configuration error below.',
+	fisqua_unit_send_error: 'Captua could not finish the last send. It tries again after the next image upload.',
+	fisqua_unit_send_stopped: 'Captua stopped the last send before it finished, and continues after the next image upload.',
+	fisqua_unit_send_other: 'Captua sent nothing to Fisqua on its last run.',
+	fisqua_unit_poll_none: 'Captua has not asked Fisqua for a status since the last restart.',
+	fisqua_unit_poll_done: (asked: number, answered: number): string =>
+		`Last status check: Captua asked about ${asked === 1 ? '1 volume' : `${formatCount(asked, 'en')} volumes`}, and Fisqua answered for ${formatCount(answered, 'en')}.`,
+	fisqua_unit_poll_config_error: 'Last status check: stopped by the configuration error below.',
+	fisqua_unit_poll_error: 'Captua could not finish the last status check. It asks again later.',
+	fisqua_unit_poll_other: 'Captua asked Fisqua for no status on its last check.',
 
 	// ── Freeing space on the card and restoring (NEH-248, offsite-free.ts) ──
 	offsite_vol_stored: 'Stored offsite',

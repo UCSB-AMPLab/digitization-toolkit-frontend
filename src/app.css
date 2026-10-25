@@ -1427,6 +1427,42 @@ tr:hover .drag-handle { opacity: 1; }
 /* A received volume whose files were freed from the card (NEH-248): healthy. */
 .offsite-freed .offsite-indicator-icon { color: var(--color-success); }
 
+/* ── Volume view: delivery to Fisqua, under the offsite line ──
+   The line takes the offsite indicator's look; the tone sets its icon. */
+.fisqua-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.fisqua-ok .offsite-indicator-icon { color: var(--color-success); }
+.fisqua-progress .offsite-indicator-icon { color: var(--color-secondary); }
+.fisqua-attention,
+.fisqua-attention .offsite-indicator-icon { color: var(--color-warning); }
+.fisqua-config-error {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-warning);
+}
+.fisqua-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  font-size: var(--text-sm);
+  color: var(--color-light-grey);
+}
+.fisqua-more summary { cursor: pointer; }
+.fisqua-more ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  max-width: 68ch;
+  line-height: 1.4;
+  color: var(--color-light);
+}
+.fisqua-problem-records { color: var(--color-light-grey); }
+
 /* ── Volume view: freeing space on the card and restoring (NEH-248) ──
    The admin's button beside the breadcrumb, and its dialog. */
 .offsite-manage-btn {
@@ -1576,6 +1612,13 @@ tr:hover .drag-handle { opacity: 1; }
 .offsite-unit.level-attention { border-color: var(--color-error); background-color: var(--color-error-bg); }
 .offsite-unit.level-off .offsite-unit-line,
 .offsite-unit.level-empty .offsite-unit-line { color: var(--color-light-grey); }
+/* The Fisqua row's configuration error, in the same box. */
+.offsite-unit-warning {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--color-light);
+  font-weight: var(--fw-bold);
+}
 
 /* ============================================================================
 LOGO and BRANDING

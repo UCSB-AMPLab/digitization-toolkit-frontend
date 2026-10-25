@@ -17,6 +17,7 @@
 		MAX_ANSWER_AGE_MS
 	} from '$lib/catalogue-backup';
 	import { unitOffsiteView } from '$lib/offsite-state';
+	import { unitFisquaView } from '$lib/fisqua-state';
 
 	type View = {
 		level: BackupLevel;
@@ -51,6 +52,13 @@
 		const { snapshot, now: nowMs } = $catalogueBackupNow;
 		if (snapshot.kind !== 'loaded' || nowMs - snapshot.receivedAt > MAX_ANSWER_AGE_MS) return null;
 		return unitOffsiteView(snapshot.status.images, new Date(nowMs), $locale, $m);
+	});
+
+	// Delivery to Fisqua: `fisqua` on the same answer, under the same freshness rule.
+	let fisquaView = $derived.by(() => {
+		const { snapshot, now: nowMs } = $catalogueBackupNow;
+		if (snapshot.kind !== 'loaded' || nowMs - snapshot.receivedAt > MAX_ANSWER_AGE_MS) return null;
+		return unitFisquaView(snapshot.status.fisqua, $m);
 	});
 </script>
 
@@ -93,6 +101,18 @@
 			{#each unitView.lines as line}
 				<p class="offsite-unit-line">{line}</p>
 			{/each}
+		</div>
+	{/if}
+
+	{#if fisquaView}
+		<div class="offsite-unit level-{fisquaView.level}" data-level={fisquaView.level} data-fisqua-unit>
+			<p class="offsite-unit-title">{$m.fisqua_unit_title}</p>
+			{#each fisquaView.lines as line, i (i)}
+				<p class="offsite-unit-line">{line}</p>
+			{/each}
+			{#if fisquaView.warning}
+				<p class="offsite-unit-warning">{fisquaView.warning}</p>
+			{/if}
 		</div>
 	{/if}
 

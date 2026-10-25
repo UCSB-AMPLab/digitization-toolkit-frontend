@@ -1631,6 +1631,8 @@ export interface CatalogueBackupStatus {
   detail:           string | null;
   /** The image upload's unit-level summary (NEH-227); absent from an older backend. */
   images?:          UnitImageUploadSummary;
+  /** Delivery to Fisqua at the unit level; absent from an older backend. */
+  fisqua?:          UnitFisquaSummary;
 }
 
 /**
@@ -1684,6 +1686,97 @@ export interface VolumeOffsiteState {
   // too. Absent from a backend that predates freeing.
   freed_files?:     number;
   freed_bytes?:     number;
+  /** Delivery to Fisqua (volume_fisqua_state in app/core/fisqua_outbox.py); null when the unit has no Fisqua configured, absent from an older backend. */
+  fisqua?:          VolumeFisquaState | null;
+}
+
+/**
+ * A problem on a Fisqua outbox row or status. A refusal by Captua
+ * (`not_exportable`) holds capture_manifest problems, plus
+ * `no_reference_code`: {rule, message, record_ids, image_ids}. A refusal by
+ * Fisqua, and Fisqua's status, hold Fisqua's own problems: {rule, message, …},
+ * with Fisqua's rule names (`id-reused`, `reference-code`, …) and its text.
+ */
+export interface FisquaProblem {
+  rule?:       string;
+  message?:    string;
+  record_ids?: number[];
+  image_ids?:  number[];
+  [key: string]: unknown;
+}
+
+/** One manifest of a volume in the Fisqua outbox (_OUTBOX_FIELDS in app/core/fisqua_outbox.py). States: app/models/fisqua.py. */
+export interface FisquaOutboxEntry {
+  manifest_id:     string;
+  stem:            string | null;
+  state:           'waiting_for_upload' | 'ready' | 'sending' | 'delivered' | 'refused' | 'failed' | 'superseded' | 'withdrawn' | string;
+  created_at:      string;          // naive UTC ISO 8601
+  attempts:        number;
+  next_attempt_at: string | null;
+  last_attempt_at: string | null;
+  /** The backend's English, never shown. */
+  last_error:      string | null;
+  refusal:         'not_exportable' | 'fisqua' | string | null;
+  problems:        FisquaProblem[] | null;
+  response:        unknown;
+  external_id:     string | null;
+  delivered_at:    string | null;
+}
+
+/** Fisqua's latest word on the volume (fisqua_status). `status` is one of STATES in app/core/fisqua_contract.py, or null. */
+export interface FisquaVolumeStatus {
+  status:            string | null;
+  status_at:         string | null;
+  status_checked_at: string | null;
+  problems:          FisquaProblem[] | null;
+  manifest_id:       string | null;
+}
+
+/** The unit-level stop while Fisqua refuses this unit's configuration (config_error in app/core/fisqua_outbox.py). */
+export interface FisquaConfigError {
+  at:                 string | null;
+  status_code:        number | null;
+  reason:             'token' | 'not_found' | 'redirect' | string | null;
+  config_fingerprint: string;
+}
+
+export interface VolumeFisquaState {
+  environment:  'production' | 'staging' | string | null;
+  config_error: FisquaConfigError | null;
+  /** Newest first, at most 20. */
+  outbox:       FisquaOutboxEntry[];
+  status:       FisquaVolumeStatus | null;
+}
+
+/** `fisqua` of GET /system/catalogue-backup: unit_fisqua_summary in app/core/fisqua_outbox.py. */
+export interface UnitFisquaSummary {
+  configured:   boolean;
+  environment:  'production' | 'staging' | string | null;
+  config_error: FisquaConfigError | null;
+  /** run_fisqua_outbox's result since the backend started; null before the first run. */
+  last_send:    FisquaRunResult | null;
+  /** poll_fisqua_status's result since the backend started; null before the first poll. */
+  last_poll:    FisquaRunResult | null;
+}
+
+/**
+ * A send run: {status, promoted, not_exportable, delivered, refused, failed, waiting};
+ * a poll: {status, asked, calls, answered, recovered}. `status` is "done",
+ * "config_error", "error", "stopped", "no_transport" or "disabled"; the counts
+ * are absent from the early returns.
+ */
+export interface FisquaRunResult {
+  status:          string;
+  promoted?:       number;
+  not_exportable?: number;
+  delivered?:      number;
+  refused?:        number;
+  failed?:         number;
+  waiting?:        number;
+  asked?:          number;
+  calls?:          number;
+  answered?:       number;
+  recovered?:      number;
 }
 
 /** One file of a free or restore: the dry run's and the job result's `files` and `refused` entries (_Object.entry in app/core/offsite_free.py). */
