@@ -854,14 +854,14 @@
           <div class="feed-label">{cameraLabel(leftIdx)}</div>
           <!-- Floating rotation overlay -->
           <div class="feed-rotate-overlay">
-            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, -90)} aria-label={$m.lv_rotate_ccw}>
+            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, -90)} aria-label={$m.lv_rotate_ccw} title={$m.lv_rotate_ccw}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                 <path d="M3 3v5h5"/>
               </svg>
             </button>
             <span class="feed-rotate-deg">{(rotateDeg ?? {})[leftIdx] ?? 0}°</span>
-            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, 90)} aria-label={$m.lv_rotate_cw}>
+            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, 90)} aria-label={$m.lv_rotate_cw} title={$m.lv_rotate_cw}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                 <path d="M21 3v5h-5"/>
@@ -916,14 +916,14 @@
             <div class="feed-label right">{cameraLabel(rightIdx)}</div>
             <!-- Floating rotation overlay -->
             <div class="feed-rotate-overlay">
-              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, -90)} aria-label={$m.lv_rotate_ccw}>
+              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, -90)} aria-label={$m.lv_rotate_ccw} title={$m.lv_rotate_ccw}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                   <path d="M3 3v5h5"/>
                 </svg>
               </button>
               <span class="feed-rotate-deg">{(rotateDeg ?? {})[rightIdx] ?? 0}°</span>
-              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, 90)} aria-label={$m.lv_rotate_cw}>
+              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, 90)} aria-label={$m.lv_rotate_cw} title={$m.lv_rotate_cw}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                   <path d="M21 3v5h-5"/>
@@ -1003,25 +1003,25 @@
       </button>
       {#if controlsOpen}
         <div class="float-divider"></div>
-        <button class="float-btn" onclick={zoomIn} aria-label={$m.lv_zoom_in}>
+        <button class="float-btn" onclick={zoomIn} aria-label={$m.lv_zoom_in} title={$m.lv_zoom_in}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
           </svg>
         </button>
-        <button class="float-btn" onclick={zoomOut} aria-label={$m.lv_zoom_out}>
+        <button class="float-btn" onclick={zoomOut} aria-label={$m.lv_zoom_out} title={$m.lv_zoom_out}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             <line x1="8" y1="11" x2="14" y2="11"/>
           </svg>
         </button>
-        <button class="float-btn" onclick={resetZoom} aria-label={$m.col_fit_screen_aria}>
+        <button class="float-btn" onclick={resetZoom} aria-label={$m.col_fit_screen_aria} title={$m.col_fit_screen_aria}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
           </svg>
         </button>
         <div class="float-divider"></div>
-        <button class="float-btn" onclick={() => showGridModal = true} aria-label={$m.lv_grid_settings}>
+        <button class="float-btn" onclick={() => showGridModal = true} aria-label={$m.lv_grid_settings} title={$m.lv_grid_settings}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
             <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>

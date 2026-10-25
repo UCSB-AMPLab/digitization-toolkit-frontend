@@ -688,9 +688,11 @@
       >
         <div class="acc-left">
           <span>{$m.cam_section_basic}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <span class="info-wrap" title={$m.cam_section_basic_info} aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           class="chevron" class:rotated={openSections.includes('basic')}>
@@ -805,9 +807,11 @@
       <button class="accordion-trigger" onclick={() => toggleSection('focus')}>
         <div class="acc-left">
           <span>{$m.cam_section_focus}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <span class="info-wrap" title={$m.cam_section_focus_info} aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           class="chevron" class:rotated={openSections.includes('focus')}>
@@ -911,9 +915,11 @@
       >
         <div class="acc-left">
           <span>{$m.cam_section_settings}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <span class="info-wrap" title={$m.cam_section_settings_info} aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           class="chevron" class:rotated={openSections.includes('settings')}>
@@ -937,6 +943,7 @@
                 onclick={handleWbCalibration}
                 disabled={isWbCalibrating}
                 aria-label={$m.cam_wb_calibrate_aria}
+                title={$m.cam_wb_calibrate_aria}
               >
                 {#if isWbCalibrating}
                   <span class="material-symbols-outlined icon-sm">sync</span>
@@ -951,6 +958,7 @@
                 onclick={handleWbPicker}
                 disabled={isWbCalibrating}
                 aria-label={isWbPickerActive ? $m.cam_wb_cancel_aria : $m.cam_wb_sample_aria}
+                title={isWbPickerActive ? $m.cam_wb_cancel_aria : $m.cam_wb_sample_aria}
                 aria-pressed={isWbPickerActive}
               >
                 <span class="material-symbols-outlined icon-sm">colorize</span>
@@ -1038,6 +1046,14 @@
               {/each}
             </div>
           </div>
+          {:else}
+            <!-- Sin esto la sección se abría vacía: un bloque que no dice
+                 nada es lo mismo que señalaba NEH-152. El texto no afirma
+                 la causa a propósito --- getCapabilities puede haber
+                 fallado por otra razón, y el .catch de arriba se la traga
+                 en silencio --- así que dice cuándo aparecen los controles,
+                 no por qué faltan. -->
+            <p class="controls-unavailable">{$m.cam_live_controls_unavailable}</p>
           {/if}
 
         </div>
@@ -1051,9 +1067,11 @@
       <button class="accordion-trigger" onclick={() => toggleSection('histogram')}>
         <div class="acc-left">
           <span>{$m.cam_histogram}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <span class="info-wrap" title={$m.cam_histogram_info} aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           class="chevron" class:rotated={openSections.includes('histogram')}>
@@ -1062,22 +1080,37 @@
       </button>
 
       {#if openSections.includes('histogram')}
+        {@const hist = $histogramStore[selectedCameraIndex] ?? { r: [], g: [], b: [] }}
+        <!-- El store arranca con treinta ceros por cámara, así que la longitud
+             del arreglo no distingue "sin datos" de "ya medido": hay que mirar
+             si alguna barra tiene altura. Una imagen real, incluso negra,
+             amontona sus píxeles en el primer bin y lo normaliza a 100, así
+             que todo en cero solo ocurre cuando no ha llegado ningún frame. -->
+        {@const hasData = hist.r.some((v) => v > 0)}
         <div class="accordion-content">
-          <div class="histogram">
-            {#each { length: 30 } as _, i}
-              {@const hist = $histogramStore[selectedCameraIndex] ?? { r: [], g: [], b: [] }}
-              <div class="bar-group">
-                <div class="bar red"   style="height:{hist.r[i] ?? 0}%"></div>
-                <div class="bar green" style="height:{hist.g[i] ?? 0}%"></div>
-                <div class="bar blue"  style="height:{hist.b[i] ?? 0}%"></div>
-              </div>
-            {/each}
-          </div>
-          <div class="hist-legend">
-            <div class="leg"><div class="leg-dot r"></div><span>R</span></div>
-            <div class="leg"><div class="leg-dot g"></div><span>G</span></div>
-            <div class="leg"><div class="leg-dot b"></div><span>B</span></div>
-          </div>
+          {#if hasData}
+            <div class="histogram">
+              {#each { length: 30 } as _, i}
+                <div class="bar-group">
+                  <div class="bar red"   style="height:{hist.r[i] ?? 0}%"></div>
+                  <div class="bar green" style="height:{hist.g[i] ?? 0}%"></div>
+                  <div class="bar blue"  style="height:{hist.b[i] ?? 0}%"></div>
+                </div>
+              {/each}
+            </div>
+            <div class="hist-legend">
+              <div class="leg"><div class="leg-dot r"></div><span>R</span></div>
+              <div class="leg"><div class="leg-dot g"></div><span>G</span></div>
+              <div class="leg"><div class="leg-dot b"></div><span>B</span></div>
+            </div>
+          {:else}
+            <!-- Sin esto queda un rectángulo vacío que se lee como algo roto y
+                 no como un gráfico esperando datos. Va sin recuadro, igual que
+                 el de Color y exposición: la caja era el gráfico, y si no hay
+                 gráfico tampoco hay caja. La leyenda R/G/B tampoco explica nada
+                 mientras no haya barras que explicar. -->
+            <p class="controls-unavailable">{$m.cam_histogram_empty}</p>
+          {/if}
         </div>
       {/if}
     </div>
@@ -1563,6 +1596,12 @@
     color: var(--color-light);
   }
 
+  /* El icono ya existía sin tooltip: prometía una explicación y no daba
+     ninguna. El title va en el <span> y no en el <svg> porque los
+     navegadores no muestran de forma fiable un title sobre un svg en
+     línea. aria-hidden: el lector de pantalla ya lee el nombre de la
+     sección, y no necesita además el texto de ayuda visual. */
+  .info-wrap { display: inline-flex; }
   .info-icon { color: var(--color-light-grey); opacity: 0.4; }
 
   .chevron {
@@ -1966,6 +2005,13 @@
   }
 
   .capitalize { text-transform: capitalize; }
+
+  .controls-unavailable {
+    margin: 0;
+    color: var(--color-light-grey);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+  }
 
   .dslr-note.is-warning {
     color: var(--color-warning);
