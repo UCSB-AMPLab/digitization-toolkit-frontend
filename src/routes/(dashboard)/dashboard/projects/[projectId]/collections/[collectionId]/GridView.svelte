@@ -23,11 +23,10 @@
   //                   derecha   = más columnas (cards más pequeñas)
   //
   // REORDENAMIENTO:
-  //   Actualmente es visual (las tarjetas muestran el ícono de mano).
-  //   Para implementar drag-and-drop real usar @neodrag/svelte:
-  //     npm install @neodrag/svelte
-  //     import { draggable, droppable } from '@neodrag/svelte'
-  //   Ver comentario TODO en el template.
+  //   Arrastre real con svelte-dnd-action. Al soltar, handleDndFinalize
+  //   persiste el orden con collectionsApi.reorderRecords; si el backend
+  //   lo rechaza, el aviso sube a +page.svelte y la lista se recarga del
+  //   servidor, porque esta vista se desmonta con la recarga.
   // ============================================================================
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
