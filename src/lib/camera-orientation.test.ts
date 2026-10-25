@@ -84,7 +84,7 @@ describe('seedRotation', () => {
     expect(result.rotation).toEqual({ 0: DEFAULT_ROTATION });
   });
 
-  it('seeds DEFAULT_ROTATION for a stored angle outside the four the capture path accepts (R31-1)', () => {
+  it('seeds DEFAULT_ROTATION for a stored angle outside the four the capture path accepts', () => {
     for (const bad of [45, 135, -90, 360, Number.NaN]) {
       const { rotation } = seedRotation({ 0: 90 }, [{ index: 0, hardware_id: 'A', orientation: bad }], new Map());
       expect(rotation[0]).toBe(DEFAULT_ROTATION);

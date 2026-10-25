@@ -103,7 +103,7 @@
   let rightNaturalH = $state(0);
 
   // Shared pan/zoom (NEH-230). The `zoom` prop is relative to the fit: 1 = fit.
-  // `pan` is a fraction shared by both pages (R34-2); each page converts it to
+  // `pan` is a fraction shared by both pages; each page converts it to
   // its own pixel offset within its own bounds, so the two move in proportion
   // even when their sizes differ, and every edge of either page stays reachable.
   let pan = $state<PanFraction>({ x: 0, y: 0 });
@@ -115,7 +115,7 @@
   let leftFitted  = $derived(fittedSize({ w: leftNaturalW, h: leftNaturalH }, { w: leftFrameW, h: leftFrameH }, rotation));
   let rightFitted = $derived(fittedSize({ w: rightNaturalW, h: rightNaturalH }, { w: rightFrameW, h: rightFrameH }, rotation));
 
-  // `effectiveOneToOne` clamps to >= 1 (R35-1), so 1:1 never shrinks a page
+  // `effectiveOneToOne` clamps to >= 1, so 1:1 never shrinks a page
   // below the fit: a page whose natural size already fits its frame (or a
   // high-DPR screen) can have a raw one-to-one zoom below 1.
   let leftOneToOneRaw  = $derived(oneToOneZoom({ w: leftNaturalW, h: leftNaturalH }, { w: leftFrameW, h: leftFrameH }, rotation, dpr()));

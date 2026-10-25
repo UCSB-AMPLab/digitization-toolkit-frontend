@@ -87,7 +87,7 @@ export function stepZoom(zoom: number, direction: 1 | -1, oneToOne: number): num
   return Math.abs(clamped - 1) <= 0.02 || crossesFit ? 1 : clamped;
 }
 
-// Clamps a page's own 1:1 zoom to at least 1 (R35-1, ruled in round 36):
+// Clamps a page's own 1:1 zoom to at least 1:
 // "1:1" means one image pixel per device pixel AND never below fit. A page
 // with fewer pixels than its frame at device resolution stays at fit when
 // 1:1 is pressed, so for that page the button shows more than one device
@@ -108,7 +108,7 @@ export function effectiveOneToOne(oneToOne: number): number {
   return Math.max(1, oneToOne);
 }
 
-// The CSS scale for one page given the SHARED zoom (R34-1), assuming
+// The CSS scale for one page given the SHARED zoom, assuming
 // `oneToOnePage` and `oneToOneRef` are already effective (>= 1, see
 // effectiveOneToOne) and `oneToOneRef` is the LARGEST effective oneToOne
 // among the pages sharing this zoom — so oneToOneRef >= oneToOnePage
@@ -157,7 +157,7 @@ export function panBounds(extent: Size, container: Size): Size {
   };
 }
 
-// Pan stored NORMALISED (R34-2): each axis is a fraction in [-1, 1] of the
+// Pan stored NORMALISED: each axis is a fraction in [-1, 1] of the
 // page's OWN bounds, so the two pages of a spread move together
 // proportionally and every edge of both stays reachable even when their
 // bounds differ.

@@ -1474,7 +1474,7 @@ export const camerasApi = {
   /**
    * Persist the capture rotation the appliance should remember for the body
    * currently at `cameraIndex`. `hardwareId` pins the write to that specific
-   * body (R30-4) — the backend returns 409 if a different body now sits at
+   * body — the backend returns 409 if a different body now sits at
    * that index, which callers should treat like any other save error (the
    * next device refresh re-seeds the index from whatever is really there).
    * Resolves once the write is acknowledged; the device row the backend

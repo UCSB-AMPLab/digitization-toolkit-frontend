@@ -53,7 +53,7 @@ export function viewportAspect(
 }
 
 /**
- * The flex-grow factor for one displayed panel in double mode (R39-2). When
+ * The flex-grow factor for one displayed panel in double mode. When
  * this panel's own frame aspect isn't known yet, it borrows the OTHER
  * panel's aspect instead of an even flex:1 — so a panel still waiting on
  * its first frame (or showing "no signal") takes the same width as its
@@ -67,7 +67,7 @@ export function panelGrowFactor(own: number | null, other: number | null, fallba
 /**
  * The largest box of the given aspect ratio that fits inside a board of
  * boardW x boardH. Used because a definite `width: 100%` defeats CSS
- * `aspect-ratio` when height is the limiting dimension (R39-3), so the
+ * `aspect-ratio` when height is the limiting dimension, so the
  * viewport gets explicit pixel dimensions instead of relying on CSS to
  * derive them. Returns a zero box when the board hasn't been measured yet
  * (width or height is 0).

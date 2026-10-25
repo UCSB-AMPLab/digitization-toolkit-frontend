@@ -56,18 +56,18 @@
 
   // Which body (hardware_id) the operator manually rotated at each camera
   // index in this session — NOT reactive state: it's bookkeeping consulted
-  // (and updated) alongside rotateDeg, never rendered on its own (R30-3).
+  // (and updated) alongside rotateDeg, never rendered on its own.
   let rotateTouched = new Map<number, string>();
 
   // Rotations changed before the device list arrives: there is no body to
   // persist them to yet, so they are kept here and applied (and saved) as
   // soon as `onDevicesChange` knows the identity of the index. Without this,
   // the first listing would overwrite the change with the saved value, and a
-  // change the operator has already seen would disappear (R31-2).
+  // change the operator has already seen would disappear.
   let rotatePending = new Map<number, number>();
 
   // Persists a rotation change to the backend, coalescing quick repeat taps
-  // on the same camera into a single in-flight PUT (R30-2).
+  // on the same camera into a single in-flight PUT.
   const saveOrientation = createOrientationSaver(
     (i, hw, deg) => camerasApi.setOrientation(i, hw, deg),
     (i, e) => console.error('[LivePreview] Error saving orientation:', i, e)

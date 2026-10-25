@@ -113,7 +113,7 @@
   // matching keyup. If the keyup never arrives (the window lost focus in the
   // middle of the press), blur and visibilitychange release it as well —
   // otherwise a pedal released out of focus would block capture until the
-  // page is reloaded (round 55).
+  // page is reloaded.
   let chordHeld = $state(false);
   // The release is compared against the physical `code` of the key that set
   // the latch, never against `chord.key`: releasing the modifier before the
@@ -196,14 +196,14 @@
   let naturalH1 = $state(0);
 
   // Measured size of the board (`.mat-board`): the viewport is sized in
-  // pixels within it (R39-3: a definite width: 100% defeats aspect-ratio
+  // pixels within it (a definite width: 100% defeats aspect-ratio
   // when height is the limit, so the viewport gets explicit dimensions
   // instead of relying on CSS to derive them).
   let boardW = $state(0);
   let boardH = $state(0);
 
   // Viewport shape: the frame's in single mode; in double mode, the sum of
-  // the two panels' widths at a common height (R39-2).
+  // the two panels' widths at a common height.
   let viewportAspect = $derived(computeViewportAspect(
     [
       naturalW0 && naturalH0 ? { w: naturalW0, h: naturalH0, rotation: rotateDeg[leftIdx] ?? 0 } : null,
@@ -217,7 +217,7 @@
   // Pixel box that gives the viewport that shape within the measured board.
   let viewportBox = $derived(fitBox(viewportAspect, boardW, boardH));
 
-  // R39-2: each panel's flex-grow factor in double mode is its own frame's
+  // Each panel's flex-grow factor in double mode is its own frame's
   // shape, so no panel is clipped even when only one is rotated. A panel
   // with no frame yet (no signal, or waiting for the first frame) borrows the
   // other panel's shape instead of an even 1:1 — it falls back to 1 only when
@@ -402,7 +402,7 @@
         previewInterval = null;
       }
       // NEH-228: also releases the held-key latch — one of the two recovery
-      // paths for a keyup that never arrives (round 55).
+      // paths for a keyup that never arrives.
       clearChordLatch();
     }
   }
@@ -529,7 +529,7 @@
   // CAPTURE KEY — keyboard handling (NEH-228)
   //
   // ownsEvent and shouldTrigger answer different questions and are called
-  // separately (round 55): ownsEvent decides whether the event belongs to
+  // separately: ownsEvent decides whether the event belongs to
   // capture (and therefore whether preventDefault is called), regardless of
   // whether this particular press should start a capture. Conflating them
   // lets a held pedal's repeats through to whatever has focus — the first
@@ -559,7 +559,7 @@
     if (!ownsEvent(event, ctx)) return;
     // Whenever the event belongs to capture, not only when it actually
     // starts one: otherwise every repeat after the first goes through to the
-    // focused button (round 55).
+    // focused button.
     event.preventDefault();
     if (shouldTrigger(event, { ...ctx, keyHeld: chordHeld, capturing: isCapturing, ready: canCapture })) {
       chordHeld = true;
@@ -1098,8 +1098,10 @@
      first measured — viewportBox is 0x0 on that first tick and the element
      has no inline size yet, so without them it would collapse to 0. Once
      viewportBox is no longer 0x0, the inline size (width/height in px)
-     overrides these two rules. max-height: 100% is deliberately absent
-     (R39-3). */
+     overrides these two rules. max-height: 100% is deliberately absent:
+     with width: 100% it would cut the height but not the width and break
+     the aspect ratio, and the inline size from fitBox already fits the
+     board. */
   .camera-viewport {
     position: relative;
     width: 100%;

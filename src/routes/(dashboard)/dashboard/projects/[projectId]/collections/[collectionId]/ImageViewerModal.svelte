@@ -78,7 +78,7 @@
 
   type FrameGeom = { scale: number; pan: Pan; bounds: { w: number; h: number } };
 
-  // effectiveOneToOne clamps each image to >= 1 (R35-1): 1:1 never shrinks
+  // effectiveOneToOne clamps each image to >= 1: 1:1 never shrinks
   // an image below fit. The reference for pageScale is the LARGEST of those
   // values across ALL of the record's images, not the first one — pageScale
   // needs the reference to be >= every image's value so that each image's
