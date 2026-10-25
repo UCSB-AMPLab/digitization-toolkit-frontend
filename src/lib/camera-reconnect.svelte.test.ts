@@ -145,7 +145,7 @@ describe('reconnect screen wiring', () => {
     await tick();
     // Well inside the 2.5 s poll, so no fresh request has answered yet.
     await new Promise((r) => setTimeout(r, 100));
-    expect(screen.getByText('Could not get the live preview').elements()).toHaveLength(0);
+    expect(screen.getByText('Could not show the live preview').elements()).toHaveLength(0);
   });
 
   it('a focus failure after a failed test capture replaces it on the status line', async () => {
@@ -167,7 +167,7 @@ describe('reconnect screen wiring', () => {
     const screen = render(Dashboard);
     await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
     await screen.getByRole('button', { name: 'Test', exact: true }).click();
-    await expect.element(screen.getByRole('status')).toHaveTextContent('Could not get the live preview');
+    await expect.element(screen.getByRole('status')).toHaveTextContent('Could not show the live preview');
     await screen.getByRole('button', { name: 'Stop', exact: true }).click();
     await expect.element(screen.getByRole('status')).not.toBeInTheDocument();
   });

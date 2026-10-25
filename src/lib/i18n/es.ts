@@ -96,26 +96,26 @@ export const es = {
 	tour_finish: 'Terminar',
 
 	tour_s1_title: 'Crear un proyecto',
-	tour_s1_where: 'Toca Proyectos › Nuevo Proyecto.',
+	tour_s1_where: 'Ve a Proyectos › Nuevo proyecto.',
 	tour_s1_body:
 		'Un proyecto agrupa lo que se va a digitalizar de un mismo fondo. Agrupa uno o varios volúmenes.',
 	tour_s2_title: 'Crear un volumen',
-	tour_s2_where: 'Toca Proyectos › tu proyecto › Nuevo volumen.',
+	tour_s2_where: 'Ve a Proyectos › tu proyecto › Nuevo volumen.',
 	tour_s2_body:
 		'Cada libro, caja o legajo es un volumen que hace parte de un proyecto. Las imágenes se guardan dentro.',
 	tour_s3_title: 'Capturar',
-	tour_s3_where: 'Toca Proyectos › tu proyecto › tu volumen › Capturar.',
+	tour_s3_where: 'Ve a Proyectos › tu proyecto › tu volumen › Capturar.',
 	tour_s3_body: 'Desde aquí se abre la pantalla de captura de este volumen.',
 	tour_s4_title: 'Pasar a revisión',
-	tour_s4_where: 'Toca Proyectos › tu proyecto › tu volumen › Enviar a revisión.',
+	tour_s4_where: 'Ve a Proyectos › tu proyecto › tu volumen › Enviar a revisión.',
 	tour_s4_body:
-		'Cuando termines de capturar, envía el volumen a revisión. Antes de enviarlo puedes corregir capturas y nomenclatura.',
+		'Cuando termines de capturar, envía el volumen a revisión. Antes de enviarlo puedes corregir las capturas y la nomenclatura.',
 	tour_s5_title: 'Revisar y aprobar',
-	tour_s5_where: 'Toca Proyectos › tu proyecto › tu volumen.',
+	tour_s5_where: 'Ve a Proyectos › tu proyecto › tu volumen.',
 	tour_s5_body:
-		'Revisa cada página: aprueba las que estén bien y rechaza, con el motivo, las que haya que repetir. Para encontrar Aprobar, abre la vista libro (el ícono del libro abierto, en la barra de la derecha) y toca Anotaciones (el globo de diálogo, en la barra de la izquierda). Solo revisores y administradores pueden aprobar.',
+		'Aprueba las páginas que estén bien y rechaza, con el motivo, las que haya que repetir. Para aprobar, abre la vista libro (ícono del libro abierto, en la barra derecha) y luego Anotaciones (globo de diálogo, en la barra izquierda). Solo pueden aprobar los roles Revisor y Administrador.',
 	tour_s6_title: 'Exportar',
-	tour_s6_where: 'Toca Proyectos › tu proyecto › tu volumen y luego el ícono de la caja, el último de la barra de la derecha.',
+	tour_s6_where: 'Ve a Proyectos › tu proyecto › tu volumen y presiona el ícono de la caja de archivo, el último de la barra derecha.',
 	tour_s6_body:
 		'Con todo aprobado, el volumen se empaqueta y queda disponible para descargarlo.',
 
@@ -186,7 +186,7 @@ export const es = {
 	dash_camera_capture_not_connected: 'la cámara no está conectada',
 	dash_camera_capture_timeout: 'la cámara no entregó la imagen a tiempo',
 	dash_camera_focus_error: 'No se pudo enfocar',
-	dash_camera_preview_error: 'No se pudo obtener la previsualización',
+	dash_camera_preview_error: 'No se pudo mostrar la previsualización',
 	dash_two_cameras: '2 cámaras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: no se detecta. Presiona el disparador hasta la mitad para despertarla o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".`,
@@ -310,7 +310,7 @@ export const es = {
 		'Reinicia el equipo. La aplicación se recargará automáticamente cuando vuelva a estar disponible.',
 	config_reboot_btn: 'Reiniciar',
 	config_offline_note:
-		'Este sistema funciona sin conexión a internet. Los datos se guardan en el equipo.',
+		'Para capturar y revisar no hace falta conexión a internet. La copia externa y el envío a Fisqua sí la necesitan.',
 	config_confirm_reboot_title: '¿Reiniciar el equipo?',
 	config_confirm_shutdown_title: '¿Apagar el equipo?',
 	config_confirm_reboot_desc:
@@ -368,7 +368,7 @@ export const es = {
 	// ── Proyectos (lista) ────────────────────────────────────────────────────
 	proj_title: 'Gestión de Proyectos',
 	proj_subtitle: 'Fondos, series, secciones',
-	proj_new: 'Nuevo Proyecto',
+	proj_new: 'Nuevo proyecto',
 	proj_search_placeholder: 'Buscar por nombre, código…',
 	proj_loading: 'Cargando proyectos…',
 	proj_empty_search: 'Sin resultados para tu búsqueda',
@@ -869,7 +869,7 @@ export const es = {
 	cam_section_settings: 'Color y exposición',
 	cam_section_settings_info: 'Ajusta el color y la exposición para que el documento se vea con sus colores reales.',
 	cam_live_controls_unavailable: 'Estos controles se muestran cuando hay conectada una cámara que los admite.',
-	cam_capabilities_failed: 'El sistema de captura no está disponible y no se pueden mostrar estos controles. Toca Reconectar cámaras y, si sigue igual, reinicia el equipo.',
+	cam_capabilities_failed: 'El sistema de captura no está disponible, así que no se pueden mostrar estos controles. Presiona "Reconectar cámaras" y, si sigue igual, reinicia el equipo.',
 	cam_orientation: 'Orientación',
 	cam_rotate_ccw: 'Girar 90° a la izquierda',
 	cam_rotate_cw: 'Girar 90° a la derecha',
@@ -878,7 +878,7 @@ export const es = {
 	cam_format: 'Formato',
 	cam_focusing: 'Enfocando…',
 	cam_autofocus: 'Enfoque automático',
-	cam_manual_focus: 'Foco manual',
+	cam_manual_focus: 'Enfoque manual',
 	cam_focus_slider_aria: 'Posición de foco (dioptrías)',
 	cam_focus_infinity: 'Infinito (lejos)',
 	cam_focus_macro: 'Macro (10 cm)',
@@ -894,7 +894,7 @@ export const es = {
 	cam_wb_calibrate_aria: 'Calibrar el balance de blancos automáticamente',
 	cam_wb_cancel_aria: 'Cancelar la muestra para el balance de blancos',
 	cam_wb_sample_aria: 'Tomar una muestra para el balance de blancos: toca un área blanca en la previsualización (experimental)',
-	cam_wb_hint: 'Toca un área blanca o gris neutro en la previsualización.',
+	cam_wb_hint: 'Selecciona un área blanca o gris neutro en la previsualización.',
 	cam_temperature: 'Temperatura',
 	cam_tint: 'Tinte',
 	cam_exposure: 'Exposición',
@@ -916,7 +916,7 @@ export const es = {
 	lv_reconnecting: 'Reconectando con la cámara…',
 	lv_camera_left_alt: 'Cámara izquierda',
 	lv_camera_right_alt: 'Cámara derecha',
-	lv_wb_click_hint: 'Haz clic en un área blanca o gris neutro',
+	lv_wb_click_hint: 'Selecciona un área blanca o gris neutro en la previsualización',
 	lv_no_signal_left: 'Sin señal — Izquierda',
 	lv_no_signal_right: 'Sin señal — Derecha',
 	lv_check_hw: 'Verifica la conexión de la cámara',

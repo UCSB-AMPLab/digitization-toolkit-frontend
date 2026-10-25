@@ -84,7 +84,7 @@ export const en: Messages = {
 	tour_finish: 'Finish',
 
 	tour_s1_title: 'Create a project',
-	tour_s1_where: 'Go to Projects › New Project.',
+	tour_s1_where: 'Go to Projects › New project.',
 	tour_s1_body:
 		'A project groups what will be digitized from a single fonds. It holds one or more volumes.',
 	tour_s2_title: 'Create a volume',
@@ -101,9 +101,9 @@ export const en: Messages = {
 	tour_s5_title: 'Review and approve',
 	tour_s5_where: 'Go to Projects › your project › your volume.',
 	tour_s5_body:
-		'Review each page: approve the ones that are right and reject, with a reason, those that need retaking. To find Approve, open the spread view (the open-book icon in the right-hand bar) and tap Annotations (the speech bubble in the left-hand bar). Only reviewers and administrators can approve.',
+		'Approve the pages that are right and reject, with a reason, those that need retaking. To approve, open the spread view (the open-book icon in the right-hand bar), then Annotations (the speech bubble in the left-hand bar). Only the Reviewer and Administrator roles can approve.',
 	tour_s6_title: 'Export',
-	tour_s6_where: 'Go to Projects › your project › your volume, then tap the box icon, the last one in the right-hand bar.',
+	tour_s6_where: 'Go to Projects › your project › your volume, then press the archive-box icon, the last one in the right-hand bar.',
 	tour_s6_body:
 		'With everything approved, the volume is packaged and becomes available to download.',
 
@@ -171,7 +171,7 @@ export const en: Messages = {
 	dash_camera_capture_not_connected: 'the camera is not connected',
 	dash_camera_capture_timeout: 'the camera did not deliver the image in time',
 	dash_camera_focus_error: 'Could not focus',
-	dash_camera_preview_error: 'Could not get the live preview',
+	dash_camera_preview_error: 'Could not show the live preview',
 	dash_two_cameras: '2 cameras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: not detected. Half-press its shutter button to wake it, or reseat its USB cable, then press "Reconnect cameras".`,
@@ -287,7 +287,7 @@ export const en: Messages = {
 	config_reboot_label: 'Restart the scanner',
 	config_reboot_desc: 'Restarts the scanner. The app will reload automatically once it is back.',
 	config_reboot_btn: 'Restart',
-	config_offline_note: 'This system works without an internet connection. Data is stored on the unit.',
+	config_offline_note: 'Capturing and reviewing need no internet connection. The external copy and sending to Fisqua do.',
 	config_confirm_reboot_title: 'Restart the scanner?',
 	config_confirm_shutdown_title: 'Shut down the scanner?',
 	config_confirm_reboot_desc:
@@ -343,7 +343,7 @@ export const en: Messages = {
 	// ── Projects (list) ──────────────────────────────────────────────────────
 	proj_title: 'Project Management',
 	proj_subtitle: 'Fonds, series, sections',
-	proj_new: 'New Project',
+	proj_new: 'New project',
 	proj_search_placeholder: 'Search by name or code…',
 	proj_loading: 'Loading projects…',
 	proj_empty_search: 'No results for your search',
@@ -838,7 +838,7 @@ export const en: Messages = {
 	cam_section_settings: 'Colour and exposure',
 	cam_section_settings_info: 'Adjust so the document looks the colour it really is.',
 	cam_live_controls_unavailable: 'Appear when a connected camera supports them.',
-	cam_capabilities_failed: 'The capture system is not available, so these controls cannot be shown. Tap Reconnect cameras; if nothing changes, restart the unit.',
+	cam_capabilities_failed: 'The capture system is not available, so these controls cannot be shown. Press "Reconnect cameras"; if nothing changes, restart the unit.',
 	cam_orientation: 'Orientation',
 	cam_rotate_ccw: 'Rotate 90° CCW',
 	cam_rotate_cw: 'Rotate 90° CW',
@@ -862,7 +862,7 @@ export const en: Messages = {
 	cam_wb_calibrate_aria: 'Calibrate white balance automatically',
 	cam_wb_cancel_aria: 'Cancel white balance sampling',
 	cam_wb_sample_aria: 'Sample white balance: tap a white area in the preview (experimental)',
-	cam_wb_hint: 'Tap a white or neutral gray area in the preview.',
+	cam_wb_hint: 'Select a white or neutral gray area in the preview.',
 	cam_temperature: 'Temperature',
 	cam_tint: 'Tint',
 	cam_exposure: 'Exposure',
@@ -884,7 +884,7 @@ export const en: Messages = {
 	lv_reconnecting: 'Reconnecting to the camera…',
 	lv_camera_left_alt: 'Left camera',
 	lv_camera_right_alt: 'Right camera',
-	lv_wb_click_hint: 'Click a white or neutral gray area',
+	lv_wb_click_hint: 'Select a white or neutral gray area in the preview',
 	lv_no_signal_left: 'No signal — Left',
 	lv_no_signal_right: 'No signal — Right',
 	lv_check_hw: 'Check the camera connection',
