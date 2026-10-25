@@ -63,7 +63,7 @@ export const es = {
 	login_offline: 'Sin conexión con el servidor',
 	login_error_fill_all_fields: 'Por favor completa todos los campos',
 	login_error_bad_credentials: 'Usuario o contraseña incorrectos',
-	login_error_unknown_role: 'Tu cuenta tiene un rol que la aplicación no reconoce. Avisa a quien administra el equipo.',
+	login_error_unknown_role: 'Tu cuenta tiene un rol que la aplicación no reconoce. Avisa al administrador.',
 	login_error_backend_unavailable: 'No se pudo conectar con el servidor. Puede que todavía no esté listo: espera unos segundos e intenta de nuevo.',
 	login_error_locked_out: (minutes: number) =>
 		minutes === 1
@@ -740,9 +740,9 @@ export const es = {
 		return `${ids.length === 1 ? 'Registro' : 'Registros'} ${shown}${rest > 0 ? ` y ${formatCount(rest, 'es')} más` : ''}`;
 	},
 	col_manifest_rule_tenant_missing:
-		'Este equipo no tiene configurada la carpeta de su institución en la copia externa, así que el manifiesto no puede indicar dónde está el volumen. Avisa a quien administra el equipo: tiene que definir DTK_OFFSITE_TENANT y reiniciar Captua.',
+		'Este equipo no tiene configurada la carpeta de su institución en la copia externa, así que el manifiesto no puede indicar dónde está el volumen. Avisa al administrador: tiene que definir DTK_OFFSITE_TENANT y reiniciar Captua.',
 	col_manifest_rule_tenant_invalid:
-		'La carpeta de la institución configurada en este equipo para la copia externa no es válida. Avisa a quien administra el equipo: tiene que corregir DTK_OFFSITE_TENANT y reiniciar Captua.',
+		'La carpeta de la institución configurada en este equipo para la copia externa no es válida. Avisa al administrador: tiene que corregir DTK_OFFSITE_TENANT y reiniciar Captua.',
 	col_manifest_rule_no_stem:
 		'El volumen no tiene raíz, así que sus imágenes no tienen nombres que Fisqua pueda leer. Asígnale una raíz al volumen: su código de referencia en Fisqua.',
 	col_manifest_rule_no_project: 'El volumen no pertenece a ningún proyecto, y el manifiesto tiene que indicar a cuál pertenece. Mueve el volumen a un proyecto.',
@@ -769,13 +769,13 @@ export const es = {
 	col_manifest_rule_page_key_repeated:
 		'Hay más de una imagen guardada con el mismo nombre, y Fisqua usa ese nombre para identificar cada página. Hay que volver a capturar los registros de esas imágenes.',
 	col_manifest_rule_sha256_missing:
-		'El manifiesto de captura no tiene un checksum SHA-256 válido para algunas imágenes. Avisa a quien administra el equipo: tiene que ejecutar en el equipo la verificación de integridad del volumen y resolver lo que encuentre.',
+		'El manifiesto de captura no tiene un checksum SHA-256 válido para algunas imágenes. Avisa al administrador: tiene que ejecutar en el equipo la verificación de integridad del volumen y resolver lo que encuentre.',
 	col_manifest_rule_preview_sha256_missing:
-		'Las vistas previas de algunas imágenes RAW no tienen checksum SHA-256 registrado, porque esas imágenes se capturaron antes de que Captua empezara a registrarlo. Avisa a quien administra el equipo: tiene que ejecutar backfill-preview-digests para este volumen en el equipo. Después, vuelve a exportar.',
+		'Las vistas previas de algunas imágenes RAW no tienen checksum SHA-256 registrado, porque esas imágenes se capturaron antes de que Captua empezara a registrarlo. Avisa al administrador: tiene que ejecutar backfill-preview-digests para este volumen en el equipo. Después, vuelve a exportar.',
 	col_manifest_rule_no_pages:
 		'Ningún registro en revisión o aprobado tiene imágenes, así que Fisqua no tiene páginas que registrar. Envía a revisión registros con imágenes.',
 	col_manifest_rule_reference_code_differs:
-		'El código de referencia del volumen en Fisqua no coincide con la raíz del volumen, así que Captua no lo envía a Fisqua. Desde aquí no se puede cambiar el código de referencia. Avisa a quien administra el equipo: tiene que hacer coincidir el código de referencia con la raíz. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
+		'El código de referencia del volumen en Fisqua no coincide con la raíz del volumen, así que Captua no lo envía a Fisqua. Desde aquí no se puede cambiar el código de referencia. Avisa al administrador: tiene que hacer coincidir el código de referencia con la raíz. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
 	col_manifest_rule_other: 'Fisqua rechazaría el archivo por otro motivo.',
 	col_manifest_err_title: 'No se pudo descargar el manifiesto de captura',
 	col_manifest_err_not_found: 'Captua no encontró este volumen. Vuelve al proyecto y ábrelo de nuevo.',
@@ -862,10 +862,10 @@ export const es = {
 	cam_dslr_note_p3: 'El enfoque automático (AF) bloquea las DSLR de Canon unos 12 segundos.',
 	cam_dslr_af_warning: (mode: string) => `El objetivo está en ${mode}. La captura puede quedarse bloqueada hasta que el interruptor del objetivo esté en MF.`,
 	cam_wb: 'Balance de blancos',
-	cam_wb_calibrate_aria: 'Calibrar white balance automáticamente (AWB convergencia)',
-	cam_wb_cancel_aria: 'Cancelar muestreo de white balance',
-	cam_wb_sample_aria: 'Muestrear white balance: toca un área blanca en el preview (experimental)',
-	cam_wb_hint: 'Toca un área blanca o gris neutro en el preview.',
+	cam_wb_calibrate_aria: 'Calibrar el balance de blancos automáticamente (convergencia AWB)',
+	cam_wb_cancel_aria: 'Cancelar la muestra para el balance de blancos',
+	cam_wb_sample_aria: 'Tomar una muestra para el balance de blancos: toca un área blanca en la previsualización (experimental)',
+	cam_wb_hint: 'Toca un área blanca o gris neutro en la previsualización.',
 	cam_temperature: 'Temperatura',
 	cam_tint: 'Tinte',
 	cam_exposure: 'Exposición',
@@ -873,13 +873,13 @@ export const es = {
 	cam_focus_result: (dpt: string) => `Foco: ${dpt} dpt`,
 	cam_af_failed: 'Autofocus falló',
 	cam_af_error: 'Error en autofocus',
-	cam_wb_calibrated: (temp: string) => `WB calibrado${temp}`,
-	cam_wb_failed: 'Calibración WB falló',
-	cam_wb_error: 'Error calibrando WB',
-	cam_wb_invalid_pixel: 'Pixel inválido — elige un área con luz',
-	cam_wb_sampled: (r: string, b: string) => `WB muestreado (R=${r}, B=${b})`,
-	cam_wb_save_error: 'Error al guardar WB',
-	cam_wb_apply_error: 'Error aplicando WB',
+	cam_wb_calibrated: (temp: string) => `Balance de blancos calibrado${temp}`,
+	cam_wb_failed: 'No se pudo calibrar el balance de blancos',
+	cam_wb_error: 'Error al calibrar el balance de blancos',
+	cam_wb_invalid_pixel: 'Píxel inválido — elige un área con luz',
+	cam_wb_sampled: (r: string, b: string) => `Balance de blancos ajustado con la muestra (R=${r}, B=${b})`,
+	cam_wb_save_error: 'No se pudo guardar el balance de blancos',
+	cam_wb_apply_error: 'No se pudo aplicar el balance de blancos',
 
 	// ── Vista en vivo ────────────────────────────────────────────────────────
 	lv_reconnecting: 'Reconectando con la cámara…',
@@ -931,7 +931,7 @@ export const es = {
 			: 'Este registro se capturó con una cámara; para volver a capturarlo, elige "Una cámara"',
 	lv_err_camera_not_connected: (n: number) => `La cámara ${n} no está conectada`,
 	lv_err_numbers_taken:
-		'Captua no hizo la captura: ya hay archivos en el disco con los próximos números de captura de este volumen; avisa a quien administra el equipo',
+		'Captua no hizo la captura: ya hay archivos en el disco con los próximos números de captura de este volumen; avisa al administrador',
 	lv_err_retake_status: 'Solo se puede volver a capturar un registro en estado Capturado o Rechazado',
 	lv_err_resolution_in_name: 'Captua no puede incluir la resolución en el nombre de archivo de las capturas',
 	lv_err_name_too_long: 'Captua no hizo la captura: el nombre de archivo tendría más de 36 caracteres',
@@ -994,7 +994,7 @@ export const es = {
 		`Copia externa en curso: ${formatCount(verified, 'es')} de ${formatCount(total, 'es')} archivos verificados, ${formatCount(pending, 'es')} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
 	offsite_vol_attention: (refused: number, verified: number, total: number, pending: number) =>
 		`${refused === 1 ? '1 archivo requiere' : `${formatCount(refused, 'es')} archivos requieren`} atención · ${formatCount(verified, 'es')} de ${formatCount(total, 'es')} verificados, ${formatCount(pending, 'es')} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
-	offsite_attention_help: 'En la copia externa ya hay otro archivo con el mismo nombre. Avisa a quien administra el equipo.',
+	offsite_attention_help: 'En la copia externa ya hay otro archivo con el mismo nombre. Avisa al administrador.',
 	offsite_vol_empty: 'Copia externa: todavía no hay archivos para copiar',
 	offsite_vol_no_stem: 'Sin copia externa: este volumen no tiene raíz',
 	offsite_vol_off: 'Copia externa de imágenes sin configurar',
@@ -1009,7 +1009,7 @@ export const es = {
 	offsite_unit_title: 'Archivos de imagen',
 	offsite_unit_off: 'La copia externa de los archivos de imagen no está configurada en este equipo.',
 	offsite_unit_misconfigured:
-		'La copia externa de los archivos de imagen no está bien configurada en este equipo. Avisa a quien administra el equipo.',
+		'La copia externa de los archivos de imagen no está bien configurada en este equipo. Avisa al administrador.',
 	offsite_unit_empty: 'Todavía no hay archivos de imagen para copiar.',
 	offsite_unit_volumes: (received: number, volumes: number) =>
 		`${formatCount(received, 'es')} de ${formatCount(volumes, 'es')} ${volumes === 1 ? 'volumen' : 'volúmenes'} con copia externa completa.`,
@@ -1073,19 +1073,19 @@ export const es = {
 	// El texto de Fisqua, tal como lo envió.
 	fisqua_problem_from_fisqua: (message: string): string => `Mensaje de Fisqua: ${message}`,
 	fisqua_incident_object_missing:
-		'Fisqua no encontró en la copia externa algunos archivos que Captua ya había verificado allí. Hay que investigarlo: avisa a quien administra el equipo para que revise la copia externa. Los archivos que faltan se listan abajo.',
+		'Fisqua no encontró en la copia externa algunos archivos que Captua ya había verificado allí. Avisa al administrador: tiene que revisar la copia externa y averiguar qué pasó con ellos. Abajo aparece la lista de los archivos que faltan.',
 	fisqua_role_single: 'Imagen única',
 	fisqua_kind_capture: 'Archivo original',
 	fisqua_kind_preview: 'Vista previa',
 	fisqua_history: (n: number): string => `Envíos anteriores (${formatCount(n, 'es')})`,
 	fisqua_cfg_token:
-		'Fisqua no acepta el token configurado en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_TOKEN y reiniciar Captua.',
+		'Fisqua no acepta el token configurado en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_TOKEN y reiniciar Captua.',
 	fisqua_cfg_not_found:
-		'Fisqua no reconoce la dirección configurada en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL o DTK_OFFSITE_TENANT y reiniciar Captua.',
+		'Fisqua no reconoce la dirección configurada en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL o DTK_OFFSITE_TENANT y reiniciar Captua.',
 	fisqua_cfg_redirect:
-		'La dirección de Fisqua configurada en este equipo redirige a otra. Captua no sigue esa redirección, para que el token no llegue a otro sitio, y dejó de enviarle volúmenes a Fisqua y de consultar en qué estado están. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_ENV o DTK_FISQUA_BASE_URL y reiniciar Captua.',
+		'La dirección de Fisqua configurada en este equipo redirige a otra. Captua no sigue esa redirección, para que el token no llegue a otro sitio, y dejó de enviarle volúmenes a Fisqua y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_ENV o DTK_FISQUA_BASE_URL y reiniciar Captua.',
 	fisqua_cfg_other:
-		'Fisqua no acepta la configuración de este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa a quien administra el equipo: tiene que revisar la configuración de Fisqua y reiniciar Captua.',
+		'Fisqua no acepta la configuración de este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que revisar la configuración de Fisqua y reiniciar Captua.',
 	fisqua_unit_title: 'Fisqua',
 	fisqua_unit_off: 'El envío a Fisqua no está configurado en este equipo.',
 	fisqua_unit_env_production:
@@ -1167,7 +1167,7 @@ export const es = {
 	offsite_err_no_read_remote:
 		'Este equipo no está configurado para restaurar: necesita acceso de lectura a la copia externa. Pide a quien instaló el equipo que lo configure.',
 	offsite_err_not_in_own_folder:
-		'Algunos archivos de este volumen todavía no están en la carpeta propia del volumen, así que Captua no puede liberarlos ni restaurarlos. Captua los mueve allí al arrancar el equipo: reinicia el equipo y vuelve a intentarlo. Si después del reinicio Captua sigue sin poder liberarlos ni restaurarlos, avísale a un administrador.',
+		'Algunos archivos de este volumen todavía no están en la carpeta propia del volumen, así que Captua no puede liberarlos ni restaurarlos. Captua los mueve allí al arrancar el equipo: reinicia el equipo y vuelve a intentarlo. Si después del reinicio Captua sigue sin poder liberarlos ni restaurarlos, avisa al administrador.',
 	offsite_err_job_running: 'Captua ya está liberando o restaurando archivos de este volumen. Espera a que termine.',
 	offsite_err_drive_unavailable:
 		'El disco configurado para los proyectos no está disponible. Conéctalo y actívalo, o vuelve al almacenamiento interno, y después intenta de nuevo.',
