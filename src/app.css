@@ -1427,6 +1427,79 @@ tr:hover .drag-handle { opacity: 1; }
 /* A received volume whose files were freed from the card (NEH-248): healthy. */
 .offsite-freed .offsite-indicator-icon { color: var(--color-success); }
 
+/* ── Volume view: delivery to Fisqua, under the offsite line ──
+   One line in the 72px top bar, in the offsite indicator's look; the tone
+   sets its icon. When there are details, the line is a button that opens a
+   panel under it, in UserMenu's look, capped in height with its own scroll. */
+.fisqua-line {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.fisqua-ok .offsite-indicator-icon { color: var(--color-success); }
+.fisqua-progress .offsite-indicator-icon { color: var(--color-secondary); }
+.fisqua-attention,
+.fisqua-attention .offsite-indicator-icon { color: var(--color-warning); }
+.fisqua-trigger {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-family);
+  text-align: left;
+  cursor: pointer;
+}
+.fisqua-trigger:hover .offsite-indicator-text { text-decoration: underline; }
+.fisqua-trigger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.fisqua-trigger[aria-expanded='true'] .fisqua-trigger-caret { transform: rotate(180deg); }
+.fisqua-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background-color: var(--color-surface-alt);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-light);
+}
+.fisqua-panel p {
+  font-size: inherit;
+  line-height: inherit;
+}
+.fisqua-panel ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.fisqua-panel-heading {
+  margin: 0;
+  font-weight: var(--fw-bold);
+  color: var(--color-light-grey);
+}
+.fisqua-config-error {
+  margin: 0;
+  color: var(--color-warning);
+}
+.fisqua-problem-records { color: var(--color-light-grey); }
+/* Fisqua's object-missing refusal: an incident, in the warning colour. */
+.fisqua-incident { color: var(--color-warning); }
+.fisqua-incident p { margin: 0; }
+.fisqua-incident ul { color: var(--color-light); }
+.fisqua-incident code { overflow-wrap: anywhere; }
+
 /* ── Volume view: freeing space on the card and restoring (NEH-248) ──
    The admin's button beside the breadcrumb, and its dialog. */
 .offsite-manage-btn {
@@ -1576,6 +1649,13 @@ tr:hover .drag-handle { opacity: 1; }
 .offsite-unit.level-attention { border-color: var(--color-error); background-color: var(--color-error-bg); }
 .offsite-unit.level-off .offsite-unit-line,
 .offsite-unit.level-empty .offsite-unit-line { color: var(--color-light-grey); }
+/* The Fisqua row's configuration error, in the same box. */
+.offsite-unit-warning {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--color-light);
+  font-weight: var(--fw-bold);
+}
 
 /* ============================================================================
 LOGO and BRANDING

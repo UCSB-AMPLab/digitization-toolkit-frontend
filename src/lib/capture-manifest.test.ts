@@ -102,6 +102,15 @@ describe('captureManifestRefusal', () => {
 		}
 	});
 
+	it.each([
+		['reference_code_differs', 'col_manifest_rule_reference_code_differs']
+	] as const)("has a catalogue text for the outbox's %s, in both languages", (rule, key) => {
+		for (const msgs of [en, es]) {
+			const view = captureManifestRefusal(refused([{ rule, message: 'x', record_ids: [], image_ids: [] }]), msgs)!;
+			expect(view.problems[0].text).toBe(msgs[key]);
+		}
+	});
+
 	it('skips malformed problem entries', () => {
 		const error = new ApiError('x', { message: 'x', problems: [null, 'x', { rule: 'no_stem' }] }, 409);
 		const view = captureManifestRefusal(error, en)!;

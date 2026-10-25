@@ -481,6 +481,8 @@ export const en: Messages = {
 	pd_val_stem_too_long: (max: number) => `The stem can be at most ${max} characters long.`,
 	pd_val_stem_pattern:
 		'Use only lowercase letters a to z and digits, separated by single hyphens, with no hyphen at the start or end.',
+	pd_err_stem_differs_from_reference_code: (externalId: string, stem: string): string =>
+		`The stem has to be the volume's Fisqua reference code, "${externalId}"; "${stem}" is different. Use "${externalId}" as the stem.`,
 	pd_err_stem_taken: 'Another volume already uses this stem.',
 	pd_err_stem_fixed: 'Images have already been captured into this volume, so its stem cannot be changed.',
 	pd_no_stem_badge: 'No stem',
@@ -507,6 +509,10 @@ export const en: Messages = {
 	col_reject_error: 'Could not reject the record. Please try again.',
 	col_reject_needs_reason: 'You must select at least one error.',
 	col_reject_other_needs_note: 'A rejection for "Other" needs a note. Describe the problem in Add note.',
+	col_reject_comment_too_long: (max: number): string =>
+		`Could not reject the record: the note can be at most ${formatCount(max, 'en')} characters long, which is what Fisqua keeps. Shorten it and try again.`,
+	col_annotation_note_count: (n: number, max: number): string =>
+		`${formatCount(n, 'en')} of ${formatCount(max, 'en')} characters`,
 	col_reject_other_note_error: 'Could not reject the record: a rejection for "Other" needs a note that describes the problem.',
 	col_review_approve_error: 'Could not approve the record. Please try again.',
 	// ── Send for review (NEH-260) ───────────────────────────────────
@@ -760,6 +766,8 @@ export const en: Messages = {
 		'No SHA-256 checksum is recorded for the previews of some RAW images, which were captured before Captua recorded it. Ask whoever manages the scanner to run backfill-preview-digests for this volume on the scanner, then export again.',
 	col_manifest_rule_no_pages:
 		'No record sent for review or approved has an image, so Fisqua has no page to register. Send records with images for review.',
+	col_manifest_rule_reference_code_differs:
+		"The volume's Fisqua reference code differs from its stem, so Captua does not send it to Fisqua. The reference code cannot be changed here: ask whoever manages the scanner to make the reference code and the stem agree, then withdraw the volume from review and send it for review again.",
 	col_manifest_rule_other: 'Fisqua would refuse the file for another reason.',
 	col_manifest_err_title: 'Could not download the capture manifest',
 	col_manifest_err_not_found: 'Captua could not find this volume. Go back to the project and open it again.',
@@ -997,6 +1005,94 @@ export const en: Messages = {
 		return `Last file verified on ${date} at ${time}.`;
 	},
 	offsite_cfg_never: 'No file has been verified yet.',
+
+	// ── Delivery to Fisqua (fisqua-state.ts) ──────────────────────────────
+	// `day`, `date` and `time` as in offsite_last_verified.
+	fisqua_vol_label: 'Delivery of this volume to Fisqua',
+	fisqua_when: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		if (day === 'today') return `today at ${time}`;
+		if (day === 'yesterday') return `yesterday at ${time}`;
+		return `on ${date} at ${time}`;
+	},
+	fisqua_out_none: 'Not sent to Fisqua yet',
+	fisqua_out_waiting: 'Waiting for the complete offsite copy before sending to Fisqua',
+	fisqua_out_sending: 'Captua is sending the capture manifest to Fisqua',
+	fisqua_out_failed: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		const when = day === 'today' ? `today at ${time}` : day === 'yesterday' ? `yesterday at ${time}` : `on ${date} at ${time}`;
+		return `Captua could not send the capture manifest to Fisqua; it will try again ${when}`;
+	},
+	fisqua_out_failed_no_time: 'Captua could not send the capture manifest to Fisqua; it will try again',
+	fisqua_out_not_exportable: 'Not sent to Fisqua: Captua cannot build the capture manifest',
+	fisqua_out_refused_by_fisqua: 'Fisqua refused the capture manifest',
+	fisqua_out_delivered: 'Sent to Fisqua; waiting for its status',
+	fisqua_out_superseded: 'Not sent: a later send for review replaced it',
+	fisqua_out_withdrawn: 'Not sent: the volume was withdrawn from review',
+	fisqua_st_received: 'Fisqua received the volume',
+	fisqua_st_registered: 'Fisqua registered the volume',
+	fisqua_st_preparing_review: 'Fisqua is preparing the volume for capture QC',
+	fisqua_st_in_capture_qc: "Fisqua is reviewing the volume's capture",
+	fisqua_st_retakes_requested: 'Fisqua asks for some records to be captured again',
+	fisqua_st_approved: 'Fisqua approved the capture of every record',
+	fisqua_st_queued: 'Queued in Fisqua',
+	fisqua_st_running: 'Fisqua is processing the volume',
+	fisqua_st_review_pending: 'The processed images are waiting for review in Fisqua',
+	fisqua_st_published: 'Published in Fisqua',
+	fisqua_st_refused: 'Fisqua refused the volume',
+	fisqua_st_superseded: 'Fisqua replaced this manifest with a later one',
+	fisqua_st_failed: 'Fisqua could not process the volume',
+	fisqua_st_unknown: 'Fisqua does not know this volume yet',
+	fisqua_st_other: 'Fisqua reports a status this version of Captua does not know',
+	fisqua_checked: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		if (day === 'today') return `checked today at ${time}`;
+		if (day === 'yesterday') return `checked yesterday at ${time}`;
+		return `checked on ${date} at ${time}`;
+	},
+	fisqua_problems: (n: number): string => (n === 1 ? '1 problem' : `${formatCount(n, 'en')} problems`),
+	// Fisqua's own text, as it sent it.
+	fisqua_notes: (n: number): string => (n === 1 ? '1 note' : `${formatCount(n, 'en')} notes`),
+	fisqua_more: (n: number): string => `and ${formatCount(n, 'en')} more`,
+	fisqua_note_unlisted_object: (key: string): string =>
+		`The offsite copy holds a file the capture manifest does not name: ${key}`,
+	fisqua_note_missing_object: (key: string): string =>
+		`The capture manifest names a file the offsite copy does not hold; Fisqua does not read it to process the volume: ${key}`,
+	fisqua_rule_bad_request: 'Fisqua refused the capture manifest as malformed, without naming a problem.',
+	fisqua_rule_payload_too_large: 'Fisqua refused the capture manifest as too large, without naming a problem.',
+	fisqua_problem_from_fisqua: (message: string): string => `From Fisqua: ${message}`,
+	fisqua_incident_object_missing:
+		'Fisqua could not find some files in the offsite copy that Captua had already verified there. This needs investigating: ask whoever manages the scanner to check the offsite copy. The missing files are listed below.',
+	fisqua_role_single: 'Single image',
+	fisqua_kind_capture: 'Master file',
+	fisqua_kind_preview: 'Preview',
+	fisqua_history: (n: number): string => `Earlier sends (${formatCount(n, 'en')})`,
+	fisqua_cfg_token:
+		'Fisqua does not accept the token configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_TOKEN and restart Captua.',
+	fisqua_cfg_not_found:
+		'Fisqua does not recognise the address configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL or DTK_OFFSITE_TENANT and restart Captua.',
+	fisqua_cfg_redirect:
+		'The Fisqua address configured on this scanner redirects to another address. Captua does not follow it, so that the token is not sent elsewhere, and has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_ENV or DTK_FISQUA_BASE_URL and restart Captua.',
+	fisqua_cfg_version:
+		'Fisqua does not read the capture manifests this version of Captua writes, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to update Captua or Fisqua.',
+	fisqua_cfg_other:
+		"Fisqua does not accept this scanner's configuration, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to check its Fisqua settings and restart Captua.",
+	fisqua_unit_title: 'Fisqua',
+	fisqua_unit_off: 'Sending to Fisqua is not configured on this scanner.',
+	fisqua_unit_env_production:
+		"Captua sends each volume's capture manifest to Fisqua once the volume is in review and its offsite copy is complete.",
+	fisqua_unit_env_staging:
+		"Captua sends each volume's capture manifest to Fisqua's test service (staging) once the volume is in review and its offsite copy is complete.",
+	fisqua_unit_send_none: 'Captua has not sent anything to Fisqua since the last restart.',
+	fisqua_unit_send_done: (delivered: number, refused: number, failed: number, waiting: number): string =>
+		`Last send: ${formatCount(delivered, 'en')} delivered, ${formatCount(refused, 'en')} refused, ${formatCount(failed, 'en')} to try again, ${formatCount(waiting, 'en')} waiting for the offsite copy.`,
+	fisqua_unit_send_config_error: 'Last send: stopped by the configuration error below.',
+	fisqua_unit_send_error: 'Captua could not finish the last send. It tries again after the next image upload to the offsite copy.',
+	fisqua_unit_send_stopped: 'Captua stopped the last send before it finished, and continues after the next image upload to the offsite copy.',
+	fisqua_unit_send_other: 'Captua sent nothing to Fisqua on its last run.',
+	fisqua_unit_poll_none: 'Captua has not asked Fisqua for a status since the last restart.',
+	fisqua_unit_poll_done: (asked: number, answered: number): string =>
+		`Last status check: Captua asked about ${asked === 1 ? '1 volume' : `${formatCount(asked, 'en')} volumes`}, and Fisqua answered for ${formatCount(answered, 'en')}.`,
+	fisqua_unit_poll_config_error: 'Last status check: stopped by the configuration error below.',
+	fisqua_unit_poll_error: 'Captua could not finish the last status check. It asks again later.',
+	fisqua_unit_poll_other: 'On its last check, Captua asked Fisqua about no volumes.',
 
 	// ── Freeing space on the card and restoring (NEH-248, offsite-free.ts) ──
 	offsite_vol_stored: 'Stored offsite',

@@ -12,9 +12,13 @@
 	// the bytes (NEH-248). The layout reads the state through `onState`, for the
 	// admin's free and restore actions beside it, and bumps `refresh` after one
 	// of them to ask again at once.
+	//
+	// The same answer carries the volume's delivery to Fisqua (`fisqua`),
+	// shown under the line by VolumeFisquaLine, with no request of its own.
 	import { untrack } from 'svelte';
 	import { m, locale } from '$lib/i18n';
 	import { collectionsApi, AuthError } from '$lib/api';
+	import VolumeFisquaLine from './VolumeFisquaLine.svelte';
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
 	import { POLL_INTERVAL_MS, REQUEST_TIMEOUT_MS, startPolling } from '$lib/catalogue-backup';
 	import {
@@ -87,6 +91,7 @@
 			: ''
 	);
 	let icon = $derived(view ? icons[view.kind] : undefined);
+	let fisqua = $derived(snapshot.kind === 'loaded' ? snapshot.state.fisqua : null);
 </script>
 
 {#if view}
@@ -99,4 +104,7 @@
 			{view.headline}{#if view.freed}<span class="offsite-indicator-sep"> · </span>{view.freed}{/if}{#if view.lastVerified}<span class="offsite-indicator-sep"> · </span>{view.lastVerified}{/if}
 		</span>
 	</p>
+{/if}
+{#if fisqua}
+	<VolumeFisquaLine {fisqua} now={$catalogueBackupNow.now} />
 {/if}

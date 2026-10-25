@@ -45,7 +45,16 @@ export const CAPTURE_MANIFEST_RULES = [
 	'no_pages'
 ] as const;
 
-type Rule = (typeof CAPTURE_MANIFEST_RULES)[number];
+/**
+ * Not a capture_manifest rule: the problem app/core/fisqua_outbox.py records,
+ * in the same shape, on a handover of a volume whose recorded reference code
+ * differs from its stem, which it does not send. Shown on the volume's Fisqua line.
+ */
+export const FISQUA_OUTBOX_RULES = ['reference_code_differs'] as const;
+
+type Rule = (typeof CAPTURE_MANIFEST_RULES)[number] | (typeof FISQUA_OUTBOX_RULES)[number];
+
+const KNOWN_RULES: readonly string[] = [...CAPTURE_MANIFEST_RULES, ...FISQUA_OUTBOX_RULES];
 
 const FALLBACK_NAME = 'capture-manifest.json';
 
@@ -123,6 +132,8 @@ function ruleText(rule: Rule, msgs: Messages): string {
 			return msgs.col_manifest_rule_preview_sha256_missing;
 		case 'no_pages':
 			return msgs.col_manifest_rule_no_pages;
+		case 'reference_code_differs':
+			return msgs.col_manifest_rule_reference_code_differs;
 	}
 }
 
@@ -141,26 +152,34 @@ function statusOf(error: unknown): unknown {
 	return error instanceof Error ? (error as Error & { status?: unknown }).status : undefined;
 }
 
+/**
+ * Problems in the capture_manifest shape ({rule, message, record_ids,
+ * image_ids}), in the catalogue's words: a known rule from the catalogue, with
+ * its record ids; a rule this build does not know gets a generic line, never
+ * the backend's text. Malformed entries are skipped.
+ */
+export function manifestProblemViews(problems: unknown[], msgs: Messages): ManifestProblemView[] {
+	const views: ManifestProblemView[] = [];
+	for (const p of problems) {
+		if (typeof p !== 'object' || p === null) continue;
+		const { rule, record_ids } = p as { rule?: unknown; record_ids?: unknown };
+		if (typeof rule !== 'string') continue;
+		const text = KNOWN_RULES.includes(rule) ? ruleText(rule as Rule, msgs) : msgs.col_manifest_rule_other;
+		const ids = Array.isArray(record_ids)
+			? [...new Set(record_ids.filter((id): id is number => Number.isInteger(id)))].sort((a, b) => a - b)
+			: [];
+		views.push({ rule, text, records: ids.length > 0 ? msgs.col_manifest_records(ids) : null });
+	}
+	return views;
+}
+
 /** The problems of a 409 refusal, in the catalogue's words, or null for any other error. */
 export function captureManifestRefusal(error: unknown, msgs: Messages): ManifestRefusalView | null {
 	if (statusOf(error) !== 409) return null;
 	const detail = (error as { detail?: unknown }).detail;
 	const problems = typeof detail === 'object' && detail !== null ? (detail as { problems?: unknown }).problems : undefined;
 	if (!Array.isArray(problems)) return null;
-	const views: ManifestProblemView[] = [];
-	for (const p of problems) {
-		if (typeof p !== 'object' || p === null) continue;
-		const { rule, record_ids } = p as { rule?: unknown; record_ids?: unknown };
-		if (typeof rule !== 'string') continue;
-		const text = (CAPTURE_MANIFEST_RULES as readonly string[]).includes(rule)
-			? ruleText(rule as Rule, msgs)
-			: msgs.col_manifest_rule_other;
-		const ids = Array.isArray(record_ids)
-			? [...new Set(record_ids.filter((id): id is number => Number.isInteger(id)))].sort((a, b) => a - b)
-			: [];
-		views.push({ rule, text, records: ids.length > 0 ? msgs.col_manifest_records(ids) : null });
-	}
-	return { problems: views };
+	return { problems: manifestProblemViews(problems, msgs) };
 }
 
 /** The message for a failed download that is not a refusal. */

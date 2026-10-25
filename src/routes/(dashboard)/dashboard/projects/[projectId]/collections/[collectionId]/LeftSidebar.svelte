@@ -28,6 +28,7 @@
   import { m, locale } from '$lib/i18n';
   import { formatCount } from '$lib/format-count';
   import { REJECTION_REASONS } from '$lib/rejectionReasons';
+  import { REJECTION_COMMENT_MAX_LENGTH, isCommentTooLong, showsCommentCount } from '$lib/rejection-comment';
 
   // ---------------------------------------------------------------------------
   // PROPS
@@ -417,11 +418,13 @@
         await onRecordUpdated();
       } catch (err) {
         console.error('[LeftSidebar] Error rechazando el registro:', err);
-        // The backend answers 422 to `other` without a comment; its own
-        // message is not the interface's.
-        reviewError = err instanceof ApiError && err.status === 422 && firstFlaggedReason === 'other'
-          ? $m.col_reject_other_note_error
-          : $m.col_reject_error;
+        // The backend answers 422 to a comment over 2,000 characters, and to
+        // `other` without a comment; its own message is not the interface's.
+        reviewError = isCommentTooLong(err)
+          ? $m.col_reject_comment_too_long(REJECTION_COMMENT_MAX_LENGTH)
+          : err instanceof ApiError && err.status === 422 && firstFlaggedReason === 'other'
+            ? $m.col_reject_other_note_error
+            : $m.col_reject_error;
       } finally {
         isRejecting = false;
       }
@@ -867,11 +870,17 @@
                     <textarea
                       class="note-textarea"
                       bind:value={noteText}
+                      maxlength={REJECTION_COMMENT_MAX_LENGTH}
                       placeholder={firstFlaggedReason === 'other'
                         ? $m.col_annotation_note_required_placeholder
                         : $m.col_annotation_comment_placeholder}
                       disabled={!currentRecord}
                     ></textarea>
+                    {#if showsCommentCount(noteText.length)}
+                      <p class="note-count" aria-live="polite">
+                        {$m.col_annotation_note_count(noteText.length, REJECTION_COMMENT_MAX_LENGTH)}
+                      </p>
+                    {/if}
                     <button
                       class="modal-btn confirm reason-done-btn"
                       disabled={!noteText.trim() || !currentRecord || isSavingAnnotation}
@@ -1460,6 +1469,8 @@
 
   .note-textarea::placeholder { color: var(--color-light-grey); opacity: 0.5; }
   .note-textarea:focus { border-color: var(--color-primary); }
+  /* Shown as the note nears the 2,000 characters Fisqua keeps. */
+  .note-count { margin: 4px 0 0; font-size: var(--text-sm); color: var(--color-light-grey); text-align: right; }
   .note-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Rechazar / Aprobar (NEH-209) — apilados, uno arriba y otro abajo, no
