@@ -1097,6 +1097,8 @@ export const es = {
 	fisqua_more: (n: number): string => `y ${formatCount(n, 'es')} más`,
 	fisqua_note_unlisted_object: (key: string): string =>
 		`La copia externa tiene un archivo que el manifiesto de captura no nombra: ${key}`,
+	fisqua_note_missing_object: (key: string): string =>
+		`El manifiesto de captura nombra un archivo que no está en la copia externa; Fisqua no lo usa para procesar el volumen: ${key}`,
 	fisqua_rule_bad_request: 'Fisqua rechazó el manifiesto de captura por estar mal formado, sin indicar ningún problema.',
 	fisqua_rule_payload_too_large: 'Fisqua rechazó el manifiesto de captura por ser demasiado grande, sin indicar ningún problema.',
 	fisqua_problem_from_fisqua: (message: string): string => `Mensaje de Fisqua: ${message}`,

@@ -1053,6 +1053,8 @@ export const en: Messages = {
 	fisqua_more: (n: number): string => `and ${formatCount(n, 'en')} more`,
 	fisqua_note_unlisted_object: (key: string): string =>
 		`The offsite copy holds a file the capture manifest does not name: ${key}`,
+	fisqua_note_missing_object: (key: string): string =>
+		`The capture manifest names a file the offsite copy does not hold; Fisqua does not read it to process the volume: ${key}`,
 	fisqua_rule_bad_request: 'Fisqua refused the capture manifest as malformed, without naming a problem.',
 	fisqua_rule_payload_too_large: 'Fisqua refused the capture manifest as too large, without naming a problem.',
 	fisqua_problem_from_fisqua: (message: string): string => `From Fisqua: ${message}`,

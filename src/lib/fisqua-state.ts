@@ -112,6 +112,12 @@ const RULE_TOO_LARGE = 'payload-too-large';
 const RULE_TRUNCATED = 'problems-truncated';
 /** A note: an object under the volume's prefix that the manifest does not name. */
 const RULE_UNLISTED_OBJECT = 'unlisted-object';
+/**
+ * A note: an object the manifest names, of those Fisqua's pipeline does not
+ * read (not a page's master), that is not in the masters bucket
+ * (inventoryNotes in Fisqua's app/lib/capture/manifest.ts).
+ */
+const RULE_MISSING_OBJECT = 'missing-object';
 
 /** The sum of the `omitted` counts of the list's `problems-truncated` entries. */
 function omittedOf(problems: FisquaProblem[] | null | undefined): number {
@@ -262,6 +268,10 @@ function fisquaProblemViews(problems: FisquaProblem[] | null | undefined, msgs: 
 		}
 		if (p.rule === RULE_UNLISTED_OBJECT && typeof p.objectKey === 'string' && p.objectKey) {
 			views.push({ text: msgs.fisqua_note_unlisted_object(p.objectKey), records: null, fromFisqua: false });
+			continue;
+		}
+		if (p.rule === RULE_MISSING_OBJECT && typeof p.objectKey === 'string' && p.objectKey) {
+			views.push({ text: msgs.fisqua_note_missing_object(p.objectKey), records: null, fromFisqua: false });
 			continue;
 		}
 		const text =

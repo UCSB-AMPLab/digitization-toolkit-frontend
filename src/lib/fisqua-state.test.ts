@@ -191,6 +191,16 @@ describe('volumeFisquaView', () => {
 		expect(view.tone).toBe('progress');
 	});
 
+	it('words a missing-object note in the catalogue, not in Fisqua\'s English', () => {
+		const problems = [
+			{ rule: 'missing-object', message: 'rionegro/co-x/extra.json is in the manifest and not in the masters bucket', stem: 'co-x', objectKey: 'rionegro/co-x/extra.json' }
+		];
+		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'registered', problems }) }), NOW, 'en', en)!;
+		expect(view.problemsKind).toBe('notes');
+		expect(view.problems).toEqual([{ text: en.fisqua_note_missing_object('rionegro/co-x/extra.json'), records: null, fromFisqua: false }]);
+		expect(JSON.stringify(view)).not.toContain('masters bucket');
+	});
+
 	it("keeps them problems when Fisqua's status is refused", () => {
 		const problems = [{ rule: 'capture-key', message: 'a' }];
 		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'refused', problems }) }), NOW, 'en', en)!;
