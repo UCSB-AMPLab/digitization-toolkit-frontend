@@ -1,35 +1,32 @@
-// ============================================================================
-// RECORRIDO GUIADO DE PRIMER ARRANQUE (NEH-95)
+// First-run guided tour (NEH-95). A new operator does not know where to
+// start, and the team is not at the archive to explain. The tour teaches the
+// order of the work: project → volume → capture → review → approval → export.
 //
-// El operador nuevo no sabe por dónde empezar y el equipo no está en el
-// archivo para explicárselo. Este recorrido enseña el orden de las cosas:
-// proyecto → volumen → captura → revisión → aprobación → exportación.
+// The tour accompanies; it does not drive. It never navigates for the
+// operator: it explains the step, waits for the operator to do it, and picks
+// up again on the next screen. The issue's acceptance criterion is that the
+// operator *completes* the guided flow, not that they watch it — and a newly
+// installed unit has no projects to show, so driving would mean showing
+// empty screens.
 //
-// ACOMPAÑA, NO CONDUCE. El recorrido no navega por el operador: explica el
-// paso, espera a que lo haga de verdad, y reaparece en la pantalla siguiente
-// donde iba. El criterio de aceptación del ticket es que el operador
-// *complete* el flujo guiado, no que lo vea pasar — y en un equipo recién
-// instalado no hay proyectos que mostrar, así que conducir significaría
-// enseñar pantallas vacías.
-//
-// Cada paso declara en qué ruta vive. Si el operador no está ahí, el paso se
-// muestra igual pero sin resaltado: sirve de indicación de a dónde ir.
-// ============================================================================
+// Each step declares the route it belongs to. When the operator is elsewhere,
+// the step is still shown, without a highlight, as a pointer to where to go.
 
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
 export type TourStep = {
-  /** Clave de i18n del título (tour_sN_title). */
+  /** Prefix of the step's i18n keys (`<id>_title`, `<id>_body`, `<id>_where`). */
   id: string;
-  /** En qué ruta vive este paso. */
+  /** The route this step belongs to. */
   match: RegExp;
   /**
-   * Atributo data-tour del control que se resalta. null cuando el control
-   * todavía no existe en la interfaz — el paso se explica sin señalar nada.
+   * data-tour attribute of the highlighted control. null when the interface
+   * has no such control yet — the step is explained without pointing at
+   * anything.
    */
   target: string | null;
-  /** Dónde se coloca la caja respecto al objetivo, si cabe. */
+  /** Where the box goes relative to the target, if it fits. */
   side: 'top' | 'bottom' | 'left' | 'right';
 };
 
@@ -40,12 +37,12 @@ const COLLECTION  = /^\/dashboard\/projects\/\d+\/collections\/\d+/;
 export const TOUR_STEPS: TourStep[] = [
   { id: 'tour_s1', match: PROJECTS,   target: 'nuevo-proyecto',  side: 'left'   },
   { id: 'tour_s2', match: PROJECT,    target: 'nuevo-volumen',   side: 'left'   },
-  // Debajo: el botón de capturar vive en la barra superior, así que una
-  // caja encima quedaría pegada al borde o tapando la propia barra.
+  // Below: the capture button sits in the top bar, so a box above it would
+  // be pressed against the edge or cover the bar itself.
   { id: 'tour_s3', match: COLLECTION, target: 'capturar',        side: 'bottom' },
-  // Debajo, como el de capturar: ambos viven en la barra superior. El botón
-  // sólo existe cuando hay capturas sin enviar, así que en un volumen vacío
-  // el paso se explica sin resaltar nada — que es el respaldo previsto.
+  // Below, like capture: both sit in the top bar. The button exists only
+  // when there are captures not yet sent, so in an empty volume the step is
+  // explained without a highlight — the intended fallback.
   { id: 'tour_s4', match: COLLECTION, target: 'entregar',        side: 'bottom' },
   // The approve button sits in the annotations panel against the left edge,
   // and the export button in the toolbar against the right edge: the box
@@ -56,23 +53,23 @@ export const TOUR_STEPS: TourStep[] = [
   { id: 'tour_s6', match: COLLECTION, target: 'exportar',        side: 'left'   },
 ];
 
-// ── Persistencia ────────────────────────────────────────────────────────────
-// Por cuenta y por navegador. En un aparato que vive en un archivo, con un
-// solo navegador y los mismos operadores, eso es «por cuenta» en la práctica.
-// No sigue al usuario a otra unidad; para eso haría falta una columna en el
-// modelo User, que hoy no tiene dónde guardar preferencias.
+// ── Persistence ─────────────────────────────────────────────────────────────
+// Per account and per browser. On an appliance that stays in one archive,
+// with one browser and the same operators, that amounts to per account. It
+// does not follow the user to another unit; that would need a column in the
+// User model, which has nowhere to store preferences.
 //
-// Falla de forma amable: si la marca se pierde, el recorrido sale otra vez.
+// If the mark is lost, the tour is shown again; nothing worse happens.
 
 const KEY = (userId: number | string) => `dtk_tour_visto:${userId}`;
 
 export function tourSeen(userId: number | string | null | undefined): boolean {
-  if (!browser || userId == null) return true; // sin usuario no se ofrece
+  if (!browser || userId == null) return true; // not offered without a user
   try {
     return localStorage.getItem(KEY(userId)) !== null;
   } catch {
-    // localStorage puede no estar disponible (modo privado, cuota agotada).
-    // Decir «ya lo vio» evita que el recorrido salte en cada carga.
+    // localStorage may be unavailable (private mode, quota exceeded).
+    // Answering "already seen" keeps the tour from opening on every load.
     return true;
   }
 }
@@ -82,7 +79,7 @@ function markSeen(userId: number | string | null | undefined) {
   try {
     localStorage.setItem(KEY(userId), new Date().toISOString());
   } catch {
-    // Sin marca el recorrido reaparecerá. Molesto, nada más.
+    // Without the mark the tour opens again next time; nothing else breaks.
   }
 }
 
@@ -99,16 +96,16 @@ function createTourStore() {
   return {
     subscribe,
 
-    /** Abrir desde el menú de ayuda. Siempre empieza en el primer paso. */
+    /** Opened from the help menu. Always starts at the first step. */
     start() {
       set({ active: true, index: 0 });
     },
 
     /**
-     * Abrir la primera vez que esta cuenta entra, y sólo esa vez.
-     * Marcar aquí y no al terminar es deliberado: alguien que lo cierra a
-     * los dos segundos no quiere verlo otra vez en cada arranque, y el
-     * botón de ayuda lo reabre cuando quiera.
+     * Opens the tour the first time this account signs in, and only then.
+     * Marking it seen here rather than on finishing is deliberate: someone
+     * who closes it after two seconds does not want it again on every start,
+     * and the help button reopens it at any time.
      */
     startIfFirstTime(userId: number | string | null | undefined) {
       if (tourSeen(userId)) return;

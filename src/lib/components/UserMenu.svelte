@@ -1,28 +1,20 @@
 <script lang="ts">
-  // ==========================================================================
-  // COMPONENTE: UserMenu (NEH-234)
+  // User avatar menu for the capture and volume top bars (NEH-234). Those are
+  // the two screens an operator works in on the kiosk, and they have no
+  // sidebar, so this menu is where they sign out and reopen the tour. Both
+  // bars use this one component rather than each keeping its own copy.
   //
-  // El avatar de usuario de las barras superiores de captura y de volumen.
-  // Antes era un <div> inerte: mostraba dos iniciales y no hacía nada, y
-  // ninguna de esas dos pantallas tenía forma de cerrar sesión — que son
-  // justo las dos pantallas en las que vive el operador en modo kiosco.
-  //
-  // Vive en $lib/components y no copiado en cada barra a propósito: duplicar
-  // a mano un bloque idéntico en dos sitios es el error que arrastraba
-  // NEH-237.
-  //
-  // El menú se cierra al tocar fuera y con Escape. En la pantalla táctil del
-  // Pi no hay hover ni tecla, así que tocar fuera es la única salida real;
-  // Escape está para el teclado de escritorio.
-  // ==========================================================================
+  // The menu closes on a tap outside and on Escape. The Pi's touch screen has
+  // no hover and no keyboard, so a tap outside is the real way out; Escape is
+  // for a desktop keyboard.
 
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
   import { m, roleLabel } from '$lib/i18n';
   import { tour } from '$lib/tour';
 
-  // La etiqueta accesible del disparador la pone quien lo usa, porque cada
-  // pantalla ya tiene su propia cadena traducida para esto.
+  // The caller supplies the trigger's accessible label, because each screen
+  // already has its own translated string for it.
   let { label }: { label: string } = $props();
 
   let open = $state(false);
@@ -37,8 +29,8 @@
     goto('/');
   }
 
-  // Cerrar al tocar fuera o con Escape. Se escucha en fase de captura (true)
-  // para que un control que detenga la propagación no deje el menú abierto.
+  // pointerdown is heard in the capture phase (true) so that a control that
+  // stops propagation cannot leave the menu open.
   $effect(() => {
     if (!open) return;
 
@@ -78,9 +70,8 @@
 
       <div class="menu-sep"></div>
 
-      <!-- Ayuda: este menú existe en captura y en la vista de volumen, que
-           son las dos pantallas sin barra lateral. Es el único sitio desde el
-           que se puede reabrir el recorrido ahí (NEH-95). -->
+      <!-- Help: on the capture and volume screens, which have no sidebar,
+           this menu is the only place to reopen the tour (NEH-95). -->
       <button class="menu-item" role="menuitem" onclick={() => { open = false; tour.start(); }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
@@ -105,8 +96,8 @@
 <style>
   .user-menu { position: relative; flex-shrink: 0; }
 
-  /* 44px: el avatar era de 30 y de 40 px en cada barra, por debajo del mínimo
-     táctil. Las dos barras miden 72px de alto, así que cabe sin estirarlas. */
+  /* 44px, the touch minimum. Both bars are 72px tall, so it fits without
+     stretching them. */
   .user-avatar {
     width: var(--touch-target-min);
     height: var(--touch-target-min);
@@ -185,9 +176,9 @@
     color: var(--color-light);
   }
 
-  /* Rojo sólo en salir, como el botón de la barra lateral del tablero. Allí
-     el color está escrito a mano como rgba(214,103,74,...); aquí se usan los
-     tokens, que es el mismo valor. */
+  /* Red only on sign-out, like the button in the dashboard sidebar. There
+     the colour is written by hand as rgba(214,103,74,...); here the tokens
+     carry the same base colour. */
   .menu-logout { color: var(--color-error); }
   .menu-logout:hover,
   .menu-logout:focus-visible {

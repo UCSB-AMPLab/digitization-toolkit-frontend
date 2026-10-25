@@ -14,7 +14,7 @@ export interface ReportContext {
   timestamp: string;
 }
 
-/** Reúne el contexto del entorno en el momento del reporte. */
+/** Collects the environment context at the time of the report. */
 export function captureContext(): ReportContext {
   const w = typeof window !== 'undefined' ? window : undefined;
   return {

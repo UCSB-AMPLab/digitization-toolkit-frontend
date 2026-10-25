@@ -1,71 +1,53 @@
-// ============================================================================
-// STORE: auth.ts
-// Maneja el estado de autenticación global de la aplicación.
-// Guarda el token, los datos del usuario y el rol.
-// Se importa desde cualquier componente que necesite saber si hay sesión activa.
-// ============================================================================
+// Global authentication state: the access token, the signed-in user and
+// their role. The token itself is persisted through `tokenStore`
+// (stores/token.ts); this store persists only the user.
 
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { tokenStore } from './token';
 
-// ----------------------------------------------------------------------------
-// TIPOS
-// ----------------------------------------------------------------------------
-
-// Roles disponibles en el sistema. Si el backend agrega roles nuevos,
-// agregarlos aquí — es el único lugar donde vive la lista.
+// Roles in the system. A role the backend adds has to be added here — this
+// is the only place the list lives.
 //
-// El arreglo es la fuente y el tipo se deriva de él, no al revés: hace falta
-// la lista en tiempo de ejecución para validar lo que responde el backend
-// (isUserRole, abajo), y tenerla escrita dos veces es garantía de que tarde o
-// temprano se separen.
+// The array is the source and the type derives from it, not the other way
+// round: the list is needed at runtime to validate the backend's response
+// (isUserRole, below), and two written copies would drift apart.
 export const USER_ROLES = ['admin', 'operator', 'reviewer'] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
 
-// El rol llega del backend como texto libre en el JSON: TypeScript lo tipa
-// como UserRole, pero nada verifica que de verdad lo sea. Un rol nuevo del
-// backend, o un typo, se colaría hasta la navegación y los permisos de cámara
-// sin que nadie lo note (NEH-117).
+// The role arrives from the backend as free text in the JSON: TypeScript
+// types it as UserRole, but nothing checks that it is one. Without this
+// check, a new backend role or a typo would reach navigation and camera
+// permissions unnoticed (NEH-117).
 export function isUserRole(value: unknown): value is UserRole {
   return typeof value === 'string' && (USER_ROLES as readonly string[]).includes(value);
 }
 
-// Datos del usuario autenticado
 export interface AuthUser {
   id: number;
   username: string;
   email: string | null;
-  role: UserRole;       // rol que determina a qué dashboard se redirige
+  role: UserRole;
   is_active: boolean;
 }
 
-// Estado completo del store de autenticación
 interface AuthState {
-  user: AuthUser | null;  // null = no hay sesión
-  token: string | null;   // JWT token de acceso
-  isLoading: boolean;     // true mientras verifica sesión al cargar la app
+  user: AuthUser | null;  // null = no session
+  token: string | null;   // JWT access token
+  isLoading: boolean;     // set only through setLoading()
 }
 
-// ----------------------------------------------------------------------------
-// ESTADO INICIAL
-// ----------------------------------------------------------------------------
-
-// Al iniciar, intenta recuperar el token guardado en localStorage
-// Si existe, la app asume que hay sesión (se verificará con el backend)
+// The token and user are restored from localStorage. With a token present,
+// the app assumes a session until the backend says otherwise.
 const initialState: AuthState = {
-  // El token viene de tokenStore (stores/token.ts) — única fuente de verdad,
-  // también la que usa apiRequest() en api.ts para cada request.
+  // tokenStore (stores/token.ts) is the single source for the token — the
+  // same one apiRequest() in api.ts reads on every request.
   token: tokenStore.get(),
   user: browser ? (() => { try { const u = localStorage.getItem('auth_user'); return u ? JSON.parse(u) : null; } catch { return null; } })() : null,
   isLoading: false,
 };
-
-// ----------------------------------------------------------------------------
-// STORE PRINCIPAL
-// ----------------------------------------------------------------------------
 
 function createAuthStore() {
   const { subscribe, set, update } = writable<AuthState>(initialState);
@@ -73,10 +55,9 @@ function createAuthStore() {
   return {
     subscribe,
 
-    // ── Guarda el token y los datos del usuario tras login exitoso ─────────
     setSession(token: string, user: AuthUser) {
-      // El token se persiste vía tokenStore (única fuente de verdad); el
-      // usuario es responsabilidad exclusiva de este store.
+      // The token is persisted through tokenStore (the single source); the
+      // user is persisted only by this store.
       tokenStore.set(token);
       if (browser) {
         localStorage.setItem('auth_user', JSON.stringify(user));
@@ -89,14 +70,13 @@ function createAuthStore() {
       }));
     },
 
-    // ── Actualiza solo el token (ej: tras /auth/refresh) sin tocar al
-    //    usuario, que no cambia en un refresh ──────────────────────────────
+    // Replaces only the token (e.g. after /auth/refresh); the user does not
+    // change on a refresh.
     updateToken(token: string) {
       tokenStore.set(token);
       update(state => ({ ...state, token }));
     },
 
-    // ── Limpia la sesión al hacer logout ──────────────────────────────────
     clearSession() {
       tokenStore.clear();
       if (browser) {
@@ -109,30 +89,26 @@ function createAuthStore() {
       });
     },
 
-    // ── Activa el spinner de carga (ej: mientras verifica token al inicio) ─
     setLoading(loading: boolean) {
       update(state => ({ ...state, isLoading: loading }));
     },
 
-    // ── Obtiene el token actual (útil fuera de componentes Svelte) ─────────
+    // For use outside Svelte components.
     getToken(): string | null {
       return get({ subscribe }).token;
     },
 
-    // ── Verifica si hay sesión activa ──────────────────────────────────────
     isAuthenticated(): boolean {
       return get({ subscribe }).token !== null;
     },
 
-    // ── Guard centralizado para rutas fuera de (dashboard) ──────────────────
-    // (dashboard)/+layout.svelte ya valida la sesión a fondo contra
-    // /users/me; las rutas que viven fuera de ese grupo (live-preview, la
-    // galería full-screen de colecciones) no heredan eso y cada una
-    // reimplementaba su propio chequeo de "hay token" copy-pasteado, sin
-    // validar rol (NEH-66). Un solo guard aquí reemplaza esas copias:
-    // redirige a /login si no hay sesión, y a `fallback` si `roles` no
-    // incluye el rol del usuario actual. Devuelve true si el llamador puede
-    // continuar montando la página.
+    // Shared guard for routes outside (dashboard) (NEH-66).
+    // (dashboard)/+layout.svelte validates the session fully against
+    // /users/me; routes outside that group (live-preview, the full-screen
+    // volume gallery) do not inherit that check, so they call this guard
+    // instead. Redirects to /login when there is no session, and to
+    // `fallback` when `roles` does not include the current user's role.
+    // Returns true when the caller can go on mounting the page.
     requireSession(roles?: UserRole[], fallback = '/dashboard'): boolean {
       const state = get({ subscribe });
       if (!state.token) {
@@ -150,34 +126,22 @@ function createAuthStore() {
 
 export const authStore = createAuthStore();
 
-// ----------------------------------------------------------------------------
-// DERIVADOS (computed values)
-// Estos son reactivos: se actualizan automáticamente cuando cambia authStore
-// ----------------------------------------------------------------------------
-
-// true si hay sesión activa
 export const isAuthenticated = derived(
   authStore,
   $auth => $auth.token !== null
 );
 
-// El usuario actual (null si no hay sesión)
 export const currentUser = derived(
   authStore,
   $auth => $auth.user
 );
 
-// El rol del usuario actual (null si no hay sesión)
 export const userRole = derived(
   authStore,
   $auth => $auth.user?.role ?? null
 );
 
-// ----------------------------------------------------------------------------
-// HELPER: getRoleDashboardPath
-// Devuelve la ruta del dashboard según el rol del usuario.
-// Si el backend cambia los nombres de los roles, actualizar aquí.
-// ----------------------------------------------------------------------------
+// Every role lands on `/dashboard`; the role argument is unused.
 export function getRoleDashboardPath(_role: UserRole): string {
   return '/dashboard';
 };

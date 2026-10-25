@@ -3,7 +3,7 @@ import { redact } from './redact';
 export interface CapturedError {
   time: string; // ISO
   kind: 'error' | 'unhandledrejection' | 'console.error';
-  message: string; // ya redactado
+  message: string; // already redacted
 }
 
 const MAX_ENTRIES = 25;
@@ -16,12 +16,12 @@ function push(kind: CapturedError['kind'], raw: string) {
   if (buffer.length > MAX_ENTRIES) buffer.shift();
 }
 
-/** Copia de los errores recientes capturados (ya redactados). */
+/** A copy of the recently captured errors (already redacted). */
 export function getRecentErrors(): CapturedError[] {
   return [...buffer];
 }
 
-/** Instala los hooks de captura. Seguro de llamar varias veces. */
+/** Installs the capture hooks. Safe to call more than once. */
 export function initErrorCapture(): void {
   if (installed || typeof window === 'undefined') return;
   installed = true;
@@ -48,7 +48,7 @@ export function initErrorCapture(): void {
         })
         .join(' ');
       push('console.error', text);
-    } catch { /* nunca romper por el logging */ }
+    } catch { /* logging must never throw */ }
     origError(...args);
   };
 }

@@ -3,8 +3,8 @@
   import { m, locale } from '$lib/i18n';
   import { formatCount } from '$lib/format-count';
 
-  // variant 'bar'    → leyenda en su propia franja (grid y vista de libro)
-  // variant 'inline'  → sólo la leyenda, para meterla en una barra existente
+  // variant 'bar'    → legend in its own strip (grid and book view)
+  // variant 'inline' → the legend only, to sit inside an existing bar
   let { records, variant = 'bar' }: {
     records: ApiRecord[];
     variant?: 'bar' | 'inline';
@@ -22,9 +22,8 @@
     approved:  $m.status_approved_plural,
   });
 
-  // Total de registros del volumen: acompaña a cada conteo para que el número
-  // se lea como proporción. Es la información que antes daba la barra de
-  // segmentos, ahora en texto.
+  // Total records in the volume: shown with each count so that the number
+  // reads as a proportion.
   let total = $derived(records.length);
 
   let counts = $derived(
@@ -53,8 +52,8 @@
 </div>
 
 <style>
-  /* En variante inline el componente no aporta caja propia: hereda la
-     alineación de la barra que lo contiene. */
+  /* In the inline variant the component has no box of its own: it takes the
+     alignment of the bar that contains it. */
   .status-bar-wrapper.inline {
     padding: 0;
     border: none;

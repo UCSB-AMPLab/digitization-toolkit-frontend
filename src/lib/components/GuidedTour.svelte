@@ -1,23 +1,19 @@
 <script lang="ts">
-  // ==========================================================================
-  // COMPONENTE: GuidedTour (NEH-95)
+  // The guided tour overlay (NEH-95): it darkens the screen, leaves a hole
+  // over the current step's control, and places a box beside it with the
+  // text, the counter and the arrows.
   //
-  // La capa del recorrido guiado: oscurece la pantalla, abre un hueco sobre
-  // el control del paso actual y pone al lado una caja con el texto, el
-  // contador y las flechas.
+  // The root layout mounts it once so that it survives route changes: the
+  // six steps are spread over three screens, and the tour accompanies the
+  // operator instead of navigating for them (see $lib/tour.ts).
   //
-  // Se monta una sola vez en el layout raíz para que sobreviva a los cambios
-  // de ruta: los seis pasos viven en tres pantallas distintas y el recorrido
-  // acompaña al operador en vez de navegar por él (ver $lib/tour.ts).
-  //
-  // DOS REGLAS QUE NO SE PUEDEN ROMPER:
-  //
-  // 1. El hueco deja tocar. La capa oscura es un box-shadow enorme sobre un
-  //    elemento con pointer-events:none, no un fondo que tape. Si tapara, el
-  //    operador no podría hacer el paso que se le está explicando.
-  // 2. La caja nunca se sale de la pantalla. En 800x480 no sobra espacio: se
-  //    coloca donde el paso pide y se recorta contra los bordes.
-  // ==========================================================================
+  // Two rules hold:
+  // 1. The hole can be touched. The dark layer is a huge box-shadow on an
+  //    element with pointer-events:none, not a covering background; if it
+  //    covered the control, the operator could not do the step being
+  //    explained.
+  // 2. The box never leaves the screen. At 800x480 there is no spare room: the
+  //    box goes where the step asks and is clamped to the edges.
 
   import { onDestroy, tick } from 'svelte';
   import { page } from '$app/stores';
@@ -30,7 +26,7 @@
 
   let box = $state<HTMLDivElement | undefined>(undefined);
 
-  // Rectángulo del control resaltado, en coordenadas de viewport.
+  // Rectangle of the highlighted control, in viewport coordinates.
   let rect = $state<TourRect | null>(null);
 
   // A modal dialog (approve confirmation, export chooser, send for review)
@@ -39,8 +35,8 @@
   // step resumes when the dialog closes.
   let modalOpen = $state(false);
 
-  // El catálogo está tipado con claves literales; los pasos las arman en
-  // tiempo de ejecución (tour_s1_title…), así que aquí se lee como mapa.
+  // The catalogue is typed with literal keys; the steps build theirs at
+  // runtime (tour_s1_title…), so here it is read as a map.
   let textos = $derived($m as unknown as Record<string, string>);
 
   let step  = $derived(TOUR_STEPS[$tour.index]);
@@ -151,8 +147,8 @@
 <svelte:window bind:innerWidth={innerW} bind:innerHeight={innerH} onkeydown={onKey} />
 
 {#if $tour.active && step && !modalOpen}
-  <!-- Resaltado. pointer-events:none a propósito: el control de abajo tiene
-       que seguir siendo pulsable mientras el recorrido está abierto. -->
+  <!-- Highlight. pointer-events:none on purpose: the control underneath has
+       to stay pressable while the tour is open. -->
   {#if rect}
     <div
       class="tour-spot"
@@ -174,8 +170,8 @@
     <p>{textos[`${step.id}_body`]}</p>
 
     {#if !onRoute}
-      <!-- Fuera de la pantalla del paso, la caja dice el camino exacto con
-           las etiquetas tal como aparecen en el menú y en los botones. -->
+      <!-- Away from the step's screen, the box gives the exact path, with the
+           labels as they appear in the menu and on the buttons. -->
       <p class="tour-hint">{textos[`${step.id}_where`]}</p>
     {/if}
 
