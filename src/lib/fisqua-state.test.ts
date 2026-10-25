@@ -276,6 +276,11 @@ describe('unitFisquaView', () => {
 		expect(view.lines[2]).toBe(en[pollKey]);
 	});
 
+	it('words one delivered and one refused in the singular in Spanish', () => {
+		expect(es.fisqua_unit_send_done(1, 1, 0, 0)).toContain('1 entregado, 1 rechazado,');
+		expect(es.fisqua_unit_send_done(2, 0, 0, 0)).toContain('2 entregados, 0 rechazados,');
+	});
+
 	it('warns about the configuration error', () => {
 		const view = unitFisquaView(
 			summary({ config_error: { at: '2026-10-24T09:30:00', status_code: 404, reason: 'not_found', config_fingerprint: 'ab12cd34' } }),

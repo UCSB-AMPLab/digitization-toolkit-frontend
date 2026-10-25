@@ -777,7 +777,7 @@ export const es = {
 	col_manifest_rule_no_reference_code:
 		'El volumen no tiene código de referencia en Fisqua, así que Captua no lo envía a Fisqua. Avisa a quien administra el equipo: tiene que asignarle al volumen su código de referencia. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
 	col_manifest_rule_reference_code_differs:
-		'El código de referencia del volumen en Fisqua no coincide con su raíz, así que Captua no lo envía a Fisqua. El código de referencia no se puede cambiar desde aquí: avisa a quien administra el equipo para que haga coincidir el código de referencia con la raíz. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
+		'El código de referencia del volumen en Fisqua no coincide con la raíz del volumen, así que Captua no lo envía a Fisqua. Desde aquí no se puede cambiar el código de referencia. Avisa a quien administra el equipo: tiene que hacer coincidir el código de referencia con la raíz. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
 	col_manifest_rule_other: 'Fisqua rechazaría el archivo por otro motivo.',
 	col_manifest_err_title: 'No se pudo descargar el manifiesto de captura',
 	col_manifest_err_not_found: 'Captua no encontró este volumen. Vuelve al proyecto y ábrelo de nuevo.',
@@ -1037,7 +1037,7 @@ export const es = {
 		return `el ${date} ${at}`;
 	},
 	fisqua_out_none: 'Todavía no se ha enviado a Fisqua',
-	fisqua_out_waiting: 'Se enviará a Fisqua cuando la copia externa esté completa',
+	fisqua_out_waiting: 'Captua lo enviará a Fisqua cuando la copia externa esté completa',
 	fisqua_out_sending: 'Captua está enviando el manifiesto de captura a Fisqua',
 	fisqua_out_failed: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
@@ -1047,8 +1047,8 @@ export const es = {
 	fisqua_out_failed_no_time: 'Captua no pudo enviar el manifiesto de captura a Fisqua; lo intentará de nuevo',
 	fisqua_out_not_exportable: 'No se envió a Fisqua: Captua no puede generar el manifiesto de captura',
 	fisqua_out_refused_by_fisqua: 'Fisqua rechazó el manifiesto de captura',
-	fisqua_out_delivered: 'Enviado a Fisqua; a la espera de su estado',
-	fisqua_out_superseded: 'No se envió: lo reemplazó un envío a revisión posterior',
+	fisqua_out_delivered: 'Enviado a Fisqua; a la espera de que Fisqua informe el estado',
+	fisqua_out_superseded: 'No se envió: el volumen se volvió a enviar a revisión y el nuevo envío lo reemplazó',
 	fisqua_out_withdrawn: 'No se envió: el volumen se retiró de revisión',
 	fisqua_st_received: 'Fisqua recibió el volumen',
 	fisqua_st_registered: 'Fisqua registró el volumen',
@@ -1060,7 +1060,7 @@ export const es = {
 	fisqua_st_superseded: 'Fisqua reemplazó este manifiesto por uno posterior',
 	fisqua_st_failed: 'Fisqua no pudo procesar el volumen',
 	fisqua_st_unknown: 'Fisqua todavía no tiene registro de este volumen',
-	fisqua_st_other: 'Fisqua informa un estado que esta versión de Captua no conoce',
+	fisqua_st_other: 'Fisqua informa un estado que esta versión de Captua no reconoce',
 	fisqua_checked: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
 		if (day === 'today') return `consultado hoy ${at}`;
@@ -1069,35 +1069,35 @@ export const es = {
 	},
 	fisqua_problems: (n: number): string => (n === 1 ? '1 problema' : `${formatCount(n, 'es')} problemas`),
 	// El texto de Fisqua, tal como lo envió.
-	fisqua_problem_from_fisqua: (message: string): string => `Según Fisqua: ${message}`,
+	fisqua_problem_from_fisqua: (message: string): string => `Mensaje de Fisqua: ${message}`,
 	fisqua_history: (n: number): string => `Envíos anteriores (${formatCount(n, 'es')})`,
 	fisqua_cfg_token:
-		'Fisqua no acepta el token configurado en este equipo, así que Captua dejó de enviarle volúmenes y de consultar su estado. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_TOKEN y reiniciar Captua.',
+		'Fisqua no acepta el token configurado en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_TOKEN y reiniciar Captua.',
 	fisqua_cfg_not_found:
-		'Fisqua no reconoce la dirección configurada en este equipo, así que Captua dejó de enviarle volúmenes y de consultar su estado. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL o DTK_OFFSITE_TENANT y reiniciar Captua.',
+		'Fisqua no reconoce la dirección configurada en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL o DTK_OFFSITE_TENANT y reiniciar Captua.',
 	fisqua_cfg_redirect:
-		'La dirección de Fisqua configurada en este equipo redirige a otra. Captua no sigue esa redirección, para que el token no llegue a otro sitio, y dejó de enviarle volúmenes a Fisqua y de consultar su estado. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_ENV o DTK_FISQUA_BASE_URL y reiniciar Captua.',
+		'La dirección de Fisqua configurada en este equipo redirige a otra. Captua no sigue esa redirección, para que el token no llegue a otro sitio, y dejó de enviarle volúmenes a Fisqua y de consultar en qué estado están. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_ENV o DTK_FISQUA_BASE_URL y reiniciar Captua.',
 	fisqua_cfg_other:
-		'Fisqua no acepta la configuración de este equipo, así que Captua dejó de enviarle volúmenes y de consultar su estado. Avisa a quien administra el equipo: tiene que revisar la configuración de Fisqua y reiniciar Captua.',
+		'Fisqua no acepta la configuración de este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa a quien administra el equipo: tiene que revisar la configuración de Fisqua y reiniciar Captua.',
 	fisqua_unit_title: 'Fisqua',
 	fisqua_unit_off: 'El envío a Fisqua no está configurado en este equipo.',
 	fisqua_unit_env_production:
 		'Captua envía a Fisqua el manifiesto de captura de cada volumen cuando el volumen está en revisión y su copia externa está completa.',
 	fisqua_unit_env_staging:
-		'Captua envía al servicio de pruebas de Fisqua (staging) el manifiesto de captura de cada volumen cuando el volumen está en revisión y su copia externa está completa.',
+		'Captua envía el manifiesto de captura de cada volumen al servicio de pruebas de Fisqua (staging) cuando el volumen está en revisión y su copia externa está completa.',
 	fisqua_unit_send_none: 'Captua no ha enviado nada a Fisqua desde el último reinicio.',
 	fisqua_unit_send_done: (delivered: number, refused: number, failed: number, waiting: number): string =>
-		`Último envío: ${formatCount(delivered, 'es')} entregados, ${formatCount(refused, 'es')} rechazados, ${formatCount(failed, 'es')} por reintentar, ${formatCount(waiting, 'es')} a la espera de la copia externa.`,
+		`Último envío: ${formatCount(delivered, 'es')} ${delivered === 1 ? 'entregado' : 'entregados'}, ${formatCount(refused, 'es')} ${refused === 1 ? 'rechazado' : 'rechazados'}, ${formatCount(failed, 'es')} por reintentar, ${formatCount(waiting, 'es')} a la espera de la copia externa.`,
 	fisqua_unit_send_config_error: 'Último envío: detenido por el error de configuración que se indica abajo.',
-	fisqua_unit_send_error: 'Captua no pudo terminar el último envío. Lo intentará de nuevo después de la próxima subida de imágenes.',
-	fisqua_unit_send_stopped: 'Captua interrumpió el último envío antes de terminarlo y lo retomará después de la próxima subida de imágenes.',
-	fisqua_unit_send_other: 'Captua no le envió nada a Fisqua en su última ejecución.',
-	fisqua_unit_poll_none: 'Captua no le ha consultado ningún estado a Fisqua desde el último reinicio.',
+	fisqua_unit_send_error: 'Captua no pudo terminar el último envío. Lo intentará de nuevo después de la próxima subida de imágenes a la copia externa.',
+	fisqua_unit_send_stopped: 'Captua interrumpió el último envío antes de terminarlo y lo retomará después de la próxima subida de imágenes a la copia externa.',
+	fisqua_unit_send_other: 'Captua no le envió nada a Fisqua en la última ronda de envíos.',
+	fisqua_unit_poll_none: 'Captua no le ha preguntado a Fisqua por el estado de ningún volumen desde el último reinicio.',
 	fisqua_unit_poll_done: (asked: number, answered: number): string =>
-		`Última consulta de estado: Captua preguntó por ${asked === 1 ? '1 volumen' : `${formatCount(asked, 'es')} volúmenes`}, y Fisqua respondió por ${formatCount(answered, 'es')}.`,
+		`Última consulta de estado: Captua preguntó por ${asked === 1 ? '1 volumen' : `${formatCount(asked, 'es')} volúmenes`} y Fisqua informó el estado de ${formatCount(answered, 'es')}.`,
 	fisqua_unit_poll_config_error: 'Última consulta de estado: detenida por el error de configuración que se indica abajo.',
 	fisqua_unit_poll_error: 'Captua no pudo terminar la última consulta de estado. Volverá a consultar más tarde.',
-	fisqua_unit_poll_other: 'Captua no le consultó ningún estado a Fisqua en su última consulta.',
+	fisqua_unit_poll_other: 'En la última consulta, Captua no le preguntó a Fisqua por ningún volumen.',
 
 	// ── Liberar espacio en la tarjeta y restaurar (NEH-248, offsite-free.ts) ─
 	offsite_vol_stored: 'Copia externa completa',

@@ -1045,15 +1045,15 @@ export const en: Messages = {
 	fisqua_unit_send_done: (delivered: number, refused: number, failed: number, waiting: number): string =>
 		`Last send: ${formatCount(delivered, 'en')} delivered, ${formatCount(refused, 'en')} refused, ${formatCount(failed, 'en')} to try again, ${formatCount(waiting, 'en')} waiting for the offsite copy.`,
 	fisqua_unit_send_config_error: 'Last send: stopped by the configuration error below.',
-	fisqua_unit_send_error: 'Captua could not finish the last send. It tries again after the next image upload.',
-	fisqua_unit_send_stopped: 'Captua stopped the last send before it finished, and continues after the next image upload.',
+	fisqua_unit_send_error: 'Captua could not finish the last send. It tries again after the next image upload to the offsite copy.',
+	fisqua_unit_send_stopped: 'Captua stopped the last send before it finished, and continues after the next image upload to the offsite copy.',
 	fisqua_unit_send_other: 'Captua sent nothing to Fisqua on its last run.',
 	fisqua_unit_poll_none: 'Captua has not asked Fisqua for a status since the last restart.',
 	fisqua_unit_poll_done: (asked: number, answered: number): string =>
 		`Last status check: Captua asked about ${asked === 1 ? '1 volume' : `${formatCount(asked, 'en')} volumes`}, and Fisqua answered for ${formatCount(answered, 'en')}.`,
 	fisqua_unit_poll_config_error: 'Last status check: stopped by the configuration error below.',
 	fisqua_unit_poll_error: 'Captua could not finish the last status check. It asks again later.',
-	fisqua_unit_poll_other: 'Captua asked Fisqua for no status on its last check.',
+	fisqua_unit_poll_other: 'On its last check, Captua asked Fisqua about no volumes.',
 
 	// ── Freeing space on the card and restoring (NEH-248, offsite-free.ts) ──
 	offsite_vol_stored: 'Stored offsite',
