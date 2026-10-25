@@ -68,10 +68,7 @@ function baseProps(overrides: Record<string, unknown> = {}) {
 	return {
 		records: [makeRecord()],
 		collectionId: 1,
-		triggerFinalizeModal: false,
 		onRecordsUpdate: vi.fn(),
-		onFinalized: vi.fn(),
-		onFinalizeModalClosed: vi.fn(),
 		onRecordClick: vi.fn(),
 		...overrides
 	};
