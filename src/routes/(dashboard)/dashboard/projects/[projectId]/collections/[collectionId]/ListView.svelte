@@ -1,13 +1,10 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: ListView (Gallery)
-  //
-  // Vista de lista de registros. Cada fila muestra los thumbnails del registro
-  // (con badge L/R si hay captura doble), el título, número de imágenes y fecha.
+  // List view of a volume's records: one row per record, with up to two
+  // thumbnails (L/R badge on a two-camera capture), title, status, image
+  // count and date. Rows can be dragged into a new order in reorder mode.
   //
   // A row click opens the record in book view (onRecordClick, handled by
   // the page), not in a modal.
-  // ============================================================================
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m, locale } from '$lib/i18n';
@@ -50,7 +47,7 @@
         onReorderNotice?.(null);
         onRecordsUpdate();
       } catch (err) {
-        console.error('[ListView] Error reordenando:', err);
+        console.error('[ListView] Error reordering:', err);
         // The page holds the notice: the reload below unmounts this view.
         onReorderNotice?.(reorderErrorText(err, $m));
         onRecordsUpdate();
@@ -58,14 +55,11 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // MODO REORDENAR (NEH-137)
-  // ---------------------------------------------------------------------------
-  // Dragging used to be live at all times here, unlike GridView. On the touch
-  // kiosk the gesture for scrolling the list IS the drag gesture, so an
-  // operator scrolling could silently renumber the pages of a volume — and
-  // record order is the archival page order. Reordering now requires entering
-  // an explicit mode, mirroring GridView.
+  // Reorder mode (NEH-137). On the touch kiosk the gesture for scrolling the
+  // list IS the drag gesture, so with dragging always live an operator
+  // scrolling could silently reorder the pages of a volume — and record
+  // order is the archival page order. Reordering therefore requires entering
+  // an explicit mode, as in GridView.
   let isReorderMode = $state(false);
 
   function toggleReorderMode() {
@@ -98,9 +92,6 @@
   }
 </script>
 
-<!-- ============================================================
-     VISTA LISTA
-     ============================================================ -->
 <div class="list-view">
 
   {#if records.length === 0}
@@ -114,8 +105,8 @@
     </div>
 
   {:else}
-    <!-- Barra: solo el modo reordenar. A diferencia de GridView no hay
-         filtros que desactivar aquí, así que no se replica esa parte. -->
+    <!-- Reorder toggle and status counts. Unlike GridView there are no
+         filters here to clear when reorder mode starts. -->
     <div class="list-toolbar">
       <div class="reorder-group">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -128,11 +119,9 @@
         </button>
       </div>
 
-      <!-- Conteo por estado, en la misma fila -->
       <RecordStatusBar {records} variant="inline" />
     </div>
 
-    <!-- Cabecera de tabla -->
     <div class="list-header">
       <span class="col-thumb">{$m.col_col_images}</span>
       <span class="col-title">{$m.col_col_title}</span>
@@ -141,7 +130,6 @@
       <span class="col-date">{$m.pd_col_date}</span>
     </div>
 
-    <!-- Filas con DnD -->
     <div
       use:dndzone={{
         items: localRecords,
@@ -165,7 +153,6 @@
         tabindex="0"
       >
 
-        <!-- Thumbnails (máx. 2) -->
         <div class="col-thumb thumb-group">
           {#each imgs.slice(0, 2) as img}
             <div class="thumb-wrap">
@@ -190,20 +177,16 @@
           {/if}
         </div>
 
-        <!-- Título -->
         <span class="col-title row-title">
           {record.title || $m.record_fallback_title(record.id)}
         </span>
 
-        <!-- Estado QA -->
         <span class="col-status">
           <StatusBadge status={record.status} />
         </span>
 
-        <!-- Número de imágenes -->
         <span class="col-count row-count">{formatCount(imgs.length, $locale)}</span>
 
-        <!-- Fecha de creación -->
         <span class="col-date row-date">{formatDate(record.created_at)}</span>
 
       </div>
@@ -224,7 +207,6 @@
   .list-view::-webkit-scrollbar { width: 4px; }
   .list-view::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 999px; }
 
-  /* Estado vacío */
   .empty-state {
     flex: 1;
     height: 100%;
@@ -238,7 +220,7 @@
     padding: 80px 0;
   }
 
-  /* Barra del modo reordenar — mismos estilos que GridView (NEH-137) */
+  /* Reorder mode bar — same styles as in GridView (NEH-137) */
   .list-toolbar {
     display: flex;
     align-items: center;
@@ -264,7 +246,6 @@
   .reorder-btn:hover { color: var(--color-light); }
   .reorder-btn.active { color: var(--color-primary); }
 
-  /* Cabecera */
   .list-header {
     display: grid;
     grid-template-columns: 160px 1fr 140px 80px 110px;
@@ -281,7 +262,6 @@
     z-index: 1;
   }
 
-  /* Fila */
   .list-row {
     display: grid;
     grid-template-columns: 160px 1fr 140px 80px 110px;
@@ -297,7 +277,6 @@
   .list-row.alt   { background-color: rgba(255,255,255,0.015); }
   .list-row.alt:hover { background-color: rgba(255,255,255,0.05); }
 
-  /* Columna thumbnails */
   .thumb-group {
     display: flex;
     gap: 6px;
@@ -349,7 +328,6 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Columnas de texto */
   .row-title {
     font-size: var(--text-sm);
     color: var(--color-light);

@@ -1,33 +1,13 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: GridView
-  // Archivo: src/routes/gallery/[collectionId]/GridView.svelte
+  // Grid view of a volume's records, one card per record (an L/R pair shares
+  // one card). The toolbar holds the status filter, renumber (numbers the
+  // records from 1 in the current order, without renaming files), the
+  // reorder mode toggle and the thumbnail size slider.
   //
-  // Vista de cuadrícula.
-  //
-  // TOOLBAR:
-  //   [Filtros | Renumerar]      [🖐 Reordenar / Listo]  [slider ──●──]
-  //
-  // SLIDER: controla el número de columnas del grid
-  //   izquierda (2) = cards grandes | derecha (6) = cards pequeñas
-  //
-  // TOOLBAR SUPERIOR:
-  //   Filtros | Renumerar           [Reordenar 🖐 ──●── ]
-  //
-  //   - Filtros     → panel de filtros por estado
-  //   - Renumerar   → numera los registros desde 1 en el orden actual (no renombra archivos)
-  //   - Reordenar   → botón que activa el modo drag-and-drop
-  //                   cuando está activo el texto cambia a "Listo"
-  //   - Slider      → controla el número de columnas del grid
-  //                   izquierda = menos columnas (cards más grandes)
-  //                   derecha   = más columnas (cards más pequeñas)
-  //
-  // REORDENAMIENTO:
-  //   Arrastre real con svelte-dnd-action. Al soltar, handleDndFinalize
-  //   persiste el orden con collectionsApi.reorderRecords; si el backend
-  //   lo rechaza, el aviso sube a +page.svelte y la lista se recarga del
-  //   servidor, porque esta vista se desmonta con la recarga.
-  // ============================================================================
+  // Reordering drags with svelte-dnd-action. On drop, handleDndFinalize saves
+  // the order with collectionsApi.reorderRecords; if the backend refuses it,
+  // the notice goes up to +page.svelte and the list is reloaded from the
+  // server, because the reload unmounts this view.
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
@@ -36,9 +16,6 @@
   // @ts-ignore — installed in Docker, not locally
   import { dndzone } from 'svelte-dnd-action';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     records,
     collectionId,
@@ -50,9 +27,9 @@
     records: Record[];
     collectionId: number;
     onRecordsUpdate: () => void;
-    // Mismo patrón que ListView: click en una tarjeta (simple o par L/R) va
-    // al Book view (spread) de ese registro — el spread ya muestra L y R
-    // juntos, así que no hace falta lógica especial para el caso de par.
+    // As in ListView, a click on a card (single or L/R pair) goes to the
+    // book view (spread) of that record — the spread already shows L and R
+    // together, so a pair needs no special handling.
     onRecordClick: (record: Record) => void;
     // Why the last drag was not saved, or null once one is saved.
     onReorderNotice?: (notice: string | null) => void;
@@ -70,46 +47,26 @@
     localRecords = [...records];
   });
 
-  // ---------------------------------------------------------------------------
-  // ESTADO LOCAL
-  // ---------------------------------------------------------------------------
-
-  // Número de columnas del grid (slider: 2 = grande, 6 = pequeño)
-  // Tamaño de miniatura, 2 (pequeña) a 6 (grande): es lo que el deslizador
-  // mueve. Las columnas son su inverso — más columnas, miniaturas más chicas —
-  // y por eso se derivan en vez de atarse directo al control.
+  // Thumbnail size, 2 (small) to 6 (large): this is what the slider sets.
+  // Columns run the other way — more columns, smaller thumbnails — so they
+  // are derived instead of bound to the control.
   let thumbSize = $state(4);
   let columns = $derived(8 - thumbSize);
 
-  // Modo reordenamiento
   let isReorderMode = $state(false);
 
-  // Filtros
   let showFilterPanel   = $state(false);
   let activeStatusFilter = $state<string | null>(null);
 
-  // Modal de Renumerar
   let showRenumberModal = $state(false);
   let renumbering       = $state(false);
   let renumberError     = $state<string | null>(null);
 
-  // ---------------------------------------------------------------------------
-  // DERIVADOS
-  // ---------------------------------------------------------------------------
-
-  // Status simulado — ELIMINADO: usar record.status real
-
-  // ---------------------------------------------------------------------------
-  // GRID GROUPS: una entrada por registro, con 1 o 2 imágenes adentro
-  //
-  // Un registro con captura doble (izq + der) agrupa sus dos imágenes en un
-  // único GridGroup — NEH-211: el par L/R se envuelve en un solo contenedor
-  // rectangular en vez de mostrarse como dos tarjetas independientes, para
-  // que se lea como una sola unidad (y, si algún día hay drag-and-drop en
-  // esta vista, el par se mueva junto). Un registro de captura simple
-  // produce un GridGroup con un solo item — mismo criterio de rol que
-  // ThumbnailStrip.svelte (misma carpeta), reutilizado acá.
-  // ---------------------------------------------------------------------------
+  // One GridGroup per record. A two-camera record (left + right) puts both
+  // images in a single GridGroup — NEH-211: the L/R pair is wrapped in one
+  // container instead of two separate cards, so it reads as one unit and
+  // moves as one in reorder mode. A single-capture record gives a GridGroup
+  // with one item. The role rule is the same as in ThumbnailStrip.svelte.
   interface GridItem {
     record: Record;
     image: RecordImage | null;
@@ -133,7 +90,7 @@
     if (!record.images || record.images.length === 0) {
       return [{ record, image: null, role: null, thumbnailUrl: null }];
     }
-    // Izquierda primero, luego derecha, luego sin rol (id como desempate)
+    // Left first, then right, then images without a role; id breaks ties.
     const sorted = [...record.images].sort((a, b) => {
       const order = (r?: string | null) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
       return order(a.role) - order(b.role) || a.id - b.id;
@@ -149,10 +106,6 @@
   function recordsToGridGroups(recs: Record[]): GridGroup[] {
     return recs.map((record): GridGroup => ({ record, items: gridItemsForRecord(record) }));
   }
-
-  // ---------------------------------------------------------------------------
-  // ACCIONES
-  // ---------------------------------------------------------------------------
 
   function toggleReorderMode() {
     isReorderMode = !isReorderMode;
@@ -179,7 +132,7 @@
       onReorderNotice?.(null);
       onRecordsUpdate();
     } catch (err) {
-      console.error('[GridView] Error reordenando:', err);
+      console.error('[GridView] Error reordering:', err);
       // The page holds the notice: the reload below unmounts this view.
       onReorderNotice?.(reorderErrorText(err, $m));
       onRecordsUpdate(); // restore from server
@@ -197,7 +150,7 @@
       onRecordsUpdate();
     } catch (err) {
       // The backend's English text goes to the console only.
-      console.error('[GridView] Error renumerando:', err);
+      console.error('[GridView] Error renumbering:', err);
       renumberError = renumberErrorText(err, $m);
     } finally {
       renumbering = false;
@@ -205,21 +158,17 @@
   }
 
   function handleCloseRenumberModal() {
-    if (renumbering) return; // no cerrar mientras la operación está en curso
+    if (renumbering) return; // not while the renumber request is in flight
     showRenumberModal = false;
     renumberError = null;
   }
 </script>
 
-<!-- ============================================================
-     VISTA GRID
-     ============================================================ -->
 <div class="grid-view">
 
   <!-- ── TOOLBAR ── -->
   <div class="grid-toolbar">
 
-    <!-- Izquierda: Filtros + Renombrar -->
     <div class="toolbar-left">
       <button
         class="toolbar-btn"
@@ -247,14 +196,12 @@
       <div class="toolbar-divider"></div>
 
       <div class="reorder-group">
-        <!-- Ícono mano -->
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
           style="color: {isReorderMode ? 'var(--color-primary)' : 'var(--color-light-grey)'}; flex-shrink:0">
           <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
           <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
         </svg>
 
-        <!-- Botón Reordenar / Listo -->
         <button
           class="reorder-btn"
           class:active={isReorderMode}
@@ -265,14 +212,11 @@
       </div>
     </div>
 
-    <!-- Derecha: Slider de columnas, solo -->
     <div class="toolbar-right">
-      <!-- Slider de columnas -->
       <!--
-        El deslizador mide TAMAÑO, no columnas: a la izquierda, miniaturas
-        pequeñas; a la derecha, grandes. Eso es lo que espera quien lo arrastra.
-        Las columnas van al revés que el tamaño, así que se derivan invertidas
-        (ver `columns` en el script). Para cambiar el rango, modifica min y max.
+        The slider sets SIZE, not columns: small thumbnails to the left, large
+        to the right, which is what the person dragging it expects. Columns
+        run the other way, so they are derived inverted (see `columns`).
       -->
       <input
         type="range"
@@ -288,7 +232,6 @@
 
   </div>
 
-  <!-- Panel de filtros -->
   {#if showFilterPanel}
     <div class="filter-panel">
       <span class="filter-title">{$m.col_filter_by_status}</span>
@@ -314,7 +257,6 @@
     </div>
   {/if}
 
-  <!-- ── CUADRÍCULA ── -->
   {#if isReorderMode}
     <div
       class="image-grid reorder-mode"
@@ -327,9 +269,9 @@
         {@const items = gridItemsForRecord(record)}
 
         {#if items.length > 1}
-          <!-- NEH-211: el par L/R se arrastra como una sola unidad — el
-               rectángulo que lo enmarca en la vista normal es también el
-               único elemento draggable acá, no dos por separado. -->
+          <!-- NEH-211: the L/R pair is dragged as one unit — the container
+               that groups it in the normal view is also the single
+               draggable element here, not two separate ones. -->
           <div class="grid-pair draggable" id="record-{record.id}">
             <div class="reorder-handle">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8">
@@ -379,7 +321,7 @@
       {@const record = group.record}
 
       {#if group.items.length > 1}
-        <!-- NEH-211: par L/R envuelto en un único contenedor rectangular -->
+        <!-- NEH-211: L/R pair wrapped in a single container -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="grid-pair" onclick={() => onRecordClick(record)} role="button" tabindex="0">
           <div class="pair-thumbs">
@@ -432,15 +374,11 @@
     </div>
   {/if}
 
-  <!-- Badge L/R — solo si el registro tiene captura doble -->
   {#if item.role}
     <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
   {/if}
 {/snippet}
 
-<!-- ============================================================
-     MODAL: Renumerar
-     ============================================================ -->
 {#if showRenumberModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -514,10 +452,9 @@
 
   .toolbar-divider { width: 1px; height: 18px; background-color: var(--border-color); margin: 0 4px; }
 
-  /* Reordenar group */
-  /* padding-left: 12px iguala el padding izquierdo de .toolbar-btn (6px
-     12px) — sin esto, el ícono de mano queda pegado al divisor mientras
-     el ícono de Renumerar (dentro de un botón con ese padding) no. */
+  /* padding-left: 12px matches the left padding of .toolbar-btn (6px
+     12px) — without it the hand icon sits against the divider while the
+     Renumber icon (inside a button with that padding) does not. */
   .reorder-group { display: flex; align-items: center; gap: 10px; padding-left: 12px; }
 
   .reorder-btn {
@@ -534,7 +471,6 @@
   .reorder-btn:hover { color: var(--color-light); }
   .reorder-btn.active { color: var(--color-primary); }
 
-  /* Slider de columnas */
   .columns-slider {
     width: 120px; height: 4px;
     -webkit-appearance: none;
@@ -559,7 +495,6 @@
 
   .columns-slider::-webkit-slider-thumb:active { transform: scale(1.2); }
 
-  /* Filtros */
   .filter-panel {
     display: flex;
     align-items: center;
@@ -595,11 +530,10 @@
 
   /* ── Grid ── */
   .image-grid {
-    /* Dos huecos distintos, y la diferencia entre ellos es lo que agrupa:
-       --grid-gap separa registros, --pair-gap separa las dos mitades de un
-       mismo folio. Antes eran el mismo valor y el par se marcaba con un
-       marco verde; ahora lo marca la cercanía. Si tocas uno, mira el
-       relleno de .grid-pair, que depende de los dos. */
+    /* Two different gaps, and the difference between them does the
+       grouping: --grid-gap separates records, --pair-gap separates the two
+       halves of one folio. The pair is marked by proximity, not by a frame.
+       Change one and check the padding of .grid-pair, which depends on both. */
     --grid-gap: 24px;
     --pair-gap: 6px;
     flex: 1;
@@ -659,35 +593,24 @@
 
   .card-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--color-light-grey); opacity: 0.3; }
 
-  /* ── Par L/R (NEH-211) ──
-     El wrapper ocupa 2 columnas reales del grid (grid-column: span 2), no
-     una sola comprimida. Adentro, .pair-thumbs reparte ese ancho en dos
-     .card-image-wrapper con el MISMO gap que usa .image-grid
-     (var(--grid-gap)) y sin padding/border propios — border-box con
-     padding o border restaría ancho y volvería a achicar las miniaturas
-     (ver bug anterior). Álgebra: ancho del wrapper = 2·col + gap; al
-     partirlo en dos con ese mismo gap en el medio, cada mitad da
-     exactamente `col` — igual que una miniatura de documento simple.
-     El marco combina un `outline` fino (no `border`: un outline no
-     participa en el box model/layout, así que no resta ancho) con un
-     relleno verde transparente detrás de las miniaturas. Ese relleno es
-     un ::before absolutamente posicionado (tampoco participa en el layout
-     del flex) que se extiende un poco más allá de .pair-thumbs con
-     `inset` negativo — al no llevar z-index compite en el mismo nivel de
-     stacking que .card-image-wrapper y, por ir primero en el DOM, queda
-     atrás sin necesidad de tocarlo. */
+  /* ── L/R pair (NEH-211) ──
+     The wrapper spans two real grid columns (grid-column: span 2), not one
+     compressed column, so its width is 2·col + --grid-gap. Inside,
+     .pair-thumbs splits that width into two .card-image-wrapper elements
+     separated by --pair-gap; the padding below makes each half exactly
+     `col` wide, the same as a single-image thumbnail. */
   .grid-pair {
     grid-column: span 2;
     position: relative;
     display: flex;
     flex-direction: column;
-    /* El par se lee como unidad por cercanía, no por un marco: las dos
-       mitades casi se tocan (--pair-gap) y el relleno lateral empuja los
-       grupos vecinos lejos. El relleno vale (--grid-gap - --pair-gap) / 2
-       justamente para que cada mitad siga midiendo lo mismo que una
-       miniatura simple, que es la garantía de NEH-211 (ver el álgebra
-       arriba); lo que sobra del hueco se va a los costados en vez de al
-       medio. Separación entre grupos: --grid-gap + 2·relleno. */
+    /* The pair reads as a unit through proximity, not a frame: the two
+       halves almost touch (--pair-gap) and the side padding pushes
+       neighbouring groups away. The padding is (--grid-gap - --pair-gap) / 2
+       so that each half still measures the same as a single thumbnail, the
+       NEH-211 guarantee (see the algebra above); the rest of the gap goes to
+       the sides instead of the middle. Gap between groups: --grid-gap +
+       2·padding. */
     padding: 0 calc((var(--grid-gap) - var(--pair-gap)) / 2);
     transition: transform var(--transition-base);
     cursor: pointer;
@@ -703,8 +626,8 @@
     gap: var(--pair-gap);
   }
 
-  /* Reutiliza .card-image-wrapper (mismo aspect-ratio/border/radius que un
-     documento simple) — flex:1 1 0 reparte el ancho 50/50 dentro del par. */
+  /* Reuses .card-image-wrapper (same aspect-ratio/border/radius as a single
+     image) — flex: 1 1 0 splits the width 50/50 inside the pair. */
   .pair-thumbs .card-image-wrapper {
     flex: 1 1 0;
     min-width: 0;
@@ -713,7 +636,8 @@
   .pair-meta { text-align: center; }
   .pair-name { text-align: center; }
 
-  /* Badge L/R — mismo estilo que ThumbnailStrip.svelte (misma carpeta). */
+  /* L/R badge — same background and border as in ThumbnailStrip.svelte;
+     position and size differ. */
   .role-badge {
     position: absolute;
     bottom: 6px; left: 6px;
@@ -740,7 +664,6 @@
   .spin { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Modales ── */
   .modal-backdrop { position: fixed; inset: 0; background-color: rgba(0,0,0,0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 24px; }
 
   .modal-card { background-color: var(--color-surface-alt); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 28px; width: 100%; max-width: 460px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 14px; }

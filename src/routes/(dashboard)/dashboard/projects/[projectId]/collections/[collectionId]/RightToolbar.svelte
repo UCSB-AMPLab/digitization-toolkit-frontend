@@ -1,28 +1,12 @@
 <script lang="ts">
   import { m } from '$lib/i18n';
-  // ============================================================================
-  // COMPONENTE: RightToolbar
-  // Archivo: src/routes/gallery/[collectionId]/RightToolbar.svelte
-  //
-  // Toolbar flotante en el lado derecho de la galería.
-  // Siempre visible independientemente de la vista activa.
-  //
-  // Controles:
-  //   - Vista lista  (ícono lista)
-  //   - Vista spread (ícono libro)
-  //   - Vista grid   (ícono cuadrícula)
-  //   [separador — solo en spread]
-  //   - Zoom in / Zoom out / Fit to screen
-  //   - Más opciones (placeholder)
-  //
-  // El ícono activo tiene un marcador verde a la izquierda + fondo oscuro.
-  // ============================================================================
+  // Toolbar on the right edge of the volume gallery, shown in every view mode.
+  // It holds the view-mode switch (list, spread, grid); the zoom controls appear
+  // only in spread view, and the BagIt export button only when the parent passes
+  // `onExport`.
 
   import { stepZoom } from '$lib/pan-zoom';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     viewMode,
     zoom,
@@ -45,25 +29,14 @@
     onExport?: () => void;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // ACCIONES
-  // ---------------------------------------------------------------------------
-
   function handleZoomIn()    { onZoomChange(stepZoom(zoom, 1, oneToOne)); }
   function handleZoomOut()   { onZoomChange(stepZoom(zoom, -1, oneToOne)); }
   function handleFitScreen() { onZoomChange(1); }
   function handleActualSize() { onZoomChange(oneToOne); }
 </script>
 
-<!-- ============================================================
-     TOOLBAR DERECHA
-     80px de ancho, altura completa, fondo surface-alt
-     ============================================================ -->
 <div class="right-toolbar">
 
-  <!-- ── Íconos de vista ── -->
-
-  <!-- Vista lista -->
   <button
     class="tool-btn"
     class:active={viewMode === 'list'}
@@ -77,7 +50,6 @@
     <span class="material-symbols-outlined icon-md">view_list</span>
   </button>
 
-  <!-- Vista spread -->
   <button
     class="tool-btn"
     class:active={viewMode === 'spread'}
@@ -88,14 +60,13 @@
     {#if viewMode === 'spread'}
       <div class="active-indicator"></div>
     {/if}
-    <!-- Ícono libro -->
+    <!-- Book icon -->
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
       <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
     </svg>
   </button>
 
-  <!-- Vista grid -->
   <button
     class="tool-btn"
     class:active={viewMode === 'grid'}
@@ -106,7 +77,7 @@
     {#if viewMode === 'grid'}
       <div class="active-indicator"></div>
     {/if}
-    <!-- Ícono grid -->
+    <!-- Grid icon -->
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="3" y="3" width="7" height="7"/>
       <rect x="14" y="3" width="7" height="7"/>
@@ -115,7 +86,6 @@
     </svg>
   </button>
 
-  <!-- Separador + controles de zoom (solo en vista spread) -->
   {#if viewMode === 'spread'}
     <div class="divider"></div>
 
@@ -145,13 +115,11 @@
       </svg>
     </button>
 
-    <!-- Tamaño real (1:1) -->
     <button class="tool-btn" onclick={handleActualSize} title={$m.col_zoom_actual} aria-label={$m.col_zoom_actual_aria}>
       <span class="one-to-one-glyph">1:1</span>
     </button>
   {/if}
 
-  <!-- Separador + Exportar BagIt -->
   {#if onExport}
     <div class="divider"></div>
     <button
@@ -169,7 +137,6 @@
 </div>
 
 <style>
-  /* Toolbar fija a la derecha */
   .right-toolbar {
     width: 80px;
     background-color: var(--color-surface-alt);
@@ -186,7 +153,6 @@
 
   .right-toolbar::-webkit-scrollbar { width: 0; }
 
-  /* Botón de herramienta */
   .tool-btn {
     position: relative;
     width: 64px; height: 64px;
@@ -208,13 +174,11 @@
     background-color: var(--color-surface);
   }
 
-  /* Estado activo: fondo + color verde */
   .tool-btn.active {
     background-color: var(--color-surface);
     color: var(--color-primary);
   }
 
-  /* Indicador verde a la izquierda del botón activo */
   .active-indicator {
     position: absolute;
     left: 0;
@@ -226,18 +190,19 @@
     border-radius: 0 3px 3px 0;
   }
 
-  /* Botón "1:1" — glifo de texto, no hay ícono Material libre (fit_screen
-     ya lo usa "Ajustar pantalla"). */
+  /* The 1:1 button uses a text glyph: there is no spare Material icon for
+     actual size, and the `fit_screen` shape is taken by the Fit to screen
+     button. */
   .one-to-one-glyph {
     font-size: var(--text-sm);
     font-weight: var(--fw-bold);
   }
 
-  /* Botón retake con borde dorado */
+  /* `.retake` sets the gold highlight color; no element in this component
+     uses the class. */
   .tool-btn.retake { color: var(--color-highlight); }
   .tool-btn.retake:hover { background-color: rgba(225,183,120,0.08); }
 
-  /* Separador */
   .divider {
     width: 48px;
     height: 1px;
@@ -246,7 +211,6 @@
     flex-shrink: 0;
   }
 
-  /* Modal */
   .modal-backdrop {
     position: fixed; inset: 0;
     background-color: rgba(0,0,0,0.65);

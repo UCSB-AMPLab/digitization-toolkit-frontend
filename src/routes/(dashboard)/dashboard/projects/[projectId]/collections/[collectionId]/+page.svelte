@@ -1,20 +1,9 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Galería de colección
-  // Ruta: /dashboard/projects/[projectId]/collections/[collectionId]
-  //
-  // Reemplaza la antigua vista de lista de registros con la galería completa.
-  // La navegación superior (breadcrumb, botón cámara) vive en +layout@.svelte.
-  //
-  // Componentes hijos:
-  //   LeftSidebar.svelte      → strip de íconos + paneles (en list y spread)
-  //   ListView.svelte         → vista de lista de registros
-  //   ImageViewer.svelte      → visor en modo spread
-  //   ImageViewerModal.svelte → modal de inspección (desde ListView)
-  //   GridView.svelte         → vista cuadrícula (con Filtros/Renumerar)
-  //   RightToolbar.svelte     → toolbar flotante derecha
-  //   ThumbnailStrip.svelte   → tira de miniaturas inferior (solo en spread)
-  // ============================================================================
+  // A volume's gallery: list, grid and spread views of its records, plus
+  // export (BagIt, image ZIP, capture manifest) and hand-over for review. The
+  // page owns the records and the view state shared by its child views; the
+  // top bar (breadcrumb, camera button) is in +layout@.svelte, and the page
+  // puts its hand-over controls there through the volume top bar slot.
 
   import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
@@ -47,44 +36,34 @@
     type ManifestRefusalView
   } from '$lib/capture-manifest';
 
-  // ---------------------------------------------------------------------------
-  // PARÁMETROS DE RUTA
-  // ---------------------------------------------------------------------------
   let projectId    = $derived(Number($page.params.projectId) || 0);
   let collectionId = $derived(Number($page.params.collectionId) || 0);
   let collectionName = $derived(($page.data as any).collectionName ?? '');
 
-  // ---------------------------------------------------------------------------
-  // ESTADO GLOBAL
-  // ---------------------------------------------------------------------------
   let viewMode         = $state<'list' | 'spread' | 'grid'>('list');
   let selectedRecordId = $state<number | null>(null);
   let records          = $state<Record[]>([]);
   let zoom             = $state(1);
   let rotation         = $state(0);
-  // Ajustes de previsualización del panel izquierdo, de -100 a 100. Viven
-  // aquí y no en el panel porque el visor también los necesita; el panel
-  // sólo los mueve. No alteran el archivo: el visor los aplica como filtro
-  // CSS sobre la imagen, igual que la rotación.
+  // Preview adjustments from the left panel, from -100 to 100. They are held
+  // here and not in the panel because the viewer needs them too; the panel
+  // only sets them. They do not alter the file: the viewer applies them as a
+  // CSS filter on the image, as it does the rotation.
   let brightness       = $state(0);
   let contrast         = $state(0);
   let saturation       = $state(0);
   let isLoading        = $state(true);
-  // Primera carga terminada. Las recargas vuelven a poner isLoading, y los
-  // controles de envío no deben desmontarse a mitad de un envío.
+  // First load finished. Reloads set `isLoading` again, and the hand-over
+  // controls must not be unmounted in the middle of a hand-over.
   let hasLoaded        = $state(false);
-  // NEH-230: el zoom al que un píxel de imagen ocupa un píxel de
-  // dispositivo — lo calcula ImageViewer (según la página de referencia
-  // medida) y lo usamos acá para el botón "1:1" y el tope de zoom de
-  // RightToolbar.
+  // NEH-230: the zoom at which one image pixel fills one device pixel.
+  // ImageViewer computes it from the measured reference page; it feeds the
+  // "1:1" button and the zoom ceiling in RightToolbar.
   let oneToOne         = $state(1);
 
-  // Registro inspeccionado en el modal (desde ListView)
+  // Record inspected in the modal (opened from the export blockers list)
   let inspectedRecord = $state<Record | null>(null);
 
-  // ---------------------------------------------------------------------------
-  // AL MONTAR
-  // ---------------------------------------------------------------------------
   onMount(async () => {
     if (!authStore.requireSession()) {
       return;
@@ -92,23 +71,23 @@
     await loadRecords();
   });
 
-  // Volumen cuyos registros están en pantalla. SvelteKit reutiliza esta
-  // página al navegar de un volumen a otro (p. ej. con el historial), así que
-  // collectionId puede cambiar sin que se vuelva a montar: sin esto quedaban
-  // los registros del volumen anterior junto a acciones dirigidas al nuevo.
+  // Volume whose records are on screen. SvelteKit reuses this page when the
+  // user navigates from one volume to another (e.g. through the history), so
+  // `collectionId` can change without a remount; without this, the previous
+  // volume's records would sit beside actions aimed at the new one.
   let loadedFor = $state<number | null>(null);
-  // Último volumen pedido. No es reactivo: el efecto de abajo solo depende
-  // de collectionId.
+  // Last volume requested. Not reactive: the effect below depends only on
+  // `collectionId`.
   let requestedFor = 0;
-  // Número de la última carga pedida: solo esa puede escribir el estado.
-  // Comparar el volumen no basta, porque A→B→A deja dos cargas de A en
-  // vuelo y la más vieja podía llegar última y pisar a la nueva.
+  // Number of the last load requested: only that one may write the state.
+  // Comparing the volume is not enough, because A→B→A leaves two loads of A
+  // in flight, and the older one can arrive last and overwrite the newer.
   let loadSeq = 0;
 
-  // Devuelve si la lista quedó actualizada, para que quien recarga después
-  // de un cambio pueda avisar si no. Con `inPlace` (NEH-248: lo que está
-  // liberado del volumen cambió) la vista no pasa por el estado de carga y el
-  // registro seleccionado se conserva si sigue en el volumen.
+  // Returns whether the list was updated, so a caller reloading after a
+  // change can report it if not. With `inPlace` (NEH-248: what is freed in
+  // the volume changed) the view skips the loading state and the selected
+  // record is kept if it is still in the volume.
   async function loadRecords({ inPlace = false }: { inPlace?: boolean } = {}): Promise<boolean> {
     const forId = collectionId;
     const seq = ++loadSeq;
@@ -116,7 +95,7 @@
     try {
       if (!inPlace) isLoading = true;
       const data = await recordsApi.listAll({ collection_id: forId });
-      // Una respuesta superada por otra carga se descarta.
+      // A response superseded by a later load is discarded.
       if (seq !== loadSeq) return false;
       // Sort by sequence (nulls last), then by id
       records = data.sort((a, b) => {
@@ -125,15 +104,15 @@
         if (b.sequence == null) return -1;
         return a.sequence - b.sequence;
       });
-      // Un volumen distinto del que había nunca conserva la selección.
+      // A different volume from the one shown never keeps the selection.
       selectedRecordId = selectionAfterLoad(records, selectedRecordId, inPlace && loadedFor === forId);
-      // El modal de inspección abierto pasa a la copia recargada de su
-      // registro, o se cierra si el registro ya no está en el volumen.
+      // An open inspection modal switches to the reloaded copy of its record,
+      // or closes if the record is no longer in the volume.
       if (inPlace) inspectedRecord = reconcileInspected(inspectedRecord, records);
       loadedFor = forId;
       return true;
     } catch (err) {
-      console.error('[Gallery] Error cargando registros:', err);
+      console.error('[Gallery] Error loading records:', err);
       return false;
     } finally {
       if (seq === loadSeq) {
@@ -143,15 +122,11 @@
     }
   }
 
-  // Al pasar a otro volumen sin desmontar la página, cargar los suyos.
+  // On a move to another volume without a remount, load that volume's records.
   $effect(() => {
     const id = collectionId;
     if (requestedFor !== 0 && id !== requestedFor) untrack(() => { reorderNotice = null; renumberedCount = null; loadRecords(); });
   });
-
-  // ---------------------------------------------------------------------------
-  // HANDLERS
-  // ---------------------------------------------------------------------------
 
   function handlePrev() {
     const idx = records.findIndex(r => r.id === selectedRecordId);
@@ -165,15 +140,15 @@
 
   function handleSelect(id: number) { selectedRecordId = id; }
 
-  // Al pasar de folio se endereza la vista, y sólo eso. Rotar es del folio:
-  // una página concreta puede haber quedado de lado y la siguiente no. La
-  // exposición, en cambio, es de la sesión --- la misma lámpara y los mismos
-  // ajustes durante toda la jornada --- así que un volumen parejo de oscuro
-  // se corrige una vez y se revisa entero así, sin tocar nada más.
+  // Moving to another folio straightens the view, and nothing else. Rotation
+  // belongs to the folio: one page may have been captured sideways and the
+  // next not. Exposure belongs to the session — the same lamp and the same
+  // settings all day — so a volume that is evenly dark is corrected once and
+  // reviewed whole that way.
   //
-  // Va en un efecto y no en handlePrev/handleNext/handleSelect porque la
-  // selección también cambia desde la cuadrícula y desde la lista, y repartir
-  // el reinicio en cinco sitios es cómo se consigue que uno se olvide.
+  // This is an effect and not part of handlePrev/handleNext/handleSelect
+  // because the selection also changes from the grid and the list, and a
+  // reset spread over five call sites is easy to miss in one of them.
   $effect(() => {
     selectedRecordId;
     rotation = 0;
@@ -188,42 +163,40 @@
   function handleRotateLeft()  { rotation = ((rotation - 90) % 360 + 360) % 360; }
   function handleRotateRight() { rotation = (rotation + 90) % 360; }
 
-  // Retomar: navega a live-preview con el mismo proyecto/colección + el
-  // record puntual, para que live-preview abra directo su modal de retoma
-  // (NEH-209 — antes se perdía el record.id acá y había que buscarlo de
-  // nuevo manualmente en la tira de miniaturas de live-preview).
+  // Retake: goes to live-preview with the same project and volume plus the
+  // record, so live-preview opens its retake modal for that record directly
+  // (NEH-209).
   function handleRetake(record: Record) {
     inspectedRecord = null;
     goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}&recordId=${record.id}`);
   }
 
-  // Recapturar desde Book view (NEH-209): mismo destino que handleRetake,
-  // disparado desde el botón "Recapturar imagen" del panel izquierdo en vez
-  // del modal de inspección de ListView.
+  // Recapture from the spread view (NEH-209): same destination as
+  // handleRetake, triggered by the left panel's recapture button instead of
+  // the inspection modal.
   function handleRecapture(record: Record) {
     goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}&recordId=${record.id}`);
   }
 
-  // Por qué no se guardó el último arrastre en la lista o la cuadrícula.
-  // Vive acá y no en la vista porque la recarga que sigue al rechazo pone
-  // isLoading, y eso desmonta la vista que lo mostraría.
+  // Why the last drag in the list or the grid was not saved. Held here and
+  // not in the view because the reload after the refusal sets `isLoading`,
+  // which unmounts the view that would show it.
   let reorderNotice = $state<string | null>(null);
 
   // How many records the last renumber touched, held here for the same
   // reason as reorderNotice; null when there is nothing to report.
   let renumberedCount = $state<number | null>(null);
 
-  // Por qué no se pudo eliminar el último registro; null si no hay aviso.
+  // Why the last record could not be deleted; null when there is no notice.
   let deleteRecordError = $state<string | null>(null);
 
-  // Eliminar registro completo y refrescar lista
   async function handleDeleteRecord(record: Record) {
     try {
       await recordsApi.delete(record.id);
       await loadRecords();
     } catch (err) {
       // The backend's English text goes to the console only.
-      console.error('[Gallery] Error eliminando registro:', err);
+      console.error('[Gallery] Error deleting record:', err);
       deleteRecordError = fileHoldText(err, $m) ?? $m.col_delete_record_retry;
     } finally {
       inspectedRecord = null;
@@ -236,20 +209,20 @@
   let exportResult    = $state<{ zip_filename: string } | null>(null);
   let exportError     = $state<string | null>(null);
   let exportProgress  = $state<{ done: number; total: number } | null>(null);
-  // Registros que impiden exportar (aún no aprobados)
+  // Records that block export: not approved, or without a current image
   let showBlockersModal = $state(false);
 
   const hasCurrentImage = (r: Record) => (r.images ?? []).some((i) => i.is_current);
   let blockingRecords   = $derived(records.filter(r => r.status !== 'approved' || !hasCurrentImage(r)));
 
-  // Selector Exportar/Descargar + descarga de imágenes (ZIP) en el navegador
+  // Export/download chooser, and the image ZIP built in the browser
   let showChooserModal = $state(false);
   let isZipping        = $state(false);
   let zipProgress      = $state(0);
   let zipError         = $state<string | null>(null);
 
-  // Manifiesto de captura para Fisqua: solo admin y operador, como el envío
-  // a revisión (el backend rechaza la ruta a los demás).
+  // Capture manifest for Fisqua: admin and operator only, as with hand-over
+  // for review (the backend refuses the route to other roles).
   let canDownloadManifest = $derived(canDownloadCaptureManifest($userRole));
   let isManifestLoading   = $state(false);
   let manifestRefusal     = $state<ManifestRefusalView | null>(null);
@@ -282,11 +255,11 @@
         }
       }
     } catch (err: any) {
-      // El cliente pre-valida canExport contra el estado local de records,
-      // pero ese estado puede quedar desactualizado (otro operador aprobó/
-      // rechazó registros entre tanto). Si el backend igual devuelve un 422
-      // con blocking_record_ids, refrescamos records y mostramos el modal
-      // de bloqueadores real en vez del modal de error genérico.
+      // The client checks `canExport` against the local `records`, which can
+      // be stale (another user approved or rejected records in the meantime).
+      // If the backend still returns a 422 with `blocking_record_ids`, the
+      // records are reloaded and the blockers modal is shown instead of the
+      // generic error modal.
       const detail = err instanceof ApiError ? (err.detail as { blocking_record_ids?: number[] } | undefined) : undefined;
       if (detail?.blocking_record_ids) {
         showExportModal = false;
@@ -302,8 +275,8 @@
     }
   }
 
-  // Descarga el manifiesto con el nombre que da el servidor. Un 409 trae la
-  // lista de problemas por los que Fisqua lo rechazaría (capture-manifest.ts).
+  // Downloads the manifest under the name the server gives. A 409 carries the
+  // list of problems for which Fisqua would reject it (capture-manifest.ts).
   async function downloadCaptureManifest() {
     if (isManifestLoading) return;
     isManifestLoading = true;
@@ -332,12 +305,12 @@
     }
   }
 
-  // Un máster liberado de la tarjeta (410 de /file, NEH-248): está en la copia
-  // externa, no en el equipo, así que no puede ir en el ZIP.
+  // A master freed from the card (410 from /file, NEH-248): it is in the
+  // offsite copy, not on the appliance, so it cannot go in the ZIP.
   class FreedFromCard extends Error {}
 
-  // Descarga de imágenes como ZIP, generado en el navegador (sin backend).
-  // Nota: para volúmenes muy grandes convendría un endpoint del backend (mejora futura).
+  // Image ZIP built in the browser, without a backend endpoint. Very large
+  // volumes would be better served by one.
   async function downloadImagesZip() {
     const items = records.flatMap(r => (r.images ?? []).map(img => ({ img, r })));
     if (items.length === 0) return;
@@ -376,18 +349,13 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // DERIVADOS
-  // ---------------------------------------------------------------------------
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
   let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved' && hasCurrentImage(r)));
 
-  // ---------------------------------------------------------------------------
-  // ENVÍO A REVISIÓN (NEH-260) — los controles van en la barra superior del
-  // layout; la página los pone ahí porque es la que tiene los registros.
-  // Solo operador y admin: el backend rechaza promote y take-back a los demás.
-  // ---------------------------------------------------------------------------
+  // Hand-over for review (NEH-260). The controls go in the layout's top bar;
+  // the page puts them there because it holds the records. Operator and
+  // admin only: the backend refuses promote and take-back to other roles.
   const topbar = getVolumeTopbar();
   let canHandOver = $derived($userRole === 'admin' || $userRole === 'operator');
 
@@ -413,13 +381,9 @@
   {/key}
 {/snippet}
 
-<!-- ============================================================
-     LAYOUT DE GALERÍA
-     (la barra superior vive en +layout@.svelte)
-     ============================================================ -->
 <div class="gallery-wrapper">
 
-  <!-- En lista la leyenda vive dentro de la barra de Reordenar, no aparte -->
+  <!-- In the list view the legend is inside the Reorder bar instead -->
   {#if viewMode !== 'list'}
     <RecordStatusBar {records} />
   {/if}
@@ -444,7 +408,6 @@
 
   <div class="content-area">
 
-    <!-- Panel lateral: solo en spread (vista libro) -->
     {#if viewMode === 'spread'}
       <LeftSidebar
         {viewMode}
@@ -532,7 +495,6 @@
 
 </div>
 
-<!-- Modal de inspección (desde ListView) -->
 {#if inspectedRecord}
   <ImageViewerModal
     record={inspectedRecord}
@@ -543,7 +505,6 @@
   />
 {/if}
 
-<!-- Modal de exportación BagIt -->
 {#if showExportModal}
   <div class="export-modal-backdrop" role="dialog" aria-modal="true">
     <div class="export-modal-card">
@@ -579,7 +540,6 @@
     </div>
   </div>
 {/if}
-<!-- Modal: no se pudo eliminar el registro -->
 {#if deleteRecordError}
   <div class="export-modal-backdrop" role="dialog" aria-modal="true">
     <div class="export-modal-card">
@@ -592,7 +552,6 @@
     </div>
   </div>
 {/if}
-<!-- Modal: registros que bloquean la exportación -->
 {#if showBlockersModal}
   <div class="export-modal-backdrop" role="dialog" aria-modal="true">
     <div class="export-modal-card">
@@ -615,7 +574,6 @@
     </div>
   </div>
 {/if}
-<!-- Modal: elegir exportación BagIt o descarga de imágenes -->
 {#if showChooserModal}
   <div class="export-modal-backdrop" role="dialog" aria-modal="true">
     <div class="export-modal-card">
@@ -655,7 +613,6 @@
     </div>
   </div>
 {/if}
-<!-- Modal: progreso / error del ZIP de imágenes -->
 {#if isZipping || zipError}
   <div class="export-modal-backdrop" role="dialog" aria-modal="true">
     <div class="export-modal-card">
@@ -675,7 +632,6 @@
   </div>
 {/if}
 
-<!-- Modal: manifiesto de captura (preparando / rechazado / error) -->
 {#if isManifestLoading || manifestRefusal || manifestError}
   <div class="export-modal-backdrop" role="dialog" aria-modal="true">
     <div class="export-modal-card">
