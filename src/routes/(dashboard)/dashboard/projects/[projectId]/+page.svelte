@@ -238,20 +238,6 @@
           ...(stemChanged ? { filename_stem: stem } : {}),
         });
         await loadCollections();
-      } else if ($authStore.token === 'demo-token') {
-        // A demo session creates the volume locally, without the backend.
-        const mockCollection = {
-          id: Date.now(),
-          name: colName.trim(),
-          description: colDesc.trim() || undefined,
-          project_id: projectId,
-          created_at: new Date().toISOString(),
-          created_by: $authStore.user?.username,
-          record_count: 0,
-          archival_metadata: archivalMetadata,
-          filename_stem: stem,
-        } as any;
-        collections = [...collections, mockCollection];
       } else {
         await collectionsApi.create({
           name: colName.trim(),
