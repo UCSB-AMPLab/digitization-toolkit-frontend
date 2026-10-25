@@ -99,11 +99,11 @@ export const en: Messages = {
 	tour_s4_body:
 		'When capture is finished, send the volume for review. Until then, capture and naming can still be corrected.',
 	tour_s5_title: 'Review and approve',
-	tour_s5_where: 'Go to Projects › your project › your volume › Approve.',
+	tour_s5_where: 'Go to Projects › your project › your volume.',
 	tour_s5_body:
-		'Approve the pages that are right. Those that need retaking are rejected with a reason.',
+		'Review each page: approve the ones that are right and reject, with a reason, those that need retaking. To find Approve, open the spread view (the open-book icon in the right-hand bar) and tap Annotations (the speech bubble in the left-hand bar). Only reviewers and administrators can approve.',
 	tour_s6_title: 'Export',
-	tour_s6_where: 'Go to Projects › your project › your volume › Export BagIt.',
+	tour_s6_where: 'Go to Projects › your project › your volume, then tap the box icon, the last one in the right-hand bar.',
 	tour_s6_body:
 		'With everything approved, the volume is packaged and becomes available to download.',
 
