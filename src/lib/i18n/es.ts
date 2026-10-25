@@ -508,7 +508,7 @@ export const es = {
 	pd_val_stem_pattern:
 		'Usa solo minúsculas sin tildes ni eñe (a–z) y números. Puedes separar partes con un guion, pero sin dos guiones seguidos ni guion al comienzo o al final.',
 	pd_err_stem_differs_from_reference_code: (externalId: string, stem: string): string =>
-		`La raíz tiene que ser el código de referencia del volumen en Fisqua, "${externalId}"; "${stem}" es distinto. Usa "${externalId}" como raíz.`,
+		`La raíz tiene que coincidir con el código de referencia del volumen en Fisqua: usa "${externalId}" en lugar de "${stem}".`,
 	pd_err_stem_taken: 'Otro volumen ya usa esta raíz.',
 	pd_err_stem_fixed: 'Ya se capturaron imágenes de este volumen, así que ya no se puede cambiar la raíz.',
 	pd_no_stem_badge: 'Sin raíz',
@@ -536,7 +536,7 @@ export const es = {
 	col_reject_needs_reason: 'Debes seleccionar al menos un error.',
 	col_reject_other_needs_note: 'Para rechazar por "Otro" hace falta una nota. Usa "Agregar nota" para describir el problema.',
 	col_reject_comment_too_long: (max: number): string =>
-		`No se pudo rechazar el registro: la nota puede tener como máximo ${formatCount(max, 'es')} caracteres, que es lo que guarda Fisqua. Acórtala y vuelve a intentarlo.`,
+		`No se pudo rechazar el registro: Fisqua guarda notas de hasta ${formatCount(max, 'es')} caracteres. Acorta la nota y vuelve a intentarlo.`,
 	col_annotation_note_count: (n: number, max: number): string =>
 		`${formatCount(n, 'es')} de ${formatCount(max, 'es')} caracteres`,
 	col_reject_other_note_error: 'No se pudo rechazar el registro: si eliges "Otro", debes agregar una nota que describa el problema.',
@@ -1092,15 +1092,15 @@ export const es = {
 		return `consultado el ${date} ${at}`;
 	},
 	fisqua_problems: (n: number): string => (n === 1 ? '1 problema' : `${formatCount(n, 'es')} problemas`),
-	// El texto de Fisqua, tal como lo envió.
 	fisqua_notes: (n: number): string => (n === 1 ? '1 nota' : `${formatCount(n, 'es')} notas`),
 	fisqua_more: (n: number): string => `y ${formatCount(n, 'es')} más`,
 	fisqua_note_unlisted_object: (key: string): string =>
-		`La copia externa tiene un archivo que el manifiesto de captura no nombra: ${key}`,
+		`La copia externa tiene un archivo que no aparece en el manifiesto de captura: ${key}`,
 	fisqua_note_missing_object: (key: string): string =>
-		`El manifiesto de captura nombra un archivo que no está en la copia externa; Fisqua no lo usa para procesar el volumen: ${key}`,
-	fisqua_rule_bad_request: 'Fisqua rechazó el manifiesto de captura por estar mal formado, sin indicar ningún problema.',
-	fisqua_rule_payload_too_large: 'Fisqua rechazó el manifiesto de captura por ser demasiado grande, sin indicar ningún problema.',
+		`Un archivo del manifiesto de captura no está en la copia externa, pero Fisqua no lo usa para procesar el volumen. Archivo: ${key}`,
+	fisqua_rule_bad_request: 'Fisqua rechazó el manifiesto de captura por un error de formato, sin señalar el problema concreto.',
+	fisqua_rule_payload_too_large: 'Fisqua rechazó el manifiesto de captura por ser demasiado grande, sin señalar ningún problema concreto.',
+	// El texto de Fisqua, tal como lo envió.
 	fisqua_problem_from_fisqua: (message: string): string => `Mensaje de Fisqua: ${message}`,
 	fisqua_incident_object_missing:
 		'Fisqua no encontró en la copia externa algunos archivos que Captua ya había verificado allí. Avisa al administrador: tiene que revisar la copia externa y averiguar qué pasó con ellos. Abajo aparece la lista de los archivos que faltan.',
@@ -1115,7 +1115,7 @@ export const es = {
 	fisqua_cfg_redirect:
 		'La dirección de Fisqua configurada en este equipo redirige a otra. Captua no sigue esa redirección, para que el token no llegue a otro sitio, y dejó de enviarle volúmenes a Fisqua y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_ENV o DTK_FISQUA_BASE_URL y reiniciar Captua.',
 	fisqua_cfg_version:
-		'Fisqua no lee los manifiestos de captura que escribe esta versión de Captua, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: hay que actualizar Captua o Fisqua. Los volúmenes que Fisqua rechazó por este motivo hay que retirarlos de revisión y volver a enviarlos a revisión.',
+		'Fisqua no puede leer los manifiestos de captura de esta versión de Captua, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que actualizar Captua, o pedir que actualicen Fisqua. Después, retira de revisión los volúmenes que Fisqua rechazó por este motivo y vuelve a enviarlos a revisión.',
 	fisqua_cfg_other:
 		'Fisqua no acepta la configuración de este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que revisar la configuración de Fisqua y reiniciar Captua.',
 	fisqua_unit_title: 'Fisqua',
