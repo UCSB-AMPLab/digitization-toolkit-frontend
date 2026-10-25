@@ -100,7 +100,7 @@ describe('VolumeFisquaLine', () => {
 
 	it("lists a refusal's problems", async () => {
 		const problems = [
-			{ rule: 'no_reference_code', message: 'The volume has no Fisqua reference code', record_ids: [], image_ids: [] },
+			{ rule: 'reference_code_differs', message: 'The reference code differs from the stem', record_ids: [], image_ids: [] },
 			{ rule: 'sequence_missing', message: 'x', record_ids: [3], image_ids: [] }
 		];
 		const screen = await shown(
@@ -108,7 +108,7 @@ describe('VolumeFisquaLine', () => {
 		);
 		const items = [...screen.container.querySelectorAll('.fisqua-problems li')].map((li) => li.textContent ?? '');
 		expect(items).toHaveLength(2);
-		expect(items[0]).toContain(es.col_manifest_rule_no_reference_code);
+		expect(items[0]).toContain(es.col_manifest_rule_reference_code_differs);
 		expect(items[1]).toContain(es.col_manifest_rule_sequence_missing);
 		expect(items[1]).toContain(es.col_manifest_records([3]));
 		expect(screen.container.querySelector('.fisqua-problems summary')!.textContent).toContain(es.fisqua_problems(2));

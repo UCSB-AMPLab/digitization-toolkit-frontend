@@ -103,7 +103,6 @@ describe('captureManifestRefusal', () => {
 	});
 
 	it.each([
-		['no_reference_code', 'col_manifest_rule_no_reference_code'],
 		['reference_code_differs', 'col_manifest_rule_reference_code_differs']
 	] as const)("has a catalogue text for the outbox's %s, in both languages", (rule, key) => {
 		for (const msgs of [en, es]) {

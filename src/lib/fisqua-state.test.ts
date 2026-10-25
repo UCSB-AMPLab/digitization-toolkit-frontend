@@ -95,9 +95,9 @@ describe('volumeFisquaView', () => {
 		expect(view.label).toBe(en.fisqua_out_failed_no_time);
 	});
 
-	it('lists a refusal by Captua in the catalogue words, with no_reference_code', () => {
+	it('lists a refusal by Captua in the catalogue words, with reference_code_differs', () => {
 		const problems = [
-			{ rule: 'no_reference_code', message: 'The volume has no Fisqua reference code, so it is not sent', record_ids: [], image_ids: [] },
+			{ rule: 'reference_code_differs', message: 'The reference code differs from the stem, so it is not sent', record_ids: [], image_ids: [] },
 			{ rule: 'sha256_missing', message: 'x', record_ids: [4, 2], image_ids: [9] },
 			{ rule: 'brand_new_rule', message: 'Something new.', record_ids: [], image_ids: [] }
 		];
@@ -105,7 +105,7 @@ describe('volumeFisquaView', () => {
 		expect(view.kind).toBe('not_exportable');
 		expect(view.label).toBe(en.fisqua_out_not_exportable);
 		expect(view.problems).toEqual([
-			{ text: en.col_manifest_rule_no_reference_code, records: null, fromFisqua: false },
+			{ text: en.col_manifest_rule_reference_code_differs, records: null, fromFisqua: false },
 			{ text: en.col_manifest_rule_sha256_missing, records: en.col_manifest_records([2, 4]), fromFisqua: false },
 			{ text: en.col_manifest_rule_other, records: null, fromFisqua: false }
 		]);

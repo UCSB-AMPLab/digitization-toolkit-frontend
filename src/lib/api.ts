@@ -1693,7 +1693,7 @@ export interface VolumeOffsiteState {
 /**
  * A problem on a Fisqua outbox row or status. A refusal by Captua
  * (`not_exportable`) holds capture_manifest problems, plus
- * `no_reference_code`: {rule, message, record_ids, image_ids}. A refusal by
+ * `reference_code_differs`: {rule, message, record_ids, image_ids}. A refusal by
  * Fisqua, and Fisqua's status, hold Fisqua's own problems: {rule, message, …},
  * with Fisqua's rule names (`id-reused`, `reference-code`, …) and its text.
  */

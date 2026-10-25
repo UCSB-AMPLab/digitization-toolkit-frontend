@@ -46,12 +46,11 @@ export const CAPTURE_MANIFEST_RULES = [
 ] as const;
 
 /**
- * Not capture_manifest rules: the problems app/core/fisqua_outbox.py records,
- * in the same shape, on a handover it refuses to send: a volume with no Fisqua
- * reference code, or one whose recorded reference code differs from its stem.
- * Shown on the volume's Fisqua line.
+ * Not a capture_manifest rule: the problem app/core/fisqua_outbox.py records,
+ * in the same shape, on a handover of a volume whose recorded reference code
+ * differs from its stem, which it does not send. Shown on the volume's Fisqua line.
  */
-export const FISQUA_OUTBOX_RULES = ['no_reference_code', 'reference_code_differs'] as const;
+export const FISQUA_OUTBOX_RULES = ['reference_code_differs'] as const;
 
 type Rule = (typeof CAPTURE_MANIFEST_RULES)[number] | (typeof FISQUA_OUTBOX_RULES)[number];
 
@@ -133,8 +132,6 @@ function ruleText(rule: Rule, msgs: Messages): string {
 			return msgs.col_manifest_rule_preview_sha256_missing;
 		case 'no_pages':
 			return msgs.col_manifest_rule_no_pages;
-		case 'no_reference_code':
-			return msgs.col_manifest_rule_no_reference_code;
 		case 'reference_code_differs':
 			return msgs.col_manifest_rule_reference_code_differs;
 	}

@@ -774,8 +774,6 @@ export const es = {
 		'Las vistas previas de algunas imágenes RAW no tienen checksum SHA-256 registrado, porque esas imágenes se capturaron antes de que Captua empezara a registrarlo. Avisa a quien administra el equipo: tiene que ejecutar backfill-preview-digests para este volumen en el equipo. Después, vuelve a exportar.',
 	col_manifest_rule_no_pages:
 		'Ningún registro en revisión o aprobado tiene imágenes, así que Fisqua no tiene páginas que registrar. Envía a revisión registros con imágenes.',
-	col_manifest_rule_no_reference_code:
-		'El volumen no tiene código de referencia en Fisqua, así que Captua no lo envía a Fisqua. Avisa a quien administra el equipo: tiene que asignarle al volumen su código de referencia. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
 	col_manifest_rule_reference_code_differs:
 		'El código de referencia del volumen en Fisqua no coincide con la raíz del volumen, así que Captua no lo envía a Fisqua. Desde aquí no se puede cambiar el código de referencia. Avisa a quien administra el equipo: tiene que hacer coincidir el código de referencia con la raíz. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
 	col_manifest_rule_other: 'Fisqua rechazaría el archivo por otro motivo.',

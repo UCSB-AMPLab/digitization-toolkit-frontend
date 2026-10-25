@@ -744,8 +744,6 @@ export const en: Messages = {
 		'No SHA-256 checksum is recorded for the previews of some RAW images, which were captured before Captua recorded it. Ask whoever manages the scanner to run backfill-preview-digests for this volume on the scanner, then export again.',
 	col_manifest_rule_no_pages:
 		'No record sent for review or approved has an image, so Fisqua has no page to register. Send records with images for review.',
-	col_manifest_rule_no_reference_code:
-		'The volume has no Fisqua reference code, so Captua does not send it to Fisqua. Ask whoever manages the scanner to give the volume its reference code, then withdraw the volume from review and send it for review again.',
 	col_manifest_rule_reference_code_differs:
 		"The volume's Fisqua reference code differs from its stem, so Captua does not send it to Fisqua. The reference code cannot be changed here: ask whoever manages the scanner to make the reference code and the stem agree, then withdraw the volume from review and send it for review again.",
 	col_manifest_rule_other: 'Fisqua would refuse the file for another reason.',
