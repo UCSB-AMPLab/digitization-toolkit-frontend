@@ -697,6 +697,57 @@ export const en: Messages = {
 		'Some images of this volume are stored offsite and are not on the SD card, so they cannot be included in the ZIP. An administrator can restore the volume from "Space on the SD card".',
 	col_export_freed: (n: number): string =>
 		`${n === 1 ? 'One file of this volume is stored offsite and is not' : `${formatCount(n, 'en')} files of this volume are stored offsite and are not`} on the SD card, so Captua cannot build the package. To export the volume, an administrator must first restore it from "Space on the SD card", next to the offsite copy line.`,
+	// ── Capture manifest for Fisqua ─────────────────────────────────────────
+	col_manifest_option_title: 'Capture manifest (Fisqua)',
+	col_manifest_option_desc: 'A JSON file that tells Fisqua which pages of this volume are in the offsite copy.',
+	col_manifest_requires: 'Requires sending for review and a complete offsite copy',
+	col_manifest_preparing: 'Preparing the capture manifest…',
+	col_manifest_refused_title: 'The capture manifest cannot be exported yet',
+	col_manifest_refused_body: 'Fisqua would refuse this file. Resolve the following, then export it again.',
+	col_manifest_records: (ids: number[]): string => {
+		const shown = ids.slice(0, 20).join(', ');
+		const rest = ids.length - 20;
+		return `${ids.length === 1 ? 'Record' : 'Records'} ${shown}${rest > 0 ? ` and ${formatCount(rest, 'en')} more` : ''}`;
+	},
+	col_manifest_rule_tenant_missing:
+		'No tenant is configured on this scanner, so the manifest has no place in the offsite copy. Ask whoever manages the scanner to set DTK_OFFSITE_TENANT and restart Captua.',
+	col_manifest_rule_tenant_invalid:
+		'The tenant configured on this scanner is not valid. Ask whoever manages the scanner to correct DTK_OFFSITE_TENANT and restart Captua.',
+	col_manifest_rule_no_stem:
+		'The volume has no file name stem, so its images have no names Fisqua can read. Give the volume its stem (its Fisqua reference code).',
+	col_manifest_rule_no_project: 'The volume is not in a project, and the manifest names its project. Move the volume into a project.',
+	col_manifest_rule_records_captured:
+		'Some records are still captured, so the volume has not been sent for review. Send it for review when its capture is finished.',
+	col_manifest_rule_sequence_missing: 'Some records have no sequence number. Renumber the volume.',
+	col_manifest_rule_sequence_repeated: 'Some records share a sequence number. Renumber the volume.',
+	col_manifest_rule_roles_invalid:
+		'Some records have neither one single image nor a left image, a right image or both. Retake them so each has one single image or a left and right pair.',
+	col_manifest_rule_capture_id_missing:
+		'Some images have no capture id, so the capture manifest holds no checksum for them. Retake those records.',
+	col_manifest_rule_not_uploaded:
+		'Some images are not yet verified in the offsite copy. Wait for Captua to finish copying and verifying them, then export again.',
+	col_manifest_rule_preview_not_uploaded:
+		'The previews of some RAW images are not yet verified in the offsite copy. Wait for Captua to finish copying and verifying them, then export again.',
+	col_manifest_rule_raw_without_preview:
+		'Some RAW images have no preview, in the offsite copy or on the SD card. Fisqua cannot read a RAW file, so those records have to be captured again.',
+	col_manifest_rule_upload_refused:
+		'Captua could not upload some files to the offsite copy: they are shown as "need attention" in the volume\'s offsite copy line. Resolve them, then export again.',
+	col_manifest_rule_key_outside:
+		"Some files are stored offsite outside this volume's folders. Captua never renames a file in the offsite copy, so those records have to be captured again.",
+	col_manifest_rule_filename_form:
+		"Some images are stored offsite under names that do not follow this volume's file names. Captua never renames a file in the offsite copy, so those records have to be captured again.",
+	col_manifest_rule_page_key_repeated:
+		'More than one image is stored under the same name, and Fisqua names each page by it. Those records have to be captured again.',
+	col_manifest_rule_sha256_missing:
+		'The capture manifest holds no valid SHA-256 checksum for some images. Ask whoever manages the scanner to run the integrity check on the volume and resolve what it reports.',
+	col_manifest_rule_preview_sha256_missing:
+		'No SHA-256 checksum is recorded for the previews of some RAW images, which were captured before Captua recorded it. Ask whoever manages the scanner to run backfill-preview-digests for this volume on the scanner, then export again.',
+	col_manifest_rule_no_pages:
+		'No record sent for review or approved has an image, so Fisqua has no page to register. Send records with images for review.',
+	col_manifest_rule_other: 'Fisqua would refuse the file for another reason.',
+	col_manifest_err_title: 'Could not download the capture manifest',
+	col_manifest_err_not_found: 'Captua could not find this volume. Go back to the project and open it again.',
+	col_manifest_err: 'Captua could not prepare the capture manifest. Try again.',
 	bug_report_button: 'Report a problem',
 	bug_report_title: 'Report a problem',
 	bug_report_desc: 'Tell us what happened. GitHub will open with a prefilled report.',

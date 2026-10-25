@@ -720,6 +720,18 @@ export const collectionsApi = {
   },
 
   /**
+   * The volume's capture manifest for Fisqua, as the file to save: the body
+   * unchanged and its Content-Disposition (null when the browser may not read
+   * it, cross-origin). Admins and operators only. Throws ApiError 409 with
+   * detail {message, problems} when Fisqua would refuse the file
+   * (export_capture_manifest in app/api/collections.py).
+   */
+  async downloadCaptureManifest(collectionId: number): Promise<{ blob: Blob; contentDisposition: string | null }> {
+    const { blob, headers } = await apiRequestBlob(`/collections/${collectionId}/capture-manifest`);
+    return { blob, contentDisposition: headers.get('Content-Disposition') };
+  },
+
+  /**
    * Hand the collection over for review: every captured record becomes
    * in_review (NEH-260). Refuses with 422 if any of them still carries a
    * rejected image or has no image at all, naming all of them at once rather

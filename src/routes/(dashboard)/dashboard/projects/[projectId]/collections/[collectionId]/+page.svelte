@@ -39,6 +39,13 @@
   import { freedExportCount } from '$lib/offsite-free';
   import { reconcileInspected, selectionAfterLoad } from '$lib/record-selection';
   import { freedFromBody } from '$lib/image-display';
+  import {
+    canDownloadCaptureManifest,
+    captureManifestErrorText,
+    captureManifestFilename,
+    captureManifestRefusal,
+    type ManifestRefusalView
+  } from '$lib/capture-manifest';
 
   // ---------------------------------------------------------------------------
   // PARÁMETROS DE RUTA
@@ -254,6 +261,13 @@
   let zipProgress      = $state(0);
   let zipError         = $state<string | null>(null);
 
+  // Manifiesto de captura para Fisqua: solo admin y operador, como el envío
+  // a revisión (el backend rechaza la ruta a los demás).
+  let canDownloadManifest = $derived(canDownloadCaptureManifest($userRole));
+  let isManifestLoading   = $state(false);
+  let manifestRefusal     = $state<ManifestRefusalView | null>(null);
+  let manifestError       = $state<string | null>(null);
+
   async function handleExport() {
     if (!canExport) { showBlockersModal = true; return; }
     showExportModal = true;
@@ -298,6 +312,36 @@
       }
     } finally {
       isExporting = false;
+    }
+  }
+
+  // Descarga el manifiesto con el nombre que da el servidor. Un 409 trae la
+  // lista de problemas por los que Fisqua lo rechazaría (capture-manifest.ts).
+  async function downloadCaptureManifest() {
+    if (isManifestLoading) return;
+    isManifestLoading = true;
+    manifestRefusal = null;
+    manifestError = null;
+    const forId = collectionId;
+    try {
+      const { blob, contentDisposition } = await collectionsApi.downloadCaptureManifest(forId);
+      if (forId !== collectionId) return;
+      const name = captureManifestFilename(contentDisposition, await blob.text());
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      if (forId !== collectionId) return;
+      const refusal = captureManifestRefusal(e, $m);
+      if (refusal) manifestRefusal = refusal;
+      else manifestError = captureManifestErrorText(e, $m);
+    } finally {
+      isManifestLoading = false;
     }
   }
 
@@ -600,6 +644,16 @@
             <span class="chooser-chip green"><span class="material-symbols-outlined">check</span>{$m.col_images_always}</span>
           </span>
         </button>
+        {#if canDownloadManifest}
+          <button class="chooser-option" onclick={() => { showChooserModal = false; downloadCaptureManifest(); }}>
+            <span class="material-symbols-outlined chooser-icon bagit">view_list</span>
+            <span class="chooser-text">
+              <span class="chooser-title">{$m.col_manifest_option_title}</span>
+              <span class="chooser-desc">{$m.col_manifest_option_desc}</span>
+              <span class="chooser-chip amber"><span class="material-symbols-outlined">lock</span>{$m.col_manifest_requires}</span>
+            </span>
+          </button>
+        {/if}
       </div>
       <div class="export-modal-actions">
         <button class="btn-secondary" onclick={() => showChooserModal = false}>{$m.common_close}</button>
@@ -621,6 +675,42 @@
         <p class="export-modal-subtitle">{zipError}</p>
         <div class="export-modal-actions">
           <button class="btn-secondary" onclick={() => zipError = null}>{$m.common_close}</button>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
+
+<!-- Modal: manifiesto de captura (preparando / rechazado / error) -->
+{#if isManifestLoading || manifestRefusal || manifestError}
+  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="export-modal-card">
+      {#if isManifestLoading}
+        <div class="spinner"></div>
+        <h3 class="export-modal-title">{$m.col_manifest_preparing}</h3>
+      {:else if manifestRefusal}
+        <span class="material-symbols-outlined icon-lg export-error-icon">block</span>
+        <h3 class="export-modal-title">{$m.col_manifest_refused_title}</h3>
+        <p class="export-modal-subtitle">{$m.col_manifest_refused_body}</p>
+        <ul class="manifest-problems">
+          {#each manifestRefusal.problems as problem, i (i)}
+            <li>
+              <span>{problem.text}</span>
+              {#if problem.records}
+                <span class="manifest-problem-records">{problem.records}</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+        <div class="export-modal-actions">
+          <button class="btn-secondary" onclick={() => manifestRefusal = null}>{$m.common_close}</button>
+        </div>
+      {:else if manifestError}
+        <span class="material-symbols-outlined icon-lg export-error-icon">error</span>
+        <h3 class="export-modal-title">{$m.col_manifest_err_title}</h3>
+        <p class="export-modal-subtitle">{manifestError}</p>
+        <div class="export-modal-actions">
+          <button class="btn-secondary" onclick={() => manifestError = null}>{$m.common_close}</button>
         </div>
       {/if}
     </div>
@@ -677,4 +767,20 @@
     transition: background-color var(--transition-fast);
   }
   .blocker-item:hover { background: var(--color-surface-alt-2); }
+  .manifest-problems {
+    margin: 0;
+    padding: 0 0 0 20px;
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    font-size: var(--text-sm);
+    color: var(--color-light);
+    line-height: 1.5;
+  }
+  .manifest-problems li { display: flex; flex-direction: column; gap: 2px; }
+  .manifest-problem-records { color: var(--color-light-grey); font-size: 12.5px; }
 </style>

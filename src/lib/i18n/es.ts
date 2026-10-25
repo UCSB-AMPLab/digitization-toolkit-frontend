@@ -727,6 +727,57 @@ export const es = {
 		'Algunas imágenes de este volumen están guardadas en la copia externa y ya no están en la tarjeta, así que no se pueden incluir en el ZIP. Un administrador puede restaurar el volumen desde "Espacio en la tarjeta".',
 	col_export_freed: (n: number): string =>
 		`${n === 1 ? 'Un archivo de este volumen está guardado en la copia externa y ya no está' : `${formatCount(n, 'es')} archivos de este volumen están guardados en la copia externa y ya no están`} en la tarjeta, así que Captua no puede armar el paquete. Para exportar el volumen, primero un administrador debe restaurarlo desde "Espacio en la tarjeta", junto a la línea de la copia externa.`,
+	// ── Manifiesto de captura para Fisqua ───────────────────────────────────
+	col_manifest_option_title: 'Manifiesto de captura (Fisqua)',
+	col_manifest_option_desc: 'Un archivo JSON que le indica a Fisqua qué páginas de este volumen están en la copia externa.',
+	col_manifest_requires: 'Requiere envío a revisión y copia externa completa',
+	col_manifest_preparing: 'Preparando el manifiesto de captura…',
+	col_manifest_refused_title: 'Todavía no se puede exportar el manifiesto de captura',
+	col_manifest_refused_body: 'Fisqua rechazaría este archivo. Corrige lo siguiente y vuelve a exportarlo.',
+	col_manifest_records: (ids: number[]): string => {
+		const shown = ids.slice(0, 20).join(', ');
+		const rest = ids.length - 20;
+		return `${ids.length === 1 ? 'Registro' : 'Registros'} ${shown}${rest > 0 ? ` y ${formatCount(rest, 'es')} más` : ''}`;
+	},
+	col_manifest_rule_tenant_missing:
+		'Este equipo no tiene configurada la carpeta de su institución en la copia externa, así que el manifiesto no puede indicar dónde está el volumen. Avisa a quien administra el equipo: tiene que definir DTK_OFFSITE_TENANT y reiniciar Captua.',
+	col_manifest_rule_tenant_invalid:
+		'La carpeta de la institución configurada en este equipo para la copia externa no es válida. Avisa a quien administra el equipo: tiene que corregir DTK_OFFSITE_TENANT y reiniciar Captua.',
+	col_manifest_rule_no_stem:
+		'El volumen no tiene raíz, así que sus imágenes no tienen nombres que Fisqua pueda leer. Asígnale una raíz al volumen: su código de referencia en Fisqua.',
+	col_manifest_rule_no_project: 'El volumen no pertenece a ningún proyecto, y el manifiesto tiene que indicar a cuál pertenece. Mueve el volumen a un proyecto.',
+	col_manifest_rule_records_captured:
+		'Algunos registros siguen en estado Capturado, así que el volumen todavía no está en revisión. Envíalo a revisión cuando termines de capturarlo.',
+	col_manifest_rule_sequence_missing: 'Algunos registros no tienen número de secuencia. Renumera el volumen.',
+	col_manifest_rule_sequence_repeated: 'Algunos registros tienen el mismo número de secuencia. Renumera el volumen.',
+	col_manifest_rule_roles_invalid:
+		'Algunos registros no tienen una imagen única, ni tampoco una imagen izquierda, una derecha o las dos. Vuelve a capturarlos para que cada uno tenga una imagen única o un par de imágenes izquierda y derecha.',
+	col_manifest_rule_capture_id_missing:
+		'Algunas imágenes no tienen identificador de captura, así que el manifiesto de captura no tiene el checksum de esas imágenes. Vuelve a capturar esos registros.',
+	col_manifest_rule_not_uploaded:
+		'Algunas imágenes todavía no están verificadas en la copia externa. Espera a que Captua termine de copiarlas y verificarlas, y vuelve a exportar.',
+	col_manifest_rule_preview_not_uploaded:
+		'Las vistas previas de algunas imágenes RAW todavía no están verificadas en la copia externa. Espera a que Captua termine de copiarlas y verificarlas, y vuelve a exportar.',
+	col_manifest_rule_raw_without_preview:
+		'Algunas imágenes RAW no tienen vista previa, ni en la copia externa ni en la tarjeta. Fisqua no puede leer un archivo RAW, así que hay que volver a capturar esos registros.',
+	col_manifest_rule_upload_refused:
+		'Captua no pudo subir algunos archivos a la copia externa: aparecen como "requieren atención" en la línea de la copia externa del volumen. Resuélvelos y vuelve a exportar.',
+	col_manifest_rule_key_outside:
+		'Algunos archivos están guardados en la copia externa fuera de las carpetas de este volumen. Captua nunca cambia el nombre de un archivo en la copia externa, así que hay que volver a capturar esos registros.',
+	col_manifest_rule_filename_form:
+		'Algunas imágenes están guardadas en la copia externa con nombres que no corresponden a los nombres de archivo de este volumen. Captua nunca cambia el nombre de un archivo en la copia externa, así que hay que volver a capturar esos registros.',
+	col_manifest_rule_page_key_repeated:
+		'Hay más de una imagen guardada con el mismo nombre, y Fisqua usa ese nombre para identificar cada página. Hay que volver a capturar los registros de esas imágenes.',
+	col_manifest_rule_sha256_missing:
+		'El manifiesto de captura no tiene un checksum SHA-256 válido para algunas imágenes. Avisa a quien administra el equipo: tiene que ejecutar en el equipo la verificación de integridad del volumen y resolver lo que encuentre.',
+	col_manifest_rule_preview_sha256_missing:
+		'Las vistas previas de algunas imágenes RAW no tienen checksum SHA-256 registrado, porque esas imágenes se capturaron antes de que Captua empezara a registrarlo. Avisa a quien administra el equipo: tiene que ejecutar backfill-preview-digests para este volumen en el equipo. Después, vuelve a exportar.',
+	col_manifest_rule_no_pages:
+		'Ningún registro en revisión o aprobado tiene imágenes, así que Fisqua no tiene páginas que registrar. Envía a revisión registros con imágenes.',
+	col_manifest_rule_other: 'Fisqua rechazaría el archivo por otro motivo.',
+	col_manifest_err_title: 'No se pudo descargar el manifiesto de captura',
+	col_manifest_err_not_found: 'Captua no encontró este volumen. Vuelve al proyecto y ábrelo de nuevo.',
+	col_manifest_err: 'Captua no pudo preparar el manifiesto de captura. Intenta de nuevo.',
 	bug_report_button: 'Reportar un problema',
 	bug_report_title: 'Reportar un problema',
 	bug_report_desc: 'Cuéntanos qué pasó. Se abrirá GitHub con un reporte prellenado.',
