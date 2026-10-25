@@ -1115,7 +1115,7 @@ export const es = {
 	fisqua_cfg_redirect:
 		'La dirección de Fisqua configurada en este equipo redirige a otra. Captua no sigue esa redirección, para que el token no llegue a otro sitio, y dejó de enviarle volúmenes a Fisqua y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_ENV o DTK_FISQUA_BASE_URL y reiniciar Captua.',
 	fisqua_cfg_version:
-		'Fisqua no puede leer los manifiestos de captura de esta versión de Captua, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que actualizar Captua, o pedir que actualicen Fisqua. Después, retira de revisión los volúmenes que Fisqua rechazó por este motivo y vuelve a enviarlos a revisión.',
+		'Fisqua no puede leer los manifiestos de captura de esta versión de Captua, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que actualizar Captua, o pedir que actualicen Fisqua.',
 	fisqua_cfg_other:
 		'Fisqua no acepta la configuración de este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que revisar la configuración de Fisqua y reiniciar Captua.',
 	fisqua_unit_title: 'Fisqua',

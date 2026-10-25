@@ -1071,7 +1071,7 @@ export const en: Messages = {
 	fisqua_cfg_redirect:
 		'The Fisqua address configured on this scanner redirects to another address. Captua does not follow it, so that the token is not sent elsewhere, and has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_ENV or DTK_FISQUA_BASE_URL and restart Captua.',
 	fisqua_cfg_version:
-		'Fisqua does not read the capture manifests this version of Captua writes, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to update Captua or Fisqua. Volumes Fisqua refused for this have to be withdrawn from review and sent for review again.',
+		'Fisqua does not read the capture manifests this version of Captua writes, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to update Captua or Fisqua.',
 	fisqua_cfg_other:
 		"Fisqua does not accept this scanner's configuration, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to check its Fisqua settings and restart Captua.",
 	fisqua_unit_title: 'Fisqua',
