@@ -18,6 +18,7 @@
   import { createCameraRefresh } from '$lib/camera-refresh';
   import InProgress from './InProgress.svelte';
   import ActivityCalendar from './ActivityCalendar.svelte';
+  import StorageAlert from './StorageAlert.svelte';
 
   let currentUser = $state<any>(null);
   let userRole    = $state('');
@@ -50,25 +51,6 @@
   // builds its table and board from them (NEH-233).
   let allCollections = $state<Collection[]>([]);
   let allProjects    = $state<Project[]>([]);
-
-  // The overview shows an alert when storage use reaches 85%. The figures
-  // below are placeholders, not read from the unit.
-  // TODO: read them from `systemApi.getStorage()` (`/system/storage`).
-  const STORAGE_ALERT_THRESHOLD = 85;  // percent
-
-  let storageUsedGB  = $state(2457.6);
-  let storageTotalGB = $state(10240);
-
-  let storagePercent = $derived(
-    Math.min(100, Math.round((storageUsedGB / storageTotalGB) * 100))
-  );
-
-  let storageAlert = $derived(storagePercent >= STORAGE_ALERT_THRESHOLD);
-
-  function formatStorage(gb: number): string {
-    if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
-    return `${gb.toFixed(0)} GB`;
-  }
 
   let expandedCamera = $state<'left' | 'right' | null>(null);
   let previewUrls    = $state<Record<string, string>>({});
@@ -370,19 +352,7 @@
     </p>
   </div>
 
-  <!-- The Settings page applies the same threshold. -->
-  {#if storageAlert}
-    <div class="storage-alert-banner">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-        <line x1="12" y1="9" x2="12" y2="13"/>
-        <line x1="12" y1="17" x2="12.01" y2="17"/>
-      </svg>
-      <span>
-        {$m.dash_storage_alert_p1}<strong>{storagePercent}%</strong>{$m.dash_storage_alert_p2(formatStorage(storageUsedGB), formatStorage(storageTotalGB))}<a href="/dashboard/config" class="alert-link">{$m.nav_settings}</a>{$m.dash_storage_alert_p3}
-      </span>
-    </div>
-  {/if}
+  <StorageAlert />
 
   <div class="kpi-grid">
 
@@ -561,28 +531,6 @@
   .page-header { margin-bottom: 28px; }
   .greeting { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
-
-  .storage-alert-banner {
-    display: flex; align-items: flex-start; gap: 12px;
-    padding: 14px 18px;
-    background-color: rgba(214,103,74,0.08);
-    border: 1px solid rgba(214,103,74,0.3);
-    border-radius: var(--radius-md);
-    color: var(--color-error);
-    font-size: var(--text-sm); line-height: 1.5;
-    margin-bottom: 24px;
-  }
-
-  .storage-alert-banner strong { font-weight: var(--fw-bold); }
-
-  .alert-link {
-    color: var(--color-error);
-    font-weight: var(--fw-semibold);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .alert-link:hover { opacity: 0.8; }
 
   /* KPIs */
   .kpi-grid {

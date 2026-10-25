@@ -25,6 +25,8 @@
     type StorageDevice,
     type PowerAction
   } from '$lib/api';
+  // The overview's banner uses the same threshold.
+  import { STORAGE_ALERT_THRESHOLD } from '$lib/storage-usage';
 
   let storageInfo    = $state<StorageInfo | null>(null);
   let storageLoading = $state(true);
@@ -47,9 +49,6 @@
   let storagePercent = $derived(
     Math.min(100, Math.round((storageUsedGB / storageTotalGB) * 100))
   );
-
-  // Percent. The overview page applies the same threshold.
-  const STORAGE_ALERT_THRESHOLD = 85;
 
   let storageAlert = $derived(storagePercent >= STORAGE_ALERT_THRESHOLD);
 
