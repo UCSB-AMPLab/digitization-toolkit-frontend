@@ -41,7 +41,7 @@
 					<ul>
 						{#each view.incident.missing as file, i (i)}
 							<li>
-								<code>{file.key}</code>{#if file.role}<span class="fisqua-problem-records"> · {file.role}</span>{/if}{#if file.captureId}<span class="fisqua-problem-records"> · {file.captureId}</span>{/if}
+								<code>{file.key}</code>{#if file.kind}<span class="fisqua-problem-records"> · {file.kind}</span>{/if}{#if file.role}<span class="fisqua-problem-records"> · {file.role}</span>{/if}{#if file.captureId}<span class="fisqua-problem-records"> · {file.captureId}</span>{/if}
 							</li>
 						{/each}
 					</ul>

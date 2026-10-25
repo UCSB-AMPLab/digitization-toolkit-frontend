@@ -139,8 +139,8 @@ describe('VolumeFisquaLine', () => {
 
 	it("shows Fisqua's object-missing refusal as an incident listing each key", async () => {
 		const problems = [
-			{ rule: 'object-missing', message: 'x', key: 'rionegro/co-x/co-x_0001_L.jpg', captureId: 'cap-1', role: 'left' },
-			{ rule: 'object-missing', message: 'x', key: 'rionegro/co-x/co-x_0001_R.jpg', captureId: 'cap-1', role: 'right' }
+			{ rule: 'object-missing', message: 'x', objectKey: 'rionegro/co-x/co-x_0001_L.jpg', captureId: 'cap-1', role: 'left', kind: 'capture' },
+			{ rule: 'object-missing', message: 'x', objectKey: 'rionegro/co-x/co-x_0001_R.jpg', captureId: 'cap-1', role: 'right', kind: 'preview' }
 		];
 		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })] })));
 		const incident = screen.container.querySelector('[data-incident="object-missing"]') as HTMLElement;
@@ -151,7 +151,9 @@ describe('VolumeFisquaLine', () => {
 		expect(items[0]).toContain('rionegro/co-x/co-x_0001_L.jpg');
 		expect(items[0]).toContain('cap-1');
 		expect(items[0]).toContain(es.col_role_left);
+		expect(items[0]).toContain(es.fisqua_kind_capture);
 		expect(items[1]).toContain(es.col_role_right);
+		expect(items[1]).toContain(es.fisqua_kind_preview);
 		expect(screen.container.querySelector('[data-fisqua]')!.classList.contains('fisqua-attention')).toBe(true);
 		expect(screen.container.querySelector('.fisqua-problems')).toBeNull();
 	});

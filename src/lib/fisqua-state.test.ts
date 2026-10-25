@@ -135,8 +135,8 @@ describe('volumeFisquaView', () => {
 
 	it("shows Fisqua's object-missing refusal as an incident, with each missing key", () => {
 		const problems = [
-			{ rule: 'object-missing', message: 'not in the masters bucket', key: 'rionegro/co-x/co-x_0001_L.jpg', captureId: 'cap-1', role: 'left' },
-			{ rule: 'object-missing', message: 'not in the masters bucket', key: 'rionegro/co-x/co-x_0002.jpg', captureId: 'cap-2', role: 'single' },
+			{ rule: 'object-missing', message: 'not in the masters bucket', objectKey: 'rionegro/co-x/co-x_0001_L.cr2', captureId: 'cap-1', role: 'left', kind: 'capture' },
+			{ rule: 'object-missing', message: 'not in the masters bucket', objectKey: 'rionegro/co-x/co-x_0002.jpg', captureId: 'cap-2', role: 'single', kind: 'preview' },
 			{ rule: 'run-started', message: 'A run has started.' }
 		];
 		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }), NOW, 'en', en)!;
@@ -144,8 +144,8 @@ describe('volumeFisquaView', () => {
 		expect(view.incident).toEqual({
 			text: en.fisqua_incident_object_missing,
 			missing: [
-				{ key: 'rionegro/co-x/co-x_0001_L.jpg', captureId: 'cap-1', role: en.col_role_left },
-				{ key: 'rionegro/co-x/co-x_0002.jpg', captureId: 'cap-2', role: en.fisqua_role_single }
+				{ key: 'rionegro/co-x/co-x_0001_L.cr2', captureId: 'cap-1', kind: en.fisqua_kind_capture, role: en.col_role_left },
+				{ key: 'rionegro/co-x/co-x_0002.jpg', captureId: 'cap-2', kind: en.fisqua_kind_preview, role: en.fisqua_role_single }
 			]
 		});
 		// The other rules stay Fisqua's messages; object-missing is not repeated among them.

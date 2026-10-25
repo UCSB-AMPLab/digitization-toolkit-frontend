@@ -1031,6 +1031,8 @@ export const en: Messages = {
 	fisqua_incident_object_missing:
 		'Fisqua could not find some files in the offsite copy that Captua had already verified there. This needs investigating: ask whoever manages the scanner to check the offsite copy. The missing files are listed below.',
 	fisqua_role_single: 'Single image',
+	fisqua_kind_capture: 'Master file',
+	fisqua_kind_preview: 'Preview',
 	fisqua_history: (n: number): string => `Earlier sends (${formatCount(n, 'en')})`,
 	fisqua_cfg_token:
 		'Fisqua does not accept the token configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_TOKEN and restart Captua.',

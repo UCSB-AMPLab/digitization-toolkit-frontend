@@ -71,8 +71,11 @@ export interface VolumeFisquaView {
 
 /** One object a manifest named that Fisqua did not find in the masters bucket. */
 export interface FisquaMissingObject {
+	/** The manifest's objectKey or previewObjectKey. */
 	key: string;
 	captureId: string | null;
+	/** "Master file" or "Preview", from Fisqua's `kind` (capture, preview), or the kind as given. */
+	kind: string | null;
 	/** The role's label (left, right, single image), or the role as Fisqua gave it. */
 	role: string | null;
 }
@@ -85,7 +88,8 @@ export interface FisquaIncidentView {
 /**
  * Contract §9.2: every object a manifest names must be in the masters bucket
  * when it arrives; otherwise Fisqua refuses it (422) with this rule, one
- * problem per missing key, with its captureId and role. Captua had verified
+ * problem per missing object: {rule, message, objectKey, captureId, role,
+ * kind}, with `kind` "capture" or "preview". Captua had verified
  * those objects, so it is shown as an incident, not as Fisqua's message.
  */
 const RULE_OBJECT_MISSING = 'object-missing';
@@ -98,6 +102,13 @@ function roleLabel(role: unknown, msgs: Messages): string | null {
 	return role;
 }
 
+function kindLabel(kind: unknown, msgs: Messages): string | null {
+	if (typeof kind !== 'string' || !kind) return null;
+	if (kind === 'capture') return msgs.fisqua_kind_capture;
+	if (kind === 'preview') return msgs.fisqua_kind_preview;
+	return kind;
+}
+
 function objectMissingIncident(problems: FisquaProblem[] | null | undefined, msgs: Messages): FisquaIncidentView | null {
 	if (!Array.isArray(problems)) return null;
 	const missing = problems.filter((p) => typeof p === 'object' && p !== null && p.rule === RULE_OBJECT_MISSING);
@@ -105,10 +116,11 @@ function objectMissingIncident(problems: FisquaProblem[] | null | undefined, msg
 	return {
 		text: msgs.fisqua_incident_object_missing,
 		missing: missing
-			.filter((p) => typeof p.key === 'string' && p.key)
+			.filter((p) => typeof p.objectKey === 'string' && p.objectKey)
 			.map((p) => ({
-				key: p.key as string,
+				key: p.objectKey as string,
 				captureId: typeof p.captureId === 'string' && p.captureId ? p.captureId : null,
+				kind: kindLabel(p.kind, msgs),
 				role: roleLabel(p.role, msgs)
 			}))
 	};
