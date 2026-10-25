@@ -24,7 +24,7 @@
   // ============================================================================
 
   import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
-  import { recordsApi } from '$lib/api';
+  import { recordsApi, ApiError } from '$lib/api';
   import { m, locale } from '$lib/i18n';
   import { formatCount } from '$lib/format-count';
   import { REJECTION_REASONS } from '$lib/rejectionReasons';
@@ -111,8 +111,23 @@
     focus: $m.col_err_focus,
     exposure: $m.col_err_exposure,
     dirt: $m.col_err_debris,
+    framing: $m.col_err_framing,
+    obstruction: $m.col_err_obstruction,
+    other: $m.col_err_other,
   });
-  const ERROR_TYPES = $derived(REJECTION_REASONS.map(r => ({ ...r, label: ERROR_LABELS[r.id] })));
+  // The line shown beneath each reason where it is offered for choosing.
+  const ERROR_GLOSSES: { [id: string]: string } = $derived({
+    blur: $m.col_err_blurry_gloss,
+    glare: $m.col_err_glare_gloss,
+    shadow: $m.col_err_shadows_gloss,
+    focus: $m.col_err_focus_gloss,
+    exposure: $m.col_err_exposure_gloss,
+    dirt: $m.col_err_debris_gloss,
+    framing: $m.col_err_framing_gloss,
+    obstruction: $m.col_err_obstruction_gloss,
+    other: $m.col_err_other_gloss,
+  });
+  const ERROR_TYPES = $derived(REJECTION_REASONS.map(r => ({ ...r, label: ERROR_LABELS[r.id], gloss: ERROR_GLOSSES[r.id] })));
 
   // Recarga las anotaciones cada vez que cambia el record activo; evita que
   // las anotaciones de un record se sigan mostrando al navegar a otro.
@@ -234,6 +249,21 @@
     return null;
   });
 
+  // The comment sent with a formal rejection, whatever the reason: the note
+  // being typed, or else the newest saved note (`annotations` is newest
+  // first). A reviewer who saved the note with "Listo" has emptied the
+  // textarea, and the note still goes with the rejection. The backend
+  // refuses `other` without a comment (422).
+  let rejectionComment = $derived(
+    noteText.trim() || annotations.find(a => a.note?.trim())?.note?.trim() || undefined
+  );
+
+  // A formal rejection for `other` waits for a note; the button stays
+  // disabled and a hint says why. Undoing an approval sends no reason.
+  let rejectNeedsNote = $derived(
+    currentRecord?.status === 'in_review' && firstFlaggedReason === 'other' && !rejectionComment
+  );
+
   // Mensaje del popup de confirmación: depende de la acción pedida Y del
   // estado actual del registro — "Rechazar" sobre un 'approved' deshace la
   // aprobación (no es un rechazo formal), y lo mismo al revés (NEH-209).
@@ -317,7 +347,7 @@
   // error ya guardada — si falta, muestra un popup en vez de abrir el de
   // confirmación (deshacer una aprobación no lo necesita).
   function requestReject() {
-    if (!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting) return;
+    if (!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting || rejectNeedsNote) return;
     if (currentRecord.status === 'in_review' && firstFlaggedReason === null) {
       showNoReasonPopup = true;
       return;
@@ -373,7 +403,7 @@
         } else {
           await recordsApi.reject(recordId, {
             predefined_reason: firstFlaggedReason!,
-            comment: noteText.trim() || undefined,
+            comment: rejectionComment,
           });
           // Un registro rechazado ya no admite más anotaciones — colapsar
           // cualquier tarjeta que hubiera quedado abierta (el botón de
@@ -387,7 +417,11 @@
         await onRecordUpdated();
       } catch (err) {
         console.error('[LeftSidebar] Error rechazando el registro:', err);
-        reviewError = $m.col_reject_error;
+        // The backend answers 422 to `other` without a comment; its own
+        // message is not the interface's.
+        reviewError = err instanceof ApiError && err.status === 422 && firstFlaggedReason === 'other'
+          ? $m.col_reject_other_note_error
+          : $m.col_reject_error;
       } finally {
         isRejecting = false;
       }
@@ -789,10 +823,15 @@
                           type="button"
                           class="error-type-btn"
                           class:selected={selectedReasons.includes(errType.id)}
+                          aria-label={errType.label}
+                          aria-describedby="et-gloss-{errType.id}"
                           onclick={() => toggleReason(errType.id)}
                         >
                           <div class="et-dot" style="background-color: {errType.color}"></div>
-                          <span>{errType.label}</span>
+                          <span class="et-text">
+                            <span>{errType.label}</span>
+                            <span id="et-gloss-{errType.id}" class="et-gloss text-xs text-muted">{errType.gloss}</span>
+                          </span>
                           {#if selectedReasons.includes(errType.id)}
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2.5" class="et-check"><polyline points="20 6 9 17 4 12"/></svg>
                           {/if}
@@ -828,7 +867,9 @@
                     <textarea
                       class="note-textarea"
                       bind:value={noteText}
-                      placeholder={$m.col_annotation_comment_placeholder}
+                      placeholder={firstFlaggedReason === 'other'
+                        ? $m.col_annotation_note_required_placeholder
+                        : $m.col_annotation_comment_placeholder}
                       disabled={!currentRecord}
                     ></textarea>
                     <button
@@ -863,6 +904,9 @@
                 {#if canReview && notReviewable}
                   <p class="review-hint">{$m.col_review_not_sent_hint}</p>
                 {/if}
+                {#if canReview && rejectNeedsNote}
+                  <p class="review-hint">{$m.col_reject_other_needs_note}</p>
+                {/if}
 
                 <div class="review-actions">
                   {#if currentRecord?.status === 'rejected' && canOperate}
@@ -876,7 +920,7 @@
                   {:else if canReview}
                     <button
                       class="btn-review reject"
-                      disabled={!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting}
+                      disabled={!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting || rejectNeedsNote}
                       onclick={requestReject}
                     >
                       <span class="material-symbols-outlined icon-sm">cancel</span>
@@ -1371,8 +1415,7 @@
 
   .error-type-btn {
     width: 100%;
-    height: 48px;
-    padding: 0 16px;
+    padding: 8px 16px;
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -1394,6 +1437,8 @@
 
   .et-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
   .et-check { margin-left: auto; flex-shrink: 0; }
+  .et-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .et-gloss { font-weight: var(--fw-regular); }
 
   .reason-done-btn { width: 100%; }
 
