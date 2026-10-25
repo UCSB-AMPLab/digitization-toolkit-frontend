@@ -7,7 +7,8 @@
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
+  import { formatApiDate } from '$lib/format-date';
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, type Project } from '$lib/api';
   import { fileHoldText } from '$lib/volume-refusals';
@@ -330,7 +331,7 @@
                     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
                     <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                   </svg>
-                  {project.created_at ? new Date(project.created_at).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' }) : '—'}
+                  {project.created_at ? formatApiDate(project.created_at, $locale, { day:'numeric', month:'short', year:'numeric' }) : '—'}
                 </div>
               </td>
 

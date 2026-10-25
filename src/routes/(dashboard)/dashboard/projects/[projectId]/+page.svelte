@@ -8,6 +8,7 @@
 
   import { onMount } from 'svelte';
   import { m, roleLabel, locale } from '$lib/i18n';
+  import { formatApiDate } from '$lib/format-date';
   import { formatCount } from '$lib/format-count';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -585,7 +586,7 @@
                     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
                     <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                   </svg>
-                  {col.created_at ? new Date(col.created_at).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' }) : '—'}
+                  {col.created_at ? formatApiDate(col.created_at, $locale, { day:'numeric', month:'short', year:'numeric' }) : '—'}
                 </div>
               </td>
 

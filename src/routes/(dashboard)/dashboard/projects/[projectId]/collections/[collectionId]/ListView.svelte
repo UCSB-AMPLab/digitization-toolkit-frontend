@@ -8,6 +8,7 @@
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m, locale } from '$lib/i18n';
+  import { formatApiDate } from '$lib/format-date';
   import { formatCount } from '$lib/format-count';
   import { reorderErrorText } from '$lib/volume-refusals';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
@@ -86,7 +87,7 @@
 
   function formatDate(dateStr: string | undefined): string {
     if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('es-ES', {
+    return formatApiDate(dateStr, $locale, {
       day: '2-digit', month: '2-digit', year: 'numeric',
     });
   }
