@@ -506,6 +506,8 @@ export const en: Messages = {
 	col_reason_done: 'Done',
 	col_reject_error: 'Could not reject the record. Please try again.',
 	col_reject_needs_reason: 'You must select at least one error.',
+	col_reject_other_needs_note: 'A rejection for "Other" needs a note. Describe the problem in Add note.',
+	col_reject_other_note_error: 'Could not reject the record: a rejection for "Other" needs a note that describes the problem.',
 	col_review_approve_error: 'Could not approve the record. Please try again.',
 	// ── Send for review (NEH-260) ───────────────────────────────────
 	col_handover_send: 'Send for review',
@@ -608,6 +610,9 @@ export const en: Messages = {
 	col_err_focus: 'Out of Focus',
 	col_err_exposure: 'Exposure',
 	col_err_debris: 'Debris on Surface',
+	col_err_framing: 'Framing',
+	col_err_obstruction: 'Obstruction',
+	col_err_other: 'Other',
 	col_tab_info: 'Image info',
 	col_tab_edit: 'Preview controls',
 	col_tab_comments: 'Annotations',

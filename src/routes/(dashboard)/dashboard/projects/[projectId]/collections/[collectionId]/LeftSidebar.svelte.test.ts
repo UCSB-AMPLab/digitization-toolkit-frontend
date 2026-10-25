@@ -13,7 +13,7 @@ import { render } from 'vitest-browser-svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { recordsApi, type Record as ApiRecord, type RecordAnnotation } from '$lib/api';
+import { recordsApi, ApiError, type Record as ApiRecord, type RecordAnnotation } from '$lib/api';
 import LeftSidebar from './LeftSidebar.svelte';
 
 function makeRecord(overrides: Partial<ApiRecord> = {}): ApiRecord {
@@ -95,12 +95,12 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).not.toBeInTheDocument();
 	});
 
-	it('tapping "Marcar error" expands all 6 error rows; tapping it again collapses without saving', async () => {
+	it('tapping "Marcar error" expands all 9 error rows; tapping it again collapses without saving', async () => {
 		const screen = render(LeftSidebar, baseProps());
 		await openAnnotationsTab(screen);
 		await openReasonCard(screen);
 
-		for (const label of ['Imagen Borrosa', 'Reflejo/Brillo', 'Sombras', 'Fuera de Foco', 'Exposición', 'Impurezas en superficie']) {
+		for (const label of ['Imagen Borrosa', 'Reflejo/Brillo', 'Sombras', 'Fuera de Foco', 'Exposición', 'Impurezas en superficie', 'Encuadre', 'Obstrucción', 'Otro']) {
 			await expect.element(screen.getByRole('button', { name: label, exact: true })).toBeVisible();
 		}
 
@@ -593,5 +593,101 @@ describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independ
 
 		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)...')).not.toBeInTheDocument();
 		await expect.poll(() => getAnnotationsSpy.mock.calls.length).toBe(2);
+	});
+
+	// "Otro" (other) needs a note saying what is wrong: the backend refuses
+	// a rejection for `other` without a comment (422). The reason sent is
+	// still the oldest saved flag; the note is the one being typed, or else
+	// the newest saved note.
+	describe('rejecting for "Otro"', () => {
+		const OTHER_HINT = 'Para rechazar por "Otro" hace falta una nota. Describe el problema en Agregar nota.';
+
+		it('saves "Otro" as an error annotation like any other reason', async () => {
+			addAnnotationSpy.mockResolvedValue(makeAnnotation({ error_types: ['other'] }));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+			await openReasonCard(screen);
+
+			await screen.getByRole('button', { name: 'Otro', exact: true }).click();
+			await screen.getByRole('button', { name: 'Listo' }).click();
+
+			await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
+			expect(addAnnotationSpy).toHaveBeenCalledWith(1, { error_types: ['other'], note: undefined });
+		});
+
+		it('without a note, Rechazar is disabled and the hint says why', async () => {
+			getAnnotationsSpy.mockResolvedValue([makeAnnotation({ id: 1, error_types: ['other'], created_at: '2026-01-01' })]);
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+
+			await expect.element(screen.getByText(OTHER_HINT)).toBeVisible();
+			await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		});
+
+		it('no hint when the oldest flag is a reason that needs no note', async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 2, error_types: ['other'], created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-01-01' })
+			]);
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+
+			await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeEnabled();
+			await expect.element(screen.getByText(OTHER_HINT)).not.toBeInTheDocument();
+		});
+
+		it('with a note being typed, Rechazar submits other with that note as the comment', async () => {
+			getAnnotationsSpy.mockResolvedValue([makeAnnotation({ id: 1, error_types: ['other'], created_at: '2026-01-01' })]);
+			rejectSpy.mockResolvedValue(makeRecord({ status: 'rejected' }));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+			await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+
+			await openNoteCard(screen);
+			await screen.getByPlaceholder('Agrega un comentario (opcional)...').fill('  página doblada  ');
+
+			await expect.element(screen.getByText(OTHER_HINT)).not.toBeInTheDocument();
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.poll(() => rejectSpy.mock.calls.length).toBe(1);
+			expect(rejectSpy).toHaveBeenCalledWith(1, { predefined_reason: 'other', comment: 'página doblada' });
+		});
+
+		it('with a saved note, Rechazar submits other with the newest saved note as the comment', async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 3, note: 'la más reciente', created_at: '2026-01-03' }),
+				makeAnnotation({ id: 2, note: 'una anterior', created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['other'], created_at: '2026-01-01' })
+			]);
+			rejectSpy.mockResolvedValue(makeRecord({ status: 'rejected' }));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+
+			await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeEnabled();
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.poll(() => rejectSpy.mock.calls.length).toBe(1);
+			expect(rejectSpy).toHaveBeenCalledWith(1, { predefined_reason: 'other', comment: 'la más reciente' });
+		});
+
+		it("the backend's 422 for other without a note is shown in the interface's words", async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 2, note: 'nota', created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['other'], created_at: '2026-01-01' })
+			]);
+			rejectSpy.mockRejectedValue(new ApiError('A rejection for other needs a comment', { detail: 'raw' }, 422));
+			const onRecordUpdated = vi.fn();
+			const screen = render(LeftSidebar, baseProps({ onRecordUpdated }));
+			await openAnnotationsTab(screen);
+
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.element(screen.getByText('No se pudo rechazar el registro: para rechazar por "Otro" hace falta una nota que describa el problema.')).toBeVisible();
+			await expect.element(screen.getByText('A rejection for other needs a comment')).not.toBeInTheDocument();
+			expect(onRecordUpdated).not.toHaveBeenCalled();
+		});
 	});
 });

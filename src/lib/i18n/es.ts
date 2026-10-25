@@ -532,6 +532,8 @@ export const es = {
 	col_reason_done: 'Listo',
 	col_reject_error: 'No se pudo rechazar el registro. Intenta de nuevo.',
 	col_reject_needs_reason: 'Debes seleccionar al menos un error.',
+	col_reject_other_needs_note: 'Para rechazar por "Otro" hace falta una nota. Describe el problema en Agregar nota.',
+	col_reject_other_note_error: 'No se pudo rechazar el registro: para rechazar por "Otro" hace falta una nota que describa el problema.',
 	col_review_approve_error: 'No se pudo aprobar el registro. Intenta de nuevo.',
 	// ── Envío a revisión (NEH-260) ──────────────────────────────────
 	col_handover_send: 'Enviar a revisión',
@@ -638,6 +640,9 @@ export const es = {
 	col_err_focus: 'Fuera de Foco',
 	col_err_exposure: 'Exposición',
 	col_err_debris: 'Impurezas en superficie',
+	col_err_framing: 'Encuadre',
+	col_err_obstruction: 'Obstrucción',
+	col_err_other: 'Otro',
 	col_tab_info: 'Información de la imagen',
 	col_tab_edit: 'Controles de previsualización',
 	col_tab_comments: 'Anotaciones',

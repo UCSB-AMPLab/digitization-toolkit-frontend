@@ -862,7 +862,11 @@ export interface Record {
 
 // The predefined rejection reasons, mirroring the backend's
 // PREDEFINED_REJECTION_REASONS and the annotation feature's error types.
-export const PREDEFINED_REJECTION_REASONS = ['blur', 'glare', 'shadow', 'focus', 'exposure', 'dirt'] as const;
+// `other` needs a comment saying what is wrong: the backend answers 422
+// without one.
+export const PREDEFINED_REJECTION_REASONS = [
+  'blur', 'glare', 'shadow', 'focus', 'exposure', 'dirt', 'framing', 'obstruction', 'other'
+] as const;
 export type PredefinedRejectionReason = (typeof PREDEFINED_REJECTION_REASONS)[number];
 
 export interface RejectRecordData {

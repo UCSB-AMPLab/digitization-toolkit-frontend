@@ -24,7 +24,7 @@
   // ============================================================================
 
   import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
-  import { recordsApi } from '$lib/api';
+  import { recordsApi, ApiError } from '$lib/api';
   import { m, locale } from '$lib/i18n';
   import { formatCount } from '$lib/format-count';
   import { REJECTION_REASONS } from '$lib/rejectionReasons';
@@ -111,6 +111,9 @@
     focus: $m.col_err_focus,
     exposure: $m.col_err_exposure,
     dirt: $m.col_err_debris,
+    framing: $m.col_err_framing,
+    obstruction: $m.col_err_obstruction,
+    other: $m.col_err_other,
   });
   const ERROR_TYPES = $derived(REJECTION_REASONS.map(r => ({ ...r, label: ERROR_LABELS[r.id] })));
 
@@ -234,6 +237,22 @@
     return null;
   });
 
+  // The comment sent with a formal rejection: the note being typed. For
+  // `other`, which the backend refuses without a comment (422), the newest
+  // saved note stands in when nothing is being typed, so a reviewer who
+  // saved the note with "Listo" can still reject.
+  let rejectionComment = $derived.by(() => {
+    const typed = noteText.trim();
+    if (typed || firstFlaggedReason !== 'other') return typed || undefined;
+    return annotations.find(a => a.note?.trim())?.note?.trim() || undefined;
+  });
+
+  // A formal rejection for `other` waits for a note; the button stays
+  // disabled and a hint says why. Undoing an approval sends no reason.
+  let rejectNeedsNote = $derived(
+    currentRecord?.status === 'in_review' && firstFlaggedReason === 'other' && !rejectionComment
+  );
+
   // Mensaje del popup de confirmación: depende de la acción pedida Y del
   // estado actual del registro — "Rechazar" sobre un 'approved' deshace la
   // aprobación (no es un rechazo formal), y lo mismo al revés (NEH-209).
@@ -317,7 +336,7 @@
   // error ya guardada — si falta, muestra un popup en vez de abrir el de
   // confirmación (deshacer una aprobación no lo necesita).
   function requestReject() {
-    if (!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting) return;
+    if (!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting || rejectNeedsNote) return;
     if (currentRecord.status === 'in_review' && firstFlaggedReason === null) {
       showNoReasonPopup = true;
       return;
@@ -373,7 +392,7 @@
         } else {
           await recordsApi.reject(recordId, {
             predefined_reason: firstFlaggedReason!,
-            comment: noteText.trim() || undefined,
+            comment: rejectionComment,
           });
           // Un registro rechazado ya no admite más anotaciones — colapsar
           // cualquier tarjeta que hubiera quedado abierta (el botón de
@@ -387,7 +406,11 @@
         await onRecordUpdated();
       } catch (err) {
         console.error('[LeftSidebar] Error rechazando el registro:', err);
-        reviewError = $m.col_reject_error;
+        // The backend answers 422 to `other` without a comment; its own
+        // message is not the interface's.
+        reviewError = err instanceof ApiError && err.status === 422 && firstFlaggedReason === 'other'
+          ? $m.col_reject_other_note_error
+          : $m.col_reject_error;
       } finally {
         isRejecting = false;
       }
@@ -863,6 +886,9 @@
                 {#if canReview && notReviewable}
                   <p class="review-hint">{$m.col_review_not_sent_hint}</p>
                 {/if}
+                {#if canReview && rejectNeedsNote}
+                  <p class="review-hint">{$m.col_reject_other_needs_note}</p>
+                {/if}
 
                 <div class="review-actions">
                   {#if currentRecord?.status === 'rejected' && canOperate}
@@ -876,7 +902,7 @@
                   {:else if canReview}
                     <button
                       class="btn-review reject"
-                      disabled={!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting}
+                      disabled={!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting || rejectNeedsNote}
                       onclick={requestReject}
                     >
                       <span class="material-symbols-outlined icon-sm">cancel</span>
