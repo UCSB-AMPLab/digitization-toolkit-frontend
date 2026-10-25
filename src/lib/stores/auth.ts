@@ -36,7 +36,6 @@ export interface AuthUser {
 interface AuthState {
   user: AuthUser | null;  // null = no session
   token: string | null;   // JWT access token
-  isLoading: boolean;     // set only through setLoading()
 }
 
 // The token and user are restored from localStorage. With a token present,
@@ -46,7 +45,6 @@ const initialState: AuthState = {
   // same one apiRequest() in api.ts reads on every request.
   token: tokenStore.get(),
   user: browser ? (() => { try { const u = localStorage.getItem('auth_user'); return u ? JSON.parse(u) : null; } catch { return null; } })() : null,
-  isLoading: false,
 };
 
 function createAuthStore() {
@@ -62,12 +60,7 @@ function createAuthStore() {
       if (browser) {
         localStorage.setItem('auth_user', JSON.stringify(user));
       }
-      update(state => ({
-        ...state,
-        token,
-        user,
-        isLoading: false,
-      }));
+      update(state => ({ ...state, token, user }));
     },
 
     // Replaces only the token (e.g. after /auth/refresh); the user does not
@@ -82,15 +75,7 @@ function createAuthStore() {
       if (browser) {
         localStorage.removeItem('auth_user');
       }
-      set({
-        user: null,
-        token: null,
-        isLoading: false,
-      });
-    },
-
-    setLoading(loading: boolean) {
-      update(state => ({ ...state, isLoading: loading }));
+      set({ user: null, token: null });
     },
 
     // For use outside Svelte components.
@@ -126,22 +111,8 @@ function createAuthStore() {
 
 export const authStore = createAuthStore();
 
-export const isAuthenticated = derived(
-  authStore,
-  $auth => $auth.token !== null
-);
-
-export const currentUser = derived(
-  authStore,
-  $auth => $auth.user
-);
-
 export const userRole = derived(
   authStore,
   $auth => $auth.user?.role ?? null
 );
 
-// Every role lands on `/dashboard`; the role argument is unused.
-export function getRoleDashboardPath(_role: UserRole): string {
-  return '/dashboard';
-};
