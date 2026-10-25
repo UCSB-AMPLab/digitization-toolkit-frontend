@@ -586,6 +586,7 @@ export const es = {
 	col_records_reload_error: 'El cambio se guardó, pero no se pudo actualizar la lista de registros. Recarga la página para ver el estado actual de los registros.',
 	col_recapture_btn: 'Recapturar imagen',
 	col_annotation_comment_placeholder: 'Agrega un comentario (opcional)...',
+	col_annotation_note_required_placeholder: 'Describe el problema (obligatorio para "Otro")...',
 	col_review_confirm_approve: '¿Confirmas que quieres aprobar esta imagen?',
 	col_review_confirm_reject: '¿Confirmas que quieres rechazar esta imagen?',
 	col_review_confirm_undo_approve: '¿Confirmas que quieres deshacer la aprobación de esta imagen?',

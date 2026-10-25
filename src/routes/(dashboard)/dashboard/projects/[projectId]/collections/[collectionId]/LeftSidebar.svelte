@@ -237,15 +237,14 @@
     return null;
   });
 
-  // The comment sent with a formal rejection: the note being typed. For
-  // `other`, which the backend refuses without a comment (422), the newest
-  // saved note stands in when nothing is being typed, so a reviewer who
-  // saved the note with "Listo" can still reject.
-  let rejectionComment = $derived.by(() => {
-    const typed = noteText.trim();
-    if (typed || firstFlaggedReason !== 'other') return typed || undefined;
-    return annotations.find(a => a.note?.trim())?.note?.trim() || undefined;
-  });
+  // The comment sent with a formal rejection, whatever the reason: the note
+  // being typed, or else the newest saved note (`annotations` is newest
+  // first). A reviewer who saved the note with "Listo" has emptied the
+  // textarea, and the note still goes with the rejection. The backend
+  // refuses `other` without a comment (422).
+  let rejectionComment = $derived(
+    noteText.trim() || annotations.find(a => a.note?.trim())?.note?.trim() || undefined
+  );
 
   // A formal rejection for `other` waits for a note; the button stays
   // disabled and a hint says why. Undoing an approval sends no reason.
@@ -851,7 +850,9 @@
                     <textarea
                       class="note-textarea"
                       bind:value={noteText}
-                      placeholder={$m.col_annotation_comment_placeholder}
+                      placeholder={firstFlaggedReason === 'other'
+                        ? $m.col_annotation_note_required_placeholder
+                        : $m.col_annotation_comment_placeholder}
                       disabled={!currentRecord}
                     ></textarea>
                     <button

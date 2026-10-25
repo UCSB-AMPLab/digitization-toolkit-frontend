@@ -557,6 +557,7 @@ export const en: Messages = {
 	col_records_reload_error: 'The change was saved, but the list of records could not be refreshed. Reload the page to see the records’ current state.',
 	col_recapture_btn: 'Recapture image',
 	col_annotation_comment_placeholder: 'Add a comment (optional)...',
+	col_annotation_note_required_placeholder: 'Describe the problem (required for "Other")...',
 	col_review_confirm_approve: 'Are you sure you want to approve this image?',
 	col_review_confirm_reject: 'Are you sure you want to reject this image?',
 	col_review_confirm_undo_approve: 'Are you sure you want to undo the approval of this image?',
