@@ -372,31 +372,6 @@
 		padding: 32px 24px 0;
 	}
 
-	.logo-circle {
-		width: 56px;
-		height: 56px;
-		border-radius: 50%;
-		background-color: var(--color-primary);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-shadow: 0 4px 16px rgba(90, 140, 98, 0.35);
-	}
-
-	.logo-icon {
-		width: 28px;
-		height: 28px;
-		filter: brightness(0) invert(1);
-	}
-
-	.system-name {
-		font-size: var(--text-lead);
-		font-weight: var(--fw-semibold);
-		color: var(--color-primary);
-		margin: 0;
-		text-align: center;
-	}
-
 	.setup-title {
 		font-size: var(--text-h5);
 		font-weight: var(--fw-bold);

@@ -507,6 +507,4 @@
     color: var(--color-light-grey);
     opacity: 0.3;
   }
-
-  .no-image span { font-size: var(--text-sm); }
 </style>

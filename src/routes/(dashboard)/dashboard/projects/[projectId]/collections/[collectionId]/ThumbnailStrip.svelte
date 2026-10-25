@@ -269,7 +269,4 @@
 
   .thumb-item.selected .thumb-name,
   .thumb-item:hover .thumb-name { color: var(--color-light); }
-
-  .spin { animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
 </style>

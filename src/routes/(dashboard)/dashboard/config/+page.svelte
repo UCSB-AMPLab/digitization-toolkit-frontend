@@ -765,41 +765,8 @@
   .page-title    { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
 
-  .btn-save {
-    display: flex; align-items: center; gap: 8px;
-    background-color: var(--color-primary); color: white;
-    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
-    border: none; border-radius: var(--radius-md);
-    padding: 9px 18px; min-height: var(--touch-target-min);
-    cursor: pointer; transition: background-color var(--transition-base); white-space: nowrap;
-  }
-
-  .btn-save:hover    { background-color: var(--color-primary-hover); }
-  .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
-
-  .spinner-sm {
-    width: 14px; height: 14px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .toast-success {
-    display: flex; align-items: center; gap: 8px;
-    padding: 12px 16px;
-    background-color: rgba(90,140,98,0.15);
-    border: 1px solid var(--color-primary);
-    border-radius: var(--radius-md);
-    color: var(--color-primary);
-    font-size: var(--text-sm); font-weight: var(--fw-semibold);
-    margin-bottom: 20px;
-    animation: fadeIn 0.3s ease;
-  }
-
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
   .config-section { margin-bottom: 32px; }
 
@@ -832,8 +799,6 @@
   }
 
   .config-row + .config-row { border-top: 1px solid var(--border-color); }
-
-  .toggle-row { min-height: 60px; }
 
   .row-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 
@@ -888,31 +853,6 @@
   }
 
   .section-divider { height: 1px; background-color: var(--border-color); }
-
-  /* Toggle switch */
-  .toggle {
-    width: 48px; height: 26px;
-    border-radius: var(--radius-full);
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    position: relative;
-    transition: background-color var(--transition-base), border-color var(--transition-base);
-    flex-shrink: 0;
-  }
-
-  .toggle.on { background-color: var(--color-primary); border-color: var(--color-primary); }
-
-  .toggle-knob {
-    position: absolute; top: 2px; left: 2px;
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    background-color: var(--color-light-grey);
-    transition: transform var(--transition-base), background-color var(--transition-base);
-    pointer-events: none;
-  }
-
-  .toggle-knob.on { transform: translateX(22px); background-color: white; }
 
   .info-note {
     display: flex; align-items: center; gap: 8px;

@@ -659,8 +659,6 @@
   .card-name { font-size: 11px; font-weight: var(--fw-bold); color: var(--color-light-grey); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; transition: color var(--transition-fast); }
   .grid-card:hover .card-name { color: var(--color-light); }
 
-  .card-status { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--color-light-grey); }
-
   .spin { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -672,8 +670,8 @@
   .modal-subtitle  { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; line-height: 1.5; }
   .modal-subtitle-sm { font-size: var(--text-xs); color: var(--color-light-grey); margin: 0; }
 
-
   .modal-actions { display: flex; gap: 12px; }
+
 
   .modal-btn { flex: 1; height: 44px; border-radius: var(--radius-md); font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold); cursor: pointer; transition: all var(--transition-base); border: 1px solid var(--border-color); }
   .modal-btn.cancel  { background-color: var(--color-surface); color: var(--color-light-grey); }

@@ -523,20 +523,6 @@
 		min-width: 0;
 		overflow: hidden;
 	}
-	.logo-name {
-		font-size: var(--text-base);
-		font-weight: var(--fw-black);
-		color: var(--color-light);
-		margin: 0;
-		white-space: nowrap;
-	}
-	.logo-role {
-		font-size: 11px;
-		color: var(--color-light-grey);
-		margin: 0;
-		text-transform: capitalize;
-		white-space: nowrap;
-	}
 
 	.collapse-btn {
 		width: 26px;

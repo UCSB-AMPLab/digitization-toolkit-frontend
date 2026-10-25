@@ -1261,12 +1261,6 @@
     color: var(--color-light-grey);
   }
 
-  .metadata-auto {
-    font-family: monospace;
-    font-size: 10px;
-    color: var(--color-light-grey);
-  }
-
   .floating-controls {
     position: absolute;
     top: 75px; right: 1px;
@@ -1390,37 +1384,6 @@
   .modal-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0 0 24px; }
 
   .modal-body   { display: flex; flex-direction: column; gap: 20px; margin-bottom: 24px; }
-  .modal-field  { display: flex; flex-direction: column; gap: 8px; }
-  .modal-label  { font-size: var(--text-sm); font-weight: var(--fw-semibold); color: var(--color-light); }
-
-  .slider-with-value { display: flex; align-items: center; gap: 12px; }
-
-  .modal-range {
-    flex: 1; height: 8px;
-    -webkit-appearance: none;
-    background-color: var(--color-surface-alt-2);
-    border-radius: var(--radius-full);
-    cursor: pointer;
-  }
-
-  .modal-range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    background-color: var(--color-primary);
-    cursor: pointer;
-  }
-
-  .range-value {
-    width: 40px; height: 40px;
-    background-color: var(--color-surface-alt-2);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: var(--fw-bold);
-    color: var(--color-light);
-    flex-shrink: 0;
-  }
 
   .modal-toggle-row {
     display: flex; align-items: center; justify-content: space-between;
@@ -1494,8 +1457,6 @@
     border: 1px solid var(--border-color);
   }
 
-  .modal-btn.cancel  { background-color: var(--color-surface); color: var(--color-light-grey); }
-  .modal-btn.cancel:hover { background-color: rgba(255,255,255,0.05); color: var(--color-light); }
   .modal-btn.confirm { background-color: var(--color-primary); color: white; border-color: var(--color-primary); box-shadow: 0 4px 12px rgba(90,140,98,0.3); }
   .modal-btn.confirm:hover { background-color: var(--color-primary-hover); }
 </style>

@@ -565,7 +565,6 @@
 
   .section { margin-bottom: 36px; }
   .section-title { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0 0 20px; }
-  .section-sub { font-size: var(--text-sm); font-weight: var(--fw-regular); color: var(--color-light-grey); margin-left: 8px; }
 
   .cameras-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 

@@ -194,11 +194,6 @@
     font-weight: var(--fw-bold);
   }
 
-  /* `.retake` sets the gold highlight color; no element in this component
-     uses the class. */
-  .tool-btn.retake { color: var(--color-highlight); }
-  .tool-btn.retake:hover { background-color: rgba(225,183,120,0.08); }
-
   .divider {
     width: 48px;
     height: 1px;
@@ -206,49 +201,4 @@
     margin: 12px auto;
     flex-shrink: 0;
   }
-
-  .modal-backdrop {
-    position: fixed; inset: 0;
-    background-color: rgba(0,0,0,0.65);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 24px;
-  }
-
-  .modal-card {
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 28px;
-    width: 100%;
-    max-width: 420px;
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .modal-title { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0; }
-  .modal-desc  { font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.6; margin: 0; }
-
-  .modal-actions { display: flex; gap: 12px; }
-
-  .modal-btn {
-    flex: 1; height: 44px;
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
-    cursor: pointer;
-    transition: all var(--transition-base);
-    border: 1px solid var(--border-color);
-  }
-
-  .modal-btn.cancel  { background-color: var(--color-surface); color: var(--color-light-grey); }
-  .modal-btn.cancel:hover  { color: var(--color-light); }
-  .modal-btn.confirm { background-color: var(--color-primary); color: white; border-color: var(--color-primary); }
-  .modal-btn.confirm:hover { background-color: var(--color-primary-hover); }
 </style>
