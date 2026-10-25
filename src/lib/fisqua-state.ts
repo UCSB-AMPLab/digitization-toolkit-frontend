@@ -65,6 +65,53 @@ export interface VolumeFisquaView {
 	configError: string | null;
 	/** The volume's other manifests, newest first. */
 	history: FisquaHistoryItem[];
+	/** Fisqua's `object-missing` refusal, an incident to investigate; null otherwise. */
+	incident: FisquaIncidentView | null;
+}
+
+/** One object a manifest named that Fisqua did not find in the masters bucket. */
+export interface FisquaMissingObject {
+	key: string;
+	captureId: string | null;
+	/** The role's label (left, right, single image), or the role as Fisqua gave it. */
+	role: string | null;
+}
+
+export interface FisquaIncidentView {
+	text: string;
+	missing: FisquaMissingObject[];
+}
+
+/**
+ * Contract §9.2: every object a manifest names must be in the masters bucket
+ * when it arrives; otherwise Fisqua refuses it (422) with this rule, one
+ * problem per missing key, with its captureId and role. Captua had verified
+ * those objects, so it is shown as an incident, not as Fisqua's message.
+ */
+const RULE_OBJECT_MISSING = 'object-missing';
+
+function roleLabel(role: unknown, msgs: Messages): string | null {
+	if (typeof role !== 'string' || !role) return null;
+	if (role === 'left') return msgs.col_role_left;
+	if (role === 'right') return msgs.col_role_right;
+	if (role === 'single') return msgs.fisqua_role_single;
+	return role;
+}
+
+function objectMissingIncident(problems: FisquaProblem[] | null | undefined, msgs: Messages): FisquaIncidentView | null {
+	if (!Array.isArray(problems)) return null;
+	const missing = problems.filter((p) => typeof p === 'object' && p !== null && p.rule === RULE_OBJECT_MISSING);
+	if (missing.length === 0) return null;
+	return {
+		text: msgs.fisqua_incident_object_missing,
+		missing: missing
+			.filter((p) => typeof p.key === 'string' && p.key)
+			.map((p) => ({
+				key: p.key as string,
+				captureId: typeof p.captureId === 'string' && p.captureId ? p.captureId : null,
+				role: roleLabel(p.role, msgs)
+			}))
+	};
 }
 
 /**
@@ -248,12 +295,20 @@ export function volumeFisquaView(
 	let label = msgs.fisqua_out_none;
 	let detail: string | null = null;
 	let problems: FisquaProblemView[] = [];
+	let incident: FisquaIncidentView | null = null;
 
 	if (current) {
 		({ kind, tone, label } = outboxLine(current, now, locale, msgs));
 		if (current.state === 'refused') {
-			problems =
-				current.refusal === 'fisqua' ? fisquaProblemViews(current.problems, msgs) : captuaProblemViews(current.problems, msgs);
+			if (current.refusal === 'fisqua') {
+				incident = objectMissingIncident(current.problems, msgs);
+				const others = Array.isArray(current.problems)
+					? current.problems.filter((p) => !(typeof p === 'object' && p !== null && p.rule === RULE_OBJECT_MISSING))
+					: null;
+				problems = fisquaProblemViews(others, msgs);
+			} else {
+				problems = captuaProblemViews(current.problems, msgs);
+			}
 		}
 		const status = fisqua.status;
 		// Fisqua's word on this manifest; one with no manifest id is its latest on the volume.
@@ -275,7 +330,7 @@ export function volumeFisquaView(
 	}
 
 	if (configError) tone = 'attention';
-	return { kind, tone, label, detail, problems, configError, history };
+	return { kind, tone, label, detail, problems, configError, history, incident };
 }
 
 export type UnitFisquaLevel = 'on' | 'off' | 'attention';

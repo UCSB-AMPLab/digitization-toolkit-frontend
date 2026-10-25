@@ -1072,6 +1072,9 @@ export const es = {
 	fisqua_problems: (n: number): string => (n === 1 ? '1 problema' : `${formatCount(n, 'es')} problemas`),
 	// El texto de Fisqua, tal como lo envió.
 	fisqua_problem_from_fisqua: (message: string): string => `Mensaje de Fisqua: ${message}`,
+	fisqua_incident_object_missing:
+		'Fisqua no encontró en la copia externa algunos archivos que Captua ya había verificado allí. Hay que investigarlo: avisa a quien administra el equipo para que revise la copia externa. Los archivos que faltan se listan abajo.',
+	fisqua_role_single: 'Imagen única',
 	fisqua_history: (n: number): string => `Envíos anteriores (${formatCount(n, 'es')})`,
 	fisqua_cfg_token:
 		'Fisqua no acepta el token configurado en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa a quien administra el equipo: tiene que corregir DTK_FISQUA_TOKEN y reiniciar Captua.',

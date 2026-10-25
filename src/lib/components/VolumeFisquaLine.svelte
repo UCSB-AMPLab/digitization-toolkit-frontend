@@ -34,6 +34,20 @@
 				{view.label}{#if view.detail}<span class="offsite-indicator-sep"> · </span>{view.detail}{/if}
 			</span>
 		</p>
+		{#if view.incident}
+			<div class="fisqua-incident" data-incident="object-missing">
+				<p>{view.incident.text}</p>
+				{#if view.incident.missing.length > 0}
+					<ul>
+						{#each view.incident.missing as file, i (i)}
+							<li>
+								<code>{file.key}</code>{#if file.role}<span class="fisqua-problem-records"> · {file.role}</span>{/if}{#if file.captureId}<span class="fisqua-problem-records"> · {file.captureId}</span>{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+		{/if}
 		{#if view.configError}
 			<p class="fisqua-config-error">{view.configError}</p>
 		{/if}

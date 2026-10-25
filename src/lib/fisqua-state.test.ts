@@ -133,6 +133,32 @@ describe('volumeFisquaView', () => {
 		]);
 	});
 
+	it("shows Fisqua's object-missing refusal as an incident, with each missing key", () => {
+		const problems = [
+			{ rule: 'object-missing', message: 'not in the masters bucket', key: 'rionegro/co-x/co-x_0001_L.jpg', captureId: 'cap-1', role: 'left' },
+			{ rule: 'object-missing', message: 'not in the masters bucket', key: 'rionegro/co-x/co-x_0002.jpg', captureId: 'cap-2', role: 'single' },
+			{ rule: 'run-started', message: 'A run has started.' }
+		];
+		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }), NOW, 'en', en)!;
+		expect(view.tone).toBe('attention');
+		expect(view.incident).toEqual({
+			text: en.fisqua_incident_object_missing,
+			missing: [
+				{ key: 'rionegro/co-x/co-x_0001_L.jpg', captureId: 'cap-1', role: en.col_role_left },
+				{ key: 'rionegro/co-x/co-x_0002.jpg', captureId: 'cap-2', role: en.fisqua_role_single }
+			]
+		});
+		// The other rules stay Fisqua's messages; object-missing is not repeated among them.
+		expect(view.problems).toEqual([{ text: en.fisqua_problem_from_fisqua('A run has started.'), records: null, fromFisqua: true }]);
+	});
+
+	it('has no incident for other Fisqua refusals', () => {
+		const problems = [{ rule: 'id-reused', message: 'taken' }];
+		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems })] }), NOW, 'en', en)!;
+		expect(view.incident).toBeNull();
+		expect(view.problems).toEqual([{ text: en.fisqua_problem_from_fisqua('taken'), records: null, fromFisqua: true }]);
+	});
+
 	it('shows a delivered manifest with no status yet as waiting for its status', () => {
 		const view = volumeFisquaView(fisqua({ outbox: [delivered] }), NOW, 'en', en)!;
 		expect(view.kind).toBe('delivered');

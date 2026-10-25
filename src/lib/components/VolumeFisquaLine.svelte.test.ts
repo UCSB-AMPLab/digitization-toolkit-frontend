@@ -134,6 +134,26 @@ describe('VolumeFisquaLine', () => {
 		const item = screen.container.querySelector('.fisqua-problems li') as HTMLElement;
 		expect(item.textContent).toContain(es.fisqua_problem_from_fisqua('A run has started on the older manifest.'));
 		expect(item.dataset.source).toBe('fisqua');
+		expect(screen.container.querySelector('[data-incident]')).toBeNull();
+	});
+
+	it("shows Fisqua's object-missing refusal as an incident listing each key", async () => {
+		const problems = [
+			{ rule: 'object-missing', message: 'x', key: 'rionegro/co-x/co-x_0001_L.jpg', captureId: 'cap-1', role: 'left' },
+			{ rule: 'object-missing', message: 'x', key: 'rionegro/co-x/co-x_0001_R.jpg', captureId: 'cap-1', role: 'right' }
+		];
+		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })] })));
+		const incident = screen.container.querySelector('[data-incident="object-missing"]') as HTMLElement;
+		expect(incident).not.toBeNull();
+		expect(incident.textContent).toContain(es.fisqua_incident_object_missing);
+		const items = [...incident.querySelectorAll('li')].map((li) => li.textContent ?? '');
+		expect(items).toHaveLength(2);
+		expect(items[0]).toContain('rionegro/co-x/co-x_0001_L.jpg');
+		expect(items[0]).toContain('cap-1');
+		expect(items[0]).toContain(es.col_role_left);
+		expect(items[1]).toContain(es.col_role_right);
+		expect(screen.container.querySelector('[data-fisqua]')!.classList.contains('fisqua-attention')).toBe(true);
+		expect(screen.container.querySelector('.fisqua-problems')).toBeNull();
 	});
 
 	it('warns that sending is stopped while Fisqua refuses the configuration', async () => {

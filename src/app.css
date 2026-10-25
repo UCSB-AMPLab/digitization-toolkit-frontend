@@ -1462,6 +1462,16 @@ tr:hover .drag-handle { opacity: 1; }
   color: var(--color-light);
 }
 .fisqua-problem-records { color: var(--color-light-grey); }
+/* Fisqua's object-missing refusal: an incident, in the warning colour. */
+.fisqua-incident {
+  max-width: 68ch;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-warning);
+}
+.fisqua-incident p { margin: 0; }
+.fisqua-incident ul { margin: 4px 0 0; padding-left: 18px; color: var(--color-light); }
+.fisqua-incident code { overflow-wrap: anywhere; }
 
 /* ── Volume view: freeing space on the card and restoring (NEH-248) ──
    The admin's button beside the breadcrumb, and its dialog. */
