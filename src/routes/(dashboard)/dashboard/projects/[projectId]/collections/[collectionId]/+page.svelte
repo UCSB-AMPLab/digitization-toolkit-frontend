@@ -11,7 +11,7 @@
   //   ListView.svelte         → vista de lista de registros
   //   ImageViewer.svelte      → visor en modo spread
   //   ImageViewerModal.svelte → modal de inspección (desde ListView)
-  //   GridView.svelte         → vista cuadrícula (con Filtros/Renombrar/Finalizar)
+  //   GridView.svelte         → vista cuadrícula (con Filtros/Renumerar)
   //   RightToolbar.svelte     → toolbar flotante derecha
   //   ThumbnailStrip.svelte   → tira de miniaturas inferior (solo en spread)
   // ============================================================================
@@ -81,12 +81,6 @@
 
   // Registro inspeccionado en el modal (desde ListView)
   let inspectedRecord = $state<Record | null>(null);
-
-  // Estado de finalización
-  let isFinalized = $state(false);
-
-  // Trigger para abrir el modal de finalización dentro de GridView
-  let triggerFinalizeModal = $state(false);
 
   // ---------------------------------------------------------------------------
   // AL MONTAR
@@ -230,17 +224,6 @@
     } finally {
       inspectedRecord = null;
     }
-  }
-
-  // GridView confirmó la finalización
-  function handleFinalized() {
-    isFinalized = true;
-    triggerFinalizeModal = false;
-  }
-
-  // GridView canceló o cerró el modal sin finalizar
-  function handleFinalizeModalClosed() {
-    triggerFinalizeModal = false;
   }
 
   // BagIt export
@@ -478,11 +461,8 @@
         <GridView
           {records}
           {collectionId}
-          {triggerFinalizeModal}
           onRecordsUpdate={loadRecords}
           onReorderNotice={(n) => (reorderNotice = n)}
-          onFinalized={handleFinalized}
-          onFinalizeModalClosed={handleFinalizeModalClosed}
           onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
         />
 

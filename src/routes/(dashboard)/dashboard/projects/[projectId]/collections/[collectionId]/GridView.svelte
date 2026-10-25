@@ -3,13 +3,7 @@
   // COMPONENTE: GridView
   // Archivo: src/routes/gallery/[collectionId]/GridView.svelte
   //
-  // Vista de cuadrícula. El botón "Finalizar" NO está aquí —
-  // vive en el TopBar y +page.svelte lo controla.
-  //
-  // Este componente recibe `triggerFinalizeModal` como prop:
-  //   - Cuando se pone true (TopBar pulsó Finalizar), abre el modal
-  //   - Cuando el usuario confirma → llama onFinalized()
-  //   - Cuando cancela → llama onFinalizeModalClosed()
+  // Vista de cuadrícula.
   //
   // TOOLBAR:
   //   [Filtros | Renumerar]      [🖐 Reordenar / Listo]  [slider ──●──]
@@ -18,7 +12,7 @@
   //   izquierda (2) = cards grandes | derecha (6) = cards pequeñas
   //
   // TOOLBAR SUPERIOR:
-  //   Filtros | Renumerar           [Reordenar 🖐 ──●── ] [Finalizar]
+  //   Filtros | Renumerar           [Reordenar 🖐 ──●── ]
   //
   //   - Filtros     → panel de filtros por estado
   //   - Renumerar   → numera los registros desde 1 en el orden actual (no renombra archivos)
@@ -27,7 +21,6 @@
   //   - Slider      → controla el número de columnas del grid
   //                   izquierda = menos columnas (cards más grandes)
   //                   derecha   = más columnas (cards más pequeñas)
-  //   - Finalizar   → botón en el TopBar (pasado como prop desde +page.svelte)
   //
   // REORDENAMIENTO:
   //   Actualmente es visual (las tarjetas muestran el ícono de mano).
@@ -50,19 +43,13 @@
   let {
     records,
     collectionId,
-    triggerFinalizeModal,
     onRecordsUpdate,
-    onFinalized,
-    onFinalizeModalClosed,
     onRecordClick,
     onReorderNotice,
   }: {
     records: Record[];
     collectionId: number;
-    triggerFinalizeModal: boolean;
     onRecordsUpdate: () => void;
-    onFinalized: () => void;
-    onFinalizeModalClosed: () => void;
     // Mismo patrón que ListView: click en una tarjeta (simple o par L/R) va
     // al Book view (spread) de ese registro — el spread ya muestra L y R
     // juntos, así que no hace falta lógica especial para el caso de par.
@@ -101,17 +88,6 @@
   let showRenumberModal = $state(false);
   let renumbering       = $state(false);
   let renumberError     = $state<string | null>(null);
-
-  // Modal de Finalizar (controlado por el prop triggerFinalizeModal)
-  let isFinalizing = $state(false);
-
-  // ---------------------------------------------------------------------------
-  // REACTIVIDAD: el prop triggerFinalizeModal abre el modal cuando se pone true
-  // ---------------------------------------------------------------------------
-  $effect(() => {
-    // No hay nada que hacer aquí porque el modal se controla directamente
-    // con la expresión {#if triggerFinalizeModal} en el template
-  });
 
   // ---------------------------------------------------------------------------
   // DERIVADOS
@@ -226,22 +202,6 @@
     if (renumbering) return; // no cerrar mientras la operación está en curso
     showRenumberModal = false;
     renumberError = null;
-  }
-
-  async function handleConfirmFinalize() {
-    isFinalizing = true;
-    try {
-      // TODO: await collectionsApi.finalize(collectionId);
-      onFinalized();  // notifica al padre (+page.svelte)
-    } catch (err) {
-      console.error('[GridView] Error finalizando:', err);
-    } finally {
-      isFinalizing = false;
-    }
-  }
-
-  function handleCancelFinalize() {
-    onFinalizeModalClosed();  // notifica al padre para resetear el trigger
   }
 </script>
 
@@ -495,42 +455,6 @@
           <button class="modal-btn cancel" onclick={handleCloseRenumberModal}>{$m.common_cancel}</button>
           <button class="modal-btn confirm" onclick={handleConfirmRenumber}>{$m.col_renumber}</button>
         {/if}
-      </div>
-    </div>
-  </div>
-{/if}
-
-<!-- ============================================================
-     MODAL: Finalizar proyecto
-     Se abre cuando triggerFinalizeModal = true (desde el TopBar via +page.svelte)
-     ============================================================ -->
-{#if triggerFinalizeModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) handleCancelFinalize(); }}>
-    <div class="modal-card">
-      <div class="finalize-header">
-        <div class="finalize-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
-        </div>
-        <div>
-          <h3 class="modal-title">{$m.col_finalize_title}</h3>
-          <p class="modal-subtitle-sm">{$m.col_finalize_subtitle}</p>
-        </div>
-      </div>
-      <p class="modal-desc">
-        {$m.col_finalize_p1}<strong>{$m.col_finalize_bold}</strong>{$m.col_finalize_p2}
-      </p>
-      <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={handleCancelFinalize} disabled={isFinalizing}>
-          {$m.common_cancel}
-        </button>
-        <button class="modal-btn confirm" onclick={handleConfirmFinalize} disabled={isFinalizing}>
-          {isFinalizing ? $m.col_finalizing : $m.col_finalize_btn}
-        </button>
       </div>
     </div>
   </div>
@@ -821,11 +745,7 @@
   .modal-title     { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0; }
   .modal-subtitle  { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; line-height: 1.5; }
   .modal-subtitle-sm { font-size: var(--text-xs); color: var(--color-light-grey); margin: 0; }
-  .modal-desc      { font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.6; margin: 0; }
-  .modal-desc strong { color: var(--color-light); }
 
-  .finalize-header { display: flex; align-items: center; gap: 12px; }
-  .finalize-icon { width: 44px; height: 44px; border-radius: 50%; background-color: var(--color-highlight); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
   .modal-actions { display: flex; gap: 12px; }
 
