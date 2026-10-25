@@ -776,6 +776,8 @@ export const es = {
 		'Ningún registro en revisión o aprobado tiene imágenes, así que Fisqua no tiene páginas que registrar. Envía a revisión registros con imágenes.',
 	col_manifest_rule_no_reference_code:
 		'El volumen no tiene código de referencia en Fisqua, así que Captua no lo envía a Fisqua. Avisa a quien administra el equipo: tiene que asignarle al volumen su código de referencia. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
+	col_manifest_rule_reference_code_differs:
+		'El código de referencia del volumen en Fisqua no coincide con su raíz, así que Captua no lo envía a Fisqua. El código de referencia no se puede cambiar desde aquí: avisa a quien administra el equipo para que haga coincidir el código de referencia con la raíz. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
 	col_manifest_rule_other: 'Fisqua rechazaría el archivo por otro motivo.',
 	col_manifest_err_title: 'No se pudo descargar el manifiesto de captura',
 	col_manifest_err_not_found: 'Captua no encontró este volumen. Vuelve al proyecto y ábrelo de nuevo.',

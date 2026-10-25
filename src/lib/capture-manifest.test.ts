@@ -102,10 +102,13 @@ describe('captureManifestRefusal', () => {
 		}
 	});
 
-	it("has a catalogue text for the outbox's no_reference_code, in both languages", () => {
+	it.each([
+		['no_reference_code', 'col_manifest_rule_no_reference_code'],
+		['reference_code_differs', 'col_manifest_rule_reference_code_differs']
+	] as const)("has a catalogue text for the outbox's %s, in both languages", (rule, key) => {
 		for (const msgs of [en, es]) {
-			const view = captureManifestRefusal(refused([{ rule: 'no_reference_code', message: 'x', record_ids: [], image_ids: [] }]), msgs)!;
-			expect(view.problems[0].text).toBe(msgs.col_manifest_rule_no_reference_code);
+			const view = captureManifestRefusal(refused([{ rule, message: 'x', record_ids: [], image_ids: [] }]), msgs)!;
+			expect(view.problems[0].text).toBe(msgs[key]);
 		}
 	});
 

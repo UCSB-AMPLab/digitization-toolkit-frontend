@@ -746,6 +746,8 @@ export const en: Messages = {
 		'No record sent for review or approved has an image, so Fisqua has no page to register. Send records with images for review.',
 	col_manifest_rule_no_reference_code:
 		'The volume has no Fisqua reference code, so Captua does not send it to Fisqua. Ask whoever manages the scanner to give the volume its reference code, then withdraw the volume from review and send it for review again.',
+	col_manifest_rule_reference_code_differs:
+		"The volume's Fisqua reference code differs from its stem, so Captua does not send it to Fisqua. The reference code cannot be changed here: ask whoever manages the scanner to make the reference code and the stem agree, then withdraw the volume from review and send it for review again.",
 	col_manifest_rule_other: 'Fisqua would refuse the file for another reason.',
 	col_manifest_err_title: 'Could not download the capture manifest',
 	col_manifest_err_not_found: 'Captua could not find this volume. Go back to the project and open it again.',

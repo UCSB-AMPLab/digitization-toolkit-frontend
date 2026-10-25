@@ -113,6 +113,12 @@ describe('volumeFisquaView', () => {
 		expect(JSON.stringify(view)).not.toContain('it is not sent');
 	});
 
+	it('lists a refusal for a reference code that differs from the stem', () => {
+		const problems = [{ rule: 'reference_code_differs', message: 'differs', record_ids: [], image_ids: [] }];
+		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'not_exportable', problems })] }), NOW, 'en', en)!;
+		expect(view.problems).toEqual([{ text: en.col_manifest_rule_reference_code_differs, records: null, fromFisqua: false }]);
+	});
+
 	it("lists a refusal by Fisqua in Fisqua's own words, marked as Fisqua's", () => {
 		const problems = [
 			{ rule: 'run-started', message: 'A run has started on the older manifest.', recordIds: [1] },
