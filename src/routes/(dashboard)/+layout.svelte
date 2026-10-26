@@ -19,6 +19,8 @@
 	import favicon from '$lib/assets/favicon-light.svg';
 	import BugReportButton from '$lib/bug-report/BugReportButton.svelte';
 	import CatalogueBackupIndicator from '$lib/components/CatalogueBackupIndicator.svelte';
+	import PowerControl from '$lib/components/PowerControl.svelte';
+	import type { PowerAction } from '$lib/api';
 
 	let { children } = $props();
 
@@ -206,6 +208,14 @@
 		return currentPath.startsWith(path);
 	}
 
+	// The confirmation and the blocking state live in PowerControl, rendered
+	// once below; the sidebar only renders the two buttons that open it.
+	let power = $state<ReturnType<typeof PowerControl> | undefined>(undefined);
+
+	function askPower(action: PowerAction) {
+		power?.ask(action);
+	}
+
 	function handleLogout() {
 		authStore.clearSession();
 		goto('/');
@@ -259,6 +269,10 @@
 			</button>
 		</div>
 
+		<!-- Navigation, backup status and footer scroll together: at 800x480 the
+		     footer alone is taller than the space left under the header, so a
+		     scrolling nav above a fixed footer would push sign-out off the screen. -->
+		<div class="s-scroll">
 		<nav class="s-nav">
 			{#each visibleNav as section}
 				{#if expanded}
@@ -387,6 +401,28 @@
 
 			<BugReportButton {expanded} />
 
+			<!-- Operators and reviewers have no Settings page, and the avatar menu
+			     exists only on the capture and volume screens, so the sidebar is
+			     where they shut down or restart from the dashboard (NEH-189). Same
+			     icons and labels as the avatar menu. -->
+			<button class="help-btn power-btn" onclick={() => askPower('poweroff')} title={$m.config_shutdown_label} aria-label={$m.config_shutdown_label}>
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+					<path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+					<line x1="12" y1="2" x2="12" y2="12" />
+				</svg>
+				{#if expanded}<span class="help-btn-label">{$m.config_shutdown_label}</span>{/if}
+			</button>
+
+			<button class="help-btn power-btn" onclick={() => askPower('reboot')} title={$m.config_reboot_label} aria-label={$m.config_reboot_label}>
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+					<polyline points="23 4 23 10 17 10" />
+					<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+				</svg>
+				{#if expanded}<span class="help-btn-label">{$m.config_reboot_label}</span>{/if}
+			</button>
+
+			<PowerControl bind:this={power} />
+
 			<button class="logout-btn" onclick={handleLogout} title={$m.nav_logout}>
 				<svg
 					width="15"
@@ -402,6 +438,7 @@
 				</svg>
 				{#if expanded}<span>{$m.nav_logout}</span>{/if}
 			</button>
+		</div>
 		</div>
 	</aside>
 
@@ -550,14 +587,25 @@
 	}
 
 	/* Nav */
-	.s-nav {
+	.s-scroll {
 		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow-y: auto;
+		overflow-x: hidden;
+	}
+
+	.s-scroll::-webkit-scrollbar {
+		width: 0;
+	}
+
+	.s-nav {
+		flex: 1 0 auto;
 		padding: 8px 6px;
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
-		overflow-y: auto;
-		overflow-x: hidden;
 	}
 
 	.sidebar:not(.expanded) .s-header {
@@ -577,10 +625,6 @@
 	.sidebar:not(.expanded) .collapse-btn:hover {
 		opacity: 1;
 		background: none;
-	}
-
-	.s-nav::-webkit-scrollbar {
-		width: 0;
 	}
 
 	.s-section-title {
@@ -749,6 +793,9 @@
 	}
 	.help-btn:hover { color: var(--color-light); background-color: rgba(255,255,255,0.05); }
 	.help-btn-label { flex: 1; text-align: left; }
+	/* Help's bottom margin separates it from the bug report; the power buttons
+	   sit in the same group as sign-out and use only the footer's gap. */
+	.power-btn { margin-bottom: 0; }
 
 	.logout-btn {
 		display: flex;
