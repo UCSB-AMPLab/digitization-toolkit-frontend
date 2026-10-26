@@ -105,11 +105,11 @@
     min-height: 0;
     max-height: 100%;
     overflow-y: auto;
-    line-height: 1.5;
+    line-height: 1.4;
   }
   /* app.css sets a size on every p, so the paragraphs take it explicitly. */
   .body p { margin: 0 0 calc(12 * var(--u)); font-size: calc(16 * var(--u)); }
-  .body .muted { color: var(--color-light-grey); }
+  .body .muted { font-size: calc(13 * var(--u)); color: var(--color-light-grey); }
 
   .scan {
     display: flex;
