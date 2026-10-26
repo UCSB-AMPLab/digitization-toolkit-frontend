@@ -1,6 +1,8 @@
 // Configuración → Energía after the move to PowerControl (NEH-189): the
 // buttons open the shared confirmation, and a failure is still shown inside
 // the Power card rather than in a dialog.
+//
+// Version: 0.1.0-beta
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

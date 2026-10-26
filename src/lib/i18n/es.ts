@@ -12,6 +12,8 @@
 //     entry, never in the component.
 //   - Text that is the same in every language (brand names, acronyms, units)
 //     is not catalogued: it stays in the component.
+//
+// Version: 0.1.0-beta
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';

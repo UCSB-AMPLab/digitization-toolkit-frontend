@@ -4,6 +4,8 @@
   // and edits a project (name, description, fondo, serie, signatura); the
   // delete modal can move the project's volumes to another project first.
   // The Status column shows placeholder values (see `mockStatuses`).
+  //
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';

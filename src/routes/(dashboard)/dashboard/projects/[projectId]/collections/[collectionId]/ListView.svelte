@@ -5,6 +5,8 @@
   //
   // A row click opens the record in book view (onRecordClick, handled by
   // the page), not in a modal.
+  //
+  // Version: 0.1.0-beta
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m, locale } from '$lib/i18n';

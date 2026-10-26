@@ -12,6 +12,8 @@
 	// incident, problems or notes, earlier sends), the line is a button that
 	// opens a panel under it, with a height cap and its own scroll. The panel
 	// follows UserMenu: it closes on Escape and on a touch or click outside.
+	//
+	// Version: 0.1.0-beta
 	import { m, locale } from '$lib/i18n';
 	import type { VolumeFisquaState } from '$lib/api';
 	import { volumeFisquaView, type FisquaTone } from '$lib/fisqua-state';

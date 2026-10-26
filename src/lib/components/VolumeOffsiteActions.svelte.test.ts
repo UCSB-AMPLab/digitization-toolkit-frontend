@@ -1,6 +1,8 @@
 // NEH-248: the admin's free and restore actions for a volume — which are
 // offered, the dry run before a free, the confirmations, the polling of the
 // job, and what is reported.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

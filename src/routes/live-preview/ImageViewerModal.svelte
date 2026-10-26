@@ -3,6 +3,8 @@
   // retake the record. Images are ordered left before right, with an L/R badge
   // in `double` mode. Retake asks for confirmation, and the modal cannot be
   // closed while the replacement capture runs.
+  //
+  // Version: 0.1.0-beta
 
   import { type Record as ApiRecord } from '$lib/api';
   import { m } from '$lib/i18n';

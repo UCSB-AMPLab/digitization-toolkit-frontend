@@ -5,6 +5,8 @@
   // filename stem rules (see `VolumeStemField`); the delete modal moves a
   // volume's records to another volume first when it has any. The Status
   // column shows placeholder values (see `mockStatuses`).
+  //
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { m, roleLabel, locale } from '$lib/i18n';

@@ -6,6 +6,8 @@
 // happens the opposite side is tried before giving up.
 //
 // Pure, so that the placement can be tested without a browser.
+//
+// Version: 0.1.0-beta
 
 export type TourSide = 'top' | 'bottom' | 'left' | 'right';
 

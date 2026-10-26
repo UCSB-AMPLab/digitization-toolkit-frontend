@@ -4,6 +4,8 @@
 // node_modules at runtime, so a page that imports one returns 500 whenever it is
 // rendered on the server. Every package belongs in devDependencies, which the
 // build bundles.
+//
+// Version: 0.1.0-beta
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 

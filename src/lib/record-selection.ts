@@ -3,6 +3,8 @@
 // change in what is freed of the volume (NEH-248), keeps the record being
 // read when it is still in the volume. With no records the selection is left
 // as it was, as the page has always done.
+//
+// Version: 0.1.0-beta
 
 export function selectionAfterLoad(
 	records: ReadonlyArray<{ id: number }>,

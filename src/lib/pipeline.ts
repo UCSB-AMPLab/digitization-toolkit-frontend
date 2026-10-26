@@ -7,6 +7,8 @@
 // one captured record is still "en captura" however many of its other records
 // are approved, and only a volume whose every record is approved is done.
 // ============================================================================
+//
+// Version: 0.1.0-beta
 
 import type { CollectionActivity, StatusCounts } from '$lib/api';
 

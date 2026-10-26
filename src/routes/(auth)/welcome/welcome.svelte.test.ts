@@ -1,5 +1,7 @@
 // The welcome splash offers both languages whatever the current one is. Each
 // button sets its language and then goes where the setup status says.
+//
+// Version: 0.1.0-beta
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';

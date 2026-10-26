@@ -3,6 +3,8 @@
   // `(dashboard)/+layout.svelte` redirects every other role. Search and
   // filters run client-side over the full list. Editing a user changes only
   // the role and the active flag; username and email are fixed at creation.
+  //
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { usersApi, type UserRead } from '$lib/api';

@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import type { Handle } from '@sveltejs/kit';
 import { localeFromCookies } from '$lib/i18n';
 

@@ -1,4 +1,6 @@
 <script lang="ts">
+  // Version: 0.1.0-beta
+
   import { m } from '$lib/i18n';
   // Toolbar on the right edge of the volume gallery, shown in every view mode.
   // It holds the view-mode switch (list, spread, grid); the zoom controls appear

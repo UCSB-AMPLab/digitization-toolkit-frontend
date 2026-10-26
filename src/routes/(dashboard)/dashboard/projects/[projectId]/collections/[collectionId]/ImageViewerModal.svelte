@@ -2,6 +2,8 @@
   // Inspection modal for one record in the gallery: shows all of the record's
   // images (with an L/R badge on a two-camera capture) under one shared
   // pan and zoom, and offers retake and delete within the record's lock.
+  //
+  // Version: 0.1.0-beta
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';

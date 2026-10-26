@@ -1,4 +1,6 @@
 <script lang="ts">
+  // Version: 0.1.0-beta
+
   import type { Record as ApiRecord } from '$lib/api';
   import { m, locale } from '$lib/i18n';
   import { formatCount } from '$lib/format-count';

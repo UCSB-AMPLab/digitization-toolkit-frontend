@@ -16,6 +16,8 @@
 	// (the layout keys it by volume) stops the polling too, and every call of
 	// onChanged names the volume its job was started for.
 	// ============================================================================
+	//
+	// Version: 0.1.0-beta
 
 	import { tick } from 'svelte';
 	import { collectionsApi, type FreePlan, type OffsiteJobResult, type VolumeOffsiteState } from '$lib/api';

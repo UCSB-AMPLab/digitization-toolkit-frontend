@@ -6,6 +6,8 @@
 	// latest answer of GET /system/catalogue-backup at the current time, or
 	// "could not check" when the request failed, timed out or could not be
 	// refreshed, never a guessed state (NEH-138).
+	//
+	// Version: 0.1.0-beta
 	import { m, locale } from '$lib/i18n';
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
 	import {

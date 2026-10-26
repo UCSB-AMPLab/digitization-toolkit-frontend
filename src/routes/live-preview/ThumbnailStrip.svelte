@@ -9,6 +9,8 @@
   // frame surrounds the whole folio rather than each half. In `single` mode
   // each record shows its first image; in `double` mode both images of the
   // folio sit together with an L/R badge.
+  //
+  // Version: 0.1.0-beta
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';

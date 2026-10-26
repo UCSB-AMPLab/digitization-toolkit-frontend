@@ -9,6 +9,8 @@
 //
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`), as login-error.ts does.
+//
+// Version: 0.1.0-beta
 
 import type { Messages } from './i18n';
 

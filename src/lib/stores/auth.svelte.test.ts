@@ -3,6 +3,8 @@
 // in sync). These tests pin authStore's session methods to actually delegate
 // to tokenStore — the single store of record — so a future change can't
 // silently reintroduce the divergence.
+//
+// Version: 0.1.0-beta
 import { afterEach, describe, expect, it } from 'vitest';
 import { authStore } from './auth';
 import { tokenStore } from './token';

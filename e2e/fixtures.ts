@@ -10,6 +10,8 @@
 // one were dropped on a reused connection, and none with Connection: close.
 // The browser's own requests are left as they are; no failure in them has
 // been traced to this.
+//
+// Version: 0.1.0-beta
 import { test as base } from '@playwright/test';
 
 export const test = base.extend({

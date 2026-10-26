@@ -1,5 +1,7 @@
 // The dashboard's activity calendar: the client call, the two views, the
 // day line, keyboard navigation and the error state.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';

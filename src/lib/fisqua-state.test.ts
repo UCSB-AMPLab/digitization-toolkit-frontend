@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
 import { en } from './i18n/en';

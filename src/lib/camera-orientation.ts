@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import type { CameraDevice } from './api';
 
 // Default clockwise capture rotation (degrees). Most digitisation rigs use

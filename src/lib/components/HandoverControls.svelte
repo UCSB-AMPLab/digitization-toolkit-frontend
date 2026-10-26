@@ -7,6 +7,8 @@
   // Shown to operators and admins only; the backend refuses both calls to
   // anyone else (allow_contributor in collections.py).
   // ============================================================================
+  //
+  // Version: 0.1.0-beta
 
   import { tick } from 'svelte';
   import { collectionsApi, type Record } from '$lib/api';

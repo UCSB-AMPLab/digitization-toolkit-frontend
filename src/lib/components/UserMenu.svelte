@@ -5,6 +5,8 @@
   // down or restart the unit (NEH-189). The entries, the closing rules and the
   // power confirmation are AccountMenu's, which the dashboard sidebar's user
   // row opens too; this file adds the avatar trigger and the identity header.
+  //
+  // Version: 0.1.0-beta
 
   import { authStore } from '$lib/stores/auth';
   import { roleLabel } from '$lib/i18n';

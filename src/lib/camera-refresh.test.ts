@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { describe, expect, it, vi } from 'vitest';
 import { createCameraRefresh } from './camera-refresh';
 

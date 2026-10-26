@@ -3,6 +3,8 @@
 // whether it succeeded or failed (NEH-166).
 //
 // Kept free of api.ts (like login-error.ts) so this stays a plain node test.
+//
+// Version: 0.1.0-beta
 
 import type { Messages } from './i18n';
 

@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { afterEach, describe, expect, it } from 'vitest';
 import { tokenStore } from './token';
 

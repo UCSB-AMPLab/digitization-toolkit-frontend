@@ -2,6 +2,8 @@
 // — it steps from the `rotateDeg` prop and only reports the change up via
 // onRotateDegChange, so it can never go stale relative to LiveViewport's
 // rotate overlay (both write through the same page-level state).
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

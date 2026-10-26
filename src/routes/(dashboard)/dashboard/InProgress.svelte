@@ -11,6 +11,8 @@
   // KPIs; this component loads the per-volume status counts itself from
   // GET /activity/collections.
   // ============================================================================
+  //
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';

@@ -7,6 +7,8 @@
   // (NEH-139) picks what each format can show: a RAW appears as its JPEG preview,
   // a TIFF only as its thumbnail, and any image falls back to its thumbnail when
   // the preview fails.
+  //
+  // Version: 0.1.0-beta
 
   import { type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';

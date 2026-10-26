@@ -1,4 +1,6 @@
 // Which API base applies in the browser and in server-side rendering.
+//
+// Version: 0.1.0-beta
 import { describe, expect, it } from 'vitest';
 import { resolveApiBase } from './api-base';
 

@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import type { CameraDevice } from '$lib/api';
 
 export type SideStatus = 'ok' | 'not-found';

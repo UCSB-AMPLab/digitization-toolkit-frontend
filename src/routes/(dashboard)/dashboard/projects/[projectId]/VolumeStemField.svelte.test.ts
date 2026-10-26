@@ -1,5 +1,7 @@
 // The volume form's "Raíz" field: validation as the operator types, and the
 // read-only state with its reason once the stem is reserved.
+//
+// Version: 0.1.0-beta
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

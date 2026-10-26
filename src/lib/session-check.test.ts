@@ -1,4 +1,6 @@
 // NEH-219: an unreachable backend must never count as a rejected session.
+//
+// Version: 0.1.0-beta
 import { describe, expect, it, vi } from 'vitest';
 import {
 	abortableSleep,

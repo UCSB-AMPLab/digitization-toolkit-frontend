@@ -1,6 +1,8 @@
 // NEH-230: the gallery inspection modal gains fit/1:1 zoom controls (it had
 // none before — a plain <img> with no zoom at all), and drag-to-pan on the
 // image itself.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

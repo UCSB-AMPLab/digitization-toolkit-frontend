@@ -5,6 +5,8 @@
 // in both languages. A no-break space keeps the number with its unit.
 //
 // No import of the catalogue index, which imports the catalogues.
+//
+// Version: 0.1.0-beta
 
 type ByteLocale = 'es' | 'en';
 

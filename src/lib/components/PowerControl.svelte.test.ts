@@ -1,5 +1,7 @@
 // NEH-189: the shared shutdown and restart flow — the confirmation, the
 // request, the blocking state after a 200, and where a failure is shown.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { get } from 'svelte/store';

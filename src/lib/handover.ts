@@ -6,6 +6,8 @@
 // handed over when none of its records is captured. So the controls are
 // derived the same way, from the counts, and never stored.
 // ============================================================================
+//
+// Version: 0.1.0-beta
 
 import type { Record } from '$lib/api';
 

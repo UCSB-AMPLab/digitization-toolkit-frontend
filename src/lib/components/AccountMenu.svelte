@@ -8,6 +8,8 @@
   // The menu closes on a tap outside and on Escape. The Pi's touch screen has
   // no hover and no keyboard, so a tap outside is the real way out; Escape is
   // for a desktop keyboard, and it returns focus to the trigger.
+  //
+  // Version: 0.1.0-beta
 
   import type { Snippet } from 'svelte';
   import { goto } from '$app/navigation';

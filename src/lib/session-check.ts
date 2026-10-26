@@ -6,6 +6,8 @@
 // any other error means the backend could not be asked, so the saved session
 // is kept and the check is repeated after a delay instead of sending the
 // operator to /login.
+//
+// Version: 0.1.0-beta
 
 export type SessionCheckFailure = 'invalid' | 'unavailable';
 

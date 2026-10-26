@@ -2,6 +2,8 @@
 // top bar: read from the same GET /collections/{id}/offsite poll, with no
 // request of its own. Fixtures are shaped as volume_fisqua_state in
 // app/core/fisqua_outbox.py. The catalogue is the default one, Spanish.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';

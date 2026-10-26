@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { get } from 'svelte/store';
 import { env } from '$env/dynamic/public';
 import { locale } from '$lib/i18n';

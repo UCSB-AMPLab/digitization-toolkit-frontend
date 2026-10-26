@@ -5,6 +5,8 @@
 // login page ((auth)/login/+page.svelte) relies on this when it stores the
 // token before calling `/users/me`. authStore (stores/auth.ts) delegates to
 // this module rather than reading or writing 'access_token' itself.
+//
+// Version: 0.1.0-beta
 
 import { browser } from '$app/environment';
 

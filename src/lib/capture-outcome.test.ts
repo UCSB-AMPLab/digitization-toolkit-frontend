@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { describe, expect, it } from 'vitest';
 import { describeCaptureFailure, describeCaptureOutcome, describeTestCapture } from './capture-outcome';
 import { es } from './i18n/es';

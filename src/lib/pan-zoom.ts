@@ -7,6 +7,8 @@
 // what keeps the two views (and, in the spread, the two pages) from
 // drifting apart: they all read the same two numbers and apply the same
 // pure functions below to their own measured geometry.
+//
+// Version: 0.1.0-beta
 
 export type Size = { w: number; h: number };
 export type Pan = { x: number; y: number };

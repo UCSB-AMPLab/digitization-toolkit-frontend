@@ -1,6 +1,8 @@
 // NEH-162: the appliance is offline and nothing verifies an email address,
 // so email became optional on setup/user forms. These are the two pure
 // helpers that back that behavior.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect } from 'vitest';
 import { normalizeEmail, emailFormatError } from './email-field';
 

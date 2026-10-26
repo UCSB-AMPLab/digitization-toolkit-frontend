@@ -3,6 +3,8 @@
 // src/lib/viewport-aspect.ts tests can't reach — actual layout in a real
 // <img>/ResizeObserver/flexbox pipeline, driven by real (canvas-drawn) PNG
 // frames fetched through the component's own polling code path.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from '@vitest/browser/context';

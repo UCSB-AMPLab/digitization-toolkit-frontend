@@ -1,6 +1,8 @@
 // "Digitalizaciones en curso": the Tablero/Tabla switch, both views rendered
 // from mocked GET /activity/collections data, the actions on each card, and
 // what the block shows when the endpoint fails.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

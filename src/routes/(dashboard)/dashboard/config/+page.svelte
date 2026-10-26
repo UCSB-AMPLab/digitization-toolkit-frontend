@@ -4,6 +4,8 @@
   // language, storage (usage, primary path, external drive), the catalogue's
   // off-site copy, diagnostics, maintenance, and power. Everything except the
   // language choice acts on the appliance through the backend.
+  //
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { m, locale, setLanguage, type Locale } from '$lib/i18n';

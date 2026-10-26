@@ -7,6 +7,7 @@
  * a newer read or reconnect supersedes the operation. Preview sides never
  * invalidate each other. Publish must synchronously update all list consumers.
  */
+// Version: 0.1.0-beta
 export function createCameraRefresh<T>(publish: (value: T) => void) {
   let epoch = 0;
   let readSequence = 0;

@@ -4,6 +4,8 @@
   // page owns the records and the view state shared by its child views; the
   // top bar (breadcrumb, camera button) is in +layout@.svelte, and the page
   // puts its hand-over controls there through the volume top bar slot.
+  //
+  // Version: 0.1.0-beta
 
   import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';

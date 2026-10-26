@@ -19,6 +19,8 @@
 // capture-errors.ts does: a change on the backend falls through to the
 // caller's generic message instead of being shown as the wrong one. No import
 // of api.ts, so the tests run in plain node.
+//
+// Version: 0.1.0-beta
 
 import type { Messages } from './i18n';
 

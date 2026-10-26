@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { describe, expect, it } from 'vitest';
 import { REJECTION_COMMENT_MAX_LENGTH, isCommentTooLong, showsCommentCount } from './rejection-comment';
 

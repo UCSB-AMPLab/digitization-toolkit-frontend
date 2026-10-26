@@ -2,6 +2,8 @@
 // instead of a hardcoded 4:3 box. A frame's displayed aspect depends on its
 // own rotation, and in double mode the two panels sit side by side at a
 // common height, so their aspects add rather than average.
+//
+// Version: 0.1.0-beta
 
 export type Frame = { w: number; h: number; rotation: number };
 

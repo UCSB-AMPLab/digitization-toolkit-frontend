@@ -3,6 +3,8 @@
 // layout puts this slot in context and renders whatever the page sets in it,
 // so the page's controls sit in the bar without the layout loading the
 // records a second time (NEH-260).
+//
+// Version: 0.1.0-beta
 
 import { getContext, setContext, type Snippet } from 'svelte';
 

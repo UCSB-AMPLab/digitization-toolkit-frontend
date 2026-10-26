@@ -3,6 +3,8 @@
 	// `/users/me` returns (NEH-117), and it tells bad credentials, a login
 	// lockout and an unreachable backend apart so each gets its own message.
 	// The footer shows whether the backend answers and holds the language selector.
+	//
+	// Version: 0.1.0-beta
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';

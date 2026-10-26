@@ -1,6 +1,8 @@
 // A renumber reloads the volume's records, and the reload swaps the grid for
 // the loading state. The count of renumbered records has to survive that, so
 // the page holds it and shows it once the records are back.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

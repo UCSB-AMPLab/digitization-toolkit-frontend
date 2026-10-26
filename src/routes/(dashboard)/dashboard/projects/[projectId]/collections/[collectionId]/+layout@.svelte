@@ -4,6 +4,8 @@
   // so the dashboard navigation sidebar is not rendered. It holds the session
   // guard and the top bar (breadcrumb, offsite copy line, camera button); the
   // page fills the rest of the screen.
+  //
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';

@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

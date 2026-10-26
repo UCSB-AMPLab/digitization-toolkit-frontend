@@ -1,6 +1,8 @@
 // NEH-139: a RAW (.cr2) record must never put its file URL straight into an
 // <img> in either inspection modal — Chromium cannot decode CR2, the operator
 // sees a broken image and retakes, and the retake supersedes the master.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

@@ -1,6 +1,8 @@
 <script lang="ts">
   // Activity calendar: images captured or records reviewed per day over the
   // last six months (182 days, GET /activity/daily).
+  //
+  // Version: 0.1.0-beta
   import { onMount, tick } from 'svelte';
   import { activityApi, browserTimeZone, type DailyActivity } from '$lib/api';
   import { m, locale } from '$lib/i18n';

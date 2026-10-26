@@ -5,6 +5,8 @@
   // panel polls still frames from `/cameras/preview/{index}`; every camera
   // status write goes through `applyCameraSides` so that a reconnect and a
   // late preview cannot overwrite each other.
+  //
+  // Version: 0.1.0-beta
 
   import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores/auth';

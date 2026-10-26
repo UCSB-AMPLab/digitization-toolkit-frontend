@@ -2,6 +2,8 @@
 // GET /system/storage reported (NEH-290). Fixtures are shaped as
 // get_storage_info in app/api/system.py; every other request the page makes
 // fails, which the page already tolerates.
+//
+// Version: 0.1.0-beta
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

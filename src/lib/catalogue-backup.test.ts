@@ -4,6 +4,8 @@
 // A zone that is not UTC, so that the day boundaries for "hoy" / "ayer" are
 // local and not UTC ones. Node applies a TZ change made at runtime; nothing
 // here builds a Date before it.
+//
+// Version: 0.1.0-beta
 process.env.TZ = 'America/Bogota';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

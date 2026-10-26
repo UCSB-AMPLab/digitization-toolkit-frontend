@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';

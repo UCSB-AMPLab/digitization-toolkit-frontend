@@ -8,6 +8,8 @@
 // annotation (not the live checklist selection, which is cleared after
 // every "Listo") and sends the first error type of the OLDEST saved
 // annotation as predefined_reason.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

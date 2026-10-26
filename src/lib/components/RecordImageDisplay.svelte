@@ -22,6 +22,8 @@
   // restore the volume. It is never shown as missing or as an error. A format
   // shown only through its thumbnail (TIFF) never requests /preview, so the
   // record's master_freed_at decides there (freedFromMetadata).
+  //
+  // Version: 0.1.0-beta
 
   import { untrack, type Snippet } from 'svelte';
   import { recordsApi, type RecordImage } from '$lib/api';

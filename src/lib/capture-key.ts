@@ -15,6 +15,8 @@
 // Using only shouldTrigger would turn a held pedal into a navigation key: the
 // first press is cancelled, but the repeats (repeat=true) reach the focused
 // control.
+//
+// Version: 0.1.0-beta
 
 import { browser } from '$app/environment';
 import { STORAGE_KEYS, readStored, removeStored, writeStored } from '$lib/storage-keys';

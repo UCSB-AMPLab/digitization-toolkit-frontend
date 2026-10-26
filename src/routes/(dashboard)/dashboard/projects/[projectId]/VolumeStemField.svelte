@@ -3,6 +3,8 @@
   // the backend's rule as the operator types (src/lib/volume-stem.ts), and
   // shows the field read-only, with the reason, once the stem is reserved:
   // the volume has a stem and has captured, so the backend refuses any change.
+  //
+  // Version: 0.1.0-beta
   import { m } from '$lib/i18n';
   import { stemProblem, stemProblemText } from '$lib/volume-stem';
 

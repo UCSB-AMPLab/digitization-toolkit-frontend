@@ -13,6 +13,8 @@
 // between concurrent requests. This is deliberate: the toolkit is a
 // single-session kiosk and the language is set at the start of each render.
 // A concurrent multi-user deployment would need Svelte context instead.
+//
+// Version: 0.1.0-beta
 
 import { derived, writable } from 'svelte/store';
 import { browser } from '$app/environment';

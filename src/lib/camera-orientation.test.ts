@@ -1,5 +1,7 @@
 // NEH-71: seeding the per-camera rotation state from the device list, and
 // coalescing the PUTs that persist a manual rotation change.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi } from 'vitest';
 import {
   DEFAULT_ROTATION,

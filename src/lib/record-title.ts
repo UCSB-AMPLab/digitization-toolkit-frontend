@@ -7,6 +7,8 @@
 // are the laptop's, not necessarily the appliance's.
 // The backend's own default is not used: for dual capture it is the same
 // English literal ("<project> - Dual capture") for every record.
+//
+// Version: 0.1.0-beta
 
 function pad(n: number): string {
 	return String(n).padStart(2, '0');
