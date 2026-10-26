@@ -145,3 +145,84 @@ describe('CameraControls — capabilities request fails', () => {
     await expect.element(screen.getByText(en.cam_format, { exact: true })).toBeVisible();
   });
 });
+
+// NEH-300: right after a boot, GET /cameras/devices can answer before gphoto2
+// has identified every body: an empty list, a list missing a body, or a row
+// whose serial read failed and so carries the `<model>_idx<N>` placeholder id
+// with no saved orientation. The page seeds rotation only from what this
+// component publishes, so it must keep reading until each body is identified.
+describe('CameraControls — device list after a boot (NEH-300)', () => {
+  const body0: CameraDevice = {
+    index: 0,
+    model: 'Canon EOS 1500D',
+    hardware_id: 'canoneos1500d_387afb538b1a4d19bed9156a8c16deef',
+    calibrated: false,
+    orientation: 270
+  };
+  const body1: CameraDevice = {
+    index: 1,
+    model: 'Canon EOS 1500D',
+    hardware_id: 'canoneos1500d_6eafa426b8e14c7b8c0614cd658a595a',
+    calibrated: false,
+    orientation: 90
+  };
+  const placeholder0: CameraDevice = {
+    ...body0,
+    hardware_id: 'canoneos1500d_idx0',
+    orientation: null
+  };
+
+  function lastPublished(onDevicesChange: ReturnType<typeof vi.fn>): CameraDevice[] | undefined {
+    return onDevicesChange.mock.calls.at(-1)?.[0] as CameraDevice[] | undefined;
+  }
+
+  for (const [name, first] of [
+    ['an empty list', [] as CameraDevice[]],
+    ['a list without camera 0', [body1]],
+    ['camera 0 under its placeholder id', [placeholder0, body1]]
+  ] as const) {
+    it(`publishes camera 0 with its saved orientation when the first answer is ${name}`, async () => {
+      vi.spyOn(camerasApi, 'listDevices')
+        .mockResolvedValueOnce([...first])
+        .mockResolvedValue([body0, body1]);
+      const onDevicesChange = vi.fn();
+      render(CameraControls, baseProps({ onDevicesChange }));
+
+      await expect
+        .poll(() => lastPublished(onDevicesChange)?.find((d) => d.index === 0)?.orientation, {
+          timeout: 8000
+        })
+        .toBe(270);
+    });
+  }
+
+  it('stops asking once the list is complete', async () => {
+    const list = vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([body0, body1]);
+    render(CameraControls, baseProps());
+    await expect.poll(() => list.mock.calls.length).toBe(1);
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops asking when the screen is left', async () => {
+    const list = vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([]);
+    const screen = render(CameraControls, baseProps());
+    await expect.poll(() => list.mock.calls.length).toBe(1);
+    screen.unmount();
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks again after a failed read', async () => {
+    vi.spyOn(camerasApi, 'listDevices')
+      .mockRejectedValueOnce(new ApiError('Capture system not available', undefined, 503))
+      .mockResolvedValue([body0, body1]);
+    const onDevicesChange = vi.fn();
+    render(CameraControls, baseProps({ onDevicesChange }));
+    await expect
+      .poll(() => lastPublished(onDevicesChange)?.find((d) => d.index === 0)?.orientation, {
+        timeout: 8000
+      })
+      .toBe(270);
+  });
+});
