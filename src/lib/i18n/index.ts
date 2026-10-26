@@ -84,6 +84,17 @@ export const roleLabel = derived(
 );
 
 /**
+ * Cookie strings for a language. The old name is written too, with the same
+ * value and attributes, so that a rollback to a build that reads only
+ * `dtk_locale` shows the language last chosen.
+ */
+export function localeCookies(next: Locale): string[] {
+	return [LOCALE_COOKIE, LEGACY_LOCALE_COOKIE].map(
+		(name) => `${name}=${next}; path=/; max-age=31536000; samesite=lax`
+	);
+}
+
+/**
  * Switches language: stores the cookie (1 year) and reloads the page so that
  * SSR renders everything again in the new language. With `to`, the page loads
  * that address instead of reloading, for a caller that is leaving the page
@@ -92,7 +103,7 @@ export const roleLabel = derived(
  */
 export function setLanguage(next: Locale, to?: string) {
 	if (!browser) return;
-	document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+	for (const cookie of localeCookies(next)) document.cookie = cookie;
 	if (to) location.assign(to);
 	else location.reload();
 }
