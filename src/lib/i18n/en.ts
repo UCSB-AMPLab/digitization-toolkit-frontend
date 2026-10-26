@@ -730,9 +730,9 @@ export const en: Messages = {
 		return `${ids.length === 1 ? 'Record' : 'Records'} ${shown}${rest > 0 ? ` and ${formatCount(rest, 'en')} more` : ''}`;
 	},
 	col_manifest_rule_tenant_missing:
-		'No tenant is configured on this scanner, so the manifest has no place in the offsite copy. Ask whoever manages the scanner to set DTK_OFFSITE_TENANT and restart Captua.',
+		'No tenant is configured on this scanner, so the manifest has no place in the offsite copy. Ask whoever manages the scanner to set CAPTUA_OFFSITE_TENANT and restart Captua.',
 	col_manifest_rule_tenant_invalid:
-		'The tenant configured on this scanner is not valid. Ask whoever manages the scanner to correct DTK_OFFSITE_TENANT and restart Captua.',
+		'The tenant configured on this scanner is not valid. Ask whoever manages the scanner to correct CAPTUA_OFFSITE_TENANT and restart Captua.',
 	col_manifest_rule_no_stem:
 		'The volume has no file name stem, so its images have no names Fisqua can read. Give the volume its stem (its Fisqua reference code).',
 	col_manifest_rule_no_project: 'The volume is not in a project, and the manifest names its project. Move the volume into a project.',
@@ -1068,11 +1068,11 @@ export const en: Messages = {
 	fisqua_kind_preview: 'Preview',
 	fisqua_history: (n: number): string => `Earlier sends (${formatCount(n, 'en')})`,
 	fisqua_cfg_token:
-		'Fisqua does not accept the token configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_TOKEN and restart Captua.',
+		'Fisqua does not accept the token configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct CAPTUA_FISQUA_TOKEN and restart Captua.',
 	fisqua_cfg_not_found:
-		'Fisqua does not recognise the address configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL or DTK_OFFSITE_TENANT and restart Captua.',
+		'Fisqua does not recognise the address configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct CAPTUA_FISQUA_ENV, CAPTUA_FISQUA_BASE_URL or CAPTUA_OFFSITE_TENANT and restart Captua.',
 	fisqua_cfg_redirect:
-		'The Fisqua address configured on this scanner redirects to another address. Captua does not follow it, so that the token is not sent elsewhere, and has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct DTK_FISQUA_ENV or DTK_FISQUA_BASE_URL and restart Captua.',
+		'The Fisqua address configured on this scanner redirects to another address. Captua does not follow it, so that the token is not sent elsewhere, and has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct CAPTUA_FISQUA_ENV or CAPTUA_FISQUA_BASE_URL and restart Captua.',
 	fisqua_cfg_version:
 		'Fisqua does not read the capture manifests this version of Captua writes, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to update Captua or Fisqua.',
 	fisqua_cfg_other:
