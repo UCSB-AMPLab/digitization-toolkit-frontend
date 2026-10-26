@@ -122,6 +122,17 @@
     color: var(--color-light-grey);
   }
 
+  /* A full-size monitor has room for larger text and a larger code; the
+     unit's 800×480 screen keeps the sizes above. */
+  @media (min-width: 1280px) and (min-height: 720px) {
+    .main { gap: 64px; }
+    .body { font-size: 20px; }
+    .body p { margin-bottom: 18px; }
+    .scan { width: 300px; gap: 14px; }
+    .qr { width: 300px; height: 300px; }
+    .scan figcaption { font-size: var(--text-base); }
+  }
+
   .logos {
     display: flex;
     justify-content: space-between;
