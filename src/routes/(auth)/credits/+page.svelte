@@ -55,7 +55,7 @@
 
   <div class="logos">
     {#each LOGOS as logo (logo.alt)}
-      <div class="logo-box" style:width="{logo.width}px">
+      <div class="logo-box" style:width="calc({logo.width} * var(--u))">
         <img src={logo.src} alt={logo.alt} class:invert={logo.dark} />
       </div>
     {/each}
@@ -63,12 +63,16 @@
 </div>
 
 <style>
+  /* The page is laid out for the unit's 800×480 screen and scales as a whole
+     on a larger one: --u is 1px at 800×480 and grows with whichever of the
+     width or height is the tighter fit, never below 1px. */
   .page {
+    --u: max(1px, min(0.125vw, 0.20833vh));
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
     height: 100vh;
-    padding: 24px 40px;
+    padding: calc(24 * var(--u)) calc(40 * var(--u));
     background-color: var(--color-bg);
     font-family: var(--font-family);
     color: var(--color-light);
@@ -78,22 +82,23 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
+    margin-bottom: calc(16 * var(--u));
   }
 
-  h1 { margin: 0; font-size: var(--text-h2); font-weight: var(--fw-bold); }
+  h1 { margin: 0; font-size: calc(28 * var(--u)); font-weight: var(--fw-bold); }
   .es { color: var(--color-light-grey); }
 
-  /* Text on the left, capped so the lines stay readable on a large monitor,
-     and the QR code beside it. The logos keep the full width. */
+  /* Text on the left, capped so the lines stay readable, and the QR code
+     beside it. ch follows the scaled size set here. */
   .main {
     flex: 1;
     min-height: 0;
     display: grid;
     grid-template-columns: minmax(0, 68ch) auto;
     justify-content: start;
-    gap: 40px;
+    gap: calc(40 * var(--u));
     align-items: start;
+    font-size: calc(16 * var(--u));
   }
 
   .body {
@@ -102,59 +107,49 @@
     overflow-y: auto;
     line-height: 1.5;
   }
-  .body p { margin: 0 0 12px; }
+  /* app.css sets a size on every p, so the paragraphs take it explicitly. */
+  .body p { margin: 0 0 calc(12 * var(--u)); font-size: calc(16 * var(--u)); }
   .body .muted { color: var(--color-light-grey); }
 
   .scan {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    width: 180px;
+    gap: calc(10 * var(--u));
+    width: calc(180 * var(--u));
     margin: 0;
   }
-  .qr { width: 180px; height: 180px; border-radius: var(--radius-md); }
+  .qr { width: calc(180 * var(--u)); height: calc(180 * var(--u)); border-radius: calc(8 * var(--u)); }
   .scan figcaption {
     text-align: center;
-    font-size: var(--text-sm);
+    font-size: calc(12 * var(--u));
     line-height: 1.4;
     color: var(--color-light-grey);
-  }
-
-  /* A full-size monitor has room for larger text and a larger code; the
-     unit's 800×480 screen keeps the sizes above. */
-  @media (min-width: 1280px) and (min-height: 720px) {
-    /* ch follows this size, so the text column widens with the type. */
-    .main { gap: 64px; font-size: 20px; }
-    .body p { margin-bottom: 18px; font-size: 20px; }
-    .scan { width: 300px; gap: 14px; }
-    .qr { width: 300px; height: 300px; }
-    .scan figcaption { font-size: var(--text-base); }
   }
 
   .logos {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-top: 16px;
+    padding-top: calc(16 * var(--u));
     border-top: 1px solid var(--border-color);
   }
 
-  .logo-box { height: 64px; flex: none; }
+  .logo-box { height: calc(64 * var(--u)); flex: none; }
   .logo-box img { width: 100%; height: 100%; object-fit: contain; }
   .invert { filter: brightness(0) invert(1); }
 
   .btn {
     display: inline-flex;
     align-items: center;
-    font-size: var(--text-base);
+    font-size: calc(16 * var(--u));
     font-weight: var(--fw-semibold);
     color: var(--color-secondary);
     text-decoration: none;
     border: 1.5px solid var(--color-secondary);
-    border-radius: var(--radius-md);
-    padding: 10px 24px;
-    min-height: var(--touch-target-min);
+    border-radius: calc(8 * var(--u));
+    padding: calc(10 * var(--u)) calc(24 * var(--u));
+    min-height: calc(44 * var(--u));
     box-sizing: border-box;
     transition: background-color var(--transition-base);
   }
