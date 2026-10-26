@@ -19,7 +19,7 @@
   // by `dark` so all five read the same on the dark ground.
   const LOGOS: { src: string; alt: string; width: number; dark: boolean }[] = [
     { src: nehSeal, alt: 'National Endowment for the Humanities', width: 150, dark: false },
-    { src: amplUcsb, alt: 'AMP Lab, University of California, Santa Barbara', width: 110, dark: false },
+    { src: amplUcsb, alt: 'AMPL, University of California, Santa Barbara', width: 110, dark: false },
     { src: utHistory, alt: 'Department of History, University of Texas at Austin', width: 160, dark: true },
     { src: burdick, alt: 'Burdick Global Scholars Program', width: 110, dark: true },
     { src: neogranadina, alt: 'Neogranadina', width: 140, dark: false },
