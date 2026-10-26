@@ -2,11 +2,13 @@
 // request, the blocking state after a 200, and where a failure is shown.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { get } from 'svelte/store';
 import { page } from 'vitest/browser';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { systemApi, PowerControlError } from '$lib/api';
+import { powerControlOpen } from '$lib/stores/power';
 import PowerControl from './PowerControl.svelte';
 
 describe('PowerControl', () => {
@@ -42,6 +44,16 @@ describe('PowerControl', () => {
 		await dialog.getByRole('button', { name: 'Cancelar' }).click();
 		await expect.element(dialog).not.toBeInTheDocument();
 		expect(powerSpy).not.toHaveBeenCalled();
+	});
+
+	it('reports itself open while the confirmation is up, so the capture key stays off', async () => {
+		const screen = render(PowerControl);
+		expect(get(powerControlOpen)).toBe(false);
+		screen.component.ask('poweroff');
+		await expect.poll(() => get(powerControlOpen)).toBe(true);
+
+		await page.getByRole('button', { name: 'Cancelar' }).click();
+		await expect.poll(() => get(powerControlOpen)).toBe(false);
 	});
 
 	it('on a 501, says power control is unavailable and does not block the screen', async () => {

@@ -21,6 +21,7 @@
   import { m } from '$lib/i18n';
   import { systemApi, healthApi, PowerControlError, type PowerAction } from '$lib/api';
   import { dismissible, toBody } from '$lib/dialog';
+  import { holdPowerControlOpen } from '$lib/stores/power';
 
   let { onError }: { onError?: (message: string | null) => void } = $props();
 
@@ -28,6 +29,12 @@
   let sending = $state(false);                            // request in flight (dialog open)
   let phase = $state<'idle' | 'poweroff' | 'reboot'>('idle');
   let error = $state<string | null>(null);                // shown here only without onError
+
+  // While anything here is on screen, the capture key must not fire behind it.
+  $effect(() => {
+    if (pendingAction === null && error === null && phase === 'idle') return;
+    return holdPowerControlOpen();
+  });
 
   let confirmTitle = $derived(
     pendingAction === 'reboot' ? $m.config_confirm_reboot_title : $m.config_confirm_shutdown_title

@@ -33,6 +33,7 @@
   import { isConflict } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
   import { dismissible } from '$lib/dialog';
+  import { powerControlOpen } from '$lib/stores/power';
 
   let {
     cameraMode,
@@ -145,10 +146,11 @@
   let pendingModifier = $state<'Control' | 'Alt' | 'Shift' | 'Meta' | null>(null);
   let learnMessage = $state<string | null>(null);
 
-  // Either modal takes the keyboard away from capture. The grid settings modal
+  // Any modal takes the keyboard away from capture. The grid settings modal
   // is local; the image-inspection modal lives in the page (+page.svelte) and
-  // arrives as a prop, so the two are combined here.
-  let modalOpen = $derived(showGridModal || otherModalOpen);
+  // arrives as a prop; the power confirmation, opened from the top bar's
+  // avatar menu, is reported through a store.
+  let modalOpen = $derived(showGridModal || otherModalOpen || $powerControlOpen);
 
   // Collapsible controls panel, open by default; collapsing it gives the feed
   // back the space the panel covers. The collapse button is always visible:
