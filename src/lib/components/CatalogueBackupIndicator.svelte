@@ -10,6 +10,8 @@
 	// `href` is the Configuración section; the layout passes it only to roles
 	// that can open Configuración, and the others get the same pill without a
 	// link.
+	//
+	// Version: 0.1.0-beta
 	import { m, locale } from '$lib/i18n';
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
 	import { classifySnapshot, dayRelation, formatBackupDate, type BackupLevel } from '$lib/catalogue-backup';

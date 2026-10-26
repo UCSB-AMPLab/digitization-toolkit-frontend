@@ -8,6 +8,8 @@
 //
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`, `message`).
+//
+// Version: 0.1.0-beta
 
 export const REJECTION_COMMENT_MAX_LENGTH = 2000;
 

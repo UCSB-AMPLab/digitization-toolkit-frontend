@@ -1,6 +1,8 @@
 // NEH-260: the operator's handover controls in the volume top bar — which
 // buttons show for which mix of statuses, what each dialog says, and what is
 // reported after promote and take-back answer.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

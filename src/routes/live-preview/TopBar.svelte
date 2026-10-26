@@ -4,6 +4,8 @@
   // right. The breadcrumb mirrors the collection view's on purpose, so the
   // operator can see where the images are being stored while capturing.
   // projectName and collectionName are '' while they load.
+  //
+  // Version: 0.1.0-beta
 
   import { m } from '$lib/i18n';
   import UserMenu from '$lib/components/UserMenu.svelte';

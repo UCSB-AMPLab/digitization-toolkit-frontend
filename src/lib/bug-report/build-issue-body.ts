@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import type { ReportContext } from './context';
 import type { CapturedError } from './error-capture';
 import { redact } from './redact';

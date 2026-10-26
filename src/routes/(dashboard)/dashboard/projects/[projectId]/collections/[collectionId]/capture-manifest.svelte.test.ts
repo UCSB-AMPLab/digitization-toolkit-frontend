@@ -2,6 +2,8 @@
 // operators only (allow_contributor on GET /collections/{id}/capture-manifest),
 // saved under the server's file name; a 409 lists its problems in the
 // catalogue's words, and a 404 says the volume was not found.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

@@ -1,5 +1,7 @@
 // NEH-230 — shared pan/zoom geometry: fit sizing, zoom stepping, per-page
 // scale under a shared zoom, and normalised pan.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect } from 'vitest';
 import {
   ZOOM_MIN,

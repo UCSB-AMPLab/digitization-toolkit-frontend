@@ -17,6 +17,8 @@
   // The dialogs are moved to <body>: the top bars and the sidebar that hold
   // the account menu are stacking contexts, and a fixed overlay inside one
   // could be covered by the page underneath.
+  //
+  // Version: 0.1.0-beta
 
   import { m } from '$lib/i18n';
   import { systemApi, healthApi, PowerControlError, type PowerAction } from '$lib/api';

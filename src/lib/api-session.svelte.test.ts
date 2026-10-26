@@ -3,6 +3,8 @@
 // request from a tab with no session at all (first-run setup), and a
 // request from a tab whose token another tab removed from localStorage
 // while this tab's authStore still held the session.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const gotoMock = vi.hoisted(() => vi.fn());

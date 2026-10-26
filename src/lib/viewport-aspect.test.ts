@@ -2,6 +2,8 @@
 // hardcoded 4:3 box. `frameAspect`/`viewportAspect` compute the aspect ratio
 // the on-screen box should have; `fitBox` turns that aspect into the largest
 // pixel box that fits the measured board.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect } from 'vitest';
 import { fitBox, frameAspect, panelGrowFactor, viewportAspect } from './viewport-aspect';
 

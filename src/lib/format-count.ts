@@ -7,6 +7,8 @@
 // with useGrouping 'min2'. The catalogues call this, so every caller of a
 // count message gets the same format. No import of the catalogue index,
 // which imports the catalogues.
+//
+// Version: 0.1.0-beta
 
 type CountLocale = 'es' | 'en';
 

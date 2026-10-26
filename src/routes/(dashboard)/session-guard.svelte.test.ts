@@ -2,6 +2,8 @@
 // answers, and Nginx returns 502 for several seconds. The layout must wait
 // and retry, keeping the saved session, and must not navigate anywhere; only a
 // 401/403 from /users/me ends the session.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { createRawSnippet } from 'svelte';

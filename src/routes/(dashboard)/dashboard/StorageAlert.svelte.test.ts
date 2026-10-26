@@ -1,5 +1,7 @@
 // The overview's low-storage banner (NEH-290), from the GET /system/storage
 // answer; fixtures are shaped as get_storage_info in app/api/system.py.
+//
+// Version: 0.1.0-beta
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

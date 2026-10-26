@@ -1,4 +1,6 @@
 <script lang="ts">
+  // Version: 0.1.0-beta
+
   import '../app.css';
   import favicon from '$lib/assets/favicon.svg';
   import GuidedTour from '$lib/components/GuidedTour.svelte';

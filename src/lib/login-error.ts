@@ -2,6 +2,8 @@
 // fetch, a 5xx, Nginx's 502 while Uvicorn is still booting — means the backend
 // is unavailable (NEH-153). A 429 means the backend's login throttle has
 // locked the account or the client IP after repeated failures (NEH-219).
+//
+// Version: 0.1.0-beta
 
 export type LoginFailure = 'credentials' | 'throttled' | 'unavailable';
 

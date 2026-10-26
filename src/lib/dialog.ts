@@ -8,6 +8,8 @@
 // The listener runs in the capture phase so that the dialog gets Escape
 // before page-level handlers (the guided tour, the capture key), and it marks
 // the event handled with preventDefault.
+//
+// Version: 0.1.0-beta
 
 export interface DismissOptions {
 	/** Called on Escape or a click on the backdrop. */

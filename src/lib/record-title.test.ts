@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { describe, expect, it } from 'vitest';
 import { defaultRecordTitle } from './record-title';
 import { locale } from './i18n';

@@ -3,6 +3,8 @@
 // so a time reads "05:05 p. m." rather than Spain's "17:05".
 //
 // No import of the catalogue index, which imports the catalogues.
+//
+// Version: 0.1.0-beta
 
 import { parseApiDate } from './pipeline';
 

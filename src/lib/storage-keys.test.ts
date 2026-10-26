@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STORAGE_KEYS, readStored, removeStored, writeStored } from './storage-keys';
 

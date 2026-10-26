@@ -1,4 +1,6 @@
 // The credits page is public and shows the grant text and the five logos.
+//
+// Version: 0.1.0-beta
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';

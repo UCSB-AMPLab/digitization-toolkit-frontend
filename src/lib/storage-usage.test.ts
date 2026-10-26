@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { describe, expect, it } from 'vitest';
 import { formatStorage, storageUsage, STORAGE_ALERT_THRESHOLD } from './storage-usage';
 import type { StorageInfo } from './api';

@@ -1,6 +1,8 @@
 // NEH-248: the layout reloads the records when the volume's freed counts
 // change, which can happen on each poll while a free or a restore runs. That
 // reload must keep the record the admin is reading selected.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

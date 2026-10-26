@@ -1,6 +1,8 @@
 // NEH-210: Gallery is navigation/organization/filtering only — quality
 // review requires the full-size Book view, so no approve/reject control
 // (individual or bulk) may ever render in the grid toolbar or on a card.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 // .image-grid's grid-template-columns (the --grid-cols mapping) lives in the

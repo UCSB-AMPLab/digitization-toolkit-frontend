@@ -21,6 +21,8 @@
 // fails says nothing about why, so the viewer asks again with fetch
 // (probeFreed) and shows a freed file as stored offsite, never as missing.
 // ============================================================================
+//
+// Version: 0.1.0-beta
 
 import type { RecordImage } from '$lib/api';
 

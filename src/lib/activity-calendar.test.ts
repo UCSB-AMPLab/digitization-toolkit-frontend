@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { describe, it, expect } from 'vitest';
 
 // The DST fixture below only fails under millisecond day arithmetic in a

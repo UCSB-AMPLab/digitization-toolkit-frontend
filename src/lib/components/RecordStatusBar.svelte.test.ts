@@ -1,4 +1,6 @@
 // The legend's counts, with the thousands separator of each language.
+//
+// Version: 0.1.0-beta
 import { afterEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

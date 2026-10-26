@@ -3,6 +3,8 @@
 // This is the node-project test for the pure module — no Svelte, no real
 // DOM. KeyboardEvent-shaped plain objects stand in for real events; a fake
 // `localStorage` stands in for the browser's.
+//
+// Version: 0.1.0-beta
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

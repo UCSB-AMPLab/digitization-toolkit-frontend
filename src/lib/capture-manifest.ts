@@ -16,6 +16,8 @@
 // - 404 is a volume the backend cannot find.
 //
 // No import of api.ts, so the tests run in plain node.
+//
+// Version: 0.1.0-beta
 
 import type { Messages } from './i18n';
 

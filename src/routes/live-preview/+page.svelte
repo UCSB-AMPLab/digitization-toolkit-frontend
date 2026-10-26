@@ -5,6 +5,8 @@
   // down as props; `CameraControls`, `LiveViewport`, `ThumbnailStrip` and
   // `ImageViewerModal` do the rendering. Only admin and operator may use it;
   // a reviewer is redirected (role guard in `onMount`, NEH-66).
+  //
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { page } from '$app/stores';

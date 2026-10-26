@@ -4,6 +4,8 @@
 // Run in a zone that is not UTC, so that reading a naive string as local time
 // would give a different instant and the parseApiDate tests could fail. Node
 // applies a TZ change made at runtime; nothing here builds a Date before it.
+//
+// Version: 0.1.0-beta
 process.env.TZ = 'America/Bogota';
 
 import { describe, it, expect } from 'vitest';

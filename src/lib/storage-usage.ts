@@ -9,6 +9,8 @@
 // counts allocated blocks and `free_bytes` only the blocks open to ordinary
 // users, so the blocks a filesystem reserves for root are in neither; on such
 // a drive the percentage stays a few points below 100 when it is full.
+//
+// Version: 0.1.0-beta
 
 import type { StorageInfo } from './api';
 

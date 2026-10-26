@@ -1,6 +1,8 @@
 // `dismissible`: Escape goes to the most recently opened dialog only, a
 // dialog can refuse it while closing would lose something, and only a click
 // on the backdrop itself counts.
+//
+// Version: 0.1.0-beta
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { dismissible, type DismissOptions } from './dialog';
 

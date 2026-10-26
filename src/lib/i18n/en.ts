@@ -1,6 +1,8 @@
 // English message catalogue. Typed against the keys of `es.ts` (see
 // `Messages` in `index.ts`): a missing or extra key here is a type error in
 // `npm run check`.
+//
+// Version: 0.1.0-beta
 
 import type { Messages } from './index';
 

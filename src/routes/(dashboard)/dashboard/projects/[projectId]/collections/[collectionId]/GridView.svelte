@@ -8,6 +8,8 @@
   // the order with collectionsApi.reorderRecords; if the backend refuses it,
   // the notice goes up to +page.svelte and the list is reloaded from the
   // server, because the reload unmounts this view.
+  //
+  // Version: 0.1.0-beta
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';

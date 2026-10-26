@@ -15,6 +15,8 @@
 	//
 	// The same answer carries the volume's delivery to Fisqua (`fisqua`),
 	// shown under the line by VolumeFisquaLine, with no request of its own.
+	//
+	// Version: 0.1.0-beta
 	import { untrack } from 'svelte';
 	import { m, locale } from '$lib/i18n';
 	import { collectionsApi, AuthError } from '$lib/api';

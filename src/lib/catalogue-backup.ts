@@ -8,6 +8,8 @@
 //
 // The module imports only a type from the API client, so the classification,
 // the date wording and the polling schedule are tested in the server project.
+//
+// Version: 0.1.0-beta
 
 import type { CatalogueBackupStatus } from '$lib/api';
 import { parseApiDate } from './pipeline';

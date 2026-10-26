@@ -1,5 +1,7 @@
 // NEH-189: every signed-in role can shut down or restart the unit from the
 // avatar menu, through the same confirmation as Settings.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

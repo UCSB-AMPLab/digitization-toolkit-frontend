@@ -3,6 +3,8 @@
 // of only telling the operator to set it there (NEH-76).
 //
 // Kept free of api.ts (like capture-outcome.ts) so this stays a plain node test.
+//
+// Version: 0.1.0-beta
 
 export type FocusModeKind = 'manual' | 'auto' | 'unknown';
 

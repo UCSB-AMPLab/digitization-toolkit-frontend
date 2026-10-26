@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { redact } from './redact';
 
 export interface CapturedError {

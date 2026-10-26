@@ -7,6 +7,8 @@
 // Monday, weekdays, months) is done on those calendar dates as UTC midnights,
 // so no local offset or daylight-saving change can move a key by a day,
 // whatever zone the code runs in.
+//
+// Version: 0.1.0-beta
 
 import type { DailyActivity } from './api';
 

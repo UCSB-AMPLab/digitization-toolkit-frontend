@@ -9,6 +9,8 @@
   // halves almost touch and neighbouring folios sit far apart. The light
   // frame is kept for what needs marking — the active folio — and surrounds
   // the whole group, not each half.
+  //
+  // Version: 0.1.0-beta
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';

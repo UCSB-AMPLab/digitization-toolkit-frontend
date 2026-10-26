@@ -5,6 +5,8 @@
   // the backend's capabilities report (picamera2 or a gphoto2 DSLR). The Basic
   // dropdowns are rendered outside the scrolling panel with `position: fixed`,
   // at coordinates taken from their trigger button each time one opens.
+  //
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { createCameraRefresh } from '$lib/camera-refresh';

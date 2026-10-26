@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { env } from '$env/dynamic/public';

@@ -12,6 +12,8 @@
   //
   // Annotations are stored in the backend (`recordsApi.*Annotation*`), scoped to
   // the current record, and reloaded whenever the current record's id changes.
+  //
+  // Version: 0.1.0-beta
 
   import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
   import { recordsApi, ApiError } from '$lib/api';

@@ -2,6 +2,8 @@
   // Root route: it only redirects and renders nothing. A stored token together
   // with a stored user goes to `/dashboard`; anything else goes to `/welcome`,
   // and a token without a user (a half-open session) is cleared first.
+  //
+  // Version: 0.1.0-beta
 
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';

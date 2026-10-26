@@ -21,6 +21,8 @@
 // on the backend falls through to the generic message instead of being shown
 // as the wrong one. No import of api.ts, so the tests run in plain node:
 // errors are matched by shape (`status`, `message`), as volume-stem.ts does.
+//
+// Version: 0.1.0-beta
 
 import type { Messages } from './i18n';
 import { isConflict, isVolumeRequired, isWrongRetakeVolume } from './volume-stem';

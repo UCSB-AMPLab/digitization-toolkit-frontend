@@ -1,6 +1,8 @@
 <script lang="ts">
   // Public credits page. Like /welcome it sits in the (auth) group, which has
   // no session guard, so it opens before anyone has signed in.
+  //
+  // Version: 0.1.0-beta
 
   import nehSeal from '$lib/assets/neh-preferred-seal-white.png';
   import amplUcsb from '$lib/assets/ampl-ucsb-white.png';

@@ -2,6 +2,8 @@
 // "Sin raíz" mark, the stem sent on create, the translated 409 for a
 // duplicate stem, and the delete refused for a volume that reserves its stem
 // without moving its records first.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

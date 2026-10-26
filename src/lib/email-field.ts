@@ -1,6 +1,8 @@
 // NEH-162: the appliance is offline and nothing verifies an address, so the
 // email field is optional across setup and user forms. A value that is
 // given still has to look like an email.
+//
+// Version: 0.1.0-beta
 
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

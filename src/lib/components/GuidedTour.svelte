@@ -14,6 +14,8 @@
   //    explained.
   // 2. The box never leaves the screen. At 800x480 there is no spare room: the
   //    box goes where the step asks and is clamped to the edges.
+  //
+  // Version: 0.1.0-beta
 
   import { onDestroy, tick } from 'svelte';
   import { page } from '$app/stores';

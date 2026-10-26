@@ -2,6 +2,8 @@
 // shared between the QA annotation feature (LeftSidebar.svelte) and the
 // NEH-209 reject form (RejectReasonModal.svelte). Mirrors the backend's
 // PREDEFINED_REJECTION_REASONS (app/schemas/record.py).
+//
+// Version: 0.1.0-beta
 import type { PredefinedRejectionReason } from './api';
 
 export interface RejectionReasonDef {

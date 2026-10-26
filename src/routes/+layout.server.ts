@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import type { LayoutServerLoad } from './$types';
 
 // Hands the components the locale that hooks.server.ts read from the cookie.

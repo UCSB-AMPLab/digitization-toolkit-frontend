@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 const DEFAULT_REPO = 'UCSB-AMPLab/digitization-toolkit-software';
 
 /** GitHub "new issue" URL, prefilled with title, body and the `bug` label. */

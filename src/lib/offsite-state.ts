@@ -15,6 +15,8 @@
 //
 // The module imports only types from the API client, so the wording is tested
 // in the server project.
+//
+// Version: 0.1.0-beta
 
 import type { Messages } from './i18n';
 import type { UnitImageUploadSummary, VolumeOffsiteState } from '$lib/api';

@@ -1,4 +1,6 @@
 // NEH-139: what a viewer may display for a record image.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi } from 'vitest';
 import {
   checkMasterStored,

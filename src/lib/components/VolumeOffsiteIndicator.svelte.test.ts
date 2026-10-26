@@ -1,6 +1,8 @@
 // NEH-248: a bump of `refresh` after a free or a restore ends must reach the
 // backend with a request made after the job ended, also when the regular poll
 // has a request in flight at that moment.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { render } from 'vitest-browser-svelte';

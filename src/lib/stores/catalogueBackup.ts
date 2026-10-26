@@ -13,6 +13,8 @@
 // components render as "state unknown" (NEH-138). A 401 or 403 stops the
 // poll; apiRequest has already cleared a dead session and the layout sends
 // the user to /login.
+//
+// Version: 0.1.0-beta
 
 import { derived, readable } from 'svelte/store';
 import { browser } from '$app/environment';

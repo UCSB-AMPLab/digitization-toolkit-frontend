@@ -1,6 +1,8 @@
 // NEH-230: drag-to-pan in the spread viewer, and the filename/side caption
 // moved out of the image frame (below it, in static flow) so it never
 // covers foliation or marginalia at any zoom.
+//
+// Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

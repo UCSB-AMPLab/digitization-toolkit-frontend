@@ -11,6 +11,8 @@
 //
 // Each step declares the route it belongs to. When the operator is elsewhere,
 // the step is still shown, without a highlight, as a pointer to where to go.
+//
+// Version: 0.1.0-beta
 
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';

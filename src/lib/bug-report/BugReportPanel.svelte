@@ -1,4 +1,6 @@
 <script lang="ts">
+  // Version: 0.1.0-beta
+
   import { onMount } from 'svelte';
   import { m } from '$lib/i18n';
   import { captureContext } from './context';

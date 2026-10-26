@@ -14,6 +14,8 @@
 // text the backend changes falls through to the action's generic message
 // rather than being shown as the wrong one. No import of api.ts beyond types,
 // so the tests run in plain node.
+//
+// Version: 0.1.0-beta
 
 import type { Messages } from './i18n';
 import { REQUEST_TIMEOUT_MS } from './catalogue-backup';

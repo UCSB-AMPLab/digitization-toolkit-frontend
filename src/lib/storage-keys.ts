@@ -2,6 +2,8 @@
 // `dtk_`; code rolled back to one of them still reads those keys, so a value
 // found only under the old name is copied across and the old entry stays.
 // Writes go to the new name only.
+//
+// Version: 0.1.0-beta
 
 const PREFIX = 'captua_';
 const LEGACY_PREFIX = 'dtk_';

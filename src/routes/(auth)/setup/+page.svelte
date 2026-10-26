@@ -5,6 +5,8 @@
 	// requires it). The page redirects to `/login` when `/auth/setup/status`
 	// reports that setup is not needed or cannot be reached, and after the
 	// account is created.
+	//
+	// Version: 0.1.0-beta
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';

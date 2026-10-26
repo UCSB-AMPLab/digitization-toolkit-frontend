@@ -6,6 +6,8 @@
 // 22 October 2026. Date and setInterval (the re-classifying clock) are faked;
 // setTimeout stays real, so the 5-minute poll never fires during a test and
 // the request timeout is tested in catalogue-backup.test.ts instead.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

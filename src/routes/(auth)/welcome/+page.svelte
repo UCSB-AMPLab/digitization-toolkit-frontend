@@ -3,6 +3,8 @@
   // `/auth/setup/status` whether this is a first install: if setup is needed
   // it goes to `/setup` to create the administrator account, otherwise — or
   // when the check fails — to `/login`.
+  //
+  // Version: 0.1.0-beta
 
   import { authApi } from '$lib/api';
   import { m, locale, setLanguage, type Locale } from '$lib/i18n';

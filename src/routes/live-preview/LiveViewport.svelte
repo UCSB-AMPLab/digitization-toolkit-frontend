@@ -7,6 +7,8 @@
   // PREVIEW_INTERVAL_MS this component fetches GET /cameras/preview/{index},
   // a single JPEG frame. The frame's resolution is the backend's default for
   // that endpoint, since no `resolution` parameter is sent from here.
+  //
+  // Version: 0.1.0-beta
 
   import { onMount, onDestroy } from 'svelte';
   import { m } from '$lib/i18n';

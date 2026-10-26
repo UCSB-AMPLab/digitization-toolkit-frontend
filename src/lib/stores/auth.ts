@@ -1,6 +1,8 @@
 // Global authentication state: the access token, the signed-in user and
 // their role. The token itself is persisted through `tokenStore`
 // (stores/token.ts); this store persists only the user.
+//
+// Version: 0.1.0-beta
 
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';

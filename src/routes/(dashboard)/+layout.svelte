@@ -6,6 +6,8 @@
 	// Users and Settings; operator and reviewer see Overview and Projects.
 	// A new section needs its route under `src/routes/(dashboard)/` and an
 	// entry in `NAV_ITEMS` listing the roles allowed to open it.
+	//
+	// Version: 0.1.0-beta
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';

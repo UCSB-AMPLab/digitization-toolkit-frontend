@@ -1,6 +1,8 @@
 // The volume's export chooser on the bench unit's 800×480 screen: the card is
 // taller than the screen, so it must scroll inside with its title and Close
 // button reachable, and Escape and a click on the backdrop must close it.
+//
+// Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

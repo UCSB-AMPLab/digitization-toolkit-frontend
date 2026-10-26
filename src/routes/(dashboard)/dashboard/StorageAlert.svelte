@@ -10,6 +10,8 @@
   // A failed request or an answer without usable figures shows nothing, and
   // clears figures read earlier: the banner never states a fill level the
   // unit did not just report.
+  //
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { systemApi } from '$lib/api';
