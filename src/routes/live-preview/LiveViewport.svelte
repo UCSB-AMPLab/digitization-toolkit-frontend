@@ -11,8 +11,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { m } from '$lib/i18n';
   import { browser } from '$app/environment';
-  import { env } from '$env/dynamic/public';
-  import { camerasApi, tokenStore, type CameraDevice } from '$lib/api';
+  import { camerasApi, tokenStore, getApiBase, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
@@ -318,11 +317,6 @@
   // the next successful frame clears it. Unlike the dashboard, a 404 here
   // does not stop polling.
   let cameraMissing = $state<Record<number, boolean>>({});
-
-  function getApiBase(): string {
-    if (!browser) return 'http://localhost:8000';
-    return env.PUBLIC_API_BASE || 'http://localhost:8000';
-  }
 
   function getAuthHeader(): HeadersInit {
     const token = tokenStore.get();

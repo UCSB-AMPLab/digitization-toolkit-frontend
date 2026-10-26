@@ -7,10 +7,8 @@
   // late preview cannot overwrite each other.
 
   import { onMount, onDestroy } from 'svelte';
-  import { browser } from '$app/environment';
-  import { env } from '$env/dynamic/public';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore,
+  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore, getApiBase,
            type Collection, type Project } from '$lib/api';
   import { m } from '$lib/i18n';
   import { describeCaptureFailure, describeTestCapture, type CaptureOutcome } from '$lib/capture-outcome';
@@ -191,11 +189,6 @@
     } else {
       expandedCamera = side;
     }
-  }
-
-  function getApiBase(): string {
-    if (!browser) return 'http://localhost:8000';
-    return env.PUBLIC_API_BASE || 'http://localhost:8000';
   }
 
   function getAuthHeader(): HeadersInit {
