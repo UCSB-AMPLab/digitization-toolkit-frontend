@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { env } from '$env/dynamic/public';
 import { get } from 'svelte/store';
+import { resolveApiBase } from './api-base';
 import { m } from './i18n';
 import { authStore } from './stores/auth';
 import { tokenStore } from './stores/token';
@@ -16,14 +17,9 @@ export { tokenStore };
  * Handles authentication, documents, images, projects, and cameras
  */
 
-// Get appropriate API base URL (browser vs SSR)
-// Uses dynamic env vars so the same Docker image works regardless of hostname/IP.
-// Set PUBLIC_API_BASE and PUBLIC_API_BASE_SSR in docker-compose environment.
-function getApiBase(): string {
-  const fallback = 'http://localhost:8000';
-  return browser
-    ? (env.PUBLIC_API_BASE || fallback)
-    : (env.PUBLIC_API_BASE_SSR || env.PUBLIC_API_BASE || fallback);
+// See api-base.ts for which base applies where.
+export function getApiBase(): string {
+  return resolveApiBase(browser, env);
 }
 
 // Thrown for 401/403 responses so callers that care can distinguish an
