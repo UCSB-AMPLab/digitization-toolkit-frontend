@@ -1,9 +1,9 @@
 import type { LayoutLoad } from './$types';
 import { projectsApi, collectionsApi } from '$lib/api';
 
-// ============================================================================
-// LOAD: Datos del proyecto y la colección para el breadcrumb del layout
-// ============================================================================
+// Loads the project and volume names for the layout breadcrumb. A failed fetch
+// yields '—' instead of an error, so the volume pages render even when a name
+// is unavailable.
 export const load: LayoutLoad = async ({ params }) => {
   const projectId    = Number(params.projectId);
   const collectionId = Number(params.collectionId);

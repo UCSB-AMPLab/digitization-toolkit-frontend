@@ -1,9 +1,6 @@
-// ============================================================================
-// CATÁLOGO DE MENSAJES — INGLÉS
-//
-// Tipado contra las claves de `es.ts` (ver `Messages` en `index.ts`): una
-// clave faltante o sobrante aquí es un error de compilación en `npm run check`.
-// ============================================================================
+// English message catalogue. Typed against the keys of `es.ts` (see
+// `Messages` in `index.ts`): a missing or extra key here is a type error in
+// `npm run check`.
 
 import type { Messages } from './index';
 

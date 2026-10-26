@@ -16,7 +16,7 @@
   let showAttach   = $state(false);
   let triedSubmit  = $state(false);
 
-  // Se captura una vez, al abrir el panel
+  // Captured once, when the panel opens.
   const ctx = captureContext();
   const errors = getRecentErrors();
 
@@ -53,8 +53,8 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<!-- El backdrop cierra al hacer clic fuera; el equivalente por teclado es
-     Escape, arriba. -->
+<!-- A click on the backdrop closes the panel; the keyboard equivalent is
+     Escape, above. -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div

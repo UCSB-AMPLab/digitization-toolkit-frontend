@@ -1,27 +1,17 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: LeftSidebar (Gallery)
-  // Archivo: src/routes/gallery/[collectionId]/LeftSidebar.svelte
+  // Left sidebar of the spread view: a strip of three icons, each of which opens
+  // or closes a panel. The panel starts closed.
   //
-  // Panel lateral izquierdo de la galería.
-  // Contiene un strip de 3 íconos y un panel expandido según el tab activo:
+  //   'info'     — per-image details of the current record
+  //   'edit'     — rotation and the brightness/contrast/saturation preview sliders
+  //   'comments' — annotations (error marks and notes) and the review actions
+  //                (NEH-209), all in one panel with no modals so that approving
+  //                or rejecting does not send the reviewer's eyes elsewhere on
+  //                the screen. Reject and Approve stay visible after a decision
+  //                so a mistake can be undone, behind a confirmation popup.
   //
-  //   'info'     → Image info: nombre, formato, metadatos, dimensiones, tamaño
-  //   'edit'     → Preview Controls: rotar, brillo, contraste, saturación
-  //   'comments' → Anotaciones: lista de notas + motivo de rechazo (desplegable)
-  //                + "Agregar nota" + Rechazar/Aprobar (NEH-209) — todo en un
-  //                solo panel, sin modales, para que aprobar/rechazar no
-  //                obligue a mirar a otro lado de la pantalla. Rechazar y
-  //                Aprobar siempre están visibles (aunque el registro ya esté
-  //                aprobado/rechazado) para poder deshacer un error, detrás
-  //                de un popup de confirmación.
-  //
-  // En vista 'spread' o 'grid', el sidebar se colapsa mostrando solo el strip.
-  // Solo se muestran los paneles en vista 'single'.
-  //
-  // Las anotaciones se persisten en el backend (recordsApi.*Annotation*),
-  // escopadas al record actual: se recargan cada vez que currentRecord cambia.
-  // ============================================================================
+  // Annotations are stored in the backend (`recordsApi.*Annotation*`), scoped to
+  // the current record, and reloaded whenever the current record's id changes.
 
   import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
   import { recordsApi, ApiError } from '$lib/api';
@@ -30,9 +20,6 @@
   import { REJECTION_REASONS } from '$lib/rejectionReasons';
   import { REJECTION_COMMENT_MAX_LENGTH, isCommentTooLong, showsCommentCount } from '$lib/rejection-comment';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     viewMode,
     currentRecord,
@@ -52,40 +39,32 @@
     currentIndex: number;
     totalRecords: number;
     userRole?: string | null;
-    // Ajustes de previsualización, de -100 a 100. Son del padre porque el
-    // visor también los necesita: el panel sólo los mueve. No tocan el
-    // archivo — se aplican como filtro CSS sobre la imagen en pantalla,
-    // igual que rotar.
+    // Preview adjustments, -100 to 100. The parent owns them because the viewer
+    // needs them too; the panel only moves them. They do not modify the file —
+    // they apply as a CSS filter on the image on screen, as rotation does.
     brightness?: number;
     contrast?: number;
     saturation?: number;
     onRotateLeft: () => void;
     onRotateRight: () => void;
-    // Puede ser async (loadRecords lo es) — confirmPendingAction lo espera
-    // para que currentRecord ya refleje el estado nuevo antes de que el
-    // usuario pueda volver a hacer click (si no, hay una ventana breve
-    // donde currentRecord.status todavía es el viejo, y un click rápido en
-    // el botón contrario calcula el mensaje de confirmación equivocado).
+    // May be async (`loadRecords` is). `confirmPendingAction` awaits it so that
+    // `currentRecord` reflects the new status before the user can click again;
+    // otherwise, for a moment `currentRecord.status` still holds the old status,
+    // and a quick click on the opposite button computes the wrong confirmation
+    // message.
     onRecordUpdated: () => void | Promise<void>;
     onRecapture: (record: Record) => void;
   } = $props();
 
   const canReview = $derived(userRole === 'reviewer' || userRole === 'admin');
-  // Recapturar dispara la cámara — solo admin/operator pueden, igual que
-  // /live-preview mismo (reviewer es redirigido ahí, NEH-66).
+  // A retake fires the camera, so only admin/operator may start one, as on
+  // /live-preview itself (which redirects a reviewer, NEH-66).
   const canOperate = $derived(userRole === 'admin' || userRole === 'operator');
 
-  // ---------------------------------------------------------------------------
-  // ESTADO LOCAL
-  // ---------------------------------------------------------------------------
-
-  // Tab activo del strip
   let activeTab = $state<'info' | 'edit' | 'comments'>('info');
 
-  // Panel oculto por defecto; el usuario lo abre pulsando un ícono del strip
   let isExpanded = $state(false);
 
-  // Abre el panel en el tab indicado, o lo colapsa si ya estaba en ese tab
   function toggleTab(tab: 'info' | 'edit' | 'comments') {
     if (isExpanded && activeTab === tab) {
       isExpanded = false;
@@ -95,16 +74,12 @@
     }
   }
 
-  // Valores de sliders de Preview Controls (-100 a 100)
-
-  // Anotaciones: persistidas en el backend, escopadas al record actual
   let annotations = $state<RecordAnnotation[]>([]);
   let annotationsError = $state<string | null>(null);
   let isSavingAnnotation = $state(false);
 
-  // Tipos de error disponibles para "Marcar error" — la lista de ids/colores
-  // vive en $lib/rejectionReasons (compartida con RejectReasonModal); acá
-  // solo se les agrega la etiqueta traducida.
+  // Error types offered under "Mark error". The ids and colors live in
+  // `$lib/rejectionReasons`; only the translated labels are added here.
   const ERROR_LABELS: { [id: string]: string } = $derived({
     blur: $m.col_err_blurry,
     glare: $m.col_err_glare,
@@ -130,11 +105,10 @@
   });
   const ERROR_TYPES = $derived(REJECTION_REASONS.map(r => ({ ...r, label: ERROR_LABELS[r.id], gloss: ERROR_GLOSSES[r.id] })));
 
-  // Recarga las anotaciones cada vez que cambia el record activo; evita que
-  // las anotaciones de un record se sigan mostrando al navegar a otro.
-  // También limpia el estado de "Agregar nota"/"Marcar error" (NEH-209): sin
-  // esto, un motivo o nota a medio escribir para un registro se filtraría al
-  // siguiente al navegar entre documentos.
+  // The effect below reloads the annotations whenever the active record
+  // changes, so one record's annotations are never shown on another. It also
+  // clears the "Add note"/"Mark error" state (NEH-209); otherwise a half-written
+  // reason or note for one record would carry over to the next.
   // The load below and the saves and deletes made while it is in flight can
   // reach the list in any order: the load can answer after a save committed
   // (the annotation would show twice), before it (it would be lost), or
@@ -182,46 +156,42 @@
       .then(data => { if (!cancelled) annotations = mergeLoaded(data, annotations); })
       .catch(err => {
         if (cancelled) return;
-        console.error('[LeftSidebar] Error cargando anotaciones:', err);
+        console.error('[LeftSidebar] Error loading annotations:', err);
         annotationsError = $m.col_annotation_load_error;
       });
 
     return () => { cancelled = true; };
   });
 
-  // "Marcar error" y "Agregar nota" son dos acordeones independientes, cada
-  // uno con su propio botón "Listo" — cada uno crea su PROPIA anotación
-  // (error_types solo, o note solo) en vez de combinarse en una — así lo
-  // pidió el usuario explícitamente ("que sean dos cosas aparte"). El
-  // backend de rechazo formal solo acepta un predefined_reason, así que
-  // "Rechazar" usa el de la anotación de error guardada más antigua (ver
-  // `firstFlaggedReason` más abajo), no la selección viva de checkboxes.
+  // "Mark error" and "Add note" are two independent accordions, each with its
+  // own "Done" button, and each creates its OWN annotation (only `error_types`,
+  // or only `note`) rather than combining into one — by explicit request, the
+  // two stay separate. The formal rejection endpoint accepts a single
+  // `predefined_reason`, so "Reject" uses the one from the oldest saved error
+  // annotation (see `firstFlaggedReason` below), not the live checkbox
+  // selection.
   let noteText = $state('');
   let selectedReasons = $state<PredefinedRejectionReason[]>([]);
   let isReasonCardExpanded = $state(false);
   let isNoteCardExpanded = $state(false);
 
-  // Un registro rechazado ya no admite más anotaciones — "Marcar error" y
-  // "Agregar nota" quedan deshabilitados hasta que alguien lo apruebe (o lo
-  // recapture, lo que también lo devuelve a 'in_review'); solo 'rejected'
-  // los bloquea.
+  // A rejected record accepts no more annotations: "Mark error" and "Add note"
+  // stay disabled until the record leaves `rejected` — undoing the rejection
+  // and a retake both return it to `in_review`. Only `rejected` locks them.
   let annotationsLocked = $derived(currentRecord?.status === 'rejected');
 
-  // Rechazar/Aprobar (NEH-209) — siempre visibles y habilitados salvo que ya
-  // estén en ese mismo estado (no se puede aprobar/rechazar dos veces), para
-  // permitir deshacer un aprobar/rechazar por error. Cada click pide
-  // confirmación antes de ejecutar (pendingAction).
+  // Reject/Approve (NEH-209) stay visible after a decision so a mistaken
+  // approval or rejection can be undone. A button is disabled when the record
+  // already has that status (no approving or rejecting twice), while the record
+  // is still `captured`, and, for Reject, while an `other` rejection lacks its
+  // note. Each click asks for confirmation first (`pendingAction`).
   let isRejecting = $state(false);
   let isApproving = $state(false);
   let reviewError = $state<string | null>(null);
   let pendingAction = $state<'approve' | 'reject' | null>(null);
-  // Se muestra al intentar "Rechazar" sin haber marcado al menos un tipo de
-  // error todavía — antes el botón solo quedaba disabled sin explicar por qué.
+  // Shown when the reviewer tries "Reject" before marking at least one error
+  // type, so the reason the rejection cannot go ahead is stated.
   let showNoReasonPopup = $state(false);
-
-  // ---------------------------------------------------------------------------
-  // HELPERS
-  // ---------------------------------------------------------------------------
 
   function getErrorLabel(id: string) {
     return ERROR_TYPES.find(e => e.id === id)?.label ?? id;
@@ -237,11 +207,10 @@
       : [...selectedReasons, id];
   }
 
-  // Motivo que se envía al rechazar: el primer tipo de error de la
-  // anotación guardada MÁS ANTIGUA que tenga alguno (no de los chips
-  // seleccionados en este momento, que se vacían en cada "Guardar") —
-  // `annotations` está ordenada de más nueva a más vieja (byNewest), así
-  // que la más antigua es la última del arreglo.
+  // The reason sent on rejection: the first error type of the OLDEST saved
+  // annotation that has one (not the chips selected right now, which are
+  // cleared on every "Done"). `annotations` is sorted newest first (`byNewest`),
+  // so the oldest is the last in the array.
   let firstFlaggedReason: PredefinedRejectionReason | null = $derived.by(() => {
     for (let i = annotations.length - 1; i >= 0; i--) {
       const reason = annotations[i].error_types[0];
@@ -252,7 +221,7 @@
 
   // The comment sent with a formal rejection, whatever the reason: the note
   // being typed, or else the newest saved note (`annotations` is newest
-  // first). A reviewer who saved the note with "Listo" has emptied the
+  // first). A reviewer who saved the note with "Done" has emptied the
   // textarea, and the note still goes with the rejection. The backend
   // refuses `other` without a comment (422).
   let rejectionComment = $derived(
@@ -265,12 +234,12 @@
     currentRecord?.status === 'in_review' && firstFlaggedReason === 'other' && !rejectionComment
   );
 
-  // Mensaje del popup de confirmación: depende de la acción pedida Y del
-  // estado actual del registro — "Rechazar" sobre un 'approved' deshace la
-  // aprobación (no es un rechazo formal), y lo mismo al revés (NEH-209).
-  // Un registro 'captured' todavía no se ha entregado a revisión: el backend
-  // no admite captured → approved, y el rechazo exige 'in_review'. Así que
-  // ninguna de las dos acciones aplica, y los dos botones quedan disabled.
+  // The confirmation message depends on the requested action AND the record's
+  // current status: "Reject" on an `approved` record undoes the approval (it is
+  // not a formal rejection), and the same in reverse (NEH-209).
+  // A `captured` record has not yet been handed over for review: the backend
+  // does not allow captured -> approved, and rejection requires `in_review`. So
+  // neither action applies, and both buttons stay disabled.
   let notReviewable = $derived(currentRecord?.status === 'captured');
 
   let pendingActionMessage = $derived.by(() => {
@@ -285,12 +254,8 @@
       : $m.col_review_confirm_reject;
   });
 
-  // ---------------------------------------------------------------------------
-  // ACCIONES
-  // ---------------------------------------------------------------------------
-
-  // Guarda los tipos de error marcados como su propia anotación (sin nota)
-  // y colapsa la tarjeta — "Listo" de "Marcar error".
+  // "Done" under "Mark error": saves the marked error types as their own
+  // annotation (no note) and collapses the card.
   async function handleSaveErrors() {
     if (selectedReasons.length === 0 || !currentRecord || isSavingAnnotation) return;
     const recordId = currentRecord.id;
@@ -301,24 +266,24 @@
         error_types: selectedReasons,
         note: undefined,
       });
-      // Si el record activo cambió mientras la request estaba en curso, el
-      // effect de carga ya reemplazó `annotations` por las del nuevo record;
-      // no anteponer aquí, o mostraríamos una anotación del record anterior.
+      // If the active record changed while the request was in flight, the load
+      // effect has already replaced `annotations` with the new record's; adding
+      // it here would show an annotation from the previous record.
       if (currentRecord?.id === recordId) {
         annotations = withAnnotation(annotations, created);
       }
       selectedReasons = [];
       isReasonCardExpanded = false;
     } catch (err) {
-      console.error('[LeftSidebar] Error guardando el motivo de error:', err);
+      console.error('[LeftSidebar] Error saving the error reason:', err);
       annotationsError = $m.col_annotation_save_error;
     } finally {
       isSavingAnnotation = false;
     }
   }
 
-  // Guarda el comentario como su propia anotación (sin tipos de error) y
-  // colapsa la tarjeta — "Listo" de "Agregar nota".
+  // "Done" under "Add note": saves the note as its own annotation (no error
+  // types) and collapses the card.
   async function handleSaveComment() {
     const note = noteText.trim();
     if (!note || !currentRecord || isSavingAnnotation) return;
@@ -336,17 +301,17 @@
       noteText = '';
       isNoteCardExpanded = false;
     } catch (err) {
-      console.error('[LeftSidebar] Error guardando la nota:', err);
+      console.error('[LeftSidebar] Error saving the note:', err);
       annotationsError = $m.col_annotation_save_error;
     } finally {
       isSavingAnnotation = false;
     }
   }
 
-  // Pide confirmación antes de rechazar (o deshacer una aprobación). Un
-  // rechazo formal (desde 'in_review') requiere al menos una anotación de
-  // error ya guardada — si falta, muestra un popup en vez de abrir el de
-  // confirmación (deshacer una aprobación no lo necesita).
+  // Asks for confirmation before rejecting (or undoing an approval). A formal
+  // rejection (from `in_review`) requires at least one saved error annotation;
+  // without one, a popup says so instead of the confirmation (undoing an
+  // approval does not need one).
   function requestReject() {
     if (!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting || rejectNeedsNote) return;
     if (currentRecord.status === 'in_review' && firstFlaggedReason === null) {
@@ -360,7 +325,7 @@
     showNoReasonPopup = false;
   }
 
-  // Pide confirmación antes de aprobar (o deshacer un rechazo).
+  // Asks for confirmation before approving (or undoing a rejection).
   function requestApprove() {
     if (!currentRecord || notReviewable || currentRecord.status === 'approved' || isApproving) return;
     pendingAction = 'approve';
@@ -370,10 +335,10 @@
     pendingAction = null;
   }
 
-  // Ejecuta la acción confirmada en el popup. Si el registro ya estaba en el
-  // estado "opuesto" (approved al rechazar, rejected al aprobar), es un
-  // deshacer — vuelve a 'in_review' sin motivo ni auditoría de rechazo, en
-  // vez de la acción formal (NEH-209).
+  // Runs the action confirmed in the popup. If the record already has the
+  // "opposite" status (approved when rejecting, rejected when approving), the
+  // action is an undo: the record returns to `in_review` with no reason and no
+  // rejection audit, instead of the formal action (NEH-209).
   async function confirmPendingAction() {
     if (!currentRecord || !pendingAction) return;
     const recordId = currentRecord.id;
@@ -384,14 +349,14 @@
       isApproving = true;
       try {
         await recordsApi.updateStatus(recordId, status === 'rejected' ? 'in_review' : 'approved');
-        // Esperar el refresco (puede ser async) antes de soltar isApproving:
-        // si no, hay una ventana breve donde currentRecord.status todavía
-        // es el viejo pero los botones ya están habilitados de nuevo, y un
-        // click rápido en el botón contrario calcularía el mensaje de
-        // confirmación (o la acción) equivocada.
+        // Await the refresh (it may be async) before clearing `isApproving`;
+        // otherwise, for a moment `currentRecord.status` still holds the old
+        // status while the buttons are enabled again, and a quick click on the
+        // opposite button would compute the wrong confirmation message (or
+        // action).
         await onRecordUpdated();
       } catch (err) {
-        console.error('[LeftSidebar] Error aprobando el registro:', err);
+        console.error('[LeftSidebar] Error approving the record:', err);
         reviewError = $m.col_review_approve_error;
       } finally {
         isApproving = false;
@@ -406,10 +371,9 @@
             predefined_reason: firstFlaggedReason!,
             comment: rejectionComment,
           });
-          // Un registro rechazado ya no admite más anotaciones — colapsar
-          // cualquier tarjeta que hubiera quedado abierta (el botón de
-          // "Marcar error"/"Agregar nota" ya se deshabilita solo vía
-          // `annotationsLocked`, pero esto también descarta lo no guardado).
+          // A rejected record accepts no more annotations, so collapse any card
+          // left open. `annotationsLocked` already disables the "Mark
+          // error"/"Add note" buttons; this also discards anything unsaved.
           isReasonCardExpanded = false;
           isNoteCardExpanded = false;
           selectedReasons = [];
@@ -417,7 +381,7 @@
         }
         await onRecordUpdated();
       } catch (err) {
-        console.error('[LeftSidebar] Error rechazando el registro:', err);
+        console.error('[LeftSidebar] Error rejecting the record:', err);
         // The backend answers 422 to a comment over 2,000 characters, and to
         // `other` without a comment; its own message is not the interface's.
         reviewError = isCommentTooLong(err)
@@ -444,13 +408,13 @@
       // back.
       annotations = annotations.filter(a => a.id !== id);
     } catch (err) {
-      console.error('[LeftSidebar] Error eliminando anotación:', err);
+      console.error('[LeftSidebar] Error deleting annotation:', err);
       deletedIds.delete(id);
-      // Solo restaurar si seguimos en el mismo record: si cambió, el effect
-      // de carga ya cargó la lista del nuevo record y restaurar aquí la
-      // pisaría con datos del record anterior. Se devuelve solo la anotación
-      // que no se pudo borrar, no la lista de antes: lo guardado mientras
-      // tanto se conserva.
+      // Restore only if the same record is still active: if it changed, the
+      // load effect has already loaded the new record's list, and restoring
+      // here would overwrite it with the previous record's data. Only the
+      // annotation that could not be deleted goes back, not the earlier list,
+      // so anything saved meanwhile is kept.
       if (currentRecord?.id === recordId) {
         if (removed) annotations = withAnnotation(annotations, removed);
         annotationsError = $m.col_annotation_delete_error;
@@ -458,20 +422,17 @@
     }
   }
 
-  // Formatea la hora de una anotación
   function formatTime(dateStr?: string): string {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   }
 
-  // Formatea tamaño de archivo
   function formatFileSize(bytes: number): string {
     if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
     if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
     return `${bytes} B`;
   }
 
-  // Formatea fecha/hora de captura
   function formatDateTime(dateStr: string): string {
     const d = new Date(dateStr);
     return d.toLocaleString('es-ES', {
@@ -480,7 +441,6 @@
     });
   }
 
-  // Imágenes del registro ordenadas: left primero, right después
   let sortedImages = $derived(
     [...(currentRecord?.images ?? [])].sort((a, b) => {
       const order = (r?: string | null) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
@@ -502,14 +462,9 @@
   }
 </script>
 
-<!-- ============================================================
-     SIDEBAR
-     En modo 'single': strip (60px) + panel expandido (260px) = 320px total
-     En modo 'spread': solo strip (60px)
-     ============================================================ -->
+<!-- Closed: the 60px strip only. Open: strip plus panel, 320px in all. -->
 <div class="sidebar" class:expanded={isExpanded}>
 
-  <!-- ── Strip de íconos ── -->
   <div class="icon-strip">
     <!-- Info -->
     <button
@@ -524,7 +479,6 @@
       </svg>
     </button>
 
-    <!-- Preview Controls -->
     <button
       class="strip-btn"
       class:active={activeTab === 'edit' && isExpanded}
@@ -538,7 +492,6 @@
       </svg>
     </button>
 
-    <!-- Anotaciones -->
     <button
       class="strip-btn"
       class:active={activeTab === 'comments' && isExpanded}
@@ -552,18 +505,15 @@
     </button>
   </div>
 
-  <!-- ── Panel de contenido (solo en single) ── -->
   {#if isExpanded}
     <div class="panel-content">
 
-      <!-- ══ TAB: IMAGE INFO ══ -->
       {#if activeTab === 'info'}
         <div class="panel-section">
           <h3 class="panel-title">{$m.col_tab_info}</h3>
 
             {#if currentRecord}
 
-              <!-- Encabezado del registro -->
               <div class="record-overview">
                 <span class="overview-name">{currentRecord.title || '—'}</span>
                 <span class="overview-pos">{formatCount(currentIndex, $locale)} / {formatCount(totalRecords, $locale)}</span>
@@ -576,7 +526,6 @@
                 {#each sortedImages as img, i}
                   <div class="img-section" class:first={i === 0}>
 
-                    <!-- Cabecera de imagen -->
                     <div class="img-section-header">
                       <span class="role-pill" class:role-right={img.role === 'right'} class:role-single={img.role !== 'left' && img.role !== 'right'}>
                         {roleLabel(img)}
@@ -584,7 +533,6 @@
                       <span class="img-section-title">{roleName(img, i)}</span>
                     </div>
 
-                    <!-- Filas de datos -->
                     <div class="info-rows">
 
                       {#if img.format}
@@ -639,25 +587,21 @@
             {/if}
           </div>
 
-        <!-- ══ TAB: PREVIEW CONTROLS ══ -->
         {:else if activeTab === 'edit'}
           <div class="panel-section">
             <div class="preview-card">
               <h3 class="panel-title">{$m.col_tab_edit}</h3>
 
-            <!-- Rotar -->
             <div class="control-group">
               <label class="control-label">{$m.col_rotate}</label>
               <div class="rotate-row">
                 <button class="rotate-btn" onclick={onRotateLeft}>
-                  <!-- Ícono rotar izquierda -->
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/>
                   </svg>
                   <span>{$m.col_rotate_left}</span>
                 </button>
                 <button class="rotate-btn" onclick={onRotateRight}>
-                  <!-- Ícono rotar derecha -->
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
                   </svg>
@@ -687,7 +631,7 @@
                   aria-label={$m.col_slider_reset}
                 >{brightness > 0 ? `+${brightness}` : brightness}</button>
               </div>
-              <!-- El gradiente del slider refleja el porcentaje actual -->
+              <!-- The track gradient fills up to the current value -->
               <input type="range" min="-100" max="100" bind:value={brightness}
                 style="background: linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) {((brightness+100)/200)*100}%, var(--color-surface) {((brightness+100)/200)*100}%, var(--color-surface) 100%)"
               />
@@ -742,12 +686,10 @@
           </div>
         </div>
 
-      <!-- ══ TAB: ANOTACIONES ══ -->
       {:else if activeTab === 'comments'}
         <div class="panel-section">
           <div class="preview-card">
 
-            <!-- Encabezado -->
             <div class="annotations-header">
               <div class="annotations-title-row">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -762,7 +704,6 @@
               <p class="annotations-error">{annotationsError}</p>
             {/if}
 
-            <!-- Lista de anotaciones -->
             <div class="annotations-list">
               {#if annotations.length === 0}
                 <p class="empty-text">{$m.col_no_annotations}</p>
@@ -770,7 +711,6 @@
                 {#each annotations as ann}
                   <div class="annotation-card">
                     <div class="annotation-body">
-                      <!-- Tags de tipo de error -->
                       {#if ann.error_types.length > 0}
                         <div class="error-tags">
                           {#each ann.error_types as errorId}
@@ -781,16 +721,15 @@
                           {/each}
                         </div>
                       {/if}
-                      <!-- Texto de la nota -->
                       {#if ann.note}
                         <p class="annotation-text">{ann.note}</p>
                       {/if}
                     </div>
                     <div class="annotation-footer">
                       <span class="annotation-time">{formatTime(ann.created_at)}</span>
-                      <!-- Botón eliminar (visible en hover) — un registro
-                           rechazado ya no admite cambios en sus anotaciones,
-                           tampoco borrarlas. -->
+                      <!-- Delete button (shown on hover). A rejected record
+                           allows no changes to its annotations, deletion
+                           included. -->
                       {#if !annotationsLocked}
                         <button class="delete-annotation-btn" onclick={() => handleDeleteAnnotation(ann.id)} aria-label={$m.col_delete_annotation}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -804,7 +743,6 @@
               {/if}
             </div>
 
-            <!-- ── Marcar error: acordeón independiente con lista de checkeo ── -->
             {#if canReview}
               <div class="review-section">
                 <button
@@ -852,7 +790,6 @@
                 {/if}
               </div>
 
-              <!-- ── Agregar nota: acordeón independiente, mismo patrón ── -->
               <div class="review-section review-section--tight">
                 <button
                   type="button"
@@ -893,23 +830,23 @@
               </div>
             {/if}
 
-            <!-- ── Rechazar / Aprobar / Recapturar (NEH-209) ── Visible para
-                 reviewer/admin (Rechazar/Aprobar, siempre ambos presentes —
-                 el único disabled es el que coincide con el estado actual,
-                 el otro queda habilitado para deshacer un error) y también
-                 para operator cuando el registro está rechazado (solo ve
-                 "Recapturar imagen" — un operator no aprueba/rechaza, pero
-                 sí puede volver a capturar). Cada click de Rechazar/Aprobar
-                 pide confirmación (pendingAction) antes de ejecutar. ── -->
+            <!-- Reject / Approve / Retake (NEH-209). A reviewer or admin sees
+                 Approve and either Reject or, on a rejected record for an
+                 admin, Retake; the button matching the current status is
+                 disabled and the other stays enabled to undo a mistake. An
+                 operator sees only "Recapture image", on a rejected record — an
+                 operator does not approve or reject, but may capture again.
+                 Each Reject/Approve click asks for confirmation
+                 (`pendingAction`) first. -->
             {#if canReview || (canOperate && currentRecord?.status === 'rejected')}
               <div class="review-section">
                 {#if reviewError}
                   <p class="annotations-error">{reviewError}</p>
                 {/if}
 
-                <!-- Por qué los dos botones están deshabilitados en un
-                     registro capturado: el operario todavía no lo ha enviado
-                     (NEH-260). En la pantalla táctil no hay tooltip. -->
+                <!-- Why both buttons are disabled on a captured record: the
+                     operator has not yet handed it over for review (NEH-260).
+                     The touch screen has no tooltip. -->
                 {#if canReview && notReviewable}
                   <p class="review-hint">{$m.col_review_not_sent_hint}</p>
                 {/if}
@@ -960,9 +897,7 @@
 
 </div>
 
-<!-- ============================================================
-     POPUP: confirmación de Aprobar/Rechazar (incluye deshacer, NEH-209)
-     ============================================================ -->
+<!-- Confirmation popup for Approve/Reject, undo included (NEH-209) -->
 {#if pendingAction}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -977,9 +912,7 @@
   </div>
 {/if}
 
-<!-- ============================================================
-     POPUP: falta seleccionar un motivo de error para rechazar
-     ============================================================ -->
+<!-- Popup: rejecting needs a saved error reason first -->
 {#if showNoReasonPopup}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -994,7 +927,6 @@
 {/if}
 
 <style>
-  /* ── Sidebar ── */
   .sidebar {
     display: flex;
     background-color: var(--color-surface-alt);
@@ -1008,7 +940,6 @@
 
   .sidebar.expanded { width: 320px; }
 
-  /* Strip de íconos */
   .icon-strip {
     width: 60px;
     flex-shrink: 0;
@@ -1043,7 +974,6 @@
     border: 1.5px solid var(--color-primary);
   }
 
-  /* Panel de contenido */
   .panel-content {
     flex: 1;
     overflow-y: auto;
@@ -1169,7 +1099,6 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   }
 
-  /* Rotar */
   .control-group { margin-bottom: 20px; }
 
   .control-label {
@@ -1220,10 +1149,11 @@
     color: var(--color-light-grey);
   }
 
-  /* La cifra es el botón de reiniciar ese deslizador: tocarla lo devuelve a
-     cero. Se hizo así y no con un botón aparte porque son tres, el panel es
-     angosto y en el táctil cada botón propio costaría 44px de alto. Mientras
-     el deslizador está en cero no hay nada que reiniciar y queda inerte. */
+  /* The number is the slider's reset button: tapping it returns the slider to
+     zero. It is not a separate button because there are three sliders, the
+     panel is narrow, and on the touch screen each separate button would cost
+     44px of height. While the slider is at zero there is nothing to reset and
+     the number is inert. */
   .slider-val {
     min-width: 44px;
     min-height: 32px;
@@ -1268,7 +1198,6 @@
     cursor: grab;
   }
 
-  /* Anotaciones */
   .annotations-header {
     display: flex;
     align-items: center;
@@ -1351,8 +1280,8 @@
   .annotation-card:hover .delete-annotation-btn { opacity: 1; }
   .delete-annotation-btn:hover { color: var(--color-error); background-color: rgba(214,103,74,0.1); }
 
-  /* Secciones inline del panel de revisión (NEH-209): nota, marcar error,
-     rechazar/aprobar — reemplazan los antiguos modales. */
+  /* Inline sections of the review panel (NEH-209): mark error, add note,
+     reject/approve — no modals. */
   .review-section {
     display: flex;
     flex-direction: column;
@@ -1362,8 +1291,8 @@
     border-top: 1px solid var(--border-color);
   }
 
-  /* Sin separador entre "Marcar error" y "Agregar nota" — son dos
-     acordeones hermanos, no secciones distintas del panel. */
+  /* No divider between "Mark error" and "Add note": they are sibling
+     accordions, not separate sections of the panel. */
   .review-section--tight {
     margin-top: 8px;
     padding-top: 0;
@@ -1389,9 +1318,9 @@
     margin: 0;
   }
 
-  /* "Marcar error" / "Agregar nota": dos acordeones independientes, cada
-     uno un botón neutro (ícono + etiqueta) que ocupa una sola fila
-     colapsado, y se expande in-line a su propia tarjeta con "Listo". */
+  /* "Mark error" / "Add note": two independent accordions, each a neutral
+     button (icon + label) that takes a single row when collapsed and expands
+     inline into its own card with "Done". */
   .annotation-toggle {
     width: 100%;
     display: flex;
@@ -1451,7 +1380,6 @@
 
   .reason-done-btn { width: 100%; }
 
-  /* Nota textarea */
   .note-textarea {
     width: 100%;
     height: 120px;
@@ -1473,8 +1401,7 @@
   .note-count { margin: 4px 0 0; font-size: var(--text-sm); color: var(--color-light-grey); text-align: right; }
   .note-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Rechazar / Aprobar (NEH-209) — apilados, uno arriba y otro abajo, no
-     lado a lado. */
+  /* Reject / Approve (NEH-209): stacked, not side by side. */
   .review-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 
   .review-hint {
@@ -1509,8 +1436,8 @@
   .btn-review.recapture:hover { opacity: 0.9; }
   .btn-review:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Popup de confirmación (NEH-209) — para aprobar/rechazar y para
-     deshacer un aprobar/rechazar anterior. */
+  /* Confirmation popup (NEH-209), for approving/rejecting and for undoing an
+     earlier approval or rejection. */
   .confirm-backdrop {
     position: fixed; inset: 0;
     background-color: rgba(0,0,0,0.6);

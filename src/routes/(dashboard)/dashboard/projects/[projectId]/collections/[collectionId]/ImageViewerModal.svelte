@@ -1,16 +1,7 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: ImageViewerModal (Gallery)
-  //
-  // Modal de inspección de imagen para la vista de galería.
-  // Muestra todas las imágenes del registro con badge L/R cuando corresponde.
-  //
-  // Props:
-  //   record    — registro a inspeccionar
-  //   onClose   — callback para cerrar el modal
-  //   onRetake  — callback para volver a capturar (navega a live-preview)
-  //   onDelete  — callback para eliminar el registro completo
-  // ============================================================================
+  // Inspection modal for one record in the gallery: shows all of the record's
+  // images (with an L/R badge on a two-camera capture) under one shared
+  // pan and zoom, and offers retake and delete within the record's lock.
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
@@ -30,9 +21,6 @@
     type PanFraction,
   } from '$lib/pan-zoom';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     record,
     onClose,
@@ -52,16 +40,13 @@
   // captured nor rejected (409, RETAKE_STATUS_DETAIL in app/core/volume_stem.py).
   let isLocked = $derived(record.status === 'in_review' || record.status === 'approved');
 
-  // ---------------------------------------------------------------------------
-  // ESTADO LOCAL
-  // ---------------------------------------------------------------------------
   let confirmAction = $state<null | 'retake' | 'delete'>(null);
 
   // Masters a 410 has said are freed (NEH-248), by image id. The records can
   // be older than a free, so master_freed_at alone can miss one.
   let masterFreedById = $state<{ [id: number]: boolean }>({});
 
-  // Imágenes del registro, ordenadas por rol (left primero, right después)
+  // Left first, then right, then images without a role; id breaks ties.
   const images = $derived(() => {
     const imgs = record.images ?? [];
     return [...imgs].sort((a, b) => {
@@ -72,18 +57,16 @@
 
   const isDouble = $derived(() => images().some(i => i.role === 'left' || i.role === 'right'));
 
-  // ---------------------------------------------------------------------------
-  // PAN/ZOOM COMPARTIDO (NEH-230) — mismo modelo que ImageViewer.svelte: un
-  // zoom y una fracción de pan compartidos por ambos frames, cada uno
-  // deriva su propia escala CSS y su propio pan en píxeles con su propia
-  // geometría medida. Acá no hay rotación (este modal no la soporta), así
-  // que rotation siempre es 0 en las llamadas al módulo.
-  // ---------------------------------------------------------------------------
+  // Shared pan and zoom (NEH-230), the same model as ImageViewer.svelte: one
+  // zoom and one pan fraction shared by both frames, from which each frame
+  // derives its own CSS scale and pixel pan with its own measured geometry.
+  // This modal does not support rotation, so rotation is always 0 in the
+  // calls to the module.
   let zoom = $state(1);
   let pan = $state<PanFraction>({ x: 0, y: 0 });
 
-  // Tamaño medido de cada frame y tamaño natural de cada imagen, por índice
-  // dentro de images() (0 = primero/referencia, 1 = segundo si lo hay).
+  // Measured size of each frame and natural size of each image, by index in
+  // images() (0 = first, 1 = second if there is one).
   let frameW    = $state<number[]>([0, 0]);
   let frameH    = $state<number[]>([0, 0]);
   let naturalW  = $state<number[]>([0, 0]);
@@ -95,12 +78,11 @@
 
   type FrameGeom = { scale: number; pan: Pan; bounds: { w: number; h: number } };
 
-  // effectiveOneToOne clampea cada imagen a >= 1 (R35-1): 1:1 nunca encoge
-  // una imagen por debajo del fit. La referencia para pageScale es la
-  // MAYOR de esos valores entre TODAS las imágenes del registro (no la
-  // primera a secas) — pageScale exige que la referencia sea >= cada
-  // imagen para que la curva fit->1:1 de cada una sea monótona (ver el
-  // comentario de pageScale en pan-zoom.ts).
+  // effectiveOneToOne clamps each image to >= 1: 1:1 never shrinks
+  // an image below fit. The reference for pageScale is the LARGEST of those
+  // values across ALL of the record's images, not the first one — pageScale
+  // needs the reference to be >= every image's value so that each image's
+  // fit->1:1 curve is monotonic (see the pageScale comment in pan-zoom.ts).
   let oneToOnes = $derived.by((): number[] =>
     images().map((_, i) =>
       effectiveOneToOne(
@@ -111,7 +93,7 @@
 
   let oneToOneRef = $derived(oneToOnes.length > 0 ? Math.max(...oneToOnes) : 1);
 
-  // Un elemento por imagen del registro, en el mismo orden que images().
+  // One entry per image of the record, in the same order as images().
   let frameGeoms = $derived.by((): FrameGeom[] => {
     const imgs = images();
     const fitted = imgs.map((_, i) =>
@@ -125,28 +107,25 @@
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // ARRASTRE (pan) — pointer events, mouse y touch por igual.
-  // ---------------------------------------------------------------------------
+  // Drag to pan, through pointer events, for mouse and touch alike.
   let dragIndex = $state<number | null>(null);
-  // El pointerId que efectivamente está arrastrando — no basta con "hay un
-  // índice activo", porque un segundo dedo (touch multipunto) también
-  // llega como pointerdown con button === 0 y, sin esto, pisa
-  // dragLastX/Y del primero: el próximo pointermove del PRIMER dedo
-  // calcularía su delta contra la posición del SEGUNDO, produciendo un
-  // salto enorme y falso.
+  // The pointerId that is actually dragging. An active index is not enough,
+  // because a second finger (multi-touch) also arrives as a pointerdown with
+  // button === 0 and would overwrite the first finger's dragLastX/Y: the
+  // FIRST finger's next pointermove would then compute its delta against the
+  // SECOND finger's position and jump.
   let dragPointerId: number | null = null;
   let dragLastX = 0;
   let dragLastY = 0;
 
   function handlePointerDown(e: PointerEvent, i: number) {
     if (e.button !== 0) return;
-    // No capturar el pointer si el down empezó sobre un control (botón de
-    // zoom, descarga) que vive dentro del frame — si no, el pointerup se
-    // retarget-ea al frame por la captura y el click nunca llega al botón.
+    // Do not capture the pointer when the down started on a control inside
+    // the frame (zoom or download button): the capture would retarget the
+    // pointerup to the frame and the click would never reach the button.
     if ((e.target as HTMLElement).closest('button, a')) return;
-    // Ya hay un pointer arrastrando — ignorar cualquier otro (segundo
-    // dedo) hasta que termine el actual.
+    // A pointer is already dragging: ignore any other (a second finger)
+    // until the current one ends.
     if (dragPointerId !== null) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     dragIndex = i;
@@ -165,7 +144,7 @@
   }
 
   function endDrag(e: PointerEvent) {
-    if (e.pointerId !== dragPointerId) return; // el dedo que suelta/cancela no es el que arrastraba
+    if (e.pointerId !== dragPointerId) return; // the finger released or cancelled is not the one dragging
     dragIndex = null;
     dragPointerId = null;
   }
@@ -177,28 +156,23 @@
     return `${transition} transform: ${transformFor(geom.pan, geom.scale, 0)};`;
   }
 
-  // Igual que RightToolbar: "fit" solo lleva zoom a 1 (relativo a fit). No
-  // hace falta tocar `pan` — a zoom 1 los bounds son 0 y el pan en píxeles
-  // ya da 0, y la fracción sigue disponible si el usuario vuelve a acercar
-  // (mismo diseño que la vista spread, ver pan-zoom.ts).
+  // As in RightToolbar, "fit" only sets zoom to 1 (relative to fit). `pan` is
+  // left alone: at zoom 1 the bounds are 0 and the pixel pan is 0, and the
+  // fraction is still there if the user zooms in again (the same design as
+  // the spread view, see pan-zoom.ts).
   function handleFit() { zoom = 1; }
   function handleActualSize() { zoom = oneToOneRef; }
 
 </script>
 
-<!-- ============================================================
-     BACKDROP: click fuera cierra el modal
-     ============================================================ -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="img-viewer-backdrop" onclick={onClose}>
 
-  <!-- Contenido del modal -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="img-viewer-content" onclick={(e) => e.stopPropagation()}>
 
-    <!-- ── Cabecera ── -->
     <div class="img-viewer-header">
       <div class="img-viewer-header-title-group">
         <span class="img-viewer-title">
@@ -211,7 +185,6 @@
       </button>
     </div>
 
-    <!-- ── Área de imágenes ── -->
     <div class="img-viewer-images">
       {#each images() as img, i}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -226,15 +199,14 @@
           onpointercancel={endDrag}
           onlostpointercapture={endDrag}
         >
-          <!-- Badge L/R en captura doble -->
           {#if isDouble() && (img.role === 'left' || img.role === 'right')}
             <span class="img-viewer-badge">
               {img.role === 'left' ? $m.badge_left : $m.badge_right}
             </span>
           {/if}
 
-          <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su miniatura,
-               nunca como imagen rota -->
+          <!-- NEH-139: a RAW is shown through its JPEG preview or its thumbnail,
+               never as a broken image -->
           <RecordImageDisplay image={img} onMasterFreed={(f) => (masterFreedById[img.id] = f)}>
             {#snippet children(src, onerror)}
               <img
@@ -293,11 +265,9 @@
       {/if}
     </div>
 
-    <!-- ── Pie de página ── -->
     <div class="img-viewer-footer">
 
       {#if confirmAction === null}
-        <!-- Acciones normales -->
         <button class="btn btn-secondary" onclick={onClose}>
           <span class="material-symbols-outlined icon-sm">close</span>
           {$m.common_close}
@@ -323,7 +293,6 @@
         </div>
 
       {:else if confirmAction === 'retake'}
-        <!-- Confirmación de retoma -->
         <span class="img-viewer-confirm-msg">
           {$m.col_retake_confirm}
         </span>
@@ -338,7 +307,6 @@
         </div>
 
       {:else if confirmAction === 'delete'}
-        <!-- Confirmación de eliminación -->
         <span class="img-viewer-confirm-msg">
           {$m.col_delete_record_confirm}
         </span>
@@ -382,8 +350,8 @@
   }
   .img-viewer-download:hover { background: var(--color-primary); }
 
-  /* Grupo fit/1:1 (NEH-230), pegado a la izquierda del botón de descarga —
-     mismo tamaño y estilo (32px, oscuro translúcido). */
+  /* Fit/1:1 group (NEH-230), just left of the download button, with the
+     same size and style (32px, translucent dark). */
   .img-viewer-zoom-controls {
     position: absolute;
     top: 8px;

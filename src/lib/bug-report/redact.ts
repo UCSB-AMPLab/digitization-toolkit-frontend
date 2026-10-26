@@ -1,20 +1,20 @@
-// Redacción de secretos en texto capturado para el reporte de errores (NEH-94).
-// Enmascara correos electrónicos, JWT, tokens de GitHub (PAT) y valores Bearer.
+// Redacts secrets in text captured for the bug report (NEH-94): masks email
+// addresses, JWTs, GitHub tokens and Bearer values.
 
 const PATTERNS: Array<[RegExp, string]> = [
   // JWT: eyJ... . ... . ...
   [/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[jwt]'],
-  // Tokens de GitHub (PAT clásicos)
+  // GitHub tokens (classic PATs)
   [/\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b/g, '[token]'],
-  // Tokens de GitHub de grano fino
+  // GitHub fine-grained tokens
   [/\bgithub_pat_[A-Za-z0-9_]{20,}\b/g, '[token]'],
   // Authorization: Bearer <token>
   [/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [redacted]'],
-  // Correos electrónicos
+  // Email addresses
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[email]'],
 ];
 
-/** Devuelve el texto con los secretos comunes enmascarados. */
+/** Returns the text with common secrets masked. */
 export function redact(input: string): string {
   if (!input) return input;
   let out = input;

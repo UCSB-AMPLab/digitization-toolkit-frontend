@@ -1,32 +1,22 @@
-// ============================================================================
-// MÓDULO: capture-key.ts (NEH-228)
+// Keyboard trigger for capture (NEH-228). A USB digitization foot pedal acts
+// as a keyboard that sends a single key, and the key differs from device to
+// device, so the operator assigns it by pressing the pedal once and the
+// browser stores it. The default (space bar) lets an ordinary keyboard work
+// with no setup.
 //
-// La captura ya no depende solo del puntero: un pedal de digitalización USB
-// se comporta como un teclado que emite una sola tecla, y esa tecla varía
-// por dispositivo. En vez de exigir configuración manual, quien opera la
-// asigna presionando el pedal una vez, y queda guardada en ese navegador.
-// El valor predeterminado (barra espaciadora) deja que un teclado normal
-// funcione sin tocar nada.
+// No Svelte imports and no direct `window` references — everything comes in
+// through arguments, so the Node test project can test the module without
+// mounting a component.
 //
-// Módulo puro: sin imports de Svelte, sin referencias directas a `window` —
-// todo entra por argumentos, para poder probarlo íntegro en el proyecto de
-// Node sin montar ningún componente.
-//
-// Dos preguntas distintas, respondidas por separado (ronda 55 de revisión):
-//   - ownsEvent:    ¿el evento le pertenece a la captura? (para decidir si
-//                    se llama a preventDefault)
-//   - shouldTrigger: ¿debe arrancar una captura ahora mismo?
-// Confundirlas convierte un pedal sostenido en un botón de navegación: si
-// solo se usara shouldTrigger, la primera pulsación se cancela pero las
-// repeticiones (evento repeat=true) pasan de largo hacia el control
-// seleccionado.
-// ============================================================================
+// Two separate questions, answered separately:
+//   - ownsEvent:     does the event belong to capture? (decides whether the
+//                    caller calls preventDefault)
+//   - shouldTrigger: should a capture start right now?
+// Using only shouldTrigger would turn a held pedal into a navigation key: the
+// first press is cancelled, but the repeats (repeat=true) reach the focused
+// control.
 
 import { browser } from '$app/environment';
-
-// ---------------------------------------------------------------------------
-// TIPOS
-// ---------------------------------------------------------------------------
 
 export type CaptureChord = {
   key: string;
@@ -44,17 +34,17 @@ export const DEFAULT_CHORD: CaptureChord = {
   shift: false
 };
 
-// Contexto para ownsEvent: lo que necesita saber si el evento pertenece a
-// la captura, sin importar si de verdad debe disparar una.
+// What ownsEvent needs to decide whether the event belongs to capture,
+// regardless of whether it should actually start one.
 export interface OwnsEventContext {
   chord: CaptureChord;
   modalOpen: boolean;
   activeElement: Element | null;
 }
 
-// shouldTrigger reutiliza el contexto anterior y agrega lo específico de
-// "arrancar una captura ahora": la tecla repetida, el seguro de tecla
-// sostenida, si ya hay una captura en curso y si la página está lista.
+// shouldTrigger adds what is specific to "start a capture now": the
+// held-key latch, whether a capture is already in progress and whether the
+// page is ready. Key repeat comes from the event itself.
 export interface ShouldTriggerContext extends OwnsEventContext {
   keyHeld: boolean;
   capturing: boolean;
@@ -65,10 +55,6 @@ export type LearnResult =
   | { ok: true; chord: CaptureChord }
   | { ok: false; reason: 'modifier-only'; modifier: 'Control' | 'Alt' | 'Shift' | 'Meta' }
   | { ok: false; reason: 'unbindable' };
-
-// ---------------------------------------------------------------------------
-// COMBINACIÓN DE TECLAS: construcción, comparación, descripción
-// ---------------------------------------------------------------------------
 
 export function chordFromEvent(event: KeyboardEvent): CaptureChord {
   return {
@@ -84,11 +70,11 @@ export function chordsMatch(a: CaptureChord, b: CaptureChord): boolean {
   return a.key === b.key && a.ctrl === b.ctrl && a.alt === b.alt && a.meta === b.meta && a.shift === b.shift;
 }
 
-// Para mostrar en pantalla: un espacio se nombra con la etiqueta dada (por
-// defecto 'Space'; imprimirlo tal cual sería invisible), y los modificadores
-// se unen con "+" en un orden fijo. El resto de las teclas queda tal como
-// las reporta el navegador — traducir 'Espacio' pero dejar F5 o Enter sin
-// traducir sería peor que dejarlos todos así.
+// For display: a space is shown with the given label (default 'Space';
+// printed as is it would be invisible), and modifiers are joined with "+" in
+// a fixed order. Every other key is shown as the browser reports it —
+// translating the space label but leaving F5 or Enter untranslated would be
+// inconsistent.
 export function describeChord(chord: CaptureChord, spaceLabel = 'Space'): string {
   const parts: string[] = [];
   if (chord.ctrl) parts.push('Ctrl');
@@ -99,13 +85,9 @@ export function describeChord(chord: CaptureChord, spaceLabel = 'Space'): string
   return parts.join('+');
 }
 
-// ---------------------------------------------------------------------------
-// ELEMENTO ACTIVO: ¿es un campo de texto?
-// ---------------------------------------------------------------------------
-
-// Tipos de <input> que aceptan texto tecleado. checkbox/radio/range/
-// button/submit quedan fuera a propósito: en esos, la tecla configurada
-// tiene que seguir disparando la captura.
+// <input> types that accept typed text. checkbox/radio/range/button/submit
+// are left out on purpose: with focus on those, the assigned key still has
+// to trigger a capture.
 const TEXT_INPUT_TYPES = new Set([
   'text',
   'search',
@@ -133,14 +115,10 @@ export function isTextEntry(element: Element | null): boolean {
   return false;
 }
 
-// ---------------------------------------------------------------------------
-// OWNSEVENT / SHOULDTRIGGER
-// ---------------------------------------------------------------------------
-
-// ¿Le pertenece este evento a la captura? Deliberadamente ignora repeat, el
-// seguro de tecla sostenida y si hay una captura en curso: esas tres
-// cosas deciden si HAY QUE arrancar una captura, no si el evento es de la
-// captura. El llamador hace preventDefault siempre que esto sea true.
+// Deliberately ignores repeat, the held-key latch and whether a capture is
+// in progress: those decide whether to start a capture, not whether the
+// event belongs to capture. The caller calls preventDefault whenever this
+// returns true.
 export function ownsEvent(event: KeyboardEvent, ctx: OwnsEventContext): boolean {
   return chordsMatch(chordFromEvent(event), ctx.chord) && !ctx.modalOpen && !isTextEntry(ctx.activeElement);
 }
@@ -149,23 +127,17 @@ export function shouldTrigger(event: KeyboardEvent, ctx: ShouldTriggerContext): 
   return ownsEvent(event, ctx) && !event.repeat && !ctx.keyHeld && !ctx.capturing && ctx.ready;
 }
 
-// ---------------------------------------------------------------------------
-// ASIGNAR LA TECLA: learnFromEvent
-// ---------------------------------------------------------------------------
-
 const MODIFIER_KEYS = new Set(['Control', 'Alt', 'Shift', 'Meta'] as const);
 
 // `Dead` (a dead key mid-composition on some layouts) and `Unidentified`
 // (the browser couldn't map the physical key) never name a real key either.
 const UNBINDABLE_KEYS = new Set(['Dead', 'Unidentified']);
 
-// Una tecla vacía, uno de los modificadores solo (Control/Alt/Shift/Meta,
-// sin ninguna otra tecla), o Dead/Unidentified, nunca puede ser el
-// disparador de una captura — ni recién asignada ni recuperada del
-// almacenamiento. Un solo predicado para los dos caminos: learnFromEvent
-// y readChord lo llaman los dos, para que no puedan desalinearse con el
-// tiempo (como pasó antes: learnFromEvent tenía su propia lista y readChord
-// ninguna).
+// An empty key, a modifier on its own (Control/Alt/Shift/Meta with no other
+// key), or Dead/Unidentified can never trigger a capture — neither when
+// newly assigned nor when read back from storage. learnFromEvent and
+// readChord both use this one predicate so that the two paths cannot drift
+// apart.
 function isBindableKey(key: string): boolean {
   return key.length > 0 && !MODIFIER_KEYS.has(key as 'Control' | 'Alt' | 'Shift' | 'Meta') && !UNBINDABLE_KEYS.has(key);
 }
@@ -175,14 +147,15 @@ function isBindableChord(chord: CaptureChord): boolean {
 }
 
 export function learnFromEvent(event: KeyboardEvent): LearnResult {
-  // Mid-composición no depende del valor de `key` — se revisa aparte.
+  // Mid-composition does not depend on the value of `key`, so it is checked
+  // separately.
   if (event.isComposing) {
     return { ok: false, reason: 'unbindable' };
   }
-  // Un modificador solo tiene su propio diagnóstico (cuál modificador,
-  // para que el control de asignación pueda decirlo); todo lo demás que
-  // isBindableKey rechaza (tecla vacía, Dead, Unidentified) comparte el
-  // mismo "unbindable" genérico que usa el almacenamiento.
+  // A lone modifier gets its own result (naming the modifier, so the
+  // assignment control can say which); everything else isBindableKey
+  // rejects (empty key, Dead, Unidentified) shares the generic
+  // "unbindable".
   if (MODIFIER_KEYS.has(event.key as 'Control' | 'Alt' | 'Shift' | 'Meta')) {
     return { ok: false, reason: 'modifier-only', modifier: event.key as 'Control' | 'Alt' | 'Shift' | 'Meta' };
   }
@@ -192,15 +165,12 @@ export function learnFromEvent(event: KeyboardEvent): LearnResult {
   return { ok: true, chord: chordFromEvent(event) };
 }
 
-// ---------------------------------------------------------------------------
-// PERSISTENCIA: una sola clave en localStorage, siguiendo la forma de
-// stores/token.ts — protegida por el flag `browser` de SvelteKit y try/catch
-// para que un storage ausente o que lanza (modo privado, cuota) devuelva el
-// valor por defecto en vez de romper la página. Un valor con la forma
-// correcta pero con una tecla vacía o solo un modificador (isBindableChord)
-// cae al valor por defecto igual que uno malformado — si no, la captura
-// quedaría muerta sin ninguna tecla capaz de dispararla.
-// ---------------------------------------------------------------------------
+// Persistence: a single localStorage key, following stores/token.ts —
+// guarded by SvelteKit's `browser` flag and try/catch so that missing or
+// throwing storage (private mode, quota) yields the default instead of
+// breaking the page. A well-formed value whose key is not bindable
+// (isBindableChord) falls back to the default just like a malformed one;
+// otherwise no key could trigger a capture.
 
 const STORAGE_KEY = 'dtk_capture_chord';
 
@@ -234,9 +204,9 @@ export function writeChord(chord: CaptureChord): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(chord));
   } catch {
-    // localStorage puede no estar disponible (modo privado, cuota agotada):
-    // la combinación de teclas queda solo en memoria para esta sesión, sin
-    // romper la página.
+    // localStorage may be unavailable (private mode, quota exceeded): the
+    // chord is then kept only in memory for this session, without breaking
+    // the page.
   }
 }
 
@@ -245,6 +215,6 @@ export function clearChord(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
-    // ver writeChord
+    // See writeChord.
   }
 }

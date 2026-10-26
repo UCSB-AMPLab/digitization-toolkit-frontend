@@ -55,7 +55,7 @@ export function seedRotation(
 
 /**
  * Builds a `save(index, hardwareId, degrees)` function that persists a
- * rotation change with exactly one PUT in flight per camera index (R30-2).
+ * rotation change with exactly one PUT in flight per camera index.
  *
  * While a save for an index is in flight, a further call for the same index
  * doesn't start a second PUT — it just remembers the latest (hardwareId,

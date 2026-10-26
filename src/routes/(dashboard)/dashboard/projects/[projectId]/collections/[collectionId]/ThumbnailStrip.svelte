@@ -1,27 +1,18 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: ThumbnailStrip (Gallery)
+  // Horizontal thumbnail strip at the bottom of the gallery's spread view.
   //
-  // Tira horizontal de miniaturas en la parte inferior de la galería.
+  // One unit per RECORD, not per image (NEH-236). A folio captured with two
+  // cameras has two images, and the list view treats it as one thing
+  // (NEH-211); the strip must agree, so the title appears once per record.
   //
-  // Una unidad por REGISTRO, no por imagen (NEH-236). Un folio capturado con
-  // dos cámaras tiene dos imágenes, y la vista de lista ya lo trata como una
-  // sola cosa desde NEH-211; la tira las mostraba sueltas y repetía el título
-  // debajo de cada mitad, así que la misma pantalla decía dos cosas distintas
-  // sobre qué es un registro.
-  //
-  // Agrupa por cercanía y no con un marco, igual que la cuadrícula: las dos
-  // mitades casi se tocan y los folios vecinos quedan lejos. El marco claro
-  // queda libre para lo que de verdad necesita marcarse —el folio activo— y
-  // rodea el grupo entero, no cada mitad.
-  // ============================================================================
+  // It groups by proximity and not with a frame, as the grid does: the two
+  // halves almost touch and neighbouring folios sit far apart. The light
+  // frame is kept for what needs marking — the active folio — and surrounds
+  // the whole group, not each half.
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     records,
     selectedRecordId,
@@ -34,9 +25,6 @@
     onSelect: (id: number) => void;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // TIPO: item individual de la tira
-  // ---------------------------------------------------------------------------
   interface ThumbItem {
     record: Record;
     image: RecordImage | null;
@@ -56,9 +44,7 @@
     return recordsApi.getImageThumbnailUrl(img.id);
   }
 
-  // ---------------------------------------------------------------------------
-  // DERIVADO: un grupo por registro, con sus imágenes dentro
-  // ---------------------------------------------------------------------------
+  // One group per record, holding its images.
   interface ThumbGroup {
     record: Record;
     items: ThumbItem[];
@@ -69,7 +55,7 @@
       if (!record.images || record.images.length === 0) {
         return { record, items: [{ record, image: null, role: null, thumbnailUrl: null }] };
       }
-      // Ordenar: left primero, luego right, luego sin rol (por id como desempate)
+      // Left first, then right, then images without a role; id breaks ties.
       const sorted = [...record.images].sort((a, b) => {
         const order = (r?: string) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
         return order(a.role) - order(b.role) || a.id - b.id;
@@ -87,9 +73,6 @@
   );
 </script>
 
-<!-- ============================================================
-     TIRA DE MINIATURAS
-     ============================================================ -->
 <div class="thumbnail-strip">
   <div class="strip-scroll">
 
@@ -112,8 +95,8 @@
           onclick={() => onSelect(group.record.id)}
         >
 
-          <!-- Las mitades del folio, juntas. El marco de seleccionado va aquí
-               y no en cada imagen: lo que se elige es el folio. -->
+          <!-- The folio's halves, together. The selection frame goes here and
+               not on each image: what is selected is the folio. -->
           <div class="thumb-pair" class:selected>
             {#each group.items as item, j}
               <div class="thumb-img-wrapper" class:alt={j % 2 !== 0}>
@@ -128,7 +111,6 @@
                   </div>
                 {/if}
 
-                <!-- Badge L/R -->
                 {#if item.role}
                   <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
                 {/if}
@@ -136,7 +118,7 @@
             {/each}
           </div>
 
-          <!-- Nombre: una vez por folio, no debajo de cada mitad -->
+          <!-- Name: once per folio, not under each half -->
           <div class="thumb-info">
             <span class="thumb-name" title={group.record.title}>{group.record.title || `Img ${i+1}`}</span>
           </div>
@@ -161,9 +143,9 @@
     flex-shrink: 0;
   }
 
-  /* 16px entre folios contra los 4 de --pair-gap: cuatro veces más, que es
-     lo que hace que el ojo lea las dos mitades como una sola cosa. Si se
-     cambia uno, mirar el otro — lo que agrupa es la diferencia, no el valor. */
+  /* 16px between folios against the 4px of --pair-gap: four times as much,
+     which is what makes the eye read the two halves as one thing. Change one
+     and check the other — the difference does the grouping, not the value. */
   .strip-scroll {
     flex: 1;
     display: flex;
@@ -189,10 +171,10 @@
     white-space: nowrap;
   }
 
-  /* El ancho lo deciden las mitades: un folio de una imagen mide 100px y uno
-     de dos mide el doble más el hueco interno, así que cada mitad conserva el
-     tamaño de una miniatura simple. El hueco entre folios lo pone .strip-scroll
-     y es bastante mayor que --pair-gap: esa diferencia es la que agrupa. */
+  /* The halves set the width: a one-image folio is 100px wide and a
+     two-image one twice that plus the inner gap, so each half keeps the size
+     of a single thumbnail. The gap between folios comes from .strip-scroll
+     and is much larger than --pair-gap: that difference does the grouping. */
   .thumb-item {
     --pair-gap: 4px;
     display: flex;
@@ -211,8 +193,8 @@
   .thumb-item:hover { opacity: 1; }
   .thumb-item.selected { opacity: 1; }
 
-  /* El marco de seleccionado rodea el folio entero. Antes iba en cada imagen,
-     que es lo que hacía parecer que cada mitad era un registro (NEH-236). */
+  /* The selection frame surrounds the whole folio, not each image, so that
+     each half does not read as a record of its own (NEH-236). */
   .thumb-pair {
     display: flex;
     gap: var(--pair-gap);

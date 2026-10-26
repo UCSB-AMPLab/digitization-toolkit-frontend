@@ -6,9 +6,9 @@ import { m } from './i18n';
 import { authStore } from './stores/auth';
 import { tokenStore } from './stores/token';
 
-// Re-exportado por compatibilidad — el resto de la app importa tokenStore
-// desde acá (ver login/+page.svelte). La implementación vive en
-// stores/token.ts, la única fuente de verdad del access token (NEH-41).
+// Re-exported so the app can import tokenStore from here (login/+page.svelte
+// does). The implementation lives in stores/token.ts, the single source for
+// the access token (NEH-41).
 export { tokenStore };
 
 /**
@@ -486,10 +486,10 @@ export const projectsApi = {
 // ============================================================================
 
 export interface Collection {
-  record_count?: number;  // número de registros — devuelto por el backend en algunos endpoints
-  // Fecha del registro modificado más recientemente dentro del volumen: cuándo
-  // se trabajó por última vez. Distinto de updated_at, que solo se mueve al
-  // editar la fila del volumen. Null si no tiene registros (NEH-247).
+  record_count?: number;  // only some backend endpoints return it
+  // Date of the most recently modified record in the volume: when it was
+  // last worked on. Unlike updated_at, which changes only when the volume's
+  // own row is edited. Null when the volume has no records (NEH-247).
   last_activity_at?: string | null;
   id: number;
   name: string;
@@ -1474,7 +1474,7 @@ export const camerasApi = {
   /**
    * Persist the capture rotation the appliance should remember for the body
    * currently at `cameraIndex`. `hardwareId` pins the write to that specific
-   * body (R30-4) — the backend returns 409 if a different body now sits at
+   * body — the backend returns 409 if a different body now sits at
    * that index, which callers should treat like any other save error (the
    * next device refresh re-seeds the index from whatever is really there).
    * Resolves once the write is acknowledged; the device row the backend
@@ -1836,14 +1836,12 @@ export interface OffsiteJobStatus {
   error:         string | null;
 }
 
-// Apagado / reinicio del equipo.
 export type PowerAction = 'poweroff' | 'reboot';
 
 /**
- * Error de la llamada de energía que conserva el código HTTP.
- * Necesario para distinguir 501 (control no disponible — máquina de
- * desarrollo) de un error real. powerControl() llama a fetch directamente,
- * sin pasar por apiRequest().
+ * Error from the power call that keeps the HTTP status, needed to tell 501
+ * (power control unavailable — a development machine) from a real error.
+ * powerControl() calls fetch directly, not through apiRequest().
  */
 export class PowerControlError extends Error {
   status: number;
@@ -1906,12 +1904,12 @@ export const systemApi = {
   },
 
   /**
-   * Apagar o reiniciar el equipo.
-   *   200 → { message } (el backend se apaga o reinicia segundos después)
-   *   501 → control de energía no disponible (p. ej. entorno de desarrollo)
-   *   401 → sesión expirada
-   * Lanza PowerControlError con el status para que la UI muestre el mensaje
-   * adecuado. Llama a fetch directamente, sin pasar por apiRequest().
+   * Powers off or reboots the unit.
+   *   200 → { message } (the backend shuts down or restarts seconds later)
+   *   501 → power control unavailable (e.g. a development environment)
+   *   401 → session expired
+   * Throws PowerControlError with the status so the UI can show the right
+   * message. Calls fetch directly, not through apiRequest().
    */
   async powerControl(action: PowerAction): Promise<{ message: string }> {
     const base  = getApiBase();
@@ -1925,8 +1923,8 @@ export const systemApi = {
       body:   JSON.stringify({ action }),
     });
 
-    // El cuerpo puede venir vacío o no ser JSON (p. ej. proxies); nunca
-    // dejamos que eso rompa el tipo de retorno declarado.
+    // The body may be empty or not JSON (e.g. from a proxy); that must not
+    // break the declared return type.
     const data: { message?: string; detail?: string } =
       await response.json().catch(() => ({}));
     if (!response.ok) {

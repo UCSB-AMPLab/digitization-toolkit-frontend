@@ -1,16 +1,10 @@
-// ============================================================================
-// STORE: token.ts
-// Única fuente de verdad para el access token persistido en localStorage
-// (NEH-41 — antes había dos escrituras independientes de la misma clave:
-// esta y una copia inline en api.ts).
+// The single source for the access token persisted in localStorage (NEH-41).
 //
-// Sin reactividad de Svelte a propósito: apiRequest() (api.ts) necesita
-// leerlo de forma síncrona en cada request, incluso antes de que authStore
-// tenga el usuario cargado — ver el comentario en el paso 2 de
-// (auth)/login/+page.svelte, que depende de este orden. authStore
-// (stores/auth.ts) delega en este módulo para el token en vez de tener su
-// propia copia de localStorage.getItem/setItem('access_token').
-// ============================================================================
+// Not a Svelte store on purpose: apiRequest() (api.ts) reads the token
+// synchronously on every request, even before authStore has the user — the
+// login page ((auth)/login/+page.svelte) relies on this when it stores the
+// token before calling `/users/me`. authStore (stores/auth.ts) delegates to
+// this module rather than reading or writing 'access_token' itself.
 
 import { browser } from '$app/environment';
 

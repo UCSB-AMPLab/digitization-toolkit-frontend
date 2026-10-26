@@ -9,9 +9,9 @@
 
   let { children, data } = $props();
 
-  // Sincroniza el store de idioma con la cookie que leyó el servidor.
-  // El idioma solo cambia con recarga completa (ver setLanguage en $lib/i18n),
-  // así que basta fijarlo una vez por carga.
+  // Syncs the locale store with the cookie the server read. The language
+  // changes only on a full reload (see `setLanguage` in `$lib/i18n`), so
+  // setting it once per load is enough.
   locale.set(data.locale);
   onMount(() => { initErrorCapture(); });
 </script>
@@ -22,9 +22,8 @@
 
 {@render children?.()}
 
-<!-- El recorrido guiado se monta aquí, una sola vez, para que sobreviva a los
-     cambios de ruta: sus pasos viven en tres pantallas distintas (NEH-95). -->
+<!-- The guided tour is mounted here, once, so that it survives route
+     changes: its steps live on three different screens (NEH-95). -->
 <GuidedTour />
 
-<!-- <VirtualKeyboard /> -->
 

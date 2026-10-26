@@ -1,12 +1,12 @@
 // NEH-222: the live viewport takes its shape from the frames instead of a
 // hardcoded 4:3 box. `frameAspect`/`viewportAspect` compute the aspect ratio
 // the on-screen box should have; `fitBox` turns that aspect into the largest
-// pixel box that fits the measured board (R39-3).
+// pixel box that fits the measured board.
 import { describe, it, expect } from 'vitest';
 import { fitBox, frameAspect, panelGrowFactor, viewportAspect } from './viewport-aspect';
 
 describe('fitBox', () => {
-  it('a 9:16 aspect in a 1000x600 board is width-limited (R39-3)', () => {
+  it('a 9:16 aspect in a 1000x600 board is width-limited', () => {
     expect(fitBox(9 / 16, 1000, 600)).toEqual({ w: 337.5, h: 600 });
   });
 

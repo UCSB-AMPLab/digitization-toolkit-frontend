@@ -1,34 +1,13 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: TopBar
-  // Archivo: src/routes/live-preview/TopBar.svelte
-  //
-  // Barra superior de la interfaz Live Preview / Gallery.
-  // Contiene:
-  //   - Botón volver + breadcrumb proyecto / volumen (izquierda)
-  //   - Botón "Ir a revisión" + avatar de usuario (derecha)
-  //
-  // Hasta mayo de 2026 esta barra tenía tabs "Live Scan / Gallery". El markup se
-  // quitó en 84acac1 y quedaron las props, el estado y el CSS. La navegación que
-  // disparaban vive ahora en el botón "Ir a revisión"; el resto se retira aquí.
-  //
-  // El breadcrumb replica el de la vista de colección a propósito: al entrar a
-  // capturar, el operador no debe perder de vista dónde se están guardando las
-  // imágenes.
-  //
-  // Props:
-  //   onBack          → callback al hacer click en volver
-  //   onGoToReview    → callback para salir a la vista de revisión del volumen
-  //   projectName     → nombre del proyecto ('' mientras carga)
-  //   collectionName  → nombre del volumen ('' mientras carga)
-  // ============================================================================
+  // Top bar of the capture page: the back button and the project / volume
+  // breadcrumb on the left, the go-to-review button and the user menu on the
+  // right. The breadcrumb mirrors the collection view's on purpose, so the
+  // operator can see where the images are being stored while capturing.
+  // projectName and collectionName are '' while they load.
 
   import { m } from '$lib/i18n';
   import UserMenu from '$lib/components/UserMenu.svelte';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     onBack,
     onGoToReview,
@@ -43,26 +22,19 @@
 
 </script>
 
-<!-- ============================================================
-     BARRA SUPERIOR
-     Altura fija 72px, fondo surface, borde verde inferior
-     ============================================================ -->
 <div class="topbar">
 
-  <!-- ── Lado izquierdo: botón volver ── -->
   <div class="topbar-left">
     <button
       class="btn-circle"
       onclick={onBack}
       aria-label={$m.tb_back}
     >
-      <!-- Ícono flecha izquierda -->
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M19 12H5M12 5l-7 7 7 7"/>
       </svg>
     </button>
 
-    <!-- Breadcrumb: dónde se están guardando las capturas -->
     {#if projectName || collectionName}
       <nav class="breadcrumb" aria-label={$m.tb_breadcrumb_nav}>
         {#if projectName}
@@ -78,10 +50,9 @@
     {/if}
   </div>
 
-  <!-- ── Lado derecho: ir a revisión + avatar ── -->
   <div class="topbar-right">
-    <!-- Simétrico al botón "Ir a captura" de la vista de colección: misma
-         esquina, mismo estilo, sentido contrario. -->
+    <!-- Symmetric with the collection view's go-to-capture button: same
+         corner, same style, opposite direction. -->
     <button
       class="btn-review"
       onclick={onGoToReview}
@@ -91,19 +62,17 @@
       <span>{$m.tb_go_to_review}</span>
     </button>
 
-    <!-- Identidad + salir. El avatar abre el menú (NEH-234). -->
+    <!-- Identity and sign-out. The avatar opens the menu (NEH-234). -->
     <UserMenu label={$m.tb_current_user} />
   </div>
 
 </div>
 
 <style>
-  /* Barra completa: 72px de alto, fondo surface oscuro */
   .topbar {
     height: 72px;
     width: 100%;
     background-color: var(--color-surface-alt);
-    /* Borde inferior verde — color primario del design system */
     border-bottom: 2px solid var(--color-primary);
     display: flex;
     align-items: center;
@@ -114,7 +83,6 @@
     z-index: 20;
   }
 
-  /* ── Lados izquierdo y derecho ── */
   .topbar-left,
   .topbar-right {
     display: flex;
@@ -133,7 +101,6 @@
     flex-shrink: 0;
   }
 
-  /* Botón circular (volver) */
   .btn-circle {
     width: 40px;
     height: 40px;
@@ -153,7 +120,7 @@
     background-color: rgba(255, 255, 255, 0.08);
   }
 
-  /* ── Botón "Ir a revisión": espejo de .btn-camera de la vista de colección ── */
+  /* Mirrors .btn-camera in the collection view */
   .btn-review {
     display: flex;
     align-items: center;
@@ -176,7 +143,7 @@
     background-color: var(--color-primary-hover);
   }
 
-  /* ── Breadcrumb: mismos valores que la vista de colección ── */
+  /* Same values as the collection view's breadcrumb */
   .breadcrumb {
     display: flex;
     align-items: center;

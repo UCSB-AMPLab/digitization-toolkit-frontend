@@ -1,20 +1,10 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Detalle de Proyecto (Inside Proyecto)
-  // Ruta: /shared/projects/[projectId]
-  // Archivo: src/routes/(dashboard)/shared/projects/[projectId]/+page.svelte
-  //
-  // Muestra:
-  //   - Nombre del proyecto + subtítulo
-  //   - Botón "Volver a Proyectos"
-  //   - KPI cards: Colecciones, Total registros, Colaboradores
-  //   - Barra de búsqueda + Filtros
-  //   - Tabla de colecciones: Colección, Estado, Núm. registros, Responsable, Fecha, Acciones
-  //   - Botón "Nueva Colección" → modal
-  //
-  // Modal "Nueva Colección":
-  //   - Nombre, Descripción, Cantidad estimada de imágenes
-  // ============================================================================
+  // Project detail (/dashboard/projects/[projectId]): the project's volumes,
+  // with KPIs, a name search, and the modals that create, edit and delete a
+  // volume and manage the project's members. The volume form owns the
+  // filename stem rules (see `VolumeStemField`); the delete modal moves a
+  // volume's records to another volume first when it has any. The Status
+  // column shows placeholder values (see `mockStatuses`).
 
   import { onMount } from 'svelte';
   import { m, roleLabel, locale } from '$lib/i18n';
@@ -28,14 +18,8 @@
   import { volumeSaveErrorText, volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
   import VolumeStemField from './VolumeStemField.svelte';
 
-  // ---------------------------------------------------------------------------
-  // PARÁMETROS DE RUTA
-  // ---------------------------------------------------------------------------
   let projectId = $derived(Number($page.params.projectId) || 0);
 
-  // ---------------------------------------------------------------------------
-  // ESTADO
-  // ---------------------------------------------------------------------------
   let project     = $state<Project | null>(null);
   let collections = $state<Collection[]>([]);
   let isLoading   = $state(true);
@@ -46,10 +30,10 @@
   // soon as it's filed into a collection, so this alone undercounts.
   let directRecordCount = $state<number | null>(null);
 
-  // Total = direct records + each collection's own record_count (now
-  // populated by GET /collections/, NEH-179). Collections aren't nested
-  // via the UI today, so summing the (flat, top-level) list covers every
-  // record under the project without a recursive traversal.
+  // Total = direct records + each collection's own record_count (populated
+  // by GET /collections/, NEH-179). The UI does not nest collections, so
+  // summing the flat, top-level list covers every record under the project
+  // without a recursive traversal.
   let recordCount = $derived(
     directRecordCount === null
       ? null
@@ -59,14 +43,12 @@
   let canCreate = $derived(
     $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
   );
-  // Solo admin puede crear/asignar/quitar colaboradores — el backend ya lo
-  // exige (allow_admin en add_project_member/remove_project_member,
-  // NEH-80); operator y reviewer ni siquiera pueden consultar la lista de
-  // usuarios (GET /auth/users es admin-only), así que el picker no debe
-  // intentar cargarla para ellos.
+  // Only admin adds or removes members — the backend enforces it too
+  // (`allow_admin` in `add_project_member`/`remove_project_member`, NEH-80).
+  // Operator and reviewer cannot even read the user list (GET /auth/users is
+  // admin-only), so the picker must not try to load it for them.
   let canManageMembers = $derived($authStore.user?.role === 'admin');
 
-  // Colecciones filtradas
   let filteredCollections = $derived(
     searchQuery.trim()
       ? collections.filter(c =>
@@ -75,9 +57,6 @@
       : collections
   );
 
-  // ---------------------------------------------------------------------------
-  // MODAL: Nueva Colección
-  // ---------------------------------------------------------------------------
   let showCreateModal = $state(false);
   let colName         = $state('');
   let colDesc         = $state('');
@@ -131,9 +110,6 @@
       : ''
   );
 
-  // ---------------------------------------------------------------------------
-  // AL MONTAR
-  // ---------------------------------------------------------------------------
   onMount(async () => {
     await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
     // ?editVolume=<id> opens that volume's form: the capture screen links
@@ -149,7 +125,7 @@
     try {
       project = await projectsApi.get(projectId);
     } catch (err) {
-      console.error('[ProjectDetail] Error cargando proyecto:', err);
+      console.error('[ProjectDetail] Error loading project:', err);
     }
   }
 
@@ -157,13 +133,10 @@
     try {
       directRecordCount = await recordsApi.count({ project_id: projectId });
     } catch (err) {
-      console.error('[ProjectDetail] Error cargando conteo de registros:', err);
+      console.error('[ProjectDetail] Error loading record count:', err);
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // COLABORADORES
-  // ---------------------------------------------------------------------------
   let members            = $state<ProjectMember[]>([]);
   let showMembersModal   = $state(false);
   let memberSearchQuery  = $state('');
@@ -185,7 +158,7 @@
     try {
       members = await projectMembersApi.list(projectId);
     } catch (err) {
-      console.error('[ProjectDetail] Error cargando colaboradores:', err);
+      console.error('[ProjectDetail] Error loading members:', err);
     }
   }
 
@@ -197,7 +170,7 @@
         const { usersApi } = await import('$lib/api');
         allUsers = await usersApi.list();
       } catch (err) {
-        console.error('[ProjectDetail] Error cargando usuarios:', err);
+        console.error('[ProjectDetail] Error loading users:', err);
       }
     }
   }
@@ -233,20 +206,12 @@
       const data = await collectionsApi.listAll({ project_id: projectId });
       collections = data;
     } catch (err) {
-      console.error('[ProjectDetail] Error cargando colecciones:', err);
+      console.error('[ProjectDetail] Error loading collections:', err);
     } finally {
       isLoading = false;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // CREAR COLECCIÓN
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // CREAR COLECCIÓN
-  // Modo demo (token = demo-token): simula localmente sin llamar al backend.
-  // Modo real: llama a collectionsApi.create() y recarga la lista.
-  // ---------------------------------------------------------------------------
   async function handleCreateCollection() {
     if (!colName.trim() || stemInvalid) return;
     isCreating = true;
@@ -262,9 +227,8 @@
 
       const stem = colStem.trim();
       if (editingCollection) {
-        // Modo edición: actualizar colección existente. The stem is sent
-        // only when it changed to a non-empty value, and never once it is
-        // reserved; null is never sent.
+        // The stem is sent only when it changed to a non-empty value, and
+        // never once it is reserved; null is never sent.
         const stemChanged = !stemLocked && stem !== '' && stem !== (editingCollection.filename_stem ?? '');
         await collectionsApi.update(editingCollection.id, {
           name: colName.trim(),
@@ -274,7 +238,7 @@
         });
         await loadCollections();
       } else if ($authStore.token === 'demo-token') {
-        // Simular creación localmente sin backend
+        // A demo session creates the volume locally, without the backend.
         const mockCollection = {
           id: Date.now(),
           name: colName.trim(),
@@ -288,7 +252,6 @@
         } as any;
         collections = [...collections, mockCollection];
       } else {
-        // Modo real: llamada al backend
         await collectionsApi.create({
           name: colName.trim(),
           description: colDesc.trim() || undefined,
@@ -311,7 +274,7 @@
       // Known cases have their own message, anything else a generic one; the
       // backend's English text goes to the console only.
       createError = volumeSaveErrorText(err, $m);
-      console.error('[ProjectDetail] Error creando colección:', err);
+      console.error('[ProjectDetail] Error creating collection:', err);
     } finally {
       isCreating = false;
     }
@@ -327,16 +290,10 @@
     colStem = '';
   }
 
-  // ---------------------------------------------------------------------------
-  // NAVEGAR A LA COLECCIÓN
-  // ---------------------------------------------------------------------------
   function handleCollectionClick(collectionId: number) {
     goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
   }
 
-  // ---------------------------------------------------------------------------
-  // MENÚ DE ACCIONES POR COLECCIÓN
-  // ---------------------------------------------------------------------------
   let openColMenuId = $state<number | null>(null);
 
   // Delete collection modal state
@@ -397,7 +354,7 @@
     try {
       deleteColRecordCount = await recordsApi.count({ collection_id: col.id });
     } catch (err) {
-      console.error('[ProjectDetail] Error obteniendo info de colección:', err);
+      console.error('[ProjectDetail] Error fetching collection info:', err);
     } finally {
       isLoadingDeleteColInfo = false;
     }
@@ -442,7 +399,7 @@
         deletingCol = { ...deletingCol, stem_reserved: true };
         await loadCollections();
       } else if (isNotEmptyRefusal(err) && deletingCol) {
-        console.error('[ProjectDetail] Error eliminando volumen:', err);
+        console.error('[ProjectDetail] Error deleting volume:', err);
         const counts = notEmptyCounts(err);
         if (counts && counts.subVolumes > 0) {
           // Sub-volumes block the delete, with or without records: moving
@@ -456,7 +413,7 @@
           try {
             deleteColRecordCount = await recordsApi.count({ collection_id: deletingCol.id });
           } catch (countErr) {
-            console.error('[ProjectDetail] Error obteniendo info de colección:', countErr);
+            console.error('[ProjectDetail] Error fetching collection info:', countErr);
           }
           if (deleteColRecordCount === 0) {
             // The count could not be read, or the records left meanwhile.
@@ -468,15 +425,14 @@
       } else {
         // The backend's English text goes to the console only.
         deleteColError = volumeDeleteErrorText(err, $m);
-        console.error('[ProjectDetail] Error eliminando volumen:', err);
+        console.error('[ProjectDetail] Error deleting volume:', err);
       }
       isDeletingCol = false;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // HELPERS DE UI (mock — conectar con backend)
-  // ---------------------------------------------------------------------------
+  // Placeholder statuses, not read from the backend: the Status column cycles
+  // through them by row index.
   let mockStatuses = $derived([$m.pd_status_active, $m.pd_status_active, $m.proj_status_paused, $m.pd_status_active, $m.pd_status_completed]);
 
   function getStatusStyle(status: string): string {
@@ -487,9 +443,6 @@
   }
 </script>
 
-<!-- ============================================================
-     PÁGINA DE DETALLE DE PROYECTO
-     ============================================================ -->
 <div class="page">
 
   <!-- Header -->
@@ -498,7 +451,7 @@
       <h1 class="page-title">{project?.name ?? '—'}</h1>
       <p class="page-subtitle">{$m.pd_subtitle}</p>
     </div>
-    <!-- Botón "+ Nueva colección" solo visible cuando ya hay colecciones -->
+    <!-- Only once volumes exist: the empty state has its own create button. -->
     {#if canCreate && collections.length > 0}
       <button class="btn-primary" data-tour="nuevo-volumen" onclick={() => showCreateModal = true}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -509,7 +462,6 @@
     {/if}
   </div>
 
-  <!-- Botón volver -->
   <button class="btn-back" onclick={() => goto('/dashboard/projects')}>
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M2.5 12H21M2.5 12l5-5M2.5 12l5 5"/>
@@ -517,7 +469,6 @@
     {$m.pd_back}
   </button>
 
-  <!-- KPI Cards + Colaboradores button -->
   <div class="kpi-bar">
     <div class="kpi-row">
       <div class="kpi-card">
@@ -542,7 +493,6 @@
     </button>
   </div>
 
-  <!-- Búsqueda -->
   <div class="toolbar">
     <div class="search-wrapper">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
@@ -552,7 +502,6 @@
     </div>
   </div>
 
-  <!-- Tabla de colecciones -->
   {#if isLoading}
     <div class="loading">
       <div class="spinner"></div>
@@ -585,7 +534,6 @@
             {@const status  = mockStatuses[i % mockStatuses.length]}
 
             <tr class="table-row" onclick={() => handleCollectionClick(col.id)}>
-              <!-- Colección -->
               <td>
                 <div class="col-cell">
                   <div class="col-icon">
@@ -617,12 +565,10 @@
                 </div>
               </td>
 
-              <!-- Estado -->
               <td>
                 <span class="status-badge" style={getStatusStyle(status)}>{status}</span>
               </td>
 
-              <!-- Núm. imágenes -->
               <td>
                 <div class="img-count">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -633,7 +579,6 @@
                 </div>
               </td>
 
-              <!-- Fecha -->
               <td>
                 <div class="date-cell">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -644,7 +589,6 @@
                 </div>
               </td>
 
-              <!-- Acciones -->
               <td class="text-right">
                 <div class="action-menu-wrap">
                   <button
@@ -679,9 +623,6 @@
 
 </div>
 
-<!-- ============================================================
-     MODAL: Nueva Colección
-     ============================================================ -->
 {#if showCreateModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -701,7 +642,6 @@
       </div>
 
       <div class="modal-body">
-        <!-- Título -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_title} <span class="field-required">*</span></label>
           <input
@@ -713,10 +653,8 @@
           />
         </div>
 
-        <!-- Raíz (filename_stem) -->
         <VolumeStemField bind:value={colStem} locked={stemLocked} required={stemRequired} />
 
-        <!-- Signatura -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_refcode}</label>
           <input
@@ -727,7 +665,6 @@
           />
         </div>
 
-        <!-- Nombre del creador -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_creator}</label>
           <input
@@ -738,7 +675,6 @@
           />
         </div>
 
-        <!-- Fechas de creación -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_dates}</label>
           <div class="date-range-row">
@@ -769,7 +705,6 @@
           {/if}
         </div>
 
-        <!-- Notas / Descripción -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_notes}</label>
           <textarea
@@ -780,7 +715,6 @@
         </div>
       </div>
 
-      <!-- Error al crear colección -->
       {#if createError}
         <div class="create-error">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -809,9 +743,6 @@
   </div>
 {/if}
 
-<!-- ============================================================
-     MODAL: Colaboradores
-     ============================================================ -->
 {#if showMembersModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -843,7 +774,7 @@
                   <span class="member-email">{member.email}</span>
                 {/if}
               </div>
-              <!-- La clase CSS conserva el valor crudo del enum; solo el texto se traduce. -->
+              <!-- The CSS class keeps the raw enum value; only the text is translated. -->
               <span class="role-badge role-badge--{member.role}">{$roleLabel(member.role)}</span>
               {#if member.is_implicit}
                 <span class="member-implicit-icon" title={$m.pd_member_implicit}>
@@ -858,7 +789,6 @@
           {/each}
         </ul>
 
-        <!-- Add member — only for admin/operator -->
         {#if canManageMembers}
           <div class="add-member-section">
             <p class="add-member-title">{$m.pd_member_add}</p>
@@ -900,9 +830,6 @@
   </div>
 {/if}
 
-<!-- ============================================================
-     MODAL: Eliminar Colección
-     ============================================================ -->
 {#if showDeleteColModal && deletingCol}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1007,7 +934,6 @@
   .page-title  { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
 
-  /* Botón volver */
   .btn-back {
     display: inline-flex;
     align-items: center;
@@ -1045,7 +971,6 @@
     gap: 4px;
   }
 
-  /* Rayita de color en la parte superior */
   .kpi-line {
     width: 24px;
     height: 2px;
@@ -1330,9 +1255,10 @@
 
   .modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
 
-  /* Colaboradores: única forma de cerrar el modal — círculo con target
-     táctil de 44x44 (--touch-target-min) y feedback de hover/active visible
-     (mismo patrón que .btn-back en +layout@.svelte y .btn:active global) */
+  /* Close button of the members modal: a circle with a 44x44 touch target
+     (--touch-target-min) and visible hover/active feedback (same pattern as
+     .btn-back in the volume view's +layout@.svelte and the global
+     .btn:active). */
   .modal-close--circle {
     width: var(--touch-target-min);
     height: var(--touch-target-min);

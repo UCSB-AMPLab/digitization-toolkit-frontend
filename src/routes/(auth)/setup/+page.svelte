@@ -1,15 +1,10 @@
 <script lang="ts">
-	// ============================================================================
-	// PÁGINA: Setup — Primera instalación
-	// Ruta: /setup → src/routes/(auth)/setup/+page.svelte
-	//
-	// Solo se muestra cuando no existe ningún usuario en el sistema.
-	// El formulario crea el primer administrador usando POST /auth/register,
-	// que en ausencia de usuarios no requiere autenticación.
-	//
-	// Tras crear la cuenta, redirige a /login.
-	// Si ya existen usuarios (instalación no nueva), redirige a /login.
-	// ============================================================================
+	// First-run setup: creates the first administrator through
+	// `POST /auth/register`, sending the device bootstrap token as
+	// `X-Bootstrap-Token` when one is entered (outside development the backend
+	// requires it). The page redirects to `/login` when `/auth/setup/status`
+	// reports that setup is not needed or cannot be reached, and after the
+	// account is created.
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -18,9 +13,6 @@
 	import logo from '$lib/assets/captua-logo.svg';
 	import { normalizeEmail, emailFormatError } from '$lib/email-field';
 
-	// ---------------------------------------------------------------------------
-	// ESTADO DEL FORMULARIO
-	// ---------------------------------------------------------------------------
 	let username = $state('');
 	let email = $state('');
 	let password = $state('');
@@ -29,16 +21,10 @@
 	let showPassword = $state(false);
 	let showConfirmPassword = $state(false);
 
-	// ---------------------------------------------------------------------------
-	// ESTADO DE LA UI
-	// ---------------------------------------------------------------------------
 	let isLoading = $state(false);
 	let errorMessage = $state('');
 	let successMessage = $state('');
 
-	// ---------------------------------------------------------------------------
-	// AL MONTAR: verificar que realmente sea primera instalación
-	// ---------------------------------------------------------------------------
 	onMount(async () => {
 		try {
 			const { needs_setup } = await authApi.setupStatus();
@@ -50,9 +36,6 @@
 		}
 	});
 
-	// ---------------------------------------------------------------------------
-	// VALIDACIÓN
-	// ---------------------------------------------------------------------------
 	function validate(): string {
 		if (!username.trim()) return $m.setup_val_username_required;
 		if (username.trim().length < 3) return $m.setup_val_username_short;
@@ -63,9 +46,6 @@
 		return '';
 	}
 
-	// ---------------------------------------------------------------------------
-	// SUBMIT
-	// ---------------------------------------------------------------------------
 	async function handleSubmit() {
 		errorMessage = '';
 		successMessage = '';
@@ -112,12 +92,8 @@
 	}
 </script>
 
-<!-- ============================================================
-     CONTENEDOR PRINCIPAL
-     ============================================================ -->
 <div class="setup-wrapper" onkeydown={handleKeydown} role="main">
 	<div class="setup-card" class:is-loading={isLoading}>
-		<!-- Logo + nombre del sistema + título -->
 		<div class="card-logo-area">
 			<div class="header">
 				<div class="card-logo-area">
@@ -128,9 +104,7 @@
 			<p class="setup-subtitle">{$m.setup_subtitle}</p>
 		</div>
 
-		<!-- Formulario -->
 		<div class="form-area">
-			<!-- CAMPO: Usuario -->
 			<div class="field-group">
 				<label class="field-label" for="su-username">{$m.common_username_label}</label>
 				<div class="input-wrapper">
@@ -159,7 +133,6 @@
 				</div>
 			</div>
 
-			<!-- CAMPO: Correo -->
 			<div class="field-group">
 				<label class="field-label" for="su-email">{$m.common_email}</label>
 				<div class="input-wrapper">
@@ -186,7 +159,6 @@
 				</div>
 			</div>
 
-			<!-- CAMPO: Contraseña -->
 			<div class="field-group">
 				<label class="field-label" for="su-password">{$m.common_password_label}</label>
 				<div class="input-wrapper">
@@ -235,7 +207,6 @@
 				<span class="setup-hint">{$m.setup_ph_password}</span>
 			</div>
 
-			<!-- CAMPO: Confirmar contraseña -->
 			<div class="field-group">
 				<label class="field-label" for="su-confirm">{$m.common_confirm_password}</label>
 				<div class="input-wrapper">
@@ -313,7 +284,6 @@
 				<span class="setup-hint">{$m.setup_token_hint}</span>
 			</div>
 
-			<!-- ALERTA: Error -->
 			{#if errorMessage}
 				<div class="alert alert-error" role="alert" aria-live="polite">
 					<svg
@@ -330,7 +300,6 @@
 				</div>
 			{/if}
 
-			<!-- ALERTA: Éxito -->
 			{#if successMessage}
 				<div class="alert alert-success" role="status" aria-live="polite">
 					<svg
@@ -347,7 +316,6 @@
 				</div>
 			{/if}
 
-			<!-- BOTÓN: Crear cuenta -->
 			<button
 				type="button"
 				class="btn-login"
@@ -360,7 +328,6 @@
 		</div>
 		<!-- /.form-area -->
 
-		<!-- OVERLAY DE CARGA -->
 		{#if isLoading}
 			<div class="loading-overlay" aria-label={$m.common_loading} role="status">
 				<div class="spinner"></div>
@@ -373,7 +340,6 @@
 <!-- /.setup-wrapper -->
 
 <style>
-	/* ── Wrapper: pantalla completa ── */
 	.setup-wrapper {
 		display: flex;
 		align-items: center;
@@ -383,7 +349,6 @@
 		padding: 24px 16px;
 	}
 
-	/* ── Card principal ── */
 	.setup-card {
 		position: relative;
 		width: 100%;
@@ -394,13 +359,11 @@
 		box-shadow: var(--shadow-lg);
 	}
 
-	/* Opacidad reducida del formulario durante la carga */
 	.setup-card.is-loading .form-area {
 		pointer-events: none;
 		opacity: 0.5;
 	}
 
-	/* ── Área del logo ── */
 	.card-logo-area {
 		display: flex;
 		flex-direction: column;
@@ -450,7 +413,6 @@
 		line-height: 1.5;
 	}
 
-	/* ── Área del formulario ── */
 	.form-area {
 		padding: 28px 24px 20px;
 		display: flex;
@@ -476,7 +438,6 @@
 		opacity: 0.75;
 	}
 
-	/* Input con ícono a la izquierda */
 	.input-wrapper {
 		position: relative;
 		display: flex;
@@ -507,7 +468,6 @@
 		padding-right: 44px;
 	}
 
-	/* Botón ojo */
 	.input-action-btn {
 		position: absolute;
 		right: 10px;
@@ -532,12 +492,10 @@
 		height: 18px;
 	}
 
-	/* Error en inputs */
 	.input-error {
 		border-color: var(--color-error) !important;
 	}
 
-	/* Alertas */
 	.alert {
 		display: flex;
 		align-items: center;
@@ -566,7 +524,6 @@
 		flex-shrink: 0;
 	}
 
-	/* Botón principal */
 	.btn-login {
 		width: 100%;
 		font-family: var(--font-family);
@@ -596,7 +553,6 @@
 		letter-spacing: 0.08em;
 	}
 
-	/* Overlay de carga */
 	.loading-overlay {
 		position: absolute;
 		inset: 0;

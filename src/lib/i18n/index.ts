@@ -1,22 +1,18 @@
-// ============================================================================
-// i18n — catálogo tipado sin framework (NEH-93)
+// i18n — a typed message catalogue without a framework (NEH-93).
 //
-// Diseño:
-//   - `es.ts` es la fuente de verdad; `Messages = typeof es` obliga a que
-//     todos los catálogos tengan exactamente las mismas claves.
-//   - El idioma se fija UNA vez por carga de página: el servidor lo lee de la
-//     cookie en `hooks.server.ts`, lo pasa por `+layout.server.ts` y el
-//     layout raíz lo fija en el store `locale`. Cambiar de idioma
-//     (`setLanguage`) escribe la cookie y recarga la página completa, así que
-//     no hay re-render reactivo de idioma a mitad de sesión.
-//   - Los componentes usan el store derivado `m`: `{$m.login_submit}`.
+//   - `es.ts` is the source catalogue; `Messages = typeof es` forces every
+//     catalogue to have exactly the same keys.
+//   - The language is set ONCE per page load: the server reads it from the
+//     cookie in `hooks.server.ts`, passes it through `+layout.server.ts`, and
+//     the root layout sets it in the `locale` store. Switching language
+//     (`setLanguage`) writes the cookie and reloads the whole page, so there
+//     is no reactive language re-render mid-session.
+//   - Components use the derived store `m`: `{$m.login_submit}`.
 //
-// Nota sobre SSR: `locale` es un store a nivel de módulo, estado compartido
-// en el servidor entre requests concurrentes. Es un compromiso deliberado:
-// el toolkit es un quiosco de una sola sesión y el idioma se fija al inicio
-// de cada render. Si el despliegue llegara a ser multiusuario concurrente,
-// migrar a contexto de Svelte.
-// ============================================================================
+// SSR: `locale` is a module-level store, so on the server it is state shared
+// between concurrent requests. This is deliberate: the toolkit is a
+// single-session kiosk and the language is set at the start of each render.
+// A concurrent multi-user deployment would need Svelte context instead.
 
 import { derived, writable } from 'svelte/store';
 import { browser } from '$app/environment';
@@ -27,10 +23,9 @@ export type Messages = typeof es;
 export type Locale = 'es' | 'en';
 
 /**
- * Claves del catálogo cuyo valor es un string simple (sin parámetros).
- * Úsalo cuando una clave se guarda como dato (p. ej. NAV_ITEMS) para que
- * una futura entrada con parámetros (función) no pueda colarse donde se
- * espera texto plano.
+ * Catalogue keys whose value is a plain string (no parameters). Use it when a
+ * key is stored as data (e.g. NAV_ITEMS), so that an entry with parameters
+ * (a function) cannot end up where plain text is expected.
  */
 export type StringMessageKey = {
 	[K in keyof Messages]: Messages[K] extends string ? K : never;
@@ -45,23 +40,23 @@ export function isLocale(value: unknown): value is Locale {
 	return value === 'es' || value === 'en';
 }
 
-/** Idioma activo de esta carga de página. Lo fija el layout raíz. */
+/** Active language for this page load. The root layout sets it. */
 export const locale = writable<Locale>(DEFAULT_LOCALE);
 
-/** Catálogo activo: `{$m.login_submit}` en los componentes. */
+/** Active catalogue: `{$m.login_submit}` in components. */
 export const m = derived(locale, (l) => catalogs[l]);
 
 /**
- * Etiqueta traducida de un rol: `{$roleLabel(member.role)}`.
+ * Translated label for a role: `{$roleLabel(member.role)}`.
  *
- * El enum viaja en inglés desde el backend (admin/operator/reviewer, con
- * CHECK constraint en la base) y no debe mostrarse crudo (NEH-183). Vive
- * aquí, y no en cada página, porque el mapeo se había copiado en tres
- * lugares y se sale de sincronía en cuanto cambie un rol o una clave.
+ * The backend sends the enum in English (admin/operator/reviewer, with a
+ * CHECK constraint in the database), and it must not be shown raw (NEH-183).
+ * The mapping lives here rather than in each page so that copies cannot fall
+ * out of sync when a role or a key changes.
  *
- * Devuelve el valor crudo si el rol es desconocido — preferible a ocultar
- * un rol nuevo que el backend ya emite — y un guion si no hay ninguno.
- * Las clases CSS de los badges siguen usando el valor crudo.
+ * Returns the raw value for an unknown role — better than hiding a new role
+ * the backend already emits — and a dash when there is none. The badge CSS
+ * classes still use the raw value.
  */
 export const roleLabel = derived(
 	m,
@@ -78,8 +73,8 @@ export const roleLabel = derived(
 );
 
 /**
- * Cambia el idioma: persiste la cookie (1 año) y recarga la página para que
- * el SSR vuelva a renderizar todo en el idioma nuevo.
+ * Switches language: stores the cookie (1 year) and reloads the page so that
+ * SSR renders everything again in the new language.
  */
 export function setLanguage(next: Locale) {
 	if (!browser) return;

@@ -1,27 +1,23 @@
-// ============================================================================
-// CATÁLOGO DE MENSAJES — ESPAÑOL (idioma fuente)
+// Spanish message catalogue — the source catalogue. `en.ts` is typed against
+// the keys of this object, so adding, renaming or removing a key here makes
+// `npm run check` fail until the English catalogue matches.
 //
-// Este archivo es la fuente de verdad del catálogo: `en.ts` se tipa contra
-// las claves de este objeto, así que agregar, renombrar o eliminar una clave
-// aquí obliga (vía `npm run check`) a mantener el inglés sincronizado.
-//
-// Convenciones:
-//   - Claves con el patrón `area_elemento` (p. ej. `login_remember_me`,
-//     `nav_overview`, `status_approved`).
-//   - Mensajes completos por clave: nunca concatenar fragmentos en los
-//     componentes. Si el mensaje necesita parámetros, la entrada es una
-//     función: `cameras_detected: (n: number) => n === 1 ? '1 cámara' : `${n} cámaras``.
-//   - La lógica que depende del idioma (plurales, concordancia) vive aquí
-//     dentro de la entrada, nunca en el componente.
-//   - Texto invariable entre idiomas (marcas, siglas, unidades) no se
-//     cataloga: queda en el componente.
-// ============================================================================
+// Conventions:
+//   - Keys follow `area_element` (e.g. `login_remember_me`, `nav_overview`,
+//     `status_approved`).
+//   - One complete message per key: components never concatenate fragments.
+//     A message that needs parameters is a function:
+//     `cameras_detected: (n: number) => n === 1 ? '1 cámara' : `${n} cámaras``.
+//   - Language-dependent logic (plurals, gender agreement) lives in the
+//     entry, never in the component.
+//   - Text that is the same in every language (brand names, acronyms, units)
+//     is not catalogued: it stays in the component.
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';
 
 export const es = {
-	// ── Comunes (usados en varias pantallas) ─────────────────────────────────
+	// ── Common (shared across screens) ───────────────────────────────────────
 	common_username_label: 'Usuario',
 	common_password_label: 'Contraseña',
 	common_show_password: 'Mostrar contraseña',
@@ -71,12 +67,12 @@ export const es = {
 			: `Demasiados intentos fallidos. Espera ${minutes} minutos e intenta de nuevo.`,
 	login_error_locked_out_unknown: 'Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.',
 
-	// ── Sesión ───────────────────────────────────────────────────────────────
+	// ── Session ──────────────────────────────────────────────────────────────
 	session_validating: 'Verificando sesión…',
 	session_backend_waiting: 'Esperando respuesta del servidor…',
 	session_backend_waiting_detail: 'Si acabas de encender el equipo, el servidor puede tardar unos segundos en responder. Captua seguirá intentando conectarse y continuará en cuanto lo logre.',
 
-	// ── Navegación (dashboard) ───────────────────────────────────────────────
+	// ── Navigation (dashboard) ───────────────────────────────────────────────
 	nav_section_main: 'PRINCIPAL',
 	nav_section_system: 'SISTEMA',
 	nav_overview: 'Resumen',
@@ -85,7 +81,7 @@ export const es = {
 	nav_settings: 'Configuración',
 	nav_collapse_sidebar: 'Contraer el menú lateral',
 	nav_expand_sidebar: 'Expandir el menú lateral',
-	// ── Recorrido guiado de primer arranque (NEH-95) ──────────────────────────
+	// ── First-run guided tour (NEH-95) ────────────────────────────────────────
 	// Tú, like the rest of the interface. The step texts name controls as the
 	// operator sees them: several are icons without a visible label.
 	nav_help: 'Ayuda',
@@ -121,7 +117,7 @@ export const es = {
 
 	nav_logout: 'Salir',
 
-	// ── Estados de registro ──────────────────────────────────────────────────
+	// ── Record statuses ──────────────────────────────────────────────────────
 	status_captured: 'Capturado',
 	status_in_review: 'En revisión',
 	status_rejected: 'Rechazado',
@@ -135,17 +131,17 @@ export const es = {
 	role_operator_desc: 'Digitalización de documentos',
 	role_reviewer_desc: 'Control de calidad',
 
-	// ── Estados de cámara (compartidos) ──────────────────────────────────────
+	// ── Camera statuses (shared) ─────────────────────────────────────────────
 	camera_not_detected: 'No detectada',
 
-	// ── Dashboard (resumen) ──────────────────────────────────────────────────
+	// ── Dashboard (overview) ─────────────────────────────────────────────────
 	dash_greeting: (name: string) => `¡Hola ${name}!`,
 	dash_greeting_fallback: 'bienvenido',
 	dash_subtitle_admin: 'Panel de administración — Resumen general del sistema',
 	dash_subtitle_operator: 'Panel de operario — Tus proyectos asignados',
 	dash_subtitle_reviewer: 'Panel de revisión — volúmenes pendientes de revisión',
-	// Alerta de almacenamiento: fragmentos alrededor del <strong> y el enlace
-	// a Configuración (el texto del enlace reutiliza nav_settings).
+	// Storage alert: fragments around the <strong> and the link to Settings
+	// (the link text reuses nav_settings).
 	dash_storage_alert_p1: 'El almacenamiento está al ',
 	dash_storage_alert_p2: (used: string, total: string) => ` (${used} / ${total}). Revisa la `,
 	dash_storage_alert_p3: ' para liberar espacio.',
@@ -157,7 +153,7 @@ export const es = {
 	dash_col_project: 'Proyecto',
 	dash_col_last_activity: 'Última modificación',
 	dash_col_actions: 'Acciones',
-	// Vista de tablero o tabla del bloque "en curso"
+	// Board or table view of the "in progress" block
 	dash_view_label: 'Vista',
 	dash_view_board: 'Tablero',
 	dash_view_table: 'Tabla',
@@ -182,7 +178,7 @@ export const es = {
 	dash_camera_capture_ok: 'Captura de prueba realizada',
 	dash_camera_capture_took: (s: string) => `en ${s} s`,
 	dash_camera_capture_error: 'No se pudo hacer la captura de prueba',
-	// Detalle tras dash_camera_capture_error y dos puntos, por eso en minúscula.
+	// Detail shown after dash_camera_capture_error and a colon, hence lowercase.
 	dash_camera_capture_not_connected: 'la cámara no está conectada',
 	dash_camera_capture_timeout: 'la cámara no entregó la imagen a tiempo',
 	dash_camera_focus_error: 'No se pudo enfocar',
@@ -193,7 +189,7 @@ export const es = {
 	dash_camera_reconnect: 'Reconectar cámaras',
 	dash_camera_reconnect_error: 'No se pudo reconectar',
 
-	// ── Calendario de actividad ──────────────────────────────────────────────
+	// ── Activity calendar ────────────────────────────────────────────────────
 	dash_cal_title: 'Calendario de actividad',
 	dash_cal_view: 'Vista',
 	dash_cal_view_captures: 'Capturas',
@@ -217,13 +213,13 @@ export const es = {
 	dash_cal_total_reviews: 'Registros revisados',
 	dash_cal_error: 'No se pudo cargar el calendario de actividad.',
 
-	// ── Configuración ────────────────────────────────────────────────────────
+	// ── Settings ─────────────────────────────────────────────────────────────
 	config_subtitle: 'Parámetros del sistema de digitalización',
 	config_section_language: 'Idioma',
 	config_language_label: 'Idioma de la interfaz',
 	config_language_desc: 'Cambia el idioma de toda la aplicación. La página se recarga para aplicarlo; la sesión no se cierra.',
 	config_section_storage: 'Almacenamiento',
-	// Fragmentos alrededor del <strong>{porcentaje}%</strong>
+	// Fragments around the <strong>{percentage}%</strong>
 	config_storage_alert_pre: 'El almacenamiento está al ',
 	config_storage_alert_post: '. Se recomienda liberar espacio o expandir la capacidad.',
 	config_storage_used: 'Almacenamiento usado',
@@ -275,8 +271,8 @@ export const es = {
 	config_logs_loading: 'Cargando actividad reciente…',
 	config_logs_empty: 'Sin actividad registrada todavía.',
 	config_err_logs: 'No se pudo cargar la actividad del sistema.',
-	// Plantillas de mensajes del log de actividad (fragmentos alrededor del
-	// actor/sujeto en negrita; el género concuerda con el sustantivo en ES)
+	// Activity log message templates (fragments around the bold actor or
+	// subject; in Spanish the gender agrees with the noun)
 	log_user_prefix: 'Usuario ',
 	log_login_success_suffix: ' inició sesión exitosamente.',
 	log_login_failed_prefix: 'Acceso fallido. Usuario: ',
@@ -290,7 +286,7 @@ export const es = {
 	log_actor_system: 'sistema',
 	config_section_maintenance: 'Mantenimiento',
 	config_tmp_files: 'Archivos temporales de previsualización',
-	// Fragmentos alrededor de los <code> (dtk_preview_c*.jpg y /tmp)
+	// Fragments around the <code> elements (dtk_preview_c*.jpg and /tmp)
 	config_tmp_files_desc_p1: 'Elimina los archivos ',
 	config_tmp_files_desc_p2: ' de ',
 	config_tmp_files_desc_p3: ' que pueden quedar si el servidor se reinicia inesperadamente',
@@ -328,7 +324,7 @@ export const es = {
 	config_err_session_expired: 'Tu sesión expiró. Vuelve a iniciar sesión para apagar o reiniciar.',
 	config_err_operation: 'No se pudo completar la operación.',
 
-	// ── Usuarios ─────────────────────────────────────────────────────────────
+	// ── Users ────────────────────────────────────────────────────────────────
 	users_title: 'Gestión de Usuarios',
 	users_subtitle: 'Control de acceso y roles del personal',
 	users_new: 'Nuevo Usuario',
@@ -360,12 +356,12 @@ export const es = {
 	users_val_password_mismatch: 'Las contraseñas no coinciden.',
 	users_val_email_format: 'Formato de correo no válido',
 	users_delete_title: '¿Eliminar usuario?',
-	// Fragmento antes del <strong>{usuario}</strong>; luego va " ({email})" solo
-	// si la cuenta tiene correo, y al final el "?".
+	// Fragment before the <strong>{username}</strong>; " ({email})" follows only
+	// when the account has an email address, and the "?" comes last.
 	users_delete_confirm_pre: '¿Estás seguro que quieres eliminar a ',
 	users_delete_btn: 'Sí, eliminar',
 
-	// ── Proyectos (lista) ────────────────────────────────────────────────────
+	// ── Projects (list) ──────────────────────────────────────────────────────
 	proj_title: 'Gestión de Proyectos',
 	proj_subtitle: 'Fondos, series, secciones',
 	proj_new: 'Nuevo proyecto',
@@ -416,7 +412,7 @@ export const es = {
 	proj_move_and_delete: 'Mover y eliminar',
 	proj_delete_without_moving: 'Eliminar sin mover',
 
-	// ── Detalle de proyecto (volúmenes) ──────────────────────────
+	// ── Project detail (volumes) ───────────────────────────────────
 	pd_subtitle: 'Gestión de volúmenes del proyecto',
 	pd_new_collection: 'Nuevo volumen',
 	pd_back: 'Volver a Proyectos',
@@ -461,7 +457,7 @@ export const es = {
 			? 'Un registro de este volumen está en revisión, así que no se puede mover. Primero retira el volumen con "Retirar de revisión".'
 			: `Hay ${formatCount(n, 'es')} registros de este volumen en revisión, así que no se pueden mover. Primero retira el volumen con "Retirar de revisión".`,
 	pd_err_delete_not_empty: 'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
-	// Rechazos de un cambio de archivos mientras otro proceso los lee
+	// Refusals of a file change while another process reads the files
 	// (volume-refusals.ts).
 	vol_err_volume_busy:
 		'En el momento en que pediste el cambio, se estaban agregando o quitando registros en este volumen, así que Captua no cambió nada. Intenta de nuevo en un momento.',
@@ -518,7 +514,7 @@ export const es = {
 	pd_delete_stem_reserved:
 		'Este volumen no se puede eliminar porque tiene raíz y ya tiene imágenes capturadas. Captua lo conserva para que esa raíz nunca se le asigne a otro volumen.',
 
-	// ── Espacio de trabajo de volumen (revisión) ───────────────────
+	// ── Volume workspace (review) ──────────────────────────────────
 	col_back_to_project: 'Volver al proyecto',
 	col_breadcrumb_nav: 'Navegación',
 	col_open_in_camera: 'Abrir la pantalla de captura para este volumen',
@@ -543,7 +539,7 @@ export const es = {
 		`${formatCount(n, 'es')} de ${formatCount(max, 'es')} caracteres`,
 	col_reject_other_note_error: 'No se pudo rechazar el registro: si eliges "Otro", debes agregar una nota que describa el problema.',
 	col_review_approve_error: 'No se pudo aprobar el registro. Intenta de nuevo.',
-	// ── Envío a revisión (NEH-260) ──────────────────────────────────
+	// ── Send for review (NEH-260) ───────────────────────────────────
 	col_handover_send: 'Enviar a revisión',
 	col_handover_send_new: (n: number) => (n === 1 ? 'Enviar 1 registro nuevo' : `Enviar ${formatCount(n, 'es')} registros nuevos`),
 	col_handover_take_back: 'Retirar de revisión',
@@ -571,8 +567,8 @@ export const es = {
 		n === 1
 			? 'El registro en revisión quedará otra vez en estado Capturado y podrás seguir trabajando en él.'
 			: `Los ${formatCount(n, 'es')} registros en revisión quedarán otra vez en estado Capturado y podrás seguir trabajando en ellos.`,
-	// Aprobados (a) y rechazados (r) que el retiro no toca. Con a = r = 0 no
-	// se muestra; el componente no la llama en ese caso.
+	// Approved (a) and rejected (r) records that taking the volume back leaves
+	// alone. The component does not call this when a = r = 0.
 	col_takeback_confirm_kept: (a: number, r: number) => {
 		if (a > 0 && r > 0) {
 			const ap = a === 1 ? 'El registro aprobado' : `Los ${formatCount(a, 'es')} registros aprobados`;
@@ -590,7 +586,7 @@ export const es = {
 	col_takeback_nothing: 'No había registros en revisión para retirar.',
 	col_takeback_error: 'No se pudo retirar el volumen de revisión. Intenta de nuevo.',
 	col_review_not_sent_hint: 'Este registro no está en revisión. Podrás aprobarlo o rechazarlo cuando se envíe a revisión.',
-	// Solo después de un envío o retiro que salió bien.
+	// Only after a send or take-back that succeeded.
 	col_records_reload_error: 'El cambio se guardó, pero no se pudo actualizar la lista de registros. Recarga la página para ver el estado actual de los registros.',
 	col_recapture_btn: 'Recapturar imagen',
 	col_annotation_comment_placeholder: 'Agrega un comentario (opcional)…',
@@ -650,7 +646,7 @@ export const es = {
 	col_err_framing: 'Encuadre',
 	col_err_obstruction: 'Obstrucción',
 	col_err_other: 'Otro',
-	// Una línea bajo cada motivo de "Marcar error" que dice qué cubre.
+	// One line beneath each reason in "Mark error", saying what it covers.
 	col_err_blurry_gloss: 'La cámara o la página se movió durante la captura y los trazos se ven arrastrados.',
 	col_err_glare_gloss: 'La luz rebota en la página o en el vidrio y no deja ver una parte.',
 	col_err_shadows_gloss: 'Una sombra cae sobre la página y oscurece o tapa una parte.',
@@ -711,7 +707,7 @@ export const es = {
 	col_export_done: 'Exportación completada',
 	col_download_zip: 'Descargar ZIP',
 	col_download_image: 'Descargar imagen',
-	// NEH-139: imágenes RAW en los visores de inspección
+	// NEH-139: RAW images in the inspection viewers
 	raw_preview_badge: 'Vista previa (RAW)',
 	raw_preview_hint: 'El navegador no puede mostrar archivos RAW. Esta es la vista previa JPEG guardada junto al original.',
 	raw_thumbnail_badge: 'Miniatura (RAW)',
@@ -720,7 +716,7 @@ export const es = {
 	raw_unviewable_body: 'El navegador no puede mostrar archivos RAW, y este archivo no tiene vista previa.',
 	image_original_stored: 'El archivo original está guardado en el equipo.',
 	image_file_missing: 'No se encontró el archivo de esta imagen.',
-	// NEH-139: imágenes que no son RAW y que el navegador no muestra (TIFF) o que no cargan
+	// NEH-139: non-RAW images the browser cannot display (TIFF) or that fail to load
 	image_thumbnail_badge: 'Miniatura',
 	image_thumbnail_hint_format: (ext: string) =>
 		`El navegador no puede mostrar archivos ${ext}. Esta es la miniatura de este archivo, en baja resolución.`,
@@ -729,7 +725,7 @@ export const es = {
 	image_unviewable_body_format: (ext: string) =>
 		`El navegador no puede mostrar archivos ${ext}, y la miniatura de este archivo tampoco se pudo mostrar.`,
 	image_unviewable_body: 'No se pudo mostrar este archivo ni su miniatura.',
-	// NEH-248: una imagen liberada de la tarjeta (RecordImageDisplay.svelte)
+	// NEH-248: an image freed from the card (RecordImageDisplay.svelte)
 	freed_title: 'Imagen guardada en la copia externa',
 	freed_where: 'Este archivo está guardado fuera del equipo, en la copia externa, para liberar espacio en la tarjeta de memoria.',
 	freed_nothing_lost: 'No se perdió nada: Captua verificó la copia externa antes de quitar el archivo de la tarjeta.',
@@ -751,7 +747,7 @@ export const es = {
 		'Algunas imágenes de este volumen están guardadas en la copia externa y ya no están en la tarjeta, así que no se pueden incluir en el ZIP. Un administrador puede restaurar el volumen desde "Espacio en la tarjeta".',
 	col_export_freed: (n: number): string =>
 		`${n === 1 ? 'Un archivo de este volumen está guardado en la copia externa y ya no está' : `${formatCount(n, 'es')} archivos de este volumen están guardados en la copia externa y ya no están`} en la tarjeta, así que Captua no puede armar el paquete. Para exportar el volumen, primero un administrador debe restaurarlo desde "Espacio en la tarjeta", junto a la línea de la copia externa.`,
-	// ── Manifiesto de captura para Fisqua ───────────────────────────────────
+	// ── Capture manifest for Fisqua ─────────────────────────────────────────
 	col_manifest_option_title: 'Manifiesto de captura (Fisqua)',
 	col_manifest_option_desc: 'Un archivo JSON que le indica a Fisqua qué páginas de este volumen están en la copia externa.',
 	col_manifest_requires: 'Requiere envío a revisión y copia externa completa',
@@ -821,7 +817,7 @@ export const es = {
 	bug_crash_desc: 'Puedes reportar este problema para que lo revisemos.',
 	bug_report_this: 'Reportar este problema',
 
-	// ── Primera instalación ──────────────────────────────────────────────────
+	// ── First-time setup ─────────────────────────────────────────────────────
 	setup_title: 'Primera instalación',
 	setup_subtitle: 'Crea cuenta del administrador.',
 	setup_ph_username: 'ej. admin',
@@ -846,11 +842,11 @@ export const es = {
 	setup_val_password_short: 'La contraseña debe tener al menos 8 caracteres',
 	setup_val_password_mismatch: 'Las contraseñas no coinciden',
 
-	// ── Bienvenida ───────────────────────────────────────────────────────────
+	// ── Welcome ──────────────────────────────────────────────────────────────
 	welcome_title: 'Bienvenido/a',
 	welcome_start: 'Comenzar',
 
-	// ── Controles de cámara ──────────────────────────────────────────────────
+	// ── Camera controls ──────────────────────────────────────────────────────
 	cam_panel_title: 'Controles de cámara',
 	cam_panel_expand_aria: 'Control de cámara',
 	cam_panel_collapse: 'Colapsar panel',
@@ -885,7 +881,7 @@ export const es = {
 	cam_zoom_reset_aria: 'Restablecer zoom a 1×',
 	cam_zoom_reset: 'restablecer',
 	cam_zoom_slider_aria: 'Zoom de cámara (ScalerCrop)',
-	// Nota DSLR: fragmentos alrededor del <strong>MF</strong>
+	// DSLR note: fragments around the <strong>MF</strong>
 	cam_dslr_note_p1: 'Pon el interruptor del lente en ',
 	cam_dslr_note_p2: ' antes de capturar.',
 	cam_dslr_note_p3: 'El enfoque automático (AF) bloquea las DSLR de Canon unos 12 segundos.',
@@ -912,7 +908,7 @@ export const es = {
 	cam_wb_save_error: 'No se pudo guardar el balance de blancos',
 	cam_wb_apply_error: 'No se pudo aplicar el balance de blancos',
 
-	// ── Vista en vivo ────────────────────────────────────────────────────────
+	// ── Live view ────────────────────────────────────────────────────────────
 	lv_reconnecting: 'Reconectando con la cámara…',
 	lv_camera_left_alt: 'Cámara izquierda',
 	lv_camera_right_alt: 'Cámara derecha',
@@ -935,7 +931,7 @@ export const es = {
 	lv_grid_desc: 'Mostrar una cuadrícula de 3×3 sobre la previsualización',
 	lv_guides: 'Líneas guía',
 	lv_guides_desc: 'Guías arrastrables (rojo)',
-	// Tecla de captura (pedal)
+	// Capture key (foot pedal)
 	lv_capture_key_current: (chord: string) => `Tecla de captura: ${chord}`,
 	lv_capture_key_desc: 'El pedal o la tecla que dispara una captura en esta pantalla.',
 	lv_capture_key_learn: 'Asignar la tecla del pedal',
@@ -949,9 +945,9 @@ export const es = {
 	lv_capture_not_ready: 'Cargando el volumen…',
 	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
 	lv_needs_stem_link: 'Asignar la raíz',
-	// Errores de una captura o una retoma que el backend rechazó
-	// (capture-errors.ts). Sin punto final, como lv_capture_error en el
-	// aviso de la pantalla; lvm_retake_error se lo agrega.
+	// Errors for a capture or retake the backend refused (capture-errors.ts).
+	// No final period, like lv_capture_error in the on-screen notice;
+	// lvm_retake_error adds one.
 	lv_err_no_volume: 'Elige un volumen antes de capturar',
 	lv_err_volume_not_found: 'Este volumen ya no está en el catálogo',
 	lv_err_record_not_found: 'Este registro ya no está en el catálogo',
@@ -979,20 +975,20 @@ export const es = {
 	lvm_retake: 'Volver a capturar',
 	lvm_retake_confirm: '¿Volver a capturar este registro? Captua guardará las imágenes actuales como versiones anteriores.',
 	lvm_retaking: 'Capturando imagen de reemplazo…',
-	// `message` es una frase propia, con o sin punto final.
+	// `message` is a sentence of its own, with or without a final period.
 	lvm_retake_error: (message: string) =>
 		`No se pudo volver a capturar el registro. ${message.endsWith('.') ? message : `${message}.`} Se conservaron las imágenes originales.`,
 
-	// ── Copia externa del catálogo (NEH-266) ─────────────────────────────────
-	// `day` dice si la copia es de hoy, de ayer o anterior, en la hora local;
-	// `date` es la fecha ya formateada y solo se usa en el último caso.
+	// ── Offsite catalogue copy (NEH-266) ─────────────────────────────────────
+	// `day` says whether the copy is from today, yesterday or earlier, in local
+	// time; `date` is the formatted date and is used only in the last case.
 	backup_ind_current: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
 		day === 'today'
 			? 'Catálogo copiado hoy'
 			: day === 'yesterday'
 				? 'Catálogo copiado ayer'
 				: `Catálogo copiado el ${date}`,
-	// Una copia con más de 36 horas nunca es de hoy.
+	// A copy more than 36 hours old is never from today.
 	backup_ind_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
 		day === 'yesterday' ? 'Catálogo sin copia desde ayer' : `Catálogo sin copia desde el ${date}`,
 	backup_ind_never: 'Catálogo sin copia verificada',
@@ -1017,7 +1013,7 @@ export const es = {
 	backup_cfg_last_file: 'Archivo de la última copia',
 	backup_cfg_locked: 'Esta configuración se define al instalar el equipo y no se puede cambiar desde aquí.',
 
-	// ── Copia externa de las imágenes (NEH-248, offsite-state.ts) ─────────
+	// ── Offsite copy of the images (NEH-248, offsite-state.ts) ─────────────
 	offsite_vol_label: 'Copia externa de este volumen',
 	offsite_vol_received: (verified: number, total: number) =>
 		`Copia externa completa: ${formatCount(verified, 'es')} de ${formatCount(total, 'es')} archivos verificados`,
@@ -1056,8 +1052,8 @@ export const es = {
 	},
 	offsite_cfg_never: 'Todavía no se ha verificado ningún archivo.',
 
-	// ── Envío a Fisqua (fisqua-state.ts) ──────────────────────────────────
-	// `day`, `date` y `time` como en offsite_last_verified.
+	// ── Delivery to Fisqua (fisqua-state.ts) ──────────────────────────────
+	// `day`, `date` and `time` as in offsite_last_verified.
 	fisqua_vol_label: 'Envío de este volumen a Fisqua',
 	fisqua_when: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
@@ -1109,7 +1105,7 @@ export const es = {
 		`Un archivo del manifiesto de captura no está en la copia externa, pero Fisqua no lo usa para procesar el volumen. Archivo: ${key}`,
 	fisqua_rule_bad_request: 'Fisqua rechazó el manifiesto de captura por un error de formato, sin señalar el problema concreto.',
 	fisqua_rule_payload_too_large: 'Fisqua rechazó el manifiesto de captura por ser demasiado grande, sin señalar ningún problema concreto.',
-	// El texto de Fisqua, tal como lo envió.
+	// Fisqua's own text, as it sent it.
 	fisqua_problem_from_fisqua: (message: string): string => `Mensaje de Fisqua: ${message}`,
 	fisqua_incident_object_missing:
 		'Fisqua no encontró en la copia externa algunos archivos que Captua ya había verificado allí. Avisa al administrador: tiene que revisar la copia externa y averiguar qué pasó con ellos. Abajo aparece la lista de los archivos que faltan.',
@@ -1147,7 +1143,7 @@ export const es = {
 	fisqua_unit_poll_error: 'Captua no pudo terminar la última consulta de estado. Volverá a consultar más tarde.',
 	fisqua_unit_poll_other: 'En la última consulta, Captua no le preguntó a Fisqua por ningún volumen.',
 
-	// ── Liberar espacio en la tarjeta y restaurar (NEH-248, offsite-free.ts) ─
+	// ── Freeing space on the card and restoring (NEH-248, offsite-free.ts) ──
 	offsite_vol_stored: 'Copia externa completa',
 	offsite_vol_freed: (files: number, bytes: number): string =>
 		`${files === 1 ? '1 archivo liberado' : `${formatCount(files, 'es')} archivos liberados`} de la tarjeta (${formatBytes(bytes, 'es')})`,
@@ -1276,7 +1272,7 @@ export const es = {
 	offsite_reason_other: (n: number): string =>
 		n === 1 ? '1 archivo, por otro motivo.' : `${formatCount(n, 'es')} archivos, por otros motivos.`,
 
-	// ── Mensajes del cliente API ─────────────────────────────────────────────
+	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',
 	api_request_failed: 'Error en la solicitud'
 };

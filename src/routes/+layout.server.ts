@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 
-// Expone a los componentes el idioma que hooks.server.ts leyó de la cookie.
+// Hands the components the locale that hooks.server.ts read from the cookie.
 export const load: LayoutServerLoad = ({ locals }) => {
 	return { locale: locals.locale };
 };

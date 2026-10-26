@@ -1,15 +1,12 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: ImageViewer
+  // Spread view: shows the left and right pages of the selected record side by
+  // side, as an open book, with a zoom and pan shared by both pages.
   //
-  // Vista spread: muestra las dos páginas (izq + der) del registro seleccionado
-  // lado a lado, como un libro abierto.
-  //
-  // Carga la imagen completa (no el thumbnail) — este es el visor principal
-  // de lectura/inspección, igual que ImageViewerModal. Excepción (NEH-139):
-  // un RAW se muestra por su vista previa JPEG y, si no la hay, por su
-  // miniatura; ver RecordImageDisplay.svelte.
-  // ============================================================================
+  // This is the main reading and inspection viewer, like ImageViewerModal, so it
+  // asks for the full image rather than the thumbnail. RecordImageDisplay
+  // (NEH-139) picks what each format can show: a RAW appears as its JPEG preview,
+  // a TIFF only as its thumbnail, and any image falls back to its thumbnail when
+  // the preview fails.
 
   import { type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
@@ -29,9 +26,6 @@
     type PanFraction,
   } from '$lib/pan-zoom';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     viewMode,
     records,
@@ -51,7 +45,7 @@
     selectedRecordId: number | null;
     zoom: number;
     rotation: number;
-    // Ajustes de previsualización, de -100 a 100 (ver LeftSidebar).
+    // Preview adjustments, -100 to 100 (set in LeftSidebar).
     brightness?: number;
     contrast?: number;
     saturation?: number;
@@ -61,14 +55,11 @@
     onOneToOneChange?: (z: number) => void;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // DERIVADOS
-  // ---------------------------------------------------------------------------
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId));
 
-  // Spread: busca L y R dentro del propio record seleccionado (captura doble).
-  // Fallback: si no hay roles asignados, usa la primera imagen como izquierda.
+  // Both pages come from the selected record itself (a dual capture). If no image
+  // has a role, the first image is shown as the left page.
   let spreadLeftImage  = $derived(
     selectedRecord?.images?.find(img => img.role === 'left')
     ?? selectedRecord?.images?.[0]
@@ -84,47 +75,37 @@
     return img?.filename ?? '—';
   }
 
-  // NEH-209: mientras el registro esté "rejected", sus imágenes actuales
-  // (selectedRecord.images, ya filtradas a is_current por el backend) SON
-  // exactamente las pendientes de recaptura — 1 para modo single, 2 para
-  // dual. No hay que asumir un número fijo: si hay imagen en la página, y
-  // el registro está rechazado, esa página está pendiente de recaptura.
-  // Un solo badge por página (no también uno flotante arriba de ambas — era
-  // redundante y ya se quitó).
+  // NEH-209: while a record is `rejected`, its current images
+  // (`selectedRecord.images`, already filtered to `is_current` by the backend)
+  // are exactly the ones awaiting retake — one in single mode, two in dual. No
+  // fixed count is assumed: a page that shows an image of a rejected record is
+  // awaiting retake. Each page carries its own badge.
   let isRejected = $derived(selectedRecord?.status === 'rejected');
   let isApproved = $derived(selectedRecord?.status === 'approved');
 
-  // ---------------------------------------------------------------------------
-  // TAMAÑO MEDIDO DE CADA PÁGINA — evita que la imagen rotada se recorte
-  // ---------------------------------------------------------------------------
-  // .spread-image no tiene width/height fijo (solo max-width/max-height), y
-  // .spread-frame tiene overflow:hidden. Un simple rotate(90/270deg) sobre esa
-  // caja se recorta porque la página cambia de landscape a portrait (o
-  // viceversa) y el rectángulo rotado ya no calza en el contenedor original.
-  //
-  // El arreglo: medimos cada .spread-frame y, en 90°/270°, le damos a la
-  // imagen el tamaño del contenedor con ancho/alto intercambiados, centrada
-  // de forma absoluta — así la caja ya rotada vuelve a calzar exacto.
+  // Measured size of each page frame, so a rotated image is not cropped.
+  // `.spread-image` has no fixed width/height (only max-width/max-height) and
+  // `.spread-frame` has `overflow: hidden`. A plain rotate(90/270deg) on that box
+  // gets cropped: the page turns from landscape to portrait (or the reverse) and
+  // the rotated rectangle no longer fits the container. So each `.spread-frame`
+  // is measured and, at 90°/270°, the image gets the container size with width
+  // and height swapped, absolutely centered, which makes the rotated box fit.
   let leftFrameW  = $state(0);
   let leftFrameH  = $state(0);
   let rightFrameW = $state(0);
   let rightFrameH = $state(0);
 
-  // Tamaño natural de cada imagen (bind:naturalWidth/Height) — necesario
-  // para calcular el "fit" y el zoom 1:1 (NEH-230).
+  // Natural size of each image (`bind:naturalWidth/Height`), needed to compute
+  // the fit and the 1:1 zoom (NEH-230).
   let leftNaturalW  = $state(0);
   let leftNaturalH  = $state(0);
   let rightNaturalW = $state(0);
   let rightNaturalH = $state(0);
 
-  // ---------------------------------------------------------------------------
-  // PAN/ZOOM COMPARTIDO (NEH-230)
-  // ---------------------------------------------------------------------------
-  // zoom (prop) es relativo al fit: 1 = fit. pan es una fracción compartida
-  // por ambas páginas (R34-2) — cada página la traduce a sus propios píxeles
-  // de desplazamiento con sus propios límites, así que las dos se mueven en
-  // proporción aunque tengan tamaños distintos, y siempre queda alcanzable
-  // cualquier borde de cualquiera de las dos.
+  // Shared pan/zoom (NEH-230). The `zoom` prop is relative to the fit: 1 = fit.
+  // `pan` is a fraction shared by both pages; each page converts it to
+  // its own pixel offset within its own bounds, so the two move in proportion
+  // even when their sizes differ, and every edge of either page stays reachable.
   let pan = $state<PanFraction>({ x: 0, y: 0 });
 
   function dpr(): number {
@@ -134,18 +115,18 @@
   let leftFitted  = $derived(fittedSize({ w: leftNaturalW, h: leftNaturalH }, { w: leftFrameW, h: leftFrameH }, rotation));
   let rightFitted = $derived(fittedSize({ w: rightNaturalW, h: rightNaturalH }, { w: rightFrameW, h: rightFrameH }, rotation));
 
-  // effectiveOneToOne clampea a >= 1 (R35-1): 1:1 nunca encoge una página
-  // por debajo del fit — una página cuyo tamaño natural ya cabe en su
-  // frame (o una pantalla de DPR alto) puede tener un oneToOne crudo < 1.
+  // `effectiveOneToOne` clamps to >= 1, so 1:1 never shrinks a page
+  // below the fit: a page whose natural size already fits its frame (or a
+  // high-DPR screen) can have a raw one-to-one zoom below 1.
   let leftOneToOneRaw  = $derived(oneToOneZoom({ w: leftNaturalW, h: leftNaturalH }, { w: leftFrameW, h: leftFrameH }, rotation, dpr()));
   let rightOneToOneRaw = $derived(oneToOneZoom({ w: rightNaturalW, h: rightNaturalH }, { w: rightFrameW, h: rightFrameH }, rotation, dpr()));
   let leftOneToOne  = $derived(effectiveOneToOne(leftOneToOneRaw));
   let rightOneToOne = $derived(effectiveOneToOne(rightOneToOneRaw));
 
-  // Referencia para pageScale: la MAYOR de las páginas con imagen (no la
-  // izquierda a secas) — pageScale exige que la referencia sea >= cada
-  // página para que la curva fit->1:1 de cada una sea monótona (ver el
-  // comentario de pageScale en pan-zoom.ts).
+  // Reference for `pageScale`: the LARGEST 1:1 among the pages that have an
+  // image, not simply the left page. `pageScale` requires the reference to be
+  // >= every page so that each page's fit -> 1:1 curve is monotonic (see the
+  // comment on `pageScale` in pan-zoom.ts).
   let oneToOneRef = $derived.by(() => {
     const candidates: number[] = [];
     if (spreadLeftImage) candidates.push(leftOneToOne);
@@ -165,37 +146,35 @@
   let leftPan  = $derived(panPixels(pan, leftBounds));
   let rightPan = $derived(panPixels(pan, rightBounds));
 
-  // Notifica al padre el 1:1 de la página de referencia (en px de
-  // dispositivo) cada vez que cambia, para que RightToolbar sepa a qué zoom
-  // apuntar el botón "1:1" y hasta dónde permitir el zoom máximo.
+  // Reports the reference page's 1:1 zoom (one image pixel per device pixel) to
+  // the parent whenever it changes, so RightToolbar knows which zoom the 1:1
+  // button targets and where to cap the maximum zoom.
   $effect(() => {
     onOneToOneChange?.(oneToOneRef);
   });
 
-  // ---------------------------------------------------------------------------
-  // ARRASTRE (pan) CON POINTER EVENTS — mouse y touch llegan por igual acá,
-  // no hace falta un handler de touch aparte.
-  // ---------------------------------------------------------------------------
+  // Drag-to-pan with pointer events: mouse and touch both arrive here, so no
+  // separate touch handler is needed.
   let dragSide = $state<'left' | 'right' | null>(null);
-  // El pointerId que efectivamente está arrastrando — no basta con "hay un
-  // lado activo", porque un segundo dedo (touch multipunto) también llega
-  // como pointerdown con button === 0 y, sin esto, pisa dragLastX/Y del
-  // primero: el próximo pointermove del PRIMER dedo calcularía su delta
-  // contra la posición del SEGUNDO, produciendo un salto enorme y falso.
+  // The pointerId that is actually dragging. Knowing the active side is not
+  // enough: a second finger (multi-touch) also arrives as a pointerdown with
+  // button === 0 and, without this, overwrites the first finger's
+  // dragLastX/Y — the FIRST finger's next pointermove would then compute its
+  // delta against the SECOND finger's position and produce a large false jump.
   let dragPointerId: number | null = null;
   let dragLastX = 0;
   let dragLastY = 0;
 
   function handlePointerDown(e: PointerEvent, side: 'left' | 'right') {
-    if (e.button !== 0) return; // solo botón primario
-    // No capturar el pointer si el down empezó sobre un control (botón,
-    // enlace) dentro del frame — si no, el pointerup se retarget-ea al
-    // frame por la captura y el click nunca llega al control. Ningún
-    // .spread-frame tiene controles hoy, pero se guarda por consistencia
-    // con ImageViewerModal.svelte y por si alguno se agrega después.
+    if (e.button !== 0) return; // primary button only
+    // Do not capture the pointer if the press started on a control (button,
+    // link) inside the frame: capture retargets the pointerup to the frame and
+    // the click never reaches the control. No `.spread-frame` contains a control,
+    // but the guard matches ImageViewerModal.svelte and covers any control added
+    // to the frame.
     if ((e.target as HTMLElement).closest('button, a')) return;
-    // Ya hay un pointer arrastrando — ignorar cualquier otro (segundo
-    // dedo) hasta que termine el actual.
+    // A pointer is already dragging: ignore any other (a second finger) until
+    // that drag ends.
     if (dragPointerId !== null) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     dragSide = side;
@@ -215,21 +194,21 @@
   }
 
   function endDrag(e: PointerEvent) {
-    if (e.pointerId !== dragPointerId) return; // el dedo que suelta/cancela no es el que arrastraba
+    if (e.pointerId !== dragPointerId) return; // the released/cancelled pointer is not the dragging one
     dragSide = null;
     dragPointerId = null;
   }
 
-  // Los tres deslizadores del panel, traducidos a un filtro CSS. Es sólo
-  // previsualización: no toca el archivo.
+  // The panel's three sliders, translated into a CSS filter. Preview only: the
+  // file is not modified.
   //
-  // El mapeo es el mismo para los tres, -100..100 a 0..2, y el 0 da la
-  // identidad para que soltarlos devuelva la imagen tal como la entregó la
-  // cámara. Se eligió simétrico y predecible a propósito: esto no sirve para
-  // retocar una foto sino para sacarle detalle a un folio velado o de tinta
-  // desvaída, y el rango correcto para eso sólo se sabe mirando escaneos de
-  // verdad. El cuarto inferior del brillo es casi negro y poco útil; se deja
-  // alcanzable en vez de meter una curva que nadie pueda razonar después.
+  // All three use the same mapping, -100..100 to 0..2, and 0 is the identity, so
+  // resetting them returns the image as the camera delivered it. The mapping is
+  // symmetric and predictable on purpose: the sliders are not for retouching a
+  // photograph but for drawing detail out of a fogged folio or faded ink, and
+  // the right range for that can only be judged on real scans. The bottom
+  // quarter of the brightness range is almost black and of little use; it stays
+  // reachable rather than adding a curve nobody can reason about.
   let filtro = $derived(
     brightness === 0 && contrast === 0 && saturation === 0
       ? ''
@@ -240,35 +219,25 @@
     const transition = dragSide === null ? 'transition: transform 0.15s ease;' : '';
     const transformStr = transformFor(pixelPan, scale, rotation);
     if (isSwapped(rotation) && containerW && containerH) {
-      // La caja intercambiada (containerH x containerW) es más ancha que el
-      // 100% del panel sin rotar — hay que anular max-width/max-height
-      // (heredados de .spread-image) o los recortan de vuelta.
+      // The swapped box (containerH x containerW) exceeds 100% of the unrotated
+      // frame on one axis, so max-width/max-height (from `.spread-image`) must be
+      // overridden or they crop it again.
       return `${transition} ${filtro} position: absolute; top: 50%; left: 50%; width: ${containerH}px; height: ${containerW}px; max-width: none; max-height: none; transform: translate(-50%, -50%) ${transformStr};`;
     }
     return `${transition} ${filtro} transform: ${transformStr};`;
   }
 </script>
 
-<!-- ============================================================
-     ÁREA DE VISUALIZACIÓN
-     ============================================================ -->
 <div class="viewer-area">
 
-  <!-- ══════════════════════════════════════════════════════
-       VISTA SPREAD: dos páginas lado a lado (libro abierto)
-       ══════════════════════════════════════════════════════ -->
-
-  <!-- Botón anterior (par anterior) -->
   <button class="nav-btn left" onclick={onPrev} disabled={selectedIndex <= 0} aria-label={$m.col_prev}>
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
       <polyline points="15 18 9 12 15 6"/>
       </svg>
     </button>
 
-    <!-- Área de spread: dos páginas -->
     <div class="spread-wrapper">
 
-      <!-- Página izquierda -->
       <div class="spread-page">
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
@@ -283,8 +252,8 @@
           onlostpointercapture={endDrag}
         >
           {#if spreadLeftImage}
-            <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su
-                 miniatura, nunca como imagen rota -->
+            <!-- NEH-139: a RAW shows as its JPEG preview or its thumbnail,
+                 never as a broken image -->
             <RecordImageDisplay image={spreadLeftImage}>
               {#snippet children(src, onerror)}
                 <img
@@ -322,10 +291,8 @@
         {/if}
       </div>
 
-      <!-- Línea divisoria (lomo del libro) -->
       <div class="book-spine"></div>
 
-      <!-- Página derecha -->
       <div class="spread-page">
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
@@ -340,8 +307,8 @@
           onlostpointercapture={endDrag}
         >
           {#if spreadRightImage}
-            <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su
-                 miniatura, nunca como imagen rota -->
+            <!-- NEH-139: a RAW shows as its JPEG preview or its thumbnail,
+                 never as a broken image -->
             <RecordImageDisplay image={spreadRightImage}>
               {#snippet children(src, onerror)}
                 <img
@@ -381,7 +348,6 @@
 
     </div>
 
-    <!-- Botón siguiente (par siguiente) -->
   <button class="nav-btn right" onclick={onNext} disabled={selectedIndex >= records.length - 1} aria-label={$m.col_next}>
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
       <polyline points="9 18 15 12 9 6"/>
@@ -402,8 +368,8 @@
     min-height: 0;
   }
 
-  /* Badge por página (NEH-209): un solo indicador de estado debajo de cada
-     página, no también uno flotante arriba de ambas — era redundante. */
+  /* Per-page badge (NEH-209): one status indicator at the bottom of each page,
+     with no shared indicator above both. */
   .pending-recapture-badge {
     position: absolute;
     bottom: 12px;
@@ -438,7 +404,6 @@
     font-weight: var(--fw-bold);
   }
 
-  /* ── Botones de navegación ── */
   .nav-btn {
     position: absolute;
     top: 50%;
@@ -457,16 +422,15 @@
     transition: background-color var(--transition-base);
   }
 
-  /* Simétricas: RightToolbar vive en su propia columna flex de 80px fuera
-     de .viewer-area (ver +page.svelte / RightToolbar.svelte), no se
-     superpone acá — el offset extra que tenía "right" era innecesario y
-     hacía que invadiera la página derecha en pantallas angostas (tablet). */
+  /* Symmetric offsets: RightToolbar sits in its own 80px flex column outside
+     `.viewer-area` (see +page.svelte / RightToolbar.svelte) and does not
+     overlap it, so the right button needs no extra offset; one would push it
+     onto the right page on narrow (tablet) screens. */
   .nav-btn.left  { left: 24px; }
   .nav-btn.right { right: 24px; }
   .nav-btn:hover { background-color: rgba(90,140,98,0.3); }
   .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  /* ── Vista spread ── */
   .spread-wrapper {
     display: flex;
     align-items: stretch;
@@ -476,9 +440,8 @@
     gap: 0;
   }
 
-  /* Columna: caja de imagen (.spread-frame) arriba, título (.spread-label)
-     debajo en flujo estático — así el título nunca se superpone a la
-     imagen sea cual sea el zoom (NEH-230). */
+  /* Column: image box (`.spread-frame`) on top, title (`.spread-label`) below in
+     static flow, so the title never overlaps the image at any zoom (NEH-230). */
   .spread-page {
     flex: 1;
     display: flex;
@@ -486,8 +449,8 @@
     min-height: 0;
   }
 
-  /* Caja de imagen: mide el frame para el fit/1:1, atrapa el pointer para
-     el arrastre (pan) y recorta lo que se sale del marco al hacer zoom. */
+  /* Image box: measured for the fit and 1:1, receives the pointer for
+     drag-to-pan, and clips whatever leaves the frame when zoomed. */
   .spread-frame {
     position: relative;
     flex: 1;
@@ -502,7 +465,6 @@
 
   .spread-frame.dragging { cursor: grabbing; }
 
-  /* Lomo del libro */
   .book-spine {
     width: 4px;
     background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.4), transparent);
@@ -510,8 +472,8 @@
     align-self: stretch;
   }
 
-  /* Label de spread — fila de texto debajo de la imagen, ya no flotando
-     encima (NEH-230: tapaba foliación/marginalia en la esquina). */
+  /* Spread label: a text row below the image, never over it (NEH-230 — an
+     overlaid label covers foliation and marginalia in the corner). */
   .spread-label {
     margin-top: 8px;
     align-self: flex-start;
@@ -534,13 +496,11 @@
     object-fit: contain;
     user-select: none;
     display: block;
-    /* Sombra suave de lomo */
   }
 
   .spread-image.left  { box-shadow: inset -8px 0 16px rgba(0,0,0,0.3); }
   .spread-image.right { box-shadow: inset  8px 0 16px rgba(0,0,0,0.3); }
 
-  /* Sin imagen */
   .no-image {
     display: flex;
     flex-direction: column;

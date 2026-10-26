@@ -13,7 +13,7 @@ export interface AttachOptions {
   errors: boolean;
 }
 
-/** Arma el cuerpo Markdown del issue (redactado al final). */
+/** Builds the issue's Markdown body (redacted as a whole at the end). */
 export function buildIssueBody(
   form: BugReportForm,
   ctx: ReportContext,

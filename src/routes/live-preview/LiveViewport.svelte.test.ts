@@ -81,7 +81,7 @@ function stubPreviewFetch(sizes: Partial<Record<number, { w: number; h: number }
 }
 
 // Mounts into a generously-sized target, then pins .mat-board to an exact
-// 1000x600 (R39-3's board) by setting its size directly — sidesteps having
+// 1000x600 (the board the fitBox tests use) by setting its size directly — sidesteps having
 // to fight the component's own flex/padding chain (.viewport-outer's
 // padding, centering, etc.) to land on an exact pixel board size.
 function renderViewport(props: ReturnType<typeof baseProps>) {
@@ -145,7 +145,7 @@ describe('LiveViewport — the viewport takes its shape from the frames (NEH-222
     expect(isInside(viewportRect, boardRect)).toBe(true);
   });
 
-  it('single mode, rotation 90: the same 16:9 frame inverts and is width-limited (337.5x600, R39-3)', async () => {
+  it('single mode, rotation 90: the same 16:9 frame inverts and is width-limited (337.5x600)', async () => {
     stubPreviewFetch({ 0: { w: 1600, h: 900 } });
     const screen = renderViewport(baseProps({ cameraMode: 'single', rotateDeg: { 0: 90 } }));
 
@@ -166,7 +166,7 @@ describe('LiveViewport — the viewport takes its shape from the frames (NEH-222
     expect(isInside(viewportRect, boardRect)).toBe(true);
   });
 
-  it('double mode: panels split proportionally to each camera\'s own displayed aspect (R39-2)', async () => {
+  it('double mode: panels split proportionally to each camera\'s own displayed aspect', async () => {
     // cam0 (left) rotated 90: a 3:2 frame displays at 2:3 ≈ 0.6667.
     // cam1 (right) at 0: a 16:9 frame displays at 16:9 ≈ 1.7778.
     stubPreviewFetch({ 0: { w: 1200, h: 800 }, 1: { w: 1600, h: 900 } });

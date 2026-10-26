@@ -1,22 +1,8 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: ImageViewerModal
-  // Archivo: src/routes/live-preview/ImageViewerModal.svelte
-  //
-  // Modal de inspección de imagen con zoom y opción de retoma.
-  //
-  // Props:
-  //   record       — registro a inspeccionar (con sus imágenes)
-  //   cameraMode   — 'single' | 'double'
-  //   onClose      — callback para cerrar el modal
-  //   onRetake     — callback para volver a capturar el registro
-  //
-  // Comportamiento:
-  //   - En modo 'double': muestra imagen L e imagen R en paralelo
-  //   - En modo 'single': muestra la única imagen centrada
-  //   - Botón "Volver a capturar": pide confirmación antes de ejecutar
-  //   - Click en el backdrop cierra el modal (sin confirmar)
-  // ============================================================================
+  // Shows one captured record's images at full size and lets the operator
+  // retake the record. Images are ordered left before right, with an L/R badge
+  // in `double` mode. Retake asks for confirmation, and the modal cannot be
+  // closed while the replacement capture runs.
 
   import { type Record as ApiRecord } from '$lib/api';
   import { m } from '$lib/i18n';
@@ -34,11 +20,10 @@
     onRetake: (record: ApiRecord) => Promise<void>;
   } = $props();
 
-  // Estado de confirmación de retoma
   let confirmRetake = $state(false);
 
-  // Estado de la retoma en curso — bloquea el cierre del modal mientras
-  // se captura, para no perder de vista un error si la captura falla.
+  // Blocks closing the modal while the capture runs, so that an error stays
+  // in view if the capture fails.
   let retaking = $state(false);
   let retakeError = $state<string | null>(null);
 
@@ -47,9 +32,11 @@
     retaking = true;
     retakeError = null;
     try {
-      // onRetake solo borra las imágenes previas si la nueva captura tuvo éxito.
+      // `onRetake` throws if the capture fails, and the record keeps its
+      // images. The frontend never deletes the previous images; the backend
+      // keeps them as history (NEH-208).
       await onRetake(record);
-      // Éxito: el padre ya cerró el modal (inspectedRecord = null).
+      // On success the parent has already closed the modal (`inspectedRecord = null`).
     } catch (err) {
       retakeError = err instanceof Error ? err.message : String(err);
     } finally {
@@ -58,11 +45,10 @@
   }
 
   function handleClose() {
-    if (retaking) return; // no cerrar mientras la captura está en curso
+    if (retaking) return;
     onClose();
   }
 
-  // Imágenes del registro, ordenadas por rol (left primero, right después)
   const images = $derived.by(() => {
     const imgs = record.images ?? [];
     return [...imgs].sort((a, b) => {
@@ -72,19 +58,15 @@
   });
 </script>
 
-<!-- ============================================================
-     BACKDROP: click fuera cierra el modal
-     ============================================================ -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="img-viewer-backdrop" onclick={handleClose}>
 
-  <!-- Contenido del modal: stopPropagation para no cerrar al hacer click dentro -->
+  <!-- `stopPropagation` keeps a click inside the content from closing the modal -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="img-viewer-content" onclick={(e) => e.stopPropagation()}>
 
-    <!-- ── Cabecera ── -->
     <div class="img-viewer-header">
       <span class="img-viewer-title">
         {record.title || $m.record_fallback_title(record.id)}
@@ -94,7 +76,7 @@
       </button>
     </div>
 
-    <!-- ── Error visible de retoma: la imagen original se conserva ── -->
+    <!-- Retake error; the record keeps its original images -->
     {#if retakeError}
       <div class="img-viewer-retake-error">
         <span class="material-symbols-outlined icon-sm">error</span>
@@ -102,19 +84,17 @@
       </div>
     {/if}
 
-    <!-- ── Área de imágenes ── -->
     <div class="img-viewer-images">
       {#each images as img}
         <div class="img-viewer-frame">
-          <!-- Badge L/R en modo doble cámara -->
           {#if cameraMode === 'double' && img.role && img.role !== 'single'}
             <span class="img-viewer-badge">
               {img.role === 'left' ? $m.badge_left : $m.badge_right}
             </span>
           {/if}
 
-          <!-- NEH-139: un RAW se muestra por su vista previa JPEG o su miniatura,
-               nunca como imagen rota -->
+          <!-- NEH-139: a RAW image is shown through its JPEG preview or its
+               thumbnail, never as a broken image -->
           <RecordImageDisplay image={img}>
             {#snippet children(src, onerror)}
               <img
@@ -135,16 +115,13 @@
       {/if}
     </div>
 
-    <!-- ── Pie de página ── -->
     <div class="img-viewer-footer">
       {#if retaking}
-        <!-- Captura de reemplazo en curso -->
         <span class="img-viewer-confirm-msg">
           <span class="img-viewer-spinner"></span>
           {$m.lvm_retaking}
         </span>
       {:else if !confirmRetake}
-        <!-- Acciones normales -->
         <button class="btn btn-secondary" onclick={handleClose}>
           <span class="material-symbols-outlined icon-sm">close</span>
           {$m.common_close}
@@ -154,7 +131,6 @@
           {$m.lvm_retake}
         </button>
       {:else}
-        <!-- Confirmación de retoma -->
         <span class="img-viewer-confirm-msg">
           {$m.lvm_retake_confirm}
         </span>

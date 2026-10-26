@@ -1,18 +1,10 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Resumen (Dashboard unificado)
-  // Ruta: /dashboard → src/routes/(dashboard)/+page.svelte
-  //
-  // Una sola página de resumen para todos los roles.
-  // El contenido se adapta según el rol:
-  //
-  //   admin    → KPIs + cámaras expandibles
-  //   operator → KPIs + cámaras expandibles
-  //   reviewer → KPIs
-  //
-  // Para mostrar/ocultar secciones por rol, busca los comentarios
-  // "Solo admin", "Admin + Operator", etc. en el template.
-  // ============================================================================
+  // The overview page at /dashboard, one page for every role: KPIs, the
+  // volumes in progress and the activity calendar for all of them, plus the
+  // camera test panel for admin and operator (`canSeeCameras`). The camera
+  // panel polls still frames from `/cameras/preview/{index}`; every camera
+  // status write goes through `applyCameraSides` so that a reconnect and a
+  // late preview cannot overwrite each other.
 
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
@@ -27,9 +19,6 @@
   import InProgress from './InProgress.svelte';
   import ActivityCalendar from './ActivityCalendar.svelte';
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Usuario y rol
-  // ---------------------------------------------------------------------------
   let currentUser = $state<any>(null);
   let userRole    = $state('');
 
@@ -41,43 +30,33 @@
     return unsub;
   });
 
-  // Derivados de visibilidad de secciones
   let isAdmin    = $derived(userRole === 'admin');
   let isOperator = $derived(userRole === 'operator');
   let isReviewer = $derived(userRole === 'reviewer');
   let canSeeCameras = $derived(isAdmin || isOperator);
 
-  // Nombre del usuario para el saludo
   let userName = $derived(
     currentUser?.username
       ? currentUser.username.charAt(0).toUpperCase() + currentUser.username.slice(1)
       : $m.dash_greeting_fallback
   );
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: KPI stats
-  // ---------------------------------------------------------------------------
   let projectCount    = $state(0);
   let collectionCount = $state(0);
   let recordCount     = $state(0);
   let isLoadingStats  = $state(true);
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Digitalizaciones en curso (NEH-233)
-  // Volúmenes y proyectos ya cargados para los KPIs; InProgress.svelte arma
-  // con ellos la tabla y el tablero.
-  // ---------------------------------------------------------------------------
+  // Volumes and projects already loaded for the KPIs; `InProgress.svelte`
+  // builds its table and board from them (NEH-233).
   let allCollections = $state<Collection[]>([]);
   let allProjects    = $state<Project[]>([]);
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Almacenamiento
-  // Se muestra una alerta en el resumen cuando el uso supera el 85%.
-  // TODO: backend — reemplazar con llamada a systemApi.getStorageInfo()
-  // ---------------------------------------------------------------------------
-  const STORAGE_ALERT_THRESHOLD = 85;  // porcentaje
+  // The overview shows an alert when storage use reaches 85%. The figures
+  // below are placeholders, not read from the unit.
+  // TODO: read them from `systemApi.getStorage()` (`/system/storage`).
+  const STORAGE_ALERT_THRESHOLD = 85;  // percent
 
-  let storageUsedGB  = $state(2457.6);   // placeholder — conectar con backend
+  let storageUsedGB  = $state(2457.6);
   let storageTotalGB = $state(10240);
 
   let storagePercent = $derived(
@@ -91,12 +70,6 @@
     return `${gb.toFixed(0)} GB`;
   }
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Cámaras
-  // expandedCamera: null | 'left' | 'right'
-  // Click en botón → expande el panel de esa cámara con preview
-  // Click de nuevo → colapsa
-  // ---------------------------------------------------------------------------
   let expandedCamera = $state<'left' | 'right' | null>(null);
   let previewUrls    = $state<Record<string, string>>({});
   let streamActive   = $state<Record<string, boolean>>({ left: false, right: false });
@@ -123,20 +96,21 @@
   }
   let previewIntervals: Record<string, ReturnType<typeof setInterval>> = {};
   let isFetchingPreview: Record<string, boolean> = {};
-  // Resultado de la última captura de prueba por cámara — visible hasta que se
-  // limpia (éxito) o hasta la próxima captura (fallo, para que no desaparezca sola).
+  // Result of the last test capture per camera. A success is cleared after
+  // 4 s; a failure stays until the next capture or camera issue, so that it
+  // does not disappear on its own.
   let captureStatus = $state<Record<'left' | 'right', CaptureOutcome | null>>({ left: null, right: null });
-  // Handle del timeout que limpia un resultado "ok" tras 4s — si llega una
-  // segunda captura en esa ventana, hay que cancelar el timer de la primera
-  // para que no borre el resultado (éxito o error) de la segunda (NEH-166).
+  // Timeout that clears an "ok" result after 4 s. A second capture inside
+  // that window must cancel the first one's timer, or it would erase the
+  // second one's result, success or error (NEH-166).
   let captureClearTimers: Record<'left' | 'right', ReturnType<typeof setTimeout> | null> = { left: null, right: null };
-  // true mientras hay una petición de captura en curso para ese lado — bloquea
-  // el botón para que no se puedan solapar dos capturas en la misma cámara.
+  // true while a capture request is in flight for that side; it disables the
+  // button so that two captures on the same camera cannot overlap.
   let captureInFlight = $state<Record<'left' | 'right', boolean>>({ left: false, right: false });
-  // Contador (no reactivo) por lado: cada captura incrementa su valor y guarda
-  // el suyo en `seq`; si al terminar el contador ya avanzó, esta respuesta es
-  // obsoleta y no debe escribir en captureStatus. Guarda de refuerzo — con el
-  // botón deshabilitado durante la petición no debería llegar a activarse.
+  // Non-reactive counter per side: each capture increments it and keeps its
+  // own value in `seq`; if the counter has moved on when the capture returns,
+  // the response is stale and must not write to `captureStatus`. A backstop —
+  // with the button disabled during the request it should never trigger.
   let captureSeq: Record<'left' | 'right', number> = { left: 0, right: 0 };
   // A failed focus or preview request per camera, shown on the same status
   // line as the test capture. The latest event owns the line: a new issue
@@ -156,12 +130,8 @@
     cameraIssue = { ...cameraIssue, [side]: issue };
   }
 
-  // Frecuencia del polling (ms) — para cambiar, modifica este valor
   const PREVIEW_INTERVAL_MS = 2500;
 
-  // ---------------------------------------------------------------------------
-  // AL MONTAR
-  // ---------------------------------------------------------------------------
   onMount(async () => {
     await Promise.all([
       loadStats(),
@@ -174,10 +144,6 @@
     Object.values(previewUrls).forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
     Object.values(captureClearTimers).forEach(timer => { if (timer) clearTimeout(timer); });
   });
-
-  // ---------------------------------------------------------------------------
-  // FUNCIONES
-  // ---------------------------------------------------------------------------
 
   async function loadStats() {
     try {
@@ -213,11 +179,10 @@
     );
   }
 
-  // true mientras hay una petición de "reconectar cámaras" en curso — evita
-  // solapar dos reconexiones y deshabilita el botón mientras corre.
+  // true while a "reconnect cameras" request is in flight; it prevents two
+  // overlapping reconnects and disables the button meanwhile.
   let rescanInFlight = $state(false);
-  // Mensaje de error de la última reconexión fallida, o null si no hay uno
-  // pendiente de mostrar.
+  // Error message of the last failed reconnect, or null if none is pending.
   let rescanError = $state<string | null>(null);
 
   async function rescanCameras() {
@@ -227,9 +192,9 @@
       await cameraRefresh.reconnect(async () => sidesFromDevices(await camerasApi.rescan()));
       rescanError = null;
     } catch (err) {
-      // Un 401 significa sesión muerta, no un fallo de reconexión — apiRequest
-      // ya limpió la sesión y redirige a /login (mismo razonamiento que
-      // checkCamerasStatus, NEH-64).
+      // A 401 means a dead session, not a failed reconnect — `apiRequest`
+      // has already cleared the session and redirects to /login (as in
+      // `checkCamerasStatus`, NEH-64).
       if (err instanceof AuthError && err.status === 401) return;
       rescanError = err instanceof Error ? err.message : String(err);
     } finally {
@@ -260,8 +225,8 @@
     streamActive = { ...streamActive, [side]: true };
     const index = side === 'left' ? 0 : 1;
     await fetchFrame(side, index);
-    // fetchFrame() puede haber detenido el stream (cámara no encontrada,
-    // 404) mientras esperábamos — no instalar el polling en ese caso.
+    // `fetchFrame()` may have stopped the stream (camera not found, 404)
+    // during the await; in that case no polling is set up.
     if (!streamActive[side]) return;
     if (previewIntervals[side]) clearInterval(previewIntervals[side]);
     previewIntervals[side] = setInterval(() => fetchFrame(side, index), PREVIEW_INTERVAL_MS);
@@ -274,10 +239,9 @@
     if (previewUrls[side]) { URL.revokeObjectURL(previewUrls[side]); previewUrls = { ...previewUrls, [side]: '' }; }
   }
 
-  // ── PARA SUSTITUIR POR STREAMING REAL ──────────────────────────────────────
-  // Cuando el backend tenga /cameras/stream/{index}, reemplazar fetchFrame por:
-  //   <img src="{getApiBase()}/cameras/stream/{index}" class="preview-img" />
-  // y eliminar el polling.
+  // Polls still frames. TODO: if the backend gains a streaming endpoint
+  // (`/cameras/stream/{index}`), an `<img>` pointed at it can replace this
+  // function and the polling.
   async function fetchFrame(side: string, index: number) {
     if (isFetchingPreview[side]) return;
     isFetchingPreview[side] = true;
@@ -311,11 +275,11 @@
         }
         if (cameraIssue[side as 'left' | 'right']?.kind === 'preview') setIssue(side as 'left' | 'right', null);
         const blob = await res.blob();
-        // Si el operador detuvo el stream mientras esta petición estaba en
-        // vuelo, el frame llega tarde: no publicarlo, porque ya no hay
-        // polling que lo reemplace y el recuadro se quedaría con una imagen
-        // vieja junto a "Probar". Una captura de prueba sí se muestra con
-        // el stream detenido (NEH-166), pero esa entra por handleCapture.
+        // If the operator stopped the stream while this request was in
+        // flight, the frame is late: it is not shown, because no polling is
+        // left to replace it and the box would keep a stale image next to
+        // "Test". A test capture is shown with the stream stopped (NEH-166),
+        // but that goes through `handleCapture`.
         if (!streamActive[side as 'left' | 'right']) return;
         const url = URL.createObjectURL(blob);
         if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
@@ -342,17 +306,17 @@
   }
 
   async function handleCapture(side: 'left' | 'right') {
-    // Si ya hay una captura en curso para este lado, ignora el clic — evita
-    // que dos peticiones se solapen y pisen el resultado la una de la otra
+    // A capture already in flight on this side means the click is ignored,
+    // so two requests cannot overlap and overwrite each other's result
     // (NEH-166).
     if (captureInFlight[side]) return;
     captureInFlight = { ...captureInFlight, [side]: true };
-    // Marca esta captura como la más reciente para este lado; cualquier
-    // escritura posterior a captureStatus[side] que no lleve este número ya
-    // quedó obsoleta y se descarta.
+    // Marks this capture as the latest for this side; any later write to
+    // `captureStatus[side]` that does not carry this number is stale and is
+    // dropped.
     const seq = ++captureSeq[side];
-    // Cancela el timer de limpieza de una captura anterior en esta cámara,
-    // si lo hay, para que no borre el resultado de esta nueva captura (NEH-166).
+    // Cancels the clear timer of an earlier capture on this camera, if any,
+    // so that it does not erase this capture's result (NEH-166).
     if (captureClearTimers[side]) {
       clearTimeout(captureClearTimers[side]!);
       captureClearTimers[side] = null;
@@ -364,9 +328,9 @@
       const index = side === 'left' ? 0 : 1;
       const result = await camerasApi.testCapture(index);
       if (seq === captureSeq[side]) {
-        // La imagen capturada sustituye el frame de preview de este lado
-        // hasta que llegue el próximo frame real (NEH-166) — así el
-        // operador ve lo que la cámara realmente tomó, en el mismo recuadro.
+        // The captured image replaces this side's preview frame until the
+        // next real frame arrives (NEH-166), so the operator sees what the
+        // camera actually took, in the same box.
         const url = URL.createObjectURL(result.blob);
         if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
         previewUrls = { ...previewUrls, [side]: url };
@@ -374,9 +338,9 @@
         captureStatus = { ...captureStatus, [side]: outcome };
         captureClearTimers[side] = setTimeout(() => {
           captureClearTimers[side] = null;
-          // Solo limpiar si el resultado sigue siendo el "ok" que programó
-          // este timer — si una captura posterior ya cambió el estado
-          // (éxito o error), no lo pisemos.
+          // Clear only if the result is still the "ok" this timer was set
+          // for — a later capture may already have changed it (success or
+          // error).
           if (seq === captureSeq[side] && captureStatus[side]?.kind === 'ok') {
             captureStatus = { ...captureStatus, [side]: null };
           }
@@ -384,7 +348,7 @@
       }
     } catch (e) {
       if (seq === captureSeq[side]) {
-        console.error('[Dashboard] Error en la captura de prueba:', e);
+        console.error('[Dashboard] Test capture error:', e);
         captureStatus = { ...captureStatus, [side]: describeCaptureFailure(e, $m) };
       }
     } finally {
@@ -394,12 +358,8 @@
 
 </script>
 
-<!-- ============================================================
-     PÁGINA DE RESUMEN
-     ============================================================ -->
 <div class="page">
 
-  <!-- Saludo personalizado -->
   <div class="page-header">
     <h1 class="greeting">{$m.dash_greeting(userName)}</h1>
     <p class="subtitle">
@@ -410,9 +370,7 @@
     </p>
   </div>
 
-  <!-- ── ALERTA DE ALMACENAMIENTO ── -->
-  <!-- Visible solo cuando el almacenamiento supera el STORAGE_ALERT_THRESHOLD -->
-  <!-- La misma lógica está en la página de Configuración -->
+  <!-- The Settings page applies the same threshold. -->
   {#if storageAlert}
     <div class="storage-alert-banner">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -426,7 +384,6 @@
     </div>
   {/if}
 
-  <!-- ── KPI CARDS ── -->
   <div class="kpi-grid">
 
     <div class="kpi-card">
@@ -449,21 +406,12 @@
 
   </div>
 
-  <!-- ══════════════════════════════════════════════════════
-       SECCIÓN: DIGITALIZACIONES EN CURSO (NEH-233)
-       Acceso directo a capturar o revisar un volumen concreto.
-       Si no hay volúmenes con registros el bloque no se dibuja: en una unidad
-       recién instalada no hay nada que listar, y una tabla vacía con encabezados
-       no informa de nada.
-       ══════════════════════════════════════════════════════ -->
+  <!-- Volumes in progress (NEH-233): direct access to capture or review a
+       given volume. `InProgress` draws nothing when no volume has records. -->
   <InProgress collections={allCollections} projects={allProjects} />
 
   <ActivityCalendar />
 
-  <!-- ══════════════════════════════════════════════════════
-       SECCIÓN: PROBAR CÁMARAS
-       Solo visible para admin y operator (canSeeCameras)
-       ══════════════════════════════════════════════════════ -->
   {#if canSeeCameras}
     <div class="section">
       <h2 class="section-title">{$m.dash_test_cameras}</h2>
@@ -477,7 +425,6 @@
 
           <div class="camera-panel" class:expanded={isExpanded}>
 
-            <!-- Botón/header (siempre visible) — click para expandir/colapsar -->
             <button class="camera-toggle-btn" class:expanded={isExpanded} onclick={() => toggleCamera(side)}>
               <div class="cam-icon">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -489,7 +436,6 @@
                 <span class="cam-name">{label}</span>
                 <span class="cam-model">{cameraModel[side] ?? '—'}</span>
               </div>
-              <!-- Badge OK / Not found -->
               <div class="cam-badge" class:ok={status === 'ok'} class:notfound={status === 'not-found'}>
                 {#if status === 'ok'}
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
@@ -505,11 +451,8 @@
               </svg>
             </button>
 
-            <!-- Panel expandido: preview + botones -->
             {#if isExpanded}
               <div class="cam-expanded">
-                <!-- Área de preview (polling) -->
-                <!-- Para sustituir: ver comentario en fetchFrame() arriba -->
                 <div class="preview-area">
                   {#if previewUrls[side]}
                     <img src={previewUrls[side]} alt={side === 'left' ? $m.dash_camera_left : $m.dash_camera_right} class="preview-img" />
@@ -525,7 +468,6 @@
                   {/if}
                 </div>
 
-                <!-- Botón Probar / Detener -->
                 <button class="btn-probar" onclick={() => active ? stopStream(side) : startStream(side)}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     {#if active}
@@ -538,7 +480,6 @@
                   {active ? $m.dash_camera_stop : $m.dash_camera_test}
                 </button>
 
-                <!-- Botones secundarios -->
                 <div class="secondary-btns">
                   <button class="btn-secondary" onclick={() => handleFocus(side)}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -578,10 +519,9 @@
         {/each}
       </div>
 
-      <!-- Recuperación de cámara: reconectar tras un cable suelto o una cámara
-           que se durmió (NEH-229). Siempre visible cuando la sección de
-           cámaras lo está; la pista de "cámara faltante" solo aparece si
-           algún lado está not-found. -->
+      <!-- Camera recovery: reconnect after a loose cable or a camera that went
+           to sleep (NEH-229). Always visible with the camera section; the
+           "missing camera" hint appears only when a side is not-found. -->
       <div class="cam-recovery">
         {#if cameraStatus.left === 'not-found' || cameraStatus.right === 'not-found'}
           {@const missingLabels = (['left', 'right'] as const)
@@ -602,7 +542,6 @@
     </div>
   {/if}
 
-  <!-- Badge flotante de cámaras (solo si el usuario puede ver cámaras) -->
   {#if canSeeCameras}
     <div class="cameras-badge">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -623,7 +562,6 @@
   .greeting { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
 
-  /* Alerta de almacenamiento */
   .storage-alert-banner {
     display: flex; align-items: flex-start; gap: 12px;
     padding: 14px 18px;
@@ -667,7 +605,6 @@
 
   .kpi-card:hover { transform: translateY(-3px); }
 
-  /* Rayita de color en la parte superior izquierda */
   .kpi-line {
     width: 32px;
     height: 3px;
@@ -678,12 +615,10 @@
   .kpi-number { font-size: var(--text-h1); font-weight: var(--fw-extrabold); color: var(--color-light); line-height: 1; margin: 0; }
   .kpi-label  { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
 
-  /* Sección */
   .section { margin-bottom: 36px; }
   .section-title { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0 0 20px; }
   .section-sub { font-size: var(--text-sm); font-weight: var(--fw-regular); color: var(--color-light-grey); margin-left: 8px; }
 
-  /* Cámaras */
   .cameras-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
   .camera-panel {
@@ -791,7 +726,6 @@
   .capture-status { margin: 8px 0 0; font-size: var(--text-sm); color: var(--color-light-grey); }
   .capture-status.is-error { color: var(--color-error); }
 
-  /* Badge flotante de cámaras */
   .cameras-badge {
     position: fixed; bottom: 24px; right: 24px;
     background-color: var(--color-surface);

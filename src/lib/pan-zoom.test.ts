@@ -1,5 +1,5 @@
 // NEH-230 — shared pan/zoom geometry: fit sizing, zoom stepping, per-page
-// scale (R34-1), and normalised pan (R34-2).
+// scale under a shared zoom, and normalised pan.
 import { describe, it, expect } from 'vitest';
 import {
   ZOOM_MIN,
@@ -118,7 +118,7 @@ describe('stepZoom', () => {
     expect(stepZoom(1, -1, 1)).toBeCloseTo(1 / ZOOM_STEP, 10);
   });
 
-  it('reaches exactly 1 stepping down from the ceiling of a page whose 1:1 is 1 (R37-1)', () => {
+  it('reaches exactly 1 stepping down from the ceiling of a page whose 1:1 is 1', () => {
     // 2 -> 1.6 -> 1.28 -> 1.024 -> would be 0.8192: the closest value misses
     // the 2% band, so the step that crosses fit must snap to it.
     let z = maxZoom(1);
@@ -127,7 +127,7 @@ describe('stepZoom', () => {
     expect(seen).toContain(1);
   });
 
-  it('reaches exactly 1 stepping up from below fit (R37-1)', () => {
+  it('reaches exactly 1 stepping up from below fit', () => {
     // 0.78125 -> 0.9765625 -> would be 1.220703125: crosses fit, snaps to 1.
     expect(stepZoom(0.9765625, 1, 10)).toBe(1);
     expect(stepZoom(1.024, -1, 1)).toBe(1);
@@ -168,7 +168,7 @@ describe('effectiveOneToOne', () => {
   });
 });
 
-describe('pageScale (R34-1, R35-1: 1:1 never shrinks a page below fit)', () => {
+describe('pageScale (1:1 never shrinks a page below fit)', () => {
   // pageScale expects both arguments already clamped through
   // effectiveOneToOne (>= 1) and `oneToOneRef` to be the MAX effective
   // oneToOne among the pages being shown — callers, not pageScale, do the
@@ -236,7 +236,7 @@ describe('panBounds', () => {
   });
 });
 
-describe('panPixels + dragToFraction (R34-2)', () => {
+describe('panPixels + dragToFraction', () => {
   const boundsLeft: import('./pan-zoom').Size = { w: 2750, h: 1700 };
   const boundsRight: import('./pan-zoom').Size = { w: 1750, h: 2700 };
 

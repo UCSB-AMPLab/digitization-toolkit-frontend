@@ -1,20 +1,10 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Live Preview
-  // Ruta: /live-preview?projectId=X&collectionId=Y
-  //
-  // Orquestador principal — solo gestiona estado global y pasa props a hijos.
-  // No tiene lógica de renderizado propia (eso está en cada componente).
-  //
-  // Componentes hijos:
-  //   TopBar.svelte         → barra superior con tabs y controles de sesión
-  //   CameraControls.svelte → panel izquierdo con ajustes de cámara
-  //   LiveViewport.svelte   → área central con la vista de cámara en vivo
-  //   ThumbnailStrip.svelte → tira de miniaturas inferior
-  //   Para acceder: iniciar sesión como admin u operator y entrar a
-  //   http://localhost:5173/live-preview?projectId=1&collectionId=1
-  //   (reviewer es redirigido — ver el guard de rol en el onMount, NEH-66)
-  // ============================================================================
+  // Capture screen, at /live-preview?projectId=X&collectionId=Y (optionally
+  // &recordId=Z). The page holds the state its children share — camera mode,
+  // exposure values, per-camera rotation, the volume's records — and passes it
+  // down as props; `CameraControls`, `LiveViewport`, `ThumbnailStrip` and
+  // `ImageViewerModal` do the rendering. Only admin and operator may use it;
+  // a reviewer is redirected (role guard in `onMount`, NEH-66).
 
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
@@ -33,37 +23,27 @@
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import ImageViewerModal from './ImageViewerModal.svelte';
 
-  // ---------------------------------------------------------------------------
-  // PARÁMETROS DE URL
-  // Se reciben desde la ruta: /live-preview?projectId=1&collectionId=2
-  // Para navegar aquí desde una colección: goto(`/live-preview?projectId=${p}&collectionId=${c}`)
-  // ---------------------------------------------------------------------------
   let projectId = $derived(Number($page.url.searchParams.get('projectId')) || 0);
   let collectionId = $derived(Number($page.url.searchParams.get('collectionId')) || 0);
-  // Presente cuando se llega acá desde el botón "Recapturar imagen" de Book
-  // view (NEH-209) sobre un registro puntual — abre directo su modal de
-  // retoma en vez de obligar a buscarlo de nuevo en la tira de miniaturas.
+  // Set when the operator arrives from Book view's "Recapture image" button
+  // (NEH-209) for one record. The page opens that record's retake modal
+  // directly, so the operator does not have to find it again in the
+  // thumbnail strip.
   let recordId = $derived(Number($page.url.searchParams.get('recordId')) || 0);
-  // Si la retoma vino de ese flujo, al terminar con éxito volvemos a Book
-  // view en vez de quedarnos en /live-preview (la retoma "suelta", iniciada
-  // desde una miniatura ya cargada acá, no navega a ningún lado).
+  // A successful retake that came from that flow returns to Book view instead
+  // of staying on /live-preview. A retake started from a thumbnail on this
+  // page does not navigate anywhere.
   let cameFromRecapture = $state(false);
 
-  // ---------------------------------------------------------------------------
-  // ESTADO GLOBAL — se pasa como props a los componentes hijos
-  // ---------------------------------------------------------------------------
-
-  // Tab activo: 'live' = captura en vivo | 'gallery' = visor de imágenes
-  // Cambiar de tab redirige a /gallery cuando se selecciona 'gallery'
-
-  // Modo de cámara: 'single' = una cámara | 'double' = dos cámaras (izq + der)
   let cameraMode = $state<'single' | 'double'>('double');
 
-  // Dispositivos de cámara detectados (actualizados por CameraControls al montar)
+  // Detected camera devices, reported by `CameraControls` through
+  // `onDevicesChange` on mount and after every device-list refresh.
   let devices = $state<CameraDevice[]>([]);
 
 
-  // Ajustes de cámara (solo activos en modo manual)
+  // Exposure values shown in the viewport's metadata bar; `CameraControls`
+  // reports changes to them.
   let shutterSpeed = $state('1.6s');
   let iso = $state('200');
   let aperture = $state('13.0');
@@ -76,29 +56,28 @@
 
   // Which body (hardware_id) the operator manually rotated at each camera
   // index in this session — NOT reactive state: it's bookkeeping consulted
-  // (and updated) alongside rotateDeg, never rendered on its own (R30-3).
+  // (and updated) alongside rotateDeg, never rendered on its own.
   let rotateTouched = new Map<number, string>();
 
-  // Rotaciones tocadas antes de que llegue la lista de dispositivos: no hay
-  // body al que persistirlas todavía, así que se recuerdan aquí y se aplican
-  // (y guardan) en cuanto onDevicesChange conoce la identidad del índice.
-  // Sin esto, el primer listado sobreescribiría el toque con el valor
-  // guardado y el cambio que la operadora ya vio desaparecería (R31-2).
+  // Rotations changed before the device list arrives: there is no body to
+  // persist them to yet, so they are kept here and applied (and saved) as
+  // soon as `onDevicesChange` knows the identity of the index. Without this,
+  // the first listing would overwrite the change with the saved value, and a
+  // change the operator has already seen would disappear.
   let rotatePending = new Map<number, number>();
 
   // Persists a rotation change to the backend, coalescing quick repeat taps
-  // on the same camera into a single in-flight PUT (R30-2).
+  // on the same camera into a single in-flight PUT.
   const saveOrientation = createOrientationSaver(
     (i, hw, deg) => camerasApi.setOrientation(i, hw, deg),
-    (i, e) => console.error('[LivePreview] Error guardando orientación:', i, e)
+    (i, e) => console.error('[LivePreview] Error saving orientation:', i, e)
   );
 
-  // Nombre real del proyecto (cargado desde la API al montar)
   let projectName = $state<string>('');
 
-  // Nombre del volumen. La barra superior lo muestra junto al proyecto: sin
-  // esto, quien captura no tiene en pantalla nada que le diga en qué volumen
-  // está guardando, y un volumen equivocado sólo se descubre después.
+  // The top bar shows the volume name next to the project. Without it the
+  // operator has nothing on screen that says which volume the captures go
+  // into, and a wrong volume is discovered only afterwards.
   let collectionName = $state<string>('');
 
   // Whether the volume has no stem (filename_stem). The backend refuses
@@ -109,37 +88,30 @@
     ? `/dashboard/projects/${projectId}?editVolume=${collectionId}`
     : '');
 
-  // Lista de registros/imágenes capturadas en esta colección
   let records = $state<ApiRecord[]>([]);
   let selectedRecordId = $state<number | null>(null);
 
-  // Registro inspeccionado en el modal de imagen (null = modal cerrado)
+  // The record open in `ImageViewerModal`; null when the modal is closed.
   let inspectedRecord = $state<ApiRecord | null>(null);
 
-  // Estado de carga general (al iniciar, al capturar, etc.)
   let isLoading = $state(false);
 
-  // ---------------------------------------------------------------------------
-  // AL MONTAR: verifica auth y carga registros existentes de la colección
-  // ---------------------------------------------------------------------------
   onMount(async () => {
-    // Verificar sesión + rol: la pantalla de captura es solo para admin y
-    // operator — reviewer no puede disparar capturas ni borrar (el backend
-    // ya lo rechaza con 403 en cameras.py/records.py), pero antes de este
-    // fix esta ruta (fuera del grupo (dashboard)) solo chequeaba que hubiera
-    // un token, sin validar rol (NEH-66).
+    // The capture screen is for admin and operator only. A reviewer cannot
+    // trigger captures or delete (the backend answers 403 in
+    // cameras.py/records.py), and this route sits outside the (dashboard)
+    // group, so it checks the role itself (NEH-66).
     if (!authStore.requireSession(['admin', 'operator'])) {
       return;
     }
 
-    // Cargar nombre del proyecto y registros en paralelo
     const tasks: Promise<void>[] = [];
 
     if (projectId) {
       tasks.push(
         projectsApi.get(projectId)
           .then(p => { projectName = p.name; })
-          .catch(e => console.error('[LivePreview] Error cargando proyecto:', e))
+          .catch(e => console.error('[LivePreview] Error loading project:', e))
       );
     }
 
@@ -148,17 +120,17 @@
       tasks.push(
         collectionsApi.get(collectionId)
           .then(c => { collectionName = c.name; volumeNeedsStem = needsStem(c); })
-          .catch(e => console.error('[LivePreview] Error cargando volumen:', e))
+          .catch(e => console.error('[LivePreview] Error loading volume:', e))
       );
     }
 
     await Promise.all(tasks);
 
-    // Si llegamos con un recordId puntual (NEH-209, botón "Recapturar
-    // imagen" de Book view), abrimos directo su modal de retoma y ajustamos
-    // el modo de cámara al capture_mode real del registro — si no, un
-    // registro dual con cameraMode en 'single' (o viceversa) dispararía el
-    // guard de modo-no-coincide del backend en cameras.py.
+    // With a `recordId` (NEH-209, Book view's "Recapture image" button), open
+    // its retake modal directly and set the camera mode to the record's
+    // actual `capture_mode`. Otherwise a dual record with `cameraMode` at
+    // 'single' (or the reverse) would trip the backend's mode-mismatch guard
+    // in cameras.py.
     if (recordId) {
       const target = records.find(r => r.id === recordId);
       if (target) {
@@ -170,50 +142,31 @@
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: Carga los registros de la colección actual
-  // Llama a recordsApi.listAll() filtrando por collectionId
-  // ---------------------------------------------------------------------------
   async function loadRecords() {
     try {
       isLoading = true;
       const data = await recordsApi.listAll({ collection_id: collectionId });
       records = data;
-      // Seleccionar el primer registro si existe
       if (data.length > 0 && !selectedRecordId) {
         selectedRecordId = data[0].id;
       }
     } catch (error) {
-      console.error('[LivePreview] Error cargando registros:', error);
+      console.error('[LivePreview] Error loading records:', error);
     } finally {
       isLoading = false;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // HANDLER: Salir a revisión
-  // Lleva a la vista del volumen, que es donde se revisa lo capturado.
-  // ---------------------------------------------------------------------------
+  // Captures are reviewed in the volume view.
   function handleGoToReview() {
     goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
   }
 
-  // ---------------------------------------------------------------------------
-  // HANDLER: Nueva captura completada
-  // Se llama desde LiveViewport cuando el botón de captura tiene éxito.
-  // Recarga los registros para mostrar la nueva imagen en la tira.
-  // ---------------------------------------------------------------------------
   async function handleCaptureDone() {
     await loadRecords();
   }
 
-  // ---------------------------------------------------------------------------
-  // HANDLER: Botón volver
-  // Regresa a la vista de la colección dentro del dashboard
-  // Para cambiar la ruta de regreso, modifica este goto
-  // ---------------------------------------------------------------------------
   function handleBack() {
-    // Navegar de regreso a la colección en el dashboard
     if (projectId && collectionId) {
       goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
     } else {
@@ -228,28 +181,24 @@
       const c = await collectionsApi.get(collectionId);
       volumeNeedsStem = needsStem(c);
     } catch (e) {
-      console.error('[LivePreview] Error cargando volumen:', e);
+      console.error('[LivePreview] Error loading volume:', e);
     }
     return volumeNeedsStem;
   }
 
-  // ---------------------------------------------------------------------------
-  // HANDLER: Retoma de un registro desde el modal de imagen
-  // El backend (cameras.py, NEH-208) ya se encarga de conservar la(s)
-  // imagen(es) anterior(es) como historial no bien detecta que el registro
-  // está 'rejected' y llega una captura nueva con el mismo record_id — las
-  // marca is_current=false en vez de borrarlas, para que sigan disponibles
-  // como auditoría vía GET /records/{id}/rejections. El frontend NO debe
-  // volver a borrarlas por su cuenta (antes lo hacía acá, destruyendo esa
-  // auditoría — bug corregido en NEH-209).
-  // ---------------------------------------------------------------------------
+  // Retake of a record from the image modal. When the record is 'rejected'
+  // and a new capture arrives with the same `record_id`, the backend
+  // (cameras.py, NEH-208) keeps the previous images as history: it marks them
+  // `is_current=false` instead of deleting them, so they remain available
+  // for audit through `GET /records/{id}/rejections`. The frontend must NOT
+  // delete them itself (NEH-209).
   async function handleRetake(record: ApiRecord) {
     // The modal shows a thrown error's message; this one is the catalogue's.
     if (volumeNeedsStem) throw new Error($m.lv_needs_stem);
     try {
       await retake(record);
     } catch (error) {
-      console.error('[LivePreview] Error en la retoma:', error);
+      console.error('[LivePreview] Error during retake:', error);
       if (isConflict(error) && (await recheckStem())) throw new Error($m.lv_needs_stem);
       // The backend's text is English; the modal shows the catalogue's.
       throw new Error(captureErrorText(error, $m));
@@ -282,11 +231,10 @@
 
     inspectedRecord = null;
 
-    // Si llegamos acá desde "Recapturar imagen" en Book view (NEH-209),
-    // volvemos ahí en vez de quedarnos en /live-preview — la retoma queda
-    // conclusa y el operador ve de una el resultado en el mismo lugar donde
-    // la pidió. La retoma "suelta" (miniatura ya cargada en esta sesión) no
-    // navega a ningún lado, como siempre.
+    // Coming from "Recapture image" in Book view (NEH-209), go back there
+    // instead of staying on /live-preview: the retake is finished, and the
+    // operator sees the result right where they asked for it. A retake
+    // started from a thumbnail on this page does not navigate anywhere.
     if (cameFromRecapture && projectId && collectionId) {
       goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
       return;
@@ -295,15 +243,12 @@
     await loadRecords();
   }
 
-  // ---------------------------------------------------------------------------
-  // HANDLER: Cambio de rotación de una cámara
-  // Único punto de escritura de rotateDeg (NEH-71) — tanto el panel de
-  // controles como el overlay de LiveViewport llaman a esta misma función,
-  // así que nunca hay dos copias del valor desincronizándose entre sí.
-  // Si el índice ya no tiene un dispositivo real (se desconectó, o el modo es
-  // single y estamos mirando la cámara derecha), solo actualizamos el estado
-  // local: no hay body al que persistirle nada.
-  // ---------------------------------------------------------------------------
+  // The only writer of `rotateDeg` (NEH-71): both the controls panel and the
+  // `LiveViewport` overlay call this function, so there are never two copies
+  // of the value drifting apart. If the index has no real device (it was
+  // disconnected, or the mode is single and the right camera is selected),
+  // only the local state changes, and the change waits in `rotatePending`
+  // until a device appears at that index.
   function handleRotateDegChange(cam: number, deg: number) {
     const device = devices.find(d => d.index === cam);
     if (!device) {
@@ -318,12 +263,9 @@
   }
 </script>
 
-<!-- ============================================================
-     LAYOUT PRINCIPAL: pantalla completa sin sidebar del dashboard
-     ============================================================ -->
+<!-- Full screen, without the dashboard sidebar -->
 <div class="live-preview-wrapper">
 
-  <!-- ── Barra superior con tabs Live Scan / Gallery ── -->
   <TopBar
     {projectName}
     {collectionName}
@@ -331,10 +273,8 @@
     onGoToReview={handleGoToReview}
   />
 
-  <!-- ── Área de contenido: controles + viewport + tiras ── -->
   <div class="content-area">
 
-    <!-- Panel izquierdo: controles de cámara -->
     <CameraControls
       {cameraMode}
       {shutterSpeed}
@@ -349,8 +289,8 @@
         const seeded = seedRotation(rotateDeg, d, rotateTouched);
         rotateDeg = seeded.rotation;
         rotateTouched = seeded.touched;
-        // Un toque hecho antes de conocer el dispositivo se aplica ahora que
-        // el índice tiene identidad: queda tocado y se persiste.
+        // A rotation set before the device was known is applied now that the
+        // index has an identity: it counts as touched and is persisted.
         for (const [cam, deg] of [...rotatePending]) {
           if (d.some(x => x.index === cam)) handleRotateDegChange(cam, deg);
         }
@@ -359,10 +299,8 @@
       {rotateDeg}
     />
 
-    <!-- Área central: viewport + tira de miniaturas -->
     <div class="center-column">
 
-      <!-- Vista de cámara en vivo -->
       <LiveViewport
         {cameraMode}
         {shutterSpeed}
@@ -381,7 +319,6 @@
         onStemRefused={recheckStem}
       />
 
-      <!-- Tira de miniaturas inferior -->
       <div class="thumbnail-area">
         <ThumbnailStrip
           {records}
@@ -397,7 +334,6 @@
 
 </div>
 
-<!-- ── Modal de inspección de imagen ── -->
 {#if inspectedRecord}
   <ImageViewerModal
     record={inspectedRecord}

@@ -1,31 +1,27 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: RecordImageDisplay (NEH-139)
+  // Decides what an inspection viewer shows of a record image (NEH-139) and
+  // lets the viewer draw the <img> with its own snippet, so the viewer keeps
+  // its scoped classes, its pan/zoom transform and its bind:naturalWidth.
   //
-  // Decide qué se muestra de una imagen de registro en un visor de inspección
-  // y deja que el visor pinte el <img> con su propio snippet (así conserva sus
-  // clases con alcance, su transform de pan/zoom y sus bind:naturalWidth).
+  // Candidates, in order (see displayCandidates in $lib/image-display):
+  //   - JPEG/PNG/WebP: /preview (the master itself), then /thumbnail.
+  //   - RAW: /preview (its JPEG preview), then /thumbnail.
+  //   - Any other format (TIFF): /thumbnail only; /preview returns 404.
+  // When the <img> fails to load a candidate, the next one is tried. With no
+  // candidates left, an explicit state names the file — never the broken-image
+  // icon, which invites a retake. In that state /file is asked whether the
+  // original is on disk, and it is reported as stored only when the backend
+  // confirms it. The /file URL never goes in an <img>: for a RAW it returns
+  // RAW bytes. The preview and the thumbnail carry a badge.
   //
-  // Candidatos, en orden (ver displayCandidates en $lib/image-display):
-  //   - JPEG/PNG/WebP: /preview (el máster mismo), luego /thumbnail.
-  //   - RAW: /preview (su vista previa JPEG), luego /thumbnail.
-  //   - Otro formato (TIFF): solo /thumbnail; /preview responde 404.
-  // Si el <img> no carga un candidato se pasa al siguiente. Sin candidatos,
-  // un estado explícito con el nombre del archivo — nunca el ícono de imagen
-  // rota, que invita a retomar. En ese estado se pregunta a /file si el
-  // original está en el disco, y solo si el backend lo confirma se dice que
-  // está guardado. La URL de /file nunca va en un <img>: para un RAW son
-  // bytes RAW. La vista previa y la miniatura llevan una etiqueta.
-  //
-  // Un archivo liberado de la tarjeta (NEH-248) responde 410 con un cuerpo que
-  // dice que está en la copia externa. El <img> no dice por qué falló, así que
-  // al fallar /preview se le vuelve a preguntar con fetch (probeFreed). Si está
-  // liberado, se muestra un aviso tranquilo sobre la miniatura, o solo, si no
-  // hay miniatura: está fuera del equipo, no se perdió nada y un administrador
-  // puede restaurar el volumen. Nunca como faltante ni como error. Un formato
-  // que solo se muestra por su miniatura (TIFF) no pide /preview, así que ahí
-  // decide el master_freed_at del registro (freedFromMetadata).
-  // ============================================================================
+  // A file freed from the card (NEH-248) returns 410 with a body saying it is
+  // in the offsite copy. The <img> does not say why it failed, so when
+  // /preview fails it is asked again with fetch (probeFreed). A freed file
+  // gets a calm notice over the thumbnail, or on its own when there is no
+  // thumbnail: the file is off the unit, nothing is lost and an admin can
+  // restore the volume. It is never shown as missing or as an error. A format
+  // shown only through its thumbnail (TIFF) never requests /preview, so the
+  // record's master_freed_at decides there (freedFromMetadata).
 
   import { untrack, type Snippet } from 'svelte';
   import { recordsApi, type RecordImage } from '$lib/api';
@@ -49,15 +45,15 @@
     onMasterFreed,
   }: {
     image: Pick<RecordImage, 'id' | 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>;
-    /** Pinta el <img>: recibe la URL a mostrar y el handler de error. */
+    /** Draws the <img>: receives the URL to show and the error handler. */
     children: Snippet<[string, () => void]>;
     /** Told whether a 410 has said the master itself is freed, whatever the
      *  record's master_freed_at says; a freed RAW preview does not count. */
     onMasterFreed?: (freed: boolean) => void;
   } = $props();
 
-  // Solo se vuelve a resolver si cambia la imagen, no cada vez que el padre
-  // pasa un objeto nuevo con los mismos datos (p. ej. al recargar la lista).
+  // Resolve again only when the image changes, not each time the parent
+  // passes a new object with the same data (e.g. when the list reloads).
   const imageKey = $derived(
     `${image.id}|${image.format}|${image.filename}|${image.master_freed_at ?? ''}|${image.preview_freed_at ?? ''}`,
   );
@@ -68,9 +64,9 @@
   });
 
   const raw = $derived.by(() => { void imageKey; return untrack(() => isRawImage(image)); });
-  // Un formato que el navegador no muestra (TIFF): el texto lo nombra. Si el
-  // formato sí se muestra (un JPEG que no cargó) o no se sabe, el texto es
-  // genérico.
+  // A format the browser cannot display (TIFF) is named in the text. When the
+  // format can be displayed (a JPEG that failed to load) or is unknown, the
+  // text is generic.
   const unsupportedExt = $derived.by(() => {
     void imageKey;
     return untrack(() => {
@@ -79,12 +75,12 @@
     });
   });
 
-  // Índice del candidato que se está mostrando; candidates.length = ninguno.
+  // Index of the candidate on screen; candidates.length = none.
   let index = $state(0);
   let master = $state<MasterCheck | 'checking'>('checking');
-  // El archivo liberado que describió el 410 de un candidato; null si no.
+  // The freed file a candidate's 410 described; null otherwise.
   let freed = $state<FreedFile | null>(null);
-  // Cancela las consultas de probeFreed al cambiar de imagen o al desmontar.
+  // Aborts the probeFreed requests when the image changes or on unmount.
   let probes: AbortController | null = null;
 
   $effect.pre(() => {
@@ -121,8 +117,8 @@
 
   const current = $derived(index < candidates.length ? candidates[index] : null);
 
-  // Al quedarse sin nada que mostrar, preguntar si el original está guardado.
-  // Al desmontar o cambiar de imagen se aborta la petición en curso.
+  // With nothing left to show, ask whether the original is stored. The
+  // request in flight is aborted on unmount or when the image changes.
   $effect(() => {
     if (current !== null) return;
     const id = untrack(() => image.id);
@@ -135,8 +131,8 @@
 
   function handleError() {
     if (!current) return;
-    // La miniatura de un archivo liberado sigue en el equipo; solo /preview
-    // puede responder 410 por un archivo liberado que el visor iba a mostrar.
+    // A freed file's thumbnail stays on the unit; only /preview can return
+    // 410 for a freed file the viewer was about to show.
     if (current.kind !== 'thumbnail') {
       probes ??= new AbortController();
       const signal = probes.signal;

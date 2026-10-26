@@ -1,19 +1,11 @@
 <script lang="ts">
-	// ============================================================================
-	// LAYOUT: Dashboard unificado
-	//
-	// Un solo layout para todos los roles (admin, operator, reviewer).
-	// La visibilidad de secciones se controla por el rol del usuario:
-	//
-	//   admin    → Resumen, Proyectos, Usuarios, Configuración
-	//   operator → Resumen, Proyectos
-	//   reviewer → Resumen, Proyectos
-	//
-	// Para agregar una sección nueva:
-	//   1. Crear la ruta en src/routes/(dashboard)/nueva-seccion/+page.svelte
-	//   2. Agregar el item en NAV_ITEMS con los roles que pueden verlo
-	//   3. Crear la ruta en SvelteKit
-	// ============================================================================
+	// One dashboard shell for every role (admin, operator, reviewer). It
+	// validates the stored session against the backend before rendering any
+	// protected content, and `NAV_ITEMS` decides both which sidebar links each
+	// role sees and which routes it may open: admin sees Overview, Projects,
+	// Users and Settings; operator and reviewer see Overview and Projects.
+	// A new section needs its route under `src/routes/(dashboard)/` and an
+	// entry in `NAV_ITEMS` listing the roles allowed to open it.
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -30,51 +22,45 @@
 
 	let { children } = $props();
 
-	// ---------------------------------------------------------------------------
-	// ESTADO DE LA SIDEBAR
-	// ---------------------------------------------------------------------------
 	let expanded = $state(true);
 
 	let currentPath = $derived($page.url.pathname);
 
-	// ---------------------------------------------------------------------------
-	// USUARIO ACTUAL
-	// ---------------------------------------------------------------------------
 	let currentUser = $state<any>(null);
 
-	// true mientras se valida la sesión contra el backend al montar el layout;
-	// el contenido protegido no se renderiza hasta que esto sea false (NEH-63).
+	// true while the session is being validated against the backend on mount;
+	// protected content is not rendered until this is false (NEH-63).
 	let isValidatingSession = $state(true);
 
-	// true mientras el backend no responde (red caída, 502/503/504 de Nginx
-	// mientras el backend arranca). La sesión guardada se conserva y la
-	// validación se repite sola (NEH-219).
+	// true while the backend does not respond (network down, or Nginx returning
+	// 502/503/504 while the backend starts). The stored session is kept and the
+	// validation is retried automatically (NEH-219).
 	let isWaitingForBackend = $state(false);
 
 	onMount(() => {
-		// Guard reactivo: si la sesión se limpia MIENTRAS se usa la app (p. ej.
-		// apiRequest interceptó un 401 en algún llamado posterior), salir.
+		// Reactive guard: if the session is cleared WHILE the app is in use (e.g.
+		// `apiRequest` intercepted a 401 on a later call), leave.
 		const unsub = authStore.subscribe((s) => {
 			currentUser = s.user;
 			if (!s.token && !isValidatingSession) goto('/login');
-			// Primera vez que esta cuenta entra: se ofrece el recorrido (NEH-95).
-			// La marca se guarda al abrirlo, no al terminarlo — quien lo cierra
-			// enseguida no quiere verlo en cada arranque, y el botón de ayuda
-			// lo reabre cuando quiera.
+			// First sign-in for this account: offer the tour (NEH-95). The flag is
+			// stored when the tour opens, not when it ends — someone who closes it
+			// straight away does not want it on every start, and the help button
+			// reopens it whenever they want.
 			if (s.user) tour.startIfFirstTime(s.user.id);
 		});
 
-		// Validación al montar: un token en localStorage no garantiza que el
-		// backend todavía lo acepte (pudo expirar, o el usuario fue
-		// desactivado), así que se valida con /users/me antes de mostrar
-		// cualquier contenido protegido (NEH-63).
+		// Validation on mount: a token in localStorage does not guarantee the
+		// backend still accepts it (it may have expired, or the user may have
+		// been deactivated), so it is checked with `/users/me` before any
+		// protected content is shown (NEH-63).
 		//
-		// Solo un 401/403 invalida la sesión. Antes, cualquier error mandaba a
-		// /login sin limpiar la sesión; /login, al ver el token, mandaba a /,
-		// y / de vuelta a /dashboard: un ciclo sin fin mientras el backend no
-		// respondía, que es lo que pasa en el kiosco durante el arranque
-		// (NEH-219). Ahora un backend que no responde deja la pantalla de
-		// espera y la validación se reintenta con espera creciente (2 s a 10 s).
+		// Only a 401/403 invalidates the session. Any other error must not send
+		// the user to /login with the session still set: /login, seeing the
+		// token, redirects to /, and / back to /dashboard, an endless loop while
+		// the backend does not respond — which is what happens on the kiosk at
+		// boot (NEH-219). An unresponsive backend keeps the waiting screen up and
+		// the validation is retried with a growing delay (2 s to 10 s).
 		const controller = new AbortController();
 		(async () => {
 			const token = authStore.getToken();
@@ -89,13 +75,13 @@
 			});
 			if (outcome.kind === 'cancelled') return;
 			if (outcome.kind === 'valid') {
-				// Refresca el usuario en el store (por si el rol cambió del
-				// lado del backend desde el último login) antes de renderizar.
+				// Refresh the user in the store (the role may have changed on the
+				// backend since the last login) before rendering.
 				authStore.setSession(token, outcome.user);
 			} else {
-				// apiRequest ya limpia la sesión ante un 401, pero no ante un
-				// 403. Si la sesión quedara puesta, /login mandaría de vuelta
-				// aquí y el ciclo volvería, así que se limpia en ambos casos.
+				// `apiRequest` clears the session on a 401 but not on a 403. If
+				// the session stayed set, /login would redirect back here and the
+				// loop would return, so it is cleared in both cases.
 				authStore.clearSession();
 				goto('/login');
 			}
@@ -110,19 +96,9 @@
 
 	let userInitials = $derived(currentUser?.username?.slice(0, 2).toUpperCase() ?? '?');
 
-	// ---------------------------------------------------------------------------
-	// DEFINICIÓN DE NAVEGACIÓN
-	//
-	// Cada item tiene:
-	//   labelKey → clave del catálogo i18n ($lib/i18n) con el texto visible
-	//   icon     → clave del ícono SVG a renderizar
-	//   path     → ruta SvelteKit
-	//   roles    → array de roles que pueden ver este item
-	//              si roles está vacío → visible para todos los roles
-	//
-	// Para restringir a solo admin: roles: ['admin']
-	// Para todos: roles: ['admin', 'operator', 'reviewer']
-	// ---------------------------------------------------------------------------
+	// `labelKey` is a key in the i18n catalogue (`$lib/i18n`); `icon` picks the
+	// inline SVG below; `roles` lists the roles that may see and open the
+	// route, and an empty `roles` means every role.
 	const NAV_ITEMS: {
 		sectionKey: StringMessageKey;
 		items: {
@@ -142,7 +118,6 @@
 					labelKey: 'nav_overview',
 					icon: 'grid',
 					path: '/dashboard',
-					// Visible para todos los roles
 					roles: ['admin', 'operator', 'reviewer']
 				},
 				{
@@ -150,10 +125,9 @@
 					labelKey: 'nav_projects',
 					icon: 'folder',
 					path: '/dashboard/projects',
-					// Visible para todos los roles
 					roles: ['admin', 'operator', 'reviewer'],
-					// El badge se muestra solo si el usuario tiene proyectos asignados
-					// TODO: conectar con conteo real desde el backend
+					// Always null, so no badge is shown.
+					// TODO: connect to a real count from the backend.
 					badge: null as number | null
 				},
 				{
@@ -161,7 +135,6 @@
 					labelKey: 'nav_users',
 					icon: 'users',
 					path: '/dashboard/users',
-					// Solo admin puede ver y gestionar usuarios
 					roles: ['admin']
 				}
 			]
@@ -174,15 +147,13 @@
 					labelKey: 'nav_settings',
 					icon: 'settings',
 					path: '/dashboard/config',
-					// Solo admin puede acceder a la configuración del sistema
 					roles: ['admin']
 				}
 			]
 		}
 	];
 
-	// Filtra los items de navegación según el rol del usuario actual
-	// Si el usuario no tiene rol reconocido, no se muestra ningún item restringido
+	// A user without a recognized role sees no restricted item.
 	let visibleNav = $derived(
 		NAV_ITEMS.map((section) => ({
 			...section,
@@ -192,27 +163,22 @@
 		})).filter((section) => section.items.length > 0)
 	);
 
-	// ---------------------------------------------------------------------------
-	// GUARD DE ROL POR RUTA (NEH-65)
-	//
-	// Ocultar los links de navegación no basta: cualquier usuario logueado
-	// puede llegar a /dashboard/users o /dashboard/config escribiendo la URL
-	// directamente. NAV_ITEMS ya declara qué roles pueden ver cada ruta, así
-	// que la reusamos como única fuente de verdad para el control de acceso
-	// en vez de mantener una lista de rutas admin-only por separado.
-	// ---------------------------------------------------------------------------
+	// Route role guard (NEH-65). Hiding the nav links is not enough: any
+	// signed-in user can reach /dashboard/users or /dashboard/config by typing
+	// the URL. `NAV_ITEMS` already declares which roles may see each route, so
+	// it is the single source of truth for access control rather than a
+	// separate list of admin-only routes.
 
-	// Busca el item de navegación que corresponde a una ruta dada, usando
-	// coincidencia exacta o de subruta (el más específico, si hay varios)
+	// Exact or sub-route match; the most specific item wins if several match.
 	function findNavItem(path: string) {
 		return NAV_ITEMS.flatMap((section) => section.items)
 			.filter((item) => path === item.path || path.startsWith(item.path + '/'))
 			.sort((a, b) => b.path.length - a.path.length)[0];
 	}
 
-	// true si la ruta no tiene restricción de rol, o si el rol del usuario
-	// actual está entre los permitidos. La usan el guard y el enlace del
-	// indicador de la copia externa, para que no puedan dar respuestas distintas.
+	// true if the route has no role restriction or the current user's role is
+	// among the allowed ones. Both the guard and the off-site copy indicator's
+	// link use it, so they cannot give different answers.
 	function canAccess(path: string): boolean {
 		const item = findNavItem(path);
 		if (!item) return true;
@@ -221,25 +187,20 @@
 
 	let hasRoleAccess = $derived(canAccess(currentPath));
 
-	// Si el rol actual puede abrir Configuración: decide si el indicador de la
-	// copia externa enlaza allí.
+	// Whether the current role may open Settings decides whether the off-site
+	// copy indicator links there.
 	let canOpenConfig = $derived(canAccess('/dashboard/config'));
 
-	// Redirige fuera de rutas admin-only en cuanto sabemos el rol del usuario
-	// (al montar, o si navega del lado del cliente a otra ruta restringida)
+	// Redirects away from restricted routes as soon as the user's role is known
+	// (on mount, or on client-side navigation to another restricted route).
 	$effect(() => {
 		if (!isValidatingSession && currentUser && !hasRoleAccess) {
 			goto('/dashboard');
 		}
 	});
 
-	// ---------------------------------------------------------------------------
-	// HELPERS
-	// ---------------------------------------------------------------------------
-
-	// Determina si una ruta está activa
-	// Para /dashboard exacto usamos igualdad estricta para evitar que
-	// /dashboard/projects también active el item "Resumen"
+	// /dashboard needs strict equality, or /dashboard/projects would also mark
+	// the Overview item active.
 	function isActive(path: string): boolean {
 		if (path === '/dashboard') return currentPath === '/dashboard';
 		return currentPath.startsWith(path);
@@ -251,10 +212,8 @@
 	}
 </script>
 
-<!-- ============================================================
-     SPLASH: se muestra mientras se valida la sesión con /users/me.
-     Ningún contenido protegido se renderiza hasta que termine (NEH-63).
-     ============================================================ -->
+<!-- Splash while the session is validated with /users/me. No protected
+     content is rendered until it finishes (NEH-63). -->
 {#if isValidatingSession || !currentUser || !hasRoleAccess}
 	<div class="session-splash" role="status" aria-live="polite">
 		<div class="spinner"></div>
@@ -266,30 +225,21 @@
 		{/if}
 	</div>
 {:else}
-<!-- ============================================================
-     SHELL: sidebar + contenido
-     ============================================================ -->
 <div class="shell">
 	<!-- ══════════════════════ SIDEBAR ══════════════════════ -->
 	<aside class="sidebar" class:expanded>
-		<!-- Header: logo + botón colapsar -->
 		<div class="s-header">
 			<div class="logo-wrap">
-				<!-- Círculo verde con asterisco/estrella — logo del sistema -->
 				<div class="logo-circle">
 				<img src={favicon} alt="icon" class="logo-icon" />
 				</div>
 				{#if expanded}
 					<div class="logo-text">
-						<!-- Nombre del sistema — para cambiarlo, edita este texto -->
 							<img src={logo} alt="Captua" class="brand-logo-xs" />
-						<!-- Rol del usuario en minúsculas con capitalize por CSS -->
-						<!-- <p class="logo-role">{currentUser?.role ?? '—'}</p> -->
 					</div>
 				{/if}
 			</div>
 
-			<!-- Botón colapsar / expandir -->
 			<button
 				class="collapse-btn"
 				onclick={() => (expanded = !expanded)}
@@ -309,10 +259,8 @@
 			</button>
 		</div>
 
-		<!-- Navegación: se renderizan solo los items visibles para el rol actual -->
 		<nav class="s-nav">
 			{#each visibleNav as section}
-				<!-- Título de sección (solo en modo expandido) -->
 				{#if expanded}
 					<p class="s-section-title">{$m[section.sectionKey]}</p>
 				{:else}
@@ -326,12 +274,10 @@
 						class:active={isActive(item.path)}
 						title={!expanded ? $m[item.labelKey] : undefined}
 					>
-						<!-- Barra indicadora de ruta activa -->
 						{#if isActive(item.path)}
 							<div class="active-bar"></div>
 						{/if}
 
-						<!-- Ícono del item -->
 						<span class="s-icon" class:active-icon={isActive(item.path)}>
 							{#if item.icon === 'grid'}
 								<svg
@@ -391,14 +337,12 @@
 							{/if}
 						</span>
 
-						<!-- Label y badge (solo en modo expandido) -->
 						{#if expanded}
 							<span class="s-label">{$m[item.labelKey]}</span>
 							{#if item.badge}
 								<span class="s-badge">{item.badge}</span>
 							{/if}
 						{:else if item.badge}
-							<!-- Punto de notificación en modo colapsado -->
 							<span class="s-badge-dot"></span>
 						{/if}
 					</a>
@@ -406,15 +350,13 @@
 			{/each}
 		</nav>
 
-		<!-- Estado de la copia externa del catálogo (NEH-266). Visible para
-		     todos los roles; enlaza a Configuración solo para quien puede
-		     abrirla. -->
+		<!-- Status of the catalogue's off-site copy (NEH-266). Visible to every
+		     role; it links to Settings only for roles that may open it. -->
 		<CatalogueBackupIndicator
 			{expanded}
 			href={canOpenConfig ? '/dashboard/config#offsite-copy' : null}
 		/>
 
-		<!-- Footer: avatar del usuario + botón salir -->
 		<div class="s-footer">
 			{#if expanded}
 				<div class="user-row">
@@ -428,13 +370,13 @@
 				<div class="user-av-sm">{userInitials}</div>
 			{/if}
 			
-			<!-- Ayuda encima del botón de fallos. En captura y en la vista de
-			     volumen no hay barra lateral: allí vive en el menú del avatar. -->
+			<!-- Help sits above the bug-report button. The capture and volume
+			     views have no sidebar; there, Help is in the avatar menu. -->
 			<button class="help-btn" onclick={() => tour.start()} title={$m.nav_help} aria-label={$m.nav_help}>
-				<!-- SVG y no material-symbols: la fuente de iconos va empaquetada
-				     como subconjunto de los que el proyecto ya usaba, y "help" no
-				     está en él --- se dibujaba la palabra en mayúsculas. Mismo icono
-				     que el de Ayuda en el menú del avatar. -->
+				<!-- An SVG, not material-symbols: the icon font is bundled as a
+				     subset of the icons the project uses, and "help" is not in it,
+				     so the ligature would render as the word in capitals. Same icon
+				     as Help in the avatar menu. -->
 				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
 					<circle cx="12" cy="12" r="10" />
 					<path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 3-3 3" />
@@ -445,7 +387,6 @@
 
 			<BugReportButton {expanded} />
 
-			<!-- Botón salir: siempre visible, ícono en colapsado + texto en expandido -->
 			<button class="logout-btn" onclick={handleLogout} title={$m.nav_logout}>
 				<svg
 					width="15"
@@ -464,7 +405,6 @@
 		</div>
 	</aside>
 
-	<!-- ══════════════════════ CONTENIDO ══════════════════════ -->
 	<main class="content">
 		{@render children()}
 	</main>
@@ -472,7 +412,6 @@
 {/if}
 
 <style>
-	/* ── Splash de validación de sesión ── */
 	.session-splash {
 		display: flex;
 		flex-direction: column;
@@ -525,7 +464,7 @@
 
 	/* ── Sidebar ── */
 	.sidebar {
-		width: 72px; /* colapsado por defecto */
+		width: 72px; /* collapsed width; `.expanded` widens it */
 		flex-shrink: 0;
 		background-color: var(--color-surface);
 		display: flex;
@@ -619,7 +558,6 @@
 		background-color: rgba(255, 255, 255, 0.05);
 	}
 
-	/* Centrar los íconos de navegación cuando la sidebar está colapsada */
 	.sidebar:not(.expanded) .s-item {
 		justify-content: center;
 		padding: 10px 0;
@@ -636,7 +574,6 @@
 		overflow-x: hidden;
 	}
 
-	/* Cuando la sidebar está colapsada: header en columna con logo centrado */
 	.sidebar:not(.expanded) .s-header {
 		flex-direction: column;
 		justify-content: center;
@@ -644,7 +581,6 @@
 		gap: 6px;
 	}
 
-	/* Botón colapsar más pequeño y discreto cuando está colapsado */
 	.sidebar:not(.expanded) .collapse-btn {
 		width: 20px;
 		height: 20px;
@@ -697,7 +633,6 @@
 		background-color: rgba(90, 140, 98, 0.15);
 	}
 
-	/* Barra verde izquierda cuando el item está activo */
 	.active-bar {
 		position: absolute;
 		left: 0;
@@ -853,7 +788,6 @@
 		background-color: rgba(214, 103, 74, 0.2);
 	}
 
-	/* Contenido principal */
 	.content {
 		flex: 1;
 		overflow-y: auto;
