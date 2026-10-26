@@ -24,6 +24,7 @@
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
   import HandoverControls from '$lib/components/HandoverControls.svelte';
   import { getVolumeTopbar } from '$lib/volume-topbar';
+  import { dismissible } from '$lib/dialog';
   import { fileHoldText } from '$lib/volume-refusals';
   import { freedExportCount } from '$lib/offsite-free';
   import { reconcileInspected, selectionAfterLoad } from '$lib/record-selection';
@@ -503,8 +504,8 @@
 {/if}
 
 {#if showExportModal}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => showExportModal = false, escape: !isExporting, backdrop: !isExporting }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       {#if isExporting}
         <div class="spinner"></div>
         <h3 class="export-modal-title">{$m.col_export_generating}</h3>
@@ -538,8 +539,8 @@
   </div>
 {/if}
 {#if deleteRecordError}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => deleteRecordError = null }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       <span class="material-symbols-outlined icon-lg export-error-icon">error</span>
       <h3 class="export-modal-title">{$m.col_delete_record_error_title}</h3>
       <p class="export-modal-subtitle">{deleteRecordError}</p>
@@ -550,8 +551,8 @@
   </div>
 {/if}
 {#if showBlockersModal}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => showBlockersModal = false }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       <span class="material-symbols-outlined icon-lg export-error-icon">block</span>
       <h3 class="export-modal-title">{$m.col_export_blocked_title}</h3>
       <p class="export-modal-subtitle">{$m.col_export_blocked_desc}</p>
@@ -572,8 +573,8 @@
   </div>
 {/if}
 {#if showChooserModal}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => showChooserModal = false }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       <h3 class="export-modal-title">{$m.col_download_choose_title}</h3>
       <p class="export-modal-subtitle">{$m.col_download_choose_desc}</p>
       <div class="chooser-options">
@@ -611,8 +612,8 @@
   </div>
 {/if}
 {#if isZipping || zipError}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => zipError = null, escape: !isZipping, backdrop: !isZipping }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       {#if isZipping}
         <div class="spinner"></div>
         <h3 class="export-modal-title">{$m.col_zip_generating}</h3>
@@ -630,8 +631,8 @@
 {/if}
 
 {#if isManifestLoading || manifestRefusal || manifestError}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => { manifestRefusal = null; manifestError = null; }, escape: !isManifestLoading, backdrop: !isManifestLoading }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       {#if isManifestLoading}
         <div class="spinner"></div>
         <h3 class="export-modal-title">{$m.col_manifest_preparing}</h3>

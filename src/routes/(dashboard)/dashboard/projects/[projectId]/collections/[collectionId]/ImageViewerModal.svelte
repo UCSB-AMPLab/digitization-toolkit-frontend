@@ -7,6 +7,7 @@
   import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
+  import { dismissible } from '$lib/dialog';
   import {
     fittedSize,
     screenExtent,
@@ -165,17 +166,24 @@
 
 </script>
 
+<!-- Escape first cancels a pending retake or delete, then closes; a click on
+     the backdrop closes outright. -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="img-viewer-backdrop" onclick={onClose}>
+<div
+  class="img-viewer-backdrop"
+  onclick={onClose}
+  use:dismissible={{ onDismiss: () => { if (confirmAction) confirmAction = null; else onClose(); }, backdrop: false }}
+>
 
+  <!-- `stopPropagation` keeps a click inside the content from closing the modal -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="img-viewer-content" onclick={(e) => e.stopPropagation()}>
+  <div class="img-viewer-content" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="img-viewer-title" onclick={(e) => e.stopPropagation()}>
 
     <div class="img-viewer-header">
       <div class="img-viewer-header-title-group">
-        <span class="img-viewer-title">
+        <span class="img-viewer-title" id="img-viewer-title">
           {record.title || $m.record_fallback_title(record.id)}
         </span>
         <StatusBadge status={record.status} />

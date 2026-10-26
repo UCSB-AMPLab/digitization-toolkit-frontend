@@ -7,6 +7,7 @@
   import { type Record as ApiRecord } from '$lib/api';
   import { m } from '$lib/i18n';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
+  import { dismissible } from '$lib/dialog';
 
   let {
     record,
@@ -58,17 +59,23 @@
   });
 </script>
 
+<!-- Escape first cancels a pending retake, then closes; a click on the
+     backdrop closes outright. Neither works while the retake runs. -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="img-viewer-backdrop" onclick={handleClose}>
+<div
+  class="img-viewer-backdrop"
+  onclick={handleClose}
+  use:dismissible={{ onDismiss: () => { if (confirmRetake) confirmRetake = false; else handleClose(); }, backdrop: false }}
+>
 
   <!-- `stopPropagation` keeps a click inside the content from closing the modal -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="img-viewer-content" onclick={(e) => e.stopPropagation()}>
+  <div class="img-viewer-content" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="lv-img-viewer-title" onclick={(e) => e.stopPropagation()}>
 
     <div class="img-viewer-header">
-      <span class="img-viewer-title">
+      <span class="img-viewer-title" id="lv-img-viewer-title">
         {record.title || $m.record_fallback_title(record.id)}
       </span>
       <button class="img-viewer-close-btn" onclick={handleClose} disabled={retaking} aria-label={$m.common_close}>

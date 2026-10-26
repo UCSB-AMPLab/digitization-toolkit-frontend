@@ -12,6 +12,7 @@
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, type Project } from '$lib/api';
   import { fileHoldText } from '$lib/volume-refusals';
+  import { dismissible } from '$lib/dialog';
 
   let projects     = $state<Project[]>([]);
   let isLoading    = $state(true);
@@ -373,7 +374,8 @@
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal(); }}>
-    <div class="modal-card">
+    <!-- No Escape: it would throw away what was typed. -->
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
 
       <div class="modal-header">
         <div>
@@ -462,10 +464,8 @@
 {/if}
 
 {#if showDeleteModal && deletingProject}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeDeleteModal(); }}>
-    <div class="modal-card delete-modal-card">
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeDeleteModal, escape: !isDeleting, backdrop: !isDeleting }}>
+    <div class="modal-card delete-modal-card dialog-fit" role="dialog" aria-modal="true">
 
       <div class="modal-header">
         <div>
@@ -830,8 +830,6 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
-    max-height: 90vh;
-    overflow-y: auto;
   }
 
   .modal-card::-webkit-scrollbar { width: 3px; }

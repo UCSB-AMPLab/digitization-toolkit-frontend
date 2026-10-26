@@ -32,6 +32,7 @@
   import { defaultRecordTitle } from '$lib/record-title';
   import { isConflict } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
+  import { dismissible } from '$lib/dialog';
 
   let {
     cameraMode,
@@ -933,11 +934,10 @@
 </div><!-- /viewport-outer -->
 
 {#if showGridModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeGridModal(); }}>
-    <div class="modal-card">
-      <h3 class="modal-title">{$m.lv_grid_modal_title}</h3>
+  <!-- No Escape while a key is being assigned: a pedal may send Escape. -->
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeGridModal, escape: !learning }}>
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="grid-modal-title">
+      <h3 class="modal-title" id="grid-modal-title">{$m.lv_grid_modal_title}</h3>
       <p class="modal-subtitle">{$m.lv_grid_modal_subtitle}</p>
       <div class="modal-body">
         <div class="modal-toggle-row">

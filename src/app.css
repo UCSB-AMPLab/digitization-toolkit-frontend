@@ -1295,6 +1295,20 @@ tr:hover .drag-handle { opacity: 1; }
 .export-success-icon { color: var(--color-success); }
 .export-error-icon   { color: var(--color-error); }
 
+/* A dialog card that fits the bench unit's 800×480 screen: capped at the
+   viewport height less a margin, it scrolls inside instead of pushing its
+   title and buttons off the screen. The backdrops pad 24px, so the cap lets
+   the card into that padding and leaves 12px at each edge. The vh line is
+   the fallback for browsers without dvh. Its children keep their height, so
+   the card scrolls as a whole instead of squeezing a list inside it. */
+.dialog-fit {
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.dialog-fit > * { flex-shrink: 0; }
+
 /* Export progress modal */
 .export-modal-backdrop {
   position: fixed;
