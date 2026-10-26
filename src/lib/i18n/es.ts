@@ -844,7 +844,6 @@ export const es = {
 
 	// ── Welcome ──────────────────────────────────────────────────────────────
 	welcome_title: 'Bienvenido/a',
-	welcome_start: 'Comenzar',
 
 	// ── Camera controls ──────────────────────────────────────────────────────
 	cam_panel_title: 'Controles de cámara',

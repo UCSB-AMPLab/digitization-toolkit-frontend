@@ -814,7 +814,6 @@ export const en: Messages = {
 
 	// ── Welcome ──────────────────────────────────────────────────────────────
 	welcome_title: 'Welcome',
-	welcome_start: 'Get started',
 
 	// ── Camera controls ──────────────────────────────────────────────────────
 	cam_panel_title: 'Camera Controls',

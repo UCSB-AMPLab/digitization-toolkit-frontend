@@ -1,11 +1,11 @@
 <script lang="ts">
-  // Splash screen. Its start button asks `/auth/setup/status` whether this is
-  // a first install: if setup is needed it goes to `/setup` to create the
-  // administrator account, otherwise — or when the check fails — to `/login`.
+  // Splash screen. Each start button sets the interface language and asks
+  // `/auth/setup/status` whether this is a first install: if setup is needed
+  // it goes to `/setup` to create the administrator account, otherwise — or
+  // when the check fails — to `/login`.
 
-  import { goto } from '$app/navigation';
   import { authApi } from '$lib/api';
-  import { m, locale } from '$lib/i18n';
+  import { m, locale, setLanguage, type Locale } from '$lib/i18n';
   import logoEs from '$lib/assets/captua-logo-descrp-light-esp.svg';
   import logoEn from '$lib/assets/captua-logo-descrp-light-eng.svg';
 
@@ -13,19 +13,29 @@
   // itself has to follow the locale.
   let logo = $derived($locale === 'en' ? logoEn : logoEs);
 
+  // Each label is in its own language whatever the current one is, so a unit
+  // with no saved language lets the person pick theirs.
+  const STARTS: { code: Locale; label: string }[] = [
+    { code: 'es', label: 'Empezar en español' },
+    { code: 'en', label: 'Get started in English' },
+  ];
+
   let isChecking = $state(false);
 
-  async function handleComenzar() {
+  // The destination is passed to `setLanguage` rather than to `goto`: the
+  // server reads the language only on a full page load.
+  async function handleStart(code: Locale) {
     if (isChecking) return;
     isChecking = true;
+    let destination = '/login';
     try {
       const { needs_setup } = await authApi.setupStatus();
-      goto(needs_setup ? '/setup' : '/login');
+      if (needs_setup) destination = '/setup';
     } catch {
-      goto('/login');
-    } finally {
-      isChecking = false;
+      // The status check failed: fall back to the login screen.
     }
+    // The page is left for good, so the guard stays on until it unloads.
+    setLanguage(code, destination);
   }
 </script>
 
@@ -40,9 +50,19 @@
 
   <h1 class="title">{$m.welcome_title}</h1>
 
-  <button class="btn" onclick={handleComenzar} disabled={isChecking} aria-busy={isChecking}>
-    {$m.welcome_start}
-  </button>
+  <div class="starts">
+    {#each STARTS as start (start.code)}
+      <button
+        class="btn"
+        lang={start.code}
+        onclick={() => handleStart(start.code)}
+        disabled={isChecking}
+        aria-busy={isChecking}
+      >
+        {start.label}
+      </button>
+    {/each}
+  </div>
 
 </div>
 
@@ -74,6 +94,12 @@
     text-align: center;
   }
 
+  /* Side by side so the splash still fits at 800x480 */
+  .starts {
+    display: flex;
+    gap: 16px;
+  }
+
   .btn {
     font-family: var(--font-family);
     font-size: var(--text-base);
@@ -82,7 +108,7 @@
     background: transparent;
     border: 1.5px solid var(--color-secondary);
     border-radius: var(--radius-md);
-    padding: 10px 48px;
+    padding: 10px 24px;
     min-height: var(--touch-target-min);
     cursor: pointer;
     transition: background-color var(--transition-base);
