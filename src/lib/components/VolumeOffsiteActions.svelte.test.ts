@@ -175,7 +175,7 @@ describe('VolumeOffsiteActions', () => {
 
 	it('restore: maps the 409 of a unit with no read access', async () => {
 		const text =
-			'Restore is not set up on this unit: it needs read access to the offsite bucket (DTK_OFFSITE_READ_REMOTE), and none is configured.';
+			'Restore is not set up on this unit: it needs read access to the offsite bucket (CAPTUA_OFFSITE_READ_REMOTE), and none is configured.';
 		restoreSpy.mockRejectedValue(new ApiError(text, { message: text }, 409));
 		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000 }));
 		await openMenu(screen);

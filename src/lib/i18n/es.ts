@@ -760,9 +760,9 @@ export const es = {
 		return `${ids.length === 1 ? 'Registro' : 'Registros'} ${shown}${rest > 0 ? ` y ${formatCount(rest, 'es')} más` : ''}`;
 	},
 	col_manifest_rule_tenant_missing:
-		'Este equipo no tiene configurada la carpeta de su institución en la copia externa, así que el manifiesto no puede indicar dónde está el volumen. Avisa al administrador: tiene que definir DTK_OFFSITE_TENANT y reiniciar Captua.',
+		'Este equipo no tiene configurada la carpeta de su institución en la copia externa, así que el manifiesto no puede indicar dónde está el volumen. Avisa al administrador: tiene que definir CAPTUA_OFFSITE_TENANT y reiniciar Captua.',
 	col_manifest_rule_tenant_invalid:
-		'La carpeta de la institución configurada en este equipo para la copia externa no es válida. Avisa al administrador: tiene que corregir DTK_OFFSITE_TENANT y reiniciar Captua.',
+		'La carpeta de la institución configurada en este equipo para la copia externa no es válida. Avisa al administrador: tiene que corregir CAPTUA_OFFSITE_TENANT y reiniciar Captua.',
 	col_manifest_rule_no_stem:
 		'El volumen no tiene raíz, así que sus imágenes no tienen nombres que Fisqua pueda leer. Asígnale una raíz al volumen: su código de referencia en Fisqua.',
 	col_manifest_rule_no_project: 'El volumen no pertenece a ningún proyecto, y el manifiesto tiene que indicar a cuál pertenece. Mueve el volumen a un proyecto.',
@@ -1112,11 +1112,11 @@ export const es = {
 	fisqua_kind_preview: 'Vista previa',
 	fisqua_history: (n: number): string => `Envíos anteriores (${formatCount(n, 'es')})`,
 	fisqua_cfg_token:
-		'Fisqua no acepta el token configurado en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_TOKEN y reiniciar Captua.',
+		'Fisqua no acepta el token configurado en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que corregir CAPTUA_FISQUA_TOKEN y reiniciar Captua.',
 	fisqua_cfg_not_found:
-		'Fisqua no reconoce la dirección configurada en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_ENV, DTK_FISQUA_BASE_URL o DTK_OFFSITE_TENANT y reiniciar Captua.',
+		'Fisqua no reconoce la dirección configurada en este equipo, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que corregir CAPTUA_FISQUA_ENV, CAPTUA_FISQUA_BASE_URL o CAPTUA_OFFSITE_TENANT y reiniciar Captua.',
 	fisqua_cfg_redirect:
-		'La dirección de Fisqua configurada en este equipo redirige a otra. Captua no sigue esa redirección, para que el token no llegue a otro sitio, y dejó de enviarle volúmenes a Fisqua y de consultar en qué estado están. Avisa al administrador: tiene que corregir DTK_FISQUA_ENV o DTK_FISQUA_BASE_URL y reiniciar Captua.',
+		'La dirección de Fisqua configurada en este equipo redirige a otra. Captua no sigue esa redirección, para que el token no llegue a otro sitio, y dejó de enviarle volúmenes a Fisqua y de consultar en qué estado están. Avisa al administrador: tiene que corregir CAPTUA_FISQUA_ENV o CAPTUA_FISQUA_BASE_URL y reiniciar Captua.',
 	fisqua_cfg_version:
 		'Fisqua no puede leer los manifiestos de captura de esta versión de Captua, así que Captua dejó de enviarle volúmenes y de consultar en qué estado están. Avisa al administrador: tiene que actualizar Captua, o pedir que actualicen Fisqua.',
 	fisqua_cfg_other:

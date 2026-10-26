@@ -48,7 +48,7 @@ const FILES_BEING_READ = 'Captua is preparing a file of this volume for the offs
 const LISTING =
 	'The offsite bucket could not be listed, so nothing could be checked against it and nothing was freed. Try again later.';
 const NO_READ_REMOTE =
-	'Restore is not set up on this unit: it needs read access to the offsite bucket (DTK_OFFSITE_READ_REMOTE), and none is configured.';
+	'Restore is not set up on this unit: it needs read access to the offsite bucket (CAPTUA_OFFSITE_READ_REMOTE), and none is configured.';
 const NOT_IN_OWN_FOLDER =
 	"Some of this volume's files have not yet been moved into the volume's own folder, so its files cannot be freed from the card or restored. Captua moves them the next time it starts. If they are still not moved after a restart, the backend's log says why (for example, the folder already holds files that are not this volume's); once that is cleared and Captua has restarted, the volume can be freed.";
 const JOB_RUNNING = 'Files of this volume are already being freed or restored. Wait for that to finish.';
