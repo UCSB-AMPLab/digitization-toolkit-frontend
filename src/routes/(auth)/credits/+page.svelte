@@ -2,8 +2,6 @@
   // Public credits page. Like /welcome it sits in the (auth) group, which has
   // no session guard, so it opens before anyone has signed in.
 
-  import { tick } from 'svelte';
-  import { dismissible } from '$lib/dialog';
   import nehSeal from '$lib/assets/neh-preferred-seal-white.png';
   import amplUcsb from '$lib/assets/ampl-ucsb-white.png';
   import utHistory from '$lib/assets/ut-history.svg';
@@ -28,20 +26,6 @@
   // The unit is offline and its kiosk has no address bar or back button, so
   // the project page is offered as a QR code for a visitor's phone instead of
   // a link.
-  let showLab = $state(false);
-  let labButton: HTMLButtonElement | undefined = $state();
-  let closeButton: HTMLButtonElement | undefined = $state();
-
-  async function openLab() {
-    showLab = true;
-    await tick();
-    closeButton?.focus();
-  }
-
-  function closeLab() {
-    showLab = false;
-    labButton?.focus();
-  }
 </script>
 
 <div class="page">
@@ -50,52 +34,45 @@
     <a href="/welcome" class="btn">Back / <span lang="es">Volver</span></a>
   </div>
 
-  <div class="body" lang="en">
-    <p>
-      Captua is developed by Adelaida Ávila, Juan Cobo Betancourt (grant PI), Jairo Melo Flórez, Santiago Muñoz Arbeláez (grant co-PI), Lucrezia Pograri, and Catalina Salguero at the Archives, Memory, and Preservation Lab of the University of California, Santa Barbara and at the University of Texas at Austin.
-    </p>
-    <p>
-      Captua has been made possible in part by a major grant from the National Endowment for the Humanities: Democracy demands wisdom. (NEH Award HAA-304052-25: "Digitization Toolkit: a Blueprint for Egalitarian Access to Technology in Low-Resource Environments".)
-    </p>
-    <button class="more" bind:this={labButton} onclick={openLab}>
-      Learn more about the Digitization Toolkit project
-      <!-- qr_code_2 is not in the icon font subset. -->
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20v1"/>
-      </svg>
-    </button>
-    <p class="muted">
-      Any views, findings, conclusions, or recommendations expressed in this software do not necessarily represent those of the National Endowment for the Humanities.
-    </p>
+  <div class="main">
+    <div class="body" lang="en">
+      <p>
+        Captua is developed by Adelaida Ávila, Juan Cobo Betancourt (grant PI), Jairo Melo Flórez, Santiago Muñoz Arbeláez (grant co-PI), Lucrezia Pograri, and Catalina Salguero at the Archives, Memory, and Preservation Lab of the University of California, Santa Barbara and at the University of Texas at Austin.
+      </p>
+      <p>
+        Captua has been made possible in part by a major grant from the National Endowment for the Humanities: Democracy demands wisdom. (NEH Award HAA-304052-25: "Digitization Toolkit: a Blueprint for Egalitarian Access to Technology in Low-Resource Environments".)
+      </p>
+      <p class="muted">
+        Any views, findings, conclusions, or recommendations expressed in this software do not necessarily represent those of the National Endowment for the Humanities.
+      </p>
+    </div>
+
+    <figure class="scan" lang="en">
+      <img class="qr" src={qr} alt="QR code for the Digitization Toolkit project page on the AMPL website" />
+      <figcaption>Scan to learn more about the project on the AMPL website</figcaption>
+    </figure>
   </div>
 
   <div class="logos">
     {#each LOGOS as logo (logo.alt)}
-      <div class="logo-box" style:width="{logo.width}px">
+      <div class="logo-box" style:width="calc({logo.width} * var(--u))">
         <img src={logo.src} alt={logo.alt} class:invert={logo.dark} />
       </div>
     {/each}
   </div>
 </div>
 
-{#if showLab}
-  <div class="backdrop" use:dismissible={{ onDismiss: closeLab }}>
-    <div class="dialog dialog-fit" role="dialog" aria-modal="true" aria-labelledby="lab-title">
-      <h2 id="lab-title" lang="en">Digitization Toolkit</h2>
-      <img class="qr" src={qr} alt="QR code for the Digitization Toolkit project page" />
-      <p class="caption" lang="en">Scan with your phone to learn more about the Digitization Toolkit project.</p>
-      <button class="btn" bind:this={closeButton} onclick={closeLab}>Close / <span lang="es">Cerrar</span></button>
-    </div>
-  </div>
-{/if}
-
 <style>
+  /* The page is laid out for the unit's 800×480 screen and scales as a whole
+     on a larger one: --u is 1px at 800×480 and grows with whichever of the
+     width or height is the tighter fit, never below 1px. */
   .page {
+    --u: max(1px, min(0.125vw, 0.20833vh));
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
     height: 100vh;
-    padding: 24px 40px;
+    padding: calc(24 * var(--u)) calc(40 * var(--u));
     background-color: var(--color-bg);
     font-family: var(--font-family);
     color: var(--color-light);
@@ -105,84 +82,74 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
+    margin-bottom: calc(16 * var(--u));
   }
 
-  h1 { margin: 0; font-size: var(--text-h2); font-weight: var(--fw-bold); }
+  h1 { margin: 0; font-size: calc(28 * var(--u)); font-weight: var(--fw-bold); }
   .es { color: var(--color-light-grey); }
 
-  .body {
+  /* Text on the left, capped so the lines stay readable, and the QR code
+     beside it. ch follows the scaled size set here. */
+  .main {
     flex: 1;
     min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 68ch) auto;
+    justify-content: start;
+    gap: calc(40 * var(--u));
+    align-items: start;
+    font-size: calc(16 * var(--u));
+  }
+
+  .body {
+    min-height: 0;
+    max-height: 100%;
     overflow-y: auto;
-    font-size: 14px;
-    line-height: 1.5;
   }
-  .body p { margin: 0 0 12px; }
-  .more {
-    display: inline-flex;
+  /* app.css sets a size and a line height on every p, so the paragraphs
+     take theirs explicitly. */
+  .body p { margin: 0 0 calc(10 * var(--u)); font-size: calc(15 * var(--u)); line-height: 1.4; }
+  .body .muted { font-size: calc(13 * var(--u)); color: var(--color-light-grey); }
+
+  .scan {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    margin-bottom: 12px;
-    font-weight: var(--fw-semibold);
-    color: var(--color-secondary);
-    text-decoration: none;
+    gap: calc(10 * var(--u));
+    width: calc(180 * var(--u));
+    margin: 0;
   }
-  .body .muted { color: var(--color-light-grey); }
+  .qr { width: calc(180 * var(--u)); height: calc(180 * var(--u)); border-radius: calc(8 * var(--u)); }
+  .scan figcaption {
+    text-align: center;
+    font-size: calc(12 * var(--u));
+    line-height: 1.4;
+    color: var(--color-light-grey);
+  }
 
   .logos {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-top: 16px;
+    padding-top: calc(16 * var(--u));
     border-top: 1px solid var(--border-color);
   }
 
-  .logo-box { height: 64px; flex: none; }
+  .logo-box { height: calc(64 * var(--u)); flex: none; }
   .logo-box img { width: 100%; height: 100%; object-fit: contain; }
   .invert { filter: brightness(0) invert(1); }
-
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background-color: rgba(0,0,0,0.65);
-  }
-
-  .dialog {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    box-sizing: border-box;
-    width: 100%;
-    max-width: 420px;
-    padding: 16px 24px;
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-  }
-
-  .dialog h2 { margin: 0; font-size: var(--text-h4); font-weight: var(--fw-bold); }
-  .qr { width: 220px; height: 220px; border-radius: var(--radius-md); }
-  .caption { margin: 0; text-align: center; font-size: var(--text-sm); color: var(--color-light-grey); }
 
   .btn {
     display: inline-flex;
     align-items: center;
-    font-size: var(--text-base);
+    font-size: calc(16 * var(--u));
     font-weight: var(--fw-semibold);
     color: var(--color-secondary);
     text-decoration: none;
     border: 1.5px solid var(--color-secondary);
-    border-radius: var(--radius-md);
-    padding: 10px 24px;
-    min-height: var(--touch-target-min);
+    border-radius: calc(8 * var(--u));
+    padding: calc(10 * var(--u)) calc(24 * var(--u));
+    min-height: calc(44 * var(--u));
     box-sizing: border-box;
     transition: background-color var(--transition-base);
   }
