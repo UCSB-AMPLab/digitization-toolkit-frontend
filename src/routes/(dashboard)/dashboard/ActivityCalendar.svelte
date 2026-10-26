@@ -4,10 +4,11 @@
   import { onMount, tick } from 'svelte';
   import { activityApi, browserTimeZone, type DailyActivity } from '$lib/api';
   import { m, locale } from '$lib/i18n';
+  import { STORAGE_KEYS, readStored, writeStored } from '$lib/storage-keys';
   import { buildGrid, moveFocus, parseLocalDate, WEEKS, type CalendarMetric } from '$lib/activity-calendar';
 
   type View = 'captures' | 'reviews';
-  const VIEW_KEY = 'dtk_activity_view';
+  const VIEW_KEY = STORAGE_KEYS.activityView;
   const DAYS = 182;
 
   let view = $state<View>('captures');
@@ -64,14 +65,12 @@
 
   function chooseView(next: View) {
     view = next;
-    try { localStorage.setItem(VIEW_KEY, next); } catch {}
+    writeStored(VIEW_KEY, next);
   }
 
   onMount(() => {
-    try {
-      const stored = localStorage.getItem(VIEW_KEY);
-      if (stored === 'captures' || stored === 'reviews') view = stored;
-    } catch {}
+    const stored = readStored(VIEW_KEY);
+    if (stored === 'captures' || stored === 'reviews') view = stored;
     load();
   });
 

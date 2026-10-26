@@ -41,7 +41,7 @@ describe('ActivityCalendar', () => {
 	let dailySpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
-		try { localStorage.removeItem('dtk_activity_view'); } catch {}
+		try { localStorage.removeItem('captua_activity_view'); } catch {}
 		dailySpy = vi.spyOn(activityApi, 'daily').mockResolvedValue(
 			series({
 				'2026-10-22': { captured_images: 212, reviewed_records: 1 },
@@ -51,7 +51,7 @@ describe('ActivityCalendar', () => {
 	});
 	afterEach(() => {
 		dailySpy.mockRestore();
-		try { localStorage.removeItem('dtk_activity_view'); } catch {}
+		try { localStorage.removeItem('captua_activity_view'); } catch {}
 	});
 
 	it('asks for 182 days in the browser zone and shows captures by default, ending today', async () => {
@@ -82,11 +82,11 @@ describe('ActivityCalendar', () => {
 		await expect.element(screen.getByText('1 registro revisado el 22 de octubre de 2026')).toBeVisible();
 		await expect.element(screen.getByRole('button', { name: 'Revisiones' })).toHaveAttribute('aria-pressed', 'true');
 		await expect.element(screen.getByRole('button', { name: 'Capturas' })).toHaveAttribute('aria-pressed', 'false');
-		expect(localStorage.getItem('dtk_activity_view')).toBe('reviews');
+		expect(localStorage.getItem('captua_activity_view')).toBe('reviews');
 	});
 
 	it('restores the remembered view', async () => {
-		localStorage.setItem('dtk_activity_view', 'reviews');
+		localStorage.setItem('captua_activity_view', 'reviews');
 		const screen = render(ActivityCalendar);
 		await expect.element(screen.getByText('Días con revisiones')).toBeVisible();
 	});

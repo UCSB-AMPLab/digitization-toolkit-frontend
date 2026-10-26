@@ -17,6 +17,7 @@
 // control.
 
 import { browser } from '$app/environment';
+import { STORAGE_KEYS, readStored, removeStored, writeStored } from '$lib/storage-keys';
 
 export type CaptureChord = {
   key: string;
@@ -172,7 +173,7 @@ export function learnFromEvent(event: KeyboardEvent): LearnResult {
 // (isBindableChord) falls back to the default just like a malformed one;
 // otherwise no key could trigger a capture.
 
-const STORAGE_KEY = 'dtk_capture_chord';
+const STORAGE_KEY = STORAGE_KEYS.captureChord;
 
 function isValidChord(value: unknown): value is CaptureChord {
   if (!value || typeof value !== 'object') return false;
@@ -189,7 +190,7 @@ function isValidChord(value: unknown): value is CaptureChord {
 export function readChord(): CaptureChord {
   if (!browser) return DEFAULT_CHORD;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = readStored(STORAGE_KEY);
     if (!raw) return DEFAULT_CHORD;
     const parsed = JSON.parse(raw);
     if (!isValidChord(parsed) || !isBindableChord(parsed)) return DEFAULT_CHORD;
@@ -201,20 +202,12 @@ export function readChord(): CaptureChord {
 
 export function writeChord(chord: CaptureChord): void {
   if (!browser) return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(chord));
-  } catch {
-    // localStorage may be unavailable (private mode, quota exceeded): the
-    // chord is then kept only in memory for this session, without breaking
-    // the page.
-  }
+  // Storage may be unavailable (private mode, quota exceeded): the chord is
+  // then kept only in memory for this session, without breaking the page.
+  writeStored(STORAGE_KEY, JSON.stringify(chord));
 }
 
 export function clearChord(): void {
   if (!browser) return;
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // See writeChord.
-  }
+  removeStored(STORAGE_KEY);
 }

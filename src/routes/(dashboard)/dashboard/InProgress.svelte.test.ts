@@ -15,7 +15,7 @@ import InProgress from './InProgress.svelte';
 // the bundled Mulish and icon fonts.
 import '../../../app.css';
 
-const VIEW_KEY = 'dtk_dashboard_in_progress_view';
+const VIEW_KEY = 'captua_dashboard_in_progress_view';
 
 const projects: Project[] = [{ id: 1, name: 'Fondo Rionegro' } as Project];
 

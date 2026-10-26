@@ -303,24 +303,24 @@ describe('storage: readChord / writeChord / clearChord', () => {
   });
 
   it('falls back to the default on malformed JSON', () => {
-    store['dtk_capture_chord'] = '{not json';
+    store['captua_capture_chord'] = '{not json';
     expect(readChord()).toEqual(DEFAULT_CHORD);
   });
 
   it('falls back to the default on a well-formed but wrong-shaped value', () => {
-    store['dtk_capture_chord'] = JSON.stringify({ foo: 'bar' });
+    store['captua_capture_chord'] = JSON.stringify({ foo: 'bar' });
     expect(readChord()).toEqual(DEFAULT_CHORD);
   });
 
   it('falls back to the default when the stored chord has an empty key', () => {
-    store['dtk_capture_chord'] = JSON.stringify({ key: '', ctrl: false, alt: false, meta: false, shift: false });
+    store['captua_capture_chord'] = JSON.stringify({ key: '', ctrl: false, alt: false, meta: false, shift: false });
     expect(readChord()).toEqual(DEFAULT_CHORD);
   });
 
   it.each(['Control', 'Alt', 'Shift', 'Meta'])(
     'falls back to the default when the stored chord is modifier-only: %s',
     (key) => {
-      store['dtk_capture_chord'] = JSON.stringify({ key, ctrl: false, alt: false, meta: false, shift: false });
+      store['captua_capture_chord'] = JSON.stringify({ key, ctrl: false, alt: false, meta: false, shift: false });
       expect(readChord()).toEqual(DEFAULT_CHORD);
     }
   );
@@ -331,7 +331,7 @@ describe('storage: readChord / writeChord / clearChord', () => {
   it.each(['Dead', 'Unidentified'])(
     'falls back to the default when the stored chord key is %s',
     (key) => {
-      store['dtk_capture_chord'] = JSON.stringify({ key, ctrl: false, alt: false, meta: false, shift: false });
+      store['captua_capture_chord'] = JSON.stringify({ key, ctrl: false, alt: false, meta: false, shift: false });
       expect(readChord()).toEqual(DEFAULT_CHORD);
     }
   );

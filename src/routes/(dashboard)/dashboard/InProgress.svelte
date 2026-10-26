@@ -17,6 +17,7 @@
   import { goto } from '$app/navigation';
   import { activityApi, AuthError, type Collection, type CollectionActivity, type Project } from '$lib/api';
   import { m, locale } from '$lib/i18n';
+  import { STORAGE_KEYS, readStored, writeStored } from '$lib/storage-keys';
   import { formatCount } from '$lib/format-count';
   import {
     PIPELINE_STAGES, barSegments, groupByStage, parseApiDate,
@@ -29,15 +30,11 @@
   // View switch, remembered per browser. Tabla is the default.
   // ---------------------------------------------------------------------------
   type View = 'board' | 'table';
-  const VIEW_STORAGE_KEY = 'dtk_dashboard_in_progress_view';
+  const VIEW_STORAGE_KEY = STORAGE_KEYS.inProgressView;
 
   function readView(): View {
     if (!browser) return 'table';
-    try {
-      return localStorage.getItem(VIEW_STORAGE_KEY) === 'board' ? 'board' : 'table';
-    } catch {
-      return 'table';
-    }
+    return readStored(VIEW_STORAGE_KEY) === 'board' ? 'board' : 'table';
   }
 
   let view = $state<View>(readView());
@@ -45,12 +42,9 @@
   function setView(next: View) {
     view = next;
     if (!browser) return;
-    try {
-      localStorage.setItem(VIEW_STORAGE_KEY, next);
-    } catch {
-      // Storage unavailable (private mode, quota): the choice lasts for this
-      // page only.
-    }
+    // Storage unavailable (private mode, quota): the choice lasts for this
+    // page only.
+    writeStored(VIEW_STORAGE_KEY, next);
   }
 
   // ---------------------------------------------------------------------------

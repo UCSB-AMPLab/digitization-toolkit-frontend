@@ -161,7 +161,7 @@
 	}
 
 	// `setLanguage` in `$lib/i18n` switches the language: it writes the
-	// `dtk_locale` cookie and reloads the page so that SSR renders the new one.
+	// `captua_locale` cookie and reloads the page so that SSR renders the new one.
 </script>
 
 <div class="login-wrapper" onkeydown={handleKeydown} role="main">
