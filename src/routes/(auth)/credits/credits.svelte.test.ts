@@ -50,7 +50,7 @@ describe('credits page', () => {
 		const screen = await render(Page);
 		for (const alt of [
 			'National Endowment for the Humanities',
-			'AMP Lab, University of California, Santa Barbara',
+			'AMPL, University of California, Santa Barbara',
 			'Department of History, University of Texas at Austin',
 			'Burdick Global Scholars Program',
 			'Neogranadina'
