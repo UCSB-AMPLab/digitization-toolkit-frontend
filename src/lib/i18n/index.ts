@@ -32,12 +32,23 @@ export type StringMessageKey = {
 }[keyof Messages];
 
 export const DEFAULT_LOCALE: Locale = 'es';
-export const LOCALE_COOKIE = 'dtk_locale';
+export const LOCALE_COOKIE = 'captua_locale';
+// Written by releases before 0.1.0; read as a fallback so that a language
+// chosen then still applies, and never written.
+export const LEGACY_LOCALE_COOKIE = 'dtk_locale';
 
 const catalogs: Record<Locale, Messages> = { es, en };
 
 export function isLocale(value: unknown): value is Locale {
 	return value === 'es' || value === 'en';
+}
+
+/** Language from the cookies: the current name first, then the old one. */
+export function localeFromCookies(get: (name: string) => string | undefined): Locale {
+	const current = get(LOCALE_COOKIE);
+	if (isLocale(current)) return current;
+	const legacy = get(LEGACY_LOCALE_COOKIE);
+	return isLocale(legacy) ? legacy : DEFAULT_LOCALE;
 }
 
 /** Active language for this page load. The root layout sets it. */

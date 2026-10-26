@@ -14,6 +14,7 @@
 
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { STORAGE_KEYS, readStoredStrict } from '$lib/storage-keys';
 
 export type TourStep = {
   /** Prefix of the step's i18n keys (`<id>_title`, `<id>_body`, `<id>_where`). */
@@ -61,12 +62,12 @@ export const TOUR_STEPS: TourStep[] = [
 //
 // If the mark is lost, the tour is shown again; nothing worse happens.
 
-const KEY = (userId: number | string) => `dtk_tour_visto:${userId}`;
+const KEY = STORAGE_KEYS.tourSeen;
 
 export function tourSeen(userId: number | string | null | undefined): boolean {
   if (!browser || userId == null) return true; // not offered without a user
   try {
-    return localStorage.getItem(KEY(userId)) !== null;
+    return readStoredStrict(KEY(userId)) !== null;
   } catch {
     // localStorage may be unavailable (private mode, quota exceeded).
     // Answering "already seen" keeps the tour from opening on every load.
