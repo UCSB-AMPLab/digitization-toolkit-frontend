@@ -19,6 +19,7 @@
 	import favicon from '$lib/assets/favicon-light.svg';
 	import BugReportButton from '$lib/bug-report/BugReportButton.svelte';
 	import CatalogueBackupIndicator from '$lib/components/CatalogueBackupIndicator.svelte';
+	import AccountMenu from '$lib/components/AccountMenu.svelte';
 
 	let { children } = $props();
 
@@ -205,11 +206,6 @@
 		if (path === '/dashboard') return currentPath === '/dashboard';
 		return currentPath.startsWith(path);
 	}
-
-	function handleLogout() {
-		authStore.clearSession();
-		goto('/');
-	}
 </script>
 
 <!-- Splash while the session is validated with /users/me. No protected
@@ -358,50 +354,44 @@
 		/>
 
 		<div class="s-footer">
-			{#if expanded}
-				<div class="user-row">
-					<div class="user-av">{userInitials}</div>
-					<div class="user-text">
-						<span class="user-name">{currentUser?.username ?? '—'}</span>
-						<span class="user-role">{$roleLabel(currentUser?.role)}</span>
-					</div>
-				</div>
-			{:else}
-				<div class="user-av-sm">{userInitials}</div>
-			{/if}
-			
-			<!-- Help sits above the bug-report button. The capture and volume
-			     views have no sidebar; there, Help is in the avatar menu. -->
-			<button class="help-btn" onclick={() => tour.start()} title={$m.nav_help} aria-label={$m.nav_help}>
-				<!-- An SVG, not material-symbols: the icon font is bundled as a
-				     subset of the icons the project uses, and "help" is not in it,
-				     so the ligature would render as the word in capitals. Same icon
-				     as Help in the avatar menu. -->
-				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-					<circle cx="12" cy="12" r="10" />
-					<path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 3-3 3" />
-					<line x1="12" y1="17" x2="12.01" y2="17" />
-				</svg>
-				{#if expanded}<span class="help-btn-label">{$m.nav_help}</span>{/if}
-			</button>
-
 			<BugReportButton {expanded} />
 
-			<button class="logout-btn" onclick={handleLogout} title={$m.nav_logout}>
-				<svg
-					width="15"
-					height="15"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-					<polyline points="16 17 21 12 16 7" />
-					<line x1="21" y1="12" x2="9" y2="12" />
-				</svg>
-				{#if expanded}<span>{$m.nav_logout}</span>{/if}
-			</button>
+			<!-- The account menu holds Help, shut down, restart and sign out, so
+			     the footer stays two rows tall: at 800x480 anything taller would
+			     push the navigation out of its scroll area (NEH-189). It opens
+			     upward over the content area. -->
+			<AccountMenu placement="above-start" fill>
+				{#snippet trigger({ open, toggle })}
+					{#if expanded}
+						<button
+							class="user-row"
+							aria-haspopup="menu"
+							aria-expanded={open}
+							onclick={toggle}
+						>
+							<div class="user-av">{userInitials}</div>
+							<div class="user-text">
+								<span class="user-name">{currentUser?.username ?? '—'}</span>
+								<span class="user-role">{$roleLabel(currentUser?.role)}</span>
+							</div>
+							<svg class="user-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+								<polyline points="18 15 12 9 6 15" />
+							</svg>
+						</button>
+					{:else}
+						<button
+							class="user-av-sm"
+							aria-haspopup="menu"
+							aria-expanded={open}
+							aria-label={$m.tb_current_user}
+							title={$m.tb_current_user}
+							onclick={toggle}
+						>
+							{userInitials}
+						</button>
+					{/if}
+				{/snippet}
+			</AccountMenu>
 		</div>
 	</aside>
 
@@ -682,13 +672,25 @@
 		align-items: center;
 	}
 
+	/* The user row and the collapsed avatar tile are the account menu's
+	   triggers: buttons restyled to look like the plain row they replace. */
 	.user-row {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		width: 100%;
 		padding: 4px 4px;
+		border: none;
+		border-radius: var(--radius-md);
+		background: none;
+		font-family: var(--font-family);
+		text-align: left;
+		cursor: pointer;
+		transition: background-color var(--transition-fast);
 	}
+	.user-row:hover,
+	.user-row[aria-expanded='true'] { background-color: rgba(255, 255, 255, 0.05); }
+	.user-chevron { flex-shrink: 0; margin-left: auto; color: var(--color-light-grey); }
 
 	.user-av {
 		width: 40px;
@@ -715,7 +717,13 @@
 		color: white;
 		font-weight: var(--fw-extrabold);
 		font-size: 13px;
+		font-family: var(--font-family);
+		border: none;
+		padding: 0;
+		cursor: pointer;
 	}
+	.user-av-sm:hover,
+	.user-av-sm[aria-expanded='true'] { background-color: var(--color-primary-hover); }
 
 	.user-text {
 		display: flex;
@@ -735,43 +743,6 @@
 		font-size: 11px;
 		color: var(--color-light-grey);
 		text-transform: capitalize;
-	}
-
-	.help-btn {
-		display: flex; align-items: center; justify-content: center; gap: 7px;
-		width: 100%; padding: 8px 10px; min-height: 40px;
-		border-radius: var(--radius-md);
-		background: none; border: 1px solid var(--border-color);
-		color: var(--color-light-grey); font-family: var(--font-family);
-		font-size: var(--text-sm); font-weight: var(--fw-semibold);
-		cursor: pointer; transition: all var(--transition-fast); white-space: nowrap;
-		margin-bottom: 8px;
-	}
-	.help-btn:hover { color: var(--color-light); background-color: rgba(255,255,255,0.05); }
-	.help-btn-label { flex: 1; text-align: left; }
-
-	.logout-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 7px;
-		width: 100%;
-		padding: 8px 10px;
-		min-height: 40px;
-		border-radius: var(--radius-md);
-		background-color: rgba(214, 103, 74, 0.1);
-		border: 1px solid rgba(214, 103, 74, 0.2);
-		color: var(--color-error);
-		font-family: var(--font-family);
-		font-size: var(--text-sm);
-		font-weight: var(--fw-semibold);
-		cursor: pointer;
-		transition: all var(--transition-fast);
-		white-space: nowrap;
-	}
-
-	.logout-btn:hover {
-		background-color: rgba(214, 103, 74, 0.2);
 	}
 
 	.content {
