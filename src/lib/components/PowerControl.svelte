@@ -1,6 +1,6 @@
 <script lang="ts">
   // Shutting down or restarting the unit (NEH-189), so that nobody has to
-  // pull the plug, which corrupts the SD card. Settings and the avatar menu
+  // pull the plug, which corrupts the SD card. Settings and the account menu
   // both use this one component: the caller renders its own buttons and
   // calls `ask(action)`; this component owns the confirmation, the request
   // and the blocking state that follows. The backend accepts the order from
@@ -12,11 +12,11 @@
   //
   // A caller that passes `onError` shows the failure itself (Settings does,
   // inside its Power card). Without it, the failure appears in a dialog here,
-  // because the avatar menu has already closed by then.
+  // because the account menu has already closed by then.
   //
-  // The dialogs are moved to <body>: the top bars that hold the avatar menu
-  // are stacking contexts, and a fixed overlay inside one could be covered
-  // by the page underneath.
+  // The dialogs are moved to <body>: the top bars and the sidebar that hold
+  // the account menu are stacking contexts, and a fixed overlay inside one
+  // could be covered by the page underneath.
 
   import { m } from '$lib/i18n';
   import { systemApi, healthApi, PowerControlError, type PowerAction } from '$lib/api';

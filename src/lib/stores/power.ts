@@ -1,6 +1,6 @@
 // How many PowerControl instances have a dialog or the blocking state on
 // screen. The capture screen reads it to keep the capture key away from the
-// power confirmation: the avatar menu that opens it lives in the top bar, so
+// power confirmation: the account menu that opens it lives in the top bar, so
 // the capture view has no other way to know it is up.
 
 import { writable, derived } from 'svelte/store';
