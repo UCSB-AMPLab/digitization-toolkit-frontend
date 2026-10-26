@@ -74,10 +74,14 @@ export const roleLabel = derived(
 
 /**
  * Switches language: stores the cookie (1 year) and reloads the page so that
- * SSR renders everything again in the new language.
+ * SSR renders everything again in the new language. With `to`, the page loads
+ * that address instead of reloading, for a caller that is leaving the page
+ * anyway: a client-side navigation would keep the old language, since the
+ * server only reads the cookie on a full load.
  */
-export function setLanguage(next: Locale) {
+export function setLanguage(next: Locale, to?: string) {
 	if (!browser) return;
 	document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
-	location.reload();
+	if (to) location.assign(to);
+	else location.reload();
 }
