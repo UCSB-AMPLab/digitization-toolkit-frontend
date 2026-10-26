@@ -1,9 +1,7 @@
 /* ============================================================================
    DIGITIZATION TOOLKIT — Global Design System
    ============================================================================ */
-
-/* Google Fonts — Mulish (all weights used in the design system) */
-/*@import url('https://fonts.googleapis.com/css2?family=Mulish:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');*/
+/* Version: 0.1.0-beta */
 
 /* Local Mulish — bundled variable font for offline use (Rionegro has no internet) */
 @font-face {
@@ -129,6 +127,14 @@
   /* --- Touch targets (7-inch tablet optimization) --- */
   --touch-target-min:  44px;
   --touch-target-lg:   52px;
+
+  /* --- Selection (NEH-237) ---
+     How a chosen item is marked. Deliberately different from
+     --color-primary, the action colour: a selection painted in the action
+     colour reads as a control. The ring includes its geometry so that every
+     thumbnail strip uses the same definition. */
+  --color-selected: var(--color-light);
+  --selected-ring:  0 0 0 2px rgba(237, 232, 220, 0.2);
 }
 
 /* ============================================================================
@@ -749,7 +755,7 @@ input[type="range"]:disabled {
 .status-dot.warning { background-color: var(--color-warning); }
 
 
-/*para evitar que el navegador de la tablet intente "emular" un ratón (lo que a veces causa un retraso de 300ms al tocar)*/
+/* Keeps the tablet browser from emulating a mouse, which can add a 300 ms delay to taps. */
 canvas, button, a, div {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -967,15 +973,12 @@ canvas, button, a, div {
   font-variant-numeric: tabular-nums;
 }
 
-/* Live preview feed rotation — applied to <img class="feed-img"> */
-.feed-rotate-90  { transform: rotate(90deg);  }
-.feed-rotate-180 { transform: rotate(180deg); }
-.feed-rotate-270 { transform: rotate(270deg); }
-
 /* Floating rotation overlay — bottom-center of each camera feed */
 .feed-rotate-overlay {
   position: absolute;
-  bottom: 8px;
+  /* 32px for the metadata bar (.metadata-bar, z-index 40) + 8px of space, so
+     the pill sits above that bar instead of being cut off by it. */
+  bottom: 40px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -984,16 +987,11 @@ canvas, button, a, div {
   background: rgba(19, 17, 16, 0.70);
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 20px;
-  padding: 3px 8px;
+  border-radius: 26px;
+  padding: 0 6px;
   z-index: 10;
-  opacity: 1;
-  transition: opacity 0.15s ease;
-  pointer-events: none;
-}
-
-.camera-feed:hover .feed-rotate-overlay {
-  opacity: 1;
+  /* Always interactive: the Pi's touch screen has no hover to enable it, and
+     without this the buttons are visible but do not respond to a tap. */
   pointer-events: auto;
 }
 
@@ -1001,8 +999,9 @@ canvas, button, a, div {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  /* The icon stays 13px; only the touch area grows. */
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
   background: transparent;
   border: none;
   border-radius: 50%;
@@ -1016,7 +1015,7 @@ canvas, button, a, div {
 }
 
 .feed-rotate-deg {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--color-light);
   min-width: 28px;
   text-align: center;
@@ -1105,10 +1104,9 @@ canvas, button, a, div {
     height: 100vh;
     background-color: var(--color-bg);
     overflow: hidden;
-    /* Sin scroll — la interfaz debe caber exactamente en la pantalla */
+    /* No scrolling — the interface has to fit the screen exactly */
   }
 
-  /* Fila horizontal: panel izquierdo + columna central */
   .content-area {
     display: flex;
     flex: 1;
@@ -1117,7 +1115,6 @@ canvas, button, a, div {
     position: relative;
   }
 
-  /* Columna central: viewport (flex: 1) + tira fija de 140px */
   .center-column {
     flex: 1;
     display: flex;
@@ -1127,7 +1124,6 @@ canvas, button, a, div {
     background-color: var(--color-bg);
   }
 
-  /* Área de miniaturas: altura fija para la tira */
   .thumbnail-area {
     height: 140px;
     flex-shrink: 0;
@@ -1163,10 +1159,17 @@ canvas, button, a, div {
 
 .drag-handle.visible { opacity: 1; }
 
-/* Grid view column layout (dynamic via --grid-cols CSS var) */
-.image-grid { grid-template-columns: repeat(var(--grid-cols, 4), 1fr); }
+/* Grid view column layout (dynamic via --grid-cols CSS var).
+   minmax(0, 1fr), not bare 1fr: a bare `1fr` track's base size is its
+   content's automatic minimum, so a track holding wide unwrappable
+   content (e.g. the StatusBadge pill) grows wider than the others and the
+   remaining tracks shrink to compensate — columns stop being equal width.
+   That breaks NEH-211's guarantee that an L/R pair's two grid-column: span 2
+   halves measure exactly the same as a single-capture column. minmax(0, 1fr)
+   forces every track's base to 0, so the 1fr's divide the row exactly
+   evenly regardless of content. */
+.image-grid { grid-template-columns: repeat(var(--grid-cols, 4), minmax(0, 1fr)); }
 
-.grid-card.selected { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .card-status-row { margin-top: 4px; }
 
 /* ImageViewerModal header group + locked state */
@@ -1188,26 +1191,26 @@ canvas, button, a, div {
 }
 
 /* ============================================================================
-   QA WORKFLOW: StatusBadge, StatusBar, ActionBar
+   QA WORKFLOW: StatusBadge, StatusBar
    ============================================================================ */
 
-/* ── StatusBadge ── */
+/* ── StatusBadge ──
+   A label, not a control: no pill, border or padding, which on a touch
+   screen read as a button. Colour and icon carry the status. */
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
   line-height: 1.4;
 }
 
-.status-badge.status-captured  { background: rgba(90,140,98,0.15);  color: var(--color-primary);  border: 1px solid rgba(90,140,98,0.3); }
-.status-badge.status-in_review { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid rgba(208,154,68,0.3); }
-.status-badge.status-rejected  { background: var(--color-error-bg);   color: var(--color-error);   border: 1px solid rgba(214,103,74,0.3); }
-.status-badge.status-approved  { background: var(--color-success-bg); color: var(--color-success); border: 1px solid rgba(111,191,115,0.3); }
+.status-badge.status-captured  { color: var(--color-primary); }
+.status-badge.status-in_review { color: var(--color-warning); }
+.status-badge.status-rejected  { color: var(--color-error); }
+.status-badge.status-approved  { color: var(--color-success); }
 
 .status-badge .material-symbols-outlined { font-size: 13px; line-height: 1; }
 
@@ -1221,26 +1224,6 @@ canvas, button, a, div {
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
-
-.status-bar-track {
-  flex: 1;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background-color: var(--border-color);
-  display: flex;
-  overflow: hidden;
-}
-
-.status-bar-segment {
-  height: 100%;
-  width: var(--seg-width, 0%);
-  transition: width 0.3s ease;
-}
-
-.status-bar-segment.seg-captured  { background-color: var(--color-primary); }
-.status-bar-segment.seg-in_review { background-color: var(--color-warning); }
-.status-bar-segment.seg-rejected  { background-color: var(--color-error); }
-.status-bar-segment.seg-approved  { background-color: var(--color-success); }
 
 .status-bar-legend {
   display: flex;
@@ -1270,237 +1253,6 @@ canvas, button, a, div {
 .status-bar-dot.seg-rejected  { background-color: var(--color-error); }
 .status-bar-dot.seg-approved  { background-color: var(--color-success); }
 
-/* ── ActionBar ── */
-.action-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 64px;
-  background-color: var(--color-surface-alt);
-  border-top: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  gap: 12px;
-  z-index: 50;
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
-  animation: slideUp 0.18s ease;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(100%); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
-}
-
-.action-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.action-bar-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  background-color: var(--color-primary);
-  color: var(--color-light);
-  border-radius: var(--radius-full);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  padding: 0 8px;
-}
-
-.action-bar-label {
-  font-size: var(--text-sm);
-  color: var(--color-light-grey);
-}
-
-.action-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.action-bar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  background-color: var(--color-surface);
-  color: var(--color-light-grey);
-  font-family: var(--font-family);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-}
-
-.action-bar-btn:hover { border-color: var(--color-primary); color: var(--color-primary); background-color: rgba(90,140,98,0.08); }
-
-.action-bar-btn.btn-in-review:hover  { border-color: var(--color-warning); color: var(--color-warning); background-color: var(--color-warning-bg); }
-.action-bar-btn.btn-approved:hover   { border-color: var(--color-success); color: var(--color-success); background-color: var(--color-success-bg); }
-.action-bar-btn.btn-rejected:hover   { border-color: var(--color-error);   color: var(--color-error);   background-color: var(--color-error-bg); }
-.action-bar-btn.btn-captured:hover   { border-color: var(--color-primary); color: var(--color-primary); background-color: rgba(90,140,98,0.08); }
-
-.action-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.action-bar-deselect {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  background: none;
-  color: var(--color-light-grey);
-  font-family: var(--font-family);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.action-bar-deselect:hover { background-color: var(--color-error-bg); color: var(--color-error); border-color: var(--color-error); }
-
-/* Rejection note modal */
-.rejection-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0,0,0,0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 24px;
-}
-
-.rejection-modal-card {
-  background-color: var(--color-surface-alt);
-  border: 1px solid rgba(214,103,74,0.35);
-  border-radius: var(--radius-xl);
-  padding: 24px;
-  width: 100%;
-  max-width: 480px;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.rejection-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.rejection-modal-title {
-  font-size: var(--text-h4);
-  font-weight: 700;
-  color: var(--color-light);
-  margin: 0;
-}
-
-.rejection-modal-close {
-  width: 32px; height: 32px;
-  border-radius: var(--radius-md);
-  border: none;
-  background: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-light-grey);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.rejection-modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
-
-.rejection-note-label {
-  font-size: var(--text-sm);
-  color: var(--color-light-grey);
-}
-
-.rejection-note-textarea {
-  width: 100%;
-  min-height: 100px;
-  background-color: var(--color-surface);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  color: var(--color-light);
-  font-family: var(--font-family);
-  font-size: var(--text-sm);
-  padding: 10px 12px;
-  resize: vertical;
-  box-sizing: border-box;
-  transition: border-color var(--transition-fast);
-}
-
-.rejection-note-textarea:focus { outline: none; border-color: var(--color-error); }
-.rejection-note-textarea::placeholder { color: var(--color-light-grey); opacity: 0.5; }
-
-.rejection-modal-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-/* ── Selectable check in list rows ── */
-.selectable-check {
-  display: inline-flex;
-  align-items: center;
-  margin-right: 6px;
-  color: var(--color-light-grey);
-  cursor: pointer;
-  vertical-align: middle;
-}
-
-.selectable-check:hover { color: var(--color-primary); }
-
-.list-row.selected { background-color: rgba(90,140,98,0.12) !important; }
-
-/* ── Select-mode checkboxes overlay ── */
-.selectable-overlay {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-sm);
-  border: 2px solid var(--border-color);
-  background-color: var(--color-surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  z-index: 5;
-}
-
-.selectable-overlay.selected {
-  background-color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.selectable-overlay .material-symbols-outlined { font-size: 15px; color: var(--color-light); }
-
 /* ── Drag handle ── */
 .drag-handle {
   cursor: grab;
@@ -1514,8 +1266,7 @@ canvas, button, a, div {
 
 .drag-handle:active { cursor: grabbing; }
 
-tr:hover .drag-handle,
-.grid-card:hover .drag-handle { opacity: 1; }
+tr:hover .drag-handle { opacity: 1; }
 
 /* BagIt export button in RightToolbar */
 .tool-btn.export-ready { color: var(--color-success); }
@@ -1544,6 +1295,20 @@ tr:hover .drag-handle,
 
 .export-success-icon { color: var(--color-success); }
 .export-error-icon   { color: var(--color-error); }
+
+/* A dialog card that fits the bench unit's 800×480 screen: capped at the
+   viewport height less a margin, it scrolls inside instead of pushing its
+   title and buttons off the screen. The backdrops pad 24px, so the cap lets
+   the card into that padding and leaves 12px at each edge. The vh line is
+   the fallback for browsers without dvh. Its children keep their height, so
+   the card scrolls as a whole instead of squeezing a list inside it. */
+.dialog-fit {
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.dialog-fit > * { flex-shrink: 0; }
 
 /* Export progress modal */
 .export-modal-backdrop {
@@ -1590,6 +1355,319 @@ tr:hover .drag-handle,
   display: flex;
   gap: 10px;
   margin-top: 8px;
+}
+
+/* ============================================================================
+   NOTICES AND STATUS LINES
+   ============================================================================ */
+
+/* Text for screen readers only. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Why an action was not done: the reorder in ListView and GridView ── */
+.action-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background-color: var(--color-warning-bg);
+  color: var(--color-light);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.action-notice.is-success {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+}
+.action-notice-text { flex: 1; min-width: 0; }
+.action-notice-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  margin: -10px -8px -10px 0;
+  border: none;
+  background: transparent;
+  color: var(--color-light-grey);
+  cursor: pointer;
+}
+.action-notice-close:hover { color: var(--color-light); }
+
+/* ── Volume view: breadcrumb with the received indicator under it ── */
+.topbar-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.offsite-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-light-grey);
+}
+.offsite-indicator-icon.material-symbols-outlined { font-size: 14px; flex-shrink: 0; }
+.offsite-indicator-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.offsite-received .offsite-indicator-icon { color: var(--color-success); }
+.offsite-uploading .offsite-indicator-icon { color: var(--color-secondary); }
+.offsite-attention,
+.offsite-misconfigured { color: var(--color-warning); }
+.offsite-attention .offsite-indicator-icon,
+.offsite-misconfigured .offsite-indicator-icon { color: var(--color-warning); }
+
+/* A received volume whose files were freed from the card (NEH-248): healthy. */
+.offsite-freed .offsite-indicator-icon { color: var(--color-success); }
+
+/* ── Volume view: delivery to Fisqua, under the offsite line ──
+   One line in the 72px top bar, in the offsite indicator's look; the tone
+   sets its icon. When there are details, the line is a button that opens a
+   panel under it, in UserMenu's look, capped in height with its own scroll. */
+.fisqua-line {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.fisqua-ok .offsite-indicator-icon { color: var(--color-success); }
+.fisqua-progress .offsite-indicator-icon { color: var(--color-secondary); }
+.fisqua-attention,
+.fisqua-attention .offsite-indicator-icon { color: var(--color-warning); }
+.fisqua-trigger {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-family);
+  text-align: left;
+  cursor: pointer;
+}
+.fisqua-trigger:hover .offsite-indicator-text { text-decoration: underline; }
+.fisqua-trigger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.fisqua-trigger[aria-expanded='true'] .fisqua-trigger-caret { transform: rotate(180deg); }
+.fisqua-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background-color: var(--color-surface-alt);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-light);
+}
+.fisqua-panel p {
+  font-size: inherit;
+  line-height: inherit;
+}
+.fisqua-panel ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.fisqua-panel-heading {
+  margin: 0;
+  font-weight: var(--fw-bold);
+  color: var(--color-light-grey);
+}
+.fisqua-config-error {
+  margin: 0;
+  color: var(--color-warning);
+}
+.fisqua-problem-records { color: var(--color-light-grey); }
+/* Fisqua's object-missing refusal: an incident, in the warning colour. */
+.fisqua-incident { color: var(--color-warning); }
+.fisqua-incident p { margin: 0; }
+.fisqua-incident ul { color: var(--color-light); }
+.fisqua-incident code { overflow-wrap: anywhere; }
+
+/* ── Volume view: freeing space on the card and restoring (NEH-248) ──
+   The admin's button beside the breadcrumb, and its dialog. */
+.offsite-manage-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-light-grey);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+.offsite-manage-btn:hover { background-color: var(--border-color); color: var(--color-light); }
+.offsite-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 24px;
+}
+.offsite-dialog-card {
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-lg);
+  outline: none;
+}
+.offsite-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-h4);
+  font-weight: var(--fw-bold);
+  color: var(--color-light);
+}
+.offsite-dialog-title .material-symbols-outlined { flex-shrink: 0; }
+.offsite-dialog-title.success .material-symbols-outlined { color: var(--color-success); }
+.offsite-dialog-title.error .material-symbols-outlined { color: var(--color-error); }
+.offsite-dialog-body {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--color-light);
+}
+.offsite-dialog-muted { color: var(--color-light-grey); }
+.offsite-dialog-list {
+  margin: 0;
+  padding: 0 0 0 20px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--color-light);
+}
+.offsite-dialog-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.offsite-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.offsite-dialog-wait {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.offsite-dialog-wait .spinner { flex-shrink: 0; }
+
+/* ── Image viewers: an image freed from the card (RecordImageDisplay) ──
+   Calm, never the look of a missing or broken file. Alone in the frame when
+   there is no thumbnail; over the bottom of the thumbnail otherwise. */
+.freed-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 360px;
+  padding: 16px;
+  text-align: center;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-light-grey);
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-lg);
+}
+.freed-panel-over {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  max-width: none;
+  margin: 0 auto;
+  width: fit-content;
+  max-width: min(480px, calc(100% - 16px));
+  box-shadow: var(--shadow-md);
+}
+.freed-panel-icon.material-symbols-outlined { font-size: 28px; color: var(--color-secondary); }
+.freed-panel-title { color: var(--color-light); font-size: var(--text-base); }
+.freed-panel-note { font-style: italic; }
+
+/* ── Configuración → Copia externa: the image files ── */
+.offsite-unit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+.offsite-unit-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  color: var(--color-light);
+}
+.offsite-unit-line {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--color-light);
+}
+.offsite-unit.level-received { border-color: var(--color-success); background-color: var(--color-success-bg); }
+.offsite-unit.level-attention { border-color: var(--color-error); background-color: var(--color-error-bg); }
+.offsite-unit.level-off .offsite-unit-line,
+.offsite-unit.level-empty .offsite-unit-line { color: var(--color-light-grey); }
+/* The Fisqua row's configuration error, in the same box. */
+.offsite-unit-warning {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--color-light);
+  font-weight: var(--fw-bold);
 }
 
 /* ============================================================================

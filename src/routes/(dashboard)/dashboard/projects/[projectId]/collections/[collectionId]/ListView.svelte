@@ -1,16 +1,20 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: ListView (Gallery)
+  // List view of a volume's records: one row per record, with up to two
+  // thumbnails (L/R badge on a two-camera capture), title, status, image
+  // count and date. Rows can be dragged into a new order in reorder mode.
   //
-  // Vista de lista de registros. Cada fila muestra los thumbnails del registro
-  // (con badge L/R si hay captura doble), el título, número de imágenes y fecha.
+  // A row click opens the record in book view (onRecordClick, handled by
+  // the page), not in a modal.
   //
-  // Al hacer click en una fila se abre el ImageViewerModal del registro.
-  // ============================================================================
+  // Version: 0.1.0-beta
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
+  import { formatApiDate } from '$lib/format-date';
+  import { formatCount } from '$lib/format-count';
+  import { reorderErrorText } from '$lib/volume-refusals';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
+  import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
   // @ts-ignore — installed in Docker, not locally
   import { dndzone } from 'svelte-dnd-action';
 
@@ -20,20 +24,17 @@
   let {
     records,
     collectionId = 0,
-    selectedIds = new Set<number>(),
     onRecordClick,
-    onToggleSelect,
     onRecordsUpdate,
+    onReorderNotice,
   }: {
     records: Record[];
     collectionId?: number;
-    selectedIds?: Set<number>;
     onRecordClick: (record: Record) => void;
-    onToggleSelect?: (id: number) => void;
     onRecordsUpdate?: () => void;
+    // Why the last drag was not saved, or null once one is saved.
+    onReorderNotice?: (notice: string | null) => void;
   } = $props();
-
-  let isSelectMode = $derived(selectedIds.size > 0);
 
   // Local copy for DnD
   let localRecords = $state<Record[]>([]);
@@ -46,12 +47,26 @@
     if (collectionId && onRecordsUpdate) {
       try {
         await collectionsApi.reorderRecords(collectionId, localRecords.map(r => r.id));
+        onReorderNotice?.(null);
         onRecordsUpdate();
       } catch (err) {
-        console.error('[ListView] Error reordenando:', err);
+        console.error('[ListView] Error reordering:', err);
+        // The page holds the notice: the reload below unmounts this view.
+        onReorderNotice?.(reorderErrorText(err, $m));
         onRecordsUpdate();
       }
     }
+  }
+
+  // Reorder mode (NEH-137). On the touch kiosk the gesture for scrolling the
+  // list IS the drag gesture, so with dragging always live an operator
+  // scrolling could silently reorder the pages of a volume — and record
+  // order is the archival page order. Reordering therefore requires entering
+  // an explicit mode, as in GridView.
+  let isReorderMode = $state(false);
+
+  function toggleReorderMode() {
+    isReorderMode = !isReorderMode;
   }
 
   // ---------------------------------------------------------------------------
@@ -74,15 +89,12 @@
 
   function formatDate(dateStr: string | undefined): string {
     if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('es-ES', {
+    return formatApiDate(dateStr, $locale, {
       day: '2-digit', month: '2-digit', year: 'numeric',
     });
   }
 </script>
 
-<!-- ============================================================
-     VISTA LISTA
-     ============================================================ -->
 <div class="list-view">
 
   {#if records.length === 0}
@@ -96,7 +108,23 @@
     </div>
 
   {:else}
-    <!-- Cabecera de tabla -->
+    <!-- Reorder toggle and status counts. Unlike GridView there are no
+         filters here to clear when reorder mode starts. -->
+    <div class="list-toolbar">
+      <div class="reorder-group">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          style="color: {isReorderMode ? 'var(--color-primary)' : 'var(--color-light-grey)'}; flex-shrink:0">
+          <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
+          <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+        </svg>
+        <button class="reorder-btn" class:active={isReorderMode} onclick={toggleReorderMode}>
+          {isReorderMode ? $m.col_reorder_done : $m.col_reorder}
+        </button>
+      </div>
+
+      <RecordStatusBar {records} variant="inline" />
+    </div>
+
     <div class="list-header">
       <span class="col-thumb">{$m.col_col_images}</span>
       <span class="col-title">{$m.col_col_title}</span>
@@ -105,9 +133,14 @@
       <span class="col-date">{$m.pd_col_date}</span>
     </div>
 
-    <!-- Filas con DnD -->
     <div
-      use:dndzone={{ items: localRecords, dragDisabled: isSelectMode }}
+      use:dndzone={{
+        items: localRecords,
+        dragDisabled: !isReorderMode,
+        // Inside reorder mode a plain touch-scroll must still scroll: the drag
+        // only starts if the finger is held down first.
+        delayTouchStart: 200
+      }}
       onconsider={handleDndConsider}
       onfinalize={handleDndFinalize}
     >
@@ -115,24 +148,14 @@
       {@const imgs = sortedImages(record)}
 
       <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="list-row"
         class:alt={i % 2 !== 0}
-        class:selected={selectedIds.has(record.id)}
-        onclick={(e) => {
-          if (isSelectMode && onToggleSelect) {
-            e.stopPropagation();
-            onToggleSelect(record.id);
-          } else {
-            onRecordClick(record);
-          }
-        }}
+        onclick={() => onRecordClick(record)}
         role="button"
         tabindex="0"
       >
 
-        <!-- Thumbnails (máx. 2) -->
         <div class="col-thumb thumb-group">
           {#each imgs.slice(0, 2) as img}
             <div class="thumb-wrap">
@@ -157,35 +180,16 @@
           {/if}
         </div>
 
-        <!-- Título -->
         <span class="col-title row-title">
-          {#if onToggleSelect}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <span
-              class="selectable-check"
-              onclick={(e) => { e.stopPropagation(); onToggleSelect!(record.id); }}
-              title={$m.col_select}
-            >
-              {#if selectedIds.has(record.id)}
-                <span class="material-symbols-outlined icon-sm">check_box</span>
-              {:else}
-                <span class="material-symbols-outlined icon-sm">check_box_outline_blank</span>
-              {/if}
-            </span>
-          {/if}
           {record.title || $m.record_fallback_title(record.id)}
         </span>
 
-        <!-- Estado QA -->
         <span class="col-status">
           <StatusBadge status={record.status} />
         </span>
 
-        <!-- Número de imágenes -->
-        <span class="col-count row-count">{imgs.length}</span>
+        <span class="col-count row-count">{formatCount(imgs.length, $locale)}</span>
 
-        <!-- Fecha de creación -->
         <span class="col-date row-date">{formatDate(record.created_at)}</span>
 
       </div>
@@ -206,7 +210,6 @@
   .list-view::-webkit-scrollbar { width: 4px; }
   .list-view::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 999px; }
 
-  /* Estado vacío */
   .empty-state {
     flex: 1;
     height: 100%;
@@ -220,7 +223,32 @@
     padding: 80px 0;
   }
 
-  /* Cabecera */
+  /* Reorder mode bar — same styles as in GridView (NEH-137) */
+  .list-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .reorder-group { display: flex; align-items: center; gap: 10px; }
+
+  .reorder-btn {
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+    color: var(--color-light-grey);
+    background: none; border: none;
+    cursor: pointer; padding: 4px 0;
+    transition: color var(--transition-fast);
+    white-space: nowrap; min-height: 0;
+  }
+
+  .reorder-btn:hover { color: var(--color-light); }
+  .reorder-btn.active { color: var(--color-primary); }
+
   .list-header {
     display: grid;
     grid-template-columns: 160px 1fr 140px 80px 110px;
@@ -237,7 +265,6 @@
     z-index: 1;
   }
 
-  /* Fila */
   .list-row {
     display: grid;
     grid-template-columns: 160px 1fr 140px 80px 110px;
@@ -253,7 +280,6 @@
   .list-row.alt   { background-color: rgba(255,255,255,0.015); }
   .list-row.alt:hover { background-color: rgba(255,255,255,0.05); }
 
-  /* Columna thumbnails */
   .thumb-group {
     display: flex;
     gap: 6px;
@@ -305,7 +331,6 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Columnas de texto */
   .row-title {
     font-size: var(--text-sm);
     color: var(--color-light);

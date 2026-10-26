@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import { get } from 'svelte/store';
 import { env } from '$env/dynamic/public';
 import { locale } from '$lib/i18n';
@@ -14,7 +16,7 @@ export interface ReportContext {
   timestamp: string;
 }
 
-/** Reúne el contexto del entorno en el momento del reporte. */
+/** Collects the environment context at the time of the report. */
 export function captureContext(): ReportContext {
   const w = typeof window !== 'undefined' ? window : undefined;
   return {

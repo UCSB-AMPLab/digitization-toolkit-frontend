@@ -1,42 +1,32 @@
 <script lang="ts">
-	// ============================================================================
-	// PÁGINA: Setup — Primera instalación
-	// Ruta: /setup → src/routes/(auth)/setup/+page.svelte
+	// First-run setup: creates the first administrator through
+	// `POST /auth/register`, sending the device bootstrap token as
+	// `X-Bootstrap-Token` when one is entered (outside development the backend
+	// requires it). The page redirects to `/login` when `/auth/setup/status`
+	// reports that setup is not needed or cannot be reached, and after the
+	// account is created.
 	//
-	// Solo se muestra cuando no existe ningún usuario en el sistema.
-	// El formulario crea el primer administrador usando POST /auth/register,
-	// que en ausencia de usuarios no requiere autenticación.
-	//
-	// Tras crear la cuenta, redirige a /login.
-	// Si ya existen usuarios (instalación no nueva), redirige a /login.
-	// ============================================================================
+	// Version: 0.1.0-beta
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authApi } from '$lib/api';
 	import { m } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
+	import { normalizeEmail, emailFormatError } from '$lib/email-field';
 
-	// ---------------------------------------------------------------------------
-	// ESTADO DEL FORMULARIO
-	// ---------------------------------------------------------------------------
 	let username = $state('');
 	let email = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
+	let bootstrapToken = $state('');
 	let showPassword = $state(false);
 	let showConfirmPassword = $state(false);
 
-	// ---------------------------------------------------------------------------
-	// ESTADO DE LA UI
-	// ---------------------------------------------------------------------------
 	let isLoading = $state(false);
 	let errorMessage = $state('');
 	let successMessage = $state('');
 
-	// ---------------------------------------------------------------------------
-	// AL MONTAR: verificar que realmente sea primera instalación
-	// ---------------------------------------------------------------------------
 	onMount(async () => {
 		try {
 			const { needs_setup } = await authApi.setupStatus();
@@ -48,23 +38,16 @@
 		}
 	});
 
-	// ---------------------------------------------------------------------------
-	// VALIDACIÓN
-	// ---------------------------------------------------------------------------
 	function validate(): string {
 		if (!username.trim()) return $m.setup_val_username_required;
 		if (username.trim().length < 3) return $m.setup_val_username_short;
-		if (!email.trim()) return $m.setup_val_email_required;
-		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return $m.setup_val_email_format;
+		if (emailFormatError(email)) return $m.setup_val_email_format;
 		if (!password) return $m.setup_val_password_required;
 		if (password.length < 8) return $m.setup_val_password_short;
 		if (password !== confirmPassword) return $m.setup_val_password_mismatch;
 		return '';
 	}
 
-	// ---------------------------------------------------------------------------
-	// SUBMIT
-	// ---------------------------------------------------------------------------
 	async function handleSubmit() {
 		errorMessage = '';
 		successMessage = '';
@@ -77,17 +60,25 @@
 
 		isLoading = true;
 		try {
-			await authApi.register({
-				username: username.trim(),
-				email: email.trim(),
-				password
-			});
+			await authApi.register(
+				{
+					username: username.trim(),
+					email: normalizeEmail(email),
+					password
+				},
+				bootstrapToken.trim() || undefined
+			);
 			successMessage = $m.setup_success;
 			setTimeout(() => goto('/login'), 1500);
 		} catch (err: any) {
-			const detail = err?.message || '';
-			if (detail.includes('409') || detail.toLowerCase().includes('already')) {
+			const status = err?.status;
+			const detail = (err?.message || '').toLowerCase();
+			if (detail.includes('already')) {
 				errorMessage = $m.setup_err_exists;
+			} else if (detail.includes('no bootstrap token configured') || detail.includes('setup is unavailable')) {
+				errorMessage = $m.setup_err_unavailable;
+			} else if (status === 401 || detail.includes('bootstrap token')) {
+				errorMessage = $m.setup_err_token;
 			} else {
 				errorMessage = $m.setup_err_create;
 			}
@@ -103,12 +94,8 @@
 	}
 </script>
 
-<!-- ============================================================
-     CONTENEDOR PRINCIPAL
-     ============================================================ -->
 <div class="setup-wrapper" onkeydown={handleKeydown} role="main">
 	<div class="setup-card" class:is-loading={isLoading}>
-		<!-- Logo + nombre del sistema + título -->
 		<div class="card-logo-area">
 			<div class="header">
 				<div class="card-logo-area">
@@ -119,9 +106,7 @@
 			<p class="setup-subtitle">{$m.setup_subtitle}</p>
 		</div>
 
-		<!-- Formulario -->
 		<div class="form-area">
-			<!-- CAMPO: Usuario -->
 			<div class="field-group">
 				<label class="field-label" for="su-username">{$m.common_username_label}</label>
 				<div class="input-wrapper">
@@ -150,7 +135,6 @@
 				</div>
 			</div>
 
-			<!-- CAMPO: Correo -->
 			<div class="field-group">
 				<label class="field-label" for="su-email">{$m.common_email}</label>
 				<div class="input-wrapper">
@@ -177,7 +161,6 @@
 				</div>
 			</div>
 
-			<!-- CAMPO: Contraseña -->
 			<div class="field-group">
 				<label class="field-label" for="su-password">{$m.common_password_label}</label>
 				<div class="input-wrapper">
@@ -226,7 +209,6 @@
 				<span class="setup-hint">{$m.setup_ph_password}</span>
 			</div>
 
-			<!-- CAMPO: Confirmar contraseña -->
 			<div class="field-group">
 				<label class="field-label" for="su-confirm">{$m.common_confirm_password}</label>
 				<div class="input-wrapper">
@@ -274,7 +256,36 @@
 				</div>
 			</div>
 
-			<!-- ALERTA: Error -->
+			<!-- FIELD: Bootstrap token. Required on provisioned devices -->
+			<div class="field-group">
+				<label class="field-label" for="su-token">{$m.setup_token_label}</label>
+				<div class="input-wrapper">
+					<svg
+						class="input-icon"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+						<path d="M7 11V7a5 5 0 0 1 10 0v4" />
+					</svg>
+					<input
+						id="su-token"
+						type="text"
+						class="input"
+						placeholder={$m.setup_ph_token}
+						bind:value={bootstrapToken}
+						disabled={isLoading}
+						autocomplete="off"
+						autocapitalize="none"
+						autocorrect="off"
+						spellcheck="false"
+					/>
+				</div>
+				<span class="setup-hint">{$m.setup_token_hint}</span>
+			</div>
+
 			{#if errorMessage}
 				<div class="alert alert-error" role="alert" aria-live="polite">
 					<svg
@@ -291,7 +302,6 @@
 				</div>
 			{/if}
 
-			<!-- ALERTA: Éxito -->
 			{#if successMessage}
 				<div class="alert alert-success" role="status" aria-live="polite">
 					<svg
@@ -308,7 +318,6 @@
 				</div>
 			{/if}
 
-			<!-- BOTÓN: Crear cuenta -->
 			<button
 				type="button"
 				class="btn-login"
@@ -321,7 +330,6 @@
 		</div>
 		<!-- /.form-area -->
 
-		<!-- OVERLAY DE CARGA -->
 		{#if isLoading}
 			<div class="loading-overlay" aria-label={$m.common_loading} role="status">
 				<div class="spinner"></div>
@@ -334,7 +342,6 @@
 <!-- /.setup-wrapper -->
 
 <style>
-	/* ── Wrapper: pantalla completa ── */
 	.setup-wrapper {
 		display: flex;
 		align-items: center;
@@ -344,7 +351,6 @@
 		padding: 24px 16px;
 	}
 
-	/* ── Card principal ── */
 	.setup-card {
 		position: relative;
 		width: 100%;
@@ -355,44 +361,17 @@
 		box-shadow: var(--shadow-lg);
 	}
 
-	/* Opacidad reducida del formulario durante la carga */
 	.setup-card.is-loading .form-area {
 		pointer-events: none;
 		opacity: 0.5;
 	}
 
-	/* ── Área del logo ── */
 	.card-logo-area {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 10px;
 		padding: 32px 24px 0;
-	}
-
-	.logo-circle {
-		width: 56px;
-		height: 56px;
-		border-radius: 50%;
-		background-color: var(--color-primary);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-shadow: 0 4px 16px rgba(90, 140, 98, 0.35);
-	}
-
-	.logo-icon {
-		width: 28px;
-		height: 28px;
-		filter: brightness(0) invert(1);
-	}
-
-	.system-name {
-		font-size: var(--text-lead);
-		font-weight: var(--fw-semibold);
-		color: var(--color-primary);
-		margin: 0;
-		text-align: center;
 	}
 
 	.setup-title {
@@ -411,7 +390,6 @@
 		line-height: 1.5;
 	}
 
-	/* ── Área del formulario ── */
 	.form-area {
 		padding: 28px 24px 20px;
 		display: flex;
@@ -437,7 +415,6 @@
 		opacity: 0.75;
 	}
 
-	/* Input con ícono a la izquierda */
 	.input-wrapper {
 		position: relative;
 		display: flex;
@@ -468,7 +445,6 @@
 		padding-right: 44px;
 	}
 
-	/* Botón ojo */
 	.input-action-btn {
 		position: absolute;
 		right: 10px;
@@ -493,12 +469,10 @@
 		height: 18px;
 	}
 
-	/* Error en inputs */
 	.input-error {
 		border-color: var(--color-error) !important;
 	}
 
-	/* Alertas */
 	.alert {
 		display: flex;
 		align-items: center;
@@ -527,7 +501,6 @@
 		flex-shrink: 0;
 	}
 
-	/* Botón principal */
 	.btn-login {
 		width: 100%;
 		font-family: var(--font-family);
@@ -557,7 +530,6 @@
 		letter-spacing: 0.08em;
 	}
 
-	/* Overlay de carga */
 	.loading-overlay {
 		position: absolute;
 		inset: 0;

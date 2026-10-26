@@ -1,71 +1,88 @@
 <script lang="ts">
-  // ============================================================================
-  // LAYOUT: Detalle de colección — galería full-screen
+  // Full-screen shell for a volume's gallery. The `@` in the filename makes
+  // this layout inherit from the root layout instead of the (dashboard) one,
+  // so the dashboard navigation sidebar is not rendered. It holds the session
+  // guard and the top bar (breadcrumb, offsite copy line, camera button); the
+  // page fills the rest of the screen.
   //
-  // El @ en el nombre rompe la herencia del layout (dashboard) y hereda
-  // directamente del layout raíz. Esto evita el sidebar de navegación.
-  //
-  // Proporciona:
-  //   - Auth guard
-  //   - Topbar minimalista con breadcrumb y acceso a live-preview
-  //   - Slot de contenido que ocupa el resto de la pantalla
-  // ============================================================================
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { authStore } from '$lib/stores/auth';
   import { m } from '$lib/i18n';
+  import UserMenu from '$lib/components/UserMenu.svelte';
+  import VolumeOffsiteIndicator from '$lib/components/VolumeOffsiteIndicator.svelte';
+  import VolumeOffsiteActions from '$lib/components/VolumeOffsiteActions.svelte';
+  import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
+  import type { VolumeOffsiteState } from '$lib/api';
+  import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
 
   let { children } = $props();
 
-  // ---------------------------------------------------------------------------
-  // PARÁMETROS
-  // ---------------------------------------------------------------------------
+  // Controls the page puts in the bar: send for review and take back (NEH-260).
+  const topbarSlot = $state<VolumeTopbarSlot>({ actions: null, reloadRecords: null });
+  setVolumeTopbar(topbarSlot);
+
   let projectId    = $derived(Number($page.params.projectId) || 0);
   let collectionId = $derived(Number($page.params.collectionId) || 0);
 
-  // ---------------------------------------------------------------------------
-  // AUTH + USUARIO
-  // ---------------------------------------------------------------------------
   let currentUser = $state<any>(null);
 
   onMount(() => {
     const unsub = authStore.subscribe((s) => {
       currentUser = s.user;
-      // Guard centralizado (NEH-66): mismo chequeo de "hay token" que antes
-      // vivía copy-pasteado acá, en live-preview y en la página hija.
+      // Shared session guard (NEH-66), also used by live-preview and the page.
       authStore.requireSession();
     });
     return unsub;
   });
 
-  // Roles que pueden abrir la cámara
   let canOpenCamera = $derived(
     currentUser?.role === 'admin' || currentUser?.role === 'operator'
   );
 
-  // Iniciales del usuario para el avatar
-  let userInitials = $derived(
-    currentUser?.username?.slice(0, 2).toUpperCase() ?? '?'
-  );
+  // Space on the card (NEH-248): free and restore, admin only. The button
+  // sits next to the breadcrumb and the offsite copy line, which is what
+  // shows what is freed. The backend refuses these routes to other roles.
+  let isAdmin = $derived(currentUser?.role === 'admin');
+  // The last state the line read: a poll that fails keeps it, so an open
+  // dialog is not closed under the admin; it is matched to the volume shown.
+  let offsiteState = $state<VolumeOffsiteState | null>(null);
+  let offsiteRefresh = $state(0);
+  // What the line last read as freed. When it changes on the volume shown, a
+  // free or a restore has moved files, whether or not its dialog was still
+  // open, so the page reloads the records and their freed state.
+  let lastFreed: FreedCounts | null = null;
 
-  // ---------------------------------------------------------------------------
-  // BREADCRUMB — nombres de proyecto y colección
-  // Los recibimos del load de +layout.ts (si existe) o del store de la página
-  // ---------------------------------------------------------------------------
+  function offsiteRead(s: VolumeOffsiteState | null) {
+    if (!s) return;
+    offsiteState = s;
+    const next = freedCountsOf(s);
+    // Advanced only once the records reloaded; a failed reload is tried
+    // again on the next poll (freedAfterRead).
+    const forId = collectionId;
+    freedAfterRead(lastFreed, next, forId, topbarSlot.reloadRecords).then((last) => {
+      if (collectionId === forId) lastFreed = last;
+    });
+  }
+
+  // A job's end, for the volume it was started for: ask the line again. A
+  // job of a volume no longer shown changes nothing here.
+  function offsiteChanged(forId: number) {
+    if (forId === collectionId) offsiteRefresh += 1;
+  }
+
+  // Project and volume names come from the load in +layout.ts.
   let projectName    = $derived(($page.data as any).projectName    ?? '—');
   let collectionName = $derived(($page.data as any).collectionName ?? '—');
 </script>
 
-<!-- ============================================================
-     TOP BAR MINIMALISTA
-     ============================================================ -->
 <div class="gallery-shell">
 
   <div class="topbar">
 
-    <!-- Volver a la lista del proyecto -->
     <div class="topbar-left">
       <button
         class="btn-back"
@@ -75,20 +92,31 @@
         <span class="material-symbols-outlined" style="font-size:20px">arrow_back</span>
       </button>
 
-      <!-- Breadcrumb -->
-      <nav class="breadcrumb" aria-label={$m.col_breadcrumb_nav}>
-        <span class="bc-item bc-project">{projectName}</span>
-        <span class="bc-sep">/</span>
-        <span class="bc-item bc-collection">{collectionName}</span>
-      </nav>
+      <!-- Breadcrumb, with the volume's offsite copy line below it (NEH-248) -->
+      <div class="topbar-title">
+        <nav class="breadcrumb" aria-label={$m.col_breadcrumb_nav}>
+          <span class="bc-item bc-project">{projectName}</span>
+          <span class="bc-sep">/</span>
+          <span class="bc-item bc-collection">{collectionName}</span>
+        </nav>
+        <VolumeOffsiteIndicator {collectionId} refresh={offsiteRefresh} onState={offsiteRead} />
+      </div>
+      {#if isAdmin && offsiteState && offsiteState.collection_id === collectionId}
+        {#key collectionId}
+          <VolumeOffsiteActions {collectionId} offsite={offsiteState} onChanged={offsiteChanged} />
+        {/key}
+      {/if}
     </div>
 
-    <!-- Derecha: botón cámara (solo operador/admin) + avatar -->
+    <!-- Camera button for operator and admin only -->
     <div class="topbar-right">
+
+      {@render topbarSlot.actions?.()}
 
       {#if canOpenCamera}
         <button
           class="btn-camera"
+          data-tour="capturar"
           onclick={() => goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`)}
           title={$m.col_open_in_camera}
         >
@@ -97,12 +125,12 @@
         </button>
       {/if}
 
-      <div class="user-avatar" aria-label={$m.col_current_user}>{userInitials}</div>
+      <!-- Identity and sign-out. The avatar opens the menu (NEH-234). -->
+      <UserMenu label={$m.col_current_user} />
 
     </div>
   </div>
 
-  <!-- Contenido de la página hija (galería) -->
   <div class="gallery-content">
     {@render children?.()}
   </div>
@@ -125,16 +153,18 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 16px;
-    height: 52px;
+    height: 72px;
     flex-shrink: 0;
-    background-color: var(--color-sidebar);
-    border-bottom: 1px solid var(--border-color);
+    /* Same background and border as the Live Preview top bar. */
+    background-color: var(--color-surface-alt);
+    border-bottom: 2px solid var(--color-primary);
   }
 
   .topbar-left {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
   }
 
   .topbar-right {
@@ -143,7 +173,27 @@
     gap: 10px;
   }
 
-  /* Botón volver */
+  /* Mirrored by `.btn-review` in live-preview/TopBar.svelte: keep the two
+     in step. Touch-target minimum height (44px). */
+  .btn-camera {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    min-height: var(--touch-target-min);
+    border-radius: var(--radius-full);
+    border: none;
+    background-color: var(--color-primary);
+    color: var(--color-light);
+    font-family: var(--font-family);
+    font-size: 13px;
+    font-weight: var(--fw-bold);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color var(--transition-base);
+  }
+  .btn-camera:hover { background-color: var(--color-primary-hover); }
+
   .btn-back {
     display: flex;
     align-items: center;
@@ -158,7 +208,6 @@
   }
   .btn-back:hover { background: var(--border-color); }
 
-  /* Breadcrumb */
   .breadcrumb {
     display: flex;
     align-items: center;
@@ -174,37 +223,7 @@
   }
   .bc-sep { color: var(--color-light-grey); }
 
-  /* Botón cámara */
-  .btn-camera {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--color-light);
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .btn-camera:hover { background: var(--color-bg); border-color: var(--color-primary); color: var(--color-primary); }
 
-  /* Avatar */
-  .user-avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background-color: var(--color-primary);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: var(--fw-bold);
-    flex-shrink: 0;
-  }
-
-  /* Contenido: ocupa el resto de la pantalla */
   .gallery-content {
     flex: 1;
     overflow: hidden;

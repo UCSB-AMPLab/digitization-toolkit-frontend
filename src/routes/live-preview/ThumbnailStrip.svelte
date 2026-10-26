@@ -1,28 +1,20 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: ThumbnailStrip
-  // Archivo: src/routes/live-preview/ThumbnailStrip.svelte
+  // Horizontal strip of thumbnails along the bottom of the live preview,
+  // showing the records captured in the current volume.
   //
-  // Tira horizontal de miniaturas en la parte inferior de la interfaz.
-  // Muestra los registros capturados en la colección actual.
+  // The unit is the RECORD, not the image (NEH-236). A folio captured with two
+  // cameras has two images and is one thing; showing them apart, with the
+  // title repeated under each half, would say otherwise. The halves are
+  // grouped by proximity, as in the gallery and the grid, and the selection
+  // frame surrounds the whole folio rather than each half. In `single` mode
+  // each record shows its first image; in `double` mode both images of the
+  // folio sit together with an L/R badge.
   //
-  // Comportamiento según cameraMode:
-  //   'single' → muestra solo imágenes de cámara izquierda (index par)
-  //   'double' → muestra todas las imágenes con badge L/R
-  //
-  // Estados de imagen:
-  //   approved   → check verde
-  //   rejected   → X rojo
-  //   processing → spinner girando
-  //   pending    → reloj (por defecto)
-  // ============================================================================
+  // Version: 0.1.0-beta
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     records,
     selectedRecordId,
@@ -35,11 +27,8 @@
     onSelect: (record: Record) => void;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // TIPO: item individual de la tira
-  // En modo 'single' → un item por registro (primera imagen)
-  // En modo 'double' → un item por imagen dentro de cada registro
-  // ---------------------------------------------------------------------------
+  // One image within a strip unit. In `single` mode a record has one item
+  // (its first image); in `double` mode, one item per image.
   interface ThumbItem {
     record: Record;
     image: RecordImage | null;
@@ -59,14 +48,13 @@
     return recordsApi.getImageThumbnailUrl(img.id);
   }
 
-  // ---------------------------------------------------------------------------
-  // ORDEN: la tira no depende del orden en que llegan los registros (NEH-159:
-  // el backend no garantiza un ORDER BY, así que el orden de llegada puede
-  // variar). Se ordena con el mismo criterio que la galería — sequence
-  // ascendente (nulls al final), luego id — y se invierte para mostrar lo más
-  // reciente primero. Cuando NEH-122 haga que la captura asigne sequence,
-  // este criterio lo recoge sin cambios.
-  // ---------------------------------------------------------------------------
+  // The strip does not depend on the order in which the records arrive
+  // (NEH-159: the backend guarantees no ORDER BY, so that order can vary). It
+  // sorts by the same criterion as the gallery — `sequence` ascending (nulls
+  // last), then `id` — in chronological reading order: oldest on the left and
+  // the most recent capture at the RIGHT end (agreed convention,
+  // NEH-159/NEH-183 — do not invert). When capture assigns `sequence`
+  // (NEH-122), this criterion applies unchanged.
   function archivalOrder(a: Record, b: Record): number {
     if (a.sequence == null && b.sequence == null) return a.id - b.id;
     if (a.sequence == null) return 1;
@@ -74,44 +62,47 @@
     return a.sequence - b.sequence;
   }
 
-  let orderedRecords = $derived([...records].sort(archivalOrder).reverse());
+  let orderedRecords = $derived([...records].sort(archivalOrder));
 
-  // ---------------------------------------------------------------------------
-  // DERIVADO: lista plana de items para la tira
-  // ---------------------------------------------------------------------------
-  let thumbItems = $derived(
-    cameraMode === 'double'
-      ? orderedRecords.flatMap((record): ThumbItem[] => {
-          if (!record.images || record.images.length === 0) {
-            return [{ record, image: null, role: null, thumbnailUrl: null }];
-          }
-          // Sort: left before right, then by id for stability
-          const sorted = [...record.images].sort((a, b) => {
-            const order = (r?: string) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
-            return order(a.role) - order(b.role) || a.id - b.id;
-          });
-          return sorted.map((img): ThumbItem => ({
-            record,
-            image: img,
-            role: imageRole(img),
-            thumbnailUrl: thumbnailUrl(img),
-          }));
-        })
-      : orderedRecords.map((record): ThumbItem => {
-          const img = record.images?.[0] ?? null;
-          return { record, image: img, role: imageRole(img), thumbnailUrl: thumbnailUrl(img) };
-        })
+  interface ThumbGroup {
+    record: Record;
+    items: ThumbItem[];
+  }
+
+  let thumbGroups = $derived(
+    orderedRecords.map((record): ThumbGroup => {
+      if (cameraMode !== 'double') {
+        const img = record.images?.[0] ?? null;
+        return {
+          record,
+          items: [{ record, image: img, role: imageRole(img), thumbnailUrl: thumbnailUrl(img) }],
+        };
+      }
+      if (!record.images || record.images.length === 0) {
+        return { record, items: [{ record, image: null, role: null, thumbnailUrl: null }] };
+      }
+      // Sort: left before right, then by id for stability
+      const sorted = [...record.images].sort((a, b) => {
+        const order = (r?: string) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
+        return order(a.role) - order(b.role) || a.id - b.id;
+      });
+      return {
+        record,
+        items: sorted.map((img): ThumbItem => ({
+          record,
+          image: img,
+          role: imageRole(img),
+          thumbnailUrl: thumbnailUrl(img),
+        })),
+      };
+    })
   );
 </script>
 
-<!-- ============================================================
-     TIRA DE MINIATURAS: barra horizontal con scroll
-     ============================================================ -->
 <div class="thumbnail-strip">
   <div class="strip-scroll">
 
-    {#if thumbItems.length === 0}
-      <!-- Estado vacío: no hay capturas aún -->
+    {#if thumbGroups.length === 0}
       <div class="empty-state">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -120,60 +111,49 @@
         <span>{$m.lv_thumb_empty}</span>
       </div>
     {:else}
-      <!-- Lista de miniaturas -->
-      {#each thumbItems as item, i}
-        {@const isSelected = item.record.id === selectedRecordId}
+      {#each thumbGroups as group, i}
+        {@const isSelected = group.record.id === selectedRecordId}
 
         <button
           class="thumbnail-item"
           class:selected={isSelected}
-          onclick={() => onSelect(item.record)}
+          onclick={() => onSelect(group.record)}
         >
 
-          <!-- Contenedor de imagen -->
-          <div
-            class="thumb-image-wrapper"
-            class:selected={isSelected}
-            class:alt-bg={i % 2 !== 0}
-          >
-            {#if item.thumbnailUrl}
-              <!-- Imagen real del registro -->
-              <img
-                src={item.thumbnailUrl}
-                alt={item.record.title}
-                class="thumb-img"
-                onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            {:else}
-              <!-- Placeholder cuando no hay imagen -->
-              <div class="thumb-placeholder">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-                </svg>
-              </div>
-            {/if}
+          <!-- The halves of the folio, together. The selection frame goes here
+               and not on each image: the operator selects the folio (NEH-236). -->
+          <div class="thumb-pair" class:selected={isSelected}>
+            {#each group.items as item, j}
+              <div class="thumb-image-wrapper" class:alt-bg={j % 2 !== 0}>
+                {#if item.thumbnailUrl}
+                  <img
+                    src={item.thumbnailUrl}
+                    alt={item.record.title}
+                    class="thumb-img"
+                    onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                {:else}
+                  <div class="thumb-placeholder">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                  </div>
+                {/if}
 
-            <!-- Badge L/R en modo doble cámara -->
-            {#if cameraMode === 'double' && item.role}
-              <div class="thumb-badge" class:right={item.role === 'R'}>
-                {item.role}
+                {#if cameraMode === 'double' && item.role}
+                  <div class="thumb-badge" class:right={item.role === 'R'}>
+                    {item.role}
+                  </div>
+                {/if}
               </div>
-            {/if}
-          </div><!-- /thumb-image-wrapper -->
+            {/each}
+          </div>
 
-          <!-- Info del registro: nombre + estado -->
+          <!-- The folio name, once for the whole folio -->
           <div class="thumb-info">
-            <span class="thumb-name" title={item.record.title}>
-              {item.record.title || `Cap. ${String(i + 1).padStart(3, '0')}`}
+            <span class="thumb-name" title={group.record.title}>
+              {group.record.title || `Cap. ${String(i + 1).padStart(3, '0')}`}
             </span>
-            <!-- Estado de la imagen (siempre pending para capturas nuevas) -->
-            <!-- Para actualizar el estado, el backend debe devolver un campo status -->
-            <div class="thumb-status">
-              <!-- Por ahora todas las capturas nuevas son 'pending' -->
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="status-icon pending">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
-            </div>
           </div>
 
         </button>
@@ -184,7 +164,6 @@
 </div>
 
 <style>
-  /* Contenedor principal de la tira */
   .thumbnail-strip {
     width: 100%;
     height: 100%;
@@ -198,11 +177,12 @@
     flex-shrink: 0;
   }
 
-  /* Área de scroll horizontal */
+  /* 18px between folios against the 4px of `--pair-gap`: the difference does
+     the grouping, not the values. A change to one needs a look at the other. */
   .strip-scroll {
     flex: 1;
     display: flex;
-    gap: 12px;
+    gap: 18px;
     overflow-x: auto;
     overflow-y: hidden;
     align-items: stretch;
@@ -210,11 +190,9 @@
     min-height: 0;
   }
 
-  /* Scrollbar mínimo */
   .strip-scroll::-webkit-scrollbar { height: 3px; }
   .strip-scroll::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 999px; }
 
-  /* Estado vacío */
   .empty-state {
     flex: 1;
     display: flex;
@@ -228,11 +206,14 @@
     min-width: 300px;
   }
 
-  /* ── Item de miniatura ── */
+  /* ── Folio ──
+     The halves set the width: 100px in single-camera mode, and in double
+     mode twice that plus the inner gap, so each half is the same size in
+     both modes. */
   .thumbnail-item {
+    --pair-gap: 4px;
     display: flex;
     flex-direction: column;
-    width: 100px;
     height: 100%;
     flex-shrink: 0;
     background: none;
@@ -247,31 +228,39 @@
   .thumbnail-item:hover { opacity: 1; }
   .thumbnail-item.selected { opacity: 1; }
 
-  /* Contenedor de la imagen */
-  .thumb-image-wrapper {
-    position: relative;
-    width: 100%;
+  /* The selection frame surrounds the whole folio, not each half. */
+  .thumb-pair {
+    display: flex;
+    gap: var(--pair-gap);
     flex: 1;
+    min-height: 0;
+    padding: 2px;
     border-radius: var(--radius-md);
-    overflow: hidden;
     border: 2px solid transparent;
     transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  }
+
+  .thumb-pair.selected {
+    border-color: var(--color-selected);
+    box-shadow: var(--selected-ring);
+  }
+
+  .thumb-image-wrapper {
+    position: relative;
+    width: 100px;
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
     background-color: var(--color-surface-alt);
     min-height: 0;
     padding: 4px;
   }
 
-  .thumb-image-wrapper.selected {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba(90,140,98,0.2);
-  }
-
-  /* Fondo alternado para diferenciar L/R */
+  /* Alternate background to tell L from R */
   .thumb-image-wrapper.alt-bg {
     background-color: var(--color-surface);
   }
 
-  /* Imagen de miniatura */
   .thumb-img {
     width: 100%;
     height: 100%;
@@ -280,7 +269,6 @@
     display: block;
   }
 
-  /* Placeholder sin imagen */
   .thumb-placeholder {
     width: 100%;
     height: 100%;
@@ -291,7 +279,6 @@
     opacity: 0.4;
   }
 
-  /* Badge L/R */
   .thumb-badge {
     position: absolute;
     top: 4px;
@@ -307,20 +294,18 @@
     line-height: 1.4;
   }
 
-  /* Badge R (derecha, se posiciona a la derecha) */
   .thumb-badge.right {
     left: auto;
     right: 4px;
   }
 
-  /* Info del registro */
+  /* The box holds only the name, with no status icon: during capture every
+     record has just been captured, so there is no status to report. The list
+     and grid views show the record status with `StatusBadge`. */
   .thumb-info {
     flex-shrink: 0;
-    height: 36px;
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+    align-items: center;
     padding: 0 2px;
   }
 
@@ -341,16 +326,4 @@
     color: var(--color-light);
   }
 
-  .thumb-status { display: flex; align-items: center; }
-
-  /* Ícono de estado */
-  .status-icon.pending  { color: var(--color-light-grey); }
-  .status-icon.approved { color: var(--color-success); }
-  .status-icon.rejected { color: var(--color-error); }
-  .status-icon.processing {
-    color: var(--color-light);
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
 </style>

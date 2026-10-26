@@ -1,47 +1,41 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: LiveViewport
-  // Archivo: src/routes/live-preview/LiveViewport.svelte
+  // The capture page's central area: the live preview of one or two cameras,
+  // the framing guides and grid, the capture button and capture key, and the
+  // grid settings modal.
   //
-  // Área central de la interfaz de captura.
-  // Contiene:
-  //   - Vista en vivo de una o dos cámaras (polling cada PREVIEW_INTERVAL_MS ms)
-  //   - Líneas de guía arrastrables (rojas)
-  //   - Líneas de grilla (cian)
-  //   - Botón de captura (círculo blanco)
-  //   - Panel flotante: zoom + configurar grilla
-  //   - Barra de metadatos inferior (ISO, shutter, aperture)
-  //   - Modal de configuración de grilla
+  // The backend has no MJPEG stream, so the live preview is polled: every
+  // PREVIEW_INTERVAL_MS this component fetches GET /cameras/preview/{index},
+  // a single JPEG frame. The frame's resolution is the backend's default for
+  // that endpoint, since no `resolution` parameter is sent from here.
   //
-  // ── CÓMO FUNCIONA EL PREVIEW ────────────────────────────────────────────────
-  // El backend NO tiene streaming MJPEG. En su lugar, el frontend hace polling:
-  // cada PREVIEW_INTERVAL_MS ms llama a GET /cameras/preview/{index} que captura
-  // un frame en resolución "low" y lo devuelve como JPEG (sin guardar en BD).
-  //
-  // Para sustituir el polling por streaming real:
-  //   1. Agrega un endpoint MJPEG al backend (ej: /cameras/stream/{index})
-  //   2. En el bloque marcado "STREAM DE CÁMARA" abajo, reemplaza el <img>
-  //      que usa previewUrls[n] por:
-  //      <img src="{getApiBase()}/cameras/stream/{n}?token={token}" ... />
-  //   3. Elimina todo el bloque "POLLING DEL PREVIEW" del <script>
-  //   4. Elimina los imports de onDestroy y browser
-  //
-  // Para cambiar la frecuencia del polling, modifica PREVIEW_INTERVAL_MS.
-  // Para cambiar la resolución del preview, modifica el endpoint en cameras.py.
-  // ============================================================================
+  // Version: 0.1.0-beta
 
   import { onMount, onDestroy } from 'svelte';
   import { m } from '$lib/i18n';
   import { browser } from '$app/environment';
-  import { env } from '$env/dynamic/public';
-  import { camerasApi, type CameraDevice } from '$lib/api';
+  import { camerasApi, tokenStore, getApiBase, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
+  import { viewportAspect as computeViewportAspect, fitBox, frameAspect, panelGrowFactor } from '$lib/viewport-aspect';
+  import {
+    DEFAULT_CHORD,
+    describeChord,
+    learnFromEvent,
+    ownsEvent,
+    readChord,
+    shouldTrigger,
+    writeChord,
+    clearChord as clearStoredChord,
+    type CaptureChord,
+    type OwnsEventContext
+  } from '$lib/capture-key';
+  import { defaultRecordTitle } from '$lib/record-title';
+  import { isConflict } from '$lib/volume-stem';
+  import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
+  import { dismissible } from '$lib/dialog';
+  import { powerControlOpen } from '$lib/stores/power';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     cameraMode,
     shutterSpeed,
@@ -54,6 +48,10 @@
     devices = [],
     rotateDeg = {},
     onRotateDegChange,
+    otherModalOpen = false,
+    needsStem = false,
+    stemFormHref = '',
+    onStemRefused,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -66,6 +64,20 @@
     devices?: CameraDevice[];
     rotateDeg?: Record<number, number>;
     onRotateDegChange?: (cam: number, deg: number) => void;
+    // NEH-228: true while the page's own image-inspection modal is open
+    // (Book view's "inspectedRecord"). That modal is rendered by +page.svelte,
+    // not by this component, so its openness arrives as a prop instead of
+    // local state — the capture key must not fire while it's up.
+    otherModalOpen?: boolean;
+    // True while the volume has no stem (filename_stem): the backend refuses
+    // every capture into it (409), so the button is disabled and a banner
+    // links to the volume's form at stemFormHref.
+    needsStem?: boolean;
+    stemFormHref?: string;
+    // Called on a 409 from a capture. Reads the volume again and resolves
+    // true when it has no stem, in which case the page sets needsStem and the
+    // banner replaces the generic capture error.
+    onStemRefused?: () => Promise<boolean>;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -74,65 +86,171 @@
     onRotateDegChange?.(camIdx, next);
   }
 
-  // ---------------------------------------------------------------------------
-  // ESTADO LOCAL: Viewport
-  // ---------------------------------------------------------------------------
-
-  let zoom = $state(1);          // Zoom del viewport CSS (1 = 100%)
-  let guideV = $state(50);       // Guía vertical (% desde izquierda)
-  let guideH = $state(50);       // Guía horizontal (% desde arriba)
+  let zoom = $state(1);          // CSS zoom of the viewport (1 = 100%)
+  let guideV = $state(50);       // Vertical guide (% from the left)
+  let guideH = $state(50);       // Horizontal guide (% from the top)
   let dragging = $state<'v' | 'h' | null>(null);
 
-  // Orientación de cámaras: swapped=true → cámara 1 a la izquierda, 0 a la derecha
+  // swapped = true puts camera 1 on the left and camera 0 on the right.
   let swapped = $state(false);
   let leftIdx  = $derived(swapped ? 1 : 0);
   let rightIdx = $derived(swapped ? 0 : 1);
 
-  // Configuración de la grilla
   let gridRows = 3;
   let gridCols = 3;
   let showGrid = $state(false);
   let showGuides = $state(true);
   let showGridModal = $state(false);
 
-  // Estado de la captura
+  // ---------------------------------------------------------------------------
+  // CAPTURE KEY (NEH-228)
+  // A USB digitization pedal behaves as a keyboard that sends a single key,
+  // different for each device. Instead of manual configuration, the operator
+  // assigns it by pressing the pedal once in the control in the grid settings
+  // modal, and the key is stored in that browser. The default is the space
+  // bar, so an ordinary keyboard works without any setup.
+  // ---------------------------------------------------------------------------
+  let chord = $state<CaptureChord>(readChord());
+
+  // Held-key latch: set when a key press starts a capture and released on the
+  // matching keyup. If the keyup never arrives (the window lost focus in the
+  // middle of the press), blur and visibilitychange release it as well —
+  // otherwise a pedal released out of focus would block capture until the
+  // page is reloaded.
+  let chordHeld = $state(false);
+  // The release is compared against the physical `code` of the key that set
+  // the latch, never against `chord.key`: releasing the modifier before the
+  // key changes what that key reports (Shift+2 sets the latch with key "@"
+  // and releases with key "2"), and `code` does not change with modifiers.
+  // null when the latch is not set, or when the device reported no usable
+  // `code` on the press.
+  //
+  // A release that does arrive always clears the latch: it clears when the
+  // two `code`s (the press's and the release's) match, and also when either
+  // of them lacks a usable `code` — a release without an identifiable `code`
+  // is still a release. This is deliberately a weak guard, the third of
+  // three: the capture-in-progress flag and the repeat flag already prevent
+  // a second real capture; this latch only keeps an operating-system key
+  // repeat from slipping an extra capture in between the keydown and its
+  // keyup. A latch stuck for lack of a `code` is worse than one released too
+  // early.
+  let heldCode = $state<string | null>(null);
+
+  // While `learning` is true, the window's next keydown does not start a
+  // capture — it goes to `learnFromEvent` instead.
+  let learning = $state(false);
+  // A bare modifier (Control/Alt/Shift/Meta) arrived while the key was being
+  // assigned, and the key that completes the combination is still expected.
+  // If the modifier is released with nothing else arriving, keyup reports a
+  // device that sends only the modifier, instead of staying in "assigning"
+  // forever.
+  let pendingModifier = $state<'Control' | 'Alt' | 'Shift' | 'Meta' | null>(null);
+  let learnMessage = $state<string | null>(null);
+
+  // Any modal takes the keyboard away from capture. The grid settings modal
+  // is local; the image-inspection modal lives in the page (+page.svelte) and
+  // arrives as a prop; the power confirmation, opened from the top bar's
+  // avatar menu, is reported through a store.
+  let modalOpen = $derived(showGridModal || otherModalOpen || $powerControlOpen);
+
+  // Collapsible controls panel, open by default; collapsing it gives the feed
+  // back the space the panel covers. The collapse button is always visible:
+  // the Pi's touchscreen has no hover that could reveal it.
+  let controlsOpen = $state(true);
+
   let isCapturing = $state(false);
   let captureFlash = $state(false);
 
-  // Listo para capturar: solo cuando projectId/collectionId ya se resolvieron
-  // (evita disparar una captura desde una URL vacía/mal formada).
+  // Ready only once projectId and collectionId have resolved, so no capture
+  // starts from an empty or malformed URL.
   const captureReady = $derived(projectId > 0 && collectionId > 0);
+  // Ready and with a stem: the only state that enables the capture button
+  // and the capture key.
+  const canCapture = $derived(captureReady && !needsStem);
 
-  // Referencia al contenedor del viewport (para calcular posición de guías)
+  // Its rect turns pointer positions into guide percentages.
   let viewportEl = $state<HTMLElement | null>(null);
 
-  // ===========================================================================
-  // POLLING DEL PREVIEW
-  // ===========================================================================
-  // Este bloque maneja la vista en vivo de las cámaras mediante polling periódico.
-  //
-  // ── PARA SUSTITUIR POR STREAMING REAL ──────────────────────────────────────
-  // Si en el futuro el backend implementa MJPEG streaming:
-  //   1. Elimina todo este bloque (desde "POLLING DEL PREVIEW" hasta "FIN POLLING")
-  //   2. En el HTML abajo, reemplaza el <img src={previewUrls[n]}> por:
-  //      <img src="{getApiBase()}/cameras/stream/{n}" class="feed-img" />
-  //   3. Agrega el token de auth como query param si el backend lo requiere:
-  //      <img src="{getApiBase()}/cameras/stream/{n}?token={getToken()}" ... />
-  // ===========================================================================
-
-  // Frecuencia de actualización del preview en milisegundos.
-  // Aumentar si el Pi tiene problemas de rendimiento (ej: 3000 = 3s).
-  // Disminuir para más fluidez si el hardware lo permite (ej: 1000 = 1s).
+  // Preview refresh interval in milliseconds. Raise it if the Pi struggles
+  // (e.g. 3000 = 3 s); lower it for a smoother preview if the hardware allows
+  // (e.g. 1000 = 1 s).
   const PREVIEW_INTERVAL_MS = 2000;
 
-  // URLs de objeto de las últimas imágenes capturadas por cada cámara.
-  // Key = índice de cámara (0 = izquierda, 1 = derecha).
-  // Se actualizan con cada ciclo de polling.
+  // Object URLs of the latest preview frame from each camera, keyed by camera
+  // index. Which index shows on the left depends on `swapped`.
   let previewUrls = $state<Record<number, string>>({});
 
   // References to the live preview <img> elements for pixel sampling.
   let imgEl0: HTMLImageElement | null = $state(null);
   let imgEl1: HTMLImageElement | null = $state(null);
+
+  // Measured size of each `.camera-feed` panel (px), so the rotated image is
+  // not clipped by the panel's overflow: hidden — see `feedRotateStyle` below.
+  let feedW0 = $state(0);
+  let feedH0 = $state(0);
+  let feedW1 = $state(0);
+  let feedH1 = $state(0);
+
+  // NEH-222: natural size (px) of the frame shown in each panel (0 = left,
+  // 1 = right). The viewport takes its shape from these frames rather than
+  // from a fixed 4:3 — see `viewportAspect` and `fitBox` below.
+  let naturalW0 = $state(0);
+  let naturalH0 = $state(0);
+  let naturalW1 = $state(0);
+  let naturalH1 = $state(0);
+
+  // Measured size of the board (`.mat-board`): the viewport is sized in
+  // pixels within it (a definite width: 100% defeats aspect-ratio
+  // when height is the limit, so the viewport gets explicit dimensions
+  // instead of relying on CSS to derive them).
+  let boardW = $state(0);
+  let boardH = $state(0);
+
+  // Viewport shape: the frame's in single mode; in double mode, the sum of
+  // the two panels' widths at a common height.
+  let viewportAspect = $derived(computeViewportAspect(
+    [
+      naturalW0 && naturalH0 ? { w: naturalW0, h: naturalH0, rotation: rotateDeg[leftIdx] ?? 0 } : null,
+      cameraMode === 'double' && naturalW1 && naturalH1
+        ? { w: naturalW1, h: naturalH1, rotation: rotateDeg[rightIdx] ?? 0 }
+        : null,
+    ],
+    cameraMode
+  ));
+
+  // Pixel box that gives the viewport that shape within the measured board.
+  let viewportBox = $derived(fitBox(viewportAspect, boardW, boardH));
+
+  // Each panel's flex-grow factor in double mode is its own frame's
+  // shape, so no panel is clipped even when only one is rotated. A panel
+  // with no frame yet (no signal, or waiting for the first frame) borrows the
+  // other panel's shape instead of an even 1:1 — it falls back to 1 only when
+  // neither has one.
+  let leftFrameAspect = $derived(
+    frameAspect({ w: naturalW0, h: naturalH0, rotation: rotateDeg[leftIdx] ?? 0 })
+  );
+  let rightFrameAspect = $derived(
+    frameAspect({ w: naturalW1, h: naturalH1, rotation: rotateDeg[rightIdx] ?? 0 })
+  );
+  let leftFeedAspect = $derived(panelGrowFactor(leftFrameAspect, rightFrameAspect));
+  let rightFeedAspect = $derived(panelGrowFactor(rightFrameAspect, leftFrameAspect));
+
+  // A plain `transform: rotate()` on a box the size of the panel is clipped
+  // at 90°/270°: the panel is a rectangle (landscape) and the rotated image
+  // becomes portrait (or the reverse), so the rotated rectangle no longer
+  // fits the original one and overflow: hidden cuts off its corners.
+  //
+  // Before rotating, the image gets the panel's size with width and height
+  // swapped, absolutely centered. Rotated 90°/270°, that swapped box fits
+  // the panel exactly. 180° keeps the orientation, so it needs no adjustment.
+  function feedRotateStyle(rotation: number, containerW: number, containerH: number): string {
+    if (rotation === 90 || rotation === 270) {
+      if (!containerW || !containerH) return `transform: rotate(${rotation}deg);`;
+      return `position: absolute; top: 50%; left: 50%; width: ${containerH}px; height: ${containerW}px; transform: translate(-50%, -50%) rotate(${rotation}deg);`;
+    }
+    if (rotation === 180) return `transform: rotate(180deg);`;
+    return '';
+  }
 
   // ---------------------------------------------------------------------------
   // WB SAMPLING — click-to-neutralize
@@ -179,39 +297,40 @@
     wbSamplingStore.set({ active: false, cameraIndex: 0, onSample: null });
   }
 
-  // Handle del intervalo de polling (null cuando está pausado)
+  // null while polling is paused.
   let previewInterval: ReturnType<typeof setInterval> | null = null;
 
-  // true cuando la pestaña es visible — se pausa el polling si el usuario
-  // cambia de pestaña para ahorrar recursos en el Raspberry Pi.
+  // true while the tab is visible — polling pauses when the user switches
+  // tabs, to save resources on the Raspberry Pi.
   let previewActive = $state(true);
 
-  // Indica si ya hay un fetch en curso para evitar requests solapados
+  // One fetch in flight per camera, so requests never overlap.
   let fetchingPreview: Record<number, boolean> = { 0: false, 1: false };
 
-  // Contador de errores consecutivos de preview — muestra banner tras 3 fallos
+  // Consecutive preview errors — the reconnect banner shows after 3.
   let previewErrorCount = $state(0);
   let previewConnectError = $derived(previewErrorCount >= 3);
 
-  // ── Helper: URL base de la API ─────────────────────────────────────────────
-  function getApiBase(): string {
-    if (!browser) return 'http://localhost:8000';
-    return env.PUBLIC_API_BASE || 'http://localhost:8000';
-  }
+  // A single missing camera (404 on its last preview fetch, NEH-229).
+  // Separate from previewConnectError: 404 is deliberately left out of the
+  // error counter because the backend returns it when the camera is not
+  // connected or its frame could not be captured, not when the backend is
+  // down — but per camera it still drives an overlay on that camera's feed.
+  // This overlay follows continuous polling, outside cameraRefresh. A 404
+  // from before reconnect can briefly restore it after reconnect succeeds;
+  // the next successful frame clears it. Unlike the dashboard, a 404 here
+  // does not stop polling.
+  let cameraMissing = $state<Record<number, boolean>>({});
 
-  // ── Helper: cabecera de autenticación ──────────────────────────────────────
   function getAuthHeader(): HeadersInit {
-    if (!browser) return {};
-    const token = localStorage.getItem('access_token');
+    const token = tokenStore.get();
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
-  // ── Fetch de un frame de preview para una cámara ───────────────────────────
-  // Llama a GET /cameras/preview/{cameraIndex} (endpoint en cameras.py).
-  // Si la cámara no está conectada, el backend devuelve 404 — falla silenciosamente.
-  // La URL de objeto anterior se libera para evitar memory leaks.
+  // Calls GET /cameras/preview/{cameraIndex} (the endpoint is in the
+  // backend's cameras.py). A 404 does not count toward the reconnect banner.
+  // The previous object URL is revoked so frames do not leak memory.
   async function fetchPreview(cameraIndex: number) {
-    // Evitar requests solapados para la misma cámara
     if (fetchingPreview[cameraIndex] || !previewActive) return;
 
     fetchingPreview[cameraIndex] = true;
@@ -225,85 +344,87 @@
         const blob = await response.blob();
         const newUrl = URL.createObjectURL(blob);
 
-        // Liberar la URL anterior para no acumular memoria
         if (previewUrls[cameraIndex]) {
           URL.revokeObjectURL(previewUrls[cameraIndex]);
         }
 
         previewUrls = { ...previewUrls, [cameraIndex]: newUrl };
         previewErrorCount = 0;  // reset on success
-      } else if (response.status !== 404) {
-        // 404 = cámara no conectada → falla silencioso
-        // Otros errores (500, etc.) cuentan para el banner
+        if (cameraMissing[cameraIndex]) {
+          cameraMissing = { ...cameraMissing, [cameraIndex]: false };
+        }
+      } else if (response.status === 404) {
+        // 404: the camera is not connected or its frame could not be
+        // captured. It does not count as an error, but it shows in the
+        // per-camera overlay (NEH-229).
+        cameraMissing = { ...cameraMissing, [cameraIndex]: true };
+      } else {
+        // Other errors (500, etc.) count toward the banner.
         previewErrorCount += 1;
       }
     } catch {
-      // Error de red — cuenta para el banner de reconexión
+      // A network error counts toward the reconnect banner.
       previewErrorCount += 1;
     } finally {
       fetchingPreview[cameraIndex] = false;
     }
   }
 
-  // ── Inicia o reinicia el polling ───────────────────────────────────────────
-  // Se llama al montar el componente y cada vez que cambia cameraMode.
-  // Cancela el intervalo anterior antes de crear uno nuevo.
+  // Called by the `$effect` below (on mount and whenever cameraMode changes)
+  // and when the tab becomes visible again. Clears the previous interval
+  // before creating a new one.
   function startPreviewPolling() {
     if (previewInterval) {
       clearInterval(previewInterval);
       previewInterval = null;
     }
 
-    // Fetch inmediato al arrancar (no esperar el primer intervalo)
+    // Fetch at once rather than waiting for the first interval.
     fetchPreview(0);
     if (cameraMode === 'double') fetchPreview(1);
 
-    // Polling periódico
     previewInterval = setInterval(() => {
       fetchPreview(0);
       if (cameraMode === 'double') fetchPreview(1);
     }, PREVIEW_INTERVAL_MS);
   }
 
-  // ── Pausa el polling cuando la pestaña pierde el foco ─────────────────────
-  // Esto ahorra recursos en el Raspberry Pi cuando el usuario no está mirando.
+  // Polling pauses while the tab is hidden, to save resources on the
+  // Raspberry Pi.
   function handleVisibilityChange() {
     previewActive = !document.hidden;
     if (previewActive) {
-      // Pestaña visible de nuevo → reiniciar polling
       startPreviewPolling();
     } else {
-      // Pestaña oculta → pausar polling
       if (previewInterval) {
         clearInterval(previewInterval);
         previewInterval = null;
       }
+      // NEH-228: also releases the held-key latch — one of the two recovery
+      // paths for a keyup that never arrives.
+      clearChordLatch();
     }
   }
 
-  // ── Ciclo de vida ──────────────────────────────────────────────────────────
   onMount(() => {
-    // Solo registrar el listener de visibilidad aquí.
-    // startPreviewPolling() se llama desde el $effect de abajo,
-    // que ya corre en el montaje inicial. Tenerlo en ambos lanzaba
-    // dos ciclos de polling al montar el componente.
+    // Only the visibility listener is registered here. startPreviewPolling()
+    // is called from the `$effect` below, which also runs on mount; calling
+    // it here as well would start two polling cycles.
     if (browser) {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
   });
 
-  // Reactivo: reiniciar polling cuando cambia el modo de cámara
-  // (ej: de single a double → empezar a pedir también camera 1)
+  // Restart polling when the camera mode changes (e.g. from single to double,
+  // so camera 1 is fetched as well).
   $effect(() => {
-    const _mode = cameraMode; // suscribirse al cambio
+    const _mode = cameraMode; // read to subscribe the effect to cameraMode
     startPreviewPolling();
   });
 
   onDestroy(() => {
-    // Limpiar el intervalo al desmontar el componente
     if (previewInterval) clearInterval(previewInterval);
 
-    // Liberar todas las URLs de objeto para evitar memory leaks
     Object.values(previewUrls).forEach(url => {
       try { URL.revokeObjectURL(url); } catch {}
     });
@@ -313,24 +434,31 @@
     }
   });
 
-  // ===========================================================================
-  // FIN POLLING DEL PREVIEW
-  // ===========================================================================
-
-  // ---------------------------------------------------------------------------
-  // ZOOM (CSS transform del wrapper — ajuste visual del viewport, no afecta la cámara)
-  // Para zoom de cámara (ScalerCrop) usa el slider de Zoom en CameraControls.
-  // ---------------------------------------------------------------------------
+  // Zoom is a CSS transform on the feeds wrapper — a visual adjustment of the
+  // viewport that does not affect the camera. Camera zoom (ScalerCrop) is the
+  // Zoom slider in CameraControls.
   function zoomIn()    { zoom = Math.min(zoom + 0.2, 3); }
   function zoomOut()   { zoom = Math.max(zoom - 0.2, 0.5); }
   function resetZoom() { zoom = 1; }
 
   // ---------------------------------------------------------------------------
-  // GUÍAS ARRASTRABLES
+  // DRAGGABLE GUIDES
   // ---------------------------------------------------------------------------
-  function startDrag(guide: 'v' | 'h') { dragging = guide; }
+  // Pointer events, not mouse events: the device is operated by finger, and a
+  // finger drag fires no mousedown/mousemove, so mouse handlers cannot move
+  // the guides on the hardware they are made for (NEH-156). Pointer events
+  // cover finger, stylus and mouse with the same code.
+  //
+  // The guide captures the pointer when grabbed, so the drag continues even
+  // when the finger leaves the 24px strip — which is normal while dragging.
+  // That is why the move and release handlers live on the guide itself, not
+  // on the viewport.
+  function startDrag(guide: 'v' | 'h', e: PointerEvent) {
+    dragging = guide;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
 
-  function handleMouseMove(e: MouseEvent) {
+  function handleGuideMove(e: PointerEvent) {
     if (!dragging || !viewportEl) return;
     const rect = viewportEl.getBoundingClientRect();
     if (dragging === 'v') {
@@ -342,20 +470,15 @@
 
   function stopDrag() { dragging = null; }
 
-  // ---------------------------------------------------------------------------
-  // CAPTURA
-  // ---------------------------------------------------------------------------
   async function handleCapture() {
-    if (isCapturing || !captureReady) return;
+    if (isCapturing || !canCapture) return;
     isCapturing = true;
-    captureFlash = true;
-    setTimeout(() => { captureFlash = false; }, 150);
 
     try {
       const payload = {
         project_name: projectName,
         collection_id: collectionId || undefined,
-        record_title: $m.lv_capture_title(new Date().toISOString().slice(0,19)),
+        record_title: defaultRecordTitle(),
       };
 
       let result;
@@ -371,56 +494,193 @@
       }
 
       if (!result.success) {
-        throw new Error(result.error || 'Capture failed');
+        // The backend's `error` is English; captureErrorText turns it into
+        // the catalogue's message below.
+        throw new CaptureFailed(result.error);
       }
+
+      // The flash fires only once the backend has confirmed the capture: it
+      // is the only success signal the operator sees, and if it always fired,
+      // a failed capture would look identical to a good one and the page
+      // would be lost unnoticed until review or export (NEH-72).
+      captureFlash = true;
+      setTimeout(() => { captureFlash = false; }, 150);
 
       cameraStatus.reportSuccess();
       onCaptureDone();
 
     } catch (error) {
-      const msg = error instanceof Error ? error.message : $m.lv_capture_error;
-      cameraStatus.reportFailure(msg);
       console.error('[LiveViewport] Capture error:', error);
+      if (isConflict(error) && onStemRefused && (await onStemRefused())) {
+        // The needs-stem banner says why, in the catalogue's words; the
+        // backend's English text is not shown.
+        return;
+      }
+      // Every backend error is English; the operator sees the catalogue's
+      // message for it, and the console has the original.
+      cameraStatus.reportFailure(captureErrorText(error, $m));
     } finally {
       isCapturing = false;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // MODAL DE GRILLA
+  // CAPTURE KEY — keyboard handling (NEH-228)
+  //
+  // ownsEvent and shouldTrigger answer different questions and are called
+  // separately: ownsEvent decides whether the event belongs to
+  // capture (and therefore whether preventDefault is called), regardless of
+  // whether this particular press should start a capture. Conflating them
+  // lets a held pedal's repeats through to whatever has focus — the first
+  // press is cancelled, but every repeat after it activates the focused
+  // button instead of the camera.
   // ---------------------------------------------------------------------------
 
-  // ---------------------------------------------------------------------------
-  // HELPER: etiqueta de cámara con índice
-  // ---------------------------------------------------------------------------
+  function ownsEventContext(): OwnsEventContext {
+    return {
+      chord,
+      modalOpen,
+      activeElement: browser ? document.activeElement : null,
+    };
+  }
+
+  function clearChordLatch() {
+    chordHeld = false;
+    heldCode = null;
+  }
+
+  function handleWindowKeydown(event: KeyboardEvent) {
+    if (learning) {
+      handleLearnKeydown(event);
+      return;
+    }
+    const ctx = ownsEventContext();
+    if (!ownsEvent(event, ctx)) return;
+    // Whenever the event belongs to capture, not only when it actually
+    // starts one: otherwise every repeat after the first goes through to the
+    // focused button.
+    event.preventDefault();
+    if (shouldTrigger(event, { ...ctx, keyHeld: chordHeld, capturing: isCapturing, ready: canCapture })) {
+      chordHeld = true;
+      // The physical `code` is stored, not `chord.key`: it is the only thing
+      // that still identifies this key when the release arrives with the
+      // modifiers already up. If the event carries no usable `code`,
+      // heldCode stays null and the next keyup of any key releases the latch.
+      heldCode = event.code || null;
+      handleCapture();
+    }
+  }
+
+  function handleWindowKeyup(event: KeyboardEvent) {
+    if (learning) {
+      // The device sent only a modifier and is now releasing it with no
+      // other key having arrived with it: tell the operator instead of
+      // leaving the control in "assigning" forever.
+      if (pendingModifier && event.key === pendingModifier) {
+        learnMessage = $m.lv_capture_key_modifier_only(pendingModifier);
+        pendingModifier = null;
+      }
+      return;
+    }
+    // Compared against the physical `code` that set the latch, not the
+    // chord's key; the latch also clears when either side lacks a usable
+    // `code`. See the comments on `chordHeld` and `heldCode` above.
+    if (!heldCode || !event.code || event.code === heldCode) {
+      clearChordLatch();
+    }
+  }
+
+  function handleLearnKeydown(event: KeyboardEvent) {
+    event.preventDefault();
+    const result = learnFromEvent(event);
+    if (result.ok) {
+      chord = result.chord;
+      writeChord(chord);
+      learning = false;
+      pendingModifier = null;
+      learnMessage = null;
+      return;
+    }
+    if (result.reason === 'modifier-only') {
+      pendingModifier = result.modifier;
+      learnMessage = null;
+      return;
+    }
+    // 'unbindable': Dead, Unidentified, or an event in the middle of IME
+    // composition.
+    learnMessage = $m.lv_capture_key_unbindable;
+  }
+
+  function startLearningChord() {
+    learning = true;
+    pendingModifier = null;
+    learnMessage = null;
+  }
+
+  // Cancelling is always a visible button, never a key — otherwise a pedal
+  // that sends Escape could never be assigned.
+  function cancelLearningChord() {
+    learning = false;
+    pendingModifier = null;
+    learnMessage = null;
+  }
+
+  function resetChord() {
+    clearStoredChord();
+    chord = DEFAULT_CHORD;
+    cancelLearningChord();
+  }
+
+  function closeGridModal() {
+    showGridModal = false;
+    // Closing the grid settings in the middle of an assignment must not
+    // leave the window's next keydown captured by a control that is no
+    // longer visible.
+    cancelLearningChord();
+  }
+
   function cameraLabel(idx: number): string {
     const dev = devices.find(d => d.index === idx);
-    return `${dev?.label || dev?.model || 'Camera'} [${idx}]`;
+    return `${dev?.label || dev?.model || $m.cam_fallback_name} [${idx}]`;
   }
 </script>
 
-<!-- ============================================================
-     VIEWPORT PRINCIPAL
-     ============================================================ -->
-<div class="viewport-outer">
-  <div class="mat-board">
+<svelte:window onkeydown={handleWindowKeydown} onkeyup={handleWindowKeyup} onblur={clearChordLatch} />
 
-    <!-- ══════════════════════════════════════════════════════════
-         ÁREA DE CÁMARAS
-         ══════════════════════════════════════════════════════════ -->
+<div class="viewport-outer">
+  <div class="mat-board" bind:clientWidth={boardW} bind:clientHeight={boardH}>
+
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="camera-viewport"
       class:flash={captureFlash}
       bind:this={viewportEl}
-      onmousemove={handleMouseMove}
-      onmouseup={stopDrag}
-      onmouseleave={stopDrag}
+      style={viewportBox.w && viewportBox.h ? `width: ${viewportBox.w}px; height: ${viewportBox.h}px` : undefined}
     >
 
-      <!-- Banner: reconectando tras errores consecutivos de preview -->
+      <!-- Banners: the volume has no stem, or the last capture failed
+           (NEH-72). The capture-error banner clears on the next good capture
+           (`reportSuccess`), so it cannot stay up in the middle of a
+           sequence. -->
+      {#if needsStem && captureReady}
+        <div class="needs-stem-banner" role="alert">
+          <span class="material-symbols-outlined icon-sm" aria-hidden="true">warning</span>
+          <span>{$m.lv_needs_stem}</span>
+          {#if stemFormHref}
+            <a class="needs-stem-link" href={stemFormHref}>{$m.lv_needs_stem_link}</a>
+          {/if}
+        </div>
+      {:else if $cameraStatus.captureError}
+        <div class="capture-error-banner" role="alert">
+          <span class="material-symbols-outlined icon-sm">error</span>
+          <!-- `||`, not `??`: an empty message must also fall back to the
+               catalogue, or the banner shows no text. -->
+          {$cameraStatus.errorMessage || $m.lv_capture_error}
+        </div>
+      {/if}
+
       {#if previewConnectError}
-        <div class="reconnect-banner">
+        <div class="reconnect-banner" class:stacked={$cameraStatus.captureError}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
           </svg>
@@ -428,48 +688,18 @@
         </div>
       {/if}
 
-      <!-- ══════════════════════════════════════════════════════
-           STREAM DE CÁMARA
-           ══════════════════════════════════════════════════════
-           Este bloque muestra el feed en vivo de una o dos cámaras.
+      <div class="camera-feeds-wrapper" style="transform: scale({zoom})">
 
-           ESTADO ACTUAL: usa previewUrls[n] que se actualiza via polling.
-           previewUrls[n] es una Object URL que apunta al último frame JPEG
-           capturado por /cameras/preview/{n} en el backend.
-
-           ── PARA SUSTITUIR POR STREAMING REAL ──────────────────
-           Cuando el backend tenga MJPEG streaming, reemplaza cada:
-
-             {#if previewUrls[n]}
-               <img src={previewUrls[n]} ... />
-             {:else}
-               <div class="no-stream">...</div>
-             {/if}
-
-           Por simplemente:
-
-             <img
-               src="{getApiBase()}/cameras/stream/{n}"
-               class="feed-img"
-               alt="Camera {n}"
-             />
-
-           Y elimina el bloque "POLLING DEL PREVIEW" del <script>.
-           ══════════════════════════════════════════════════════ -->
-      <div class="camera-feeds-wrapper" style="transform: scale({zoom * 0.85})">
-
-        <!-- Cámara izquierda (leftIdx) — siempre visible -->
-        <div class="camera-feed">
+        <div class="camera-feed" bind:clientWidth={feedW0} bind:clientHeight={feedH0} style="flex-grow: {leftFeedAspect}">
           {#if previewUrls[leftIdx]}
-            <!-- Frame en vivo del polling — se actualiza cada PREVIEW_INTERVAL_MS -->
             <img
               bind:this={imgEl0}
+              bind:naturalWidth={naturalW0}
+              bind:naturalHeight={naturalH0}
               src={previewUrls[leftIdx]}
               alt={$m.lv_camera_left_alt}
               class="feed-img"
-              class:feed-rotate-90={(rotateDeg[leftIdx] ?? 0) === 90}
-              class:feed-rotate-180={(rotateDeg[leftIdx] ?? 0) === 180}
-              class:feed-rotate-270={(rotateDeg[leftIdx] ?? 0) === 270}
+              style={feedRotateStyle(rotateDeg[leftIdx] ?? 0, feedW0, feedH0)}
               onload={() => { if (imgEl0) histogramStore.update(s => ({ ...s, [leftIdx]: computeHistogram(imgEl0!) })); }}
             />
             <!-- WB sampling overlay: visible only when picker is active for this camera -->
@@ -482,8 +712,11 @@
                 title={$m.lv_wb_click_hint}
               ></div>
             {/if}
-          {:else}
-            <!-- Placeholder: sin señal o esperando primer frame -->
+          {:else if !cameraMissing[leftIdx]}
+            <!-- No signal yet, or waiting for the first frame. Omitted when
+                 the camera is marked missing: the NEH-229 notice says the same
+                 with the concrete instruction, and both would sit in the
+                 center of the feed. -->
             <div class="no-stream">
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -493,18 +726,21 @@
               <small>{$m.lv_check_hw}</small>
             </div>
           {/if}
-          <!-- Badge identificador de cámara -->
+          <!-- The camera returned 404 on its last fetch (NEH-229). -->
+          {#if cameraMissing[leftIdx]}
+            <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
+          {/if}
           <div class="feed-label">{cameraLabel(leftIdx)}</div>
           <!-- Floating rotation overlay -->
           <div class="feed-rotate-overlay">
-            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, -90)} aria-label={$m.lv_rotate_ccw}>
+            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, -90)} aria-label={$m.lv_rotate_ccw} title={$m.lv_rotate_ccw}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                 <path d="M3 3v5h5"/>
               </svg>
             </button>
             <span class="feed-rotate-deg">{(rotateDeg ?? {})[leftIdx] ?? 0}°</span>
-            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, 90)} aria-label={$m.lv_rotate_cw}>
+            <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, 90)} aria-label={$m.lv_rotate_cw} title={$m.lv_rotate_cw}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                 <path d="M21 3v5h-5"/>
@@ -513,19 +749,17 @@
           </div>
         </div>
 
-        <!-- Cámara derecha (rightIdx) — solo en modo double -->
         {#if cameraMode === 'double'}
-          <div class="camera-feed">
+          <div class="camera-feed" bind:clientWidth={feedW1} bind:clientHeight={feedH1} style="flex-grow: {rightFeedAspect}">
             {#if previewUrls[rightIdx]}
-              <!-- Frame en vivo del polling -->
               <img
                 bind:this={imgEl1}
+                bind:naturalWidth={naturalW1}
+                bind:naturalHeight={naturalH1}
                 src={previewUrls[rightIdx]}
                 alt={$m.lv_camera_right_alt}
                 class="feed-img"
-                class:feed-rotate-90={(rotateDeg[rightIdx] ?? 0) === 90}
-                class:feed-rotate-180={(rotateDeg[rightIdx] ?? 0) === 180}
-                class:feed-rotate-270={(rotateDeg[rightIdx] ?? 0) === 270}
+                style={feedRotateStyle(rotateDeg[rightIdx] ?? 0, feedW1, feedH1)}
                 onload={() => { if (imgEl1) histogramStore.update(s => ({ ...s, [rightIdx]: computeHistogram(imgEl1!) })); }}
               />
               {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === rightIdx}
@@ -537,8 +771,11 @@
                   title={$m.lv_wb_click_hint}
                 ></div>
               {/if}
-            {:else}
-              <!-- Placeholder: sin señal o esperando primer frame -->
+            {:else if !cameraMissing[rightIdx]}
+              <!-- No signal yet, or waiting for the first frame. Omitted when
+                   the camera is marked missing: the NEH-229 notice says the
+                   same with the concrete instruction, and both would sit in
+                   the center of the feed. -->
               <div class="no-stream">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -548,18 +785,21 @@
                 <small>{$m.lv_check_hw}</small>
               </div>
             {/if}
-            <!-- Badge identificador de cámara -->
+            <!-- The camera returned 404 on its last fetch (NEH-229). -->
+            {#if cameraMissing[rightIdx]}
+              <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
+            {/if}
             <div class="feed-label right">{cameraLabel(rightIdx)}</div>
             <!-- Floating rotation overlay -->
             <div class="feed-rotate-overlay">
-              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, -90)} aria-label={$m.lv_rotate_ccw}>
+              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, -90)} aria-label={$m.lv_rotate_ccw} title={$m.lv_rotate_ccw}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                   <path d="M3 3v5h5"/>
                 </svg>
               </button>
               <span class="feed-rotate-deg">{(rotateDeg ?? {})[rightIdx] ?? 0}°</span>
-              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, 90)} aria-label={$m.lv_rotate_cw}>
+              <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, 90)} aria-label={$m.lv_rotate_cw} title={$m.lv_rotate_cw}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                   <path d="M21 3v5h-5"/>
@@ -570,9 +810,7 @@
         {/if}
 
       </div>
-      <!-- ══ FIN STREAM DE CÁMARA ══ -->
 
-      <!-- ── GRILLA (líneas cian, no arrastrables) ── -->
       {#if showGrid}
         {#each Array.from({length: gridCols - 1}, (_, i) => i) as i}
           <div class="grid-line vertical" style="left: {(i+1) * (100/gridCols)}%"></div>
@@ -582,19 +820,31 @@
         {/each}
       {/if}
 
-      <!-- ── GUÍAS ARRASTRABLES (líneas rojas) ── -->
       {#if showGuides}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="guide vertical" style="left: {guideV}%" onmousedown={() => startDrag('v')}>
+        <div
+          class="guide vertical"
+          style="left: {guideV}%"
+          onpointerdown={(e) => startDrag('v', e)}
+          onpointermove={handleGuideMove}
+          onpointerup={stopDrag}
+          onpointercancel={stopDrag}
+        >
           <div class="guide-line"></div>
         </div>
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="guide horizontal" style="top: {guideH}%" onmousedown={() => startDrag('h')}>
+        <div
+          class="guide horizontal"
+          style="top: {guideH}%"
+          onpointerdown={(e) => startDrag('h', e)}
+          onpointermove={handleGuideMove}
+          onpointerup={stopDrag}
+          onpointercancel={stopDrag}
+        >
           <div class="guide-line"></div>
         </div>
       {/if}
 
-      <!-- ── BARRA DE METADATOS ── -->
       <div class="metadata-bar">
         <div class="metadata-values">
           <span>ISO {iso}</span>
@@ -606,54 +856,70 @@
 
     </div><!-- /camera-viewport -->
 
-    <!-- ── PANEL FLOTANTE: zoom + grilla ── -->
-    <div class="floating-controls">
-      <button class="float-btn" onclick={zoomIn} aria-label={$m.lv_zoom_in}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+    <div class="floating-controls" class:collapsed={!controlsOpen}>
+      <button
+        class="float-btn float-btn-toggle"
+        onclick={() => controlsOpen = !controlsOpen}
+        aria-expanded={controlsOpen}
+        aria-label={controlsOpen ? $m.lv_controls_collapse : $m.lv_controls_expand}
+        title={controlsOpen ? $m.lv_controls_collapse : $m.lv_controls_expand}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          {#if controlsOpen}
+            <path d="M9 18l6-6-6-6"/>
+          {:else}
+            <path d="M15 18l-6-6 6-6"/>
+          {/if}
         </svg>
       </button>
-      <button class="float-btn" onclick={zoomOut} aria-label={$m.lv_zoom_out}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          <line x1="8" y1="11" x2="14" y2="11"/>
-        </svg>
-      </button>
-      <button class="float-btn" onclick={resetZoom} aria-label={$m.col_fit_screen_aria}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-        </svg>
-      </button>
-      <div class="float-divider"></div>
-      <button class="float-btn" onclick={() => showGridModal = true} aria-label={$m.lv_grid_settings}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-        </svg>
-      </button>
-      {#if cameraMode === 'double'}
+      {#if controlsOpen}
         <div class="float-divider"></div>
-        <button
-          class="float-btn"
-          class:float-btn-active={swapped}
-          onclick={() => swapped = !swapped}
-          aria-label={$m.lv_swap_orientation}
-          title={swapped ? $m.lv_orientation_swapped : $m.lv_orientation_normal}
-        >
-          <span class="material-symbols-outlined" style="font-size:18px">sync</span>
+        <button class="float-btn" onclick={zoomIn} aria-label={$m.lv_zoom_in} title={$m.lv_zoom_in}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+          </svg>
         </button>
+        <button class="float-btn" onclick={zoomOut} aria-label={$m.lv_zoom_out} title={$m.lv_zoom_out}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="8" y1="11" x2="14" y2="11"/>
+          </svg>
+        </button>
+        <button class="float-btn" onclick={resetZoom} aria-label={$m.col_fit_screen_aria} title={$m.col_fit_screen_aria}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          </svg>
+        </button>
+        <div class="float-divider"></div>
+        <button class="float-btn" onclick={() => showGridModal = true} aria-label={$m.lv_grid_settings} title={$m.lv_grid_settings}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          </svg>
+        </button>
+        {#if cameraMode === 'double'}
+          <div class="float-divider"></div>
+          <button
+            class="float-btn"
+            class:float-btn-active={swapped}
+            onclick={() => swapped = !swapped}
+            aria-label={$m.lv_swap_orientation}
+            title={swapped ? $m.lv_orientation_swapped : $m.lv_orientation_normal}
+          >
+            <span class="material-symbols-outlined" style="font-size:22px">swap_horiz</span>
+          </button>
+        {/if}
       {/if}
     </div>
 
-    <!-- ── BOTÓN DE CAPTURA ── -->
     <div class="capture-btn-wrapper">
       <button
         class="capture-btn"
         class:capturing={isCapturing}
         onclick={handleCapture}
-        disabled={isCapturing || !captureReady}
-        title={captureReady ? undefined : $m.lv_capture_not_ready}
+        disabled={isCapturing || !canCapture}
+        title={!captureReady ? $m.lv_capture_not_ready : needsStem ? $m.lv_needs_stem : undefined}
         aria-label={$m.lv_capture_btn}
       >
         <div class="capture-ring outer"></div>
@@ -665,15 +931,11 @@
   </div><!-- /mat-board -->
 </div><!-- /viewport-outer -->
 
-<!-- ============================================================
-     MODAL: Configuración de Grilla
-     ============================================================ -->
 {#if showGridModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) showGridModal = false; }}>
-    <div class="modal-card">
-      <h3 class="modal-title">{$m.lv_grid_modal_title}</h3>
+  <!-- No Escape while a key is being assigned: a pedal may send Escape. -->
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeGridModal, escape: !learning }}>
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="grid-modal-title">
+      <h3 class="modal-title" id="grid-modal-title">{$m.lv_grid_modal_title}</h3>
       <p class="modal-subtitle">{$m.lv_grid_modal_subtitle}</p>
       <div class="modal-body">
         <div class="modal-toggle-row">
@@ -694,9 +956,33 @@
             <div class="toggle-thumb" class:on={showGuides}></div>
           </button>
         </div>
+
+        <!-- NEH-228: the capture key — assigned once and stored in this
+             browser. -->
+        <div class="modal-toggle-row capture-key-row">
+          <div>
+            <p class="modal-toggle-title">{$m.lv_capture_key_current(describeChord(chord, $m.lv_capture_key_space))}</p>
+            <p class="modal-toggle-sub">{$m.lv_capture_key_desc}</p>
+          </div>
+          <div class="capture-key-buttons">
+            {#if learning}
+              <button class="capture-key-btn" onclick={cancelLearningChord}>{$m.common_cancel}</button>
+            {:else}
+              <button class="capture-key-btn" onclick={startLearningChord}>{$m.lv_capture_key_learn}</button>
+            {/if}
+            <button class="capture-key-btn" onclick={resetChord}>{$m.lv_capture_key_reset}</button>
+          </div>
+        </div>
+        {#if learning}
+          <p class="modal-toggle-sub capture-key-status" role="status">{$m.lv_capture_key_learning}</p>
+        {/if}
+        {#if learnMessage}
+          <p class="modal-toggle-sub capture-key-status" role="alert">{learnMessage}</p>
+        {/if}
+        <p class="modal-toggle-sub capture-key-note">{$m.lv_capture_key_note}</p>
       </div>
       <div class="modal-actions">
-        <button class="modal-btn confirm" onclick={() => showGridModal = false}>{$m.common_close}</button>
+        <button class="modal-btn confirm" onclick={closeGridModal}>{$m.common_close}</button>
       </div>
     </div>
   </div>
@@ -726,7 +1012,57 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Banner de reconexión */
+  /* Failed-capture banner — the same visual language as the reconnect
+     banner, but opaque and without the pulse: it is a state that calls for
+     action, not a wait. z-index 60 puts it above everything drawn in the
+     viewport (guides and overlays go up to 50), so it is not hidden while
+     the operator has the framing guides on. */
+  .capture-error-banner {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 80%;
+    padding: 8px 16px;
+    background: rgba(190, 45, 35, 0.96);
+    color: #fff;
+    font-size: 0.8rem;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+  }
+
+  /* Banner: the volume has no stem. Unlike the error banner, it receives
+     clicks: it carries the link to the volume's form. */
+  .needs-stem-banner {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 80%;
+    padding: 8px 16px;
+    background: rgba(30, 30, 30, 0.94);
+    border: 1px solid var(--color-highlight);
+    color: #fff;
+    font-size: 0.8rem;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+  }
+  .needs-stem-link {
+    color: var(--color-highlight);
+    font-weight: var(--fw-bold);
+    text-decoration: underline;
+    white-space: nowrap;
+  }
+
   .reconnect-banner {
     position: absolute;
     top: 10px;
@@ -746,18 +1082,28 @@
     animation: pulse-opacity 1.5s ease-in-out infinite;
   }
 
+  /* A failed capture and a lost preview connection can show both banners at
+     once, both centered at the top: the reconnect banner then moves down so
+     it is not hidden under the failed-capture banner. */
+  .reconnect-banner.stacked { top: 52px; }
+
   @keyframes pulse-opacity {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.6; }
   }
 
-  /* ── Viewport negro interno ── */
+  /* width/aspect-ratio are the fallback until the board (.mat-board) is
+     first measured — viewportBox is 0x0 on that first tick and the element
+     has no inline size yet, so without them it would collapse to 0. Once
+     viewportBox is no longer 0x0, the inline size (width/height in px)
+     overrides these two rules. max-height: 100% is deliberately absent:
+     with width: 100% it would cut the height but not the width and break
+     the aspect ratio, and the inline size from fitBox already fits the
+     board. */
   .camera-viewport {
     position: relative;
     width: 100%;
-    max-width: 1200px;
-    max-height: 100%;
-    aspect-ratio: 4/3;
+    aspect-ratio: 4 / 3;
     background-color: #0a0a0a;
     border: 1px solid rgba(90,140,98,0.2);
     box-shadow: 0 4px 24px rgba(0,0,0,0.6);
@@ -765,7 +1111,6 @@
     cursor: crosshair;
   }
 
-  /* Efecto flash al capturar */
   .camera-viewport.flash::after {
     content: '';
     position: absolute;
@@ -778,12 +1123,9 @@
 
   @keyframes flash { 0% { opacity: 0.3; } 100% { opacity: 0; } }
 
-  /* ══════════════════════════════════════════════════════════════
-     FEEDS DE CÁMARA
-     Wrapper flex que contiene los paneles L y R lado a lado.
-     En modo single: solo aparece el feed izquierdo (flex: 1).
-     En modo double: dos feeds iguales dividiendo el espacio.
-     ══════════════════════════════════════════════════════════════ */
+  /* Holds the left and right panels side by side. In double mode each
+     panel's flex-grow is set inline from its frame's shape (leftFeedAspect,
+     rightFeedAspect). */
   .camera-feeds-wrapper {
     display: flex;
     width: 100%;
@@ -791,21 +1133,38 @@
     transition: transform 0.3s ease;
   }
 
-  /* Cada panel de cámara */
   .camera-feed {
-    flex: 1;
+    flex: 1 1 0;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
     overflow: hidden;
-    /* Línea divisoria entre L y R */
     border-right: 1px solid rgba(255,255,255,0.06);
   }
 
   .camera-feed:last-child { border-right: none; }
 
-  /* Imagen del stream / polling */
+  /* Missing camera (404 on its last preview fetch, NEH-229) */
+  .camera-missing {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 80%;
+    background: rgba(19,17,16,0.85);
+    backdrop-filter: blur(2px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-md);
+    padding: 10px 16px;
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-light);
+    text-align: center;
+    z-index: 6;
+    pointer-events: none;
+  }
+
   .feed-img {
     width: 100%;
     height: 100%;
@@ -813,7 +1172,6 @@
     display: block;
   }
 
-  /* Badge L / R en la esquina del feed */
   .feed-label {
     position: absolute;
     top: 8px;
@@ -822,8 +1180,8 @@
     backdrop-filter: blur(2px);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 4px;
-    padding: 2px 6px;
-    font-size: 9px;
+    padding: 4px 10px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--color-light);
     pointer-events: none;
@@ -832,7 +1190,6 @@
 
   .feed-label.right { left: auto; right: 8px; }
 
-  /* Placeholder sin señal */
   .no-stream {
     display: flex;
     flex-direction: column;
@@ -847,7 +1204,6 @@
   .no-stream span  { font-size: var(--text-base); font-weight: var(--fw-medium); }
   .no-stream small { font-size: var(--text-sm); }
 
-  /* ── Grilla (cian) ── */
   .grid-line {
     position: absolute;
     pointer-events: none;
@@ -858,14 +1214,20 @@
   .grid-line.vertical   { top: 0; bottom: 0; width: 1px; }
   .grid-line.horizontal { left: 0; right: 0; height: 1px; }
 
-  /* ── Guías arrastrables (rojo) ── */
   .guide {
     position: absolute;
     z-index: 30;
+    /* Without this the browser treats the gesture as a scroll and takes it
+       over: pointer events stop arriving in the middle of the drag. */
+    touch-action: none;
   }
 
-  .guide.vertical   { top: 0; bottom: 0; width: 16px; margin-left: -8px; cursor: ew-resize; }
-  .guide.horizontal { left: 0; right: 0; height: 16px; margin-top: -8px; cursor: ns-resize; }
+  /* 24px, not 16: the strip has to be grabbed with a finger. It stays below
+     the 44px touch minimum on purpose — a 44px vertical guide would cover a
+     whole column of the image being framed, and unlike a button, a guide is
+     visible before it is grabbed and is dragged rather than tapped. */
+  .guide.vertical   { top: 0; bottom: 0; width: 24px; margin-left: -12px; cursor: ew-resize; }
+  .guide.horizontal { left: 0; right: 0; height: 24px; margin-top: -12px; cursor: ns-resize; }
 
   .guide-line {
     position: absolute;
@@ -877,7 +1239,6 @@
   .guide.horizontal .guide-line { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-50%); }
   .guide:hover .guide-line { background-color: rgba(255,80,80,1); }
 
-  /* ── Barra de metadatos ── */
   .metadata-bar {
     position: absolute;
     bottom: 0; left: 0; right: 0;
@@ -898,13 +1259,6 @@
     color: var(--color-light-grey);
   }
 
-  .metadata-auto {
-    font-family: monospace;
-    font-size: 10px;
-    color: var(--color-light-grey);
-  }
-
-  /* ── Panel flotante ── */
   .floating-controls {
     position: absolute;
     top: 75px; right: 1px;
@@ -917,12 +1271,25 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    width: 54px;
+    width: 56px;
     align-items: center;
+    /* No scroll on purpose: the panel is sized by its content. It sits inside
+       the viewport, which clips any overflow, so any added control has to be
+       checked against the space available. */
+    transition: width var(--transition-base);
   }
 
+  /* Collapsed: only the toggle button, to give the area back to the feed */
+  .floating-controls.collapsed {
+    background-color: rgba(26,24,21,0.6);
+  }
+
+  .float-btn-toggle { color: var(--color-light); }
+
   .float-btn {
-    width: 38px; height: 38px;
+    /* 44px, not 64: the collection view's rail can afford 64 because it is a
+       full-height bar; this panel sits inside the viewport. */
+    width: var(--touch-target-min); height: var(--touch-target-min);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -939,7 +1306,6 @@
 
   .float-divider { width: 32px; height: 1px; background-color: var(--border-color); }
 
-  /* ── Botón de captura ── */
   .capture-btn-wrapper {
     position: absolute;
     bottom: 24px;
@@ -1016,37 +1382,6 @@
   .modal-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0 0 24px; }
 
   .modal-body   { display: flex; flex-direction: column; gap: 20px; margin-bottom: 24px; }
-  .modal-field  { display: flex; flex-direction: column; gap: 8px; }
-  .modal-label  { font-size: var(--text-sm); font-weight: var(--fw-semibold); color: var(--color-light); }
-
-  .slider-with-value { display: flex; align-items: center; gap: 12px; }
-
-  .modal-range {
-    flex: 1; height: 8px;
-    -webkit-appearance: none;
-    background-color: var(--color-surface-alt-2);
-    border-radius: var(--radius-full);
-    cursor: pointer;
-  }
-
-  .modal-range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    background-color: var(--color-primary);
-    cursor: pointer;
-  }
-
-  .range-value {
-    width: 40px; height: 40px;
-    background-color: var(--color-surface-alt-2);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: var(--fw-bold);
-    color: var(--color-light);
-    flex-shrink: 0;
-  }
 
   .modal-toggle-row {
     display: flex; align-items: center; justify-content: space-between;
@@ -1083,6 +1418,30 @@
 
   .toggle-thumb.on { transform: translateX(24px); background-color: white; }
 
+  /* NEH-228: the capture key row — like .modal-toggle-row, but with two
+     buttons instead of a toggle on the right. */
+  .capture-key-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .capture-key-btn {
+    padding: 8px 12px;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background-color: var(--color-surface-alt);
+    color: var(--color-light);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .capture-key-btn:hover { background-color: rgba(255,255,255,0.05); }
+
+  .capture-key-status { color: var(--color-primary); }
+
+  .capture-key-note { margin-top: -8px; }
+
   .modal-actions { display: flex; gap: 12px; }
 
   .modal-btn {
@@ -1096,8 +1455,6 @@
     border: 1px solid var(--border-color);
   }
 
-  .modal-btn.cancel  { background-color: var(--color-surface); color: var(--color-light-grey); }
-  .modal-btn.cancel:hover { background-color: rgba(255,255,255,0.05); color: var(--color-light); }
   .modal-btn.confirm { background-color: var(--color-primary); color: white; border-color: var(--color-primary); box-shadow: 0 4px 12px rgba(90,140,98,0.3); }
   .modal-btn.confirm:hover { background-color: var(--color-primary-hover); }
 </style>

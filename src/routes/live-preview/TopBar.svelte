@@ -1,92 +1,80 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: TopBar
-  // Archivo: src/routes/live-preview/TopBar.svelte
+  // Top bar of the capture page: the back button and the project / volume
+  // breadcrumb on the left, the go-to-review button and the user menu on the
+  // right. The breadcrumb mirrors the collection view's on purpose, so the
+  // operator can see where the images are being stored while capturing.
+  // projectName and collectionName are '' while they load.
   //
-  // Barra superior de la interfaz Live Preview / Gallery.
-  // Contiene:
-  //   - Botón volver (izquierda)
-  //   - Tabs "Live Scan" / "Gallery" (centro)
-  //   - Badge de estado + avatar de usuario (derecha)
-  //
-  // Props:
-  //   activeTab       → tab activo ('live' | 'gallery')
-  //   onTabChange     → callback al cambiar de tab
-  //   onBack          → callback al hacer click en volver
-  // ============================================================================
+  // Version: 0.1.0-beta
 
-  import { authStore } from '$lib/stores/auth';
   import { m } from '$lib/i18n';
+  import UserMenu from '$lib/components/UserMenu.svelte';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
-    activeTab,
-    onTabChange,
     onBack,
+    onGoToReview,
+    projectName = '',
+    collectionName = '',
   }: {
-    activeTab: 'live' | 'gallery';
-    onTabChange: (tab: 'live' | 'gallery') => void;
     onBack: () => void;
+    onGoToReview: () => void;
+    projectName?: string;
+    collectionName?: string;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // INICIALES DEL USUARIO para el avatar
-  // Lee el username del store de auth y toma las dos primeras letras
-  // Si no hay usuario, muestra '?'
-  // ---------------------------------------------------------------------------
-  let userInitials = $derived(() => {
-    let username = '';
-    authStore.subscribe(s => { username = s.user?.username ?? ''; })();
-    return username.slice(0, 2).toUpperCase() || '?';
-  });
 </script>
 
-<!-- ============================================================
-     BARRA SUPERIOR
-     Altura fija 72px, fondo surface, borde verde inferior
-     ============================================================ -->
 <div class="topbar">
 
-  <!-- ── Lado izquierdo: botón volver ── -->
   <div class="topbar-left">
     <button
       class="btn-circle"
       onclick={onBack}
       aria-label={$m.tb_back}
     >
-      <!-- Ícono flecha izquierda -->
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M19 12H5M12 5l-7 7 7 7"/>
       </svg>
     </button>
+
+    {#if projectName || collectionName}
+      <nav class="breadcrumb" aria-label={$m.tb_breadcrumb_nav}>
+        {#if projectName}
+          <span class="bc-item bc-project">{projectName}</span>
+        {/if}
+        {#if projectName && collectionName}
+          <span class="bc-item bc-sep" aria-hidden="true">/</span>
+        {/if}
+        {#if collectionName}
+          <span class="bc-item bc-collection">{collectionName}</span>
+        {/if}
+      </nav>
+    {/if}
   </div>
 
-  <!-- ── Lado derecho: badge de estado + avatar ── -->
   <div class="topbar-right">
-    <!-- Badge "In Review" — estilo sand/naranja del design system -->
-    <!-- Para cambiar el texto o el color, modifica aquí -->
-    <div class="status-badge">
-      {$m.status_in_review}
-    </div>
+    <!-- Symmetric with the collection view's go-to-capture button: same
+         corner, same style, opposite direction. -->
+    <button
+      class="btn-review"
+      onclick={onGoToReview}
+      title={$m.tb_go_to_review_title}
+    >
+      <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">rate_review</span>
+      <span>{$m.tb_go_to_review}</span>
+    </button>
 
-    <!-- Avatar circular con iniciales del usuario -->
-    <!-- El color verde viene del design system (--color-primary) -->
-    <div class="user-avatar" aria-label={$m.tb_current_user}>
-      {userInitials()}
-    </div>
+    <!-- Identity and sign-out. The avatar opens the menu (NEH-234). -->
+    <UserMenu label={$m.tb_current_user} />
   </div>
 
 </div>
 
 <style>
-  /* Barra completa: 72px de alto, fondo surface oscuro */
   .topbar {
     height: 72px;
     width: 100%;
     background-color: var(--color-surface-alt);
-    /* Borde inferior verde — color primario del design system */
     border-bottom: 2px solid var(--color-primary);
     display: flex;
     align-items: center;
@@ -97,7 +85,6 @@
     z-index: 20;
   }
 
-  /* ── Lados izquierdo y derecho ── */
   .topbar-left,
   .topbar-right {
     display: flex;
@@ -106,11 +93,16 @@
     min-width: 120px;
   }
 
-  .topbar-right {
-    justify-content: flex-end;
+  .topbar-left {
+    min-width: 0;
+    flex: 1;
   }
 
-  /* Botón circular (volver) */
+  .topbar-right {
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+
   .btn-circle {
     width: 40px;
     height: 40px;
@@ -130,76 +122,47 @@
     background-color: rgba(255, 255, 255, 0.08);
   }
 
-  /* ── Tabs centrados (posición absoluta para centrado perfecto) ── */
-  .tabs-container {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  /* Contenedor pill de los tabs */
-  .tabs-pill {
-    background-color: var(--color-surface);
-    padding: 4px;
-    border-radius: var(--radius-lg);
+  /* Mirrors .btn-camera in the collection view */
+  .btn-review {
     display: flex;
-    gap: 0;
-  }
-
-  /* Cada botón tab */
-  .tab-btn {
-    padding: 8px 24px;
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-base);
-    font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    background: none;
-    border: none;
-    cursor: pointer;
-    transition: color var(--transition-base), background-color var(--transition-base);
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
     min-height: var(--touch-target-min);
-    white-space: nowrap;
-  }
-
-  .tab-btn:hover {
-    color: var(--color-light);
-  }
-
-  /* Tab activo: fondo verde primario */
-  .tab-btn.active {
-    background-color: var(--color-primary);
-    color: var(--color-light);
-  }
-
-  /* ── Badge de estado ── */
-  .status-badge {
-    padding: 6px 16px;
     border-radius: var(--radius-full);
-    background-color: var(--color-highlight);  /* sand/naranja del design system */
+    border: none;
+    background-color: var(--color-primary);
     color: var(--color-light);
     font-family: var(--font-family);
     font-size: 13px;
     font-weight: var(--fw-bold);
+    cursor: pointer;
     white-space: nowrap;
+    transition: background-color var(--transition-base);
   }
 
-  /* ── Avatar del usuario ── */
-  .user-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background-color: var(--color-primary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+  .btn-review:hover {
+    background-color: var(--color-primary-hover);
+  }
+
+  /* Same values as the collection view's breadcrumb */
+  .breadcrumb {
     display: flex;
     align-items: center;
-    justify-content: center;
-    color: var(--color-light);
-    font-family: var(--font-family);
-    font-weight: var(--fw-bold);
-    font-size: var(--text-sm);
-    flex-shrink: 0;
-    user-select: none;
+    gap: 6px;
+    font-size: 13px;
+    min-width: 0;
   }
+  .bc-item {
+    color: var(--color-light-grey);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bc-sep { flex-shrink: 0; }
+  .bc-collection {
+    color: var(--color-light);
+    font-weight: var(--fw-bold);
+  }
+
 </style>

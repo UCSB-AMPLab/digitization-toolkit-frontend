@@ -1,27 +1,19 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Galería de colección
-  // Ruta: /dashboard/projects/[projectId]/collections/[collectionId]
+  // A volume's gallery: list, grid and spread views of its records, plus
+  // export (BagIt, image ZIP, capture manifest) and hand-over for review. The
+  // page owns the records and the view state shared by its child views; the
+  // top bar (breadcrumb, camera button) is in +layout@.svelte, and the page
+  // puts its hand-over controls there through the volume top bar slot.
   //
-  // Reemplaza la antigua vista de lista de registros con la galería completa.
-  // La navegación superior (breadcrumb, botón cámara) vive en +layout@.svelte.
-  //
-  // Componentes hijos:
-  //   LeftSidebar.svelte      → strip de íconos + paneles (en list y spread)
-  //   ListView.svelte         → vista de lista de registros
-  //   ImageViewer.svelte      → visor en modo spread
-  //   ImageViewerModal.svelte → modal de inspección (desde ListView)
-  //   GridView.svelte         → vista cuadrícula (con Filtros/Renombrar/Finalizar)
-  //   RightToolbar.svelte     → toolbar flotante derecha
-  //   ThumbnailStrip.svelte   → tira de miniaturas inferior (solo en spread)
-  // ============================================================================
+  // Version: 0.1.0-beta
 
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
   import { recordsApi, collectionsApi, ApiError, type Record } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
+  import { formatCount } from '$lib/format-count';
   import JSZip from 'jszip';
 
   import LeftSidebar from './LeftSidebar.svelte';
@@ -32,41 +24,49 @@
   import RightToolbar from './RightToolbar.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
-  import ActionBar from './ActionBar.svelte';
+  import HandoverControls from '$lib/components/HandoverControls.svelte';
+  import { getVolumeTopbar } from '$lib/volume-topbar';
+  import { dismissible } from '$lib/dialog';
+  import { fileHoldText } from '$lib/volume-refusals';
+  import { freedExportCount } from '$lib/offsite-free';
+  import { reconcileInspected, selectionAfterLoad } from '$lib/record-selection';
+  import { freedFromBody } from '$lib/image-display';
+  import {
+    canDownloadCaptureManifest,
+    captureManifestErrorText,
+    captureManifestFilename,
+    captureManifestRefusal,
+    type ManifestRefusalView
+  } from '$lib/capture-manifest';
 
-  // ---------------------------------------------------------------------------
-  // PARÁMETROS DE RUTA
-  // ---------------------------------------------------------------------------
   let projectId    = $derived(Number($page.params.projectId) || 0);
   let collectionId = $derived(Number($page.params.collectionId) || 0);
   let collectionName = $derived(($page.data as any).collectionName ?? '');
 
-  // ---------------------------------------------------------------------------
-  // ESTADO GLOBAL
-  // ---------------------------------------------------------------------------
   let viewMode         = $state<'list' | 'spread' | 'grid'>('list');
   let selectedRecordId = $state<number | null>(null);
   let records          = $state<Record[]>([]);
   let zoom             = $state(1);
   let rotation         = $state(0);
+  // Preview adjustments from the left panel, from -100 to 100. They are held
+  // here and not in the panel because the viewer needs them too; the panel
+  // only sets them. They do not alter the file: the viewer applies them as a
+  // CSS filter on the image, as it does the rotation.
+  let brightness       = $state(0);
+  let contrast         = $state(0);
+  let saturation       = $state(0);
   let isLoading        = $state(true);
+  // First load finished. Reloads set `isLoading` again, and the hand-over
+  // controls must not be unmounted in the middle of a hand-over.
+  let hasLoaded        = $state(false);
+  // NEH-230: the zoom at which one image pixel fills one device pixel.
+  // ImageViewer computes it from the measured reference page; it feeds the
+  // "1:1" button and the zoom ceiling in RightToolbar.
+  let oneToOne         = $state(1);
 
-  // Multi-select state
-  let selectedIds   = $state<Set<number>>(new Set());
-  let isSelectMode  = $state(false);
-
-  // Registro inspeccionado en el modal (desde ListView)
+  // Record inspected in the modal (opened from the export blockers list)
   let inspectedRecord = $state<Record | null>(null);
 
-  // Estado de finalización
-  let isFinalized = $state(false);
-
-  // Trigger para abrir el modal de finalización dentro de GridView
-  let triggerFinalizeModal = $state(false);
-
-  // ---------------------------------------------------------------------------
-  // AL MONTAR
-  // ---------------------------------------------------------------------------
   onMount(async () => {
     if (!authStore.requireSession()) {
       return;
@@ -74,10 +74,32 @@
     await loadRecords();
   });
 
-  async function loadRecords() {
+  // Volume whose records are on screen. SvelteKit reuses this page when the
+  // user navigates from one volume to another (e.g. through the history), so
+  // `collectionId` can change without a remount; without this, the previous
+  // volume's records would sit beside actions aimed at the new one.
+  let loadedFor = $state<number | null>(null);
+  // Last volume requested. Not reactive: the effect below depends only on
+  // `collectionId`.
+  let requestedFor = 0;
+  // Number of the last load requested: only that one may write the state.
+  // Comparing the volume is not enough, because A→B→A leaves two loads of A
+  // in flight, and the older one can arrive last and overwrite the newer.
+  let loadSeq = 0;
+
+  // Returns whether the list was updated, so a caller reloading after a
+  // change can report it if not. With `inPlace` (NEH-248: what is freed in
+  // the volume changed) the view skips the loading state and the selected
+  // record is kept if it is still in the volume.
+  async function loadRecords({ inPlace = false }: { inPlace?: boolean } = {}): Promise<boolean> {
+    const forId = collectionId;
+    const seq = ++loadSeq;
+    requestedFor = forId;
     try {
-      isLoading = true;
-      const data = await recordsApi.listAll({ collection_id: collectionId });
+      if (!inPlace) isLoading = true;
+      const data = await recordsApi.listAll({ collection_id: forId });
+      // A response superseded by a later load is discarded.
+      if (seq !== loadSeq) return false;
       // Sort by sequence (nulls last), then by id
       records = data.sort((a, b) => {
         if (a.sequence == null && b.sequence == null) return a.id - b.id;
@@ -85,17 +107,29 @@
         if (b.sequence == null) return -1;
         return a.sequence - b.sequence;
       });
-      if (records.length > 0) selectedRecordId = records[0].id;
+      // A different volume from the one shown never keeps the selection.
+      selectedRecordId = selectionAfterLoad(records, selectedRecordId, inPlace && loadedFor === forId);
+      // An open inspection modal switches to the reloaded copy of its record,
+      // or closes if the record is no longer in the volume.
+      if (inPlace) inspectedRecord = reconcileInspected(inspectedRecord, records);
+      loadedFor = forId;
+      return true;
     } catch (err) {
-      console.error('[Gallery] Error cargando registros:', err);
+      console.error('[Gallery] Error loading records:', err);
+      return false;
     } finally {
-      isLoading = false;
+      if (seq === loadSeq) {
+        isLoading = false;
+        hasLoaded = true;
+      }
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // HANDLERS
-  // ---------------------------------------------------------------------------
+  // On a move to another volume without a remount, load that volume's records.
+  $effect(() => {
+    const id = collectionId;
+    if (requestedFor !== 0 && id !== requestedFor) untrack(() => { reorderNotice = null; renumberedCount = null; loadRecords(); });
+  });
 
   function handlePrev() {
     const idx = records.findIndex(r => r.id === selectedRecordId);
@@ -109,6 +143,20 @@
 
   function handleSelect(id: number) { selectedRecordId = id; }
 
+  // Moving to another folio straightens the view, and nothing else. Rotation
+  // belongs to the folio: one page may have been captured sideways and the
+  // next not. Exposure belongs to the session — the same lamp and the same
+  // settings all day — so a volume that is evenly dark is corrected once and
+  // reviewed whole that way.
+  //
+  // This is an effect and not part of handlePrev/handleNext/handleSelect
+  // because the selection also changes from the grid and the list, and a
+  // reset spread over five call sites is easy to miss in one of them.
+  $effect(() => {
+    selectedRecordId;
+    rotation = 0;
+  });
+
   function handleViewModeChange(mode: 'list' | 'spread' | 'grid') {
     viewMode = mode;
     zoom = 1;
@@ -118,72 +166,70 @@
   function handleRotateLeft()  { rotation = ((rotation - 90) % 360 + 360) % 360; }
   function handleRotateRight() { rotation = (rotation + 90) % 360; }
 
-  // Retomar: navega a live-preview con el mismo proyecto/colección
+  // Retake: goes to live-preview with the same project and volume plus the
+  // record, so live-preview opens its retake modal for that record directly
+  // (NEH-209).
   function handleRetake(record: Record) {
     inspectedRecord = null;
-    goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`);
+    goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}&recordId=${record.id}`);
   }
 
-  // Eliminar registro completo y refrescar lista
+  // Recapture from the spread view (NEH-209): same destination as
+  // handleRetake, triggered by the left panel's recapture button instead of
+  // the inspection modal.
+  function handleRecapture(record: Record) {
+    goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}&recordId=${record.id}`);
+  }
+
+  // Why the last drag in the list or the grid was not saved. Held here and
+  // not in the view because the reload after the refusal sets `isLoading`,
+  // which unmounts the view that would show it.
+  let reorderNotice = $state<string | null>(null);
+
+  // How many records the last renumber touched, held here for the same
+  // reason as reorderNotice; null when there is nothing to report.
+  let renumberedCount = $state<number | null>(null);
+
+  // Why the last record could not be deleted; null when there is no notice.
+  let deleteRecordError = $state<string | null>(null);
+
   async function handleDeleteRecord(record: Record) {
     try {
       await recordsApi.delete(record.id);
       await loadRecords();
     } catch (err) {
-      console.error('[Gallery] Error eliminando registro:', err);
+      // The backend's English text goes to the console only.
+      console.error('[Gallery] Error deleting record:', err);
+      deleteRecordError = fileHoldText(err, $m) ?? $m.col_delete_record_retry;
     } finally {
       inspectedRecord = null;
-    }
-  }
-
-  // GridView confirmó la finalización
-  function handleFinalized() {
-    isFinalized = true;
-    triggerFinalizeModal = false;
-  }
-
-  // GridView canceló o cerró el modal sin finalizar
-  function handleFinalizeModalClosed() {
-    triggerFinalizeModal = false;
-  }
-
-  // Multi-select handlers
-  function handleToggleSelect(id: number) {
-    const next = new Set(selectedIds);
-    if (next.has(id)) { next.delete(id); } else { next.add(id); }
-    selectedIds = next;
-    isSelectMode = next.size > 0;
-  }
-
-  function handleDeselectAll() {
-    selectedIds = new Set();
-    isSelectMode = false;
-  }
-
-  async function handleBulkStatusChange(status: Record['status'], rejectionNote?: string) {
-    try {
-      await recordsApi.bulkUpdateStatus(Array.from(selectedIds), status, rejectionNote);
-      await loadRecords();
-      handleDeselectAll();
-    } catch (err) {
-      console.error('[Gallery] Error actualizando estado:', err);
     }
   }
 
   // BagIt export
   let showExportModal = $state(false);
   let isExporting     = $state(false);
-  let exportResult    = $state<{ bag_name: string; zip_filename: string; size_bytes: number; download_url: string } | null>(null);
+  let exportResult    = $state<{ zip_filename: string } | null>(null);
   let exportError     = $state<string | null>(null);
-  // Registros que impiden exportar (aún no aprobados)
+  let exportProgress  = $state<{ done: number; total: number } | null>(null);
+  // Records that block export: not approved, or without a current image
   let showBlockersModal = $state(false);
-  let blockingRecords   = $derived(records.filter(r => r.status !== 'approved'));
 
-  // Selector Exportar/Descargar + descarga de imágenes (ZIP) en el navegador
+  const hasCurrentImage = (r: Record) => (r.images ?? []).some((i) => i.is_current);
+  let blockingRecords   = $derived(records.filter(r => r.status !== 'approved' || !hasCurrentImage(r)));
+
+  // Export/download chooser, and the image ZIP built in the browser
   let showChooserModal = $state(false);
   let isZipping        = $state(false);
   let zipProgress      = $state(0);
   let zipError         = $state<string | null>(null);
+
+  // Capture manifest for Fisqua: admin and operator only, as with hand-over
+  // for review (the backend refuses the route to other roles).
+  let canDownloadManifest = $derived(canDownloadCaptureManifest($userRole));
+  let isManifestLoading   = $state(false);
+  let manifestRefusal     = $state<ManifestRefusalView | null>(null);
+  let manifestError       = $state<string | null>(null);
 
   async function handleExport() {
     if (!canExport) { showBlockersModal = true; return; }
@@ -191,30 +237,83 @@
     isExporting = true;
     exportResult = null;
     exportError = null;
+    exportProgress = null;
     try {
-      const result = await collectionsApi.exportBagit(collectionId);
-      exportResult = result;
+      // Export runs as a background job on the appliance
+      const { job_id } = await collectionsApi.exportBagit(collectionId);
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        await new Promise((r) => setTimeout(r, 700));
+        const st = await collectionsApi.getExportStatus(collectionId, job_id);
+        exportProgress = { done: st.done, total: st.total };
+        if (st.state === 'done' && st.zip_filename) {
+          exportResult = { zip_filename: st.zip_filename };
+          break;
+        }
+        if (st.state === 'failed') {
+          // A free that followed the request: the worker checks again (NEH-248).
+          const freed = freedExportCount(st.error);
+          exportError = freed !== null ? $m.col_export_freed(freed) : (st.error ?? $m.col_err_export);
+          break;
+        }
+      }
     } catch (err: any) {
-      // El cliente pre-valida canExport contra el estado local de records,
-      // pero ese estado puede quedar desactualizado (otro operador aprobó/
-      // rechazó registros entre tanto). Si el backend igual devuelve un 422
-      // con blocking_record_ids, refrescamos records y mostramos el modal
-      // de bloqueadores real en vez del modal de error genérico.
+      // The client checks `canExport` against the local `records`, which can
+      // be stale (another user approved or rejected records in the meantime).
+      // If the backend still returns a 422 with `blocking_record_ids`, the
+      // records are reloaded and the blockers modal is shown instead of the
+      // generic error modal.
       const detail = err instanceof ApiError ? (err.detail as { blocking_record_ids?: number[] } | undefined) : undefined;
       if (detail?.blocking_record_ids) {
         showExportModal = false;
         await loadRecords();
         showBlockersModal = true;
       } else {
-        exportError = err?.message ?? $m.col_err_export;
+        // Masters freed from the card are stored offsite, not here: a restore comes first (NEH-248).
+        const freed = freedExportCount(err);
+        exportError = freed !== null ? $m.col_export_freed(freed) : (fileHoldText(err, $m) ?? err?.message ?? $m.col_err_export);
       }
     } finally {
       isExporting = false;
     }
   }
 
-  // Descarga de imágenes como ZIP, generado en el navegador (sin backend).
-  // Nota: para volúmenes muy grandes convendría un endpoint del backend (mejora futura).
+  // Downloads the manifest under the name the server gives. A 409 carries the
+  // list of problems for which Fisqua would reject it (capture-manifest.ts).
+  async function downloadCaptureManifest() {
+    if (isManifestLoading) return;
+    isManifestLoading = true;
+    manifestRefusal = null;
+    manifestError = null;
+    const forId = collectionId;
+    try {
+      const { blob, contentDisposition } = await collectionsApi.downloadCaptureManifest(forId);
+      if (forId !== collectionId) return;
+      const name = captureManifestFilename(contentDisposition, await blob.text());
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      if (forId !== collectionId) return;
+      const refusal = captureManifestRefusal(e, $m);
+      if (refusal) manifestRefusal = refusal;
+      else manifestError = captureManifestErrorText(e, $m);
+    } finally {
+      isManifestLoading = false;
+    }
+  }
+
+  // A master freed from the card (410 from /file, NEH-248): it is in the
+  // offsite copy, not on the appliance, so it cannot go in the ZIP.
+  class FreedFromCard extends Error {}
+
+  // Image ZIP built in the browser, without a backend endpoint. Very large
+  // volumes would be better served by one.
   async function downloadImagesZip() {
     const items = records.flatMap(r => (r.images ?? []).map(img => ({ img, r })));
     if (items.length === 0) return;
@@ -226,6 +325,7 @@
       let done = 0;
       for (const { img, r } of items) {
         const res = await fetch(recordsApi.getImageFileUrl(img.id));
+        if (res.status === 410 && freedFromBody(410, await res.json().catch(() => null))) throw new FreedFromCard();
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
         const ext = (img.format || img.filename?.split('.').pop() || 'jpg').toLowerCase();
@@ -246,39 +346,85 @@
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      zipError = e?.message ?? $m.col_zip_error;
+      zipError = e instanceof FreedFromCard ? $m.col_zip_freed : (e?.message ?? $m.col_zip_error);
     } finally {
       isZipping = false;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // DERIVADOS
-  // ---------------------------------------------------------------------------
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
-  let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved'));
+  let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved' && hasCurrentImage(r)));
+
+  // Hand-over for review (NEH-260). The controls go in the layout's top bar;
+  // the page puts them there because it holds the records. Operator and
+  // admin only: the backend refuses promote and take-back to other roles.
+  const topbar = getVolumeTopbar();
+  let canHandOver = $derived($userRole === 'admin' || $userRole === 'operator');
+
+  $effect(() => {
+    if (!topbar) return;
+    topbar.actions = canHandOver && hasLoaded && loadedFor === collectionId ? handoverActions : null;
+    return () => { topbar.actions = null; };
+  });
+
+  // After a free or a restore of the volume (NEH-248), the layout reloads the
+  // records so each image's freed state is current.
+  $effect(() => {
+    if (!topbar) return;
+    topbar.reloadRecords = () => loadRecords({ inPlace: true });
+    return () => { topbar.reloadRecords = null; };
+  });
 </script>
 
-<!-- ============================================================
-     LAYOUT DE GALERÍA
-     (la barra superior vive en +layout@.svelte)
-     ============================================================ -->
+{#snippet handoverActions()}
+  <!-- Keyed so a dialog open on one volume does not survive into another. -->
+  {#key collectionId}
+    <HandoverControls {records} {collectionId} onChanged={loadRecords} />
+  {/key}
+{/snippet}
+
 <div class="gallery-wrapper">
 
-  <RecordStatusBar {records} />
+  <!-- In the list view the legend is inside the Reorder bar instead -->
+  {#if viewMode !== 'list'}
+    <RecordStatusBar {records} />
+  {/if}
+
+  {#if reorderNotice}
+    <div class="action-notice" role="alert">
+      <span class="action-notice-text">{reorderNotice}</span>
+      <button class="action-notice-close" onclick={() => (reorderNotice = null)} aria-label={$m.common_close}>
+        <span class="material-symbols-outlined icon-sm">close</span>
+      </button>
+    </div>
+  {/if}
+
+  {#if renumberedCount !== null}
+    <div class="action-notice is-success" role="status">
+      <span class="action-notice-text">{$m.col_renumber_done(renumberedCount)}</span>
+      <button class="action-notice-close" onclick={() => (renumberedCount = null)} aria-label={$m.common_close}>
+        <span class="material-symbols-outlined icon-sm">close</span>
+      </button>
+    </div>
+  {/if}
 
   <div class="content-area">
 
-    <!-- Panel lateral: en list y spread -->
-    {#if viewMode !== 'grid'}
+    {#if viewMode === 'spread'}
       <LeftSidebar
         {viewMode}
         currentRecord={selectedRecord}
         currentIndex={selectedIndex}
         totalRecords={records.length}
+        userRole={$userRole}
+        bind:brightness
+        bind:contrast
+        bind:saturation
         onRotateLeft={handleRotateLeft}
         onRotateRight={handleRotateRight}
+        onRecordUpdated={async () => { await loadRecords(); }}
+        onRecapture={handleRecapture}
       />
     {/if}
 
@@ -294,22 +440,19 @@
         <GridView
           {records}
           {collectionId}
-          {selectedIds}
-          {triggerFinalizeModal}
           onRecordsUpdate={loadRecords}
-          onFinalized={handleFinalized}
-          onFinalizeModalClosed={handleFinalizeModalClosed}
-          onToggleSelect={handleToggleSelect}
+          onReorderNotice={(n) => (reorderNotice = n)}
+          onRenumbered={(id, n) => { if (id === collectionId) renumberedCount = n; }}
+          onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
         />
 
       {:else if viewMode === 'list'}
         <ListView
           {records}
           {collectionId}
-          {selectedIds}
-          onRecordClick={(r) => { selectedRecordId = r.id; inspectedRecord = r; }}
-          onToggleSelect={handleToggleSelect}
+          onRecordClick={(r) => { selectedRecordId = r.id; viewMode = 'spread'; }}
           onRecordsUpdate={loadRecords}
+          onReorderNotice={(n) => (reorderNotice = n)}
         />
 
       {:else if viewMode === 'spread'}
@@ -319,9 +462,12 @@
           {selectedRecordId}
           {zoom}
           {rotation}
+          {brightness}
+          {contrast}
+          {saturation}
           onPrev={handlePrev}
           onNext={handleNext}
-          onZoomChange={(z) => zoom = z}
+          onOneToOneChange={(z) => oneToOne = z}
         />
         <div class="thumbnail-area">
           <ThumbnailStrip
@@ -338,11 +484,10 @@
     <RightToolbar
       {viewMode}
       {zoom}
+      {oneToOne}
       {canExport}
       onViewModeChange={handleViewModeChange}
       onZoomChange={(z) => zoom = z}
-      onRotateLeft={handleRotateLeft}
-      onRotateRight={handleRotateRight}
       onExport={() => showChooserModal = true}
     />
 
@@ -350,7 +495,6 @@
 
 </div>
 
-<!-- Modal de inspección (desde ListView) -->
 {#if inspectedRecord}
   <ImageViewerModal
     record={inspectedRecord}
@@ -358,31 +502,26 @@
     onClose={() => inspectedRecord = null}
     onRetake={handleRetake}
     onDelete={handleDeleteRecord}
-    onStatusChange={async (id, status) => { await recordsApi.updateStatus(id, status); await loadRecords(); inspectedRecord = null; }}
   />
 {/if}
 
-<!-- Barra de acciones multi-selección -->
-<ActionBar
-  selectedCount={selectedIds.size}
-  userRole={$userRole}
-  onBulkStatusChange={handleBulkStatusChange}
-  onDeselect={handleDeselectAll}
-/>
-
-<!-- Modal de exportación BagIt -->
 {#if showExportModal}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => showExportModal = false, escape: !isExporting, backdrop: !isExporting }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       {#if isExporting}
         <div class="spinner"></div>
         <h3 class="export-modal-title">{$m.col_export_generating}</h3>
-        <p class="export-modal-subtitle">{$m.col_export_copying}</p>
+        <p class="export-modal-subtitle">
+          {#if exportProgress && exportProgress.total > 0}
+            {formatCount(exportProgress.done, $locale)} / {formatCount(exportProgress.total, $locale)}
+          {:else}
+            {$m.col_export_copying}
+          {/if}
+        </p>
       {:else if exportResult}
         <span class="material-symbols-outlined icon-lg export-success-icon">check_circle</span>
         <h3 class="export-modal-title">{$m.col_export_done}</h3>
         <p class="export-modal-subtitle">{exportResult.zip_filename}</p>
-        <p class="export-modal-subtitle">{(exportResult.size_bytes / 1024 / 1024).toFixed(1)} MB</p>
         <div class="export-modal-actions">
           <a href={collectionsApi.getExportDownloadUrl(collectionId)} download class="btn-primary">
             <span class="material-symbols-outlined icon-sm">download</span>
@@ -401,10 +540,21 @@
     </div>
   </div>
 {/if}
-<!-- Modal: registros que bloquean la exportación -->
+{#if deleteRecordError}
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => deleteRecordError = null }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
+      <span class="material-symbols-outlined icon-lg export-error-icon">error</span>
+      <h3 class="export-modal-title">{$m.col_delete_record_error_title}</h3>
+      <p class="export-modal-subtitle">{deleteRecordError}</p>
+      <div class="export-modal-actions">
+        <button class="btn-secondary" onclick={() => deleteRecordError = null}>{$m.common_close}</button>
+      </div>
+    </div>
+  </div>
+{/if}
 {#if showBlockersModal}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => showBlockersModal = false }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       <span class="material-symbols-outlined icon-lg export-error-icon">block</span>
       <h3 class="export-modal-title">{$m.col_export_blocked_title}</h3>
       <p class="export-modal-subtitle">{$m.col_export_blocked_desc}</p>
@@ -424,10 +574,9 @@
     </div>
   </div>
 {/if}
-<!-- Modal: elegir exportación BagIt o descarga de imágenes -->
 {#if showChooserModal}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => showChooserModal = false }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       <h3 class="export-modal-title">{$m.col_download_choose_title}</h3>
       <p class="export-modal-subtitle">{$m.col_download_choose_desc}</p>
       <div class="chooser-options">
@@ -447,6 +596,16 @@
             <span class="chooser-chip green"><span class="material-symbols-outlined">check</span>{$m.col_images_always}</span>
           </span>
         </button>
+        {#if canDownloadManifest}
+          <button class="chooser-option" onclick={() => { showChooserModal = false; downloadCaptureManifest(); }}>
+            <span class="material-symbols-outlined chooser-icon bagit">view_list</span>
+            <span class="chooser-text">
+              <span class="chooser-title">{$m.col_manifest_option_title}</span>
+              <span class="chooser-desc">{$m.col_manifest_option_desc}</span>
+              <span class="chooser-chip amber"><span class="material-symbols-outlined">lock</span>{$m.col_manifest_requires}</span>
+            </span>
+          </button>
+        {/if}
       </div>
       <div class="export-modal-actions">
         <button class="btn-secondary" onclick={() => showChooserModal = false}>{$m.common_close}</button>
@@ -454,10 +613,9 @@
     </div>
   </div>
 {/if}
-<!-- Modal: progreso / error del ZIP de imágenes -->
 {#if isZipping || zipError}
-  <div class="export-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="export-modal-card">
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => zipError = null, escape: !isZipping, backdrop: !isZipping }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
       {#if isZipping}
         <div class="spinner"></div>
         <h3 class="export-modal-title">{$m.col_zip_generating}</h3>
@@ -474,8 +632,44 @@
   </div>
 {/if}
 
+{#if isManifestLoading || manifestRefusal || manifestError}
+  <div class="export-modal-backdrop" use:dismissible={{ onDismiss: () => { manifestRefusal = null; manifestError = null; }, escape: !isManifestLoading, backdrop: !isManifestLoading }}>
+    <div class="export-modal-card dialog-fit" role="dialog" aria-modal="true">
+      {#if isManifestLoading}
+        <div class="spinner"></div>
+        <h3 class="export-modal-title">{$m.col_manifest_preparing}</h3>
+      {:else if manifestRefusal}
+        <span class="material-symbols-outlined icon-lg export-error-icon">block</span>
+        <h3 class="export-modal-title">{$m.col_manifest_refused_title}</h3>
+        <p class="export-modal-subtitle">{$m.col_manifest_refused_body}</p>
+        <ul class="manifest-problems">
+          {#each manifestRefusal.problems as problem, i (i)}
+            <li>
+              <span>{problem.text}</span>
+              {#if problem.records}
+                <span class="manifest-problem-records">{problem.records}</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+        <div class="export-modal-actions">
+          <button class="btn-secondary" onclick={() => manifestRefusal = null}>{$m.common_close}</button>
+        </div>
+      {:else if manifestError}
+        <span class="material-symbols-outlined icon-lg export-error-icon">error</span>
+        <h3 class="export-modal-title">{$m.col_manifest_err_title}</h3>
+        <p class="export-modal-subtitle">{manifestError}</p>
+        <div class="export-modal-actions">
+          <button class="btn-secondary" onclick={() => manifestError = null}>{$m.common_close}</button>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
+
 <style>
   @keyframes spin { to { transform: rotate(360deg); } }
+
   .chooser-options { display: flex; flex-direction: column; gap: 12px; width: 100%; margin: 6px 0 4px; }
   .chooser-option {
     display: flex; gap: 14px; text-align: left; width: 100%;
@@ -523,4 +717,20 @@
     transition: background-color var(--transition-fast);
   }
   .blocker-item:hover { background: var(--color-surface-alt-2); }
+  .manifest-problems {
+    margin: 0;
+    padding: 0 0 0 20px;
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    font-size: var(--text-sm);
+    color: var(--color-light);
+    line-height: 1.5;
+  }
+  .manifest-problems li { display: flex; flex-direction: column; gap: 2px; }
+  .manifest-problem-records { color: var(--color-light-grey); font-size: 12.5px; }
 </style>

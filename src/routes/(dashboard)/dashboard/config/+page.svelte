@@ -1,53 +1,42 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Configuración del Sistema
-  // Ruta: /dashboard/config
-  // Archivo: src/routes/(dashboard)/dashboard/config/+page.svelte
+  // Settings page (/dashboard/config), admin only: the role guard in
+  // `(dashboard)/+layout.svelte` redirects every other role. Sections:
+  // language, storage (usage, primary path, external drive), the catalogue's
+  // off-site copy, diagnostics, maintenance, and power. Everything except the
+  // language choice acts on the appliance through the backend.
   //
-  // Solo visible para administradores (el layout redirige a los roles
-  // sin acceso — ver el guard de rol en (dashboard)/+layout.svelte).
-  //
-  // Secciones:
-  //   1. Almacenamiento
-  //      - Barra de uso (usado / total)
-  //      - Almacenamiento primario (ruta local del sistema)
-  //      - Alerta automática cuando el uso supera el 85%
-  //
-  //   2. Seguridad & Acceso
-
-  //
-  // MODO DEMO: los valores son locales — no se envían al backend.
-  // Para conectar con el backend cuando esté disponible, busca los
-  // comentarios "TODO: backend" y reemplaza con las llamadas a la API.
-  // ============================================================================
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
-  import { m, locale } from '$lib/i18n';
+  import { m, locale, setLanguage, type Locale } from '$lib/i18n';
+  import CatalogueBackupCard from './CatalogueBackupCard.svelte';
+  // Available languages. The catalogue lives in `$lib/i18n`; this list only
+  // names them for the selector.
+  const LANGUAGES: { code: Locale; label: string }[] = [
+    { code: 'es', label: 'Español' },
+    { code: 'en', label: 'English' },
+  ];
+
   import {
     systemApi,
     camerasApi,
-    healthApi,
-    PowerControlError,
     type SystemLogEntry,
     type StorageInfo,
-    type StorageDevice,
-    type PowerAction
+    type StorageDevice
   } from '$lib/api';
+  // The overview's banner reads the figures the same way and uses the same threshold.
+  import { formatStorage, storageUsage, STORAGE_ALERT_THRESHOLD } from '$lib/storage-usage';
+  import PowerControl from '$lib/components/PowerControl.svelte';
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Almacenamiento — info del disco actual
-  // ---------------------------------------------------------------------------
   let storageInfo    = $state<StorageInfo | null>(null);
   let storageLoading = $state(true);
 
-  // Derived values replace the old mock literals
-  let storageUsedGB  = $derived(storageInfo ? storageInfo.used_bytes  / (1024 ** 3) : 0);
-  let storageTotalGB = $derived(storageInfo ? storageInfo.total_bytes / (1024 ** 3) : 1);
+  // Null when the request failed or the backend reported no usable figures
+  // (`available: false` comes with zeros): the row then shows a dash and the
+  // bar is hidden, rather than a percentage the unit never reported.
+  let usage = $derived(storageUsage(storageInfo));
   let storagePrimaryPath = $derived(storageInfo?.projects_path ?? '…');
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Almacenamiento — selector de dispositivo externo
-  // ---------------------------------------------------------------------------
   let devicesExpanded  = $state(false);
   let devices          = $state<StorageDevice[]>([]);
   let devicesLoading   = $state(false);
@@ -59,37 +48,17 @@
   let storageOpSuccess = $state<string | null>(null);
   let resettingStorage = $state(false);
 
-  // Porcentaje de uso calculado
-  let storagePercent = $derived(
-    Math.min(100, Math.round((storageUsedGB / storageTotalGB) * 100))
-  );
+  let storageAlert = $derived(usage?.alert ?? false);
 
-  // Alerta cuando el uso supera este umbral (%)
-  // Para cambiar el umbral, edita este valor
-  const STORAGE_ALERT_THRESHOLD = 85;
-
-  // true cuando el almacenamiento está por completarse
-  let storageAlert = $derived(storagePercent >= STORAGE_ALERT_THRESHOLD);
-
-  // Formato legible del almacenamiento (GB → TB si es >= 1000)
-  function formatStorage(gb: number): string {
-    if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
-    return `${gb.toFixed(0)} GB`;
-  }
-
-  // Color de la barra de almacenamiento según el porcentaje
-  // Verde normal → amarillo de advertencia → rojo crítico
+  // Green below 70%, warning from 70%, error from the alert threshold.
   let storageBarColor = $derived(
-    storagePercent >= STORAGE_ALERT_THRESHOLD
+    (usage?.percent ?? 0) >= STORAGE_ALERT_THRESHOLD
       ? 'var(--color-error)'
-      : storagePercent >= 70
+      : (usage?.percent ?? 0) >= 70
         ? 'var(--color-warning)'
         : 'var(--color-primary)'
   );
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Mantenimiento — limpieza de archivos temporales
-  // ---------------------------------------------------------------------------
   let flushingPreview    = $state(false);
   let flushPreviewResult = $state<string | null>(null);
   let flushPreviewError  = $state<string | null>(null);
@@ -112,107 +81,34 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Energía — apagar / reiniciar el equipo
-  //
-  // Reemplaza el hábito de desconectar la corriente directamente, que corrompe
-  // la tarjeta SD. El backend ejecuta el apagado o reinicio real; segundos
-  // después deja de responder, así que la UI entra en un estado bloqueante.
-  //
-  //   200 → apagado/reinicio en curso (el backend se va enseguida)
-  //   501 → control de energía no disponible (equipo de desarrollo)
-  //   401 → sesión expirada
-  // ---------------------------------------------------------------------------
-  let pendingPowerAction = $state<PowerAction | null>(null);   // acción esperando confirmación
-  let sendingPower = $state(false);                            // petición en curso (diálogo abierto)
-  let powerPhase = $state<'idle' | 'poweroff' | 'reboot'>('idle');
+  // Power: the shutdown and reboot buttons below. The confirmation, the
+  // request and the blocking state live in PowerControl, which the avatar
+  // menu uses too; failures are shown inside the Power card.
+  let power = $state<ReturnType<typeof PowerControl> | undefined>(undefined);
   let powerError = $state<string | null>(null);
 
-  // Texto del diálogo de confirmación según la acción elegida
-  let confirmTitle = $derived(
-    pendingPowerAction === 'reboot' ? $m.config_confirm_reboot_title : $m.config_confirm_shutdown_title
-  );
-  let confirmDesc = $derived(
-    pendingPowerAction === 'reboot'
-      ? $m.config_confirm_reboot_desc
-      : $m.config_confirm_shutdown_desc
-  );
 
-  function askPower(action: PowerAction) {
-    powerError = null;
-    pendingPowerAction = action;
-  }
+  // Active camera backend (NEH-188), shown exactly as the backend reports it
+  // ('picamera2', 'gphoto2', 'chdk'…): that identifier is what supporting a
+  // unit in the field needs. It is neither translated nor given a trade name.
+  let cameraBackend = $state<string | null>(null);
 
-  function cancelPower() {
-    if (sendingPower) return; // no cancelar una orden ya enviada
-    pendingPowerAction = null;
-  }
-
-  async function confirmPower() {
-    const action = pendingPowerAction;
-    if (!action || sendingPower) return;
-    powerError = null;
-    // El diálogo permanece abierto con los botones deshabilitados mientras
-    // la petición está en vuelo. El estado bloqueante solo se muestra
-    // cuando el backend confirma (200) — un 501/401 no debe bloquear la página.
-    sendingPower = true;
-    try {
-      await systemApi.powerControl(action);
-      // El backend aceptó la orden; entramos en el estado bloqueante.
-      powerPhase = action === 'reboot' ? 'reboot' : 'poweroff';
-      if (action === 'reboot') pollForRecovery();
-    } catch (e: unknown) {
-      if (e instanceof PowerControlError && e.status === 501) {
-        powerError = $m.config_err_power_unavailable;
-      } else if (e instanceof PowerControlError && e.status === 401) {
-        powerError = $m.config_err_session_expired;
-      } else {
-        powerError = (e instanceof Error ? e.message : null) || $m.config_err_operation;
-      }
-    } finally {
-      sendingPower = false;
-      pendingPowerAction = null;
-    }
-  }
-
-  // Tras un reinicio, el backend se cae y vuelve. Cuando /health responde de
-  // nuevo, recargamos la aplicación para retomar una sesión limpia.
-  async function pollForRecovery() {
-    // Damos margen a que el backend empiece a apagarse antes de sondear.
-    await new Promise((r) => setTimeout(r, 8000));
-    while (powerPhase === 'reboot') {
-      try {
-        await healthApi.check();
-        window.location.reload();
-        return;
-      } catch {
-        // Aún no responde — reintentar.
-        await new Promise((r) => setTimeout(r, 3000));
-      }
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // ESTADO: Seguridad & Acceso
-  // ---------------------------------------------------------------------------
-
-
-  // ---------------------------------------------------------------------------
-  // CICLO DE VIDA
-  // ---------------------------------------------------------------------------
   onMount(async () => {
     try {
       storageInfo = await systemApi.getStorage();
     } catch {
-      // fail silently — bar shows 0% until backend is reachable
+      // No figures: the row shows a dash and the bar is hidden.
     } finally {
       storageLoading = false;
     }
+
+    try {
+      cameraBackend = (await camerasApi.getCapabilities()).backend;
+    } catch {
+      // With no capture backend available the row shows "not available".
+    }
   });
 
-  // ---------------------------------------------------------------------------
-  // ACCIONES: Almacenamiento externo
-  // ---------------------------------------------------------------------------
   async function toggleDevices() {
     devicesExpanded = !devicesExpanded;
     if (devicesExpanded && devices.length === 0 && !devicesLoading) {
@@ -295,9 +191,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Diagnóstico — logs del sistema
-  // ---------------------------------------------------------------------------
   let logsExpanded = $state(false);
   let logs         = $state<SystemLogEntry[]>([]);
   let logsLoading  = $state(false);
@@ -351,9 +244,6 @@
 
 </script>
 
-<!-- ============================================================
-     PÁGINA DE CONFIGURACIÓN
-     ============================================================ -->
 <div class="page">
 
   <!-- Header -->
@@ -364,17 +254,41 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 1: ALMACENAMIENTO
-       Muestra el uso actual del disco y la ruta de almacenamiento.
-       La alerta se activa cuando el uso supera STORAGE_ALERT_THRESHOLD.
-       ══════════════════════════════════════════════════════════ -->
+  <!-- Language comes first because it is the only personal preference on
+       this page; the rest are operations on the appliance. `setLanguage`
+       writes a cookie and reloads: it does not touch the session. -->
+  <div class="config-section">
+    <h2 class="section-title">{$m.config_section_language}</h2>
+    <div class="config-card">
+
+      <div class="config-row">
+        <div class="row-info">
+          <span class="row-label">{$m.config_language_label}</span>
+          <span class="row-desc">{$m.config_language_desc}</span>
+        </div>
+
+        <div class="lang-options" role="group" aria-label={$m.config_language_label}>
+          {#each LANGUAGES as lang}
+            <button
+              type="button"
+              class="lang-option"
+              class:active={$locale === lang.code}
+              aria-pressed={$locale === lang.code}
+              onclick={() => setLanguage(lang.code)}
+            >
+              {lang.label}
+            </button>
+          {/each}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_storage}</h2>
     <div class="config-card">
 
-      <!-- Alerta de almacenamiento casi lleno -->
-      <!-- Esta misma lógica se replica en el dashboard de Resumen -->
       {#if storageAlert}
         <div class="storage-alert">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -383,36 +297,37 @@
             <line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
           <span>
-            {$m.config_storage_alert_pre}<strong>{storagePercent}%</strong>{$m.config_storage_alert_post}
+            {$m.config_storage_alert_pre}<strong>{usage?.percent}%</strong>{$m.config_storage_alert_post}
           </span>
         </div>
       {/if}
 
-      <!-- Fila: Almacenamiento usado + barra de progreso -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_storage_used}</span>
         </div>
         {#if storageLoading}
           <span class="row-value muted">{$m.common_loading_ellipsis}</span>
-        {:else}
-          <span class="row-value" class:alert-text={storageAlert}>
-            {formatStorage(storageUsedGB)} / {formatStorage(storageTotalGB)}
+        {:else if usage}
+          <span class="row-value" class:alert-text={storageAlert} data-storage-used>
+            {formatStorage(usage.usedGB)} / {formatStorage(usage.totalGB)}
           </span>
+        {:else}
+          <span class="row-value muted" data-storage-used>—</span>
         {/if}
       </div>
 
-      <!-- Barra de progreso de almacenamiento -->
-      <div class="storage-bar-bg">
-        <div
-          class="storage-bar-fill"
-          style="width: {storagePercent}%; background-color: {storageBarColor}"
-        ></div>
-      </div>
+      {#if usage}
+        <div class="storage-bar-bg">
+          <div
+            class="storage-bar-fill"
+            style="width: {usage.percent}%; background-color: {storageBarColor}"
+          ></div>
+        </div>
+      {/if}
 
       <div class="section-divider"></div>
 
-      <!-- Fila: Almacenamiento primario (ruta del disco) -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_storage_primary}</span>
@@ -426,9 +341,19 @@
         <span class="row-value muted">{storagePrimaryPath}</span>
       </div>
 
+      {#if storageInfo?.override_invalid}
+        <div class="storage-override-banner storage-override-warning">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span>{$m.config_storage_override_invalid}</span>
+        </div>
+      {/if}
+
       <div class="section-divider"></div>
 
-      <!-- ── Selector de unidad externa (expandible) ── -->
       <button class="config-row logs-expand-row" onclick={toggleDevices}>
         <div class="row-info">
           <span class="row-label">{$m.config_storage_device} <span class="badge-experimental">{$m.config_badge_experimental}</span></span>
@@ -444,7 +369,6 @@
         <div class="section-divider"></div>
         <div class="devices-panel">
 
-          <!-- Banner: override activo -->
           {#if storageInfo?.is_override}
             <div class="storage-override-banner">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -457,7 +381,6 @@
             </div>
           {/if}
 
-          <!-- Aviso experimental -->
           <div class="devices-notice devices-notice-warning">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -467,7 +390,6 @@
             <span><strong>{$m.config_experimental_lead}</strong> {$m.config_experimental_body}</span>
           </div>
 
-          <!-- Alerta de advertencia sobre proyectos existentes -->
           <div class="devices-notice">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px">
               <circle cx="12" cy="12" r="10"/>
@@ -477,7 +399,6 @@
             <span>{$m.config_new_projects_note}</span>
           </div>
 
-          <!-- Mensajes de operación -->
           {#if storageOpError}
             <div class="devices-op-msg devices-op-error">{storageOpError}</div>
           {/if}
@@ -485,7 +406,6 @@
             <div class="devices-op-msg devices-op-success">{storageOpSuccess}</div>
           {/if}
 
-          <!-- Lista de dispositivos -->
           {#if devicesLoading}
             <p class="logs-status">{$m.config_detecting_devices}</p>
           {:else if devicesError}
@@ -543,7 +463,6 @@
             {/each}
           {/if}
 
-          <!-- Actualizar lista -->
           <button class="btn-refresh-devices" onclick={refreshDevices} disabled={devicesLoading}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="23 4 23 10 17 10"/>
@@ -558,16 +477,28 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 2: DIAGNÓSTICO DEL SISTEMA
-       Logs de actividad reciente. Ocultos por defecto, expandibles.
-       Solo administradores (el layout redirige a los roles sin acceso).
-       ══════════════════════════════════════════════════════════ -->
+  <!-- The catalogue's off-site copy (NEH-266). Read-only: the destination is
+       set when the unit is installed. The sidebar indicator links to
+       #offsite-copy. -->
+  <div class="config-section" id="offsite-copy">
+    <h2 class="section-title">{$m.backup_section_title}</h2>
+    <CatalogueBackupCard />
+  </div>
+
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_diagnostics}</h2>
     <div class="config-card">
 
-      <!-- Fila expandible: click para mostrar/ocultar logs -->
+      <div class="config-row">
+        <div class="row-info">
+          <span class="row-label">{$m.config_camera_backend}</span>
+          <span class="row-desc">{$m.config_camera_backend_desc}</span>
+        </div>
+        <code class="inline-code">{cameraBackend ?? $m.config_camera_backend_unknown}</code>
+      </div>
+
+      <div class="section-divider"></div>
+
       <button class="config-row logs-expand-row" onclick={toggleLogs}>
         <div class="row-info">
           <span class="row-label">{$m.config_system_logs}</span>
@@ -610,14 +541,10 @@
 
 
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 3: MANTENIMIENTO
-       ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_maintenance}</h2>
     <div class="config-card">
 
-      <!-- Fila: Limpiar archivos temporales de previsualización -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_tmp_files}</span>
@@ -648,16 +575,10 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECCIÓN 4: ENERGÍA
-       Apagar o reiniciar el equipo de forma segura. Reemplaza el
-       hábito de desconectar la corriente, que corrompe la tarjeta SD.
-       ══════════════════════════════════════════════════════════ -->
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_power}</h2>
     <div class="config-card">
 
-      <!-- Fila: Apagar el equipo -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_shutdown_label}</span>
@@ -665,7 +586,7 @@
             {$m.config_shutdown_desc}
           </span>
         </div>
-        <button class="btn-power btn-power-off" onclick={() => askPower('poweroff')}>
+        <button class="btn-power btn-power-off" onclick={() => power?.ask('poweroff')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
             <line x1="12" y1="2" x2="12" y2="12"/>
@@ -674,7 +595,6 @@
         </button>
       </div>
 
-      <!-- Fila: Reiniciar el equipo -->
       <div class="config-row">
         <div class="row-info">
           <span class="row-label">{$m.config_reboot_label}</span>
@@ -682,7 +602,7 @@
             {$m.config_reboot_desc}
           </span>
         </div>
-        <button class="btn-power btn-power-reboot" onclick={() => askPower('reboot')}>
+        <button class="btn-power btn-power-reboot" onclick={() => power?.ask('reboot')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="23 4 23 10 17 10"/>
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -701,7 +621,6 @@
     </div>
   </div>
 
-  <!-- Nota informativa sobre el contexto offline -->
   <p class="info-note">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="12" cy="12" r="10"/>
@@ -713,62 +632,7 @@
 
 </div>
 
-<!-- ============================================================
-     MODAL DE CONFIRMACIÓN — Apagar / Reiniciar
-     Mismo estilo que el resto de confirmaciones (ver Usuarios).
-     Evita apagados accidentales con un solo clic.
-     ============================================================ -->
-{#if pendingPowerAction}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => {
-    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) {
-      cancelPower();
-    }
-  }}>
-    <div class="modal-card modal-confirm">
-      <h3 class="confirm-title">{confirmTitle}</h3>
-      <p class="confirm-desc">{confirmDesc}</p>
-
-      <div class="modal-actions">
-        <button class="btn-ghost" onclick={cancelPower} disabled={sendingPower}>{$m.common_cancel}</button>
-        {#if pendingPowerAction === 'reboot'}
-          <button class="btn-confirm-power" onclick={confirmPower} disabled={sendingPower}>
-            {sendingPower ? $m.config_sending : $m.config_confirm_reboot_btn}
-          </button>
-        {:else}
-          <button class="btn-delete" onclick={confirmPower} disabled={sendingPower}>
-            {sendingPower ? $m.config_sending : $m.config_confirm_shutdown_btn}
-          </button>
-        {/if}
-      </div>
-    </div>
-  </div>
-{/if}
-
-<!-- ============================================================
-     ESTADO BLOQUEANTE — el backend se está apagando o reiniciando
-     No hay botones: la única salida es que el equipo se apague
-     (poweroff) o que la app se recargue sola (reboot).
-     ============================================================ -->
-{#if powerPhase === 'poweroff' || powerPhase === 'reboot'}
-  <div class="power-overlay">
-    <div class="power-overlay-card">
-      <div class="spinner-lg"></div>
-      {#if powerPhase === 'poweroff'}
-        <h3 class="power-overlay-title">{$m.config_shutting_down}</h3>
-        <p class="power-overlay-desc">
-          {$m.config_shutdown_overlay_desc}
-        </p>
-      {:else}
-        <h3 class="power-overlay-title">{$m.config_rebooting}</h3>
-        <p class="power-overlay-desc">
-          {$m.config_reboot_overlay_desc}
-        </p>
-      {/if}
-    </div>
-  </div>
-{/if}
+<PowerControl bind:this={power} onError={(message) => (powerError = message)} />
 
 <style>
   .page { padding: 32px; max-width: 900px; }
@@ -782,45 +646,7 @@
   .page-title    { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
 
-  /* Botón guardar */
-  .btn-save {
-    display: flex; align-items: center; gap: 8px;
-    background-color: var(--color-primary); color: white;
-    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
-    border: none; border-radius: var(--radius-md);
-    padding: 9px 18px; min-height: var(--touch-target-min);
-    cursor: pointer; transition: background-color var(--transition-base); white-space: nowrap;
-  }
 
-  .btn-save:hover    { background-color: var(--color-primary-hover); }
-  .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
-
-  .spinner-sm {
-    width: 14px; height: 14px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* Toast de éxito */
-  .toast-success {
-    display: flex; align-items: center; gap: 8px;
-    padding: 12px 16px;
-    background-color: rgba(90,140,98,0.15);
-    border: 1px solid var(--color-primary);
-    border-radius: var(--radius-md);
-    color: var(--color-primary);
-    font-size: var(--text-sm); font-weight: var(--fw-semibold);
-    margin-bottom: 20px;
-    animation: fadeIn 0.3s ease;
-  }
-
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-
-  /* Secciones */
   .config-section { margin-bottom: 32px; }
 
   .section-title {
@@ -828,7 +654,6 @@
     color: var(--color-light); margin: 0 0 14px;
   }
 
-  /* Card de configuración */
   .config-card {
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
@@ -836,7 +661,6 @@
     overflow: hidden;
   }
 
-  /* Alerta de almacenamiento */
   .storage-alert {
     display: flex; align-items: flex-start; gap: 10px;
     padding: 14px 20px;
@@ -848,7 +672,6 @@
 
   .storage-alert strong { font-weight: var(--fw-bold); }
 
-  /* Fila de configuración */
   .config-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 20px; gap: 20px;
@@ -856,12 +679,35 @@
 
   .config-row + .config-row { border-top: 1px solid var(--border-color); }
 
-  .toggle-row { min-height: 60px; }
-
   .row-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 
   .row-label { font-size: var(--text-base); color: var(--color-light); font-weight: var(--fw-medium); }
   .row-desc  { font-size: var(--text-sm); color: var(--color-light-grey); }
+
+  /* Language selector: toggle buttons, not a dropdown — two options fit on
+     screen, so the current one can be read without opening anything. */
+  .lang-options { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .lang-option {
+    padding: 8px 16px;
+    min-height: var(--touch-target-min);
+    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--border-color);
+    background-color: transparent;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-light-grey);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color var(--transition-base), border-color var(--transition-base);
+  }
+  .lang-option:hover { color: var(--color-light); }
+  .lang-option.active {
+    border-color: var(--color-light);
+    color: var(--color-light);
+    font-weight: var(--fw-bold);
+  }
 
   .row-value {
     font-size: var(--text-sm); color: var(--color-light);
@@ -871,7 +717,6 @@
   .row-value.muted { color: var(--color-light-grey); font-weight: var(--fw-regular); }
   .row-value.alert-text { color: var(--color-error); }
 
-  /* Barra de almacenamiento */
   .storage-bar-bg {
     height: 6px;
     background-color: var(--color-surface-alt-2);
@@ -886,42 +731,14 @@
     transition: width 0.5s ease, background-color 0.3s ease;
   }
 
-  /* Separador dentro de la card */
   .section-divider { height: 1px; background-color: var(--border-color); }
 
-  /* Toggle switch */
-  .toggle {
-    width: 48px; height: 26px;
-    border-radius: var(--radius-full);
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    position: relative;
-    transition: background-color var(--transition-base), border-color var(--transition-base);
-    flex-shrink: 0;
-  }
-
-  .toggle.on { background-color: var(--color-primary); border-color: var(--color-primary); }
-
-  .toggle-knob {
-    position: absolute; top: 2px; left: 2px;
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    background-color: var(--color-light-grey);
-    transition: transform var(--transition-base), background-color var(--transition-base);
-    pointer-events: none;
-  }
-
-  .toggle-knob.on { transform: translateX(22px); background-color: white; }
-
-  /* Nota informativa */
   .info-note {
     display: flex; align-items: center; gap: 8px;
     font-size: var(--text-sm); color: var(--color-light-grey);
     opacity: 0.6; margin-top: 8px;
   }
 
-  /* Logs expandibles (sección Diagnóstico) */
   .logs-expand-row {
     width: 100%; background: none; border: none; cursor: pointer;
     text-align: left; font-family: var(--font-family);
@@ -994,6 +811,13 @@
   }
   .storage-override-banner span { flex: 1; line-height: 1.4; }
   .storage-override-banner strong { font-weight: var(--fw-semibold); }
+
+  .storage-override-warning {
+    margin-top: 10px;
+    background-color: rgba(200,140,60,0.12);
+    border-color: rgba(200,140,60,0.4);
+    color: var(--color-warning, #b5731f);
+  }
 
   .storage-override-badge {
     display: inline-block;
@@ -1081,7 +905,6 @@
   .btn-refresh-devices:hover:not(:disabled) { color: var(--color-light); }
   .btn-refresh-devices:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* ── Mantenimiento ──────────────────────────────────────── */
   .btn-flush {
     font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-semibold);
     color: var(--color-light-grey);
@@ -1116,7 +939,6 @@
     padding: 1px 4px;
   }
 
-  /* ── Energía ────────────────────────────────────────────── */
   .btn-power {
     display: flex; align-items: center; gap: 8px;
     font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-semibold);
@@ -1141,109 +963,4 @@
   .btn-power-reboot:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); background-color: rgba(255,255,255,0.04); }
 
   .power-error-row { padding: 10px 20px 14px; }
-
-  /* ── Modal de confirmación (mismo estilo que Usuarios) ──── */
-  .modal-backdrop {
-    position: fixed; inset: 0;
-    background-color: rgba(0,0,0,0.65);
-    backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 100; padding: 24px;
-  }
-
-  .modal-card {
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 28px;
-    width: 100%; max-width: 420px;
-    box-shadow: var(--shadow-lg);
-    display: flex; flex-direction: column; gap: 16px;
-    max-height: 90vh; overflow-y: auto;
-  }
-
-  .modal-confirm { max-width: 440px; gap: 12px; }
-
-  .confirm-title {
-    font-size: var(--text-h3); font-weight: var(--fw-bold);
-    color: var(--color-light); margin: 0;
-  }
-
-  .confirm-desc {
-    font-size: var(--text-sm); color: var(--color-light-grey);
-    line-height: 1.6; margin: 0;
-  }
-
-  .modal-actions {
-    display: flex; gap: 12px;
-    padding-top: 4px;
-    border-top: 1px solid var(--border-color);
-  }
-
-  .btn-ghost {
-    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-    flex: 1;
-    background: none; border: 1px solid var(--border-color);
-    border-radius: var(--radius-md); padding: 9px 18px;
-    font-family: var(--font-family); font-size: var(--text-sm);
-    color: var(--color-light-grey); cursor: pointer;
-    transition: all var(--transition-fast); min-height: var(--touch-target-min);
-    white-space: nowrap;
-  }
-  .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
-  .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* Botón destructivo — rojo (apagar) */
-  .btn-delete {
-    flex: 1; height: 44px;
-    background-color: var(--color-error); color: white;
-    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
-    border: none; border-radius: var(--radius-md);
-    cursor: pointer; transition: opacity var(--transition-base);
-  }
-  .btn-delete:hover    { opacity: 0.85; }
-  .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* Botón confirmar reinicio — verde primario (no destructivo) */
-  .btn-confirm-power {
-    flex: 1; height: 44px;
-    background-color: var(--color-primary); color: white;
-    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
-    border: none; border-radius: var(--radius-md);
-    cursor: pointer; transition: background-color var(--transition-base);
-  }
-  .btn-confirm-power:hover    { background-color: var(--color-primary-hover); }
-  .btn-confirm-power:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* ── Estado bloqueante (apagando / reiniciando) ─────────── */
-  .power-overlay {
-    position: fixed; inset: 0;
-    background-color: rgba(19,17,16,0.92);
-    backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 200; padding: 24px;
-  }
-
-  .power-overlay-card {
-    display: flex; flex-direction: column; align-items: center; text-align: center;
-    gap: 16px; max-width: 420px;
-  }
-
-  .power-overlay-title {
-    font-size: var(--text-h3); font-weight: var(--fw-bold);
-    color: var(--color-light); margin: 0;
-  }
-
-  .power-overlay-desc {
-    font-size: var(--text-base); color: var(--color-light-grey);
-    line-height: 1.6; margin: 0;
-  }
-
-  .spinner-lg {
-    width: 40px; height: 40px;
-    border: 3px solid var(--border-color);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
 </style>

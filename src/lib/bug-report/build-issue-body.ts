@@ -1,3 +1,5 @@
+// Version: 0.1.0-beta
+
 import type { ReportContext } from './context';
 import type { CapturedError } from './error-capture';
 import { redact } from './redact';
@@ -13,7 +15,7 @@ export interface AttachOptions {
   errors: boolean;
 }
 
-/** Arma el cuerpo Markdown del issue (redactado al final). */
+/** Builds the issue's Markdown body (redacted as a whole at the end). */
 export function buildIssueBody(
   form: BugReportForm,
   ctx: ReportContext,

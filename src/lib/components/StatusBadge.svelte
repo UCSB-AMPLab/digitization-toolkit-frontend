@@ -1,4 +1,6 @@
 <script lang="ts">
+  // Version: 0.1.0-beta
+
   import type { Record } from '$lib/api';
   import { m } from '$lib/i18n';
 

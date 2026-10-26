@@ -1,36 +1,23 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: CameraControls
-  // Archivo: src/routes/live-preview/CameraControls.svelte
+  // Left-hand camera panel of the live preview. Its controls apply to the
+  // selected camera; in `single` mode that is always camera 0, and in `double`
+  // mode the operator picks it from a dropdown. The sections offer only what
+  // the backend's capabilities report (picamera2 or a gphoto2 DSLR). The Basic
+  // dropdowns are rendered outside the scrolling panel with `position: fixed`,
+  // at coordinates taken from their trigger button each time one opens.
   //
-  // Panel izquierdo de controles de cámara.
-  //
-  // Lógica de cámaras:
-  //   Single Camera → solo cámara izquierda activa, selector muestra solo "Left"
-  //   Double Camera → selector muestra "Left" y "Right", se puede alternar
-  //                   los controles de Basic/Focus/Settings aplican a la cámara seleccionada
-  //
-  // Acordeones:
-  //   Basic    → Shutter Speed, ISO, Aperture (deshabilitado en modo 'automatic')
-  //   Focus    → Botones de ajuste fino de foco
-  //   Settings → White Balance, Temperatura, Tinte, Exposure (deshabilitado en 'automatic')
-  //   Histogram→ Visualización RGB
-  //
-  // IMPORTANTE: Los dropdowns de Basic usan position:fixed para escapar del
-  //             overflow:hidden del panel. Por eso usan onmount para calcular
-  //             la posición del botón en el viewport.
-  // ============================================================================
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
+  import { createCameraRefresh } from '$lib/camera-refresh';
+  import { isDeviceListComplete } from '$lib/camera-orientation';
   import { m } from '$lib/i18n';
   import { camerasApi, AuthError, type CameraDevice, type CameraControlsRequest, type CameraCapabilities, type DSLRSettingsUpdate } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore } from '$lib/stores/histogram';
+  import { describeFocusMode } from '$lib/focus-mode';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     cameraMode,
     shutterSpeed,
@@ -42,6 +29,7 @@
     onApertureChange,
     onDevicesChange,
     onRotateDegChange,
+    rotateDeg = {},
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -53,22 +41,27 @@
     onApertureChange: (value: string) => void;
     onDevicesChange?: (devices: CameraDevice[]) => void;
     onRotateDegChange?: (cam: number, deg: number) => void;
+    rotateDeg?: Record<number, number>;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // ESTADO LOCAL
-  // ---------------------------------------------------------------------------
-
-  // Cámara seleccionada actualmente (0 = izquierda, 1 = derecha)
+  // Index of the camera the panel controls: 0 = left, 1 = right.
   let selectedCameraIndex = $state(0);
 
-  // Lista de dispositivos reales cargados desde la API
   let devices = $state<CameraDevice[]>([]);
+  // Writers: readDevicesUntilComplete, handleWbCalibration, applyPickedWb,
+  // rescanCameras.
+  // All list results go through cameraRefresh, which publishes local and
+  // parent state together. Calibration reloads wait for an active reconnect.
+  function publishDevices(list: CameraDevice[]) {
+    devices = list;
+    onDevicesChange?.(list);
+  }
+  const cameraRefresh = createCameraRefresh<CameraDevice[]>(publishDevices);
 
-  // Estado del sidebar: colapsado por defecto (optimizado para pantalla de 7")
+  // Collapsed by default, for the 7" screen.
   let sidebarOpen = $state(false);
 
-  // Posición actual del foco (dioptrias: 0 = infinito, 10 = 10cm)
+  // Lens position in dioptres: 0 = infinity, 10 = 10 cm.
   let lensPosition = $state(0);
   let isFocusing = $state(false);
   let focusDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -86,6 +79,11 @@
 
   // Backend capabilities (loaded on mount alongside devices)
   let capabilities = $state<CameraCapabilities | null>(null);
+  // Set when the capabilities request fails, typically a 503 while the
+  // capture system is down. Without capabilities the panel cannot tell a
+  // DSLR rig from a picamera2 one, so it shows the failure in place of the
+  // controls rather than guessing and offering the wrong options.
+  let capabilitiesFailed = $state(false);
 
   // Derived capability flags
   const isDSLR          = $derived(capabilities?.dslr_settings === true);
@@ -95,16 +93,16 @@
   // DSLR-specific per-camera state
   let cameraDslrAperture = $state<Record<number, string>>({ 0: '5.6', 1: '5.6' });
   let cameraDslrFormat   = $state<Record<number, string>>({ 0: 'JPEG', 1: 'JPEG' });
+  let cameraFocusMode    = $state<Record<number, string | undefined>>({});
+  let dslrSettingsSeq = 0;
 
-  // Per-camera capture rotation (clockwise degrees): 0 | 90 | 180 | 270
-  // Default 90° — most digitisation rigs use vertical (portrait) orientation
-  let cameraRotateDeg = $state<Record<number, number>>({ 0: 90, 1: 90 });
-
+  // Per-camera rotation lives in the page (NEH-71): this panel keeps no copy
+  // of its own, only reads the `rotateDeg` prop and reports steps upward, so
+  // it never drifts from the `LiveViewport` overlay.
   function stepRotation(delta: number) {
     const idx = selectedCameraIndex;
-    const current = cameraRotateDeg[idx] ?? 0;
+    const current = rotateDeg[idx] ?? 0;
     const next = ((current + delta) % 360 + 360) % 360;
-    cameraRotateDeg = { ...cameraRotateDeg, [idx]: next };
     onRotateDegChange?.(idx, next);
   }
 
@@ -124,7 +122,6 @@
     }
   });
 
-  // Cámara actualmente seleccionada (derivado)
   const selectedDevice = $derived(devices.find(d => d.index === selectedCameraIndex));
   const cameraDisplayName = $derived(
     selectedDevice
@@ -132,17 +129,15 @@
       : `${$m.cam_fallback_name} ${selectedCameraIndex}`
   );
 
-  // Secciones abiertas del acordeón
   let openSections = $state(['basic', 'focus', 'settings', 'histogram']);
 
-  // Dropdowns abiertos
   let showCameraDropdown = $state(false);
 
-  // Dropdown activo de Basic (shutter/iso/aperture/format) — solo uno a la vez
+  // The open Basic dropdown; only one is open at a time.
   let openDropdown = $state<'shutter' | 'iso' | 'aperture' | 'format' | null>(null);
 
-  // Posición del dropdown de Basic (calculada en viewport para escapar overflow:hidden)
-  // Se recalcula cada vez que se abre uno de los dropdowns
+  // Viewport coordinates of the open Basic dropdown, recalculated each time
+  // one opens (see `openBasicDropdown`).
   let dropdownPos = $state({ top: 0, left: 0, width: 0 });
 
   // References to the dropdown trigger buttons of Basic
@@ -151,12 +146,10 @@
   let apertureBtnEl = $state<HTMLElement | null>(null);
   let formatBtnEl  = $state<HTMLElement | null>(null);
 
-  // Valores de los sliders de Settings
-  let temperature = $state(0);   // Temperatura de color (-100 a +100)
-  let tint = $state(0);          // Tinte (-100 a +100)
-  let exposure = $state(0);      // Exposición (-3 a +3)
+  let temperature = $state(0);   // -100 to +100
+  let tint = $state(0);          // -100 to +100
+  let exposure = $state(0);      // -3 to +3
 
-  // Opciones de los dropdowns de Basic
   // Shutter speed options useful for scanning (fixed lighting, no motion)
   const shutterOptions = ['1/1000s','1/500s','1/250s','1/125s','1/60s','1/30s','1/15s','1/8s','1/4s','1/2s','1s','1.6s','2s','3.2s','4s'];
   // ISO options: keep low for archival quality (IMX519 analogue gain max ≈ 16× = ISO 1600)
@@ -172,19 +165,14 @@
   // DSLR image format options
   const dsrlFormatOptions = ['JPEG','RAW','RAW+JPEG'];
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: abrir un dropdown de Basic y calcular su posición en viewport
-  // Necesario porque el panel tiene overflow:hidden y los dropdowns se cortaban.
-  // La posición se calcula relativa al botón que lo abre.
-  // ---------------------------------------------------------------------------
+  // The Basic dropdowns sit outside the panel with `position: fixed`, so the
+  // scrolling panel does not clip them; each opens below its trigger button.
   function openBasicDropdown(which: 'shutter' | 'iso' | 'aperture' | 'format') {
-    // Si ya está abierto, cerrar
     if (openDropdown === which) {
       openDropdown = null;
       return;
     }
 
-    // Obtener la referencia del botón correspondiente
     const btnEl = which === 'shutter'  ? shutterBtnEl
                 : which === 'iso'      ? isoBtnEl
                 : which === 'aperture' ? apertureBtnEl
@@ -201,19 +189,12 @@
     openDropdown = which;
   }
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: toggle de acordeón
-  // ---------------------------------------------------------------------------
   function toggleSection(section: string) {
     openSections = openSections.includes(section)
       ? openSections.filter(s => s !== section)
       : [...openSections, section];
   }
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: Autofocus
-  // Llama al backend y actualiza el slider de foco con el resultado.
-  // ---------------------------------------------------------------------------
   function showFocusResult(ok: boolean, msg: string) {
     focusResultOk = ok;
     focusResultMsg = msg;
@@ -229,7 +210,7 @@
       if (result.success && result.lens_position != null) {
         lensPosition = result.lens_position;
         cameraStatus.reportSuccess();
-        showFocusResult(true, $m.cam_focus_result(result.lens_position.toFixed(2)));
+        showFocusResult(true, $m.cam_focus_result(result.lens_position));
       } else {
         const msg = result.error ?? $m.cam_af_failed;
         cameraStatus.reportFailure(msg);
@@ -244,10 +225,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: Calibración white balance
-  // Llama al backend, actualiza los gains y refresca la lista de dispositivos.
-  // ---------------------------------------------------------------------------
   function showWbResult(ok: boolean, msg: string) {
     wbResultOk = ok;
     wbResultMsg = msg;
@@ -262,9 +239,7 @@
       const result = await camerasApi.calibrateWhiteBalance({ camera_index: idx });
       if (result.success) {
         // Refresh device list so selectedDevice.awb_gains picks up new values
-        try {
-          devices = await camerasApi.listDevices();
-        } catch { /* ignore — gains will apply on next mount */ }
+        await cameraRefresh.read(() => camerasApi.listDevices());
         // Reset sliders to neutral; the new baseGains already encodes the calibrated WB
         temperature = 0;
         tint = 0;
@@ -294,18 +269,15 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: WB picker — click-to-neutralize
-  // Activa el modo de muestreo en LiveViewport. Cuando el usuario hace clic
-  // sobre un área blanca/neutra, se calcula la corrección de ganancias y se
-  // guarda en el registro de la cámara.
+  // WB picker (click to neutralize). Puts `LiveViewport` into sampling mode.
+  // When the operator clicks a white or neutral area, the gain correction is
+  // computed and saved to the camera registry.
   //
-  // Fórmula: neutral_gray = (R+G+B)/3
+  // Formula: neutral_gray = (R+G+B)/3
   //   new_red_gain  = baseGains[0] * (gray / R)
   //   new_blue_gain = baseGains[1] * (gray / B)
-  // Esto corrige la diferencia entre el color observado y el gris neutro,
-  // relativo a las ganancias de calibración almacenadas.
-  // ---------------------------------------------------------------------------
+  // This corrects the difference between the observed colour and neutral
+  // grey, relative to the stored calibration gains.
   function handleWbPicker() {
     if (isWbPickerActive) {
       // Toggle off — cancel sampling
@@ -343,7 +315,7 @@
       // Persist to registry
       const result = await camerasApi.commitWhiteBalance(idx, gains);
       if (result.success) {
-        try { devices = await camerasApi.listDevices(); } catch { /* ignore */ }
+        await cameraRefresh.read(() => camerasApi.listDevices());
         temperature = 0;
         tint = 0;
         cameraStatus.reportSuccess();
@@ -358,10 +330,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: Ajuste manual de foco (slider vertical)
-  // Envía el valor al backend con debounce de 150ms.
-  // ---------------------------------------------------------------------------
   function handleFocusSlider(value: number) {
     lensPosition = value;
     if (focusDebounce) clearTimeout(focusDebounce);
@@ -369,14 +337,11 @@
       try {
         await camerasApi.setFocus(selectedCameraIndex, value);
       } catch {
-        // fallo silencioso — el preview mostrará el foco actual
+        // Fail silently; the preview shows the actual focus.
       }
     }, 150);
   }
 
-  // ---------------------------------------------------------------------------
-  // FUNCIÓN: Zoom de cámara (ScalerCrop via API) por índice de cámara
-  // ---------------------------------------------------------------------------
   function handleZoomSlider(value: number) {
     cameraZoom = { ...cameraZoom, [selectedCameraIndex]: value };
     if (zoomDebounce) clearTimeout(zoomDebounce);
@@ -384,14 +349,11 @@
       try {
         await camerasApi.setCameraControls(selectedCameraIndex, { zoom_factor: value });
       } catch {
-        // fallo silencioso
+        // Fail silently.
       }
     }, 150);
   }
 
-  // ---------------------------------------------------------------------------
-  // Al cambiar a modo 'single', forzar cámara izquierda
-  // ---------------------------------------------------------------------------
   $effect(() => {
     if (cameraMode === 'single') {
       selectedCameraIndex = 0;
@@ -407,23 +369,12 @@
     onIsoChange(cameraIso[selectedCameraIndex] ?? '100');
   });
 
-  // ---------------------------------------------------------------------------
-  // Al cambiar de cámara, actualizar lensPosition desde calibración si disponible
-  // ---------------------------------------------------------------------------
   $effect(() => {
     const dev = devices.find(d => d.index === selectedCameraIndex);
     if (dev?.lens_position !== undefined) {
       lensPosition = dev.lens_position;
     }
   });
-
-  // ---------------------------------------------------------------------------
-  // Cerrar dropdowns al hacer click fuera (usando el backdrop)
-  // ---------------------------------------------------------------------------
-  function closeAll() {
-    openDropdown = null;
-    showCameraDropdown = false;
-  }
 
   // ---------------------------------------------------------------------------
   // HELPERS: Settings sliders → camera controls
@@ -446,7 +397,7 @@
       try {
         await camerasApi.setCameraControls(selectedCameraIndex, controls);
       } catch {
-        // Fallo silencioso — la cámara puede no estar disponible
+        // Fail silently; the camera may be unavailable.
       }
     }, debounceMs);
   }
@@ -467,35 +418,96 @@
     return [red, blue];
   }
 
-  // ---------------------------------------------------------------------------
-  // Cargar dispositivos reales al montar
-  // ---------------------------------------------------------------------------
-  onMount(() => {
-    Promise.all([
-      camerasApi.listDevices(),
-      camerasApi.getCapabilities().catch(() => null),
-    ]).then(([d, caps]) => {
-      devices = d;
+  // Only the latest request writes: a slow mount-time failure must not
+  // undo the answer that came after a successful reconnect.
+  let capabilitiesSeq = 0;
+  async function loadCapabilities() {
+    const seq = ++capabilitiesSeq;
+    try {
+      const caps = await camerasApi.getCapabilities();
+      if (seq !== capabilitiesSeq) return;
       capabilities = caps;
-      onDevicesChange?.(d);
-    }).catch((err) => {
-      // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
-      // limpió la sesión y redirige a /login; dejar `devices` como está en
-      // vez de que este catch conflate el error de auth con un estado real
-      // de "no hay cámaras conectadas" (NEH-64).
+      capabilitiesFailed = false;
+    } catch (err) {
+      if (seq !== capabilitiesSeq) return;
+      // A dead session already sends the operator to the login screen.
       if (err instanceof AuthError && err.status === 401) return;
-      /* cualquier otro error: fallo silencioso, cámara puede no estar conectada */
-    });
+      capabilities = null;
+      capabilitiesFailed = true;
+    }
+  }
+
+  // Right after a boot the appliance can answer before gphoto2 has found or
+  // identified every body (an empty list, a missing row, a placeholder id).
+  // The page seeds each camera's saved rotation from what this panel
+  // publishes, so it asks again on a short backoff until the list is
+  // complete for the capture mode; the cap keeps a rig that is genuinely
+  // short of a camera from polling for the whole session. Reconnect remains the operator's lever.
+  const DEVICE_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
+  let deviceRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  let unmounted = false;
+
+  async function readDevicesUntilComplete() {
+    for (let attempt = 0; ; attempt++) {
+      let sessionEnded = false;
+      await cameraRefresh.read(
+        () => camerasApi.listDevices(),
+        (err) => {
+          // A dead session already sends the operator to the login screen.
+          if (err instanceof AuthError && err.status === 401) sessionEnded = true;
+        }
+      );
+      if (unmounted || sessionEnded || isDeviceListComplete(devices, cameraMode)) return;
+      if (attempt >= DEVICE_RETRY_DELAYS_MS.length) return;
+      await new Promise<void>((resolve) => {
+        deviceRetryTimer = setTimeout(resolve, DEVICE_RETRY_DELAYS_MS[attempt]);
+      });
+      deviceRetryTimer = null;
+      if (unmounted) return;
+    }
+  }
+
+  onMount(() => {
+    void loadCapabilities();
+    void readDevicesUntilComplete();
+    return () => {
+      unmounted = true;
+      if (deviceRetryTimer) clearTimeout(deviceRetryTimer);
+    };
   });
 
-  // ---------------------------------------------------------------------------
-  // DSLR: cargar ajustes reales cuando se activa el backend gphoto2
-  // ---------------------------------------------------------------------------
+  // Reconnect cameras: rescans the USB ports and closes stale sessions
+  // (NEH-229). It applies to every backend, not only DSLRs — a camera can
+  // disconnect or go to sleep under gphoto2 and picamera2 alike.
+  let rescanInFlight = $state(false);
+  let rescanError = $state<string | null>(null);
+
+  async function rescanCameras() {
+    if (rescanInFlight) return;
+    rescanInFlight = true;
+    try {
+      await cameraRefresh.reconnect(() => camerasApi.rescan());
+      rescanError = null;
+      // Reconnecting is the remedy the failure message offers, so the
+      // capabilities are asked for again once the cameras are back.
+      await loadCapabilities();
+    } catch (err) {
+      if (err instanceof AuthError && err.status === 401) return;
+      rescanError = err instanceof Error ? err.message : String(err);
+    } finally {
+      rescanInFlight = false;
+    }
+  }
+
   $effect(() => {
     if (!isDSLR) return;
     const idx = selectedCameraIndex;
+    const seq = ++dslrSettingsSeq;
     camerasApi.getDSLRSettings(idx)
       .then(s => {
+        // Only the latest response writes the DSLR state; a stale response that
+        // arrives late is discarded (the same guard as the dashboard capture).
+        if (seq !== dslrSettingsSeq) return;
         if (s.shutter_speed) cameraShutter = { ...cameraShutter, [idx]: s.shutter_speed };
         if (s.iso)           cameraIso     = { ...cameraIso,     [idx]: s.iso };
         if (s.aperture)      cameraDslrAperture = { ...cameraDslrAperture, [idx]: s.aperture };
@@ -504,8 +516,11 @@
           const fmtMap: Record<string, string> = { 'L': 'JPEG', 'RAW': 'RAW', 'RAW + L': 'RAW+JPEG' };
           cameraDslrFormat = { ...cameraDslrFormat, [idx]: fmtMap[s.image_format] ?? s.image_format };
         }
+        // Store it even when undefined: a reconnection that loses the value
+        // must clear the warning, not keep the last one read (NEH-76).
+        cameraFocusMode = { ...cameraFocusMode, [idx]: s.focus_mode };
       })
-      .catch(() => {}); // silencioso — cámara puede no estar conectada
+      .catch(() => {}); // Silent: the camera may not be connected.
   });
 
   // ---------------------------------------------------------------------------
@@ -515,20 +530,15 @@
     try {
       await camerasApi.applyDSLRSettings(selectedCameraIndex, settings);
     } catch {
-      // fallo silencioso — la cámara puede no estar disponible
+      // Fail silently; the camera may be unavailable.
     }
   }
 </script>
 
-<!-- ============================================================
-     SIDEBAR WRAPPER — colapsado por defecto en pantallas de 7"
-     ============================================================ -->
 <div class="sidebar-wrapper">
 
   {#if !sidebarOpen}
-    <!-- ── TIRA DE ICONOS (sidebar colapsado) ── -->
     <div class="icon-strip">
-      <!-- Botón para expandir -->
       <button class="strip-btn toggle" onclick={() => sidebarOpen = true} aria-label={$m.cam_panel_expand_aria}>
         <svg
 									width="18"
@@ -547,16 +557,11 @@
     </div>
 
   {:else}
-    <!-- ── PANEL COMPLETO (sidebar expandido) ── -->
 
-<!-- ============================================================
-     PANEL DE CONTROLES
-     ============================================================ -->
 <div class="controls-panel">
 
   <div class="panel-header">
     <h2 class="panel-title">{$m.cam_panel_title}</h2>
-    <!-- Botón para colapsar -->
     <button class="collapse-btn" onclick={() => sidebarOpen = false} aria-label={$m.cam_panel_collapse}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="15 18 9 12 15 6"/>
@@ -566,7 +571,6 @@
 
   <div class="panel-body">
 
-    <!-- ── RADIO: Single / Double Camera ── -->
     <div class="camera-mode-row">
       <label class="radio-label">
         <div class="radio-circle" class:active={cameraMode === 'single'} style="border-color: {cameraMode === 'single' ? 'var(--color-light)' : 'var(--color-light-grey)'}">
@@ -585,9 +589,6 @@
       </label>
     </div>
 
-    <!-- ── SELECTOR DE CÁMARA ── -->
-    <!-- En modo single: no clickeable (siempre cámara 0)     -->
-    <!-- En modo double: dropdown para seleccionar cuál controlar -->
     <div class="relative">
       <button
         class="camera-selector"
@@ -611,7 +612,6 @@
         {/if}
       </button>
 
-      <!-- Dropdown de selección de cámara (solo en double) -->
       {#if showCameraDropdown && cameraMode === 'double'}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -640,7 +640,6 @@
       {/if}
     </div>
 
-    <!-- ── ESTADO DE CÁMARA ── -->
     <div class="camera-status-row">
       <span class="status-dot" class:dot-connected={selectedDevice !== undefined} class:dot-disconnected={selectedDevice === undefined}></span>
       {#if selectedDevice !== undefined}
@@ -650,10 +649,16 @@
       {/if}
     </div>
 
+    <!-- ── Reconnect cameras (NEH-229) ── -->
+    <div class="reconnect-row">
+      <button class="btn-reconnect" disabled={rescanInFlight} onclick={rescanCameras}>
+        {$m.cam_reconnect}
+      </button>
+      {#if rescanError}
+        <p class="text-error focus-result-msg">{$m.cam_reconnect_error}: {rescanError}</p>
+      {/if}
+    </div>
 
-    <!-- ══════════════════════════════════════════
-         ACORDEÓN: BASIC
-         ══════════════════════════════════════════ -->
     <div class="accordion-block">
       <button
         class="accordion-trigger"
@@ -661,9 +666,11 @@
       >
         <div class="acc-left">
           <span>{$m.cam_section_basic}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <span class="info-wrap" title={$m.cam_section_basic_info} aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           class="chevron" class:rotated={openSections.includes('basic')}>
@@ -674,7 +681,6 @@
       {#if openSections.includes('basic')}
         <div class="accordion-content">
 
-          <!-- Fila: Orientation (portrait / landscape rotation) -->
           <div class="control-row">
             <span class="control-label">{$m.cam_orientation}</span>
             <div class="orientation-row">
@@ -684,7 +690,7 @@
                   <path d="M3 3v5h5"/>
                 </svg>
               </button>
-              <span class="orientation-label">{cameraRotateDeg[selectedCameraIndex] ?? 0}°</span>
+              <span class="orientation-label">{rotateDeg[selectedCameraIndex] ?? 0}°</span>
               <button class="rotate-step-btn" onclick={() => stepRotation(90)} aria-label={$m.cam_rotate_cw}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
@@ -694,10 +700,12 @@
             </div>
           </div>
 
-          <!-- Fila: Shutter Speed -->
+          {#if capabilitiesFailed}
+          <p class="controls-unavailable" role="alert">{$m.cam_capabilities_failed}</p>
+          {:else if capabilities}
           <div class="control-row">
             <span class="control-label">{$m.cam_shutter}</span>
-            <!-- El botón guarda su referencia para calcular la posición del dropdown -->
+            <!-- `bind:this` gives `openBasicDropdown` the button's position -->
             <button
               bind:this={shutterBtnEl}
               class="control-btn"
@@ -712,7 +720,6 @@
             </button>
           </div>
 
-          <!-- Fila: ISO -->
           <div class="control-row">
             <span class="control-label">ISO</span>
             <button
@@ -729,7 +736,6 @@
             </button>
           </div>
 
-          <!-- Fila: Aperture (solo si la cámara lo soporta) -->
           {#if selectedDevice?.has_aperture_control}
           <div class="control-row">
             <span class="control-label">{$m.cam_aperture}</span>
@@ -748,7 +754,6 @@
           </div>
           {/if}
 
-          <!-- Fila: Image Format (solo DSLR) -->
           {#if isDSLR}
           <div class="control-row">
             <span class="control-label">{$m.cam_format}</span>
@@ -766,21 +771,21 @@
             </button>
           </div>
           {/if}
+          {/if}
 
         </div>
       {/if}
     </div>
 
-    <!-- ══════════════════════════════════════════
-         ACORDEÓN: FOCUS
-         ══════════════════════════════════════════ -->
     <div class="accordion-block">
       <button class="accordion-trigger" onclick={() => toggleSection('focus')}>
         <div class="acc-left">
           <span>{$m.cam_section_focus}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <span class="info-wrap" title={$m.cam_section_focus_info} aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           class="chevron" class:rotated={openSections.includes('focus')}>
@@ -790,7 +795,9 @@
 
       {#if openSections.includes('focus')}
         <div class="accordion-content">
-          {#if hasFocusControl}
+          {#if capabilitiesFailed}
+          <p class="controls-unavailable" role="alert">{$m.cam_capabilities_failed}</p>
+          {:else if hasFocusControl}
           <!-- Autofocus -->
           <button class="btn-autofocus" onclick={handleAutoFocus} disabled={isFocusing}>
             {#if isFocusing}
@@ -806,7 +813,6 @@
             <p class:text-success={focusResultOk} class:text-error={!focusResultOk} class="focus-result-msg">{focusResultMsg}</p>
           {/if}
 
-          <!-- Foco manual (horizontal) -->
           <div class="zoom-row">
             <div class="zoom-header">
               <span class="zoom-row-label">{$m.cam_manual_focus}</span>
@@ -829,7 +835,6 @@
             </div>
           </div>
 
-          <!-- Zoom de cámara (ScalerCrop por cámara) -->
           <div class="zoom-row">
             <div class="zoom-header">
               <span class="zoom-row-label">Zoom</span>
@@ -866,14 +871,14 @@
             {$m.cam_dslr_note_p1}<strong>MF</strong>{$m.cam_dslr_note_p2}
             {$m.cam_dslr_note_p3}
           </p>
+          {#if describeFocusMode(cameraFocusMode[selectedCameraIndex]) === 'auto'}
+          <p class="dslr-note is-warning" role="status">{$m.cam_dslr_af_warning(cameraFocusMode[selectedCameraIndex] ?? '')}</p>
+          {/if}
           {/if}
         </div>
       {/if}
     </div>
 
-    <!-- ══════════════════════════════════════════
-         ACORDEÓN: SETTINGS
-         ══════════════════════════════════════════ -->
     <div class="accordion-block">
       <button
         class="accordion-trigger"
@@ -881,9 +886,11 @@
       >
         <div class="acc-left">
           <span>{$m.cam_section_settings}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <span class="info-wrap" title={$m.cam_section_settings_info} aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           class="chevron" class:rotated={openSections.includes('settings')}>
@@ -893,7 +900,9 @@
 
       {#if openSections.includes('settings')}
         <div class="accordion-content settings-content">
-          {#if hasLiveControls}
+          {#if capabilitiesFailed}
+          <p class="controls-unavailable" role="alert">{$m.cam_capabilities_failed}</p>
+          {:else if hasLiveControls}
 
           <!-- White Balance -->
           <div class="settings-block">
@@ -907,6 +916,7 @@
                 onclick={handleWbCalibration}
                 disabled={isWbCalibrating}
                 aria-label={$m.cam_wb_calibrate_aria}
+                title={$m.cam_wb_calibrate_aria}
               >
                 {#if isWbCalibrating}
                   <span class="material-symbols-outlined icon-sm">sync</span>
@@ -921,6 +931,7 @@
                 onclick={handleWbPicker}
                 disabled={isWbCalibrating}
                 aria-label={isWbPickerActive ? $m.cam_wb_cancel_aria : $m.cam_wb_sample_aria}
+                title={isWbPickerActive ? $m.cam_wb_cancel_aria : $m.cam_wb_sample_aria}
                 aria-pressed={isWbPickerActive}
               >
                 <span class="material-symbols-outlined icon-sm">colorize</span>
@@ -938,11 +949,9 @@
             {/if}
           </div>
 
-          <!-- Slider Temperatura: azul → arena (col design system) -->
           <div class="settings-block">
             <span class="settings-label">{$m.cam_temperature}</span>
             <div class="slider-row">
-              <!-- Track con gradiente visible + input range encima -->
               <div class="slider-track-wrapper temp">
                 <input
                   type="range"
@@ -960,7 +969,6 @@
             </div>
           </div>
 
-          <!-- Slider Tinte: verde → magenta -->
           <div class="settings-block">
             <span class="settings-label">{$m.cam_tint}</span>
             <div class="slider-row">
@@ -981,7 +989,6 @@
             </div>
           </div>
 
-          <!-- Slider Exposure: -3 a +3 con marcas -->
           <div class="settings-block exposure-block">
             <span class="settings-label">{$m.cam_exposure}</span>
             <div class="exposure-val" class:nonzero={exposure !== 0}>
@@ -996,7 +1003,6 @@
               class="styled-range exposure-range"
               oninput={() => applySettings({ ae_enable: true, exposure_value: exposure })}
             />
-            <!-- Marcas debajo del slider -->
             <div class="exposure-marks">
               {#each [-3, -2, -1, 0, 1, 2, 3] as mark}
                 <div class="e-mark" class:active={mark === exposure}>
@@ -1008,22 +1014,26 @@
               {/each}
             </div>
           </div>
+          {:else}
+            <!-- An empty section is what NEH-152 reported. A failed
+                 capabilities request has its own message above; this one
+                 covers a camera that lacks the controls. -->
+            <p class="controls-unavailable">{$m.cam_live_controls_unavailable}</p>
           {/if}
 
         </div>
       {/if}
     </div>
 
-    <!-- ══════════════════════════════════════════
-         ACORDEÓN: HISTOGRAM
-         ══════════════════════════════════════════ -->
     <div class="accordion-block">
       <button class="accordion-trigger" onclick={() => toggleSection('histogram')}>
         <div class="acc-left">
           <span>{$m.cam_histogram}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <span class="info-wrap" title={$m.cam_histogram_info} aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           class="chevron" class:rotated={openSections.includes('histogram')}>
@@ -1032,22 +1042,37 @@
       </button>
 
       {#if openSections.includes('histogram')}
+        {@const hist = $histogramStore[selectedCameraIndex] ?? { r: [], g: [], b: [] }}
+        <!-- The store starts with thirty zeros per camera, so the array length
+             does not tell "no data" from "measured": the check is whether any
+             bar has height. A real image, even a black one, piles its pixels
+             into the first bin and normalizes it to 100, so all zeros happen
+             only when no frame has arrived. -->
+        {@const hasData = hist.r.some((v) => v > 0)}
         <div class="accordion-content">
-          <div class="histogram">
-            {#each { length: 30 } as _, i}
-              {@const hist = $histogramStore[selectedCameraIndex] ?? { r: [], g: [], b: [] }}
-              <div class="bar-group">
-                <div class="bar red"   style="height:{hist.r[i] ?? 0}%"></div>
-                <div class="bar green" style="height:{hist.g[i] ?? 0}%"></div>
-                <div class="bar blue"  style="height:{hist.b[i] ?? 0}%"></div>
-              </div>
-            {/each}
-          </div>
-          <div class="hist-legend">
-            <div class="leg"><div class="leg-dot r"></div><span>R</span></div>
-            <div class="leg"><div class="leg-dot g"></div><span>G</span></div>
-            <div class="leg"><div class="leg-dot b"></div><span>B</span></div>
-          </div>
+          {#if hasData}
+            <div class="histogram">
+              {#each { length: 30 } as _, i}
+                <div class="bar-group">
+                  <div class="bar red"   style="height:{hist.r[i] ?? 0}%"></div>
+                  <div class="bar green" style="height:{hist.g[i] ?? 0}%"></div>
+                  <div class="bar blue"  style="height:{hist.b[i] ?? 0}%"></div>
+                </div>
+              {/each}
+            </div>
+            <div class="hist-legend">
+              <div class="leg"><div class="leg-dot r"></div><span>R</span></div>
+              <div class="leg"><div class="leg-dot g"></div><span>G</span></div>
+              <div class="leg"><div class="leg-dot b"></div><span>B</span></div>
+            </div>
+          {:else}
+            <!-- Without this message an empty rectangle reads as something
+                 broken rather than as a chart waiting for data. The message has
+                 no box, like the one in the Settings section: the box belongs
+                 to the chart, and with no chart there is no box. The R/G/B
+                 legend is hidden too while there are no bars to explain. -->
+            <p class="controls-unavailable">{$m.cam_histogram_empty}</p>
+          {/if}
         </div>
       {/if}
     </div>
@@ -1057,17 +1082,14 @@
   {/if}<!-- /sidebarOpen -->
 </div><!-- /sidebar-wrapper -->
 
-<!-- ══════════════════════════════════════════════════════════════
-     DROPDOWNS DE BASIC (fuera del panel para escapar overflow:hidden)
-     Se renderizan en el DOM root y usan posición fija calculada.
-     ══════════════════════════════════════════════════════════════ -->
+<!-- Basic dropdowns, rendered outside the panel with `position: fixed` so the
+     scrolling panel does not clip them -->
 {#if openDropdown !== null}
-  <!-- Backdrop invisible que cierra el dropdown al hacer click fuera -->
+  <!-- Invisible backdrop: a click outside the dropdown closes it -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="global-backdrop" onclick={() => openDropdown = null}></div>
 
-  <!-- Menú del dropdown posicionado en el viewport -->
   <div
     class="global-dropdown"
     style="top: {dropdownPos.top}px; left: {dropdownPos.left}px; width: {dropdownPos.width}px"
@@ -1142,7 +1164,6 @@
     flex-shrink: 0;
   }
 
-  /* ── Tira de iconos (sidebar colapsado) ── */
   .icon-strip {
     width: 48px;
     height: 100%;
@@ -1181,7 +1202,6 @@
     color: var(--color-primary);
   }
 
-  /* ── Botón de colapsar (dentro del panel) ── */
   .collapse-btn {
     position: absolute;
     right: 8px;
@@ -1206,7 +1226,6 @@
     color: var(--color-light);
   }
 
-  /* ── Icono giratorio (autofocus en curso) ── */
   .spin-icon {
     animation: spin 1s linear infinite;
   }
@@ -1272,14 +1291,12 @@
     user-select: none;
   }
 
-  /* ── Badge de calibración ── */
   .cal-dot {
     font-size: 10px;
     color: var(--color-success, #4ade80);
     line-height: 1;
   }
 
-  /* ── Panel principal ── */
   .controls-panel {
     width: 280px;
     background-color: var(--color-surface-alt);
@@ -1288,7 +1305,7 @@
     flex-direction: column;
     border-right: 1px solid var(--border-color);
     overflow-y: auto;
-    overflow-x: visible; /* importante: no cortar los dropdowns */
+    overflow-x: visible; /* computes to auto beside overflow-y: auto; the Basic dropdowns escape through position: fixed */
     flex-shrink: 0;
     z-index: 20;
   }
@@ -1352,7 +1369,6 @@
     border-radius: 50%;
   }
 
-  /* ── Selector de cámara ── */
   .camera-selector {
     width: 100%;
     background-color: var(--color-surface);
@@ -1380,7 +1396,7 @@
 
   .relative { position: relative; }
 
-  /* Backdrop local (para dropdowns dentro del panel) */
+  /* Backdrop for the camera dropdown, which stays inside the panel */
   .fixed-backdrop {
     position: fixed;
     inset: 0;
@@ -1420,7 +1436,6 @@
   .camera-option:hover { background-color: var(--color-primary); color: white; }
   .camera-option.selected { background-color: var(--color-primary); color: white; }
 
-  /* ── Fila Estado + Modo ── */
   .camera-status-row {
     display: flex;
     align-items: center;
@@ -1454,6 +1469,24 @@
     color: #e07830;
   }
 
+  .reconnect-row { display: flex; flex-direction: column; gap: 4px; }
+
+  .btn-reconnect {
+    height: 36px;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-family);
+    font-size: 12px;
+    color: var(--color-light-grey);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .btn-reconnect:hover { border-color: var(--color-primary); color: var(--color-light); }
+  .btn-reconnect:disabled { opacity: 0.5; cursor: not-allowed; }
+
   /* ── Auto Focus ── */
   .btn-autofocus {
     width: 100%;
@@ -1474,17 +1507,11 @@
   .btn-autofocus:disabled { opacity: 0.6; cursor: not-allowed; }
   .btn-autofocus:disabled:hover { background-color: var(--color-primary); }
 
-  /* ── Acordeón ── */
   .accordion-block {
     background-color: var(--color-surface-alt);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    overflow: visible; /* IMPORTANTE: no cortar los dropdowns hijos */
-  }
-
-  .accordion-block.disabled {
-    opacity: 0.4;
-    pointer-events: none;
+    overflow: visible;
   }
 
   .accordion-trigger {
@@ -1514,6 +1541,11 @@
     color: var(--color-light);
   }
 
+  /* The title sits on the <span>, not on the <svg>, because browsers do not
+     reliably show a title on an inline svg. aria-hidden: the screen reader
+     already reads the section name and does not need the visual help text
+     as well. */
+  .info-wrap { display: inline-flex; }
   .info-icon { color: var(--color-light-grey); opacity: 0.4; }
 
   .chevron {
@@ -1532,10 +1564,9 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    overflow: visible; /* no cortar dropdowns */
+    overflow: visible;
   }
 
-  /* ── Filas de Basic ── */
   .control-row {
     display: flex;
     align-items: center;
@@ -1551,7 +1582,6 @@
     flex: 1;
   }
 
-  /* Botón de dropdown de Basic */
   .control-btn {
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
@@ -1572,13 +1602,11 @@
     z-index: 1;
   }
 
-  /* Borde color sand/highlight cuando está abierto */
   .control-btn:hover, .control-btn.open {
     border-color: var(--color-highlight);
   }
 
-  /* ── Dropdowns globales de Basic (renderizados fuera del panel) ── */
-  /* Se usan position: fixed calculada desde el viewport */
+  /* ── Basic dropdowns (rendered outside the panel, position: fixed) ── */
 
   .global-backdrop {
     position: fixed;
@@ -1620,34 +1648,6 @@
   .global-dropdown button:hover  { background-color: rgba(188,130,60,0.2); }
   .global-dropdown button.selected { background-color: var(--color-highlight); color: white; }
 
-  /* ── Focus buttons ── */
-  .focus-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 4px 0;
-  }
-
-  .focus-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    flex-shrink: 0;
-  }
-
-  .focus-btn:hover { background-color: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); }
-  .focus-btn:active { background-color: var(--color-primary); color: white; transform: scale(0.95); }
-  .focus-btn.center { background-color: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 10px rgba(90,140,98,0.3); }
-
   /* ── Settings ── */
   .settings-content { gap: 14px; }
 
@@ -1669,25 +1669,6 @@
     gap: 8px;
   }
 
-  .wb-btn {
-    flex: 1;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 0 10px;
-    min-height: var(--touch-target-min);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-family: var(--font-family);
-    font-size: 12px;
-    color: var(--color-light);
-    cursor: pointer;
-    transition: border-color var(--transition-base);
-  }
-
-  .wb-btn:hover { border-color: var(--color-highlight); }
-
   .wb-pipette {
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
@@ -1705,8 +1686,7 @@
 
   .wb-pipette:hover { background-color: var(--color-highlight); color: white; }
 
-  /* ── Sliders de gradiente (Temperatura y Tinte) ── */
-  /* El input[type=range] es completamente visible y estilizado */
+  /* ── Gradient sliders (temperature and tint) ── */
   .slider-row {
     display: flex;
     align-items: center;
@@ -1723,7 +1703,6 @@
     position: relative;
   }
 
-  /* Track de gradiente visible detrás del range */
   .slider-track-wrapper.temp {
     background: linear-gradient(to right, #4a7ec4, #d4a944);
     border-radius: 4px;
@@ -1738,7 +1717,7 @@
     overflow: visible;
   }
 
-  /* El input range flota sobre el track de gradiente */
+  /* The range input sits over the gradient track */
   .styled-range {
     position: absolute;
     inset: 0;
@@ -1752,7 +1731,6 @@
     transform: translateY(-50%);
   }
 
-  /* ── Thumb del range: dot blanco visible ── */
   .styled-range::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 24px;
@@ -1767,7 +1745,6 @@
 
   .styled-range::-webkit-slider-thumb:active { transform: scale(1.1); cursor: grabbing; }
 
-  /* ── Slider de Exposure ── */
   .exposure-block { align-items: center; }
 
   .exposure-val {
@@ -1790,14 +1767,12 @@
     z-index: 1;
   }
 
-  /* Track oscuro del exposure */
   .exposure-range::-webkit-slider-runnable-track {
     height: 4px;
     background-color: var(--color-surface);
     border-radius: 999px;
   }
 
-  /* Dot verde del exposure */
   .exposure-range::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 20px;
@@ -1813,7 +1788,6 @@
 
   .exposure-range::-webkit-slider-thumb:active { transform: scale(1.15); cursor: grabbing; }
 
-  /* Marcas del exposure */
   .exposure-marks {
     display: flex;
     justify-content: space-between;
@@ -1840,7 +1814,6 @@
   .e-mark span { font-size: 9px; color: var(--color-light-grey); }
   .e-mark.active span { color: var(--color-primary); }
 
-  /* ── Histograma ── */
   .histogram {
     height: 90px;
     background-color: var(--color-surface);
@@ -1916,5 +1889,15 @@
     flex-shrink: 0;
   }
 
-  .capitalize { text-transform: capitalize; }
+  .controls-unavailable {
+    margin: 0;
+    color: var(--color-light-grey);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+  }
+
+  .dslr-note.is-warning {
+    color: var(--color-warning);
+    margin-top: 6px;
+  }
 </style>

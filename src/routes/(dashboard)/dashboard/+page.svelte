@@ -1,29 +1,25 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Resumen (Dashboard unificado)
-  // Ruta: /dashboard → src/routes/(dashboard)/+page.svelte
+  // The overview page at /dashboard, one page for every role: KPIs, the
+  // volumes in progress and the activity calendar for all of them, plus the
+  // camera test panel for admin and operator (`canSeeCameras`). The camera
+  // panel polls still frames from `/cameras/preview/{index}`; every camera
+  // status write goes through `applyCameraSides` so that a reconnect and a
+  // late preview cannot overwrite each other.
   //
-  // Una sola página de resumen para todos los roles.
-  // El contenido se adapta según el rol:
-  //
-  //   admin    → KPIs + cámaras expandibles
-  //   operator → KPIs + cámaras expandibles
-  //   reviewer → KPIs
-  //
-  // Para mostrar/ocultar secciones por rol, busca los comentarios
-  // "Solo admin", "Admin + Operator", etc. en el template.
-  // ============================================================================
+  // Version: 0.1.0-beta
 
   import { onMount, onDestroy } from 'svelte';
-  import { browser } from '$app/environment';
-  import { env } from '$env/dynamic/public';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError } from '$lib/api';
+  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore, getApiBase,
+           type Collection, type Project } from '$lib/api';
   import { m } from '$lib/i18n';
+  import { describeCaptureFailure, describeTestCapture, type CaptureOutcome } from '$lib/capture-outcome';
+  import { sidesFromDevices, type SideInfo, type SideStatus } from '$lib/camera-sides';
+  import { createCameraRefresh } from '$lib/camera-refresh';
+  import InProgress from './InProgress.svelte';
+  import ActivityCalendar from './ActivityCalendar.svelte';
+  import StorageAlert from './StorageAlert.svelte';
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Usuario y rol
-  // ---------------------------------------------------------------------------
   let currentUser = $state<any>(null);
   let userRole    = $state('');
 
@@ -35,67 +31,89 @@
     return unsub;
   });
 
-  // Derivados de visibilidad de secciones
   let isAdmin    = $derived(userRole === 'admin');
   let isOperator = $derived(userRole === 'operator');
   let isReviewer = $derived(userRole === 'reviewer');
   let canSeeCameras = $derived(isAdmin || isOperator);
 
-  // Nombre del usuario para el saludo
   let userName = $derived(
     currentUser?.username
       ? currentUser.username.charAt(0).toUpperCase() + currentUser.username.slice(1)
       : $m.dash_greeting_fallback
   );
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: KPI stats
-  // ---------------------------------------------------------------------------
   let projectCount    = $state(0);
   let collectionCount = $state(0);
   let recordCount     = $state(0);
   let isLoadingStats  = $state(true);
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Almacenamiento
-  // Se muestra una alerta en el resumen cuando el uso supera el 85%.
-  // TODO: backend — reemplazar con llamada a systemApi.getStorageInfo()
-  // ---------------------------------------------------------------------------
-  const STORAGE_ALERT_THRESHOLD = 85;  // porcentaje
+  // Volumes and projects already loaded for the KPIs; `InProgress.svelte`
+  // builds its table and board from them (NEH-233).
+  let allCollections = $state<Collection[]>([]);
+  let allProjects    = $state<Project[]>([]);
 
-  let storageUsedGB  = $state(2457.6);   // placeholder — conectar con backend
-  let storageTotalGB = $state(10240);
-
-  let storagePercent = $derived(
-    Math.min(100, Math.round((storageUsedGB / storageTotalGB) * 100))
-  );
-
-  let storageAlert = $derived(storagePercent >= STORAGE_ALERT_THRESHOLD);
-
-  function formatStorage(gb: number): string {
-    if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
-    return `${gb.toFixed(0)} GB`;
-  }
-
-  // ---------------------------------------------------------------------------
-  // ESTADO: Cámaras
-  // expandedCamera: null | 'left' | 'right'
-  // Click en botón → expande el panel de esa cámara con preview
-  // Click de nuevo → colapsa
-  // ---------------------------------------------------------------------------
   let expandedCamera = $state<'left' | 'right' | null>(null);
   let previewUrls    = $state<Record<string, string>>({});
   let streamActive   = $state<Record<string, boolean>>({ left: false, right: false });
   let cameraStatus   = $state<Record<string, 'ok' | 'not-found' | 'unknown'>>({ left: 'unknown', right: 'unknown' });
+  let cameraModel    = $state<Record<string, string | null>>({ left: null, right: null });
+  type CameraSides = { left: SideInfo; right: SideInfo };
+  // Writers: initial enumeration, reconnect, and per-side preview results.
+  // List writers use cameraRefresh; previews check its recovery token and
+  // patch only their own side. Every status/model write happens here.
+  function applyCameraSides(sides: Partial<CameraSides>) {
+    for (const side of ['left', 'right'] as const) {
+      const info = sides[side];
+      if (!info) continue;
+      cameraStatus = { ...cameraStatus, [side]: info.status };
+      cameraModel = { ...cameraModel, [side]: info.model };
+    }
+  }
+  const cameraRefresh = createCameraRefresh<CameraSides>(applyCameraSides);
+
+  function applyPreviewStatus(token: number | null, side: string, status: SideStatus): boolean {
+    if (!cameraRefresh.acceptPreview(token)) return false;
+    applyCameraSides({ [side]: { status, model: cameraModel[side] } });
+    return true;
+  }
   let previewIntervals: Record<string, ReturnType<typeof setInterval>> = {};
   let isFetchingPreview: Record<string, boolean> = {};
+  // Result of the last test capture per camera. A success is cleared after
+  // 4 s; a failure stays until the next capture or camera issue, so that it
+  // does not disappear on its own.
+  let captureStatus = $state<Record<'left' | 'right', CaptureOutcome | null>>({ left: null, right: null });
+  // Timeout that clears an "ok" result after 4 s. A second capture inside
+  // that window must cancel the first one's timer, or it would erase the
+  // second one's result, success or error (NEH-166).
+  let captureClearTimers: Record<'left' | 'right', ReturnType<typeof setTimeout> | null> = { left: null, right: null };
+  // true while a capture request is in flight for that side; it disables the
+  // button so that two captures on the same camera cannot overlap.
+  let captureInFlight = $state<Record<'left' | 'right', boolean>>({ left: false, right: false });
+  // Non-reactive counter per side: each capture increments it and keeps its
+  // own value in `seq`; if the counter has moved on when the capture returns,
+  // the response is stale and must not write to `captureStatus`. A backstop —
+  // with the button disabled during the request it should never trigger.
+  let captureSeq: Record<'left' | 'right', number> = { left: 0, right: 0 };
+  // A failed focus or preview request per camera, shown on the same status
+  // line as the test capture. The latest event owns the line: a new issue
+  // clears an older capture result, and a new capture result hides the
+  // issue. The preview poll repeats the same issue every few seconds, so
+  // only a change of issue counts as new.
+  let cameraIssue = $state<Record<'left' | 'right', { kind: 'focus' | 'preview'; text: string } | null>>({ left: null, right: null });
+  function setIssue(side: 'left' | 'right', issue: { kind: 'focus' | 'preview'; text: string } | null) {
+    const current = cameraIssue[side];
+    if (issue && (current?.kind !== issue.kind || current.text !== issue.text) && captureStatus[side]) {
+      if (captureClearTimers[side]) {
+        clearTimeout(captureClearTimers[side]!);
+        captureClearTimers[side] = null;
+      }
+      captureStatus = { ...captureStatus, [side]: null };
+    }
+    cameraIssue = { ...cameraIssue, [side]: issue };
+  }
 
-  // Frecuencia del polling (ms) — para cambiar, modifica este valor
   const PREVIEW_INTERVAL_MS = 2500;
 
-  // ---------------------------------------------------------------------------
-  // AL MONTAR
-  // ---------------------------------------------------------------------------
   onMount(async () => {
     await Promise.all([
       loadStats(),
@@ -106,11 +124,8 @@
   onDestroy(() => {
     Object.values(previewIntervals).forEach(clearInterval);
     Object.values(previewUrls).forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
+    Object.values(captureClearTimers).forEach(timer => { if (timer) clearTimeout(timer); });
   });
-
-  // ---------------------------------------------------------------------------
-  // FUNCIONES
-  // ---------------------------------------------------------------------------
 
   async function loadStats() {
     try {
@@ -123,6 +138,8 @@
       projectCount    = projects.length;
       collectionCount = collectionCountResult;
       recordCount     = count;
+      allProjects     = projects;
+      allCollections  = await collectionsApi.listAll();
     } catch (err) {
       console.error('[Dashboard] Stats error:', err);
     } finally {
@@ -131,19 +148,39 @@
   }
 
   async function checkCamerasStatus() {
+    await cameraRefresh.read(
+      async () => sidesFromDevices(await camerasApi.listDevices()),
+      (err) => {
+        // A dead login is not a hardware failure; apiRequest redirects (NEH-64).
+        if (err instanceof AuthError && err.status === 401) return;
+        applyCameraSides({
+          left: { status: 'not-found', model: null },
+          right: { status: 'not-found', model: null }
+        });
+      }
+    );
+  }
+
+  // true while a "reconnect cameras" request is in flight; it prevents two
+  // overlapping reconnects and disables the button meanwhile.
+  let rescanInFlight = $state(false);
+  // Error message of the last failed reconnect, or null if none is pending.
+  let rescanError = $state<string | null>(null);
+
+  async function rescanCameras() {
+    if (rescanInFlight) return;
+    rescanInFlight = true;
     try {
-      const devices = await camerasApi.listDevices();
-      cameraStatus = {
-        left:  devices.some(d => d.index === 0) ? 'ok' : 'not-found',
-        right: devices.some(d => d.index === 1) ? 'ok' : 'not-found',
-      };
+      await cameraRefresh.reconnect(async () => sidesFromDevices(await camerasApi.rescan()));
+      rescanError = null;
     } catch (err) {
-      // Un 401 significa sesión muerta, no "sin cámaras" — apiRequest ya
-      // limpió la sesión y redirige a /login; no pisar esa navegación
-      // mostrando cámaras "not-found" que leerían como una falla de
-      // hardware (NEH-64).
+      // A 401 means a dead session, not a failed reconnect — `apiRequest`
+      // has already cleared the session and redirects to /login (as in
+      // `checkCamerasStatus`, NEH-64).
       if (err instanceof AuthError && err.status === 401) return;
-      cameraStatus = { left: 'not-found', right: 'not-found' };
+      rescanError = err instanceof Error ? err.message : String(err);
+    } finally {
+      rescanInFlight = false;
     }
   }
 
@@ -156,14 +193,8 @@
     }
   }
 
-  function getApiBase(): string {
-    if (!browser) return 'http://localhost:8000';
-    return env.PUBLIC_API_BASE || 'http://localhost:8000';
-  }
-
   function getAuthHeader(): HeadersInit {
-    if (!browser) return {};
-    const token = localStorage.getItem('access_token');
+    const token = tokenStore.get();
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
@@ -171,51 +202,141 @@
     streamActive = { ...streamActive, [side]: true };
     const index = side === 'left' ? 0 : 1;
     await fetchFrame(side, index);
+    // `fetchFrame()` may have stopped the stream (camera not found, 404)
+    // during the await; in that case no polling is set up.
+    if (!streamActive[side]) return;
     if (previewIntervals[side]) clearInterval(previewIntervals[side]);
     previewIntervals[side] = setInterval(() => fetchFrame(side, index), PREVIEW_INTERVAL_MS);
   }
 
   function stopStream(side: 'left' | 'right') {
     streamActive = { ...streamActive, [side]: false };
+    if (cameraIssue[side]?.kind === 'preview') setIssue(side, null);
     if (previewIntervals[side]) { clearInterval(previewIntervals[side]); delete previewIntervals[side]; }
     if (previewUrls[side]) { URL.revokeObjectURL(previewUrls[side]); previewUrls = { ...previewUrls, [side]: '' }; }
   }
 
-  // ── PARA SUSTITUIR POR STREAMING REAL ──────────────────────────────────────
-  // Cuando el backend tenga /cameras/stream/{index}, reemplazar fetchFrame por:
-  //   <img src="{getApiBase()}/cameras/stream/{index}" class="preview-img" />
-  // y eliminar el polling.
+  // Polls still frames. TODO: if the backend gains a streaming endpoint
+  // (`/cameras/stream/{index}`), an `<img>` pointed at it can replace this
+  // function and the polling.
   async function fetchFrame(side: string, index: number) {
     if (isFetchingPreview[side]) return;
     isFetchingPreview[side] = true;
+    const token = cameraRefresh.previewToken();
+    // A failure from before or during a reconnect says nothing about the
+    // camera now. Read-only check: acceptPreview would count it as a
+    // status observation.
+    const failureCounts = () =>
+      streamActive[side as 'left' | 'right'] && token !== null && cameraRefresh.previewToken() === token;
     try {
       const res = await fetch(`${getApiBase()}/cameras/preview/${index}`, { headers: getAuthHeader() });
+      if (res.status === 404) {
+        // A preview from before/during reconnect cannot undo its result or
+        // stop the stream. An accepted failure changes only this camera.
+        if (applyPreviewStatus(token, side, 'not-found')) {
+          stopStream(side as 'left' | 'right');
+        }
+        return;
+      }
+      if (!res.ok) {
+        if (failureCounts()) {
+          setIssue(side as 'left' | 'right', { kind: 'preview', text: $m.dash_camera_preview_error });
+        }
+        return;
+      }
       if (res.ok) {
+        // A good frame is evidence the body is there, whether the badge said
+        // not-found or was still unknown while the device list loaded.
+        if (cameraStatus[side] !== 'ok') {
+          applyPreviewStatus(token, side, 'ok');
+        }
+        if (cameraIssue[side as 'left' | 'right']?.kind === 'preview') setIssue(side as 'left' | 'right', null);
         const blob = await res.blob();
+        // If the operator stopped the stream while this request was in
+        // flight, the frame is late: it is not shown, because no polling is
+        // left to replace it and the box would keep a stale image next to
+        // "Test". A test capture is shown with the stream stopped (NEH-166),
+        // but that goes through `handleCapture`.
+        if (!streamActive[side as 'left' | 'right']) return;
         const url = URL.createObjectURL(blob);
         if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
         previewUrls = { ...previewUrls, [side]: url };
       }
-    } catch {}
+    } catch (e) {
+      console.error('[Dashboard] Preview request failed:', e);
+      if (failureCounts()) {
+        setIssue(side as 'left' | 'right', { kind: 'preview', text: $m.dash_camera_preview_error });
+      }
+    }
     finally { isFetchingPreview[side] = false; }
   }
 
   async function handleFocus(side: 'left' | 'right') {
-    try { await camerasApi.calibrate({ camera_index: side === 'left' ? 0 : 1 }); } catch {}
+    if (cameraIssue[side]?.kind === 'focus') setIssue(side, null);
+    try {
+      await camerasApi.calibrate({ camera_index: side === 'left' ? 0 : 1 });
+    } catch (e) {
+      if (e instanceof AuthError && e.status === 401) return;
+      console.error('[Dashboard] Focus failed:', e);
+      setIssue(side, { kind: 'focus', text: $m.dash_camera_focus_error });
+    }
   }
 
   async function handleCapture(side: 'left' | 'right') {
-    try { await camerasApi.capture({ project_name: '_test', camera_index: side === 'left' ? 0 : 1 }); } catch {}
+    // A capture already in flight on this side means the click is ignored,
+    // so two requests cannot overlap and overwrite each other's result
+    // (NEH-166).
+    if (captureInFlight[side]) return;
+    captureInFlight = { ...captureInFlight, [side]: true };
+    // Marks this capture as the latest for this side; any later write to
+    // `captureStatus[side]` that does not carry this number is stale and is
+    // dropped.
+    const seq = ++captureSeq[side];
+    // Cancels the clear timer of an earlier capture on this camera, if any,
+    // so that it does not erase this capture's result (NEH-166).
+    if (captureClearTimers[side]) {
+      clearTimeout(captureClearTimers[side]!);
+      captureClearTimers[side] = null;
+    }
+    captureStatus = { ...captureStatus, [side]: null };
+    // An old focus failure would come back once a good capture's line clears.
+    if (cameraIssue[side]?.kind === 'focus') setIssue(side, null);
+    try {
+      const index = side === 'left' ? 0 : 1;
+      const result = await camerasApi.testCapture(index);
+      if (seq === captureSeq[side]) {
+        // The captured image replaces this side's preview frame until the
+        // next real frame arrives (NEH-166), so the operator sees what the
+        // camera actually took, in the same box.
+        const url = URL.createObjectURL(result.blob);
+        if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
+        previewUrls = { ...previewUrls, [side]: url };
+        const outcome = describeTestCapture(result, url);
+        captureStatus = { ...captureStatus, [side]: outcome };
+        captureClearTimers[side] = setTimeout(() => {
+          captureClearTimers[side] = null;
+          // Clear only if the result is still the "ok" this timer was set
+          // for — a later capture may already have changed it (success or
+          // error).
+          if (seq === captureSeq[side] && captureStatus[side]?.kind === 'ok') {
+            captureStatus = { ...captureStatus, [side]: null };
+          }
+        }, 4000);
+      }
+    } catch (e) {
+      if (seq === captureSeq[side]) {
+        console.error('[Dashboard] Test capture error:', e);
+        captureStatus = { ...captureStatus, [side]: describeCaptureFailure(e, $m) };
+      }
+    } finally {
+      captureInFlight = { ...captureInFlight, [side]: false };
+    }
   }
 
 </script>
 
-<!-- ============================================================
-     PÁGINA DE RESUMEN
-     ============================================================ -->
 <div class="page">
 
-  <!-- Saludo personalizado -->
   <div class="page-header">
     <h1 class="greeting">{$m.dash_greeting(userName)}</h1>
     <p class="subtitle">
@@ -226,23 +347,8 @@
     </p>
   </div>
 
-  <!-- ── ALERTA DE ALMACENAMIENTO ── -->
-  <!-- Visible solo cuando el almacenamiento supera el STORAGE_ALERT_THRESHOLD -->
-  <!-- La misma lógica está en la página de Configuración -->
-  {#if storageAlert}
-    <div class="storage-alert-banner">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-        <line x1="12" y1="9" x2="12" y2="13"/>
-        <line x1="12" y1="17" x2="12.01" y2="17"/>
-      </svg>
-      <span>
-        {$m.dash_storage_alert_p1}<strong>{storagePercent}%</strong>{$m.dash_storage_alert_p2(formatStorage(storageUsedGB), formatStorage(storageTotalGB))}<a href="/dashboard/config" class="alert-link">{$m.nav_settings}</a>{$m.dash_storage_alert_p3}
-      </span>
-    </div>
-  {/if}
+  <StorageAlert />
 
-  <!-- ── KPI CARDS ── -->
   <div class="kpi-grid">
 
     <div class="kpi-card">
@@ -265,10 +371,12 @@
 
   </div>
 
-  <!-- ══════════════════════════════════════════════════════
-       SECCIÓN: PROBAR CÁMARAS
-       Solo visible para admin y operator (canSeeCameras)
-       ══════════════════════════════════════════════════════ -->
+  <!-- Volumes in progress (NEH-233): direct access to capture or review a
+       given volume. `InProgress` draws nothing when no volume has records. -->
+  <InProgress collections={allCollections} projects={allProjects} />
+
+  <ActivityCalendar />
+
   {#if canSeeCameras}
     <div class="section">
       <h2 class="section-title">{$m.dash_test_cameras}</h2>
@@ -282,7 +390,6 @@
 
           <div class="camera-panel" class:expanded={isExpanded}>
 
-            <!-- Botón/header (siempre visible) — click para expandir/colapsar -->
             <button class="camera-toggle-btn" class:expanded={isExpanded} onclick={() => toggleCamera(side)}>
               <div class="cam-icon">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -292,9 +399,8 @@
               </div>
               <div class="cam-info">
                 <span class="cam-name">{label}</span>
-                <span class="cam-model">imx519</span>
+                <span class="cam-model">{cameraModel[side] ?? '—'}</span>
               </div>
-              <!-- Badge OK / Not found -->
               <div class="cam-badge" class:ok={status === 'ok'} class:notfound={status === 'not-found'}>
                 {#if status === 'ok'}
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
@@ -310,13 +416,10 @@
               </svg>
             </button>
 
-            <!-- Panel expandido: preview + botones -->
             {#if isExpanded}
               <div class="cam-expanded">
-                <!-- Área de preview (polling) -->
-                <!-- Para sustituir: ver comentario en fetchFrame() arriba -->
                 <div class="preview-area">
-                  {#if previewUrls[side] && active}
+                  {#if previewUrls[side]}
                     <img src={previewUrls[side]} alt={side === 'left' ? $m.dash_camera_left : $m.dash_camera_right} class="preview-img" />
                   {:else}
                     <div class="no-signal">
@@ -330,7 +433,6 @@
                   {/if}
                 </div>
 
-                <!-- Botón Probar / Detener -->
                 <button class="btn-probar" onclick={() => active ? stopStream(side) : startStream(side)}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     {#if active}
@@ -343,7 +445,6 @@
                   {active ? $m.dash_camera_stop : $m.dash_camera_test}
                 </button>
 
-                <!-- Botones secundarios -->
                 <div class="secondary-btns">
                   <button class="btn-secondary" onclick={() => handleFocus(side)}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -351,7 +452,7 @@
                     </svg>
                     {$m.dash_camera_focus}
                   </button>
-                  <button class="btn-secondary" onclick={() => handleCapture(side)}>
+                  <button class="btn-secondary" disabled={captureInFlight[side]} onclick={() => handleCapture(side)}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <rect x="3" y="3" width="18" height="18" rx="2"/>
                       <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -360,16 +461,52 @@
                     {$m.common_capture}
                   </button>
                 </div>
+                {#if !captureStatus[side] && cameraIssue[side]}
+                  <p class="capture-status is-error" role="status">{cameraIssue[side].text}</p>
+                {/if}
+                {#if captureStatus[side]}
+                  <p
+                    class="capture-status"
+                    class:is-error={captureStatus[side].kind === 'error'}
+                    role="status"
+                  >
+                    {captureStatus[side].kind === 'ok' ? $m.dash_camera_capture_ok : $m.dash_camera_capture_error}
+                    {#if captureStatus[side].kind === 'ok' && captureStatus[side].seconds != null}
+                      {$m.dash_camera_capture_took(captureStatus[side].seconds.toFixed(1))}
+                    {/if}
+                    {#if captureStatus[side].kind === 'error' && captureStatus[side].detail}: {captureStatus[side].detail}{/if}
+                  </p>
+                {/if}
               </div>
             {/if}
 
           </div>
         {/each}
       </div>
+
+      <!-- Camera recovery: reconnect after a loose cable or a camera that went
+           to sleep (NEH-229). Always visible with the camera section; the
+           "missing camera" hint appears only when a side is not-found. -->
+      <div class="cam-recovery">
+        {#if cameraStatus.left === 'not-found' || cameraStatus.right === 'not-found'}
+          {@const missingLabels = (['left', 'right'] as const)
+            .filter(side => cameraStatus[side] === 'not-found')
+            .map(side => (side === 'left' ? $m.dash_camera_left : $m.dash_camera_right))
+            .join(' / ')}
+          <p class="cam-hint">{$m.dash_camera_missing_hint(missingLabels)}</p>
+        {/if}
+        <button class="btn-secondary" disabled={rescanInFlight} onclick={rescanCameras}>
+          {$m.dash_camera_reconnect}
+        </button>
+        {#if rescanError}
+          <p class="capture-status is-error" role="status">
+            {$m.dash_camera_reconnect_error}: {rescanError}
+          </p>
+        {/if}
+      </div>
     </div>
   {/if}
 
-  <!-- Badge flotante de cámaras (solo si el usuario puede ver cámaras) -->
   {#if canSeeCameras}
     <div class="cameras-badge">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -389,29 +526,6 @@
   .page-header { margin-bottom: 28px; }
   .greeting { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
-
-  /* Alerta de almacenamiento */
-  .storage-alert-banner {
-    display: flex; align-items: flex-start; gap: 12px;
-    padding: 14px 18px;
-    background-color: rgba(214,103,74,0.08);
-    border: 1px solid rgba(214,103,74,0.3);
-    border-radius: var(--radius-md);
-    color: var(--color-error);
-    font-size: var(--text-sm); line-height: 1.5;
-    margin-bottom: 24px;
-  }
-
-  .storage-alert-banner strong { font-weight: var(--fw-bold); }
-
-  .alert-link {
-    color: var(--color-error);
-    font-weight: var(--fw-semibold);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .alert-link:hover { opacity: 0.8; }
 
   /* KPIs */
   .kpi-grid {
@@ -434,7 +548,6 @@
 
   .kpi-card:hover { transform: translateY(-3px); }
 
-  /* Rayita de color en la parte superior izquierda */
   .kpi-line {
     width: 32px;
     height: 3px;
@@ -445,12 +558,9 @@
   .kpi-number { font-size: var(--text-h1); font-weight: var(--fw-extrabold); color: var(--color-light); line-height: 1; margin: 0; }
   .kpi-label  { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
 
-  /* Sección */
   .section { margin-bottom: 36px; }
   .section-title { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0 0 20px; }
-  .section-sub { font-size: var(--text-sm); font-weight: var(--fw-regular); color: var(--color-light-grey); margin-left: 8px; }
 
-  /* Cámaras */
   .cameras-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
   .camera-panel {
@@ -489,6 +599,9 @@
   .cam-info { display: flex; flex-direction: column; text-align: left; flex: 1; min-width: 0; }
   .cam-name  { font-size: 13px; font-weight: var(--fw-bold); color: var(--color-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cam-model { font-size: 11px; color: var(--color-light-grey); }
+
+  .cam-recovery { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 12px; }
+  .cam-hint { font-size: 12px; color: var(--color-light-grey); margin: 0; }
 
   .cam-badge {
     display: flex; align-items: center; gap: 4px;
@@ -550,8 +663,11 @@
   }
 
   .btn-secondary:hover { border-color: var(--color-primary); color: var(--color-light); }
+  .btn-secondary:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
 
-  /* Badge flotante de cámaras */
+  .capture-status { margin: 8px 0 0; font-size: var(--text-sm); color: var(--color-light-grey); }
+  .capture-status.is-error { color: var(--color-error); }
+
   .cameras-badge {
     position: fixed; bottom: 24px; right: 24px;
     background-color: var(--color-surface);

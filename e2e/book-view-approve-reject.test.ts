@@ -1,0 +1,471 @@
+// NEH-209: Approve/Reject from Book view, end to end against a real
+// running backend (the docker compose dev stack, which the superproject's
+// `scripts/start-dev.sh` starts). Test data (project/collection/records/images)
+// is created and torn down via direct API calls in beforeAll/afterAll, since
+// this repo has no seed script.
+//
+// Requires an admin-role account to already exist in the target backend.
+// A reviewer is not enough: the backend creates records as 'captured', and
+// handing a collection over for review (captured -> in_review) needs an
+// operator or admin, while approving needs a reviewer or admin. Only admin
+// can do both. Configure via env vars (falls back to the throwaway
+// `e2e_neh209` account provisioned in this dev environment):
+//   E2E_USERNAME, E2E_PASSWORD
+//
+// Version: 0.1.0-beta
+import { test, expect, testStem, type APIRequestContext } from './fixtures';
+
+const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
+const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh209';
+const E2E_PASSWORD = process.env.E2E_PASSWORD ?? 'E2ePassword123!';
+
+// 1x1 px JPEG, just enough for the backend's image-upload validation.
+const TINY_JPEG = Buffer.from(
+	'/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/wAALCAABAAEBAREA/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAA/AL+n/9k=',
+	'base64'
+);
+
+interface SetupResult {
+	token: string;
+	projectId: number;
+	dualCollectionId: number;
+	singleCollectionId: number;
+	dualRecordId: number;
+	singleRecordId: number;
+}
+
+async function login(request: APIRequestContext): Promise<string> {
+	const resp = await request.post(`${API_BASE}/auth/login`, {
+		data: { username: E2E_USERNAME, password: E2E_PASSWORD }
+	});
+	if (!resp.ok()) {
+		throw new Error(
+			`E2E login failed (${resp.status()}). Set E2E_USERNAME/E2E_PASSWORD to a valid admin account. Body: ${await resp.text()}`
+		);
+	}
+	const { access_token } = await resp.json();
+	return access_token as string;
+}
+
+async function createRecordWithImages(
+	request: APIRequestContext,
+	token: string,
+	collectionId: number,
+	title: string,
+	captureMode: 'single' | 'dual'
+): Promise<number> {
+	const authHeaders = { Authorization: `Bearer ${token}` };
+
+	const recResp = await request.post(`${API_BASE}/records/`, {
+		headers: authHeaders,
+		data: { title, collection_id: collectionId, capture_mode: captureMode }
+	});
+	expect(recResp.ok(), await recResp.text()).toBeTruthy();
+	const record = await recResp.json();
+
+	const roles = captureMode === 'dual' ? ['left', 'right'] : ['single'];
+	for (const role of roles) {
+		// `role` is a query param on this endpoint, not a multipart field
+		// (it isn't declared with FastAPI's Form()) — sending it as form
+		// data gets silently ignored and every image ends up with role=null.
+		const imgResp = await request.post(
+			`${API_BASE}/records/${record.id}/images?role=${role}`,
+			{
+				headers: authHeaders,
+				multipart: {
+					file: { name: `${role}.jpg`, mimeType: 'image/jpeg', buffer: TINY_JPEG }
+				}
+			}
+		);
+		expect(imgResp.ok(), await imgResp.text()).toBeTruthy();
+	}
+
+	// Hand the collection over, so the record reaches in_review — the only
+	// state a reviewer can approve or reject from (NEH-260). The backend
+	// creates records as captured, and promotion acts on a whole collection.
+	// Every record created before this one has already been promoted, so
+	// this one is the only captured record there.
+	const promoteResp = await request.post(`${API_BASE}/collections/${collectionId}/promote`, {
+		headers: authHeaders
+	});
+	expect(promoteResp.ok(), await promoteResp.text()).toBeTruthy();
+	expect((await promoteResp.json()).promoted).toBe(1);
+
+	return record.id as number;
+}
+
+async function setup(request: APIRequestContext): Promise<SetupResult> {
+	const token = await login(request);
+	const authHeaders = { Authorization: `Bearer ${token}` };
+	const suffix = Date.now();
+
+	const projResp = await request.post(`${API_BASE}/projects/`, {
+		headers: authHeaders,
+		data: { name: `NEH-209 e2e ${suffix}` }
+	});
+	expect(projResp.ok(), await projResp.text()).toBeTruthy();
+	const project = await projResp.json();
+
+	const dualColResp = await request.post(`${API_BASE}/collections/`, {
+		headers: authHeaders,
+		data: { name: `Dual ${suffix}`, project_id: project.id, filename_stem: testStem() }
+	});
+	expect(dualColResp.ok(), await dualColResp.text()).toBeTruthy();
+	const dualCollection = await dualColResp.json();
+
+	const singleColResp = await request.post(`${API_BASE}/collections/`, {
+		headers: authHeaders,
+		data: { name: `Single ${suffix}`, project_id: project.id, filename_stem: testStem() }
+	});
+	expect(singleColResp.ok(), await singleColResp.text()).toBeTruthy();
+	const singleCollection = await singleColResp.json();
+
+	const dualRecordId = await createRecordWithImages(
+		request,
+		token,
+		dualCollection.id,
+		'Dual-mode document',
+		'dual'
+	);
+	const singleRecordId = await createRecordWithImages(
+		request,
+		token,
+		singleCollection.id,
+		'Single-mode document',
+		'single'
+	);
+
+	return {
+		token,
+		projectId: project.id,
+		dualCollectionId: dualCollection.id,
+		singleCollectionId: singleCollection.id,
+		dualRecordId,
+		singleRecordId
+	};
+}
+
+async function teardown(request: APIRequestContext, token: string, projectId: number) {
+	// Neither DELETE /projects/{id} nor DELETE /collections/{id} cascade —
+	// both 409 on anything non-empty — so records must go first, then
+	// collections, then the project itself.
+	const authHeaders = { Authorization: `Bearer ${token}` };
+
+	const colsResp = await request.get(`${API_BASE}/collections/?project_id=${projectId}`, {
+		headers: authHeaders
+	});
+	const collections = await colsResp.json();
+
+	for (const collection of collections) {
+		const recsResp = await request.get(`${API_BASE}/records/?collection_id=${collection.id}`, {
+			headers: authHeaders
+		});
+		const records = await recsResp.json();
+		for (const record of records) {
+			await request.delete(`${API_BASE}/records/${record.id}`, { headers: authHeaders });
+		}
+		await request.delete(`${API_BASE}/collections/${collection.id}`, { headers: authHeaders });
+	}
+
+	await request.delete(`${API_BASE}/projects/${projectId}`, { headers: authHeaders });
+}
+
+async function openBookView(page: import('@playwright/test').Page, ctx: SetupResult, collectionId: number) {
+	await page.addInitScript(
+		([token, user]) => {
+			localStorage.setItem('access_token', token as string);
+			localStorage.setItem('auth_user', user as string);
+		},
+		[ctx.token, JSON.stringify({ id: 0, username: E2E_USERNAME, email: 'e2e@example.com', role: 'admin', is_active: true })]
+	);
+	await page.goto(`/dashboard/projects/${ctx.projectId}/collections/${collectionId}`);
+	// Switch to Book view (spread). The toolbar is in the server-rendered
+	// markup, so it can be clicked before the page has hydrated, and that
+	// click is lost: the view stays on list and the left panel, which only
+	// book view renders, never appears. Retry the click until it does.
+	await expect(async () => {
+		await page.getByTitle('Vista libro').click();
+		await expect(page.getByRole('button', { name: 'Anotaciones' })).toBeVisible({ timeout: 1000 });
+	}).toPass({ timeout: 15000 });
+	// Approve/Reject live in the left panel's "Anotaciones" tab (NEH-209),
+	// which is collapsed by default, so open it.
+	await page.getByRole('button', { name: 'Anotaciones' }).click();
+	// Wait for the panel to actually be interactive before any test starts
+	// clicking inside it — avoids a race where a click lands before the
+	// tab's content has finished rendering.
+	await expect(page.getByRole('button', { name: 'Marcar error' })).toBeVisible();
+}
+
+// "Marcar error" and "Agregar nota" are two independent accordion buttons,
+// collapsed by default. Expands "Marcar error", taps each given error row
+// (asserting it registers as selected before moving on) and saves them as
+// ONE error-only annotation via "Listo" — "Rechazar" depends on a SAVED
+// error annotation existing, not on the live checklist selection.
+async function flagErrors(page: import('@playwright/test').Page, labels: string[]) {
+	await page.getByRole('button', { name: 'Marcar error' }).click();
+	for (const label of labels) {
+		const row = page.getByRole('button', { name: label, exact: true });
+		await expect(row).toBeVisible();
+		await row.click();
+		await expect(row).toHaveClass(/selected/);
+	}
+	await page.getByRole('button', { name: 'Listo', exact: true }).click();
+	// The card collapses only once the annotation has been saved and added
+	// to the panel's list. Until then Rechazar still finds no saved reason
+	// and opens the "select a reason" popup instead of the confirmation.
+	await expect(page.getByRole('button', { name: labels[0], exact: true })).toBeHidden();
+}
+
+// "Agregar nota" is a separate accordion — saves a note-only annotation
+// (no error types) via its own "Listo".
+async function addNote(page: import('@playwright/test').Page, text: string) {
+	await page.getByRole('button', { name: 'Agregar nota' }).click();
+	await page.getByPlaceholder('Agrega un comentario (opcional)…').fill(text);
+	await page.getByRole('button', { name: 'Listo', exact: true }).click();
+	// As in flagErrors: the card collapses once the note has been saved.
+	await expect(page.getByPlaceholder('Agrega un comentario (opcional)…')).toBeHidden();
+}
+
+test.describe('Book view — approve/reject (NEH-209)', () => {
+	let ctx: SetupResult;
+
+	test.beforeAll(async ({ request }) => {
+		ctx = await setup(request);
+	});
+
+	test.afterAll(async ({ request }) => {
+		await teardown(request, ctx.token, ctx.projectId);
+	});
+
+	test('dual-camera document: reject shows both images pending recapture', async ({ page }) => {
+		await openBookView(page, ctx, ctx.dualCollectionId);
+
+		await flagErrors(page, ['Imagen movida']);
+		await page.getByRole('button', { name: 'Rechazar' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect(page.locator('.pending-recapture-badge')).toHaveCount(2);
+	});
+
+	test('single-camera document: reject shows exactly one image pending recapture', async ({ page }) => {
+		await openBookView(page, ctx, ctx.singleCollectionId);
+
+		await flagErrors(page, ['Imagen movida']);
+		await page.getByRole('button', { name: 'Rechazar' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect(page.locator('.pending-recapture-badge')).toHaveCount(1);
+	});
+
+	test('approve reflects immediately without a page reload, and shows the "Aprobada" tag', async ({ page, request }) => {
+		const colResp = await request.post(`${API_BASE}/collections/`, {
+			headers: { Authorization: `Bearer ${ctx.token}` },
+			data: { name: `Approve ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+		});
+		const collection = await colResp.json();
+		await createRecordWithImages(request, ctx.token, collection.id, 'Approve-me document', 'single');
+
+		await openBookView(page, ctx, collection.id);
+
+		await page.getByRole('button', { name: 'Aprobar' }).click();
+		await expect(page.getByText('¿Confirmas que quieres aprobar esta imagen?')).toBeVisible();
+		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect(page.getByText(/pendiente de recaptura/)).toHaveCount(0);
+		await expect(page.locator('.approved-badge')).toHaveCount(1);
+		await expect(page.getByText('Aprobada')).toBeVisible();
+		// No navigation happened — still on the same collection URL.
+		await expect(page).toHaveURL(new RegExp(`/collections/${collection.id}$`));
+	});
+
+	test('undo: approving then rejecting-to-undo brings the record back to in_review, fully interactive again', async ({ page, request }) => {
+		const colResp = await request.post(`${API_BASE}/collections/`, {
+			headers: { Authorization: `Bearer ${ctx.token}` },
+			data: { name: `Undo ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+		});
+		const collection = await colResp.json();
+		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Undo document', 'single');
+
+		await openBookView(page, ctx, collection.id);
+
+		// Approve it.
+		await page.getByRole('button', { name: 'Aprobar' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+		await expect(page.getByRole('button', { name: 'Aprobar' })).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeEnabled();
+
+		// Undo the approval: Rechazar on an approved record reverts to
+		// in_review (no reason required) instead of a formal rejection.
+		await page.getByRole('button', { name: 'Rechazar' }).click();
+		await expect(page.getByText('¿Confirmas que quieres deshacer la aprobación de esta imagen?')).toBeVisible();
+		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect(page.locator('.approved-badge')).toHaveCount(0);
+		const statusResp = await request.get(`${API_BASE}/records/${recordId}`, {
+			headers: { Authorization: `Bearer ${ctx.token}` }
+		});
+		expect((await statusResp.json()).status).toBe('in_review');
+
+		// Back to fully interactive: both buttons enabled again. Rechazar
+		// still needs a saved reason, but it asks for one in a popup rather
+		// than staying disabled.
+		await expect(page.getByRole('button', { name: 'Aprobar' })).toBeEnabled();
+		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeEnabled();
+		await page.getByRole('button', { name: 'Rechazar' }).click();
+		await expect(page.getByRole('dialog').getByText('Debes seleccionar al menos un error.')).toBeVisible();
+	});
+
+	test('undo: rejecting then approving-to-undo brings the record back to in_review', async ({ page, request }) => {
+		const colResp = await request.post(`${API_BASE}/collections/`, {
+			headers: { Authorization: `Bearer ${ctx.token}` },
+			data: { name: `Undo2 ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+		});
+		const collection = await colResp.json();
+		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Undo2 document', 'single');
+
+		await openBookView(page, ctx, collection.id);
+
+		// Reject it.
+		await flagErrors(page, ['Imagen movida']);
+		await page.getByRole('button', { name: 'Rechazar' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+
+		// A rejected record accepts no more annotations: both accordion
+		// buttons are disabled until it's approved (or recaptured) again.
+		await expect(page.getByRole('button', { name: 'Marcar error' })).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'Agregar nota' })).toBeDisabled();
+
+		// Undo the rejection: Aprobar on a rejected record reverts to
+		// in_review instead of jumping straight to approved.
+		await page.getByRole('button', { name: 'Aprobar' }).click();
+		await expect(page.getByText('¿Confirmas que quieres deshacer el rechazo de esta imagen?')).toBeVisible();
+		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect(page.locator('.pending-recapture-badge')).toHaveCount(0);
+		const statusResp = await request.get(`${API_BASE}/records/${recordId}`, {
+			headers: { Authorization: `Bearer ${ctx.token}` }
+		});
+		expect((await statusResp.json()).status).toBe('in_review');
+
+		// Re-enabled again now that it's back in in_review.
+		await expect(page.getByRole('button', { name: 'Marcar error' })).toBeEnabled();
+		await expect(page.getByRole('button', { name: 'Agregar nota' })).toBeEnabled();
+	});
+
+	test('cancelling the confirm popup performs no action', async ({ page, request }) => {
+		const colResp = await request.post(`${API_BASE}/collections/`, {
+			headers: { Authorization: `Bearer ${ctx.token}` },
+			data: { name: `Cancel ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+		});
+		const collection = await colResp.json();
+		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Cancel document', 'single');
+
+		await openBookView(page, ctx, collection.id);
+
+		await page.getByRole('button', { name: 'Aprobar' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Cancelar', exact: true }).click();
+
+		await expect(page.getByText('¿Confirmas que quieres aprobar esta imagen?')).toHaveCount(0);
+		const statusResp = await request.get(`${API_BASE}/records/${recordId}`, {
+			headers: { Authorization: `Bearer ${ctx.token}` }
+		});
+		expect((await statusResp.json()).status).toBe('in_review');
+	});
+
+	test('"Marcar error" and "Agregar nota" are independent — picking two errors and adding a note create TWO separate annotation cards', async ({ page, request }) => {
+		const colResp = await request.post(`${API_BASE}/collections/`, {
+			headers: { Authorization: `Bearer ${ctx.token}` },
+			data: { name: `MultiTag ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+		});
+		const collection = await colResp.json();
+		await createRecordWithImages(request, ctx.token, collection.id, 'MultiTag document', 'single');
+
+		await openBookView(page, ctx, collection.id);
+
+		await flagErrors(page, ['Imagen movida', 'Reflejo/Brillo']);
+		await addNote(page, 'nota independiente');
+
+		await expect(page.getByText('nota independiente')).toBeVisible();
+		const noteCard = page.locator('.annotation-card', { hasText: 'nota independiente' });
+		await expect(noteCard.getByText('Imagen movida')).toHaveCount(0);
+
+		const errorCard = page.locator('.annotation-card', { has: page.getByText('Imagen movida') });
+		await expect(errorCard.getByText('Reflejo/Brillo')).toBeVisible();
+		await expect(errorCard.getByText('nota independiente')).toHaveCount(0);
+	});
+
+	test('rejecting with multiple reasons selected sends only the FIRST one to the backend', async ({ page, request }) => {
+		const colResp = await request.post(`${API_BASE}/collections/`, {
+			headers: { Authorization: `Bearer ${ctx.token}` },
+			data: { name: `FirstReason ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+		});
+		const collection = await colResp.json();
+		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'FirstReason document', 'single');
+
+		await openBookView(page, ctx, collection.id);
+
+		// Pick "Reflejo/Brillo" (glare) first, then "Imagen movida" (blur) —
+		// saved as one annotation, so the reject sends the first of the two.
+		await flagErrors(page, ['Reflejo/Brillo', 'Imagen movida']);
+		await page.getByRole('button', { name: 'Rechazar' }).click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect(page.locator('.pending-recapture-badge')).toHaveCount(1);
+		const rejectionsResp = await request.get(`${API_BASE}/records/${recordId}/rejections`, {
+			headers: { Authorization: `Bearer ${ctx.token}` }
+		});
+		const rejections = await rejectionsResp.json();
+		expect(rejections[0].predefined_reason).toBe('glare');
+	});
+
+	test('"Recapturar imagen" on a rejected record navigates to live-preview with the record id', async ({ page, request }) => {
+		const colResp = await request.post(`${API_BASE}/collections/`, {
+			headers: { Authorization: `Bearer ${ctx.token}` },
+			data: { name: `Recapture ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+		});
+		const collection = await colResp.json();
+		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Recapture document', 'single');
+		const rejectResp = await request.post(`${API_BASE}/records/${recordId}/reject`, {
+			headers: { Authorization: `Bearer ${ctx.token}`, 'Content-Type': 'application/json' },
+			data: { predefined_reason: 'blur' }
+		});
+		expect(rejectResp.ok(), await rejectResp.text()).toBeTruthy();
+
+		await openBookView(page, ctx, collection.id);
+
+		await expect(page.getByRole('button', { name: 'Rechazar' })).toHaveCount(0);
+		await page.getByRole('button', { name: 'Recapturar imagen' }).click();
+
+		await expect(page).toHaveURL(new RegExp(`/live-preview\\?projectId=${ctx.projectId}&collectionId=${collection.id}&recordId=${recordId}$`));
+	});
+
+	test('regression: the old isolated rejection-comment modal never appears, and "Marcar error"/"Agregar nota" are collapsed accordions, not an always-open list', async ({ page, request }) => {
+		const colResp = await request.post(`${API_BASE}/collections/`, {
+			headers: { Authorization: `Bearer ${ctx.token}` },
+			data: { name: `Regression ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+		});
+		const collection = await colResp.json();
+		await createRecordWithImages(request, ctx.token, collection.id, 'Regression-check document', 'single');
+
+		await openBookView(page, ctx, collection.id);
+
+		// Rejection must not open a standalone dialog with this heading and a
+		// plain textarea that has no reason picker.
+		await expect(page.getByText('Rechazar registros')).toHaveCount(0);
+		await expect(page.getByPlaceholder('Describe el motivo del rechazo…')).toHaveCount(0);
+		// Collapsed by default: neither the error rows nor the comment box
+		// are visible until their own accordion button is tapped.
+		await expect(page.getByRole('button', { name: 'Imagen movida', exact: true })).toHaveCount(0);
+		await expect(page.getByPlaceholder('Agrega un comentario (opcional)…')).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Marcar error' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Agregar nota' })).toBeVisible();
+		await page.getByRole('button', { name: 'Marcar error' }).click();
+		await expect(page.getByRole('button', { name: 'Imagen movida', exact: true })).toBeVisible();
+		// Rechazar/Aprobar are inline in the panel, no dialog/modal involved
+		// until a click actually requests confirmation.
+		await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Aprobar' })).toBeVisible();
+	});
+});

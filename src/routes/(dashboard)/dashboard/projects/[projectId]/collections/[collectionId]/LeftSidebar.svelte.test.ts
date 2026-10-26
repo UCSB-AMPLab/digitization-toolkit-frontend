@@ -1,0 +1,808 @@
+// NEH-anotaciones-rechazo: "Marcar error" and "Agregar nota" are two
+// independent accordion buttons (collapsed by default, icon + label,
+// neutral surface style) — each expands in-line to its own content
+// (a vertical checkmark-row list of error types, or a comment textarea)
+// plus its own "Listo" button, and each creates its OWN annotation
+// (error_types only, or note only) instead of a combined one. "Rechazar"
+// still depends on whether the record already has a SAVED error
+// annotation (not the live checklist selection, which is cleared after
+// every "Listo") and sends the first error type of the OLDEST saved
+// annotation as predefined_reason.
+//
+// Version: 0.1.0-beta
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+
+vi.mock('$env/dynamic/public', () => ({ env: {} }));
+
+import { recordsApi, ApiError, type Record as ApiRecord, type RecordAnnotation } from '$lib/api';
+import { es } from '$lib/i18n/es';
+import LeftSidebar from './LeftSidebar.svelte';
+
+function makeRecord(overrides: Partial<ApiRecord> = {}): ApiRecord {
+	return {
+		id: 1,
+		title: 'Test record',
+		status: 'in_review',
+		capture_mode: 'single',
+		images: [],
+		...overrides
+	};
+}
+
+function makeAnnotation(overrides: Partial<RecordAnnotation> = {}): RecordAnnotation {
+	return {
+		id: 1,
+		record_id: 1,
+		error_types: [],
+		note: undefined,
+		created_at: '',
+		...overrides
+	};
+}
+
+function baseProps(overrides: Record<string, unknown> = {}) {
+	return {
+		viewMode: 'spread' as const,
+		currentIndex: 1,
+		totalRecords: 1,
+		onRotateLeft: vi.fn(),
+		onRotateRight: vi.fn(),
+		onRecordUpdated: vi.fn(),
+		onRecapture: vi.fn(),
+		currentRecord: makeRecord(),
+		userRole: 'reviewer',
+		...overrides
+	};
+}
+
+async function openAnnotationsTab(screen: { getByRole: (...a: any[]) => any }) {
+	await screen.getByRole('button', { name: 'Anotaciones' }).click();
+}
+
+async function openReasonCard(screen: { getByRole: (...a: any[]) => any }) {
+	await screen.getByRole('button', { name: 'Marcar error' }).click();
+}
+
+async function openNoteCard(screen: { getByRole: (...a: any[]) => any }) {
+	await screen.getByRole('button', { name: 'Agregar nota' }).click();
+}
+
+describe('LeftSidebar — review controls (NEH-anotaciones-rechazo: two independent accordions)', () => {
+	let rejectSpy: ReturnType<typeof vi.spyOn>;
+	let updateStatusSpy: ReturnType<typeof vi.spyOn>;
+	let getAnnotationsSpy: ReturnType<typeof vi.spyOn>;
+	let addAnnotationSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		rejectSpy = vi.spyOn(recordsApi, 'reject');
+		updateStatusSpy = vi.spyOn(recordsApi, 'updateStatus');
+		getAnnotationsSpy = vi.spyOn(recordsApi, 'getAnnotations').mockResolvedValue([]);
+		addAnnotationSpy = vi.spyOn(recordsApi, 'addAnnotation');
+	});
+
+	afterEach(() => {
+		rejectSpy.mockRestore();
+		updateStatusSpy.mockRestore();
+		getAnnotationsSpy.mockRestore();
+		addAnnotationSpy.mockRestore();
+	});
+
+	it('both accordions start collapsed — no error rows or comment box visible until tapped', async () => {
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Marcar error' })).toBeVisible();
+		await expect.element(screen.getByRole('button', { name: 'Agregar nota' })).toBeVisible();
+		await expect.element(screen.getByRole('button', { name: es.col_err_blurry, exact: true })).not.toBeInTheDocument();
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).not.toBeInTheDocument();
+	});
+
+	it('tapping "Marcar error" expands all 9 error rows; tapping it again collapses without saving', async () => {
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+
+		for (const label of [es.col_err_blurry, es.col_err_glare, es.col_err_shadows, es.col_err_focus, es.col_err_exposure, es.col_err_debris, es.col_err_framing, es.col_err_obstruction, es.col_err_other]) {
+			await expect.element(screen.getByRole('button', { name: label, exact: true })).toBeVisible();
+		}
+
+		await screen.getByRole('button', { name: es.col_err_blurry, exact: true }).click();
+		await openReasonCard(screen); // tap the header again — collapses
+
+		await expect.element(screen.getByRole('button', { name: es.col_err_blurry, exact: true })).not.toBeInTheDocument();
+		expect(addAnnotationSpy).not.toHaveBeenCalled();
+	});
+
+	it('"Listo" in "Marcar error" is disabled with 0 rows checked, enables once one is tapped, and toggling a second/third keeps them independent', async () => {
+		addAnnotationSpy.mockResolvedValue(makeAnnotation({ error_types: ['glare'] }));
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Listo' })).toBeDisabled();
+
+		await screen.getByRole('button', { name: es.col_err_blurry, exact: true }).click();
+		await screen.getByRole('button', { name: 'Reflejo/Brillo', exact: true }).click();
+		// Untap blur — only "Reflejo/Brillo" should remain selected.
+		await screen.getByRole('button', { name: es.col_err_blurry, exact: true }).click();
+		await expect.element(screen.getByRole('button', { name: 'Listo' })).not.toBeDisabled();
+
+		await screen.getByRole('button', { name: 'Listo' }).click();
+		await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
+		expect(addAnnotationSpy).toHaveBeenCalledWith(1, { error_types: ['glare'], note: undefined });
+	});
+
+	it('"Listo" in "Marcar error" saves error types as their OWN annotation (no note attached), then collapses the card', async () => {
+		addAnnotationSpy.mockResolvedValue(makeAnnotation({ error_types: ['blur', 'glare'] }));
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+
+		await screen.getByRole('button', { name: es.col_err_blurry, exact: true }).click();
+		await screen.getByRole('button', { name: 'Reflejo/Brillo', exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+
+		await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
+		expect(addAnnotationSpy).toHaveBeenCalledWith(1, { error_types: ['blur', 'glare'], note: undefined });
+
+		// Collapsed again: the error rows are gone, only the toggle button remains.
+		await expect.element(screen.getByRole('button', { name: es.col_err_blurry, exact: true })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Marcar error' })).toBeVisible();
+	});
+
+	it('"Agregar nota" is a separate accordion: "Listo" is disabled with empty text, saves a note-only annotation, then collapses', async () => {
+		addAnnotationSpy.mockResolvedValue(makeAnnotation({ error_types: [], note: 'una nota suelta' }));
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openNoteCard(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Listo' })).toBeDisabled();
+
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('una nota suelta');
+		await expect.element(screen.getByRole('button', { name: 'Listo' })).not.toBeDisabled();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+
+		await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
+		expect(addAnnotationSpy).toHaveBeenCalledWith(1, { error_types: [], note: 'una nota suelta' });
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).not.toBeInTheDocument();
+	});
+
+	it('in_review with no saved error annotations yet: Aprobar enabled; Rechazar is clickable but shows a popup asking for a reason instead of confirming', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
+		await openAnnotationsTab(screen);
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeDisabled();
+
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Debes seleccionar al menos un error.')).toBeVisible();
+		// It's the "select a reason" popup, not the reject confirmation.
+		await expect.element(dialog.getByText('¿Confirmas que quieres rechazar esta imagen?')).not.toBeInTheDocument();
+		expect(rejectSpy).not.toHaveBeenCalled();
+	});
+
+	it('Rechazar keeps showing the "select a reason" popup while an error row is only tapped (not yet saved via Listo), and opens the real confirm once it persists', async () => {
+		addAnnotationSpy.mockResolvedValue(makeAnnotation({ error_types: ['exposure'] }));
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+
+		await screen.getByRole('button', { name: 'Exposición', exact: true }).click();
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+		await expect.element(screen.getByRole('dialog').getByText('Debes seleccionar al menos un error.')).toBeVisible();
+		await screen.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).click();
+
+		await screen.getByRole('button', { name: 'Listo' }).click();
+		await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
+
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+		await expect.element(screen.getByRole('dialog').getByText('¿Confirmas que quieres rechazar esta imagen?')).toBeVisible();
+	});
+
+	it('a note-only annotation (via "Agregar nota") does NOT satisfy the reason requirement — Rechazar still asks for one', async () => {
+		addAnnotationSpy.mockResolvedValue(makeAnnotation({ error_types: [], note: 'solo comentario' }));
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
+		await openAnnotationsTab(screen);
+		await openNoteCard(screen);
+
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('solo comentario');
+		await screen.getByRole('button', { name: 'Listo' }).click();
+		await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
+
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+		await expect.element(screen.getByRole('dialog').getByText('Debes seleccionar al menos un error.')).toBeVisible();
+	});
+
+	it('approved: Aprobar disabled (can\'t approve twice), Rechazar enabled (undo, no saved annotation needed)', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'approved' }) }));
+		await openAnnotationsTab(screen);
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeDisabled();
+	});
+
+	it('captured: Aprobar and Rechazar are both disabled — the record has not been handed over for review', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'captured' }) }));
+		await openAnnotationsTab(screen);
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		// The screen says why, since the Pi has no hover to show a tooltip.
+		await expect.element(screen.getByText('Este registro no está en revisión.', { exact: false })).toBeVisible();
+		expect(updateStatusSpy).not.toHaveBeenCalled();
+		expect(rejectSpy).not.toHaveBeenCalled();
+	});
+
+	it('in review: no "not sent" line', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
+		await openAnnotationsTab(screen);
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).toBeEnabled();
+		await expect.element(screen.getByText('Este registro no está en revisión.', { exact: false })).not.toBeInTheDocument();
+	});
+
+	it('rejected: "Marcar error" and "Agregar nota" are both disabled — a rejected record accepts no more annotations', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'rejected' }), userRole: 'admin' }));
+		await openAnnotationsTab(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Marcar error' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Agregar nota' })).toBeDisabled();
+	});
+
+	it('rejected: existing annotations can no longer be deleted either (the delete button is hidden, not just disabled)', async () => {
+		getAnnotationsSpy.mockResolvedValue([makeAnnotation({ id: 5, error_types: ['blur'] })]);
+		const deleteAnnotationSpy = vi.spyOn(recordsApi, 'deleteAnnotation');
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'rejected' }), userRole: 'admin' }));
+		await openAnnotationsTab(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Eliminar anotación' })).not.toBeInTheDocument();
+		expect(deleteAnnotationSpy).not.toHaveBeenCalled();
+		deleteAnnotationSpy.mockRestore();
+	});
+
+	it('in_review: existing annotations can still be deleted', async () => {
+		getAnnotationsSpy.mockResolvedValue([makeAnnotation({ id: 5, error_types: ['blur'] })]);
+		const deleteAnnotationSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockResolvedValue(undefined);
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
+		await openAnnotationsTab(screen);
+
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => deleteAnnotationSpy.mock.calls.length).toBe(1);
+		expect(deleteAnnotationSpy).toHaveBeenCalledWith(5);
+		deleteAnnotationSpy.mockRestore();
+	});
+
+	it('approved: "Marcar error" and "Agregar nota" are enabled again (re-approving a record re-enables annotations)', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'approved' }) }));
+		await openAnnotationsTab(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Marcar error' })).not.toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Agregar nota' })).not.toBeDisabled();
+	});
+
+	it('rejecting a record collapses any open annotation card and disables both toggle buttons immediately after', async () => {
+		getAnnotationsSpy.mockResolvedValue([makeAnnotation({ error_types: ['blur'] })]);
+		rejectSpy.mockResolvedValue(makeRecord({ status: 'rejected' }));
+		const onRecordUpdated = vi.fn(async () => {
+			// Simulate the parent re-fetching and handing back the now-rejected record.
+			await Promise.resolve();
+		});
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }), onRecordUpdated }));
+		await openAnnotationsTab(screen);
+		await openNoteCard(screen);
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('a medio escribir');
+
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+		await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect.poll(() => rejectSpy.mock.calls.length).toBe(1);
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).not.toBeInTheDocument();
+	});
+
+	it('rejected + admin: "Recapturar imagen" replaces Rechazar, Aprobar (undo) also available, and clicking it calls onRecapture', async () => {
+		const onRecapture = vi.fn();
+		const record = makeRecord({ status: 'rejected' });
+		const screen = render(LeftSidebar, baseProps({ currentRecord: record, userRole: 'admin', onRecapture }));
+		await openAnnotationsTab(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Recapturar imagen' })).toBeVisible();
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeDisabled();
+
+		await screen.getByRole('button', { name: 'Recapturar imagen' }).click();
+		expect(onRecapture).toHaveBeenCalledWith(record);
+	});
+
+	it('rejected + reviewer: no "Recapturar imagen" button (can\'t operate a camera), Rechazar just stays disabled', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'rejected' }), userRole: 'reviewer' }));
+		await openAnnotationsTab(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Recapturar imagen' })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeDisabled();
+	});
+
+	it('clicking Aprobar/Rechazar opens a confirm popup and does NOT call the API until confirmed', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }) }));
+		await openAnnotationsTab(screen);
+
+		await screen.getByRole('button', { name: 'Aprobar' }).click();
+
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('¿Confirmas que quieres aprobar esta imagen?')).toBeVisible();
+		expect(updateStatusSpy).not.toHaveBeenCalled();
+
+		await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		expect(updateStatusSpy).not.toHaveBeenCalled();
+	});
+
+	it('formal approve (in_review) calls updateStatus(id, "approved") after confirming', async () => {
+		updateStatusSpy.mockResolvedValue(makeRecord({ status: 'approved' }));
+		const onRecordUpdated = vi.fn();
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }), onRecordUpdated }));
+		await openAnnotationsTab(screen);
+
+		await screen.getByRole('button', { name: 'Aprobar' }).click();
+		await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect.poll(() => updateStatusSpy.mock.calls.length).toBe(1);
+		expect(updateStatusSpy).toHaveBeenCalledWith(1, 'approved');
+		expect(onRecordUpdated).toHaveBeenCalledTimes(1);
+	});
+
+	it('formal reject sends the first error type of the OLDEST saved annotation as predefined_reason', async () => {
+		// annotations arrive newest-first from the backend: 'dirt' is the most
+		// recent flag, 'glare' was the first problem ever flagged on this record.
+		getAnnotationsSpy.mockResolvedValue([
+			makeAnnotation({ id: 2, error_types: ['dirt'], created_at: '2026-01-02' }),
+			makeAnnotation({ id: 1, error_types: ['glare'], created_at: '2026-01-01' })
+		]);
+		rejectSpy.mockResolvedValue(makeRecord({ status: 'rejected' }));
+		const onRecordUpdated = vi.fn();
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }), onRecordUpdated }));
+		await openAnnotationsTab(screen);
+
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('¿Confirmas que quieres rechazar esta imagen?')).toBeVisible();
+		await dialog.getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect.poll(() => rejectSpy.mock.calls.length).toBe(1);
+		expect(rejectSpy).toHaveBeenCalledWith(1, { predefined_reason: 'glare', comment: undefined });
+		expect(onRecordUpdated).toHaveBeenCalledTimes(1);
+	});
+
+	it('undo an approval: Rechazar on an approved record reverts to in_review with no saved annotation required', async () => {
+		updateStatusSpy.mockResolvedValue(makeRecord({ status: 'in_review' }));
+		const onRecordUpdated = vi.fn();
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'approved' }), onRecordUpdated }));
+		await openAnnotationsTab(screen);
+
+		await screen.getByRole('button', { name: 'Rechazar' }).click();
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('¿Confirmas que quieres deshacer la aprobación de esta imagen?')).toBeVisible();
+		await dialog.getByRole('button', { name: 'Confirmar' }).click();
+
+		await expect.poll(() => updateStatusSpy.mock.calls.length).toBe(1);
+		expect(updateStatusSpy).toHaveBeenCalledWith(1, 'in_review');
+		expect(rejectSpy).not.toHaveBeenCalled();
+		expect(onRecordUpdated).toHaveBeenCalledTimes(1);
+	});
+
+	it('operator on an in_review record sees no review actions at all (can\'t approve/reject, and nothing to recapture yet)', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'in_review' }), userRole: 'operator' }));
+		await openAnnotationsTab(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Recapturar imagen' })).not.toBeInTheDocument();
+	});
+
+	it('operator on a rejected record sees ONLY "Recapturar imagen" — no Aprobar (operators don\'t approve/reject)', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ status: 'rejected' }), userRole: 'operator' }));
+		await openAnnotationsTab(screen);
+
+		await expect.element(screen.getByRole('button', { name: 'Recapturar imagen' })).toBeVisible();
+		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument();
+	});
+
+	// The panel asks for the record's annotations when it opens. If one is
+	// saved while that request is in flight, the server can answer it after
+	// the save has committed, so the list already holds the new annotation
+	// when the save's own response arrives. Seen once in about 14 e2e runs.
+	it('an annotation saved while the first load is in flight appears once', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		const created = makeAnnotation({ id: 42, error_types: ['blur'] });
+		let resolveAdd!: (v: RecordAnnotation) => void;
+		addAnnotationSpy.mockReturnValue(new Promise((r) => { resolveAdd = r; }));
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: es.col_err_blurry, exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+
+		resolveLoad([created]);
+		await new Promise((r) => setTimeout(r, 0));
+		resolveAdd(created);
+
+		await expect.element(screen.getByText(es.col_err_blurry).first()).toBeVisible();
+		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
+	});
+
+	it('an annotation saved while the first load is in flight is kept when the load answers without it', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		addAnnotationSpy.mockResolvedValue(makeAnnotation({ id: 43, error_types: ['blur'] }));
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: es.col_err_blurry, exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
+
+		resolveLoad([]);
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => document.querySelectorAll('.annotation-card').length).toBe(1);
+	});
+
+	const cards = () => [...document.querySelectorAll('.annotation-card')].map((c) => c.textContent ?? '');
+	const flag = async (screen: ReturnType<typeof render>, label: string) => {
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: label, exact: true }).click();
+		await screen.getByRole('button', { name: 'Listo' }).click();
+	};
+
+	it('keeps the backend order, newest first, when a save answers after a load that already holds a newer annotation', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		const a = makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-10-21T10:00:00' });
+		const b = makeAnnotation({ id: 2, error_types: ['glare'], created_at: '2026-10-21T10:05:00' });
+		let resolveAdd!: (v: RecordAnnotation) => void;
+		addAnnotationSpy.mockReturnValue(new Promise((r) => { resolveAdd = r; }));
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await flag(screen, es.col_err_blurry);
+		resolveLoad([b, a]);
+		await new Promise((r) => setTimeout(r, 0));
+		resolveAdd(a);
+
+		await expect.poll(() => cards().length).toBe(2);
+		// The oldest, which supplies the rejection reason, stays last.
+		expect(cards()[0]).toContain('Reflejo/Brillo');
+		expect(cards()[1]).toContain(es.col_err_blurry);
+	});
+
+	it('an annotation deleted while the first load is in flight does not come back with it', async () => {
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		const a = makeAnnotation({ id: 7, error_types: ['blur'] });
+		addAnnotationSpy.mockResolvedValue(a);
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockResolvedValue(undefined as never);
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await flag(screen, es.col_err_blurry);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+
+		resolveLoad([a]);
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+		deleteSpy.mockRestore();
+	});
+
+	it('a failed delete puts back only that annotation, keeping one saved meanwhile', async () => {
+		const a = makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-10-21T10:00:00' });
+		const b = makeAnnotation({ id: 2, error_types: ['glare'], created_at: '2026-10-21T10:05:00' });
+		getAnnotationsSpy.mockResolvedValue([a]);
+		let rejectDelete!: (e: Error) => void;
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockReturnValue(new Promise((_, rej) => { rejectDelete = rej; }));
+		addAnnotationSpy.mockResolvedValue(b);
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+		await flag(screen, 'Reflejo/Brillo');
+		await expect.poll(() => cards().length).toBe(1);
+
+		rejectDelete(new Error('network'));
+		await expect.poll(() => cards().length).toBe(2);
+		expect(cards()[0]).toContain('Reflejo/Brillo');
+		expect(cards()[1]).toContain(es.col_err_blurry);
+		deleteSpy.mockRestore();
+	});
+
+	it('a save that answers after its annotation was deleted does not put it back', async () => {
+		const a = makeAnnotation({ id: 9, error_types: ['blur'] });
+		let resolveLoad!: (v: RecordAnnotation[]) => void;
+		getAnnotationsSpy.mockReturnValue(new Promise((r) => { resolveLoad = r; }));
+		let resolveAdd!: (v: RecordAnnotation) => void;
+		addAnnotationSpy.mockReturnValue(new Promise((r) => { resolveAdd = r; }));
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockResolvedValue(undefined as never);
+
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await flag(screen, es.col_err_blurry);
+		resolveLoad([a]);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+
+		resolveAdd(a);
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+		deleteSpy.mockRestore();
+	});
+
+	it('a delete still in flight keeps its annotation out when the record is left and reopened', async () => {
+		const recA = makeRecord({ id: 1 });
+		const recB = makeRecord({ id: 2, title: 'Otro' });
+		const a7 = makeAnnotation({ id: 70, record_id: 1, error_types: ['blur'] });
+		getAnnotationsSpy.mockImplementation(async (id: number) => (id === 1 ? [a7] : []));
+		let resolveDelete!: () => void;
+		const deleteSpy = vi.spyOn(recordsApi, 'deleteAnnotation').mockReturnValue(new Promise((r) => { resolveDelete = () => r(undefined as never); }));
+
+		const screen = render(LeftSidebar, baseProps({ currentRecord: recA }));
+		await openAnnotationsTab(screen);
+		await expect.poll(() => cards().length).toBe(1);
+		await screen.getByRole('button', { name: 'Eliminar anotación' }).click();
+		await expect.poll(() => cards().length).toBe(0);
+
+		await screen.rerender(baseProps({ currentRecord: recB }));
+		await screen.rerender(baseProps({ currentRecord: recA }));
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+
+		resolveDelete();
+		await new Promise((r) => setTimeout(r, 0));
+		await expect.poll(() => cards().length).toBe(0);
+		deleteSpy.mockRestore();
+	});
+	// After a free or a restore the page reloads its records in place
+	// (NEH-248), so the sidebar receives a new object for the same record.
+	it('a refresh that hands over the same record as a new object keeps an unsaved note and selected reasons', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ id: 1 }) }));
+		await openAnnotationsTab(screen);
+		await openNoteCard(screen);
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('a medio escribir');
+		await openReasonCard(screen);
+		await screen.getByRole('button', { name: es.col_err_blurry, exact: true }).click();
+
+		await screen.rerender(baseProps({ currentRecord: makeRecord({ id: 1 }) }));
+		await new Promise((r) => setTimeout(r, 0));
+
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).toHaveValue('a medio escribir');
+		for (const listo of screen.getByRole('button', { name: 'Listo' }).all()) {
+			await expect.element(listo).not.toBeDisabled();
+		}
+		expect(getAnnotationsSpy).toHaveBeenCalledTimes(1);
+	});
+
+	it('moving to another record still clears the unsaved note', async () => {
+		const screen = render(LeftSidebar, baseProps({ currentRecord: makeRecord({ id: 1 }) }));
+		await openAnnotationsTab(screen);
+		await openNoteCard(screen);
+		await screen.getByPlaceholder('Agrega un comentario (opcional)…').fill('a medio escribir');
+
+		await screen.rerender(baseProps({ currentRecord: makeRecord({ id: 2 }) }));
+
+		await expect.element(screen.getByPlaceholder('Agrega un comentario (opcional)…')).not.toBeInTheDocument();
+		await expect.poll(() => getAnnotationsSpy.mock.calls.length).toBe(2);
+	});
+
+	// Each reason in "Marcar error" carries a one-line gloss beneath it. The
+	// gloss describes the button; it is not part of its name.
+	it('each of the nine reasons shows its gloss beneath its label', async () => {
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+		await openReasonCard(screen);
+
+		const pairs: [string, string][] = [
+			[es.col_err_blurry, es.col_err_blurry_gloss],
+			[es.col_err_glare, es.col_err_glare_gloss],
+			[es.col_err_shadows, es.col_err_shadows_gloss],
+			[es.col_err_focus, es.col_err_focus_gloss],
+			[es.col_err_exposure, es.col_err_exposure_gloss],
+			[es.col_err_debris, es.col_err_debris_gloss],
+			[es.col_err_framing, es.col_err_framing_gloss],
+			[es.col_err_obstruction, es.col_err_obstruction_gloss],
+			[es.col_err_other, es.col_err_other_gloss]
+		];
+		for (const [label, gloss] of pairs) {
+			expect(gloss).toBeTruthy();
+			const button = screen.getByRole('button', { name: label, exact: true });
+			await expect.element(button).toBeVisible();
+			await expect.element(button).toHaveAccessibleDescription(gloss);
+			await expect.element(button.getByText(gloss, { exact: true })).toBeVisible();
+		}
+	});
+
+	it('a saved annotation shows the label without the gloss', async () => {
+		getAnnotationsSpy.mockResolvedValue([makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-01-01' })]);
+		const screen = render(LeftSidebar, baseProps());
+		await openAnnotationsTab(screen);
+
+		await expect.element(screen.getByText(es.col_err_blurry, { exact: true })).toBeVisible();
+		await expect.element(screen.getByText(es.col_err_blurry_gloss)).not.toBeInTheDocument();
+	});
+
+	// "Otro" (other) needs a note saying what is wrong: the backend refuses
+	// a rejection for `other` without a comment (422). The reason sent is
+	// still the oldest saved flag. For every reason, the comment is the note
+	// being typed, or else the newest saved note.
+	describe('rejecting for "Otro"', () => {
+		const OTHER_HINT = es.col_reject_other_needs_note;
+
+		it('saves "Otro" as an error annotation like any other reason', async () => {
+			addAnnotationSpy.mockResolvedValue(makeAnnotation({ error_types: ['other'] }));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+			await openReasonCard(screen);
+
+			await screen.getByRole('button', { name: es.col_err_other, exact: true }).click();
+			await screen.getByRole('button', { name: 'Listo' }).click();
+
+			await expect.poll(() => addAnnotationSpy.mock.calls.length).toBe(1);
+			expect(addAnnotationSpy).toHaveBeenCalledWith(1, { error_types: ['other'], note: undefined });
+		});
+
+		it('without a note, Rechazar is disabled and the hint says why', async () => {
+			getAnnotationsSpy.mockResolvedValue([makeAnnotation({ id: 1, error_types: ['other'], created_at: '2026-01-01' })]);
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+
+			await expect.element(screen.getByText(OTHER_HINT)).toBeVisible();
+			await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+		});
+
+		it('no hint when the oldest flag is a reason that needs no note', async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 2, error_types: ['other'], created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-01-01' })
+			]);
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+
+			await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeEnabled();
+			await expect.element(screen.getByText(OTHER_HINT)).not.toBeInTheDocument();
+		});
+
+		it('with a note being typed, Rechazar submits other with that note as the comment', async () => {
+			getAnnotationsSpy.mockResolvedValue([makeAnnotation({ id: 1, error_types: ['other'], created_at: '2026-01-01' })]);
+			rejectSpy.mockResolvedValue(makeRecord({ status: 'rejected' }));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+			await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
+
+			await openNoteCard(screen);
+			await expect.element(screen.getByPlaceholder(es.col_annotation_comment_placeholder)).not.toBeInTheDocument();
+			await screen.getByPlaceholder(es.col_annotation_note_required_placeholder).fill('  página doblada  ');
+
+			await expect.element(screen.getByText(OTHER_HINT)).not.toBeInTheDocument();
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.poll(() => rejectSpy.mock.calls.length).toBe(1);
+			expect(rejectSpy).toHaveBeenCalledWith(1, { predefined_reason: 'other', comment: 'página doblada' });
+		});
+
+		it('the note box keeps its usual placeholder when the reason is not other', async () => {
+			getAnnotationsSpy.mockResolvedValue([makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-01-01' })]);
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+			await openNoteCard(screen);
+
+			await expect.element(screen.getByPlaceholder(es.col_annotation_comment_placeholder)).toBeVisible();
+			await expect.element(screen.getByPlaceholder(es.col_annotation_note_required_placeholder)).not.toBeInTheDocument();
+		});
+
+		it('with a saved note, Rechazar submits other with the newest saved note as the comment', async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 3, note: 'la más reciente', created_at: '2026-01-03' }),
+				makeAnnotation({ id: 2, note: 'una anterior', created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['other'], created_at: '2026-01-01' })
+			]);
+			rejectSpy.mockResolvedValue(makeRecord({ status: 'rejected' }));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+
+			await expect.element(screen.getByRole('button', { name: 'Rechazar' })).toBeEnabled();
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.poll(() => rejectSpy.mock.calls.length).toBe(1);
+			expect(rejectSpy).toHaveBeenCalledWith(1, { predefined_reason: 'other', comment: 'la más reciente' });
+		});
+
+		it('any reason sends the newest saved note when nothing is being typed', async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 2, note: 'esquina cortada', created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['framing'], created_at: '2026-01-01' })
+			]);
+			rejectSpy.mockResolvedValue(makeRecord({ status: 'rejected' }));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.poll(() => rejectSpy.mock.calls.length).toBe(1);
+			expect(rejectSpy).toHaveBeenCalledWith(1, { predefined_reason: 'framing', comment: 'esquina cortada' });
+		});
+
+		it('a note being typed wins over a saved one, for any reason', async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 2, note: 'guardada', created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-01-01' })
+			]);
+			rejectSpy.mockResolvedValue(makeRecord({ status: 'rejected' }));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+			await openNoteCard(screen);
+			await screen.getByPlaceholder(es.col_annotation_comment_placeholder).fill('escrita');
+
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.poll(() => rejectSpy.mock.calls.length).toBe(1);
+			expect(rejectSpy).toHaveBeenCalledWith(1, { predefined_reason: 'blur', comment: 'escrita' });
+		});
+
+		it("the backend's 422 for a comment over 2,000 characters is shown in the interface's words", async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 2, note: 'n'.repeat(2500), created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['blur'], created_at: '2026-01-01' })
+			]);
+			const detail = [{ type: 'value_error', loc: ['body', 'comment'], msg: 'Value error, A rejection comment can be at most 2,000 characters long.' }];
+			rejectSpy.mockRejectedValue(new ApiError(JSON.stringify(detail), detail, 422));
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.element(screen.getByText(es.col_reject_comment_too_long(2000))).toBeVisible();
+		});
+
+		it('the note field stops at 2,000 characters and shows its count near the limit', async () => {
+			getAnnotationsSpy.mockResolvedValue([makeAnnotation({ error_types: ['blur'] })]);
+			const screen = render(LeftSidebar, baseProps());
+			await openAnnotationsTab(screen);
+			await openNoteCard(screen);
+			const field = screen.getByPlaceholder(es.col_annotation_comment_placeholder);
+			await expect.element(field).toHaveAttribute('maxlength', '2000');
+
+			await field.fill('corta');
+			await expect.element(screen.getByText(es.col_annotation_note_count(5, 2000))).not.toBeInTheDocument();
+
+			await field.fill('x'.repeat(1900));
+			await expect.element(screen.getByText(es.col_annotation_note_count(1900, 2000))).toBeVisible();
+		});
+
+		it("the backend's 422 for other without a note is shown in the interface's words", async () => {
+			getAnnotationsSpy.mockResolvedValue([
+				makeAnnotation({ id: 2, note: 'nota', created_at: '2026-01-02' }),
+				makeAnnotation({ id: 1, error_types: ['other'], created_at: '2026-01-01' })
+			]);
+			rejectSpy.mockRejectedValue(new ApiError('A rejection for other needs a comment', { detail: 'raw' }, 422));
+			const onRecordUpdated = vi.fn();
+			const screen = render(LeftSidebar, baseProps({ onRecordUpdated }));
+			await openAnnotationsTab(screen);
+
+			await screen.getByRole('button', { name: 'Rechazar' }).click();
+			await screen.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
+
+			await expect.element(screen.getByText(es.col_reject_other_note_error)).toBeVisible();
+			await expect.element(screen.getByText('A rejection for other needs a comment')).not.toBeInTheDocument();
+			expect(onRecordUpdated).not.toHaveBeenCalled();
+		});
+	});
+});

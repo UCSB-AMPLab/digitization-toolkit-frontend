@@ -1,54 +1,58 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Detalle de Proyecto (Inside Proyecto)
-  // Ruta: /shared/projects/[projectId]
-  // Archivo: src/routes/(dashboard)/shared/projects/[projectId]/+page.svelte
+  // Project detail (/dashboard/projects/[projectId]): the project's volumes,
+  // with KPIs, a name search, and the modals that create, edit and delete a
+  // volume and manage the project's members. The volume form owns the
+  // filename stem rules (see `VolumeStemField`); the delete modal moves a
+  // volume's records to another volume first when it has any. The Status
+  // column shows placeholder values (see `mockStatuses`).
   //
-  // Muestra:
-  //   - Nombre del proyecto + subtítulo
-  //   - Botón "Volver a Proyectos"
-  //   - KPI cards: Colecciones, Total imágenes, Colaboradores
-  //   - Barra de búsqueda + Filtros
-  //   - Tabla de colecciones: Colección, Estado, Núm. imágenes, Responsable, Fecha, Acciones
-  //   - Botón "Nueva Colección" → modal
-  //
-  // Modal "Nueva Colección":
-  //   - Nombre, Descripción, Cantidad estimada de imágenes
-  // ============================================================================
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
-  import { m } from '$lib/i18n';
+  import { m, roleLabel, locale } from '$lib/i18n';
+  import { formatApiDate } from '$lib/format-date';
+  import { formatCount } from '$lib/format-count';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, projectMembersApi,
            type Project, type Collection, type ProjectMember, type UserRead } from '$lib/api';
+  import { stemProblem, stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
+  import { volumeSaveErrorText, volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
+  import VolumeStemField from './VolumeStemField.svelte';
+  import { dismissible } from '$lib/dialog';
 
-  // ---------------------------------------------------------------------------
-  // PARÁMETROS DE RUTA
-  // ---------------------------------------------------------------------------
   let projectId = $derived(Number($page.params.projectId) || 0);
 
-  // ---------------------------------------------------------------------------
-  // ESTADO
-  // ---------------------------------------------------------------------------
   let project     = $state<Project | null>(null);
   let collections = $state<Collection[]>([]);
   let isLoading   = $state(true);
   let searchQuery = $state('');
-  let recordCount = $state<number | null>(null);
+
+  // Records living directly under the project (no collection) — the
+  // single-parent DB constraint means a record's project_id is NULL as
+  // soon as it's filed into a collection, so this alone undercounts.
+  let directRecordCount = $state<number | null>(null);
+
+  // Total = direct records + each collection's own record_count (populated
+  // by GET /collections/, NEH-179). The UI does not nest collections, so
+  // summing the flat, top-level list covers every record under the project
+  // without a recursive traversal.
+  let recordCount = $derived(
+    directRecordCount === null
+      ? null
+      : directRecordCount + collections.reduce((sum, c) => sum + (c.record_count ?? 0), 0)
+  );
 
   let canCreate = $derived(
     $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
   );
-  // Solo admin puede crear/asignar/quitar colaboradores — el backend ya lo
-  // exige (allow_admin en add_project_member/remove_project_member,
-  // NEH-80); operator y reviewer ni siquiera pueden consultar la lista de
-  // usuarios (GET /auth/users es admin-only), así que el picker no debe
-  // intentar cargarla para ellos.
+  // Only admin adds or removes members — the backend enforces it too
+  // (`allow_admin` in `add_project_member`/`remove_project_member`, NEH-80).
+  // Operator and reviewer cannot even read the user list (GET /auth/users is
+  // admin-only), so the picker must not try to load it for them.
   let canManageMembers = $derived($authStore.user?.role === 'admin');
 
-  // Colecciones filtradas
   let filteredCollections = $derived(
     searchQuery.trim()
       ? collections.filter(c =>
@@ -57,9 +61,6 @@
       : collections
   );
 
-  // ---------------------------------------------------------------------------
-  // MODAL: Nueva Colección
-  // ---------------------------------------------------------------------------
   let showCreateModal = $state(false);
   let colName         = $state('');
   let colDesc         = $state('');
@@ -67,6 +68,10 @@
   let colDateEnd      = $state('');
   let colCreator      = $state('');
   let colSignatura    = $state('');
+  // The stem ("raíz", filename_stem). Required on a new volume; on an
+  // existing one it can be given once while empty, and is read-only once
+  // the volume reserves it (stem_reserved).
+  let colStem         = $state('');
   let isCreating        = $state(false);
   let createError       = $state('');
   let editingCollection = $state<Collection | null>(null);
@@ -92,6 +97,13 @@
     return false;
   }
 
+  let stemLocked = $derived(!!editingCollection?.stem_reserved);
+  // Required on a new volume and on one that already has a stem: a stem can
+  // be changed before the first capture, but never blanked. Only a volume
+  // that has never had one may be saved without it.
+  let stemRequired = $derived(!editingCollection || !!editingCollection.filename_stem);
+  let stemInvalid = $derived(!stemLocked && stemProblem(colStem, stemRequired) !== null);
+
   let dateError = $derived(
     (colDateStart && !isValidISODate(colDateStart))
       ? $m.pd_val_start_date
@@ -102,32 +114,33 @@
       : ''
   );
 
-  // ---------------------------------------------------------------------------
-  // AL MONTAR
-  // ---------------------------------------------------------------------------
   onMount(async () => {
     await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
+    // ?editVolume=<id> opens that volume's form: the capture screen links
+    // here when the volume has no stem yet.
+    const editId = Number($page.url.searchParams.get('editVolume')) || 0;
+    if (editId && canCreate) {
+      const target = collections.find(c => c.id === editId);
+      if (target) openEditCollection(target);
+    }
   });
 
   async function loadProject() {
     try {
       project = await projectsApi.get(projectId);
     } catch (err) {
-      console.error('[ProjectDetail] Error cargando proyecto:', err);
+      console.error('[ProjectDetail] Error loading project:', err);
     }
   }
 
   async function loadRecordCount() {
     try {
-      recordCount = await recordsApi.count({ project_id: projectId });
+      directRecordCount = await recordsApi.count({ project_id: projectId });
     } catch (err) {
-      console.error('[ProjectDetail] Error cargando conteo de registros:', err);
+      console.error('[ProjectDetail] Error loading record count:', err);
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // COLABORADORES
-  // ---------------------------------------------------------------------------
   let members            = $state<ProjectMember[]>([]);
   let showMembersModal   = $state(false);
   let memberSearchQuery  = $state('');
@@ -149,7 +162,7 @@
     try {
       members = await projectMembersApi.list(projectId);
     } catch (err) {
-      console.error('[ProjectDetail] Error cargando colaboradores:', err);
+      console.error('[ProjectDetail] Error loading members:', err);
     }
   }
 
@@ -161,7 +174,7 @@
         const { usersApi } = await import('$lib/api');
         allUsers = await usersApi.list();
       } catch (err) {
-        console.error('[ProjectDetail] Error cargando usuarios:', err);
+        console.error('[ProjectDetail] Error loading users:', err);
       }
     }
   }
@@ -197,22 +210,14 @@
       const data = await collectionsApi.listAll({ project_id: projectId });
       collections = data;
     } catch (err) {
-      console.error('[ProjectDetail] Error cargando colecciones:', err);
+      console.error('[ProjectDetail] Error loading collections:', err);
     } finally {
       isLoading = false;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // CREAR COLECCIÓN
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // CREAR COLECCIÓN
-  // Modo demo (token = demo-token): simula localmente sin llamar al backend.
-  // Modo real: llama a collectionsApi.create() y recarga la lista.
-  // ---------------------------------------------------------------------------
   async function handleCreateCollection() {
-    if (!colName.trim()) return;
+    if (!colName.trim() || stemInvalid) return;
     isCreating = true;
     createError = '';
 
@@ -224,35 +229,26 @@
       if (colSignatura.trim()) archMeta.signatura  = colSignatura.trim();
       const archivalMetadata = Object.keys(archMeta).length > 0 ? archMeta : undefined;
 
+      const stem = colStem.trim();
       if (editingCollection) {
-        // Modo edición: actualizar colección existente
+        // The stem is sent only when it changed to a non-empty value, and
+        // never once it is reserved; null is never sent.
+        const stemChanged = !stemLocked && stem !== '' && stem !== (editingCollection.filename_stem ?? '');
         await collectionsApi.update(editingCollection.id, {
           name: colName.trim(),
           description: colDesc.trim() || undefined,
           archival_metadata: archivalMetadata,
+          ...(stemChanged ? { filename_stem: stem } : {}),
         });
         await loadCollections();
-      } else if ($authStore.token === 'demo-token') {
-        // Simular creación localmente sin backend
-        const mockCollection = {
-          id: Date.now(),
-          name: colName.trim(),
-          description: colDesc.trim() || undefined,
-          project_id: projectId,
-          created_at: new Date().toISOString(),
-          created_by: $authStore.user?.username,
-          record_count: 0,
-          archival_metadata: archivalMetadata,
-        } as any;
-        collections = [...collections, mockCollection];
       } else {
-        // Modo real: llamada al backend
         await collectionsApi.create({
           name: colName.trim(),
           description: colDesc.trim() || undefined,
           project_id: projectId,
           created_by: $authStore.user?.username,
           archival_metadata: archivalMetadata,
+          filename_stem: stem,
         });
         await loadCollections();
       }
@@ -262,11 +258,13 @@
       colName = ''; colDesc = '';
       colDateStart = ''; colDateEnd = '';
       colCreator = ''; colSignatura = '';
+      colStem = '';
 
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      createError = $m.pd_err_create_collection(msg);
-      console.error('[ProjectDetail] Error creando colección:', err);
+      // Known cases have their own message, anything else a generic one; the
+      // backend's English text goes to the console only.
+      createError = volumeSaveErrorText(err, $m);
+      console.error('[ProjectDetail] Error creating collection:', err);
     } finally {
       isCreating = false;
     }
@@ -279,18 +277,13 @@
     colName = ''; colDesc = '';
     colDateStart = ''; colDateEnd = '';
     colCreator = ''; colSignatura = '';
+    colStem = '';
   }
 
-  // ---------------------------------------------------------------------------
-  // NAVEGAR A LA COLECCIÓN
-  // ---------------------------------------------------------------------------
   function handleCollectionClick(collectionId: number) {
     goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
   }
 
-  // ---------------------------------------------------------------------------
-  // MENÚ DE ACCIONES POR COLECCIÓN
-  // ---------------------------------------------------------------------------
   let openColMenuId = $state<number | null>(null);
 
   // Delete collection modal state
@@ -301,6 +294,10 @@
   let isDeletingCol          = $state(false);
   let deleteColError         = $state('');
   let isLoadingDeleteColInfo = $state(false);
+  // Set when the backend refused the delete because the volume still holds
+  // sub-volumes. This screen cannot move those, so the modal offers no
+  // target, the delete stays disabled, and records are never moved.
+  let deleteBlockedBySubvolumes = $state(false);
 
   $effect(() => {
     if (openColMenuId !== null) {
@@ -317,8 +314,14 @@
 
   function startEditCollection(e: MouseEvent, col: Collection) {
     e.stopPropagation();
+    openEditCollection(col);
+  }
+
+  function openEditCollection(col: Collection) {
     openColMenuId = null;
+    createError = '';
     editingCollection = col;
+    colStem      = col.filename_stem ?? '';
     colName      = col.name;
     colDesc      = col.description ?? '';
     colSignatura = col.archival_metadata?.signatura ?? '';
@@ -335,12 +338,13 @@
     deleteMoveColTarget = '';
     deleteColError = '';
     deleteColRecordCount = 0;
+    deleteBlockedBySubvolumes = false;
     showDeleteColModal = true;
     isLoadingDeleteColInfo = true;
     try {
       deleteColRecordCount = await recordsApi.count({ collection_id: col.id });
     } catch (err) {
-      console.error('[ProjectDetail] Error obteniendo info de colección:', err);
+      console.error('[ProjectDetail] Error fetching collection info:', err);
     } finally {
       isLoadingDeleteColInfo = false;
     }
@@ -351,30 +355,74 @@
     deletingCol = null;
     deleteMoveColTarget = '';
     deleteColError = '';
+    deleteBlockedBySubvolumes = false;
     isDeletingCol = false;
   }
 
   async function executeDeleteCol() {
-    if (!deletingCol) return;
+    if (!deletingCol || deleteRefused(deletingCol) || deleteBlockedBySubvolumes) return;
     isDeletingCol = true;
     deleteColError = '';
     try {
       if (deleteMoveColTarget !== '') {
+        // The list may be older than the volume's last capture. Moving the
+        // records out of a volume the backend then refuses to delete would
+        // leave them moved and the volume still there, so the volume is read
+        // again first and the move is skipped once it reserves its stem.
+        const fresh = await collectionsApi.get(deletingCol.id);
+        if (deleteRefused(fresh)) {
+          deletingCol = fresh;
+          isDeletingCol = false;
+          await loadCollections();
+          return;
+        }
         await collectionsApi.moveRecords(deletingCol.id, Number(deleteMoveColTarget));
       }
       await collectionsApi.delete(deletingCol.id);
       await loadCollections();
       closeDeleteColModal();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      deleteColError = $m.pd_err_delete_collection(msg);
+      const conflict = stemConflict(err);
+      if (conflict === 'stem_reserved' && deletingCol) {
+        // The backend refused: the modal switches to the reserved notice,
+        // which says why, and the delete stays disabled.
+        deletingCol = { ...deletingCol, stem_reserved: true };
+        await loadCollections();
+      } else if (isNotEmptyRefusal(err) && deletingCol) {
+        console.error('[ProjectDetail] Error deleting volume:', err);
+        const counts = notEmptyCounts(err);
+        if (counts && counts.subVolumes > 0) {
+          // Sub-volumes block the delete, with or without records: moving
+          // the records would not be enough, so no target is offered.
+          deleteBlockedBySubvolumes = true;
+          deleteMoveColTarget = '';
+          deleteColError = $m.pd_err_delete_has_subvolumes;
+        } else if (deleteMoveColTarget === '') {
+          // The modal opened believing the volume was empty, and it is not.
+          // The count is read again so the target select appears here.
+          try {
+            deleteColRecordCount = await recordsApi.count({ collection_id: deletingCol.id });
+          } catch (countErr) {
+            console.error('[ProjectDetail] Error fetching collection info:', countErr);
+          }
+          if (deleteColRecordCount === 0) {
+            // The count could not be read, or the records left meanwhile.
+            deleteColError = volumeDeleteErrorText(err, $m);
+          }
+        } else {
+          deleteColError = volumeDeleteErrorText(err, $m);
+        }
+      } else {
+        // The backend's English text goes to the console only.
+        deleteColError = volumeDeleteErrorText(err, $m);
+        console.error('[ProjectDetail] Error deleting volume:', err);
+      }
       isDeletingCol = false;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // HELPERS DE UI (mock — conectar con backend)
-  // ---------------------------------------------------------------------------
+  // Placeholder statuses, not read from the backend: the Status column cycles
+  // through them by row index.
   let mockStatuses = $derived([$m.pd_status_active, $m.pd_status_active, $m.proj_status_paused, $m.pd_status_active, $m.pd_status_completed]);
 
   function getStatusStyle(status: string): string {
@@ -385,9 +433,6 @@
   }
 </script>
 
-<!-- ============================================================
-     PÁGINA DE DETALLE DE PROYECTO
-     ============================================================ -->
 <div class="page">
 
   <!-- Header -->
@@ -396,9 +441,9 @@
       <h1 class="page-title">{project?.name ?? '—'}</h1>
       <p class="page-subtitle">{$m.pd_subtitle}</p>
     </div>
-    <!-- Botón "+ Nueva colección" solo visible cuando ya hay colecciones -->
+    <!-- Only once volumes exist: the empty state has its own create button. -->
     {#if canCreate && collections.length > 0}
-      <button class="btn-primary" onclick={() => showCreateModal = true}>
+      <button class="btn-primary" data-tour="nuevo-volumen" onclick={() => showCreateModal = true}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -407,7 +452,6 @@
     {/if}
   </div>
 
-  <!-- Botón volver -->
   <button class="btn-back" onclick={() => goto('/dashboard/projects')}>
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M2.5 12H21M2.5 12l5-5M2.5 12l5 5"/>
@@ -415,19 +459,18 @@
     {$m.pd_back}
   </button>
 
-  <!-- KPI Cards + Colaboradores button -->
   <div class="kpi-bar">
     <div class="kpi-row">
       <div class="kpi-card">
         <div class="kpi-line" style="background: var(--color-primary)"></div>
-        <div class="kpi-num">{collections.length}</div>
+        <div class="kpi-num">{formatCount(collections.length, $locale)}</div>
         <div class="kpi-lbl">{$m.dash_kpi_collections}</div>
       </div>
 
       <div class="kpi-card">
         <div class="kpi-line" style="background: var(--color-secondary)"></div>
         <div class="kpi-num">{recordCount ?? '—'}</div>
-        <div class="kpi-lbl">{$m.pd_kpi_total_images}</div>
+        <div class="kpi-lbl">{$m.pd_kpi_total_records}</div>
       </div>
     </div>
 
@@ -435,12 +478,11 @@
       <span class="material-symbols-outlined icon-sm">group</span>
       <span>{$m.pd_members}</span>
       {#if members.length > 0}
-        <span class="member-badge">{members.length}</span>
+        <span class="member-badge">{formatCount(members.length, $locale)}</span>
       {/if}
     </button>
   </div>
 
-  <!-- Búsqueda + Filtros -->
   <div class="toolbar">
     <div class="search-wrapper">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
@@ -448,15 +490,8 @@
       </svg>
       <input type="text" placeholder={$m.proj_search_placeholder} bind:value={searchQuery} class="search-input" />
     </div>
-    <button class="btn-ghost">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-      </svg>
-      {$m.common_filters}
-    </button>
   </div>
 
-  <!-- Tabla de colecciones -->
   {#if isLoading}
     <div class="loading">
       <div class="spinner"></div>
@@ -479,7 +514,7 @@
           <tr>
             <th>{$m.pd_col_collection}</th>
             <th>{$m.common_status}</th>
-            <th>{$m.pd_col_images}</th>
+            <th>{$m.pd_col_records}</th>
             <th>{$m.pd_col_date}</th>
             <th class="text-right">{$m.common_actions}</th>
           </tr>
@@ -489,7 +524,6 @@
             {@const status  = mockStatuses[i % mockStatuses.length]}
 
             <tr class="table-row" onclick={() => handleCollectionClick(col.id)}>
-              <!-- Colección -->
               <td>
                 <div class="col-cell">
                   <div class="col-icon">
@@ -498,18 +532,33 @@
                     </svg>
                   </div>
                   <div>
-                    <p class="col-name">{col.name}</p>
-                    <p class="col-code">{col.archival_metadata?.signatura ?? (project?.signatura ? `${project.signatura}-${String(i+1).padStart(3,'0')}` : String(i+1).padStart(3,'0'))}</p>
+                    <p class="col-name">
+                      {col.name}
+                      {#if needsStem(col)}
+                        {#if canCreate}
+                          <button
+                            type="button"
+                            class="no-stem-badge"
+                            title={$m.pd_no_stem_title}
+                            onclick={(e) => startEditCollection(e, col)}
+                          >{$m.pd_no_stem_badge}</button>
+                        {:else}
+                          <span class="no-stem-badge" title={$m.pd_no_stem_title}>{$m.pd_no_stem_badge}</span>
+                        {/if}
+                      {/if}
+                    </p>
+                    <!-- Only a signatura the volume has: no code is built from the project's or the row number. -->
+                    {#if col.archival_metadata?.signatura}
+                      <p class="col-code">{col.archival_metadata.signatura}</p>
+                    {/if}
                   </div>
                 </div>
               </td>
 
-              <!-- Estado -->
               <td>
                 <span class="status-badge" style={getStatusStyle(status)}>{status}</span>
               </td>
 
-              <!-- Núm. imágenes -->
               <td>
                 <div class="img-count">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -520,18 +569,16 @@
                 </div>
               </td>
 
-              <!-- Fecha -->
               <td>
                 <div class="date-cell">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
                     <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                   </svg>
-                  {col.created_at ? new Date(col.created_at).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' }) : '—'}
+                  {col.created_at ? formatApiDate(col.created_at, $locale, { day:'numeric', month:'short', year:'numeric' }) : '—'}
                 </div>
               </td>
 
-              <!-- Acciones -->
               <td class="text-right">
                 <div class="action-menu-wrap">
                   <button
@@ -566,14 +613,12 @@
 
 </div>
 
-<!-- ============================================================
-     MODAL: Nueva Colección
-     ============================================================ -->
 {#if showCreateModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal(); }}>
-    <div class="modal-card">
+    <!-- No Escape: it would throw away what was typed. -->
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
 
       <div class="modal-header">
         <div>
@@ -588,7 +633,6 @@
       </div>
 
       <div class="modal-body">
-        <!-- Título -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_title} <span class="field-required">*</span></label>
           <input
@@ -600,7 +644,8 @@
           />
         </div>
 
-        <!-- Signatura -->
+        <VolumeStemField bind:value={colStem} locked={stemLocked} required={stemRequired} />
+
         <div class="form-field">
           <label class="field-label">{$m.pd_field_refcode}</label>
           <input
@@ -611,7 +656,6 @@
           />
         </div>
 
-        <!-- Nombre del creador -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_creator}</label>
           <input
@@ -622,7 +666,6 @@
           />
         </div>
 
-        <!-- Fechas de creación -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_dates}</label>
           <div class="date-range-row">
@@ -653,7 +696,6 @@
           {/if}
         </div>
 
-        <!-- Notas / Descripción -->
         <div class="form-field">
           <label class="field-label">{$m.pd_field_notes}</label>
           <textarea
@@ -664,7 +706,6 @@
         </div>
       </div>
 
-      <!-- Error al crear colección -->
       {#if createError}
         <div class="create-error">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -680,7 +721,7 @@
         <button
           class="btn-crear"
           onclick={handleCreateCollection}
-          disabled={isCreating || !colName.trim() || dateError !== ''}
+          disabled={isCreating || !colName.trim() || dateError !== '' || stemInvalid}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -693,14 +734,9 @@
   </div>
 {/if}
 
-<!-- ============================================================
-     MODAL: Colaboradores
-     ============================================================ -->
 {#if showMembersModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) { showMembersModal = false; } }}>
-    <div class="modal-card modal-card--wide">
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: () => showMembersModal = false }}>
+    <div class="modal-card modal-card--wide dialog-fit" role="dialog" aria-modal="true">
 
       <div class="modal-header">
         <div>
@@ -723,9 +759,12 @@
               <div class="member-av">{member.username.slice(0,2).toUpperCase()}</div>
               <div class="member-info">
                 <span class="member-name">{member.username}</span>
-                <span class="member-email">{member.email}</span>
+                {#if member.email}
+                  <span class="member-email">{member.email}</span>
+                {/if}
               </div>
-              <span class="role-badge role-badge--{member.role}">{member.role}</span>
+              <!-- The CSS class keeps the raw enum value; only the text is translated. -->
+              <span class="role-badge role-badge--{member.role}">{$roleLabel(member.role)}</span>
               {#if member.is_implicit}
                 <span class="member-implicit-icon" title={$m.pd_member_implicit}>
                   <span class="material-symbols-outlined icon-sm">lock</span>
@@ -739,7 +778,6 @@
           {/each}
         </ul>
 
-        <!-- Add member — only for admin/operator -->
         {#if canManageMembers}
           <div class="add-member-section">
             <p class="add-member-title">{$m.pd_member_add}</p>
@@ -747,7 +785,7 @@
               <select class="field-input add-member-select" bind:value={addUserId}>
                 <option value={null}>{$m.pd_member_select}</option>
                 {#each filteredUsers as u}
-                  <option value={u.id}>{u.username} ({u.email})</option>
+                  <option value={u.id}>{u.email ? `${u.username} (${u.email})` : u.username}</option>
                 {/each}
               </select>
               <select class="field-input add-role-select" bind:value={addRole}>
@@ -781,14 +819,9 @@
   </div>
 {/if}
 
-<!-- ============================================================
-     MODAL: Eliminar Colección
-     ============================================================ -->
 {#if showDeleteColModal && deletingCol}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeDeleteColModal(); }}>
-    <div class="modal-card delete-modal-card">
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeDeleteColModal, escape: !isDeletingCol, backdrop: !isDeletingCol }}>
+    <div class="modal-card delete-modal-card dialog-fit" role="dialog" aria-modal="true">
 
       <div class="modal-header">
         <div>
@@ -802,7 +835,17 @@
         </button>
       </div>
 
-      {#if isLoadingDeleteColInfo}
+      {#if deleteRefused(deletingCol)}
+        <!-- The backend refuses this delete (409); nothing is moved first. -->
+        <div class="delete-warning" role="note">
+          <div class="delete-warning-icon">
+            <span class="material-symbols-outlined icon-md">lock</span>
+          </div>
+          <p class="delete-warning-body">{$m.pd_delete_stem_reserved}</p>
+        </div>
+      {:else if deleteBlockedBySubvolumes}
+        <!-- No target select: the error below says why the delete is refused. -->
+      {:else if isLoadingDeleteColInfo}
         <div class="delete-loading">
           <div class="spinner"></div>
           {$m.pd_delete_loading}
@@ -822,9 +865,11 @@
         </div>
 
         <div class="delete-move-section">
-          <label class="field-label">{$m.pd_move_label}</label>
-          <select class="field-input" bind:value={deleteMoveColTarget}>
-            <option value="">{$m.pd_move_none}</option>
+          <!-- The backend refuses to delete a volume that still has records,
+               so a target is required and the empty option is a placeholder. -->
+          <label class="field-label" for="delete-move-target">{$m.pd_move_label}</label>
+          <select id="delete-move-target" class="field-input" bind:value={deleteMoveColTarget} required aria-required="true">
+            <option value="" disabled>{$m.pd_move_none}</option>
             {#each collections.filter(c => c.id !== deletingCol!.id) as c}
               <option value={c.id}>{c.name}</option>
             {/each}
@@ -855,7 +900,9 @@
         <button
           class="btn-danger"
           onclick={executeDeleteCol}
-          disabled={isDeletingCol || isLoadingDeleteColInfo}
+          disabled={isDeletingCol || isLoadingDeleteColInfo || deleteRefused(deletingCol)
+            || deleteBlockedBySubvolumes
+            || (deleteColRecordCount > 0 && deleteMoveColTarget === '')}
         >
           <span class="material-symbols-outlined icon-sm">delete</span>
           {isDeletingCol ? $m.common_deleting : (deleteMoveColTarget !== '' ? $m.proj_move_and_delete : $m.pd_delete_collection_title)}
@@ -874,7 +921,6 @@
   .page-title  { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
 
-  /* Botón volver */
   .btn-back {
     display: inline-flex;
     align-items: center;
@@ -912,7 +958,6 @@
     gap: 4px;
   }
 
-  /* Rayita de color en la parte superior */
   .kpi-line {
     width: 24px;
     height: 2px;
@@ -1068,6 +1113,21 @@
 
   .col-name { font-weight: var(--fw-semibold); color: var(--color-light); margin: 0 0 2px; }
   .col-code { font-size: 11px; color: var(--color-light-grey); margin: 0; }
+  .no-stem-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    font-family: var(--font-family);
+    font-size: 11px;
+    font-weight: var(--fw-bold);
+    color: var(--color-highlight);
+    background: rgba(225, 183, 120, 0.12);
+    border: 1px solid rgba(225, 183, 120, 0.4);
+    border-radius: var(--radius-md);
+    vertical-align: middle;
+  }
+  button.no-stem-badge { cursor: pointer; }
+  button.no-stem-badge:hover { background: rgba(225, 183, 120, 0.22); }
 
   .status-badge {
     display: inline-block;
@@ -1182,9 +1242,10 @@
 
   .modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
 
-  /* Colaboradores: única forma de cerrar el modal — círculo con target
-     táctil de 44x44 (--touch-target-min) y feedback de hover/active visible
-     (mismo patrón que .btn-back en +layout@.svelte y .btn:active global) */
+  /* Close button of the members modal: a circle with a 44x44 touch target
+     (--touch-target-min) and visible hover/active feedback (same pattern as
+     .btn-back in the volume view's +layout@.svelte and the global
+     .btn:active). */
   .modal-close--circle {
     width: var(--touch-target-min);
     height: var(--touch-target-min);

@@ -1,71 +1,51 @@
 <script lang="ts">
-	// ============================================================================
-	// PÁGINA: Login
-	// Ruta: /login → src/routes/(auth)/login/+page.svelte
+	// Login page. Before it opens a session it validates the role that
+	// `/users/me` returns (NEH-117), and it tells bad credentials, a login
+	// lockout and an unreachable backend apart so each gets its own message.
+	// The footer shows whether the backend answers and holds the language selector.
 	//
-	// Estados que maneja:
-	//   - Default:  formulario vacío listo para ingresar credenciales
-	//   - Loading:  spinner + overlay mientras espera respuesta del backend
-	//   - Error:    alerta roja "Usuario o contraseña incorrectos"
-	//   - Popup:    modal "¿Olvidaste tu contraseña?" con instrucción de contacto
-	// ============================================================================
+	// Version: 0.1.0-beta
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authApi, healthApi, usersApi, tokenStore } from '$lib/api';
-	import { authStore, getRoleDashboardPath, type UserRole } from '$lib/stores/auth';
+	import { classifyLoginError, lockoutMinutes, retryAfterOf } from '$lib/login-error';
+	import { authStore, isUserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
-	import logo from '$lib/assets/captua-logo-descrp-light-esp.svg';
+	import logoEs from '$lib/assets/captua-logo-descrp-light-esp.svg';
+	import logoEn from '$lib/assets/captua-logo-descrp-light-eng.svg';
 	import favicon from '$lib/assets/favicon.svg';
 
-	// ---------------------------------------------------------------------------
-	// ESTADO DEL FORMULARIO
-	// ---------------------------------------------------------------------------
+	// the descriptor in the logo is baked into the SVG, so the asset
+	// itself has to follow the locale.
+	let logo = $derived($locale === 'en' ? logoEn : logoEs);
 
-	let username = $state(''); // valor del campo Usuario
-	let password = $state(''); // valor del campo Contraseña
-	let rememberMe = $state(false); // checkbox "Recuérdame"
-	let showPassword = $state(false); // toggle mostrar/ocultar contraseña
+	let username = $state('');
+	let password = $state('');
+	let showPassword = $state(false);
 
-	// ---------------------------------------------------------------------------
-	// ESTADO DE LA UI
-	// ---------------------------------------------------------------------------
+	let isLoading = $state(false);
+	let errorMessage = $state(''); // empty = no error
+	let isConnected = $state(false);
 
-	let isLoading = $state(false); // true mientras se procesa el login
-	let errorMessage = $state(''); // mensaje de error (vacío = sin error)
-	let isConnected = $state(false); // true si el backend responde
-
-	// ── POPUP "¿Olvidaste tu contraseña?" ─────────────────────────────────────
-	// showForgotPopup controla la visibilidad del modal.
-	// Para cambiar el mensaje del popup, edita login_forgot_message en $lib/i18n.
 	let showForgotPopup = $state(false);
 
-	// Idiomas disponibles en el selector de idioma del footer.
-	// Las siglas se muestran siempre en su propio idioma (no se traducen).
-	// PT queda fuera hasta que exista un catálogo pt.ts en $lib/i18n.
+	// The labels stay in their own language rather than being translated. PT
+	// is left out until `$lib/i18n` has a `pt.ts` catalogue.
 	const languages: { code: Locale; label: string }[] = [
 		{ code: 'es', label: 'ES' },
 		{ code: 'en', label: 'EN' }
 	];
 
-	// ---------------------------------------------------------------------------
-	// AL MONTAR: verifica si ya hay sesión y chequea conexión al backend
-	// ---------------------------------------------------------------------------
 	onMount(async () => {
-		// Si ya hay sesión activa, no tiene sentido mostrar el login
+		// A signed-in user has no reason to see the login form.
 		if (authStore.isAuthenticated()) {
 			goto('/');
 			return;
 		}
-		// Verifica que el backend esté respondiendo para mostrar el indicador
 		await checkConnection();
 	});
 
-	// ---------------------------------------------------------------------------
-	// FUNCIÓN: Verifica si el backend está disponible
-	// Actualiza el punto verde/rojo de "Conectado / Sin conexión" en el footer.
-	// El endpoint de healthcheck está en api.ts → healthApi.check()
-	// ---------------------------------------------------------------------------
 	async function checkConnection() {
 		try {
 			await healthApi.check();
@@ -75,18 +55,9 @@
 		}
 	}
 
-	// ---------------------------------------------------------------------------
-	// FUNCIÓN: Maneja el submit del formulario de login
-	//
-	//   1. Llama a authApi.login() con las credenciales
-	//   2. Obtiene datos del usuario con /users/me
-	//   3. Guarda sesión y redirige al dashboard según rol
-	// ---------------------------------------------------------------------------
 	async function handleLogin() {
-		// Limpiar error anterior en cada intento
 		errorMessage = '';
 
-		// Validación de campos vacíos
 		if (!username.trim() || !password.trim()) {
 			errorMessage = $m.login_error_fill_all_fields;
 			return;
@@ -94,110 +65,117 @@
 
 		isLoading = true;
 
+		// Flipped once /auth/login returns 200, so a later failure can't be
+		// reported as a bad password.
+		let credentialsChecked = false;
+
 		try {
-			// Paso 1: autenticar y obtener token JWT
 			const authResponse = await authApi.login({
 				username: username.trim(),
 				password
 			});
+			credentialsChecked = true;
 
-			// Paso 2: obtener datos del usuario autenticado (incluye el rol)
-			// ⚠️ El endpoint /users/me debe devolver el campo 'role' con uno de:
-			//    'admin' | 'operator' | 'reviewer'
-			// Si el backend usa otros nombres de rol, actualizar UserRole en auth.ts
+			// The role `/users/me` returns has to be in `USER_ROLES`
+			// (stores/auth.ts). If the backend adds roles, that list is the only
+			// place to add them — the role check below validates against it.
 			//
-			// usersApi.me() usa apiRequest, que arma el header Authorization desde
-			// tokenStore — hay que persistir el token recién obtenido primero para
-			// que este llamado lo levante.
+			// `usersApi.me()` goes through `apiRequest`, which builds the
+			// Authorization header from `tokenStore`, so the new token has to be
+			// stored first for this call to pick it up.
 			tokenStore.set(authResponse.access_token);
 			const userData = await usersApi.me();
 
-			// Paso 3: guardar sesión en el store global
+			// Validate the role before opening a session. Without this check, a
+			// role the frontend does not know gets in anyway and ends up deciding
+			// navigation and camera permissions (NEH-117).
+			//
+			// The session has to be cleared: the token is already in localStorage
+			// so that `/users/me` could be called, and `authStore` reads its
+			// initial state from there — leaving it in place means a reload shows
+			// a half-open session. `clearSession` also removes any `auth_user`
+			// left over from an earlier session.
+			if (!isUserRole(userData.role)) {
+				authStore.clearSession();
+				console.error('[Login] Unrecognized role:', userData.role);
+				errorMessage = $m.login_error_unknown_role;
+				return;
+			}
+
 			authStore.setSession(authResponse.access_token, userData);
 
-			// Paso 4: redirigir al dashboard según rol
-			goto(getRoleDashboardPath(userData.role));
+			goto('/dashboard');
 		} catch (error) {
-			// Mensaje genérico para no revelar si el usuario existe
-			errorMessage = $m.login_error_bad_credentials;
+			// Bad credentials, a lockout and an unreachable backend each get their
+			// own message. The credentials message stays generic, and it does not
+			// cover connection failures.
+			const failure = classifyLoginError(error, { credentialsChecked });
+			if (failure === 'credentials') {
+				errorMessage = $m.login_error_bad_credentials;
+			} else if (failure === 'throttled') {
+				// The backend locks login after repeated failures and says for
+				// how long in Retry-After (seconds).
+				const minutes = lockoutMinutes(retryAfterOf(error));
+				errorMessage =
+					minutes === null
+						? $m.login_error_locked_out_unknown
+						: $m.login_error_locked_out(minutes);
+			} else {
+				errorMessage = $m.login_error_backend_unavailable;
+				// Keep the footer's connection dot consistent with the message.
+				await checkConnection();
+			}
 			console.error('[Login] Error:', error);
 		} finally {
-			// Siempre apagar el loading al terminar (éxito o error)
 			isLoading = false;
 		}
 	}
 
-	// ---------------------------------------------------------------------------
-	// ACCIÓN: Abrir popup "¿Olvidaste tu contraseña?"
-	// Muestra el modal con el mensaje de contacto.
-	// Para cambiar el mensaje, edita la variable forgotMessage arriba.
-	// ---------------------------------------------------------------------------
 	function handleForgotPassword() {
 		showForgotPopup = true;
 	}
 
-	// ---------------------------------------------------------------------------
-	// ACCIÓN: Cerrar el popup de contraseña olvidada
-	// Se llama desde el botón "Cerrar" dentro del modal.
-	// ---------------------------------------------------------------------------
 	function closeForgotPopup() {
 		showForgotPopup = false;
 	}
 
-	// ---------------------------------------------------------------------------
-	// ACCIÓN: Cerrar popup con clic en el backdrop (fuera del modal)
-	// ---------------------------------------------------------------------------
 	function handleBackdropClick(event: MouseEvent) {
-		// Solo cierra si el click fue directamente en el backdrop,
-		// no en el contenido del modal
+		// Clicks inside the modal content bubble up to the backdrop too; only a
+		// click on the backdrop itself closes the popup.
 		if ((event.target as HTMLElement).classList.contains('popup-backdrop')) {
 			closeForgotPopup();
 		}
 	}
 
-	// ---------------------------------------------------------------------------
-	// ACCIÓN: Cerrar popup con tecla Escape
-	// ---------------------------------------------------------------------------
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape' && showForgotPopup) {
 			closeForgotPopup();
 			return;
 		}
-		// Permite enviar el formulario con Enter cuando el popup está cerrado
+		// The fields are not in a <form>, so Enter submits here, while the popup is closed.
 		if (event.key === 'Enter' && !isLoading && !showForgotPopup) {
 			handleLogin();
 		}
 	}
 
-	// ---------------------------------------------------------------------------
-	// ACCIÓN: Toggle mostrar/ocultar contraseña
-	// ---------------------------------------------------------------------------
 	function togglePassword() {
 		showPassword = !showPassword;
 	}
 
-	// El cambio de idioma lo hace setLanguage de $lib/i18n: escribe la cookie
-	// dtk_locale y recarga la página para que el SSR renderice el idioma nuevo.
+	// `setLanguage` in `$lib/i18n` switches the language: it writes the
+	// `captua_locale` cookie and reloads the page so that SSR renders the new one.
 </script>
 
-<!-- ============================================================
-     CONTENEDOR PRINCIPAL
-     ============================================================ -->
 <div class="login-wrapper" onkeydown={handleKeydown} role="main">
-	<!-- ── CARD DE LOGIN ─────────────────────────────────────────── -->
 	<div class="login-card" class:is-loading={isLoading}>
-		<!-- Logo + nombre del sistema -->
 		<div class="card-logo-area">
 			<img src={logo} alt="Captua" class="brand-logo" />
 		</div>
 
-		<!-- Formulario -->
 		<div class="form-area">
-			<!-- CAMPO: Usuario -->
 			<div class="field-group">
 				<label class="field-label" for="username">{$m.common_username_label}</label>
 				<div class="input-wrapper">
-					<!-- Ícono persona -->
 					<svg
 						class="input-icon"
 						viewBox="0 0 24 24"
@@ -223,11 +201,9 @@
 				</div>
 			</div>
 
-			<!-- CAMPO: Contraseña -->
 			<div class="field-group">
 				<label class="field-label" for="password">{$m.common_password_label}</label>
 				<div class="input-wrapper">
-					<!-- Ícono candado -->
 					<svg
 						class="input-icon"
 						viewBox="0 0 24 24"
@@ -238,7 +214,6 @@
 						<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
 						<path d="M7 11V7a5 5 0 0 1 10 0v4" />
 					</svg>
-					<!-- type cambia según showPassword -->
 					<input
 						id="password"
 						type={showPassword ? 'text' : 'password'}
@@ -249,7 +224,6 @@
 						disabled={isLoading}
 						autocomplete="current-password"
 					/>
-					<!-- Botón ojo mostrar/ocultar -->
 					<button
 						type="button"
 						class="input-action-btn"
@@ -257,7 +231,7 @@
 						aria-label={showPassword ? $m.common_hide_password : $m.common_show_password}
 					>
 						{#if showPassword}
-							<!-- Ojo tachado: contraseña visible -->
+							<!-- Crossed-out eye: the password is visible -->
 							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 								<path
 									d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
@@ -266,7 +240,7 @@
 								<line x1="1" y1="1" x2="23" y2="23" />
 							</svg>
 						{:else}
-							<!-- Ojo abierto: contraseña oculta -->
+							<!-- Open eye: the password is hidden -->
 							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 								<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
 								<circle cx="12" cy="12" r="3" />
@@ -276,13 +250,7 @@
 				</div>
 			</div>
 
-			<!-- FILA: Recuérdame + ¿Olvidaste tu contraseña? -->
 			<div class="row-options">
-				<label class="remember-label">
-					<input type="checkbox" class="checkbox" bind:checked={rememberMe} disabled={isLoading} />
-					<span>{$m.login_remember_me}</span>
-				</label>
-				<!-- Al hacer click abre el popup — ver handleForgotPassword() arriba -->
 				<button
 					type="button"
 					class="forgot-link"
@@ -293,7 +261,6 @@
 				</button>
 			</div>
 
-			<!-- ALERTA DE ERROR: visible solo cuando hay errorMessage -->
 			{#if errorMessage}
 				<div class="alert alert-error" role="alert" aria-live="polite">
 					<svg
@@ -310,7 +277,6 @@
 				</div>
 			{/if}
 
-			<!-- BOTÓN: Iniciar sesión -->
 			<button
 				type="button"
 				class="btn-login"
@@ -318,21 +284,19 @@
 				disabled={isLoading}
 				aria-busy={isLoading}
 			>
-				<!-- En estado loading el texto va en mayúsculas (igual que en el diseño) -->
+				<!-- The loading label is uppercase in the i18n catalogues, as in the design -->
 				{isLoading ? $m.login_submit_loading : $m.login_submit}
 			</button>
 		</div>
 		<!-- /form-area -->
 
-		<!-- FOOTER: estado de conexión + selector de idioma -->
 		<div class="card-footer">
-			<!-- Punto verde/rojo + texto "Conectado" / "Sin conexión" -->
 			<div class="connection-status">
 				<span class="status-dot" class:success={isConnected} class:error={!isConnected}></span>
 				<span class="status-text">{isConnected ? $m.login_connected : $m.login_offline}</span>
 			</div>
 
-			<!-- Selector de idioma — escribe la cookie y recarga (ver $lib/i18n) -->
+			<!-- `setLanguage` writes the locale cookie and reloads (see `$lib/i18n`) -->
 			<div class="lang-selector">
 				<svg
 					viewBox="0 0 24 24"
@@ -363,7 +327,6 @@
 			</div>
 		</div>
 
-		<!-- OVERLAY DE CARGA: se superpone sobre el card durante el login -->
 		{#if isLoading}
 			<div class="loading-overlay" aria-label={$m.common_loading} role="status">
 				<div class="spinner"></div>
@@ -375,14 +338,8 @@
 </div>
 <!-- /login-wrapper -->
 
-<!-- ============================================================
-     POPUP: ¿Olvidaste tu contraseña?
-     Se muestra sobre todo el contenido cuando showForgotPopup = true.
-     Para cambiar el mensaje, edita login_forgot_message en $lib/i18n.
-     Para cerrar: botón "Cerrar", tecla Escape, o click fuera del modal.
-     ============================================================ -->
+<!-- The popup closes on its Close button, Escape, or a click outside the modal. -->
 {#if showForgotPopup}
-	<!-- Backdrop oscuro — click fuera del modal lo cierra -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
@@ -392,9 +349,7 @@
 		aria-modal="true"
 		aria-label={$m.login_forgot_dialog_aria}
 	>
-		<!-- Contenido del modal -->
-		<div class="popup-card">
-			<!-- Ícono de advertencia/información -->
+		<div class="popup-card dialog-fit">
 			<div class="popup-icon-wrapper">
 				<svg
 					viewBox="0 0 24 24"
@@ -409,14 +364,10 @@
 				</svg>
 			</div>
 
-			<!-- Título del popup -->
 			<h3 class="popup-title">{$m.login_forgot_title}</h3>
 
-			<!-- Mensaje principal -->
-			<!-- Para cambiar este texto, edita login_forgot_message en $lib/i18n -->
 			<p class="popup-message">{$m.login_forgot_message}</p>
 
-			<!-- Botón cerrar -->
 			<button type="button" class="popup-close-btn" onclick={closeForgotPopup}>
 				{$m.common_close}
 			</button>
@@ -425,7 +376,6 @@
 {/if}
 
 <style>
-	/* ── Wrapper: pantalla completa ── */
 	.login-wrapper {
 		display: flex;
 		align-items: center;
@@ -435,7 +385,6 @@
 		padding: 24px 16px;
 	}
 
-	/* ── Card principal ── */
 	.login-card {
 		position: relative;
 		width: 100%;
@@ -446,13 +395,11 @@
 		box-shadow: var(--shadow-lg);
 	}
 
-	/* Opacidad reducida del formulario durante la carga */
 	.login-card.is-loading .form-area {
 		pointer-events: none;
 		opacity: 0.5;
 	}
 
-	/* ── Área del logo ── */
 	.card-logo-area {
 		display: flex;
 		flex-direction: column;
@@ -469,7 +416,6 @@
 		margin: 0 auto;
 	}
 
-	/* ── Área del formulario ── */
 	.form-area {
 		padding: 28px 24px 20px;
 		display: flex;
@@ -489,7 +435,6 @@
 		color: var(--color-light-grey);
 	}
 
-	/* Input con ícono a la izquierda */
 	.input-wrapper {
 		position: relative;
 		display: flex;
@@ -520,7 +465,6 @@
 		padding-right: 44px;
 	}
 
-	/* Botón ojo */
 	.input-action-btn {
 		position: absolute;
 		right: 10px;
@@ -545,30 +489,20 @@
 		height: 18px;
 	}
 
-	/* Error en inputs */
 	.input-error {
 		border-color: var(--color-error) !important;
 	}
 
-	/* Fila recuérdame + ¿olvidaste? */
+	/* There is no "remember me" checkbox: the session persists either way
+	   (NEH-152). */
 	.row-options {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: flex-end;
 		gap: 8px;
 	}
 
-	.remember-label {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-size: var(--text-sm);
-		color: var(--color-light-grey);
-		cursor: pointer;
-		user-select: none;
-	}
 
-	/* Link ¿Olvidaste? — abre el popup al hacer click */
 	.forgot-link {
 		background: none;
 		border: none;
@@ -589,7 +523,6 @@
 		cursor: not-allowed;
 	}
 
-	/* Alerta de error */
 	.alert {
 		display: flex;
 		align-items: center;
@@ -612,7 +545,6 @@
 		flex-shrink: 0;
 	}
 
-	/* Botón principal de login */
 	.btn-login {
 		width: 100%;
 		font-family: var(--font-family);
@@ -642,7 +574,6 @@
 		letter-spacing: 0.08em;
 	}
 
-	/* Footer del card */
 	.card-footer {
 		display: flex;
 		align-items: center;
@@ -721,7 +652,6 @@
 		user-select: none;
 	}
 
-	/* Overlay de carga */
 	.loading-overlay {
 		position: absolute;
 		inset: 0;
@@ -758,26 +688,19 @@
 		}
 	}
 
-	/* ══════════════════════════════════════════════════════════════
-     POPUP: ¿Olvidaste tu contraseña?
-     ══════════════════════════════════════════════════════════════ */
-
-	/* Backdrop: capa oscura semitransparente sobre toda la pantalla */
 	.popup-backdrop {
 		position: fixed;
-		inset: 0; /* cubre toda la viewport */
+		inset: 0;
 		background-color: rgba(0, 0, 0, 0.65);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		z-index: 100; /* por encima de todo */
+		z-index: 100;
 		padding: 24px;
-		backdrop-filter: blur(3px); /* desenfoca el fondo */
-		/* Animación de entrada */
+		backdrop-filter: blur(3px);
 		animation: fadeIn 0.15s ease;
 	}
 
-	/* Card del modal */
 	.popup-card {
 		background-color: var(--color-surface);
 		border: 1px solid var(--border-color);
@@ -790,16 +713,14 @@
 		align-items: center;
 		gap: 16px;
 		box-shadow: var(--shadow-lg);
-		/* Animación de entrada del modal */
 		animation: slideUp 0.2s ease;
 	}
 
-	/* Círculo con ícono de información */
 	.popup-icon-wrapper {
 		width: 52px;
 		height: 52px;
 		border-radius: 50%;
-		background-color: rgba(150, 177, 240, 0.12); /* azul tenue */
+		background-color: rgba(150, 177, 240, 0.12);
 		border: 1px solid var(--color-secondary);
 		display: flex;
 		align-items: center;
@@ -813,7 +734,6 @@
 		color: var(--color-secondary);
 	}
 
-	/* Título del popup */
 	.popup-title {
 		font-size: var(--text-h4); /* 20px */
 		font-weight: var(--fw-bold);
@@ -822,8 +742,6 @@
 		text-align: center;
 	}
 
-	/* Mensaje del popup */
-	/* Para cambiar el texto, edita la variable forgotMessage en el <script> */
 	.popup-message {
 		font-size: var(--text-base);
 		color: var(--color-light-grey);
@@ -832,7 +750,6 @@
 		margin: 0;
 	}
 
-	/* Botón cerrar */
 	.popup-close-btn {
 		width: 100%;
 		font-family: var(--font-family);
@@ -856,7 +773,6 @@
 		transform: scale(0.98);
 	}
 
-	/* Animaciones del popup */
 	@keyframes fadeIn {
 		from {
 			opacity: 0;

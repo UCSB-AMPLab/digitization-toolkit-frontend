@@ -1,56 +1,74 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: LeftSidebar (Gallery)
-  // Archivo: src/routes/gallery/[collectionId]/LeftSidebar.svelte
+  // Left sidebar of the spread view: a strip of three icons, each of which opens
+  // or closes a panel. The panel starts closed.
   //
-  // Panel lateral izquierdo de la galería.
-  // Contiene un strip de 3 íconos y un panel expandido según el tab activo:
+  //   'info'     — per-image details of the current record
+  //   'edit'     — rotation and the brightness/contrast/saturation preview sliders
+  //   'comments' — annotations (error marks and notes) and the review actions
+  //                (NEH-209), all in one panel with no modals so that approving
+  //                or rejecting does not send the reviewer's eyes elsewhere on
+  //                the screen. Reject and Approve stay visible after a decision
+  //                so a mistake can be undone, behind a confirmation popup.
   //
-  //   'info'     → Image info: nombre, formato, metadatos, dimensiones, tamaño
-  //   'edit'     → Preview Controls: rotar, brillo, contraste, saturación
-  //   'comments' → Anotaciones: lista de notas + "Marcar error" + "Agregar nota"
+  // Annotations are stored in the backend (`recordsApi.*Annotation*`), scoped to
+  // the current record, and reloaded whenever the current record's id changes.
   //
-  // En vista 'spread' o 'grid', el sidebar se colapsa mostrando solo el strip.
-  // Solo se muestran los paneles en vista 'single'.
-  //
-  // Las anotaciones se persisten en el backend (recordsApi.*Annotation*),
-  // escopadas al record actual: se recargan cada vez que currentRecord cambia.
-  // ============================================================================
+  // Version: 0.1.0-beta
 
-  import type { Record, RecordImage, RecordAnnotation } from '$lib/api';
-  import { recordsApi } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
+  import { recordsApi, ApiError } from '$lib/api';
+  import { m, locale } from '$lib/i18n';
+  import { formatApiDate } from '$lib/format-date';
+  import { formatCount } from '$lib/format-count';
+  import { REJECTION_REASONS } from '$lib/rejectionReasons';
+  import { REJECTION_COMMENT_MAX_LENGTH, isCommentTooLong, showsCommentCount } from '$lib/rejection-comment';
+  import { dismissible } from '$lib/dialog';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     viewMode,
     currentRecord,
     currentIndex,
     totalRecords,
+    userRole = null,
+    brightness = $bindable(0),
+    contrast = $bindable(0),
+    saturation = $bindable(0),
     onRotateLeft,
     onRotateRight,
+    onRecordUpdated,
+    onRecapture,
   }: {
     viewMode: 'list' | 'spread' | 'grid';
     currentRecord: Record | null;
     currentIndex: number;
     totalRecords: number;
+    userRole?: string | null;
+    // Preview adjustments, -100 to 100. The parent owns them because the viewer
+    // needs them too; the panel only moves them. They do not modify the file —
+    // they apply as a CSS filter on the image on screen, as rotation does.
+    brightness?: number;
+    contrast?: number;
+    saturation?: number;
     onRotateLeft: () => void;
     onRotateRight: () => void;
+    // May be async (`loadRecords` is). `confirmPendingAction` awaits it so that
+    // `currentRecord` reflects the new status before the user can click again;
+    // otherwise, for a moment `currentRecord.status` still holds the old status,
+    // and a quick click on the opposite button computes the wrong confirmation
+    // message.
+    onRecordUpdated: () => void | Promise<void>;
+    onRecapture: (record: Record) => void;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // ESTADO LOCAL
-  // ---------------------------------------------------------------------------
+  const canReview = $derived(userRole === 'reviewer' || userRole === 'admin');
+  // A retake fires the camera, so only admin/operator may start one, as on
+  // /live-preview itself (which redirects a reviewer, NEH-66).
+  const canOperate = $derived(userRole === 'admin' || userRole === 'operator');
 
-  // Tab activo del strip
   let activeTab = $state<'info' | 'edit' | 'comments'>('info');
 
-  // Panel oculto por defecto; el usuario lo abre pulsando un ícono del strip
   let isExpanded = $state(false);
 
-  // Abre el panel en el tab indicado, o lo colapsa si ya estaba en ese tab
   function toggleTab(tab: 'info' | 'edit' | 'comments') {
     if (isExpanded && activeTab === tab) {
       isExpanded = false;
@@ -60,58 +78,124 @@
     }
   }
 
-  // Valores de sliders de Preview Controls (-100 a 100)
-  let brightness = $state(0);
-  let contrast = $state(0);
-  let saturation = $state(0);
-
-  // Anotaciones: persistidas en el backend, escopadas al record actual
   let annotations = $state<RecordAnnotation[]>([]);
   let annotationsError = $state<string | null>(null);
   let isSavingAnnotation = $state(false);
 
-  // Tipos de error disponibles para "Marcar error"
-  // Para agregar tipos, añadir aquí
-  const ERROR_TYPES = $derived([
-    { id: 'blur',     label: $m.col_err_blurry,   color: '#bc823c' },
-    { id: 'glare',    label: $m.col_err_glare,    color: '#c05a44' },
-    { id: 'shadow',   label: $m.col_err_shadows,  color: '#8b7355' },
-    { id: 'focus',    label: $m.col_err_focus,    color: '#7ba3a3' },
-    { id: 'exposure', label: $m.col_err_exposure, color: '#c4a052' },
-    { id: 'dirt',     label: $m.col_err_debris,   color: '#a85e78' },
-  ]);
+  // Error types offered under "Mark error". The ids and colors live in
+  // `$lib/rejectionReasons`; only the translated labels are added here.
+  const ERROR_LABELS: { [id: string]: string } = $derived({
+    blur: $m.col_err_blurry,
+    glare: $m.col_err_glare,
+    shadow: $m.col_err_shadows,
+    focus: $m.col_err_focus,
+    exposure: $m.col_err_exposure,
+    dirt: $m.col_err_debris,
+    framing: $m.col_err_framing,
+    obstruction: $m.col_err_obstruction,
+    other: $m.col_err_other,
+  });
+  // The line shown beneath each reason where it is offered for choosing.
+  const ERROR_GLOSSES: { [id: string]: string } = $derived({
+    blur: $m.col_err_blurry_gloss,
+    glare: $m.col_err_glare_gloss,
+    shadow: $m.col_err_shadows_gloss,
+    focus: $m.col_err_focus_gloss,
+    exposure: $m.col_err_exposure_gloss,
+    dirt: $m.col_err_debris_gloss,
+    framing: $m.col_err_framing_gloss,
+    obstruction: $m.col_err_obstruction_gloss,
+    other: $m.col_err_other_gloss,
+  });
+  const ERROR_TYPES = $derived(REJECTION_REASONS.map(r => ({ ...r, label: ERROR_LABELS[r.id], gloss: ERROR_GLOSSES[r.id] })));
 
-  // Recarga las anotaciones cada vez que cambia el record activo; evita que
-  // las anotaciones de un record se sigan mostrando al navegar a otro.
+  // The effect below reloads the annotations whenever the active record
+  // changes, so one record's annotations are never shown on another. It also
+  // clears the "Add note"/"Mark error" state (NEH-209); otherwise a half-written
+  // reason or note for one record would carry over to the next.
+  // The load below and the saves and deletes made while it is in flight can
+  // reach the list in any order: the load can answer after a save committed
+  // (the annotation would show twice), before it (it would be lost), or
+  // before a delete (it would come back). So the list is merged by id, minus
+  // what was deleted meanwhile, and kept in the backend's order, newest
+  // first, whatever path each annotation took: firstFlaggedReason reads the
+  // oldest from the end.
+  function byNewest(a: RecordAnnotation, b: RecordAnnotation): number {
+    const t = (b.created_at ?? '').localeCompare(a.created_at ?? '');
+    return t !== 0 ? t : b.id - a.id;
+  }
+  // Annotations deleted, or being deleted, from this panel. Annotation ids
+  // are unique across records, so the set is not reset when the record
+  // changes: a delete still in flight on a record left and reopened stays
+  // out of its reload. A failed delete takes its id back out. Not reactive.
+  const deletedIds = new Set<number>();
+  function withAnnotation(list: RecordAnnotation[], added: RecordAnnotation): RecordAnnotation[] {
+    const rest = list.filter(a => a.id !== added.id);
+    return (deletedIds.has(added.id) ? rest : [...rest, added]).sort(byNewest);
+  }
+  function mergeLoaded(loaded: RecordAnnotation[], local: RecordAnnotation[]): RecordAnnotation[] {
+    const merged = [...local.filter(a => !loaded.some(l => l.id === a.id)), ...loaded];
+    return merged.filter(a => !deletedIds.has(a.id)).sort(byNewest);
+  }
+
+  // Keyed on the id, not the object: after a free or a restore (NEH-248) the
+  // page reloads its records in place and passes a new object for the same
+  // record, which must not erase a note or reasons the operator has not saved.
+  const currentRecordId = $derived(currentRecord?.id ?? null);
+
   $effect(() => {
-    const recordId = currentRecord?.id ?? null;
+    const recordId = currentRecordId;
     annotations = [];
     annotationsError = null;
+    noteText = '';
+    selectedReasons = [];
+    isReasonCardExpanded = false;
+    isNoteCardExpanded = false;
+    reviewError = null;
+    pendingAction = null;
     if (recordId == null) return;
 
     let cancelled = false;
     recordsApi.getAnnotations(recordId)
-      .then(data => { if (!cancelled) annotations = data; })
+      .then(data => { if (!cancelled) annotations = mergeLoaded(data, annotations); })
       .catch(err => {
         if (cancelled) return;
-        console.error('[LeftSidebar] Error cargando anotaciones:', err);
+        console.error('[LeftSidebar] Error loading annotations:', err);
         annotationsError = $m.col_annotation_load_error;
       });
 
     return () => { cancelled = true; };
   });
 
-  // Modal de "Marcar error"
-  let showErrorModal = $state(false);
-  let selectedErrorTypes = $state<string[]>([]);
-
-  // Modal de "Agregar nota"
-  let showNoteModal = $state(false);
+  // "Mark error" and "Add note" are two independent accordions, each with its
+  // own "Done" button, and each creates its OWN annotation (only `error_types`,
+  // or only `note`) rather than combining into one — by explicit request, the
+  // two stay separate. The formal rejection endpoint accepts a single
+  // `predefined_reason`, so "Reject" uses the one from the oldest saved error
+  // annotation (see `firstFlaggedReason` below), not the live checkbox
+  // selection.
   let noteText = $state('');
+  let selectedReasons = $state<PredefinedRejectionReason[]>([]);
+  let isReasonCardExpanded = $state(false);
+  let isNoteCardExpanded = $state(false);
 
-  // ---------------------------------------------------------------------------
-  // HELPERS
-  // ---------------------------------------------------------------------------
+  // A rejected record accepts no more annotations: "Mark error" and "Add note"
+  // stay disabled until the record leaves `rejected` — undoing the rejection
+  // and a retake both return it to `in_review`. Only `rejected` locks them.
+  let annotationsLocked = $derived(currentRecord?.status === 'rejected');
+
+  // Reject/Approve (NEH-209) stay visible after a decision so a mistaken
+  // approval or rejection can be undone. A button is disabled when the record
+  // already has that status (no approving or rejecting twice), while the record
+  // is still `captured`, and, for Reject, while an `other` rejection lacks its
+  // note. Each click asks for confirmation first (`pendingAction`).
+  let isRejecting = $state(false);
+  let isApproving = $state(false);
+  let reviewError = $state<string | null>(null);
+  let pendingAction = $state<'approve' | 'reject' | null>(null);
+  // Shown when the reviewer tries "Reject" before marking at least one error
+  // type, so the reason the rejection cannot go ahead is stated.
+  let showNoReasonPopup = $state(false);
 
   function getErrorLabel(id: string) {
     return ERROR_TYPES.find(e => e.id === id)?.label ?? id;
@@ -121,104 +205,245 @@
     return ERROR_TYPES.find(e => e.id === id)?.color ?? '#666';
   }
 
-  function toggleErrorType(id: string) {
-    selectedErrorTypes = selectedErrorTypes.includes(id)
-      ? selectedErrorTypes.filter(t => t !== id)
-      : [...selectedErrorTypes, id];
+  function toggleReason(id: PredefinedRejectionReason) {
+    selectedReasons = selectedReasons.includes(id)
+      ? selectedReasons.filter(r => r !== id)
+      : [...selectedReasons, id];
   }
 
-  // ---------------------------------------------------------------------------
-  // ACCIONES
-  // ---------------------------------------------------------------------------
+  // The reason sent on rejection: the first error type of the OLDEST saved
+  // annotation that has one (not the chips selected right now, which are
+  // cleared on every "Done"). `annotations` is sorted newest first (`byNewest`),
+  // so the oldest is the last in the array.
+  let firstFlaggedReason: PredefinedRejectionReason | null = $derived.by(() => {
+    for (let i = annotations.length - 1; i >= 0; i--) {
+      const reason = annotations[i].error_types[0];
+      if (reason) return reason as PredefinedRejectionReason;
+    }
+    return null;
+  });
 
-  async function handleSaveError() {
-    if (selectedErrorTypes.length === 0 || !currentRecord || isSavingAnnotation) return;
+  // The comment sent with a formal rejection, whatever the reason: the note
+  // being typed, or else the newest saved note (`annotations` is newest
+  // first). A reviewer who saved the note with "Done" has emptied the
+  // textarea, and the note still goes with the rejection. The backend
+  // refuses `other` without a comment (422).
+  let rejectionComment = $derived(
+    noteText.trim() || annotations.find(a => a.note?.trim())?.note?.trim() || undefined
+  );
+
+  // A formal rejection for `other` waits for a note; the button stays
+  // disabled and a hint says why. Undoing an approval sends no reason.
+  let rejectNeedsNote = $derived(
+    currentRecord?.status === 'in_review' && firstFlaggedReason === 'other' && !rejectionComment
+  );
+
+  // The confirmation message depends on the requested action AND the record's
+  // current status: "Reject" on an `approved` record undoes the approval (it is
+  // not a formal rejection), and the same in reverse (NEH-209).
+  // A `captured` record has not yet been handed over for review: the backend
+  // does not allow captured -> approved, and rejection requires `in_review`. So
+  // neither action applies, and both buttons stay disabled.
+  let notReviewable = $derived(currentRecord?.status === 'captured');
+
+  let pendingActionMessage = $derived.by(() => {
+    if (!pendingAction || !currentRecord) return '';
+    if (pendingAction === 'approve') {
+      return currentRecord.status === 'rejected'
+        ? $m.col_review_confirm_undo_reject
+        : $m.col_review_confirm_approve;
+    }
+    return currentRecord.status === 'approved'
+      ? $m.col_review_confirm_undo_approve
+      : $m.col_review_confirm_reject;
+  });
+
+  // "Done" under "Mark error": saves the marked error types as their own
+  // annotation (no note) and collapses the card.
+  async function handleSaveErrors() {
+    if (selectedReasons.length === 0 || !currentRecord || isSavingAnnotation) return;
     const recordId = currentRecord.id;
     isSavingAnnotation = true;
     annotationsError = null;
     try {
-      const created = await recordsApi.addAnnotation(recordId, { error_types: selectedErrorTypes });
-      // Si el record activo cambió mientras la request estaba en curso, el
-      // effect de carga ya reemplazó `annotations` por las del nuevo record;
-      // no anteponer aquí, o mostraríamos una anotación del record anterior.
-      // La anotación ya quedó guardada en el backend y aparecerá al volver.
+      const created = await recordsApi.addAnnotation(recordId, {
+        error_types: selectedReasons,
+        note: undefined,
+      });
+      // If the active record changed while the request was in flight, the load
+      // effect has already replaced `annotations` with the new record's; adding
+      // it here would show an annotation from the previous record.
       if (currentRecord?.id === recordId) {
-        annotations = [created, ...annotations];
+        annotations = withAnnotation(annotations, created);
       }
-      selectedErrorTypes = [];
-      showErrorModal = false;
+      selectedReasons = [];
+      isReasonCardExpanded = false;
     } catch (err) {
-      console.error('[LeftSidebar] Error guardando anotación:', err);
+      console.error('[LeftSidebar] Error saving the error reason:', err);
       annotationsError = $m.col_annotation_save_error;
     } finally {
       isSavingAnnotation = false;
     }
   }
 
-  async function handleSaveNote() {
-    if (!noteText.trim() || !currentRecord || isSavingAnnotation) return;
+  // "Done" under "Add note": saves the note as its own annotation (no error
+  // types) and collapses the card.
+  async function handleSaveComment() {
+    const note = noteText.trim();
+    if (!note || !currentRecord || isSavingAnnotation) return;
     const recordId = currentRecord.id;
     isSavingAnnotation = true;
     annotationsError = null;
     try {
-      const created = await recordsApi.addAnnotation(recordId, { note: noteText.trim() });
-      // Mismo guard que handleSaveError: si el record cambió durante el
-      // await, el effect de carga ya tiene la lista correcta para el nuevo
-      // record activo.
+      const created = await recordsApi.addAnnotation(recordId, {
+        error_types: [],
+        note,
+      });
       if (currentRecord?.id === recordId) {
-        annotations = [created, ...annotations];
+        annotations = withAnnotation(annotations, created);
       }
       noteText = '';
-      showNoteModal = false;
+      isNoteCardExpanded = false;
     } catch (err) {
-      console.error('[LeftSidebar] Error guardando anotación:', err);
+      console.error('[LeftSidebar] Error saving the note:', err);
       annotationsError = $m.col_annotation_save_error;
     } finally {
       isSavingAnnotation = false;
     }
+  }
+
+  // Asks for confirmation before rejecting (or undoing an approval). A formal
+  // rejection (from `in_review`) requires at least one saved error annotation;
+  // without one, a popup says so instead of the confirmation (undoing an
+  // approval does not need one).
+  function requestReject() {
+    if (!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting || rejectNeedsNote) return;
+    if (currentRecord.status === 'in_review' && firstFlaggedReason === null) {
+      showNoReasonPopup = true;
+      return;
+    }
+    pendingAction = 'reject';
+  }
+
+  function closeNoReasonPopup() {
+    showNoReasonPopup = false;
+  }
+
+  // Asks for confirmation before approving (or undoing a rejection).
+  function requestApprove() {
+    if (!currentRecord || notReviewable || currentRecord.status === 'approved' || isApproving) return;
+    pendingAction = 'approve';
+  }
+
+  function cancelPendingAction() {
+    pendingAction = null;
+  }
+
+  // Runs the action confirmed in the popup. If the record already has the
+  // "opposite" status (approved when rejecting, rejected when approving), the
+  // action is an undo: the record returns to `in_review` with no reason and no
+  // rejection audit, instead of the formal action (NEH-209).
+  async function confirmPendingAction() {
+    if (!currentRecord || !pendingAction) return;
+    const recordId = currentRecord.id;
+    const status = currentRecord.status;
+    reviewError = null;
+
+    if (pendingAction === 'approve') {
+      isApproving = true;
+      try {
+        await recordsApi.updateStatus(recordId, status === 'rejected' ? 'in_review' : 'approved');
+        // Await the refresh (it may be async) before clearing `isApproving`;
+        // otherwise, for a moment `currentRecord.status` still holds the old
+        // status while the buttons are enabled again, and a quick click on the
+        // opposite button would compute the wrong confirmation message (or
+        // action).
+        await onRecordUpdated();
+      } catch (err) {
+        console.error('[LeftSidebar] Error approving the record:', err);
+        reviewError = $m.col_review_approve_error;
+      } finally {
+        isApproving = false;
+      }
+    } else {
+      isRejecting = true;
+      try {
+        if (status === 'approved') {
+          await recordsApi.updateStatus(recordId, 'in_review');
+        } else {
+          await recordsApi.reject(recordId, {
+            predefined_reason: firstFlaggedReason!,
+            comment: rejectionComment,
+          });
+          // A rejected record accepts no more annotations, so collapse any card
+          // left open. `annotationsLocked` already disables the "Mark
+          // error"/"Add note" buttons; this also discards anything unsaved.
+          isReasonCardExpanded = false;
+          isNoteCardExpanded = false;
+          selectedReasons = [];
+          noteText = '';
+        }
+        await onRecordUpdated();
+      } catch (err) {
+        console.error('[LeftSidebar] Error rejecting the record:', err);
+        // The backend answers 422 to a comment over 2,000 characters, and to
+        // `other` without a comment; its own message is not the interface's.
+        reviewError = isCommentTooLong(err)
+          ? $m.col_reject_comment_too_long(REJECTION_COMMENT_MAX_LENGTH)
+          : err instanceof ApiError && err.status === 422 && firstFlaggedReason === 'other'
+            ? $m.col_reject_other_note_error
+            : $m.col_reject_error;
+      } finally {
+        isRejecting = false;
+      }
+    }
+    pendingAction = null;
   }
 
   async function handleDeleteAnnotation(id: number) {
+    if (annotationsLocked) return;
     const recordId = currentRecord?.id ?? null;
-    const previous = annotations;
+    const removed = annotations.find(a => a.id === id);
+    deletedIds.add(id);
     annotations = annotations.filter(a => a.id !== id);
     try {
       await recordsApi.deleteAnnotation(id);
+      // A load that answered while the delete was in flight may have put it
+      // back.
+      annotations = annotations.filter(a => a.id !== id);
     } catch (err) {
-      console.error('[LeftSidebar] Error eliminando anotación:', err);
-      // Solo restaurar si seguimos en el mismo record: si cambió, el effect
-      // de carga ya cargó la lista del nuevo record y restaurar aquí la
-      // pisaría con datos del record anterior.
+      console.error('[LeftSidebar] Error deleting annotation:', err);
+      deletedIds.delete(id);
+      // Restore only if the same record is still active: if it changed, the
+      // load effect has already loaded the new record's list, and restoring
+      // here would overwrite it with the previous record's data. Only the
+      // annotation that could not be deleted goes back, not the earlier list,
+      // so anything saved meanwhile is kept.
       if (currentRecord?.id === recordId) {
-        annotations = previous;
+        if (removed) annotations = withAnnotation(annotations, removed);
         annotationsError = $m.col_annotation_delete_error;
       }
     }
   }
 
-  // Formatea la hora de una anotación
   function formatTime(dateStr?: string): string {
     if (!dateStr) return '';
-    return new Date(dateStr).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    return formatApiDate(dateStr, $locale, { hour: '2-digit', minute: '2-digit' });
   }
 
-  // Formatea tamaño de archivo
   function formatFileSize(bytes: number): string {
     if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
     if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
     return `${bytes} B`;
   }
 
-  // Formatea fecha/hora de captura
   function formatDateTime(dateStr: string): string {
-    const d = new Date(dateStr);
-    return d.toLocaleString('es-ES', {
+    return formatApiDate(dateStr, $locale, {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
   }
 
-  // Imágenes del registro ordenadas: left primero, right después
   let sortedImages = $derived(
     [...(currentRecord?.images ?? [])].sort((a, b) => {
       const order = (r?: string | null) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
@@ -240,14 +465,9 @@
   }
 </script>
 
-<!-- ============================================================
-     SIDEBAR
-     En modo 'single': strip (60px) + panel expandido (260px) = 320px total
-     En modo 'spread': solo strip (60px)
-     ============================================================ -->
+<!-- Closed: the 60px strip only. Open: strip plus panel, 320px in all. -->
 <div class="sidebar" class:expanded={isExpanded}>
 
-  <!-- ── Strip de íconos ── -->
   <div class="icon-strip">
     <!-- Info -->
     <button
@@ -262,7 +482,6 @@
       </svg>
     </button>
 
-    <!-- Preview Controls -->
     <button
       class="strip-btn"
       class:active={activeTab === 'edit' && isExpanded}
@@ -276,7 +495,6 @@
       </svg>
     </button>
 
-    <!-- Anotaciones -->
     <button
       class="strip-btn"
       class:active={activeTab === 'comments' && isExpanded}
@@ -290,21 +508,18 @@
     </button>
   </div>
 
-  <!-- ── Panel de contenido (solo en single) ── -->
   {#if isExpanded}
     <div class="panel-content">
 
-      <!-- ══ TAB: IMAGE INFO ══ -->
       {#if activeTab === 'info'}
         <div class="panel-section">
           <h3 class="panel-title">{$m.col_tab_info}</h3>
 
             {#if currentRecord}
 
-              <!-- Encabezado del registro -->
               <div class="record-overview">
                 <span class="overview-name">{currentRecord.title || '—'}</span>
-                <span class="overview-pos">{currentIndex} / {totalRecords}</span>
+                <span class="overview-pos">{formatCount(currentIndex, $locale)} / {formatCount(totalRecords, $locale)}</span>
               </div>
 
               {#if sortedImages.length === 0}
@@ -314,7 +529,6 @@
                 {#each sortedImages as img, i}
                   <div class="img-section" class:first={i === 0}>
 
-                    <!-- Cabecera de imagen -->
                     <div class="img-section-header">
                       <span class="role-pill" class:role-right={img.role === 'right'} class:role-single={img.role !== 'left' && img.role !== 'right'}>
                         {roleLabel(img)}
@@ -322,7 +536,6 @@
                       <span class="img-section-title">{roleName(img, i)}</span>
                     </div>
 
-                    <!-- Filas de datos -->
                     <div class="info-rows">
 
                       {#if img.format}
@@ -377,25 +590,21 @@
             {/if}
           </div>
 
-        <!-- ══ TAB: PREVIEW CONTROLS ══ -->
         {:else if activeTab === 'edit'}
           <div class="panel-section">
             <div class="preview-card">
               <h3 class="panel-title">{$m.col_tab_edit}</h3>
 
-            <!-- Rotar -->
             <div class="control-group">
               <label class="control-label">{$m.col_rotate}</label>
               <div class="rotate-row">
                 <button class="rotate-btn" onclick={onRotateLeft}>
-                  <!-- Ícono rotar izquierda -->
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/>
                   </svg>
                   <span>{$m.col_rotate_left}</span>
                 </button>
                 <button class="rotate-btn" onclick={onRotateRight}>
-                  <!-- Ícono rotar derecha -->
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
                   </svg>
@@ -416,9 +625,16 @@
                   </svg>
                   <span>{$m.col_brightness}</span>
                 </div>
-                <span class="slider-val">{brightness > 0 ? `+${brightness}` : brightness}</span>
+                <button
+                  class="slider-val"
+                  class:is-set={brightness !== 0}
+                  disabled={brightness === 0}
+                  onclick={() => (brightness = 0)}
+                  title={$m.col_slider_reset}
+                  aria-label={$m.col_slider_reset}
+                >{brightness > 0 ? `+${brightness}` : brightness}</button>
               </div>
-              <!-- El gradiente del slider refleja el porcentaje actual -->
+              <!-- The track gradient fills up to the current value -->
               <input type="range" min="-100" max="100" bind:value={brightness}
                 style="background: linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) {((brightness+100)/200)*100}%, var(--color-surface) {((brightness+100)/200)*100}%, var(--color-surface) 100%)"
               />
@@ -433,7 +649,14 @@
                   </svg>
                   <span>{$m.col_contrast}</span>
                 </div>
-                <span class="slider-val">{contrast > 0 ? `+${contrast}` : contrast}</span>
+                <button
+                  class="slider-val"
+                  class:is-set={contrast !== 0}
+                  disabled={contrast === 0}
+                  onclick={() => (contrast = 0)}
+                  title={$m.col_slider_reset}
+                  aria-label={$m.col_slider_reset}
+                >{contrast > 0 ? `+${contrast}` : contrast}</button>
               </div>
               <input type="range" min="-100" max="100" bind:value={contrast}
                 style="background: linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) {((contrast+100)/200)*100}%, var(--color-surface) {((contrast+100)/200)*100}%, var(--color-surface) 100%)"
@@ -449,7 +672,14 @@
                   </svg>
                   <span>{$m.col_saturation}</span>
                 </div>
-                <span class="slider-val">{saturation > 0 ? `+${saturation}` : saturation}</span>
+                <button
+                  class="slider-val"
+                  class:is-set={saturation !== 0}
+                  disabled={saturation === 0}
+                  onclick={() => (saturation = 0)}
+                  title={$m.col_slider_reset}
+                  aria-label={$m.col_slider_reset}
+                >{saturation > 0 ? `+${saturation}` : saturation}</button>
               </div>
               <input type="range" min="-100" max="100" bind:value={saturation}
                 style="background: linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) {((saturation+100)/200)*100}%, var(--color-surface) {((saturation+100)/200)*100}%, var(--color-surface) 100%)"
@@ -459,12 +689,10 @@
           </div>
         </div>
 
-      <!-- ══ TAB: ANOTACIONES ══ -->
       {:else if activeTab === 'comments'}
         <div class="panel-section">
           <div class="preview-card">
 
-            <!-- Encabezado -->
             <div class="annotations-header">
               <div class="annotations-title-row">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -472,14 +700,13 @@
                 </svg>
                 <h3 class="panel-title" style="margin:0">{$m.col_tab_comments}</h3>
               </div>
-              <span class="annotation-count">{annotations.length}</span>
+              <span class="annotation-count">{formatCount(annotations.length, $locale)}</span>
             </div>
 
             {#if annotationsError}
               <p class="annotations-error">{annotationsError}</p>
             {/if}
 
-            <!-- Lista de anotaciones -->
             <div class="annotations-list">
               {#if annotations.length === 0}
                 <p class="empty-text">{$m.col_no_annotations}</p>
@@ -487,7 +714,6 @@
                 {#each annotations as ann}
                   <div class="annotation-card">
                     <div class="annotation-body">
-                      <!-- Tags de tipo de error -->
                       {#if ann.error_types.length > 0}
                         <div class="error-tags">
                           {#each ann.error_types as errorId}
@@ -498,41 +724,172 @@
                           {/each}
                         </div>
                       {/if}
-                      <!-- Texto de la nota -->
                       {#if ann.note}
                         <p class="annotation-text">{ann.note}</p>
                       {/if}
                     </div>
                     <div class="annotation-footer">
                       <span class="annotation-time">{formatTime(ann.created_at)}</span>
-                      <!-- Botón eliminar (visible en hover) -->
-                      <button class="delete-annotation-btn" onclick={() => handleDeleteAnnotation(ann.id)} aria-label={$m.col_delete_annotation}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                      </button>
+                      <!-- Delete button (shown on hover). A rejected record
+                           allows no changes to its annotations, deletion
+                           included. -->
+                      {#if !annotationsLocked}
+                        <button class="delete-annotation-btn" onclick={() => handleDeleteAnnotation(ann.id)} aria-label={$m.col_delete_annotation}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      {/if}
                     </div>
                   </div>
                 {/each}
               {/if}
             </div>
 
-            <!-- Botones de acción -->
-            <div class="annotation-actions">
-              <button class="action-btn" disabled={!currentRecord} onclick={() => showErrorModal = true}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-                <span>{$m.col_flag_error}</span>
-              </button>
-              <button class="action-btn" disabled={!currentRecord} onclick={() => showNoteModal = true}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-                <span>{$m.col_add_note}</span>
-              </button>
-            </div>
+            {#if canReview}
+              <div class="review-section">
+                <button
+                  type="button"
+                  class="annotation-toggle"
+                  disabled={annotationsLocked}
+                  onclick={() => isReasonCardExpanded = !isReasonCardExpanded}
+                  aria-expanded={isReasonCardExpanded}
+                >
+                  <span class="material-symbols-outlined icon-sm">warning</span>
+                  <span>{$m.col_mark_error_btn}</span>
+                </button>
+
+                {#if isReasonCardExpanded}
+                  <div class="expandable-card">
+                    <div class="reason-options">
+                      {#each ERROR_TYPES as errType}
+                        <button
+                          type="button"
+                          class="error-type-btn"
+                          class:selected={selectedReasons.includes(errType.id)}
+                          aria-label={errType.label}
+                          aria-describedby="et-gloss-{errType.id}"
+                          onclick={() => toggleReason(errType.id)}
+                        >
+                          <div class="et-dot" style="background-color: {errType.color}"></div>
+                          <span class="et-text">
+                            <span>{errType.label}</span>
+                            <span id="et-gloss-{errType.id}" class="et-gloss text-xs text-muted">{errType.gloss}</span>
+                          </span>
+                          {#if selectedReasons.includes(errType.id)}
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2.5" class="et-check"><polyline points="20 6 9 17 4 12"/></svg>
+                          {/if}
+                        </button>
+                      {/each}
+                    </div>
+                    <button
+                      class="modal-btn confirm reason-done-btn"
+                      disabled={selectedReasons.length === 0 || !currentRecord || isSavingAnnotation}
+                      onclick={handleSaveErrors}
+                    >
+                      {$m.col_reason_done}
+                    </button>
+                  </div>
+                {/if}
+              </div>
+
+              <div class="review-section review-section--tight">
+                <button
+                  type="button"
+                  class="annotation-toggle"
+                  disabled={annotationsLocked}
+                  onclick={() => isNoteCardExpanded = !isNoteCardExpanded}
+                  aria-expanded={isNoteCardExpanded}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span>{$m.col_add_note}</span>
+                </button>
+
+                {#if isNoteCardExpanded}
+                  <div class="expandable-card">
+                    <textarea
+                      class="note-textarea"
+                      bind:value={noteText}
+                      maxlength={REJECTION_COMMENT_MAX_LENGTH}
+                      placeholder={firstFlaggedReason === 'other'
+                        ? $m.col_annotation_note_required_placeholder
+                        : $m.col_annotation_comment_placeholder}
+                      disabled={!currentRecord}
+                    ></textarea>
+                    {#if showsCommentCount(noteText.length)}
+                      <p class="note-count" aria-live="polite">
+                        {$m.col_annotation_note_count(noteText.length, REJECTION_COMMENT_MAX_LENGTH)}
+                      </p>
+                    {/if}
+                    <button
+                      class="modal-btn confirm reason-done-btn"
+                      disabled={!noteText.trim() || !currentRecord || isSavingAnnotation}
+                      onclick={handleSaveComment}
+                    >
+                      {$m.col_reason_done}
+                    </button>
+                  </div>
+                {/if}
+              </div>
+            {/if}
+
+            <!-- Reject / Approve / Retake (NEH-209). A reviewer or admin sees
+                 Approve and either Reject or, on a rejected record for an
+                 admin, Retake; the button matching the current status is
+                 disabled and the other stays enabled to undo a mistake. An
+                 operator sees only "Recapture image", on a rejected record — an
+                 operator does not approve or reject, but may capture again.
+                 Each Reject/Approve click asks for confirmation
+                 (`pendingAction`) first. -->
+            {#if canReview || (canOperate && currentRecord?.status === 'rejected')}
+              <div class="review-section">
+                {#if reviewError}
+                  <p class="annotations-error">{reviewError}</p>
+                {/if}
+
+                <!-- Why both buttons are disabled on a captured record: the
+                     operator has not yet handed it over for review (NEH-260).
+                     The touch screen has no tooltip. -->
+                {#if canReview && notReviewable}
+                  <p class="review-hint">{$m.col_review_not_sent_hint}</p>
+                {/if}
+                {#if canReview && rejectNeedsNote}
+                  <p class="review-hint">{$m.col_reject_other_needs_note}</p>
+                {/if}
+
+                <div class="review-actions">
+                  {#if currentRecord?.status === 'rejected' && canOperate}
+                    <button
+                      class="btn-review recapture"
+                      onclick={() => onRecapture(currentRecord!)}
+                    >
+                      <span class="material-symbols-outlined icon-sm">photo_camera</span>
+                      {$m.col_recapture_btn}
+                    </button>
+                  {:else if canReview}
+                    <button
+                      class="btn-review reject"
+                      disabled={!currentRecord || notReviewable || currentRecord.status === 'rejected' || isRejecting || rejectNeedsNote}
+                      onclick={requestReject}
+                    >
+                      <span class="material-symbols-outlined icon-sm">cancel</span>
+                      {$m.col_reject}
+                    </button>
+                  {/if}
+                  {#if canReview}
+                    <button
+                      class="btn-review approve"
+                      data-tour="aprobar"
+                      disabled={!currentRecord || notReviewable || currentRecord.status === 'approved' || isApproving}
+                      onclick={requestApprove}
+                    >
+                      <span class="material-symbols-outlined icon-sm">check_circle</span>
+                      {$m.col_approve}
+                    </button>
+                  {/if}
+                </div>
+              </div>
+            {/if}
 
           </div>
         </div>
@@ -543,75 +900,32 @@
 
 </div>
 
-<!-- ============================================================
-     MODAL: Tipología de Error
-     ============================================================ -->
-{#if showErrorModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) { showErrorModal = false; selectedErrorTypes = []; } }}>
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 class="modal-title">{$m.col_error_type_title}</h3>
-        <button class="modal-close" onclick={() => { showErrorModal = false; selectedErrorTypes = []; }} aria-label={$m.common_close}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <div class="error-type-list">
-        {#each ERROR_TYPES as errType}
-          <button
-            class="error-type-btn"
-            class:selected={selectedErrorTypes.includes(errType.id)}
-            onclick={() => toggleErrorType(errType.id)}
-          >
-            <div class="et-dot" style="background-color: {errType.color}"></div>
-            <span>{errType.label}</span>
-            {#if selectedErrorTypes.includes(errType.id)}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2.5" class="et-check"><polyline points="20 6 9 17 4 12"/></svg>
-            {/if}
-          </button>
-        {/each}
-      </div>
-      <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => { showErrorModal = false; selectedErrorTypes = []; }}>{$m.common_cancel}</button>
-        <button class="modal-btn confirm" disabled={selectedErrorTypes.length === 0 || isSavingAnnotation} onclick={handleSaveError}>{$m.common_save}</button>
+<!-- Confirmation popup for Approve/Reject, undo included (NEH-209) -->
+{#if pendingAction}
+  <div class="confirm-backdrop" use:dismissible={{ onDismiss: cancelPendingAction }}>
+    <div class="confirm-card dialog-fit" role="dialog" aria-modal="true">
+      <p class="confirm-message">{pendingActionMessage}</p>
+      <div class="confirm-actions">
+        <button class="modal-btn cancel" onclick={cancelPendingAction}>{$m.common_cancel}</button>
+        <button class="modal-btn confirm" onclick={confirmPendingAction}>{$m.common_confirm}</button>
       </div>
     </div>
   </div>
 {/if}
 
-<!-- ============================================================
-     MODAL: Agregar Nota
-     ============================================================ -->
-{#if showNoteModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) { showNoteModal = false; noteText = ''; } }}>
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 class="modal-title">{$m.col_add_note_title}</h3>
-        <button class="modal-close" onclick={() => { showNoteModal = false; noteText = ''; }} aria-label={$m.common_close}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <label class="note-label">{$m.col_note}</label>
-      <!-- svelte-ignore a11y_autofocus -->
-      <textarea
-        class="note-textarea"
-        bind:value={noteText}
-        placeholder={$m.col_note_placeholder}
-        autofocus
-      ></textarea>
-      <div class="modal-actions">
-        <button class="modal-btn cancel" onclick={() => { showNoteModal = false; noteText = ''; }}>{$m.common_cancel}</button>
-        <button class="modal-btn confirm" disabled={!noteText.trim() || isSavingAnnotation} onclick={handleSaveNote}>{$m.common_save}</button>
+<!-- Popup: rejecting needs a saved error reason first -->
+{#if showNoReasonPopup}
+  <div class="confirm-backdrop" use:dismissible={{ onDismiss: closeNoReasonPopup }}>
+    <div class="confirm-card dialog-fit" role="dialog" aria-modal="true">
+      <p class="confirm-message">{$m.col_reject_needs_reason}</p>
+      <div class="confirm-actions">
+        <button class="modal-btn confirm" onclick={closeNoReasonPopup}>{$m.common_close}</button>
       </div>
     </div>
   </div>
 {/if}
 
 <style>
-  /* ── Sidebar ── */
   .sidebar {
     display: flex;
     background-color: var(--color-surface-alt);
@@ -625,7 +939,6 @@
 
   .sidebar.expanded { width: 320px; }
 
-  /* Strip de íconos */
   .icon-strip {
     width: 60px;
     flex-shrink: 0;
@@ -660,7 +973,6 @@
     border: 1.5px solid var(--color-primary);
   }
 
-  /* Panel de contenido */
   .panel-content {
     flex: 1;
     overflow-y: auto;
@@ -786,7 +1098,6 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   }
 
-  /* Rotar */
   .control-group { margin-bottom: 20px; }
 
   .control-label {
@@ -837,12 +1148,34 @@
     color: var(--color-light-grey);
   }
 
+  /* The number is the slider's reset button: tapping it returns the slider to
+     zero. It is not a separate button because there are three sliders, the
+     panel is narrow, and on the touch screen each separate button would cost
+     44px of height. While the slider is at zero there is nothing to reset and
+     the number is inert. */
   .slider-val {
+    min-width: 44px;
+    min-height: 32px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: none;
+    font-family: monospace;
     font-size: var(--text-xs);
     color: var(--color-light-grey);
-    font-family: monospace;
-    min-width: 28px;
     text-align: right;
+    cursor: default;
+    transition: all var(--transition-fast);
+  }
+  .slider-val.is-set {
+    cursor: pointer;
+    color: var(--color-light);
+    border-color: var(--border-color);
+  }
+  .slider-val.is-set:hover,
+  .slider-val.is-set:focus-visible {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
   }
 
   .slider-group input[type="range"] {
@@ -864,7 +1197,6 @@
     cursor: grab;
   }
 
-  /* Anotaciones */
   .annotations-header {
     display: flex;
     align-items: center;
@@ -947,30 +1279,24 @@
   .annotation-card:hover .delete-annotation-btn { opacity: 1; }
   .delete-annotation-btn:hover { color: var(--color-error); background-color: rgba(214,103,74,0.1); }
 
-  .annotation-actions { display: flex; flex-direction: column; gap: 8px; }
-
-  .action-btn {
-    width: 100%;
-    height: 40px;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
+  /* Inline sections of the review panel (NEH-209): mark error, add note,
+     reject/approve — no modals. */
+  .review-section {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
     gap: 8px;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    min-height: var(--touch-target-min);
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
   }
 
-  .action-btn:hover { background-color: rgba(90,140,98,0.12); border-color: var(--color-primary); color: var(--color-primary); }
-  .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .action-btn:disabled:hover { background-color: var(--color-surface); border-color: var(--border-color); color: var(--color-light-grey); }
+  /* No divider between "Mark error" and "Add note": they are sibling
+     accordions, not separate sections of the panel. */
+  .review-section--tight {
+    margin-top: 8px;
+    padding-top: 0;
+    border-top: none;
+  }
 
   .annotations-error {
     font-size: var(--text-xs);
@@ -991,54 +1317,42 @@
     margin: 0;
   }
 
-  /* ══ Modales ══ */
-  .modal-backdrop {
-    position: fixed; inset: 0;
-    background-color: rgba(0,0,0,0.6);
-    backdrop-filter: blur(4px);
+  /* "Mark error" / "Add note": two independent accordions, each a neutral
+     button (icon + label) that takes a single row when collapsed and expands
+     inline into its own card with "Done". */
+  .annotation-toggle {
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
-    padding: 24px;
-  }
-
-  .modal-card {
-    background-color: var(--color-surface-alt);
-    border: 1px solid rgba(90,140,98,0.3);
-    border-radius: var(--radius-xl);
-    padding: 24px;
-    width: 100%;
-    max-width: 480px;
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .modal-header { display: flex; align-items: center; justify-content: space-between; }
-
-  .modal-title { font-size: var(--text-h4); font-weight: var(--fw-bold); color: var(--color-light); margin: 0; }
-
-  .modal-close {
-    width: 32px; height: 32px;
+    gap: 10px;
+    padding: 14px 16px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    border: none; background: none;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey);
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-light);
     cursor: pointer;
     transition: all var(--transition-fast);
+    min-height: var(--touch-target-min);
+  }
+  .annotation-toggle:hover { border-color: rgba(90,140,98,0.5); }
+  .annotation-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .expandable-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
   }
 
-  .modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
-
-  /* Error type list */
-  .error-type-list { display: flex; flex-direction: column; gap: 8px; }
+  .reason-options { display: flex; flex-direction: column; gap: 6px; }
 
   .error-type-btn {
     width: 100%;
-    height: 48px;
-    padding: 0 16px;
+    padding: 8px 16px;
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -1060,9 +1374,10 @@
 
   .et-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
   .et-check { margin-left: auto; flex-shrink: 0; }
+  .et-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .et-gloss { font-weight: var(--fw-regular); }
 
-  /* Nota textarea */
-  .note-label { font-size: var(--text-sm); color: var(--color-light-grey); }
+  .reason-done-btn { width: 100%; }
 
   .note-textarea {
     width: 100%;
@@ -1081,12 +1396,27 @@
 
   .note-textarea::placeholder { color: var(--color-light-grey); opacity: 0.5; }
   .note-textarea:focus { border-color: var(--color-primary); }
+  /* Shown as the note nears the 2,000 characters Fisqua keeps. */
+  .note-count { margin: 4px 0 0; font-size: var(--text-sm); color: var(--color-light-grey); text-align: right; }
+  .note-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Modal actions */
-  .modal-actions { display: flex; gap: 12px; }
+  /* Reject / Approve (NEH-209): stacked, not side by side. */
+  .review-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 
-  .modal-btn {
-    flex: 1; height: 40px;
+  .review-hint {
+    margin: 0 0 8px;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--color-light-grey);
+  }
+
+  .btn-review {
+    width: 100%;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     border-radius: var(--radius-md);
     font-family: var(--font-family);
     font-size: var(--text-sm);
@@ -1094,11 +1424,62 @@
     cursor: pointer;
     transition: all var(--transition-base);
     border: 1px solid var(--border-color);
+    min-height: var(--touch-target-min);
+  }
+
+  .btn-review.reject { background-color: var(--color-surface); color: var(--color-error); border-color: rgba(214,103,74,0.4); }
+  .btn-review.reject:hover { background-color: rgba(214,103,74,0.12); }
+  .btn-review.approve { background-color: var(--color-primary); color: white; border-color: var(--color-primary); }
+  .btn-review.approve:hover { background-color: var(--color-primary-hover); }
+  .btn-review.recapture { background-color: var(--color-highlight); color: var(--color-bg); border-color: var(--color-highlight); }
+  .btn-review.recapture:hover { opacity: 0.9; }
+  .btn-review:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Confirmation popup (NEH-209), for approving/rejecting and for undoing an
+     earlier approval or rejection. */
+  .confirm-backdrop {
+    position: fixed; inset: 0;
+    background-color: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+  }
+
+  .confirm-card {
+    background-color: var(--color-surface-alt);
+    border: 1px solid rgba(90,140,98,0.3);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .confirm-message { font-size: var(--text-base); color: var(--color-light); margin: 0; line-height: 1.5; }
+
+  .confirm-actions { display: flex; gap: 12px; }
+
+  .modal-btn {
+    flex: 1; height: 44px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-bold);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    border: 1px solid var(--border-color);
+    min-height: var(--touch-target-min);
   }
 
   .modal-btn.cancel { background-color: var(--color-surface); color: var(--color-light-grey); }
   .modal-btn.cancel:hover { color: var(--color-light); border-color: rgba(90,140,98,0.5); }
   .modal-btn.confirm { background-color: var(--color-primary); color: white; border-color: var(--color-primary); }
   .modal-btn.confirm:hover { background-color: var(--color-primary-hover); }
-  .modal-btn.confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+  .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

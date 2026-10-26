@@ -1,4 +1,6 @@
 <script lang="ts">
+	// Version: 0.1.0-beta
+
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 

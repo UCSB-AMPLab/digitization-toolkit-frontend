@@ -1,35 +1,25 @@
 <script lang="ts">
-  // ============================================================================
-  // PÁGINA: Proyectos
-  // Ruta: /shared/projects → src/routes/(dashboard)/shared/projects/+page.svelte
+  // Project list (/dashboard/projects). Search filters client-side by name
+  // and description; a row opens /dashboard/projects/{id}. One modal creates
+  // and edits a project (name, description, fondo, serie, signatura); the
+  // delete modal can move the project's volumes to another project first.
+  // The Status column shows placeholder values (see `mockStatuses`).
   //
-  // Tabla de proyectos con:
-  //   - Búsqueda por nombre/código
-  //   - Filtros (dropdown)
-  //   - Botón "+ Nuevo Proyecto" → abre el modal de creación
-  //   - Tabla: Proyecto, Progreso, Equipo, Fecha Inicio, Acciones
-  //   - Click en fila → navega a /shared/projects/{id}
-  //
-  // Modal "Crear Nuevo Proyecto" — 3 pasos:
-  //   Paso 1: Información (nombre, descripción, ubicación, cant. estimada, fecha, prioridad)
-  //   Paso 2: Configuración (resolución DPI, formato de salida, modo de color)
-  //   Paso 3: Equipo (asignar operario + revisor)
-  // ============================================================================
+  // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { m } from '$lib/i18n';
+  import { m, locale } from '$lib/i18n';
+  import { formatApiDate } from '$lib/format-date';
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, type Project } from '$lib/api';
+  import { fileHoldText } from '$lib/volume-refusals';
+  import { dismissible } from '$lib/dialog';
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Lista de proyectos
-  // ---------------------------------------------------------------------------
   let projects     = $state<Project[]>([]);
   let isLoading    = $state(true);
   let searchQuery  = $state('');
 
-  // Proyectos filtrados por búsqueda
   let filteredProjects = $derived(
     searchQuery.trim()
       ? projects.filter(p =>
@@ -39,17 +29,13 @@
       : projects
   );
 
-  // ¿El usuario puede crear proyectos? Solo admin — el backend ya lo exige
-  // (allow_admin en create_project, NEH-80); operator puede crear y
-  // eliminar colecciones dentro de un proyecto, pero no proyectos.
+  // Only admin creates projects — the backend enforces it too (`allow_admin`
+  // in `create_project`, NEH-80); operator can create and delete volumes
+  // inside a project, but not projects.
   let canCreate = $derived($authStore.user?.role === 'admin');
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Modal de crear proyecto (formulario simplificado)
-  // ---------------------------------------------------------------------------
   let showCreateModal = $state(false);
 
-  // Campos del formulario
   let formName       = $state('');
   let formDesc       = $state('');
   let formFondo      = $state('');
@@ -59,15 +45,11 @@
   let isCreating  = $state(false);
   let createError = $state('');
 
-  // Proyecto siendo editado (null = modo creación)
+  // Project being edited (null = create mode).
   let editingProject = $state<Project | null>(null);
 
-  // Menú de acciones abierto (id del proyecto)
   let openMenuId = $state<number | null>(null);
 
-  // ---------------------------------------------------------------------------
-  // ESTADO: Modal de eliminación con opción de mover colecciones
-  // ---------------------------------------------------------------------------
   let showDeleteModal      = $state(false);
   let deletingProject      = $state<Project | null>(null);
   let deleteCollectionCount = $state(0);
@@ -77,7 +59,7 @@
   let deleteError          = $state('');
   let isLoadingDeleteInfo  = $state(false);
 
-  // Cierra el menú al hacer click fuera
+  // Closes the open row menu on the next click anywhere.
   $effect(() => {
     if (openMenuId !== null) {
       const close = () => { openMenuId = null; };
@@ -86,9 +68,6 @@
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // AL MONTAR: carga proyectos y usuarios operarios
-  // ---------------------------------------------------------------------------
   onMount(async () => {
     await loadProjects();
   });
@@ -105,9 +84,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // CREAR PROYECTO
-  // ---------------------------------------------------------------------------
   async function handleCreateProject() {
     if (!formName.trim()) return;
     isCreating = true;
@@ -136,8 +112,11 @@
       showCreateModal = false;
       resetForm();
     } catch (err) {
+      // A rename refused while an export or the offsite upload reads the
+      // project's files has its own message.
+      const hold = fileHoldText(err, $m, 'project');
       const msg = err instanceof Error ? err.message : String(err);
-      createError = $m.proj_err_create(msg);
+      createError = hold ?? $m.proj_err_create(msg);
     } finally {
       isCreating = false;
     }
@@ -154,16 +133,10 @@
     resetForm();
   }
 
-  // ---------------------------------------------------------------------------
-  // NAVEGAR AL PROYECTO
-  // ---------------------------------------------------------------------------
   function handleProjectClick(id: number) {
     goto(`/dashboard/projects/${id}`);
   }
 
-  // ---------------------------------------------------------------------------
-  // ACCIONES DE FILA
-  // ---------------------------------------------------------------------------
   function openMenu(e: MouseEvent, id: number) {
     e.stopPropagation();
     openMenuId = openMenuId === id ? null : id;
@@ -199,7 +172,7 @@
       deleteCollectionCount = colCount;
       deleteImageCount = imgs;
     } catch (err) {
-      console.error('[Projects] Error obteniendo info del proyecto:', err);
+      console.error('[Projects] Error fetching project info:', err);
     } finally {
       isLoadingDeleteInfo = false;
     }
@@ -225,15 +198,15 @@
       await loadProjects();
       closeDeleteModal();
     } catch (err) {
+      // A move of the volumes refused while an export or the offsite upload
+      // reads their files has its own message.
+      const hold = fileHoldText(err, $m, 'project');
       const msg = err instanceof Error ? err.message : String(err);
-      deleteError = $m.proj_err_delete(msg);
+      deleteError = hold ?? $m.proj_err_delete(msg);
       isDeleting = false;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // HELPERS DE ESTADO (mock — en producción vendrá del backend)
-  // ---------------------------------------------------------------------------
   let statusStyleMap = $derived<Record<string, string>>({
     [$m.proj_status_in_progress]: 'color: var(--color-primary); background: rgba(90,140,98,0.15)',
     [$m.proj_status_started]:     'color: var(--color-secondary); background: rgba(150,177,240,0.15)',
@@ -246,7 +219,9 @@
     return statusStyleMap[status] ?? 'color: var(--color-light-grey); background: rgba(0,0,0,0.2)';
   }
 
-  // Progreso simulado (conectar con backend cuando esté disponible)
+  // Placeholder statuses, not read from the backend: the Status column cycles
+  // through them by row index.
+  // TODO: connect to a real project status from the backend.
   let mockStatuses = $derived([
     $m.proj_status_in_progress,
     $m.proj_status_started,
@@ -256,9 +231,6 @@
   ]);
 </script>
 
-<!-- ============================================================
-     PÁGINA DE PROYECTOS
-     ============================================================ -->
 <div class="page">
 
   <!-- Header -->
@@ -267,9 +239,9 @@
       <h1 class="page-title">{$m.proj_title}</h1>
       <p class="page-subtitle">{$m.proj_subtitle}</p>
     </div>
-    <!-- Botón "Nuevo Proyecto" solo visible cuando ya hay proyectos -->
+    <!-- Only once projects exist: the empty state has its own create button. -->
     {#if canCreate && projects.length > 0}
-      <button class="btn-primary" onclick={() => showCreateModal = true}>
+      <button class="btn-primary" data-tour="nuevo-proyecto" onclick={() => showCreateModal = true}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -278,7 +250,6 @@
     {/if}
   </div>
 
-  <!-- Búsqueda + Filtros -->
   <div class="toolbar">
     <div class="search-wrapper">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
@@ -291,15 +262,8 @@
         class="search-input"
       />
     </div>
-    <button class="btn-ghost">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-      </svg>
-      {$m.common_filters}
-    </button>
   </div>
 
-  <!-- Tabla -->
   {#if isLoading}
     <div class="loading">
       <div class="spinner"></div>
@@ -332,7 +296,6 @@
             {@const status = mockStatuses[i % mockStatuses.length]}
 
             <tr onclick={() => handleProjectClick(project.id)} class="table-row">
-              <!-- Proyecto -->
               <td>
                 <div class="project-cell">
                   <div class="project-icon">
@@ -347,7 +310,6 @@
                 </div>
               </td>
 
-              <!-- Referencia archivística -->
               <td>
                 {#if project.signatura}
                   <span class="signatura-badge">{project.signatura}</span>
@@ -362,23 +324,20 @@
                 {/if}
               </td>
 
-              <!-- Estado -->
               <td>
                 <span class="status-badge" style={getStatusStyle(status)}>{status}</span>
               </td>
 
-              <!-- Fecha -->
               <td>
                 <div class="date-cell">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
                     <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                   </svg>
-                  {project.created_at ? new Date(project.created_at).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' }) : '—'}
+                  {project.created_at ? formatApiDate(project.created_at, $locale, { day:'numeric', month:'short', year:'numeric' }) : '—'}
                 </div>
               </td>
 
-              <!-- Acciones -->
               <td class="text-right">
                 <div class="action-menu-wrap">
                   <button
@@ -413,16 +372,13 @@
 
 </div>
 
-<!-- ============================================================
-     MODAL: Crear Nuevo Proyecto
-     ============================================================ -->
 {#if showCreateModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal(); }}>
-    <div class="modal-card">
+    <!-- No Escape: it would throw away what was typed. -->
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
 
-      <!-- Cabecera -->
       <div class="modal-header">
         <div>
           <h3 class="modal-title">{editingProject ? $m.proj_modal_edit_title : $m.proj_new}</h3>
@@ -434,7 +390,6 @@
         </button>
       </div>
 
-      <!-- Formulario -->
       <div class="form-section">
 
         <div class="form-field">
@@ -476,7 +431,6 @@
 
       </div>
 
-      <!-- Error -->
       {#if createError}
         <div class="create-error">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -511,16 +465,10 @@
   </div>
 {/if}
 
-<!-- ============================================================
-     MODAL: Eliminar Proyecto
-     ============================================================ -->
 {#if showDeleteModal && deletingProject}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeDeleteModal(); }}>
-    <div class="modal-card delete-modal-card">
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeDeleteModal, escape: !isDeleting, backdrop: !isDeleting }}>
+    <div class="modal-card delete-modal-card dialog-fit" role="dialog" aria-modal="true">
 
-      <!-- Cabecera -->
       <div class="modal-header">
         <div>
           <h3 class="modal-title">{$m.proj_delete_title}</h3>
@@ -539,7 +487,6 @@
           <span>{$m.proj_checking_contents}</span>
         </div>
       {:else if deleteCollectionCount > 0}
-        <!-- Proyecto NO vacío — aviso + opción de mover -->
         <div class="delete-warning">
           <div class="delete-warning-icon">
             <span class="material-symbols-outlined icon-md">warning</span>
@@ -572,14 +519,12 @@
         </div>
 
       {:else}
-        <!-- Proyecto vacío — confirmación simple -->
         <p class="delete-confirm-text">
           {$m.proj_delete_confirm_pre}<strong>"{deletingProject.name}"</strong>?
           {$m.common_irreversible}
         </p>
       {/if}
 
-      <!-- Error -->
       {#if deleteError}
         <div class="create-error">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
@@ -699,7 +644,6 @@
 
   .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
 
-  /* Dropdown de acciones por fila */
   .action-menu-wrap { position: relative; display: inline-flex; justify-content: flex-end; }
 
   .btn-menu {
@@ -742,7 +686,6 @@
   .action-item:hover { background-color: var(--color-surface); color: var(--color-light); }
   .action-item-danger:hover { color: var(--color-error); }
 
-  /* Error en modal */
   .create-error {
     display: flex;
     align-items: center;
@@ -828,7 +771,6 @@
 
   .text-right { text-align: right; }
 
-  /* Celdas */
   .project-cell { display: flex; align-items: center; gap: 12px; }
 
   .project-icon {
@@ -890,8 +832,6 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
-    max-height: 90vh;
-    overflow-y: auto;
   }
 
   .modal-card::-webkit-scrollbar { width: 3px; }

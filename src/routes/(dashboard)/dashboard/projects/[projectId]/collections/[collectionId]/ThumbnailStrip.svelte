@@ -1,22 +1,20 @@
 <script lang="ts">
-  // ============================================================================
-  // COMPONENTE: ThumbnailStrip (Gallery)
+  // Horizontal thumbnail strip at the bottom of the gallery's spread view.
   //
-  // Tira horizontal de miniaturas en la parte inferior de la galería.
-  // Muestra una miniatura por cada imagen del registro — si un registro tiene
-  // imagen izquierda Y derecha (captura doble), ambas aparecen como items
-  // independientes con badge L/R, igual que en el live-preview.
+  // One unit per RECORD, not per image (NEH-236). A folio captured with two
+  // cameras has two images, and the list view treats it as one thing
+  // (NEH-211); the strip must agree, so the title appears once per record.
   //
-  // En vista 'spread': los dos items del par activo se resaltan.
-  // ============================================================================
+  // It groups by proximity and not with a frame, as the grid does: the two
+  // halves almost touch and neighbouring folios sit far apart. The light
+  // frame is kept for what needs marking — the active folio — and surrounds
+  // the whole group, not each half.
+  //
+  // Version: 0.1.0-beta
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
-  import StatusBadge from '$lib/components/StatusBadge.svelte';
 
-  // ---------------------------------------------------------------------------
-  // PROPS
-  // ---------------------------------------------------------------------------
   let {
     records,
     selectedRecordId,
@@ -29,9 +27,6 @@
     onSelect: (id: number) => void;
   } = $props();
 
-  // ---------------------------------------------------------------------------
-  // TIPO: item individual de la tira
-  // ---------------------------------------------------------------------------
   interface ThumbItem {
     record: Record;
     image: RecordImage | null;
@@ -51,43 +46,39 @@
     return recordsApi.getImageThumbnailUrl(img.id);
   }
 
-  // ---------------------------------------------------------------------------
-  // DERIVADO: lista plana — un item por imagen dentro de cada registro
-  // Los registros con captura doble producen dos items (L + R).
-  // ---------------------------------------------------------------------------
-  let thumbItems = $derived(
-    records.flatMap((record): ThumbItem[] => {
+  // One group per record, holding its images.
+  interface ThumbGroup {
+    record: Record;
+    items: ThumbItem[];
+  }
+
+  let thumbGroups = $derived(
+    records.map((record): ThumbGroup => {
       if (!record.images || record.images.length === 0) {
-        return [{ record, image: null, role: null, thumbnailUrl: null }];
+        return { record, items: [{ record, image: null, role: null, thumbnailUrl: null }] };
       }
-      // Ordenar: left primero, luego right, luego sin rol (por id como desempate)
+      // Left first, then right, then images without a role; id breaks ties.
       const sorted = [...record.images].sort((a, b) => {
         const order = (r?: string) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
         return order(a.role) - order(b.role) || a.id - b.id;
       });
-      return sorted.map((img): ThumbItem => ({
+      return {
         record,
-        image: img,
-        role: imageRole(img),
-        thumbnailUrl: imageThumbnailUrl(img),
-      }));
+        items: sorted.map((img): ThumbItem => ({
+          record,
+          image: img,
+          role: imageRole(img),
+          thumbnailUrl: imageThumbnailUrl(img),
+        })),
+      };
     })
   );
-
-  // En vista 'spread': resalta el par de items del registro activo
-  function isSelected(item: ThumbItem): boolean {
-    if (viewMode === 'spread') return item.record.id === selectedRecordId;
-    return item.record.id === selectedRecordId;
-  }
 </script>
 
-<!-- ============================================================
-     TIRA DE MINIATURAS
-     ============================================================ -->
 <div class="thumbnail-strip">
   <div class="strip-scroll">
 
-    {#if thumbItems.length === 0}
+    {#if thumbGroups.length === 0}
       <div class="empty-state">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -97,40 +88,41 @@
         <span>{$m.col_empty_collection}</span>
       </div>
     {:else}
-      {#each thumbItems as item, i}
-        {@const selected = isSelected(item)}
+      {#each thumbGroups as group, i}
+        {@const selected = group.record.id === selectedRecordId}
 
         <button
           class="thumb-item"
           class:selected
-          onclick={() => onSelect(item.record.id)}
+          onclick={() => onSelect(group.record.id)}
         >
 
-          <!-- Imagen -->
-          <div class="thumb-img-wrapper" class:selected class:alt={i % 2 !== 0}>
-            {#if item.thumbnailUrl}
-              <img src={item.thumbnailUrl} alt={item.record.title} class="thumb-img" />
-            {:else}
-              <div class="thumb-placeholder">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-              </div>
-            {/if}
+          <!-- The folio's halves, together. The selection frame goes here and
+               not on each image: what is selected is the folio. -->
+          <div class="thumb-pair" class:selected>
+            {#each group.items as item, j}
+              <div class="thumb-img-wrapper" class:alt={j % 2 !== 0}>
+                {#if item.thumbnailUrl}
+                  <img src={item.thumbnailUrl} alt={item.record.title} class="thumb-img" />
+                {:else}
+                  <div class="thumb-placeholder">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                  </div>
+                {/if}
 
-            <!-- Badge L/R -->
-            {#if item.role}
-              <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
-            {/if}
+                {#if item.role}
+                  <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
+                {/if}
+              </div>
+            {/each}
           </div>
 
-          <!-- Nombre + status -->
+          <!-- Name: once per folio, not under each half -->
           <div class="thumb-info">
-            <span class="thumb-name" title={item.record.title}>{item.record.title || `Img ${i+1}`}</span>
-            <div class="thumb-status">
-              <StatusBadge status={item.record.status} />
-            </div>
+            <span class="thumb-name" title={group.record.title}>{group.record.title || `Img ${i+1}`}</span>
           </div>
 
         </button>
@@ -153,10 +145,13 @@
     flex-shrink: 0;
   }
 
+  /* 16px between folios against the 4px of --pair-gap: four times as much,
+     which is what makes the eye read the two halves as one thing. Change one
+     and check the other — the difference does the grouping, not the value. */
   .strip-scroll {
     flex: 1;
     display: flex;
-    gap: 10px;
+    gap: 16px;
     overflow-x: auto;
     overflow-y: hidden;
     align-items: stretch;
@@ -178,10 +173,14 @@
     white-space: nowrap;
   }
 
+  /* The halves set the width: a one-image folio is 100px wide and a
+     two-image one twice that plus the inner gap, so each half keeps the size
+     of a single thumbnail. The gap between folios comes from .strip-scroll
+     and is much larger than --pair-gap: that difference does the grouping. */
   .thumb-item {
+    --pair-gap: 4px;
     display: flex;
     flex-direction: column;
-    width: 100px;
     height: 100%;
     flex-shrink: 0;
     background: none;
@@ -196,22 +195,33 @@
   .thumb-item:hover { opacity: 1; }
   .thumb-item.selected { opacity: 1; }
 
-  .thumb-img-wrapper {
-    position: relative;
-    width: 100%;
+  /* The selection frame surrounds the whole folio, not each image, so that
+     each half does not read as a record of its own (NEH-236). */
+  .thumb-pair {
+    display: flex;
+    gap: var(--pair-gap);
     flex: 1;
+    min-height: 0;
+    padding: 2px;
     border-radius: var(--radius-md);
-    overflow: hidden;
     border: 2px solid transparent;
     transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  }
+
+  .thumb-pair.selected {
+    border-color: var(--color-selected);
+    box-shadow: var(--selected-ring);
+  }
+
+  .thumb-img-wrapper {
+    position: relative;
+    width: 100px;
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
     background-color: var(--color-surface-alt);
     min-height: 0;
     padding: 3px;
-  }
-
-  .thumb-img-wrapper.selected {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba(90,140,98,0.2);
   }
 
   .thumb-img-wrapper.alt { background-color: var(--color-surface); }
@@ -241,11 +251,9 @@
 
   .thumb-info {
     flex-shrink: 0;
-    height: 36px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 2px;
     padding: 0 2px;
   }
 
@@ -263,9 +271,4 @@
 
   .thumb-item.selected .thumb-name,
   .thumb-item:hover .thumb-name { color: var(--color-light); }
-
-  .thumb-status { display: flex; align-items: center; }
-
-  .spin { animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
