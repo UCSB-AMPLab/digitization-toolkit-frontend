@@ -68,7 +68,7 @@
     flex-direction: column;
     box-sizing: border-box;
     height: 100vh;
-    padding: 24px max(40px, calc((100vw - 1100px) / 2));
+    padding: 24px 40px;
     background-color: var(--color-bg);
     font-family: var(--font-family);
     color: var(--color-light);
@@ -84,10 +84,13 @@
   h1 { margin: 0; font-size: var(--text-h2); font-weight: var(--fw-bold); }
   .es { color: var(--color-light-grey); }
 
-  /* Text on the left, the QR code on the right; the page is centred and
-     capped so the lines stay readable on a large monitor. */
+  /* Text on the left, the QR code on the right, centred and capped so the
+     lines stay readable on a large monitor. The logos keep the full width. */
   .main {
     flex: 1;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
     min-height: 0;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
