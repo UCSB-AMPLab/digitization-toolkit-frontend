@@ -100,7 +100,6 @@
     min-height: 0;
     max-height: 100%;
     overflow-y: auto;
-    font-size: 14px;
     line-height: 1.5;
   }
   .body p { margin: 0 0 12px; }
@@ -126,8 +125,7 @@
      unit's 800×480 screen keeps the sizes above. */
   @media (min-width: 1280px) and (min-height: 720px) {
     .main { gap: 64px; }
-    .body { font-size: 20px; }
-    .body p { margin-bottom: 18px; }
+    .body p { margin-bottom: 18px; font-size: 20px; }
     .scan { width: 300px; gap: 14px; }
     .qr { width: 300px; height: 300px; }
     .scan figcaption { font-size: var(--text-base); }
