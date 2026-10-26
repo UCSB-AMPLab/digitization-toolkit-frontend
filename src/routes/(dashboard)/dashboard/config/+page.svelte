@@ -25,12 +25,16 @@
     type StorageDevice,
     type PowerAction
   } from '$lib/api';
+  // The overview's banner reads the figures the same way and uses the same threshold.
+  import { formatStorage, storageUsage, STORAGE_ALERT_THRESHOLD } from '$lib/storage-usage';
 
   let storageInfo    = $state<StorageInfo | null>(null);
   let storageLoading = $state(true);
 
-  let storageUsedGB  = $derived(storageInfo ? storageInfo.used_bytes  / (1024 ** 3) : 0);
-  let storageTotalGB = $derived(storageInfo ? storageInfo.total_bytes / (1024 ** 3) : 1);
+  // Null when the request failed or the backend reported no usable figures
+  // (`available: false` comes with zeros): the row then shows a dash and the
+  // bar is hidden, rather than a percentage the unit never reported.
+  let usage = $derived(storageUsage(storageInfo));
   let storagePrimaryPath = $derived(storageInfo?.projects_path ?? '…');
 
   let devicesExpanded  = $state(false);
@@ -44,25 +48,13 @@
   let storageOpSuccess = $state<string | null>(null);
   let resettingStorage = $state(false);
 
-  let storagePercent = $derived(
-    Math.min(100, Math.round((storageUsedGB / storageTotalGB) * 100))
-  );
-
-  // Percent. The overview page applies the same threshold.
-  const STORAGE_ALERT_THRESHOLD = 85;
-
-  let storageAlert = $derived(storagePercent >= STORAGE_ALERT_THRESHOLD);
-
-  function formatStorage(gb: number): string {
-    if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
-    return `${gb.toFixed(0)} GB`;
-  }
+  let storageAlert = $derived(usage?.alert ?? false);
 
   // Green below 70%, warning from 70%, error from the alert threshold.
   let storageBarColor = $derived(
-    storagePercent >= STORAGE_ALERT_THRESHOLD
+    (usage?.percent ?? 0) >= STORAGE_ALERT_THRESHOLD
       ? 'var(--color-error)'
-      : storagePercent >= 70
+      : (usage?.percent ?? 0) >= 70
         ? 'var(--color-warning)'
         : 'var(--color-primary)'
   );
@@ -174,7 +166,7 @@
     try {
       storageInfo = await systemApi.getStorage();
     } catch {
-      // fail silently — bar shows 0% until backend is reachable
+      // No figures: the row shows a dash and the bar is hidden.
     } finally {
       storageLoading = false;
     }
@@ -374,7 +366,7 @@
             <line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
           <span>
-            {$m.config_storage_alert_pre}<strong>{storagePercent}%</strong>{$m.config_storage_alert_post}
+            {$m.config_storage_alert_pre}<strong>{usage?.percent}%</strong>{$m.config_storage_alert_post}
           </span>
         </div>
       {/if}
@@ -385,19 +377,23 @@
         </div>
         {#if storageLoading}
           <span class="row-value muted">{$m.common_loading_ellipsis}</span>
-        {:else}
-          <span class="row-value" class:alert-text={storageAlert}>
-            {formatStorage(storageUsedGB)} / {formatStorage(storageTotalGB)}
+        {:else if usage}
+          <span class="row-value" class:alert-text={storageAlert} data-storage-used>
+            {formatStorage(usage.usedGB)} / {formatStorage(usage.totalGB)}
           </span>
+        {:else}
+          <span class="row-value muted" data-storage-used>—</span>
         {/if}
       </div>
 
-      <div class="storage-bar-bg">
-        <div
-          class="storage-bar-fill"
-          style="width: {storagePercent}%; background-color: {storageBarColor}"
-        ></div>
-      </div>
+      {#if usage}
+        <div class="storage-bar-bg">
+          <div
+            class="storage-bar-fill"
+            style="width: {usage.percent}%; background-color: {storageBarColor}"
+          ></div>
+        </div>
+      {/if}
 
       <div class="section-divider"></div>
 
