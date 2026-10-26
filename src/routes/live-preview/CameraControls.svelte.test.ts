@@ -195,4 +195,34 @@ describe('CameraControls — device list after a boot (NEH-300)', () => {
         .toBe(270);
     });
   }
+
+  it('stops asking once the list is complete', async () => {
+    const list = vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([body0, body1]);
+    render(CameraControls, baseProps());
+    await expect.poll(() => list.mock.calls.length).toBe(1);
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops asking when the screen is left', async () => {
+    const list = vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([]);
+    const screen = render(CameraControls, baseProps());
+    await expect.poll(() => list.mock.calls.length).toBe(1);
+    screen.unmount();
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks again after a failed read', async () => {
+    vi.spyOn(camerasApi, 'listDevices')
+      .mockRejectedValueOnce(new ApiError('Capture system not available', undefined, 503))
+      .mockResolvedValue([body0, body1]);
+    const onDevicesChange = vi.fn();
+    render(CameraControls, baseProps({ onDevicesChange }));
+    await expect
+      .poll(() => lastPublished(onDevicesChange)?.find((d) => d.index === 0)?.orientation, {
+        timeout: 8000
+      })
+      .toBe(270);
+  });
 });

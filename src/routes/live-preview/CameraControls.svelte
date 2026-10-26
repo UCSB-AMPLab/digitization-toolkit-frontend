@@ -8,6 +8,7 @@
 
   import { onMount } from 'svelte';
   import { createCameraRefresh } from '$lib/camera-refresh';
+  import { isDeviceListComplete } from '$lib/camera-orientation';
   import { m } from '$lib/i18n';
   import { camerasApi, AuthError, type CameraDevice, type CameraControlsRequest, type CameraCapabilities, type DSLRSettingsUpdate } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
@@ -45,7 +46,8 @@
   let selectedCameraIndex = $state(0);
 
   let devices = $state<CameraDevice[]>([]);
-  // Writers: onMount, handleWbCalibration, applyPickedWb, rescanCameras.
+  // Writers: readDevicesUntilComplete, handleWbCalibration, applyPickedWb,
+  // rescanCameras.
   // All list results go through cameraRefresh, which publishes local and
   // parent state together. Calibration reloads wait for an active reconnect.
   function publishDevices(list: CameraDevice[]) {
@@ -433,9 +435,43 @@
     }
   }
 
+  // Right after a boot the appliance can answer before gphoto2 has found or
+  // identified every body (an empty list, a missing row, a placeholder id).
+  // The page seeds each camera's saved rotation from what this panel
+  // publishes, so it asks again on a short backoff until the list is
+  // complete for the capture mode; the cap keeps a rig that is genuinely
+  // short of a camera from polling for the whole session. Reconnect remains the operator's lever.
+  const DEVICE_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
+  let deviceRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  let unmounted = false;
+
+  async function readDevicesUntilComplete() {
+    for (let attempt = 0; ; attempt++) {
+      let sessionEnded = false;
+      await cameraRefresh.read(
+        () => camerasApi.listDevices(),
+        (err) => {
+          // A dead session already sends the operator to the login screen.
+          if (err instanceof AuthError && err.status === 401) sessionEnded = true;
+        }
+      );
+      if (unmounted || sessionEnded || isDeviceListComplete(devices, cameraMode)) return;
+      if (attempt >= DEVICE_RETRY_DELAYS_MS.length) return;
+      await new Promise<void>((resolve) => {
+        deviceRetryTimer = setTimeout(resolve, DEVICE_RETRY_DELAYS_MS[attempt]);
+      });
+      deviceRetryTimer = null;
+      if (unmounted) return;
+    }
+  }
+
   onMount(() => {
     void loadCapabilities();
-    void cameraRefresh.read(() => camerasApi.listDevices());
+    void readDevicesUntilComplete();
+    return () => {
+      unmounted = true;
+      if (deviceRetryTimer) clearTimeout(deviceRetryTimer);
+    };
   });
 
   // Reconnect cameras: rescans the USB ports and closes stale sessions

@@ -13,7 +13,7 @@
   import { camerasApi, recordsApi, projectsApi, collectionsApi, type Record as ApiRecord, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { m } from '$lib/i18n';
-  import { seedRotation, createOrientationSaver } from '$lib/camera-orientation';
+  import { seedRotation, createOrientationSaver, canSaveRotation, settlePendingRotations } from '$lib/camera-orientation';
   import { isConflict, needsStem } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
 
@@ -59,11 +59,12 @@
   // (and updated) alongside rotateDeg, never rendered on its own.
   let rotateTouched = new Map<number, string>();
 
-  // Rotations changed before the device list arrives: there is no body to
-  // persist them to yet, so they are kept here and applied (and saved) as
-  // soon as `onDevicesChange` knows the identity of the index. Without this,
-  // the first listing would overwrite the change with the saved value, and a
-  // change the operator has already seen would disappear.
+  // Rotations changed while an index has no identified body (no device yet,
+  // or one reported under a placeholder id): there is nothing to persist them
+  // to, so they are kept here until the first identified body appears at the
+  // index. That body takes the change unless it has a saved orientation of
+  // its own, which wins (settlePendingRotations). Until then the change stays
+  // on screen, so a reseed from an incomplete listing does not undo it.
   let rotatePending = new Map<number, number>();
 
   // Persists a rotation change to the backend, coalescing quick repeat taps
@@ -245,13 +246,13 @@
 
   // The only writer of `rotateDeg` (NEH-71): both the controls panel and the
   // `LiveViewport` overlay call this function, so there are never two copies
-  // of the value drifting apart. If the index has no real device (it was
-  // disconnected, or the mode is single and the right camera is selected),
-  // only the local state changes, and the change waits in `rotatePending`
-  // until a device appears at that index.
+  // of the value drifting apart. If the index has no identified body (it was
+  // disconnected, the mode is single and the right camera is selected, or the
+  // body is reported under a placeholder id), only the local state changes,
+  // and the change waits in `rotatePending` until a body is identified there.
   function handleRotateDegChange(cam: number, deg: number) {
     const device = devices.find(d => d.index === cam);
-    if (!device) {
+    if (!canSaveRotation(device)) {
       rotateDeg = { ...rotateDeg, [cam]: deg };
       rotatePending.set(cam, deg);
       return;
@@ -287,13 +288,13 @@
       onDevicesChange={(d) => {
         devices = d;
         const seeded = seedRotation(rotateDeg, d, rotateTouched);
-        rotateDeg = seeded.rotation;
+        const settled = settlePendingRotations(rotatePending, d);
+        rotatePending = settled.remaining;
+        rotateDeg = { ...seeded.rotation, ...Object.fromEntries(settled.remaining) };
         rotateTouched = seeded.touched;
-        // A rotation set before the device was known is applied now that the
-        // index has an identity: it counts as touched and is persisted.
-        for (const [cam, deg] of [...rotatePending]) {
-          if (d.some(x => x.index === cam)) handleRotateDegChange(cam, deg);
-        }
+        // Applied through the single writer so the change counts as touched
+        // and is saved against the body now identified at that index.
+        for (const [cam, deg] of settled.apply) handleRotateDegChange(cam, deg);
       }}
       onRotateDegChange={handleRotateDegChange}
       {rotateDeg}

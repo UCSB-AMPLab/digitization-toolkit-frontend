@@ -1,7 +1,15 @@
 // NEH-71: seeding the per-camera rotation state from the device list, and
 // coalescing the PUTs that persist a manual rotation change.
 import { describe, it, expect, vi } from 'vitest';
-import { DEFAULT_ROTATION, seedRotation, createOrientationSaver } from './camera-orientation';
+import {
+  DEFAULT_ROTATION,
+  seedRotation,
+  createOrientationSaver,
+  isPlaceholderHardwareId,
+  isDeviceListComplete,
+  canSaveRotation,
+  settlePendingRotations
+} from './camera-orientation';
 import type { CameraDevice } from './api';
 
 type Dev = Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation'>;
@@ -187,5 +195,78 @@ describe('createOrientationSaver', () => {
     expect(put).toHaveBeenNthCalledWith(2, 1, 'hw-b', 180);
     d0.resolve(undefined);
     d1.resolve(undefined);
+  });
+});
+
+// NEH-300: `<model>_idx<N>` is what the backend reports when it could not
+// read a body's serial. It names a USB position, so it must never stand in
+// for a body the operator rotated.
+describe('placeholder hardware ids (NEH-300)', () => {
+  const placeholder = 'canoneos1500d_idx1';
+
+  it('recognises the placeholder form and nothing else', () => {
+    expect(isPlaceholderHardwareId(placeholder)).toBe(true);
+    expect(isPlaceholderHardwareId('canoneos1500d_6eafa426b8e14c7b8c0614cd658a595a')).toBe(false);
+    expect(isPlaceholderHardwareId('hw-a')).toBe(false);
+  });
+
+  it('counts a device list as complete only when every index the mode uses names its body', () => {
+    const both = [device(), device({ index: 1, hardware_id: 'hw-b' })];
+    expect(isDeviceListComplete([], 'single')).toBe(false);
+    expect(isDeviceListComplete([device({ hardware_id: placeholder })], 'single')).toBe(false);
+    expect(isDeviceListComplete([device({ index: 1, hardware_id: 'hw-b' })], 'double')).toBe(false);
+    expect(isDeviceListComplete([device()], 'double')).toBe(false);
+    expect(isDeviceListComplete([device()], 'single')).toBe(true);
+    expect(isDeviceListComplete(both, 'double')).toBe(true);
+    expect(isDeviceListComplete([both[0], device({ index: 1, hardware_id: placeholder })], 'double')).toBe(false);
+  });
+
+  it('does not let a rotation be saved, and so touched, under a placeholder id', () => {
+    expect(canSaveRotation(undefined)).toBe(false);
+    expect(canSaveRotation(device({ hardware_id: placeholder }))).toBe(false);
+    expect(canSaveRotation(device({ hardware_id: 'hw-a' }))).toBe(true);
+  });
+
+  it('does not keep a rotation for another body that arrives under the same placeholder id', () => {
+    const result = seedRotation(
+      { 1: 180 },
+      [device({ index: 1, hardware_id: placeholder, orientation: null })],
+      new Map([[1, placeholder]])
+    );
+    expect(result.rotation).toEqual({ 1: DEFAULT_ROTATION });
+    expect(result.touched.has(1)).toBe(false);
+  });
+});
+
+describe('settlePendingRotations (NEH-300)', () => {
+  it('keeps a pending rotation while the index has no identified body', () => {
+    const pending = new Map([[0, 180], [1, 0]]);
+    const result = settlePendingRotations(pending, [
+      device({ index: 0, hardware_id: 'canoneos1500d_idx0', orientation: null })
+    ]);
+    expect(result.apply).toEqual([]);
+    expect([...result.remaining]).toEqual([[0, 180], [1, 0]]);
+  });
+
+  it('applies it to the first identified body when that body has no saved orientation', () => {
+    const result = settlePendingRotations(new Map([[0, 180]]), [
+      device({ index: 0, hardware_id: 'hw-a', orientation: null })
+    ]);
+    expect(result.apply).toEqual([[0, 180]]);
+    expect(result.remaining.size).toBe(0);
+  });
+
+  it('drops it when the first identified body already has a saved orientation', () => {
+    const result = settlePendingRotations(new Map([[0, 180]]), [
+      device({ index: 0, hardware_id: 'hw-a', orientation: 270 })
+    ]);
+    expect(result.apply).toEqual([]);
+    expect(result.remaining.size).toBe(0);
+  });
+
+  it('never mutates the pending map it is given', () => {
+    const pending = new Map([[0, 180]]);
+    settlePendingRotations(pending, [device({ index: 0, hardware_id: 'hw-a', orientation: null })]);
+    expect([...pending]).toEqual([[0, 180]]);
   });
 });

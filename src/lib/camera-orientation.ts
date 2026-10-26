@@ -15,6 +15,68 @@ export function isValidRotation(value: unknown): value is number {
   return typeof value === 'number' && VALID_ROTATIONS.includes(value);
 }
 
+// The backend reports `<model>_idx<N>` when it could not read a body's serial
+// number. That id names a USB position, not a body: two different bodies can
+// carry the same one, and the registry holds no orientation for it.
+const PLACEHOLDER_HARDWARE_ID = /_idx\d+$/;
+
+export function isPlaceholderHardwareId(hardwareId: string): boolean {
+  return PLACEHOLDER_HARDWARE_ID.test(hardwareId);
+}
+
+/**
+ * True once a device list has a row at every camera index the capture mode
+ * uses (0 for single, 0 and 1 for double) and names every body it reports.
+ * Until then the capture screen keeps asking: right after a boot the
+ * appliance can answer before gphoto2 has found or identified every camera.
+ */
+export function isDeviceListComplete(
+  devices: Pick<CameraDevice, 'index' | 'hardware_id'>[],
+  mode: 'single' | 'double'
+): boolean {
+  const required = mode === 'double' ? [0, 1] : [0];
+  return (
+    required.every((index) => devices.some((d) => d.index === index)) &&
+    !devices.some((d) => isPlaceholderHardwareId(d.hardware_id))
+  );
+}
+
+/**
+ * Whether a rotation change at this index can be saved against a body now.
+ * Without an identified body there is nothing to key the saved value to, so
+ * the change waits until one appears (see settlePendingRotations).
+ */
+export function canSaveRotation(
+  device: Pick<CameraDevice, 'hardware_id'> | undefined
+): device is Pick<CameraDevice, 'hardware_id'> {
+  return device !== undefined && !isPlaceholderHardwareId(device.hardware_id);
+}
+
+/**
+ * Decides what happens to rotations the operator set while an index had no
+ * identified body. Each one belongs to the first identified body that appears
+ * at its index: it is applied to it (and saved) when that body has no saved
+ * orientation, and dropped when it has one, since the saved value describes
+ * how that body is mounted. Indices still without an identified body keep
+ * their pending value.
+ */
+export function settlePendingRotations(
+  pending: ReadonlyMap<number, number>,
+  devices: Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation'>[]
+): { apply: [number, number][]; remaining: Map<number, number> } {
+  const apply: [number, number][] = [];
+  const remaining = new Map<number, number>();
+  for (const [index, degrees] of pending) {
+    const device = devices.find((d) => d.index === index);
+    if (!canSaveRotation(device)) {
+      remaining.set(index, degrees);
+    } else if (!isValidRotation(device.orientation)) {
+      apply.push([index, degrees]);
+    }
+  }
+  return { apply, remaining };
+}
+
 /**
  * Seeds the per-camera rotation state from the device list the appliance
  * reports (each device's `orientation`, as remembered by the backend), and
@@ -22,7 +84,8 @@ export function isValidRotation(value: unknown): value is number {
  *
  * A rotation the operator sets in this session survives later device
  * refreshes for as long as the same physical body (by `hardware_id`) is
- * still the one sitting at that camera index — `touched` records which body
+ * still the one sitting at that camera index (a placeholder id never counts
+ * as the same body, since it does not name one) — `touched` records which body
  * was last rotated at each index, so a matching device there is left alone.
  * A replacement body at that index (or an index the operator never touched)
  * starts instead from its own stored `orientation`, or DEFAULT_ROTATION when
@@ -41,7 +104,7 @@ export function seedRotation(
   const nextTouched = new Map(touched);
 
   for (const { index, hardware_id, orientation } of devices) {
-    if (touched.get(index) === hardware_id) {
+    if (touched.get(index) === hardware_id && !isPlaceholderHardwareId(hardware_id)) {
       // Same body still there and it was rotated in this session — leave the
       // current value (and the touch) alone.
       continue;
