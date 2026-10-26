@@ -2,13 +2,17 @@
   // Public credits page. Like /welcome it sits in the (auth) group, which has
   // no session guard, so it opens before anyone has signed in.
 
-  import { onMount } from 'svelte';
-  import { isKiosk } from '$lib/kiosk';
+  import { tick } from 'svelte';
+  import { dismissible } from '$lib/dialog';
   import nehSeal from '$lib/assets/neh-preferred-seal-white.png';
   import amplUcsb from '$lib/assets/ampl-ucsb-white.png';
   import utHistory from '$lib/assets/ut-history.svg';
   import burdick from '$lib/assets/burdick.png';
   import neogranadina from '$lib/assets/neogranadina-white.png';
+  // Encodes https://ampl.clair.ucsb.edu/project/digitization-toolkit, dark
+  // modules #131110 on white, error correction M, quiet zone of 4 modules.
+  // Regenerate with: npx qrcode@1.5.4 -t svg -e M -q 4 -d '#131110' -l '#ffffff' -o <file> <url>
+  import qr from '$lib/assets/qr-digitization-toolkit.svg';
 
   // The credit text is English whatever the interface language, like the
   // start labels on /welcome. Logos that are not white already are inverted
@@ -21,10 +25,23 @@
     { src: neogranadina, alt: 'Neogranadina', width: 140, dark: false },
   ];
 
-  // Set after mount so the server render never includes the link and the
-  // kiosk never flashes it.
-  let showLink = $state(false);
-  onMount(() => { showLink = !isKiosk(); });
+  // The unit is offline and its kiosk has no address bar or back button, so
+  // the project page is offered as a QR code for a visitor's phone instead of
+  // a link.
+  let showLab = $state(false);
+  let labButton: HTMLButtonElement | undefined = $state();
+  let closeButton: HTMLButtonElement | undefined = $state();
+
+  async function openLab() {
+    showLab = true;
+    await tick();
+    closeButton?.focus();
+  }
+
+  function closeLab() {
+    showLab = false;
+    labButton?.focus();
+  }
 </script>
 
 <div class="page">
@@ -40,19 +57,13 @@
     <p>
       Captua has been made possible in part by a major grant from the National Endowment for the Humanities: Democracy demands wisdom. (NEH Award HAA-304052-25: "Digitization Toolkit: a Blueprint for Egalitarian Access to Technology in Low-Resource Environments".)
     </p>
-    <!-- A new tab, never this one, so a desktop visitor keeps the app open.
-         The kiosk does not get the link at all (see `isKiosk`). -->
-    {#if showLink}
-    <a
-      class="more"
-      href="https://ampl.clair.ucsb.edu/project/digitization-toolkit"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
+    <button class="more" bind:this={labButton} onclick={openLab}>
       Learn more about the Digitization Toolkit project
-      <span class="material-symbols-outlined icon-sm" aria-hidden="true">open_in_new</span>
-    </a>
-    {/if}
+      <!-- qr_code_2 is not in the icon font subset. -->
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20v1"/>
+      </svg>
+    </button>
     <p class="muted">
       Any views, findings, conclusions, or recommendations expressed in this software do not necessarily represent those of the National Endowment for the Humanities.
     </p>
@@ -66,6 +77,17 @@
     {/each}
   </div>
 </div>
+
+{#if showLab}
+  <div class="backdrop" use:dismissible={{ onDismiss: closeLab }}>
+    <div class="dialog dialog-fit" role="dialog" aria-modal="true" aria-labelledby="lab-title">
+      <h2 id="lab-title" lang="en">Digitization Toolkit</h2>
+      <img class="qr" src={qr} alt="QR code for the Digitization Toolkit project page" />
+      <p class="caption" lang="en">Scan with your phone to learn more about the Digitization Toolkit project.</p>
+      <button class="btn" bind:this={closeButton} onclick={closeLab}>Close / <span lang="es">Cerrar</span></button>
+    </div>
+  </div>
+{/if}
 
 <style>
   .page {
@@ -121,6 +143,35 @@
   .logo-box img { width: 100%; height: 100%; object-fit: contain; }
   .invert { filter: brightness(0) invert(1); }
 
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background-color: rgba(0,0,0,0.65);
+  }
+
+  .dialog {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 420px;
+    padding: 16px 24px;
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+  }
+
+  .dialog h2 { margin: 0; font-size: var(--text-h4); font-weight: var(--fw-bold); }
+  .qr { width: 220px; height: 220px; border-radius: var(--radius-md); }
+  .caption { margin: 0; text-align: center; font-size: var(--text-sm); color: var(--color-light-grey); }
+
   .btn {
     display: inline-flex;
     align-items: center;
@@ -135,5 +186,6 @@
     box-sizing: border-box;
     transition: background-color var(--transition-base);
   }
+  .btn { background: none; font-family: inherit; cursor: pointer; }
   .btn:hover { background-color: rgba(150,177,240,0.1); }
 </style>

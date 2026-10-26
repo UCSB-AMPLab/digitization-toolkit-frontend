@@ -1,8 +1,8 @@
 // The credits page is public and shows the grant text and the five logos.
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-const { goto, isKiosk } = vi.hoisted(() => ({ goto: vi.fn(), isKiosk: vi.fn(() => false) }));
-vi.mock('$lib/kiosk', () => ({ isKiosk }));
+import { userEvent } from 'vitest/browser';
+const { goto } = vi.hoisted(() => ({ goto: vi.fn() }));
 vi.mock('$app/navigation', () => ({ goto }));
 
 import Page from './+page.svelte';
@@ -20,17 +20,30 @@ describe('credits page', () => {
 		await expect.element(screen.getByText('Captua is developed by Adelaida Ávila', { exact: false })).toBeVisible();
 		await expect.element(screen.getByText('(NEH Award HAA-304052-25: "Digitization Toolkit', { exact: false })).toBeVisible();
 		await expect.element(screen.getByText('Any views, findings, conclusions', { exact: false })).toBeVisible();
-		const link = screen.getByRole('link', { name: 'Learn more about the Digitization Toolkit project' });
-		await expect.element(link).toHaveAttribute('href', 'https://ampl.clair.ucsb.edu/project/digitization-toolkit');
-		await expect.element(link).toHaveAttribute('target', '_blank');
-		await expect.element(link).toHaveAttribute('rel', 'noopener noreferrer');
 	});
 
-	it('hides the project link on the kiosk', async () => {
-		isKiosk.mockReturnValueOnce(true);
+	const LAB = 'Learn more about the Digitization Toolkit project';
+
+	it('opens the QR dialog and closes it with the button', async () => {
 		const screen = await render(Page);
-		await expect.element(screen.getByText('Any views, findings', { exact: false })).toBeVisible();
-		expect(screen.getByRole('link', { name: 'Learn more about the Digitization Toolkit project' }).elements()).toHaveLength(0);
+		const opener = screen.getByRole('button', { name: LAB });
+		await userEvent.click(opener);
+		await expect.element(screen.getByRole('dialog')).toBeVisible();
+		await expect.element(screen.getByRole('img', { name: 'QR code for the Digitization Toolkit project page' })).toBeVisible();
+		await expect.element(screen.getByText('Scan with your phone to learn more about the Digitization Toolkit project.')).toBeVisible();
+		await userEvent.click(screen.getByRole('button', { name: 'Close / Cerrar' }));
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		await expect.element(opener).toHaveFocus();
+	});
+
+	it('closes on Escape and returns focus to the button', async () => {
+		const screen = await render(Page);
+		const opener = screen.getByRole('button', { name: LAB });
+		await userEvent.click(opener);
+		await expect.element(screen.getByRole('button', { name: 'Close / Cerrar' })).toHaveFocus();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		await expect.element(opener).toHaveFocus();
 	});
 
 	it('shows the five logos with their alts', async () => {
