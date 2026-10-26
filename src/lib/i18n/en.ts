@@ -813,7 +813,6 @@ export const en: Messages = {
 	setup_val_password_mismatch: 'Passwords do not match',
 
 	// ── Welcome ──────────────────────────────────────────────────────────────
-	welcome_title: 'Welcome',
 
 	// ── Camera controls ──────────────────────────────────────────────────────
 	cam_panel_title: 'Camera Controls',

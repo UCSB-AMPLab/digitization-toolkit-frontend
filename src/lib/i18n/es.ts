@@ -843,7 +843,6 @@ export const es = {
 	setup_val_password_mismatch: 'Las contraseñas no coinciden',
 
 	// ── Welcome ──────────────────────────────────────────────────────────────
-	welcome_title: 'Te damos la bienvenida',
 
 	// ── Camera controls ──────────────────────────────────────────────────────
 	cam_panel_title: 'Controles de cámara',

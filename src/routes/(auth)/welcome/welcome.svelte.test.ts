@@ -34,8 +34,8 @@ describe('welcome splash', () => {
 	}
 
 	for (const [name, code] of [
-		['Empezar en español', 'es'],
-		['Get started in English', 'en']
+		['Get started in English', 'en'],
+		['Empezar en español', 'es']
 	] as const) {
 		it(`${name} sets ${code} and goes to setup on a first install`, async () => {
 			vi.spyOn(authApi, 'setupStatus').mockResolvedValue({ needs_setup: true });
@@ -45,6 +45,19 @@ describe('welcome splash', () => {
 			expect(setLanguage).toHaveBeenCalledWith(code, '/setup');
 		});
 	}
+
+	it('puts the English button first', async () => {
+		const screen = await render(Page);
+		const labels = screen.getByRole('button').elements().map((b) => b.textContent?.trim());
+		expect(labels).toEqual(['Get started in English', 'Empezar en español']);
+	});
+
+	it('credits the NEH award and links to the credits page', async () => {
+		const screen = await render(Page);
+		await expect.element(screen.getByText('HAA-304052-25', { exact: false })).toBeVisible();
+		await expect.element(screen.getByRole('img', { name: 'National Endowment for the Humanities' })).toBeVisible();
+		await expect.element(screen.getByRole('link', { name: 'Credits / Créditos' })).toHaveAttribute('href', '/credits');
+	});
 
 	it('goes to login when setup is done', async () => {
 		vi.spyOn(authApi, 'setupStatus').mockResolvedValue({ needs_setup: false });
