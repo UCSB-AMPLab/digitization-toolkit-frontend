@@ -781,8 +781,6 @@
 
   .meta-cell { color: var(--color-light-grey); font-size: var(--text-sm); }
 
-  .performance { font-weight: var(--fw-bold); font-size: var(--text-sm); }
-
   .col-actions { text-align: center; width: 80px; }
 
   .actions-menu-wrapper { position: relative; display: inline-flex; justify-content: center; }
@@ -871,8 +869,6 @@
   .modal-body { display: flex; flex-direction: column; gap: 14px; }
 
   /* Form fields */
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
   .form-field { display: flex; flex-direction: column; gap: 6px; }
 
   .field-label {

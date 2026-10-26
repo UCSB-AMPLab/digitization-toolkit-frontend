@@ -60,7 +60,6 @@ function baseProps(overrides: Record<string, unknown> = {}) {
     rotation: 0,
     onPrev: vi.fn(),
     onNext: vi.fn(),
-    onZoomChange: vi.fn(),
     ...overrides,
   };
 }

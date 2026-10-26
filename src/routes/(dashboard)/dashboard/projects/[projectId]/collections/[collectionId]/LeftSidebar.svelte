@@ -16,6 +16,7 @@
   import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
   import { recordsApi, ApiError } from '$lib/api';
   import { m, locale } from '$lib/i18n';
+  import { formatApiDate } from '$lib/format-date';
   import { formatCount } from '$lib/format-count';
   import { REJECTION_REASONS } from '$lib/rejectionReasons';
   import { REJECTION_COMMENT_MAX_LENGTH, isCommentTooLong, showsCommentCount } from '$lib/rejection-comment';
@@ -424,7 +425,7 @@
 
   function formatTime(dateStr?: string): string {
     if (!dateStr) return '';
-    return new Date(dateStr).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    return formatApiDate(dateStr, $locale, { hour: '2-digit', minute: '2-digit' });
   }
 
   function formatFileSize(bytes: number): string {
@@ -434,8 +435,7 @@
   }
 
   function formatDateTime(dateStr: string): string {
-    const d = new Date(dateStr);
-    return d.toLocaleString('es-ES', {
+    return formatApiDate(dateStr, $locale, {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });

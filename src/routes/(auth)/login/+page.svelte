@@ -8,7 +8,7 @@
 	import { goto } from '$app/navigation';
 	import { authApi, healthApi, usersApi, tokenStore } from '$lib/api';
 	import { classifyLoginError, lockoutMinutes, retryAfterOf } from '$lib/login-error';
-	import { authStore, getRoleDashboardPath, isUserRole } from '$lib/stores/auth';
+	import { authStore, isUserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
 	import logoEs from '$lib/assets/captua-logo-descrp-light-esp.svg';
 	import logoEn from '$lib/assets/captua-logo-descrp-light-eng.svg';
@@ -102,7 +102,7 @@
 
 			authStore.setSession(authResponse.access_token, userData);
 
-			goto(getRoleDashboardPath(userData.role));
+			goto('/dashboard');
 		} catch (error) {
 			// Bad credentials, a lockout and an unreachable backend each get their
 			// own message. The credentials message stays generic, and it does not

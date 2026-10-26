@@ -65,27 +65,6 @@
     margin-bottom: 80px;
   }
 
-  .logo {
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    background-color: var(--color-primary);
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 16px rgba(90,140,98,0.4);
-  }
-
-  .logo-img {
-    width: 28px; height: 28px;
-    filter: brightness(0) invert(1);
-  }
-
-  .name {
-    font-family: var(--font-family);
-    font-size: var(--text-lead);
-    font-weight: var(--fw-semibold);
-    color: var(--color-primary);
-    margin: 0;
-  }
-
   .title {
     font-family: var(--font-family);
     font-size: var(--text-h2);

@@ -1476,11 +1476,6 @@
     overflow: visible;
   }
 
-  .accordion-block.disabled {
-    opacity: 0.4;
-    pointer-events: none;
-  }
-
   .accordion-trigger {
     width: 100%;
     display: flex;
@@ -1615,34 +1610,6 @@
   .global-dropdown button:hover  { background-color: rgba(188,130,60,0.2); }
   .global-dropdown button.selected { background-color: var(--color-highlight); color: white; }
 
-  /* ── Focus buttons ── */
-  .focus-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 4px 0;
-  }
-
-  .focus-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    flex-shrink: 0;
-  }
-
-  .focus-btn:hover { background-color: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); }
-  .focus-btn:active { background-color: var(--color-primary); color: white; transform: scale(0.95); }
-  .focus-btn.center { background-color: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 10px rgba(90,140,98,0.3); }
-
   /* ── Settings ── */
   .settings-content { gap: 14px; }
 
@@ -1663,25 +1630,6 @@
     display: flex;
     gap: 8px;
   }
-
-  .wb-btn {
-    flex: 1;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 0 10px;
-    min-height: var(--touch-target-min);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-family: var(--font-family);
-    font-size: 12px;
-    color: var(--color-light);
-    cursor: pointer;
-    transition: border-color var(--transition-base);
-  }
-
-  .wb-btn:hover { border-color: var(--color-highlight); }
 
   .wb-pipette {
     background-color: var(--color-surface);
@@ -1902,8 +1850,6 @@
     color: var(--color-light);
     flex-shrink: 0;
   }
-
-  .capitalize { text-transform: capitalize; }
 
   .controls-unavailable {
     margin: 0;
