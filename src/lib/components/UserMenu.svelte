@@ -1,8 +1,11 @@
 <script lang="ts">
   // User avatar menu for the capture and volume top bars (NEH-234). Those are
   // the two screens an operator works in on the kiosk, and they have no
-  // sidebar, so this menu is where they sign out and reopen the tour. Both
-  // bars use this one component rather than each keeping its own copy.
+  // sidebar, so this menu is where they sign out, reopen the tour, and shut
+  // down or restart the unit (NEH-189). Settings, the only other place with
+  // the power controls, is open to admins alone, and operators and reviewers
+  // never sign in as admin. Both bars use this one component rather than each
+  // keeping its own copy.
   //
   // The menu closes on a tap outside and on Escape. The Pi's touch screen has
   // no hover and no keyboard, so a tap outside is the real way out; Escape is
@@ -12,6 +15,8 @@
   import { authStore } from '$lib/stores/auth';
   import { m, roleLabel } from '$lib/i18n';
   import { tour } from '$lib/tour';
+  import type { PowerAction } from '$lib/api';
+  import PowerControl from './PowerControl.svelte';
 
   // The caller supplies the trigger's accessible label, because each screen
   // already has its own translated string for it.
@@ -22,6 +27,15 @@
 
   let user     = $derived($authStore.user);
   let initials = $derived((user?.username ?? '').slice(0, 2).toUpperCase() || '?');
+
+  // Rendered outside the menu, which closes as soon as an entry is chosen,
+  // so that the confirmation and the blocking state outlive it.
+  let power = $state<ReturnType<typeof PowerControl> | undefined>(undefined);
+
+  function askPower(action: PowerAction) {
+    open = false;
+    power?.ask(action);
+  }
 
   function handleLogout() {
     open = false;
@@ -81,6 +95,28 @@
         <span>{$m.nav_help}</span>
       </button>
 
+      <div class="menu-sep"></div>
+
+      <!-- One entry per action, like the rest of the menu: each goes straight
+           to its own confirmation. Same icons as the buttons in Settings. -->
+      <button class="menu-item" role="menuitem" onclick={() => askPower('poweroff')}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+          <line x1="12" y1="2" x2="12" y2="12" />
+        </svg>
+        <span>{$m.config_shutdown_label}</span>
+      </button>
+
+      <button class="menu-item" role="menuitem" onclick={() => askPower('reboot')}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <polyline points="23 4 23 10 17 10" />
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+        </svg>
+        <span>{$m.config_reboot_label}</span>
+      </button>
+
+      <div class="menu-sep"></div>
+
       <button class="menu-item menu-logout" role="menuitem" onclick={handleLogout}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -92,6 +128,8 @@
     </div>
   {/if}
 </div>
+
+<PowerControl bind:this={power} />
 
 <style>
   .user-menu { position: relative; flex-shrink: 0; }
@@ -167,6 +205,9 @@
     font-family: var(--font-family);
     font-size: var(--text-base);
     text-align: left;
+    /* The menu hangs from a 44px avatar, so without this its labels would
+       wrap at min-width instead of widening it. */
+    white-space: nowrap;
     cursor: pointer;
     transition: background-color var(--transition-base);
   }

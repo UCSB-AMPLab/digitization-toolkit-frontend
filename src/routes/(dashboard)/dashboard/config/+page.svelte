@@ -18,16 +18,13 @@
   import {
     systemApi,
     camerasApi,
-    healthApi,
-    PowerControlError,
     type SystemLogEntry,
     type StorageInfo,
-    type StorageDevice,
-    type PowerAction
+    type StorageDevice
   } from '$lib/api';
   // The overview's banner reads the figures the same way and uses the same threshold.
   import { formatStorage, storageUsage, STORAGE_ALERT_THRESHOLD } from '$lib/storage-usage';
-  import { dismissible } from '$lib/dialog';
+  import PowerControl from '$lib/components/PowerControl.svelte';
 
   let storageInfo    = $state<StorageInfo | null>(null);
   let storageLoading = $state(true);
@@ -82,80 +79,11 @@
     }
   }
 
-  // Power: shut down or reboot the unit, so that nobody has to pull the
-  // plug, which corrupts the SD card. The backend performs the real shutdown
-  // or reboot and stops responding seconds later, so the UI enters a blocking
-  // state.
-  //
-  //   200 → shutdown/reboot under way (the backend goes away at once)
-  //   501 → power control unavailable (development machine)
-  //   401 → session expired
-  let pendingPowerAction = $state<PowerAction | null>(null);   // action awaiting confirmation
-  let sendingPower = $state(false);                            // request in flight (dialog open)
-  let powerPhase = $state<'idle' | 'poweroff' | 'reboot'>('idle');
+  // Power: the shutdown and reboot buttons below. The confirmation, the
+  // request and the blocking state live in PowerControl, which the avatar
+  // menu uses too; failures are shown inside the Power card.
+  let power = $state<ReturnType<typeof PowerControl> | undefined>(undefined);
   let powerError = $state<string | null>(null);
-
-  let confirmTitle = $derived(
-    pendingPowerAction === 'reboot' ? $m.config_confirm_reboot_title : $m.config_confirm_shutdown_title
-  );
-  let confirmDesc = $derived(
-    pendingPowerAction === 'reboot'
-      ? $m.config_confirm_reboot_desc
-      : $m.config_confirm_shutdown_desc
-  );
-
-  function askPower(action: PowerAction) {
-    powerError = null;
-    pendingPowerAction = action;
-  }
-
-  function cancelPower() {
-    if (sendingPower) return; // an order already sent cannot be cancelled
-    pendingPowerAction = null;
-  }
-
-  async function confirmPower() {
-    const action = pendingPowerAction;
-    if (!action || sendingPower) return;
-    powerError = null;
-    // The dialog stays open with its buttons disabled while the request is
-    // in flight. The blocking state appears only once the backend confirms
-    // (200) — a 501/401 must not block the page.
-    sendingPower = true;
-    try {
-      await systemApi.powerControl(action);
-      powerPhase = action === 'reboot' ? 'reboot' : 'poweroff';
-      if (action === 'reboot') pollForRecovery();
-    } catch (e: unknown) {
-      if (e instanceof PowerControlError && e.status === 501) {
-        powerError = $m.config_err_power_unavailable;
-      } else if (e instanceof PowerControlError && e.status === 401) {
-        powerError = $m.config_err_session_expired;
-      } else {
-        powerError = (e instanceof Error ? e.message : null) || $m.config_err_operation;
-      }
-    } finally {
-      sendingPower = false;
-      pendingPowerAction = null;
-    }
-  }
-
-  // After a reboot the backend goes down and comes back. Once /health
-  // responds again, the app is reloaded to start from a clean session.
-  async function pollForRecovery() {
-    // Gives the backend time to start shutting down before polling.
-    await new Promise((r) => setTimeout(r, 8000));
-    while (powerPhase === 'reboot') {
-      try {
-        await healthApi.check();
-        window.location.reload();
-        return;
-      } catch {
-        await new Promise((r) => setTimeout(r, 3000));
-      }
-    }
-  }
-
 
 
   // Active camera backend (NEH-188), shown exactly as the backend reports it
@@ -656,7 +584,7 @@
             {$m.config_shutdown_desc}
           </span>
         </div>
-        <button class="btn-power btn-power-off" onclick={() => askPower('poweroff')}>
+        <button class="btn-power btn-power-off" onclick={() => power?.ask('poweroff')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
             <line x1="12" y1="2" x2="12" y2="12"/>
@@ -672,7 +600,7 @@
             {$m.config_reboot_desc}
           </span>
         </div>
-        <button class="btn-power btn-power-reboot" onclick={() => askPower('reboot')}>
+        <button class="btn-power btn-power-reboot" onclick={() => power?.ask('reboot')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="23 4 23 10 17 10"/>
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -702,51 +630,7 @@
 
 </div>
 
-<!-- Shutdown/reboot confirmation, styled like the confirmations on the
-     Users page, so that a single click cannot power the unit off. -->
-{#if pendingPowerAction}
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: cancelPower }}>
-    <div class="modal-card modal-confirm dialog-fit" role="dialog" aria-modal="true" aria-labelledby="power-confirm-title">
-      <h3 class="confirm-title" id="power-confirm-title">{confirmTitle}</h3>
-      <p class="confirm-desc">{confirmDesc}</p>
-
-      <div class="modal-actions">
-        <button class="btn-ghost" onclick={cancelPower} disabled={sendingPower}>{$m.common_cancel}</button>
-        {#if pendingPowerAction === 'reboot'}
-          <button class="btn-confirm-power" onclick={confirmPower} disabled={sendingPower}>
-            {sendingPower ? $m.config_sending : $m.config_confirm_reboot_btn}
-          </button>
-        {:else}
-          <button class="btn-delete" onclick={confirmPower} disabled={sendingPower}>
-            {sendingPower ? $m.config_sending : $m.config_confirm_shutdown_btn}
-          </button>
-        {/if}
-      </div>
-    </div>
-  </div>
-{/if}
-
-<!-- Blocking state while the backend shuts down or reboots. No buttons: it
-     ends only when the unit powers off (poweroff) or the app reloads itself
-     (reboot). -->
-{#if powerPhase === 'poweroff' || powerPhase === 'reboot'}
-  <div class="power-overlay">
-    <div class="power-overlay-card">
-      <div class="spinner-lg"></div>
-      {#if powerPhase === 'poweroff'}
-        <h3 class="power-overlay-title">{$m.config_shutting_down}</h3>
-        <p class="power-overlay-desc">
-          {$m.config_shutdown_overlay_desc}
-        </p>
-      {:else}
-        <h3 class="power-overlay-title">{$m.config_rebooting}</h3>
-        <p class="power-overlay-desc">
-          {$m.config_reboot_overlay_desc}
-        </p>
-      {/if}
-    </div>
-  </div>
-{/if}
+<PowerControl bind:this={power} onError={(message) => (powerError = message)} />
 
 <style>
   .page { padding: 32px; max-width: 900px; }
@@ -759,8 +643,6 @@
 
   .page-title    { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
 
 
   .config-section { margin-bottom: 32px; }
@@ -1079,106 +961,4 @@
   .btn-power-reboot:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); background-color: rgba(255,255,255,0.04); }
 
   .power-error-row { padding: 10px 20px 14px; }
-
-  /* Confirmation modal: same styles as the Users page. */
-  .modal-backdrop {
-    position: fixed; inset: 0;
-    background-color: rgba(0,0,0,0.65);
-    backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 100; padding: 24px;
-  }
-
-  .modal-card {
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 28px;
-    width: 100%; max-width: 420px;
-    box-shadow: var(--shadow-lg);
-    display: flex; flex-direction: column; gap: 16px;
-  }
-
-  .modal-confirm { max-width: 440px; gap: 12px; }
-
-  .confirm-title {
-    font-size: var(--text-h3); font-weight: var(--fw-bold);
-    color: var(--color-light); margin: 0;
-  }
-
-  .confirm-desc {
-    font-size: var(--text-sm); color: var(--color-light-grey);
-    line-height: 1.6; margin: 0;
-  }
-
-  .modal-actions {
-    display: flex; gap: 12px;
-    padding-top: 4px;
-    border-top: 1px solid var(--border-color);
-  }
-
-  .btn-ghost {
-    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-    flex: 1;
-    background: none; border: 1px solid var(--border-color);
-    border-radius: var(--radius-md); padding: 9px 18px;
-    font-family: var(--font-family); font-size: var(--text-sm);
-    color: var(--color-light-grey); cursor: pointer;
-    transition: all var(--transition-fast); min-height: var(--touch-target-min);
-    white-space: nowrap;
-  }
-  .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
-  .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  .btn-delete {
-    flex: 1; height: 44px;
-    background-color: var(--color-error); color: white;
-    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
-    border: none; border-radius: var(--radius-md);
-    cursor: pointer; transition: opacity var(--transition-base);
-  }
-  .btn-delete:hover    { opacity: 0.85; }
-  .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* Reboot is not destructive, so its confirm button is primary green. */
-  .btn-confirm-power {
-    flex: 1; height: 44px;
-    background-color: var(--color-primary); color: white;
-    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
-    border: none; border-radius: var(--radius-md);
-    cursor: pointer; transition: background-color var(--transition-base);
-  }
-  .btn-confirm-power:hover    { background-color: var(--color-primary-hover); }
-  .btn-confirm-power:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  .power-overlay {
-    position: fixed; inset: 0;
-    background-color: rgba(19,17,16,0.92);
-    backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 200; padding: 24px;
-  }
-
-  .power-overlay-card {
-    display: flex; flex-direction: column; align-items: center; text-align: center;
-    gap: 16px; max-width: 420px;
-  }
-
-  .power-overlay-title {
-    font-size: var(--text-h3); font-weight: var(--fw-bold);
-    color: var(--color-light); margin: 0;
-  }
-
-  .power-overlay-desc {
-    font-size: var(--text-base); color: var(--color-light-grey);
-    line-height: 1.6; margin: 0;
-  }
-
-  .spinner-lg {
-    width: 40px; height: 40px;
-    border: 3px solid var(--border-color);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
 </style>

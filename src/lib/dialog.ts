@@ -58,3 +58,15 @@ export function dismissible(node: HTMLElement, options: DismissOptions) {
 		}
 	};
 }
+
+// Moves a dialog to <body>. A `position: fixed` dialog rendered inside a
+// stacking context (an element with a z-index, a transform or a filter) is
+// painted at that context's level, so the page around it can cover it.
+export function toBody(node: HTMLElement) {
+	document.body.appendChild(node);
+	return {
+		destroy() {
+			node.remove();
+		}
+	};
+}
