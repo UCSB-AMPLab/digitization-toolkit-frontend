@@ -723,7 +723,7 @@
   // ---------------------------------------------------------------------------
   function cameraLabel(idx: number): string {
     const dev = devices.find(d => d.index === idx);
-    return `${dev?.label || dev?.model || 'Camera'} [${idx}]`;
+    return `${dev?.label || dev?.model || $m.cam_fallback_name} [${idx}]`;
   }
 </script>
 

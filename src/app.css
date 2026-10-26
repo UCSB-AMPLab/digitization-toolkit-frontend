@@ -1199,23 +1199,23 @@ canvas, button, a, div {
    QA WORKFLOW: StatusBadge, StatusBar
    ============================================================================ */
 
-/* ── StatusBadge ── */
+/* ── StatusBadge ──
+   A label, not a control: no pill, border or padding, which on a touch
+   screen read as a button. Colour and icon carry the status. */
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
   line-height: 1.4;
 }
 
-.status-badge.status-captured  { background: rgba(90,140,98,0.15);  color: var(--color-primary);  border: 1px solid rgba(90,140,98,0.3); }
-.status-badge.status-in_review { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid rgba(208,154,68,0.3); }
-.status-badge.status-rejected  { background: var(--color-error-bg);   color: var(--color-error);   border: 1px solid rgba(214,103,74,0.3); }
-.status-badge.status-approved  { background: var(--color-success-bg); color: var(--color-success); border: 1px solid rgba(111,191,115,0.3); }
+.status-badge.status-captured  { color: var(--color-primary); }
+.status-badge.status-in_review { color: var(--color-warning); }
+.status-badge.status-rejected  { color: var(--color-error); }
+.status-badge.status-approved  { color: var(--color-success); }
 
 .status-badge .material-symbols-outlined { font-size: 13px; line-height: 1; }
 
@@ -1378,6 +1378,10 @@ tr:hover .drag-handle { opacity: 1; }
   color: var(--color-light);
   font-size: var(--text-sm);
   line-height: 1.5;
+}
+.action-notice.is-success {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
 }
 .action-notice-text { flex: 1; min-width: 0; }
 .action-notice-close {

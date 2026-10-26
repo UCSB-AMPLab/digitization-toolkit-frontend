@@ -19,10 +19,11 @@
   //    coloca donde el paso pide y se recorta contra los bordes.
   // ==========================================================================
 
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { page } from '$app/stores';
   import { m } from '$lib/i18n';
   import { tour, TOUR_STEPS } from '$lib/tour';
+  import { placeTourBox, type TourRect } from '$lib/tour-position';
 
   const BOX_W = 264;
   const GAP   = 12;
@@ -30,7 +31,13 @@
   let box = $state<HTMLDivElement | undefined>(undefined);
 
   // Rectángulo del control resaltado, en coordenadas de viewport.
-  let rect = $state<{ top: number; left: number; width: number; height: number } | null>(null);
+  let rect = $state<TourRect | null>(null);
+
+  // A modal dialog (approve confirmation, export chooser, send for review)
+  // sits below the tour's z-index, so with the veil on top the operator
+  // could not answer it. While one is open the tour hides and waits; the
+  // step resumes when the dialog closes.
+  let modalOpen = $state(false);
 
   // El catálogo está tipado con claves literales; los pasos las arman en
   // tiempo de ejecución (tour_s1_title…), así que aquí se lee como mapa.
@@ -39,75 +46,111 @@
   let step  = $derived(TOUR_STEPS[$tour.index]);
   let onRoute = $derived(step ? step.match.test($page.url.pathname) : false);
 
-  // Posición de la caja. Sin objetivo visible se centra abajo: el paso sigue
-  // explicándose y de paso dice a dónde hay que ir.
-  let pos = $derived.by(() => {
-    if (!rect) {
-      return {
-        left: Math.max(GAP, (innerW - BOX_W) / 2),
-        top: Math.max(GAP, innerH - boxH - GAP * 2),
-      };
-    }
-    let left: number, top: number;
-    switch (step.side) {
-      case 'left':  left = rect.left - BOX_W - GAP; top = rect.top - 40; break;
-      case 'right': left = rect.left + rect.width + GAP; top = rect.top - 40; break;
-      case 'top':   left = rect.left; top = rect.top - boxH - GAP; break;
-      default:      left = rect.left; top = rect.top + rect.height + GAP;
-    }
-    return {
-      left: Math.max(GAP, Math.min(left, innerW - BOX_W - GAP)),
-      top:  Math.max(GAP, Math.min(top,  innerH - boxH - GAP)),
-    };
-  });
-
   let innerW = $state(0);
   let innerH = $state(0);
   let boxH   = $state(180);
 
-  // Volver a medir cuando cambia el paso, la ruta o el tamaño. El control
-  // puede aparecer después (una lista que termina de cargar), así que se
-  // reintenta un par de veces antes de darlo por ausente.
-  $effect(() => {
-    const _ = [$tour.active, $tour.index, $page.url.pathname, innerW, innerH];
+  let pos = $derived(
+    placeTourBox(rect, step?.side ?? 'bottom', { width: BOX_W, height: boxH }, { width: innerW, height: innerH }, GAP)
+  );
+
+  // Scroll a control into view once per step, not on every measurement:
+  // repeating it would pull a list back each time the operator scrolls it.
+  let scrolledTo: Element | null = null;
+
+  function sameRect(a: TourRect | null, b: TourRect | null) {
+    return a === b || (!!a && !!b && a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height);
+  }
+
+  function measure() {
+    modalOpen = document.querySelector('[aria-modal="true"]') !== null;
     if (!$tour.active || !onRoute || !step?.target) {
       rect = null;
       return;
     }
+    const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+    // A control inside a collapsed or hidden panel has no boxes.
+    if (!el || el.getClientRects().length === 0) {
+      rect = null;
+      return;
+    }
+    if (scrolledTo !== el) {
+      scrolledTo = el;
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    const r = el.getBoundingClientRect();
+    const next = { top: r.top, left: r.left, width: r.width, height: r.height };
+    // Assign only on change: the tour's own re-render is a DOM mutation too.
+    if (!sameRect(rect, next)) rect = next;
+  }
 
-    let cancelled = false;
-    (async () => {
-      for (let intento = 0; intento < 6 && !cancelled; intento++) {
-        await tick();
-        const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
-        if (el) {
-          const r = el.getBoundingClientRect();
-          rect = { top: r.top, left: r.left, width: r.width, height: r.height };
-          return;
-        }
-        await new Promise((r) => setTimeout(r, 120));
-      }
-      if (!cancelled) rect = null;
-    })();
+  let frame = 0;
+  function schedule() {
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      measure();
+    });
+  }
 
-    return () => { cancelled = true; };
+  // Measure again when the step, the route or the window size changes.
+  $effect(() => {
+    void [$tour.active, $tour.index, $page.url.pathname, innerW, innerH];
+    scrolledTo = null;
+    tick().then(measure);
   });
 
+  // The control of a step often appears after the step does: the approve
+  // button exists only in book view with the annotations panel open, and the
+  // send-for-review button only once there are captures. While the tour is
+  // open, watch the page and measure again whenever it changes. Style
+  // attributes are left out because the tour writes its own on each render.
   $effect(() => {
-    if (box) boxH = box.offsetHeight;
+    if (!$tour.active) return;
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'hidden', 'aria-modal', 'open', 'disabled'],
+    });
+    // Panels slide open with a CSS transition; measure once it ends.
+    document.addEventListener('transitionend', schedule, true);
+    // Lists scroll inside their own panels, which window scroll never sees.
+    document.addEventListener('scroll', schedule, { capture: true, passive: true });
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('transitionend', schedule, true);
+      document.removeEventListener('scroll', schedule, true);
+    };
+  });
+
+  // The box grows with the text of each step and with the route hint.
+  $effect(() => {
+    if (!box) return;
+    const el = box;
+    boxH = el.offsetHeight;
+    const observer = new ResizeObserver(() => { boxH = el.offsetHeight; });
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
+
+  onDestroy(() => {
+    if (frame) cancelAnimationFrame(frame);
   });
 
   function onKey(event: KeyboardEvent) {
-    if (!$tour.active) return;
+    // Keys belong to the open dialog, not to the tour hidden behind it.
+    if (!$tour.active || modalOpen) return;
     if (event.key === 'Escape') tour.stop();
     if (event.key === 'ArrowRight') tour.next();
     if (event.key === 'ArrowLeft') tour.prev();
   }
 </script>
 
-<svelte:window bind:innerWidth={innerW} bind:innerHeight={innerH} onkeydown={onKey} onscroll={() => ($tour.active ? tour.goTo($tour.index) : null)} />
+<svelte:window bind:innerWidth={innerW} bind:innerHeight={innerH} onkeydown={onKey} />
 
-{#if $tour.active && step}
+{#if $tour.active && step && !modalOpen}
   <!-- Resaltado. pointer-events:none a propósito: el control de abajo tiene
        que seguir siendo pulsable mientras el recorrido está abierto. -->
   {#if rect}
@@ -184,6 +227,10 @@
     background-color: var(--color-surface-alt);
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-lg);
+    /* Long steps on the 800x480 screen scroll inside the box instead of
+       running past the bottom edge. */
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
     transition: left var(--transition-base), top var(--transition-base);
   }
   .tour-box h3 {

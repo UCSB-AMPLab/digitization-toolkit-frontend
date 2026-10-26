@@ -45,6 +45,7 @@
     onRecordsUpdate,
     onRecordClick,
     onReorderNotice,
+    onRenumbered,
   }: {
     records: Record[];
     collectionId: number;
@@ -55,6 +56,10 @@
     onRecordClick: (record: Record) => void;
     // Why the last drag was not saved, or null once one is saved.
     onReorderNotice?: (notice: string | null) => void;
+    // How many records the backend renumbered, and in which volume. The
+    // page shows it, because the reload that follows unmounts this view;
+    // the volume lets it drop a result that lands after the operator left.
+    onRenumbered?: (volumeId: number, count: number) => void;
   } = $props();
 
   // Local copy of records for DnD reordering
@@ -185,8 +190,10 @@
     renumbering = true;
     renumberError = null;
     try {
-      await collectionsApi.renumberImages(collectionId);
+      const volumeId = collectionId;
+      const { renumbered } = await collectionsApi.renumberImages(volumeId);
       showRenumberModal = false;
+      onRenumbered?.(volumeId, renumbered);
       onRecordsUpdate();
     } catch (err) {
       // The backend's English text goes to the console only.
@@ -722,9 +729,6 @@
   }
   .role-badge.right { left: auto; right: 6px; }
 
-  .status-badge { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 3; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
-  .status-badge.approved { background-color: var(--color-success); }
-  .status-badge.rejected { background-color: var(--color-error); }
 
   .card-meta { padding: 7px 2px 2px; }
 

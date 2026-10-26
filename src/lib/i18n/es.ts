@@ -83,12 +83,11 @@ export const es = {
 	nav_projects: 'Proyectos',
 	nav_users: 'Usuarios',
 	nav_settings: 'Configuración',
-	nav_collapse_sidebar: 'Colapsar sidebar',
-	nav_expand_sidebar: 'Expandir sidebar',
+	nav_collapse_sidebar: 'Contraer el menú lateral',
+	nav_expand_sidebar: 'Expandir el menú lateral',
 	// ── Recorrido guiado de primer arranque (NEH-95) ──────────────────────────
-	// Los textos están en usted: el personal del archivo se trata de usted, y
-	// así está escrita la tarjeta del operador de Rionegro. El resto del
-	// catálogo todavía está en tú — ver NEH-38.
+	// Tú, like the rest of the interface. The step texts name controls as the
+	// operator sees them: several are icons without a visible label.
 	nav_help: 'Ayuda',
 	tour_aria: 'Recorrido guiado',
 	tour_skip: 'Saltar el recorrido',
@@ -97,26 +96,26 @@ export const es = {
 	tour_finish: 'Terminar',
 
 	tour_s1_title: 'Crear un proyecto',
-	tour_s1_where: 'Pulse en Proyectos › Nuevo Proyecto.',
+	tour_s1_where: 'Ve a Proyectos › Nuevo proyecto.',
 	tour_s1_body:
 		'Un proyecto agrupa lo que se va a digitalizar de un mismo fondo. Agrupa uno o varios volúmenes.',
 	tour_s2_title: 'Crear un volumen',
-	tour_s2_where: 'Pulse en Proyectos › su proyecto › Nuevo volumen.',
+	tour_s2_where: 'Ve a Proyectos › tu proyecto › Nuevo volumen.',
 	tour_s2_body:
 		'Cada libro, caja o legajo es un volumen que hace parte de un proyecto. Las imágenes se guardan dentro.',
 	tour_s3_title: 'Capturar',
-	tour_s3_where: 'Pulse en Proyectos › su proyecto › su volumen › Capturar.',
+	tour_s3_where: 'Ve a Proyectos › tu proyecto › tu volumen › Capturar.',
 	tour_s3_body: 'Desde aquí se abre la pantalla de captura de este volumen.',
 	tour_s4_title: 'Pasar a revisión',
-	tour_s4_where: 'Pulse en Proyectos › su proyecto › su volumen › Enviar a revisión.',
+	tour_s4_where: 'Ve a Proyectos › tu proyecto › tu volumen › Enviar a revisión.',
 	tour_s4_body:
-		'Al terminar de capturar, envíe el volumen a revisión. Antes de eso es posible hacer correcciones de captura y de nomenclatura.',
+		'Cuando termines de capturar, envía el volumen a revisión. Antes de enviarlo puedes corregir las capturas y la nomenclatura.',
 	tour_s5_title: 'Revisar y aprobar',
-	tour_s5_where: 'Pulse en Proyectos › su proyecto › su volumen › Aprobar.',
+	tour_s5_where: 'Ve a Proyectos › tu proyecto › tu volumen.',
 	tour_s5_body:
-		'Apruebe que las páginas estén bien. Las que haya que repetir se rechazan indicando el motivo.',
+		'Aprueba las páginas que estén bien y rechaza, con el motivo, las que haya que repetir. Para aprobar, abre la vista libro (ícono del libro abierto, en la barra derecha) y luego Anotaciones (globo de diálogo, en la barra izquierda). Solo pueden aprobar los roles Revisor y Administrador.',
 	tour_s6_title: 'Exportar',
-	tour_s6_where: 'Pulse en Proyectos › su proyecto › su volumen › Exportar BagIt.',
+	tour_s6_where: 'Ve a Proyectos › tu proyecto › tu volumen y presiona el ícono de la caja de archivo, el último de la barra derecha.',
 	tour_s6_body:
 		'Con todo aprobado, el volumen se empaqueta y queda disponible para descargarlo.',
 
@@ -186,6 +185,8 @@ export const es = {
 	// Detalle tras dash_camera_capture_error y dos puntos, por eso en minúscula.
 	dash_camera_capture_not_connected: 'la cámara no está conectada',
 	dash_camera_capture_timeout: 'la cámara no entregó la imagen a tiempo',
+	dash_camera_focus_error: 'No se pudo enfocar',
+	dash_camera_preview_error: 'No se pudo mostrar la previsualización',
 	dash_two_cameras: '2 cámaras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: no se detecta. Presiona el disparador hasta la mitad para despertarla o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".`,
@@ -263,16 +264,17 @@ export const es = {
 	config_err_unmount: 'Error al desmontar el dispositivo.',
 	config_restored_default: 'Restaurado al almacenamiento predeterminado.',
 	config_err_restore: 'Error al restaurar.',
-	config_camera_backend: 'Backend de cámara',
+	config_camera_backend: 'Sistema de captura',
 	config_camera_backend_desc:
 		'Qué sistema de captura está activo en este equipo. Se define al instalarlo; cambiarlo exige reconfigurar el equipo.',
 	config_camera_backend_unknown: 'No disponible',
 	config_section_diagnostics: 'Diagnóstico',
-	config_system_logs: 'Logs del sistema',
+	// Not "registro": in this interface a registro is a record.
+	config_system_logs: 'Actividad del sistema',
 	config_system_logs_desc: 'Actividad reciente — última hora',
 	config_logs_loading: 'Cargando actividad reciente…',
 	config_logs_empty: 'Sin actividad registrada todavía.',
-	config_err_logs: 'No se pudieron cargar los logs del sistema.',
+	config_err_logs: 'No se pudo cargar la actividad del sistema.',
 	// Plantillas de mensajes del log de actividad (fragmentos alrededor del
 	// actor/sujeto en negrita; el género concuerda con el sustantivo en ES)
 	log_user_prefix: 'Usuario ',
@@ -308,7 +310,7 @@ export const es = {
 		'Reinicia el equipo. La aplicación se recargará automáticamente cuando vuelva a estar disponible.',
 	config_reboot_btn: 'Reiniciar',
 	config_offline_note:
-		'Este sistema opera completamente offline. Los datos se almacenan localmente en el dispositivo.',
+		'Para capturar y revisar no hace falta conexión a internet. La copia externa y el envío a Fisqua sí la necesitan.',
 	config_confirm_reboot_title: '¿Reiniciar el equipo?',
 	config_confirm_shutdown_title: '¿Apagar el equipo?',
 	config_confirm_reboot_desc:
@@ -346,8 +348,8 @@ export const es = {
 	users_field_username: 'Nombre de usuario',
 	users_ph_username: 'Ej: maria.garcia',
 	users_ph_email: 'Ej: maria@archivo.org',
-	users_ph_password: 'Ingrese contraseña',
-	users_ph_confirm: 'Confirme contraseña',
+	users_ph_password: 'Escribe la contraseña',
+	users_ph_confirm: 'Repite la contraseña',
 	users_field_account_status: 'Estado de la cuenta',
 	users_field_assign_role: 'Asignar rol',
 	users_create_btn: 'Crear usuario',
@@ -366,7 +368,7 @@ export const es = {
 	// ── Proyectos (lista) ────────────────────────────────────────────────────
 	proj_title: 'Gestión de Proyectos',
 	proj_subtitle: 'Fondos, series, secciones',
-	proj_new: 'Nuevo Proyecto',
+	proj_new: 'Nuevo proyecto',
 	proj_search_placeholder: 'Buscar por nombre, código…',
 	proj_loading: 'Cargando proyectos…',
 	proj_empty_search: 'Sin resultados para tu búsqueda',
@@ -602,7 +604,7 @@ export const es = {
 	col_renumber: 'Renumerar',
 	col_reorder_done: 'Listo',
 	col_reorder: 'Reordenar',
-	col_thumb_size: 'Tamaño de thumbnails',
+	col_thumb_size: 'Tamaño de las miniaturas',
 	col_columns_aria: 'Número de columnas',
 	col_filter_by_status: 'Filtrar por estado:',
 	col_clear_filter: '× Limpiar',
@@ -613,6 +615,12 @@ export const es = {
 		'Captua numerará los registros de este volumen a partir de 1, en el orden en que aparecen ahora, sin cambiar el nombre de ningún archivo.',
 	col_renumbering: 'Renumerando…',
 	col_renumber_error: 'Captua no pudo renumerar los registros de este volumen. Intenta de nuevo.',
+	col_renumber_done: (n: number) =>
+		n === 0
+			? 'Este volumen no tiene registros para renumerar.'
+			: n === 1
+				? 'Se renumeró 1 registro.'
+				: `Se renumeraron ${formatCount(n, 'es')} registros.`,
 	col_reorder_stale:
 		'Mientras reordenabas, se agregaron o se quitaron registros en este volumen, así que Captua no guardó el orden nuevo. Captua volvió a cargar el orden guardado.',
 	col_reorder_error: 'Captua no pudo guardar el orden nuevo. Captua volvió a cargar el orden guardado.',
@@ -697,6 +705,8 @@ export const es = {
 	col_export: 'Exportar BagIt',
 	col_err_export: 'Error al exportar',
 	col_export_generating: 'Generando BagIt…',
+	// "Checksum" stays: it is the term BagIt and archival preservation use,
+	// and the rest of this catalogue uses it.
 	col_export_copying: 'Copiando imágenes y calculando checksums',
 	col_export_done: 'Exportación completada',
 	col_download_zip: 'Descargar ZIP',
@@ -859,6 +869,7 @@ export const es = {
 	cam_section_settings: 'Color y exposición',
 	cam_section_settings_info: 'Ajusta el color y la exposición para que el documento se vea con sus colores reales.',
 	cam_live_controls_unavailable: 'Estos controles se muestran cuando hay conectada una cámara que los admite.',
+	cam_capabilities_failed: 'El sistema de captura no está disponible, así que no se pueden mostrar estos controles. Presiona "Reconectar cámaras" y, si sigue igual, reinicia el equipo.',
 	cam_orientation: 'Orientación',
 	cam_rotate_ccw: 'Girar 90° a la izquierda',
 	cam_rotate_cw: 'Girar 90° a la derecha',
@@ -866,8 +877,8 @@ export const es = {
 	cam_aperture: 'Apertura',
 	cam_format: 'Formato',
 	cam_focusing: 'Enfocando…',
-	cam_autofocus: 'Enfocar auto',
-	cam_manual_focus: 'Foco manual',
+	cam_autofocus: 'Enfoque automático',
+	cam_manual_focus: 'Enfoque manual',
 	cam_focus_slider_aria: 'Posición de foco (dioptrías)',
 	cam_focus_infinity: 'Infinito (lejos)',
 	cam_focus_macro: 'Macro (10 cm)',
@@ -880,19 +891,19 @@ export const es = {
 	cam_dslr_note_p3: 'El enfoque automático (AF) bloquea las DSLR de Canon unos 12 segundos.',
 	cam_dslr_af_warning: (mode: string) => `El lente está en ${mode}. La captura puede quedarse bloqueada hasta que el interruptor del lente esté en MF.`,
 	cam_wb: 'Balance de blancos',
-	cam_wb_calibrate_aria: 'Calibrar el balance de blancos automáticamente (convergencia AWB)',
+	cam_wb_calibrate_aria: 'Calibrar el balance de blancos automáticamente',
 	cam_wb_cancel_aria: 'Cancelar la muestra para el balance de blancos',
 	cam_wb_sample_aria: 'Tomar una muestra para el balance de blancos: toca un área blanca en la previsualización (experimental)',
-	cam_wb_hint: 'Toca un área blanca o gris neutro en la previsualización.',
+	cam_wb_hint: 'Selecciona un área blanca o gris neutro en la previsualización.',
 	cam_temperature: 'Temperatura',
 	cam_tint: 'Tinte',
 	cam_exposure: 'Exposición',
 	cam_histogram: 'Histograma',
 	cam_histogram_info: 'Verifica que la imagen no pierda detalle en las zonas claras ni en las oscuras.',
 	cam_histogram_empty: 'El histograma se muestra cuando hay imagen en la previsualización.',
-	cam_focus_result: (dpt: string) => `Foco: ${dpt} dpt`,
-	cam_af_failed: 'Autofocus falló',
-	cam_af_error: 'Error en autofocus',
+	cam_focus_result: (dpt: number) => `Foco: ${dpt.toFixed(2).replace('.', ',')} dioptrías`,
+	cam_af_failed: 'No se pudo enfocar automáticamente',
+	cam_af_error: 'Error al enfocar automáticamente',
 	cam_wb_calibrated: (temp: string) => `Balance de blancos calibrado${temp}`,
 	cam_wb_failed: 'No se pudo calibrar el balance de blancos',
 	cam_wb_error: 'Error al calibrar el balance de blancos',
@@ -905,10 +916,10 @@ export const es = {
 	lv_reconnecting: 'Reconectando con la cámara…',
 	lv_camera_left_alt: 'Cámara izquierda',
 	lv_camera_right_alt: 'Cámara derecha',
-	lv_wb_click_hint: 'Haz clic en un área blanca o gris neutro',
+	lv_wb_click_hint: 'Selecciona un área blanca o gris neutro en la previsualización',
 	lv_no_signal_left: 'Sin señal — Izquierda',
 	lv_no_signal_right: 'Sin señal — Derecha',
-	lv_check_hw: 'Verifica conexión del hardware',
+	lv_check_hw: 'Verifica la conexión de la cámara',
 	lv_camera_missing: 'Cámara no detectada. Presiona el disparador hasta la mitad o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".',
 	lv_rotate_ccw: 'Girar a la izquierda',
 	lv_rotate_cw: 'Girar a la derecha',
@@ -918,11 +929,11 @@ export const es = {
 	lv_swap_orientation: 'Intercambiar izquierda y derecha',
 	lv_orientation_swapped: 'Intercambiar izquierda y derecha (ahora la cámara [1] está a la izquierda)',
 	lv_orientation_normal: 'Intercambiar izquierda y derecha (ahora la cámara [0] está a la izquierda)',
-	lv_grid_modal_title: 'Cuadrícula y Guías',
+	lv_grid_modal_title: 'Cuadrícula y guías',
 	lv_grid_modal_subtitle: 'Activa las ayudas visuales de encuadre.',
 	lv_grid: 'Cuadrícula',
-	lv_grid_desc: 'Mostrar grid 3×3 de captura',
-	lv_guides: 'Líneas de Guía',
+	lv_grid_desc: 'Mostrar una cuadrícula de 3×3 sobre la previsualización',
+	lv_guides: 'Líneas guía',
 	lv_guides_desc: 'Guías arrastrables (rojo)',
 	// Tecla de captura (pedal)
 	lv_capture_key_current: (chord: string) => `Tecla de captura: ${chord}`,

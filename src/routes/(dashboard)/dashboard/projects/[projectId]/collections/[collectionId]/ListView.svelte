@@ -5,7 +5,8 @@
   // Vista de lista de registros. Cada fila muestra los thumbnails del registro
   // (con badge L/R si hay captura doble), el título, número de imágenes y fecha.
   //
-  // Al hacer click en una fila se abre el ImageViewerModal del registro.
+  // A row click opens the record in book view (onRecordClick, handled by
+  // the page), not in a modal.
   // ============================================================================
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';

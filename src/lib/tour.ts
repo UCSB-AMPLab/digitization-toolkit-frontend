@@ -47,8 +47,13 @@ export const TOUR_STEPS: TourStep[] = [
   // sólo existe cuando hay capturas sin enviar, así que en un volumen vacío
   // el paso se explica sin resaltar nada — que es el respaldo previsto.
   { id: 'tour_s4', match: COLLECTION, target: 'entregar',        side: 'bottom' },
-  { id: 'tour_s5', match: COLLECTION, target: 'aprobar',         side: 'top'    },
-  { id: 'tour_s6', match: COLLECTION, target: 'exportar',        side: 'top'    },
+  // The approve button sits in the annotations panel against the left edge,
+  // and the export button in the toolbar against the right edge: the box
+  // goes on the side with room. Approve exists only in book view with the
+  // annotations panel open, for reviewers and admins, so the step text says
+  // how to reach it.
+  { id: 'tour_s5', match: COLLECTION, target: 'aprobar',         side: 'right'  },
+  { id: 'tour_s6', match: COLLECTION, target: 'exportar',        side: 'left'   },
 ];
 
 // ── Persistencia ────────────────────────────────────────────────────────────
