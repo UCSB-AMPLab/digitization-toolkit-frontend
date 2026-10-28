@@ -4,26 +4,33 @@
   // exposure values, per-camera rotation, the volume's records — and passes it
   // down as props; `CameraControls`, `LiveViewport`, `ThumbnailStrip` and
   // `ImageViewerModal` do the rendering. Only admin and operator may use it;
-  // a reviewer is redirected (role guard in `onMount`, NEH-66).
+  // a reviewer is redirected (role guard in `onMount`, NEH-66). When the
+  // volume is an item of a stored digitisation list, `CaptureInstruction`
+  // shows that item's notes and action under the top bar: the item of the
+  // newest list for this volume (GET /imports/digitisation-lists), or, when
+  // no list has one, the notes the import kept in the volume's
+  // custom_attributes.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.2.0
 
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, recordsApi, projectsApi, collectionsApi, type Record as ApiRecord, type CameraDevice } from '$lib/api';
+  import { camerasApi, recordsApi, projectsApi, collectionsApi, importsApi, type Record as ApiRecord, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { m } from '$lib/i18n';
   import { seedRotation, createOrientationSaver, canSaveRotation, settlePendingRotations } from '$lib/camera-orientation';
   import { isConflict, needsStem } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
+  import { captureInstruction, instructionForVolume, type CaptureInstruction as Instruction } from '$lib/queue';
 
   import TopBar from './TopBar.svelte';
   import CameraControls from './CameraControls.svelte';
   import LiveViewport from './LiveViewport.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import ImageViewerModal from './ImageViewerModal.svelte';
+  import CaptureInstruction from './CaptureInstruction.svelte';
 
   let projectId = $derived(Number($page.url.searchParams.get('projectId')) || 0);
   let collectionId = $derived(Number($page.url.searchParams.get('collectionId')) || 0);
@@ -87,6 +94,13 @@
   // every capture into such a volume, so the viewport disables capture and
   // links to the volume's form, where an operator gives it one.
   let volumeNeedsStem = $state(false);
+
+  // The list item's notes and action. `listInstruction` is undefined until
+  // the lists arrive, and when they fail or no list has an item for this
+  // volume; the volume's custom_attributes are used then.
+  let listInstruction = $state<Instruction | null | undefined>(undefined);
+  let attributesInstruction = $state<Instruction | null>(null);
+  let instruction = $derived(listInstruction !== undefined ? listInstruction : attributesInstruction);
   let stemFormHref = $derived(projectId && collectionId
     ? `/dashboard/projects/${projectId}?editVolume=${collectionId}`
     : '');
@@ -122,8 +136,17 @@
       tasks.push(loadRecords());
       tasks.push(
         collectionsApi.get(collectionId)
-          .then(c => { collectionName = c.name; volumeNeedsStem = needsStem(c); })
+          .then(c => {
+            collectionName = c.name;
+            volumeNeedsStem = needsStem(c);
+            attributesInstruction = captureInstruction(c.custom_attributes);
+          })
           .catch(e => console.error('[LivePreview] Error loading volume:', e))
+      );
+      tasks.push(
+        importsApi.lists()
+          .then(lists => { listInstruction = instructionForVolume(lists, collectionId); })
+          .catch(e => console.error('[LivePreview] Error loading digitisation lists:', e))
       );
     }
 
@@ -275,6 +298,8 @@
     onBack={handleBack}
     onGoToReview={handleGoToReview}
   />
+
+  <CaptureInstruction {instruction} />
 
   <div class="content-area">
 

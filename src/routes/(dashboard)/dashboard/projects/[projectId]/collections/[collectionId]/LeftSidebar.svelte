@@ -13,14 +13,14 @@
   // Annotations are stored in the backend (`recordsApi.*Annotation*`), scoped to
   // the current record, and reloaded whenever the current record's id changes.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.2.0
 
   import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
   import { recordsApi, ApiError } from '$lib/api';
   import { m, locale } from '$lib/i18n';
   import { formatApiDate } from '$lib/format-date';
   import { formatCount } from '$lib/format-count';
-  import { REJECTION_REASONS } from '$lib/rejectionReasons';
+  import { REJECTION_REASONS, rejectionReasonText } from '$lib/rejectionReasons';
   import { REJECTION_COMMENT_MAX_LENGTH, isCommentTooLong, showsCommentCount } from '$lib/rejection-comment';
   import { dismissible } from '$lib/dialog';
 
@@ -83,31 +83,8 @@
   let isSavingAnnotation = $state(false);
 
   // Error types offered under "Mark error". The ids and colors live in
-  // `$lib/rejectionReasons`; only the translated labels are added here.
-  const ERROR_LABELS: { [id: string]: string } = $derived({
-    blur: $m.col_err_blurry,
-    glare: $m.col_err_glare,
-    shadow: $m.col_err_shadows,
-    focus: $m.col_err_focus,
-    exposure: $m.col_err_exposure,
-    dirt: $m.col_err_debris,
-    framing: $m.col_err_framing,
-    obstruction: $m.col_err_obstruction,
-    other: $m.col_err_other,
-  });
-  // The line shown beneath each reason where it is offered for choosing.
-  const ERROR_GLOSSES: { [id: string]: string } = $derived({
-    blur: $m.col_err_blurry_gloss,
-    glare: $m.col_err_glare_gloss,
-    shadow: $m.col_err_shadows_gloss,
-    focus: $m.col_err_focus_gloss,
-    exposure: $m.col_err_exposure_gloss,
-    dirt: $m.col_err_debris_gloss,
-    framing: $m.col_err_framing_gloss,
-    obstruction: $m.col_err_obstruction_gloss,
-    other: $m.col_err_other_gloss,
-  });
-  const ERROR_TYPES = $derived(REJECTION_REASONS.map(r => ({ ...r, label: ERROR_LABELS[r.id], gloss: ERROR_GLOSSES[r.id] })));
+  // `$lib/rejectionReasons`, with the translated labels and glosses.
+  const ERROR_TYPES = $derived(REJECTION_REASONS.map(r => ({ ...r, ...rejectionReasonText($m, r.id) })));
 
   // The effect below reloads the annotations whenever the active record
   // changes, so one record's annotations are never shown on another. It also

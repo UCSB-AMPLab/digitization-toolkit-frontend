@@ -2,7 +2,7 @@
 // `Messages` in `index.ts`): a missing or extra key here is a type error in
 // `npm run check`.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.0
 
 import type { Messages } from './index';
 
@@ -74,6 +74,10 @@ export const en: Messages = {
 	nav_settings: 'Settings',
 	nav_collapse_sidebar: 'Collapse sidebar',
 	nav_expand_sidebar: 'Expand sidebar',
+	nav_queue: 'Queue',
+	nav_retakes: 'To retake',
+	nav_retakes_count: (n: number) =>
+		n === 1 ? '1 record to retake' : `${formatCount(n, 'en')} records to retake`,
 	// ── First-run guided tour (NEH-95) ────────────────────────────────────────
 	nav_help: 'Help',
 	tour_aria: 'Guided tour',
@@ -1226,6 +1230,103 @@ export const en: Messages = {
 		n === 1 ? 'Captua could not write 1 file to the SD card.' : `Captua could not write ${formatCount(n, 'en')} files to the SD card.`,
 	offsite_reason_other: (n: number): string =>
 		n === 1 ? '1 file, for another reason.' : `${formatCount(n, 'en')} files, for other reasons.`,
+
+	// ── Cola: imported digitisation lists (0.2.0) ────────────────────────────
+	queue_title: 'Digitisation queue',
+	queue_subtitle: "The items of the imported digitisation lists, in the list's order.",
+	queue_import: 'Import list',
+	queue_importing: 'Importing…',
+	queue_import_file_label: 'Digitisation list file',
+	queue_list_label: 'List',
+	queue_list_option: (name: string, date: string) => `${name}, imported ${date}`,
+	queue_imported_at: (date: string) => `Imported ${date}`,
+	queue_empty: 'No lists have been imported yet. Import a digitisation list to see its items here in order.',
+	queue_list_file_missing:
+		"Captua has no copy of this list's file, so it cannot show the list's items. Import the file again to see them.",
+	queue_load_error: 'The queue could not be loaded.',
+	queue_filter_label: 'Action',
+	queue_filter_all: 'All',
+	queue_action_spot_recapture: 'Spot recapture',
+	queue_action_full_rescan: 'Full rescan',
+	queue_action_full_digitisation: 'Full digitisation',
+	queue_action_complete: 'Completion',
+	queue_next: 'Next',
+	queue_done: 'Done',
+	queue_no_volume: 'No volume on this unit',
+	queue_mark_done: 'Mark as done',
+	queue_unmark_done: 'Unmark',
+	queue_done_by: (who: string, date: string) => `Marked done by ${who} on ${date}`,
+	queue_done_by_who: (who: string) => `Marked done by ${who}`,
+	queue_done_on: (date: string) => `Marked done on ${date}`,
+	queue_done_marked: 'Marked done',
+	queue_done_approved: 'Every record is approved.',
+	queue_mark_error: "Captua could not change this item's mark.",
+	queue_next_hidden: 'The next item is hidden by the filter.',
+	queue_order_label: (n: number) => `Order ${formatCount(n, 'en')}`,
+	// Import report
+	queue_report_title: (name: string) => `List imported: ${name}`,
+	queue_report_created: (n: number) =>
+		n === 1 ? 'Captua created 1 volume.' : `Captua created ${formatCount(n, 'en')} volumes.`,
+	queue_report_skipped: (n: number) =>
+		n === 1 ? 'Captua skipped 1 item.' : `Captua skipped ${formatCount(n, 'en')} items.`,
+	queue_report_project_created: (name: string) => `Captua created the project ${name}.`,
+	queue_report_list_not_stored:
+		'Captua imported the list but could not keep a copy of the file, so the queue cannot show it.',
+	queue_report_item: (position: number, code: string | null) =>
+		code ? `Item ${formatCount(position, 'en')} (${code})` : `Item ${formatCount(position, 'en')}`,
+	// Why an item was skipped, one per reason code in app/core/list_import.py.
+	queue_reason_item_not_an_object: 'The item is not a JSON object.',
+	queue_reason_missing_reference_code: 'The item has no reference code.',
+	queue_reason_invalid_reference_code: 'The reference code is not text, or is too long.',
+	queue_reason_reference_code_padded: 'The reference code begins or ends with spaces.',
+	queue_reason_reference_code_duplicated_in_list: 'An earlier item in this list has the same reference code.',
+	queue_reason_missing_filename_stem: 'The item has no file name stem.',
+	queue_reason_filename_stem_not_a_slug:
+		'The file name stem may hold only lowercase letters a to z and digits, separated by single hyphens.',
+	queue_reason_filename_stem_too_long: 'The file name stem is too long.',
+	queue_reason_filename_stem_differs_from_reference_code: 'The file name stem is not the same as the reference code.',
+	queue_reason_filename_stem_duplicated_in_list: 'An earlier item in this list has the same file name stem.',
+	queue_reason_missing_title: 'The item has no title.',
+	queue_reason_invalid_title: 'The title is not text, or is too long.',
+	queue_reason_invalid_dates: 'The dates are not in the form YYYY-MM-DD.',
+	queue_reason_end_date_before_start: 'The end date is before the start date.',
+	queue_reason_invalid_sequence: 'The sequence is not a valid whole number.',
+	queue_reason_reference_code_on_unit: 'A volume with this reference code is already on this unit.',
+	queue_reason_filename_stem_on_unit: 'A volume with this file name stem is already on this unit.',
+	queue_reason_refused_by_database: 'The database refused the volume.',
+	queue_reason_filename_stem_is_project_directory: "The file name stem is the name of a project's folder on this unit.",
+	queue_reason_filename_stem_directory_occupied:
+		"A folder named as this file name stem already holds files on this unit, and Captua never merges two volumes' files.",
+	queue_reason_filename_stem_held_offsite:
+		'The offsite copy holds images under this file name stem, so Captua cannot give it to a new volume.',
+	queue_reason_unknown: (code: string) => `Captua did not create this volume (${code}).`,
+	// Why the whole file was refused, by the response's HTTP status.
+	queue_import_err_unreadable: 'Captua could not read the file.',
+	queue_import_err_needs_admin:
+		"No project has this list's name. If Captua imported the list, it would create one, and only an admin can do that.",
+	queue_import_err_list_reused:
+		'A list with this id was already imported from a different file, or Captua could not check the earlier import, so Captua did not import this one.',
+	queue_import_err_too_large: 'The file is larger than 10 MB.',
+	queue_import_err_refused: 'The file is not a digitisation list Captua can import.',
+	queue_import_err_busy: 'Captua could not import the list just now. Try again.',
+	queue_import_err_other: 'Captua could not import the list.',
+
+	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────
+	retakes_title: 'To retake',
+	retakes_subtitle: 'Records rejected in review, oldest rejection first.',
+	retakes_empty: 'Nothing is waiting to be retaken.',
+	retakes_load_error: 'The records to retake could not be loaded.',
+	retakes_retake: 'Retake',
+	retakes_sequence: (n: number) => `Sequence ${formatCount(n, 'en')}`,
+	retakes_rejected_by: (who: string, date: string) => `Rejected by ${who} on ${date}`,
+	retakes_rejected_on: (date: string) => `Rejected on ${date}`,
+	retakes_no_reason: 'No reason was recorded for this rejection.',
+	retakes_comment_label: 'Note',
+	retakes_no_volume: 'This record is in no volume.',
+	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
+	lv_instruction_label: 'From the list',
+	lv_instruction_show_all: 'Show all',
+	lv_instruction_show_less: 'Show less',
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
