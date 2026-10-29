@@ -12,7 +12,9 @@
   // volume or project has no button.
   //
   // A select above the list narrows it to one volume, client-side. The volume
-  // is kept in the query (?collectionId=), which the Cola page links to.
+  // is kept in the query (?collectionId=), which the Cola page links to. The
+  // select shows whenever the rows span two volumes or a volume is chosen, so
+  // a filter can always be cleared.
   // ============================================================================
   //
   // Version: 0.2.0
@@ -94,7 +96,7 @@
   {:else if rows.length === 0}
     <p class="empty">{$m.retakes_empty}</p>
   {:else}
-    {#if volumes.length > 1}
+    {#if volumes.length > 1 || volumeId !== null}
       <label class="filter">
         <span class="filter-label">{$m.retakes_filter_volume_label}</span>
         <select class="filter-select" value={volumeId === null ? '' : String(volumeId)} onchange={chooseVolume}>

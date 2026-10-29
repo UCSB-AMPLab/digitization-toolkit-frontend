@@ -255,5 +255,14 @@ describe('Por recapturar', () => {
 			await expect.element(screen.getByText('Tomo 6')).toBeVisible();
 			expect(screen.getByRole('combobox').elements()).toHaveLength(0);
 		});
+
+		it('keeps the select while a volume is chosen, even when the rows span one volume', async () => {
+			pageUrl.href = 'http://localhost/dashboard/retakes?collectionId=5';
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([toRetake[0]]);
+			const screen = render(Retakes);
+			const select = screen.getByRole('combobox', { name: 'Volumen' });
+			await expect.element(select).toBeVisible();
+			expect((select.element() as HTMLSelectElement).value).toBe('5');
+		});
 	});
 });

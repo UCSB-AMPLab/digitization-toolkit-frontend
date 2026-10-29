@@ -117,7 +117,7 @@
   );
 
   onMount(async () => {
-    await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers(), loadStages()]);
+    await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
     // ?editVolume=<id> opens that volume's form: the capture screen links
     // here when the volume has no stem yet.
     const editId = Number($page.url.searchParams.get('editVolume')) || 0;
@@ -209,7 +209,9 @@
   async function loadCollections() {
     try {
       isLoading = true;
-      const data = await collectionsApi.listAll({ project_id: projectId });
+      // The stages are reloaded with the list, so a volume created, or one
+      // that received records from a deleted volume, shows its current stage.
+      const [data] = await Promise.all([collectionsApi.listAll({ project_id: projectId }), loadStages()]);
       collections = data;
     } catch (err) {
       console.error('[ProjectDetail] Error loading collections:', err);
