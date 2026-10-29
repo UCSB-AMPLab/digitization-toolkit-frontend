@@ -64,7 +64,7 @@ const rionegro: QueueList = {
 		// Next: the first not done with a volume. In its own project.
 		item(4, { action: 'complete', notes: 'Desde el folio 49r hasta el final', projectId: 8 }),
 		// A full rescan of a volume whose old records are all approved: to do.
-		item(5, { action: 'full-rescan', notes: { folios: ['1r'] }, status: counts({ approved: 30 }), projectId: null })
+		item(5, { action: 'full-rescan', notes: null, status: counts({ approved: 30 }), projectId: null })
 	]
 };
 
@@ -127,13 +127,12 @@ describe('Cola', () => {
 		expect(el.scrollWidth).toBeLessThanOrEqual(el.clientWidth + 1);
 	});
 
-	it('shows notes only when the file gives a string', async () => {
+	it('shows no notes block for an item without notes', async () => {
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 		const screen = render(Queue);
 		const row5 = screen.getByRole('listitem').nth(4);
 		await expect.element(row5.getByText('Tomo 5')).toBeVisible();
 		expect(row5.element().querySelector('.q-notes')).toBeNull();
-		expect(row5.element().textContent).not.toContain('[object Object]');
 	});
 
 	it('marks the first item that is not done and has a volume as Siguiente, and the done items as done', async () => {
@@ -164,18 +163,29 @@ describe('Cola', () => {
 		for (const role of ['admin', 'reviewer'] as const) {
 			it(`lets the ${role} mark an item done and take a mark off`, async () => {
 				signIn(role);
-				const lists = vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
-				const setDone = vi.spyOn(importsApi, 'setDone').mockResolvedValue(undefined);
+				const lists = vi.spyOn(importsApi, 'lists').mockResolvedValue([structuredClone(rionegro)]);
+				const setDone = vi
+					.spyOn(importsApi, 'setDone')
+					.mockResolvedValueOnce({ by: role, at: '2026-10-28T15:00:00' })
+					.mockResolvedValueOnce(null);
 				const screen = render(Queue);
 				const rows = screen.getByRole('listitem');
 
+				// The mark the PUT returns goes into the item; the lists are not read again.
 				await rows.nth(3).getByRole('button', { name: 'Marcar como hecho' }).click();
 				expect(setDone).toHaveBeenCalledWith(rionegro.listId, 4, true);
-				await expect.poll(() => lists.mock.calls.length).toBe(2);
+				await expect.element(rows.nth(3).getByText(new RegExp(`^Marcado como hecho por ${role} el `))).toBeVisible();
+				await expect.element(rows.nth(3).getByText('Hecho', { exact: true })).toBeVisible();
+				// Siguiente moves on to the next item not done.
+				await expect.element(rows.nth(4).getByText('Siguiente')).toBeVisible();
 
 				await rows.nth(1).getByRole('button', { name: 'Desmarcar' }).click();
 				expect(setDone).toHaveBeenCalledWith(rionegro.listId, 2, false);
-				await expect.poll(() => lists.mock.calls.length).toBe(3);
+				await expect.element(rows.nth(1).getByRole('button', { name: 'Marcar como hecho' })).toBeVisible();
+				await expect.element(rows.nth(1).getByText('Hecho', { exact: true })).not.toBeInTheDocument();
+				// Item 2, a spot recapture no longer marked, is the first not done again.
+				await expect.element(rows.nth(1).getByText('Siguiente')).toBeVisible();
+				expect(lists.mock.calls.length).toBe(1);
 			});
 		}
 
@@ -208,7 +218,18 @@ describe('Cola', () => {
 			vi.spyOn(importsApi, 'setDone').mockRejectedValue(new ApiError('boom', undefined, 500));
 			const screen = render(Queue);
 			await screen.getByRole('listitem').nth(3).getByRole('button', { name: 'Marcar como hecho' }).click();
-			await expect.element(screen.getByRole('alert')).toHaveTextContent('Captua no pudo cambiar la marca de este elemento.');
+			await expect.element(screen.getByRole('alert')).toHaveTextContent('Captua no pudo guardar el cambio en este elemento.');
+		});
+
+		it('asks to try again when the unit is busy (503)', async () => {
+			signIn('admin');
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			vi.spyOn(importsApi, 'setDone').mockRejectedValue(new ApiError('busy', undefined, 503));
+			const screen = render(Queue);
+			await screen.getByRole('listitem').nth(3).getByRole('button', { name: 'Marcar como hecho' }).click();
+			await expect
+				.element(screen.getByRole('alert'))
+				.toHaveTextContent('Captua no pudo guardar el cambio en este momento. Intenta de nuevo.');
 		});
 	});
 
@@ -264,10 +285,10 @@ describe('Cola', () => {
 		const titles = () => screen.getByRole('listitem').elements().map((r) => r.querySelector('.q-title')?.textContent?.trim());
 		await expect.poll(titles).toEqual(['Tomo 5']);
 		// The next item (4, a completion) is not in this filter.
-		await expect.element(screen.getByText('El siguiente elemento no está en este filtro.')).toBeVisible();
+		await expect.element(screen.getByText('El siguiente elemento no aparece con este filtro.')).toBeVisible();
 
 		await group.getByRole('button', { name: 'Completar digitalización' }).click();
-		await expect.element(screen.getByText('El siguiente elemento no está en este filtro.')).not.toBeInTheDocument();
+		await expect.element(screen.getByText('El siguiente elemento no aparece con este filtro.')).not.toBeInTheDocument();
 
 		await group.getByRole('button', { name: 'Todas' }).click();
 		await expect.poll(titles).toEqual(['Tomo 1', 'Tomo 2', 'Tomo sin volumen', 'Tomo 4', 'Tomo 5']);
@@ -299,6 +320,50 @@ describe('Cola', () => {
 		await expect
 			.element(none.getByText('Todavía no hay listas importadas. Importa una lista de digitalización para ver aquí sus elementos en orden.'))
 			.toBeVisible();
+	});
+
+	it('keeps a newer answer when an older one arrives late', async () => {
+		const stale: QueueList = { ...rionegro, items: [item(1, { title: 'Respuesta vieja' })] };
+		let resolveFirst!: (v: QueueList[]) => void;
+		const lists = vi
+			.spyOn(importsApi, 'lists')
+			.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)))
+			.mockResolvedValue([rionegro]);
+		vi.spyOn(importsApi, 'importList').mockResolvedValue({
+			listId: rionegro.listId, listName: 'Rionegro 2026', projectId: 7, projectName: 'Rionegro 2026',
+			projectCreated: false, importedAt: '2026-10-28T10:00:00Z', created: 5, skipped: 0, volumes: [],
+			rejects: [], reportStored: true, listStored: true
+		});
+		const screen = render(Queue);
+		const input = screen.container.querySelector('input[type="file"]') as HTMLInputElement;
+		await userEvent.upload(input, new File(['{}'], 'r.json', { type: 'application/json' }));
+		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
+		expect(lists.mock.calls.length).toBe(2);
+
+		resolveFirst([stale]);
+		await new Promise((r) => setTimeout(r, 50));
+		await expect.element(screen.getByText('Respuesta vieja')).not.toBeInTheDocument();
+		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
+	});
+
+	it('keeps the list on screen with a small notice when a later reload fails', async () => {
+		vi.spyOn(importsApi, 'lists')
+			.mockResolvedValueOnce([rionegro])
+			.mockRejectedValue(new ApiError('boom', undefined, 500));
+		vi.spyOn(importsApi, 'importList').mockResolvedValue({
+			listId: rionegro.listId, listName: 'Rionegro 2026', projectId: 7, projectName: 'Rionegro 2026',
+			projectCreated: false, importedAt: '2026-10-28T10:00:00Z', created: 0, skipped: 0, volumes: [],
+			rejects: [], reportStored: true, listStored: true
+		});
+		const screen = render(Queue);
+		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
+		const input = screen.container.querySelector('input[type="file"]') as HTMLInputElement;
+		await userEvent.upload(input, new File(['{}'], 'r.json', { type: 'application/json' }));
+		await expect
+			.element(screen.getByText('No se pudo actualizar la cola; puede que lo que ves no esté al día.'))
+			.toBeVisible();
+		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
+		await expect.element(screen.getByText('No se pudo cargar la cola.')).not.toBeInTheDocument();
 	});
 
 	it('says when the lists cannot be loaded', async () => {
@@ -398,7 +463,7 @@ describe('Cola', () => {
 		const refusals: [number, string][] = [
 			[400, 'Captua no pudo leer el archivo.'],
 			[403, 'No hay un proyecto con el nombre de esta lista. Al importarla, Captua crearía uno, y solo un administrador puede hacerlo.'],
-			[409, 'Ya se importó una lista con este identificador desde un archivo distinto, o Captua no pudo revisar la importación anterior, así que no importó esta.'],
+			[409, 'Captua no importó esta lista: ya se importó otra con el mismo identificador desde un archivo distinto, o Captua no pudo comprobar la importación anterior.'],
 			[413, 'El archivo pesa más de 10 MB.'],
 			[422, 'El archivo no es una lista de digitalización que Captua pueda importar.'],
 			[503, 'Captua no pudo importar la lista en este momento. Intenta de nuevo.'],

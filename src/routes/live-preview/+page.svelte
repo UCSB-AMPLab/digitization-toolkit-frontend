@@ -143,11 +143,11 @@
           })
           .catch(e => console.error('[LivePreview] Error loading volume:', e))
       );
-      tasks.push(
-        importsApi.lists()
-          .then(lists => { listInstruction = instructionForVolume(lists, collectionId); })
-          .catch(e => console.error('[LivePreview] Error loading digitisation lists:', e))
-      );
+      // Not one of `tasks`: the band can arrive late, and the retake modal
+      // below (NEH-209) must never wait for the lists.
+      importsApi.lists()
+        .then(lists => { listInstruction = instructionForVolume(lists, collectionId); })
+        .catch(e => console.error('[LivePreview] Error loading digitisation lists:', e));
     }
 
     await Promise.all(tasks);

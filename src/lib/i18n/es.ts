@@ -1306,8 +1306,10 @@ export const es = {
 	queue_done_on: (date: string) => `Marcado como hecho el ${date}`,
 	queue_done_marked: 'Marcado como hecho',
 	queue_done_approved: 'Todos los registros están aprobados.',
-	queue_mark_error: 'Captua no pudo cambiar la marca de este elemento.',
-	queue_next_hidden: 'El siguiente elemento no está en este filtro.',
+	queue_mark_error: 'Captua no pudo guardar el cambio en este elemento.',
+	queue_mark_error_busy: 'Captua no pudo guardar el cambio en este momento. Intenta de nuevo.',
+	queue_refresh_error: 'No se pudo actualizar la cola; puede que lo que ves no esté al día.',
+	queue_next_hidden: 'El siguiente elemento no aparece con este filtro.',
 	queue_order_label: (n: number) => `Orden ${formatCount(n, 'es')}`,
 	// Import report
 	queue_report_title: (name: string) => `Lista importada: ${name}`,
@@ -1351,7 +1353,7 @@ export const es = {
 	queue_import_err_needs_admin:
 		'No hay un proyecto con el nombre de esta lista. Al importarla, Captua crearía uno, y solo un administrador puede hacerlo.',
 	queue_import_err_list_reused:
-		'Ya se importó una lista con este identificador desde un archivo distinto, o Captua no pudo revisar la importación anterior, así que no importó esta.',
+		'Captua no importó esta lista: ya se importó otra con el mismo identificador desde un archivo distinto, o Captua no pudo comprobar la importación anterior.',
 	queue_import_err_too_large: 'El archivo pesa más de 10 MB.',
 	queue_import_err_refused: 'El archivo no es una lista de digitalización que Captua pueda importar.',
 	queue_import_err_busy: 'Captua no pudo importar la lista en este momento. Intenta de nuevo.',
@@ -1371,8 +1373,8 @@ export const es = {
 	retakes_no_volume: 'Este registro no está en ningún volumen.',
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
 	lv_instruction_label: 'Instrucción de la lista',
-	lv_instruction_show_all: 'Ver todo',
-	lv_instruction_show_less: 'Ver menos',
+	lv_instruction_show_all: 'Mostrar todo',
+	lv_instruction_show_less: 'Mostrar menos',
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',

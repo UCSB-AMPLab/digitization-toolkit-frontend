@@ -8,9 +8,10 @@
   //
   // Collapsed, the notes show at most two lines and the band stays under
   // 15vh, so on the 800x480 kiosk the preview keeps nearly all its room.
-  // When the notes run longer, "Ver todo" opens the whole text (scrolling
-  // inside the band past half the screen) and "Ver menos" closes it again;
-  // the operator chooses when to give up preview height. Without an
+  // When the notes run longer, "Mostrar todo" opens the whole text and
+  // "Mostrar menos" closes it again. Open, the band scrolls inside a cap
+  // that leaves the top bar, a minimum preview height, the capture button
+  // and the thumbnail strip on screen (--ci-expanded-max). Without an
   // instruction, nothing is drawn.
   //
   // Version: 0.2.0
@@ -87,8 +88,15 @@
     border-bottom: 1px solid var(--border-color);
     border-left: 4px solid var(--color-highlight);
   }
+  /* Open, the band takes what the rest of the screen can spare: the full
+     height less the top bar (72px, TopBar.svelte), the thumbnail strip
+     (140px, .thumbnail-area in app.css) and a minimum preview of 150px,
+     which holds the capture button (60px, 24px off the viewport's bottom
+     edge, inside 16px of padding) with room above it. At 800x480 that is
+     118px; never less than the collapsed 15vh. */
   .capture-instruction.expanded {
-    max-height: 50vh;
+    --ci-expanded-max: max(15vh, calc(100vh - 72px - 140px - 150px));
+    max-height: var(--ci-expanded-max);
     overflow-y: auto;
   }
 

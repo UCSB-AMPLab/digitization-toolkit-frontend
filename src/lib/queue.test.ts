@@ -211,8 +211,8 @@ describe('instructionForVolume', () => {
 		expect(instructionForVolume([list('a', [item(1, { collectionId: 9 })])], 9)).toBeNull();
 	});
 
-	it('shows only notes that are text', () => {
-		const lists = [list('a', [item(1, { collectionId: 9, notes: { folios: ['1r'] }, action: 'complete' })])];
+	it('treats blank notes as none', () => {
+		const lists = [list('a', [item(1, { collectionId: 9, notes: '   ', action: 'complete' })])];
 		expect(instructionForVolume(lists, 9)).toEqual({ notes: null, action: 'complete' });
 	});
 

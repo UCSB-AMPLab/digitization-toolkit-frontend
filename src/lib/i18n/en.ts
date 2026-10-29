@@ -1261,6 +1261,8 @@ export const en: Messages = {
 	queue_done_marked: 'Marked done',
 	queue_done_approved: 'Every record is approved.',
 	queue_mark_error: "Captua could not change this item's mark.",
+	queue_mark_error_busy: 'Captua could not save the change just now. Try again.',
+	queue_refresh_error: 'The queue could not be refreshed; what you see may be out of date.',
 	queue_next_hidden: 'The next item is hidden by the filter.',
 	queue_order_label: (n: number) => `Order ${formatCount(n, 'en')}`,
 	// Import report

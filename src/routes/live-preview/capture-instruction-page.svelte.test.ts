@@ -2,16 +2,28 @@
 // reads the stored lists and shows the item of the newest list whose volume
 // is the open one; with no such item it falls back to the notes the import
 // kept in the volume's custom_attributes; and it shows nothing when there
-// is neither. Every request is answered by a fetch mock keyed on the path.
+// is neither. Opened at 800x480, the band leaves the capture button and the
+// thumbnail strip on screen and clickable. The lists never hold up the
+// retake modal of a record opened from Book view (NEH-209). Every request
+// is answered by a fetch mock keyed on the path.
 //
 // Version: 0.2.0
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { readable } from 'svelte/store';
+import { page as browserPage } from 'vitest/browser';
+
+// The address the page reads; a test may add a recordId.
+const current = vi.hoisted(() => ({ url: '' }));
+const BASE_URL = 'http://localhost/live-preview?projectId=2&collectionId=9';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/stores', () => ({
-	page: readable({ url: new URL('http://localhost/live-preview?projectId=2&collectionId=9') })
+	page: {
+		subscribe(run: (value: { url: URL }) => void) {
+			run({ url: new URL(current.url) });
+			return () => {};
+		}
+	}
 }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -46,17 +58,31 @@ function json(body: unknown, status = 200) {
 	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-// The volume carries `attributes`; the lists endpoint answers `lists`, or
-// fails when `lists` is null.
-function serve(attributes: string | null, lists: QueueList[] | null) {
+const LONG = Array.from({ length: 300 }, (_, i) => `${100 + i}r, ${99 + i}v`).join('; ');
+
+const rejectedRecord = {
+	id: 41,
+	title: '2026-10-20T09:15:00',
+	status: 'rejected',
+	capture_mode: 'single',
+	collection_id: 9,
+	images: []
+};
+
+// The volume carries `attributes`; the lists endpoint answers `lists`,
+// fails when `lists` is null, and never answers when it is 'pending'.
+function serve(attributes: string | null, lists: QueueList[] | null | 'pending') {
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
-		if (path.endsWith('/imports/digitisation-lists')) return lists ? json(lists) : json({ detail: 'boom' }, 500);
+		if (path.endsWith('/imports/digitisation-lists')) {
+			if (lists === 'pending') return new Promise<Response>(() => {});
+			return lists ? json(lists) : json({ detail: 'boom' }, 500);
+		}
 		if (path.endsWith('/collections/9')) {
 			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: attributes });
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
-		if (path.endsWith('/records')) return json([]);
+		if (path.endsWith('/records')) return json([rejectedRecord]);
 		if (path.includes('/cameras/capabilities')) return json({});
 		return json([]);
 	});
@@ -65,6 +91,10 @@ function serve(attributes: string | null, lists: QueueList[] | null) {
 function signInAdmin() {
 	authStore.setSession('tok', { id: 1, username: 'admin', email: null, role: 'admin', is_active: true });
 }
+
+beforeEach(() => {
+	current.url = BASE_URL;
+});
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -117,5 +147,39 @@ describe('capture page instruction', () => {
 		const screen = render(LivePreview);
 		await expect.element(screen.getByText('Tomo 6')).toBeVisible();
 		expect(screen.container.querySelector('[role="note"]')).toBeNull();
+	});
+
+	it('opened at 800x480, leaves the capture button clickable and the thumbnail strip on screen', async () => {
+		locale.set('es');
+		signInAdmin();
+		await browserPage.viewport(800, 480);
+		serve(null, [list('new', [item(2, 9, { notes: LONG, action: 'spot-recapture' })])]);
+		const screen = render(LivePreview);
+		const toggle = screen.getByRole('button', { name: 'Mostrar todo' });
+		await expect.element(toggle).toBeVisible();
+		await toggle.click();
+		await expect.element(screen.getByRole('button', { name: 'Mostrar menos' })).toBeVisible();
+
+		const capture = screen.getByRole('button', { name: 'Capturar' }).element() as HTMLElement;
+		const box = capture.getBoundingClientRect();
+		const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+		expect(hit && capture.contains(hit)).toBe(true);
+
+		const thumbs = screen.container.querySelector('.thumbnail-area')!.getBoundingClientRect();
+		expect(thumbs.bottom).toBeLessThanOrEqual(480 + 0.5);
+		expect(thumbs.height).toBeGreaterThanOrEqual(139);
+
+		// The band, open, scrolls inside its cap rather than growing past it.
+		const band = screen.getByRole('note').element() as HTMLElement;
+		expect(band.scrollHeight).toBeGreaterThan(band.clientHeight);
+	});
+
+	it('opens the retake modal for a recordId without waiting for the lists', async () => {
+		locale.set('es');
+		signInAdmin();
+		current.url = `${BASE_URL}&recordId=41`;
+		serve(null, 'pending');
+		const screen = render(LivePreview);
+		await expect.element(screen.getByRole('dialog')).toBeVisible();
 	});
 });

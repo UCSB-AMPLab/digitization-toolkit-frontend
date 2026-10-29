@@ -1,8 +1,8 @@
 // The capture instruction band: the list item's notes, labelled with its
 // action, in the page flow above the capture screen. Collapsed it shows at
 // most two lines and stays under 15% of the screen height, so the preview
-// keeps its room on the 800x480 kiosk; "Ver todo" opens the whole text and
-// "Ver menos" closes it. Without an instruction, nothing is drawn.
+// keeps its room on the 800x480 kiosk; "Mostrar todo" opens the whole text and
+// "Mostrar menos" closes it. Without an instruction, nothing is drawn.
 //
 // Version: 0.2.0
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -26,7 +26,7 @@ describe('CaptureInstruction', () => {
 		await expect.element(band).toBeVisible();
 		await expect.element(band.getByText('117r, 116v; 193r, 192v')).toBeVisible();
 		// Short notes need no toggle.
-		await expect.element(screen.getByRole('button', { name: 'Ver todo' })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Mostrar todo' })).not.toBeInTheDocument();
 	});
 
 	it('uses a general label when the item has no action, and shows an unknown action as given', async () => {
@@ -45,10 +45,10 @@ describe('CaptureInstruction', () => {
 		expect(band.element().querySelector('.ci-notes')).toBeNull();
 	});
 
-	it('collapsed, keeps long notes to two lines and under 15vh, with Ver todo to open them', async () => {
+	it('collapsed, keeps long notes to two lines and under 15vh, with Mostrar todo to open them', async () => {
 		const screen = render(CaptureInstruction, { instruction: { notes: LONG, action: 'spot-recapture' } });
 		const band = screen.getByRole('note').element() as HTMLElement;
-		const toggle = screen.getByRole('button', { name: 'Ver todo' });
+		const toggle = screen.getByRole('button', { name: 'Mostrar todo' });
 		await expect.element(toggle).toBeVisible();
 		await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
 
@@ -59,12 +59,12 @@ describe('CaptureInstruction', () => {
 		expect(getComputedStyle(notes).whiteSpace).not.toBe('nowrap');
 
 		await toggle.click();
-		const close = screen.getByRole('button', { name: 'Ver menos' });
+		const close = screen.getByRole('button', { name: 'Mostrar menos' });
 		await expect.element(close).toHaveAttribute('aria-expanded', 'true');
 		expect(notes.getBoundingClientRect().height).toBeGreaterThan(lineHeight * 2 + 1);
 
 		await close.click();
-		await expect.element(screen.getByRole('button', { name: 'Ver todo' })).toBeVisible();
+		await expect.element(screen.getByRole('button', { name: 'Mostrar todo' })).toBeVisible();
 		expect(band.getBoundingClientRect().height).toBeLessThanOrEqual(480 * 0.15 + 1);
 	});
 

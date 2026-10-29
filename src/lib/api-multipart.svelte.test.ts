@@ -45,11 +45,12 @@ describe('apiRequest with a FormData body', () => {
 		expect(await sent.text()).toBe('{"contract":"fisqua-captua-exchange"}');
 	});
 
-	it('leaves a JSON request with its Content-Type', async () => {
+	it('leaves a JSON request with its Content-Type, and setDone returns the new mark', async () => {
 		authStore.setSession('tok-9', { id: 1, username: 'rev', email: null, role: 'reviewer', is_active: true });
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+		const mark = { by: 'rev', at: '2026-10-28T12:00:00' };
+		const fetchSpy = respondJson({ doneMark: mark });
 
-		await importsApi.setDone('0b9c1d5e-0000-4000-8000-000000000001', 3, true);
+		expect(await importsApi.setDone('0b9c1d5e-0000-4000-8000-000000000001', 3, true)).toEqual(mark);
 
 		const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
 		expect(url.endsWith('/imports/digitisation-lists/0b9c1d5e-0000-4000-8000-000000000001/items/3/done')).toBe(true);

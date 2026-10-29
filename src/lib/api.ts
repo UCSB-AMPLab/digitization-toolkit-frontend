@@ -1620,7 +1620,7 @@ export interface RecordToRetake {
 // the item's optional action field, unvalidated; `collectionId` the volume
 // on this unit whose stem is the item's, null when there is none, and
 // `status` that volume's record counts, null without a volume. `notes` is
-// whatever JSON value the file holds, so only a string is shown.
+// the item's notes, or null when it has none.
 // `projectId` is the volume's own project. `doneMark` is set when an admin
 // or reviewer marked the item done by hand, with who and when.
 export interface QueueDoneMark {
@@ -1634,7 +1634,7 @@ export interface QueueItem {
   referenceCode: string | null;
   filenameStem:  string | null;
   title:         string | null;
-  notes:         unknown;
+  notes:         string | null;
   action:        string | null;
   collectionId:  number | null;
   projectId:     number | null;
@@ -1699,13 +1699,15 @@ export const importsApi = {
 
   /**
    * Mark a list item done by hand, or take the mark off (admin or reviewer;
-   * an operator gets a 403).
+   * an operator gets a 403). Returns the item's mark as the backend now
+   * holds it: null once taken off.
    */
-  async setDone(listId: string, position: number, done: boolean): Promise<void> {
-    await apiRequest(
+  async setDone(listId: string, position: number, done: boolean): Promise<QueueDoneMark | null> {
+    const result = await apiRequest<{ doneMark: QueueDoneMark | null }>(
       `/imports/digitisation-lists/${encodeURIComponent(listId)}/items/${position}/done`,
       { method: 'PUT', body: JSON.stringify({ done }) }
     );
+    return result?.doneMark ?? null;
   },
 };
 

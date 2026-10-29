@@ -8,7 +8,8 @@
   // the page shows one at a time, with a picker when there are several. The
   // next item and the done ones are decided in $lib/queue; an admin or a
   // reviewer can also mark an item done by hand, or take the mark off
-  // (PUT .../items/{position}/done). Importing a list
+  // (PUT .../items/{position}/done), and the mark the backend returns goes
+  // straight into the item. Importing a list
   // posts the picked file to POST /imports/digitisation-list and shows the
   // report: what was created, and each skipped item with its reason, an item
   // already on the unit apart from the errors.
@@ -40,21 +41,32 @@
   // Lists
   // ---------------------------------------------------------------------------
   let lists = $state<QueueList[] | null>(null);
+  // The first load failed: nothing to show.
   let loadError = $state(false);
+  // A later reload failed: the lists already on screen stay, with a notice.
+  let refreshError = $state(false);
+  // Each load takes a number; only the latest one's answer is kept, so an
+  // older answer arriving late cannot overwrite a newer one.
+  let loadSequence = 0;
   let selectedListId = $state<string | null>(null);
 
   async function loadLists(select?: string) {
+    const sequence = ++loadSequence;
     try {
       const data = await importsApi.lists();
+      if (sequence !== loadSequence) return;
       lists = data;
       loadError = false;
+      refreshError = false;
       if (select && data.some(l => l.listId === select)) selectedListId = select;
       else if (!data.some(l => l.listId === selectedListId)) selectedListId = data[0]?.listId ?? null;
     } catch (err) {
       // A 401 is a dead session: apiRequest already sends the user to /login.
+      if (sequence !== loadSequence) return;
       if (err instanceof AuthError && err.status === 401) return;
       console.error('[Queue] Error loading lists:', err);
-      loadError = true;
+      if (lists === null) loadError = true;
+      else refreshError = true;
     }
   }
 
@@ -100,15 +112,18 @@
 
   async function setDone(item: QueueItem, done: boolean) {
     if (!list) return;
+    const listId = list.listId;
     markingPosition = item.position;
     markError = null;
     try {
-      await importsApi.setDone(list.listId, item.position, done);
-      await loadLists();
+      const doneMark = await importsApi.setDone(listId, item.position, done);
+      const target = lists?.find(l => l.listId === listId)?.items.find(i => i.position === item.position);
+      if (target) target.doneMark = doneMark;
     } catch (err) {
       if (err instanceof AuthError && err.status === 401) return;
       console.error('[Queue] Error changing the done mark:', err);
-      markError = $m.queue_mark_error;
+      const status = err instanceof ApiError ? err.status : undefined;
+      markError = status === 503 ? $m.queue_mark_error_busy : $m.queue_mark_error;
     } finally {
       markingPosition = null;
     }
@@ -259,6 +274,9 @@
 
   {#if markError}
     <p class="notice is-error" role="alert">{markError}</p>
+  {/if}
+  {#if refreshError}
+    <p class="notice is-error" role="status">{$m.queue_refresh_error}</p>
   {/if}
 
   {#if loadError}
