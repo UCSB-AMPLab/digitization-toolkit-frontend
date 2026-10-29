@@ -4,9 +4,13 @@
   // page owns the records and the view state shared by its child views; the
   // top bar (breadcrumb, camera button) is in +layout@.svelte, and the page
   // puts its hand-over controls there through the volume top bar slot.
-  // While any record is rejected (0.2.0), a sand band above the views says
-  // how many page pairs wait for a retake and opens the capture screen on
-  // the first of them by sequence.
+  // While any record is pending a retake (0.2.0), a sand band above the
+  // views says how many page pairs wait and opens the capture screen on the
+  // first of them. Pending is the backend's: rejected, or captured with a
+  // current image that still carries its rejection (prepared for retake).
+  // The records do not show the second, so the count and the first record
+  // come from GET /records/to-retake/summary, read with every load of the
+  // records; without it, the rejected records are counted.
   //
   // Version: 0.2.0
 
@@ -14,7 +18,8 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { recordsApi, collectionsApi, ApiError, type Record } from '$lib/api';
+  import { recordsApi, collectionsApi, ApiError, type Record, type RetakeSummaryVolume } from '$lib/api';
+  import { readRetakeSummary } from '$lib/recapture-turn';
   import { m, locale } from '$lib/i18n';
   import { formatCount } from '$lib/format-count';
   import JSZip from 'jszip';
@@ -95,8 +100,24 @@
   // change can report it if not. With `inPlace` (NEH-248: what is freed in
   // the volume changed) the view skips the loading state and the selected
   // record is kept if it is still in the volume.
+  // This volume's entry in the recapture summary: undefined until the
+  // summary arrives, and when it cannot be loaded; null when it lists
+  // nothing pending for the volume.
+  let retakeEntry = $state<RetakeSummaryVolume | null | undefined>(undefined);
+
+  async function loadRetakeEntry(forId: number) {
+    try {
+      const summary = readRetakeSummary(await recordsApi.toRetakeSummary());
+      if (forId !== collectionId) return;
+      retakeEntry = summary ? (summary.volumes.find(v => v.collectionId === forId) ?? null) : undefined;
+    } catch (err) {
+      console.error('[Gallery] Error loading the recapture summary:', err);
+    }
+  }
+
   async function loadRecords({ inPlace = false }: { inPlace?: boolean } = {}): Promise<boolean> {
     const forId = collectionId;
+    loadRetakeEntry(forId);
     const seq = ++loadSeq;
     requestedFor = forId;
     try {
@@ -356,11 +377,14 @@
     }
   }
 
-  // The volume's rejected records, the lowest sequence first: the band
-  // counts them and its button opens the first.
+  // The volume's rejected records, the lowest sequence first, and what is
+  // pending: the summary's count and first record when it has them, the
+  // rejected records otherwise. Never fewer than the rejected on screen.
   let rejectedRecords = $derived(
     records.filter(r => r.status === 'rejected').sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
   );
+  let pendingCount = $derived(Math.max(retakeEntry?.pending ?? 0, rejectedRecords.length));
+  let firstPendingId = $derived(retakeEntry?.firstPendingRecordId ?? rejectedRecords[0]?.id ?? null);
 
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
@@ -390,20 +414,20 @@
 {#snippet handoverActions()}
   <!-- Keyed so a dialog open on one volume does not survive into another. -->
   {#key collectionId}
-    <HandoverControls {records} {collectionId} onChanged={loadRecords} />
+    <HandoverControls {records} {collectionId} pending={pendingCount} onChanged={loadRecords} />
   {/key}
 {/snippet}
 
 <div class="gallery-wrapper">
 
-  {#if rejectedRecords.length > 0}
+  {#if pendingCount > 0 && firstPendingId !== null}
     <section class="retake-band" aria-labelledby="retake-band-title">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="retake-band-icon">
         <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" />
       </svg>
-      <h2 id="retake-band-title" class="retake-band-title">{$m.vol_band_title(rejectedRecords.length)}</h2>
+      <h2 id="retake-band-title" class="retake-band-title">{$m.vol_band_title(pendingCount)}</h2>
       {#if canHandOver}
-        <a class="btn btn-recapture retake-band-cta" href={retakeUrl(projectId, collectionId, rejectedRecords[0].id)}>{$m.vol_band_cta}</a>
+        <a class="btn btn-recapture retake-band-cta" href={retakeUrl(projectId, collectionId, firstPendingId)}>{$m.vol_band_cta}</a>
       {/if}
     </section>
   {/if}

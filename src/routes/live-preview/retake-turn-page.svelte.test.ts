@@ -76,6 +76,10 @@ function queueItem(position: number, collectionId: number): QueueItem {
 // The state the fetch mock serves; each test sets it.
 const served = {
 	records: [] as Rec[],
+	// When set, the next GET of the records answers through it, once.
+	nextRecords: null as null | (() => Promise<Response>),
+	// The captures that were not retakes (no record_id).
+	plainCaptures: 0,
 	summaries: [] as RetakeSummary[],
 	lists: [] as QueueList[],
 	comments: new Map<number, string>()
@@ -100,9 +104,17 @@ function serve() {
 			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
-		if (path.endsWith('/records')) return json(served.records.map((r) => ({ ...r })));
+		if (path.endsWith('/records')) {
+			const once = served.nextRecords;
+			if (once) {
+				served.nextRecords = null;
+				return once();
+			}
+			return json(served.records.map((r) => ({ ...r })));
+		}
 		if (path.endsWith('/cameras/capture')) {
 			const body = JSON.parse(String(init?.body ?? '{}')) as { record_id?: number };
+			if (body.record_id == null) served.plainCaptures++;
 			const target = served.records.find((r) => r.id === body.record_id);
 			if (target) target.status = 'captured';
 			return json({ success: true, record_id: body.record_id });
@@ -119,6 +131,8 @@ beforeEach(() => {
 	locale.set('es');
 	current.url = BASE_URL;
 	served.records = [];
+	served.nextRecords = null;
+	served.plainCaptures = 0;
 	served.summaries = [summary('free')];
 	served.lists = [];
 	served.comments = new Map();
@@ -292,6 +306,105 @@ describe('capture screen: the guided retake', () => {
 		await dialog.getByRole('button', { name: 'Saltar por ahora' }).click();
 		await expect.element(screen.getByRole('dialog').getByText('Recaptura 1 de 1 · Tomo 6')).toBeVisible();
 		await expect.element(screen.getByText('Terminaste las recapturas', { exact: false })).not.toBeInTheDocument();
+	});
+
+	it('keeps capture blocked while the records reload after a retake, until the next record is open', async () => {
+		signIn('operator');
+		served.records = [rec(41, 1, 'rejected'), rec(42, 2, 'rejected')];
+		current.url = `${BASE_URL}&recordId=41`;
+		serve();
+		const screen = render(LivePreview);
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Par 1')).toBeVisible();
+
+		// The reload after the retake is held open.
+		let release: () => void = () => {};
+		served.nextRecords = () =>
+			new Promise<Response>((resolve) => (release = () => resolve(json(served.records.map((r) => ({ ...r }))))));
+		await retakeCurrent(screen);
+		await expect.poll(() => served.records[0].status).toBe('captured');
+
+		// The capture key during the reload starts nothing.
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+		await new Promise((r) => setTimeout(r, 200));
+		expect(served.plainCaptures).toBe(0);
+
+		release();
+		await expect.element(screen.getByRole('dialog').getByText('Par 2')).toBeVisible();
+		expect(served.plainCaptures).toBe(0);
+
+		// Once the guide is closed the key captures again, so the check above means something.
+		await screen.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).first().click();
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+		await expect.poll(() => served.plainCaptures).toBe(1);
+	});
+
+	it('pauses on a failed reload after a retake, with a retry, and never reopens the record just retaken', async () => {
+		signIn('operator');
+		served.records = [rec(41, 1, 'rejected'), rec(42, 2, 'rejected')];
+		current.url = `${BASE_URL}&recordId=41`;
+		serve();
+		const screen = render(LivePreview);
+		await expect.element(screen.getByRole('dialog').getByText('Par 1')).toBeVisible();
+
+		served.nextRecords = async () => json({ detail: 'boom' }, 500);
+		await retakeCurrent(screen);
+		const paused = screen.getByRole('alert').filter({ hasText: 'No se pudo cargar la lista de registros por recapturar.' });
+		await expect.element(paused).toBeVisible();
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		// No capture controls while paused.
+		await expect.element(screen.getByRole('button', { name: 'Capturar', exact: true })).not.toBeInTheDocument();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+
+		await screen.getByRole('button', { name: 'Reintentar' }).click();
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Par 2')).toBeVisible();
+		await expect.element(dialog.getByText('Recaptura 2 de 2 · Tomo 6')).toBeVisible();
+		await expect.element(dialog.getByText('Par 1')).not.toBeInTheDocument();
+		expect(served.plainCaptures).toBe(0);
+	});
+
+	it('counts a record prepared for retake as still to retake, as the summary says', async () => {
+		signIn('operator');
+		// 42 was prepared for retake: captured, with a current image still carrying its rejection.
+		served.records = [rec(41, 1, 'rejected'), rec(42, 2, 'captured'), rec(43, 3, 'captured')];
+		const volume9 = (pending: number, first: number) => ({
+			collectionId: 9, projectId: 2, name: 'Tomo 6', filenameStem: 'co-ahr-6', pending, total: 2, firstPendingRecordId: first
+		});
+		served.summaries = [
+			{ ...summary('recaptures'), volumes: [volume9(2, 41)] },
+			{ ...summary('recaptures'), volumes: [volume9(1, 42)] },
+			summary('recaptures')
+		];
+		current.url = `${BASE_URL}&recordId=41`;
+		serve();
+		const screen = render(LivePreview);
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Recaptura 1 de 2 · Tomo 6')).toBeVisible();
+
+		await retakeCurrent(screen);
+		await expect.element(dialog.getByText('Recaptura 2 de 2 · Tomo 6')).toBeVisible();
+		await expect.element(dialog.getByText('Par 2')).toBeVisible();
+		await expect.element(screen.getByText('Terminaste las recapturas', { exact: false })).not.toBeInTheDocument();
+
+		await retakeCurrent(screen);
+		await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+	});
+
+	it('guides from a prepared record the summary names as the volume first pending', async () => {
+		signIn('operator');
+		served.records = [rec(42, 2, 'captured'), rec(43, 3, 'captured')];
+		served.summaries = [
+			{ ...summary('recaptures'), volumes: [{ collectionId: 9, projectId: 2, name: 'Tomo 6', filenameStem: 'co-ahr-6', pending: 1, total: 1, firstPendingRecordId: 42 }] }
+		];
+		current.url = `${BASE_URL}&recordId=42`;
+		serve();
+		const screen = render(LivePreview);
+		await expect.element(screen.getByRole('dialog').getByText('Recaptura 1 de 1 · Tomo 6')).toBeVisible();
 	});
 
 	it('ends with the new-volume line when the last retake opened the turn', async () => {

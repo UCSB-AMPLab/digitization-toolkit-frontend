@@ -61,6 +61,31 @@ describe('volume page: recapture band', () => {
 		expect(style.color).toBe('rgb(19, 17, 16)');
 	});
 
+	it('counts the records prepared for retake as the summary does, and opens its first pending record', async () => {
+		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(6, 6, 'rejected'), rec(8, 8, 'captured')]);
+		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
+			pendingRecords: 3,
+			volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 066', filenameStem: 'co-66', pending: 3, total: 3, firstPendingRecordId: 1 }],
+			turn: { state: 'recaptures', unlockedBy: null }
+		});
+		const screen = render(CollectionPage);
+		const band = screen.getByRole('region', { name: '3 pares de páginas por recapturar' });
+		await expect.element(band).toBeVisible();
+		await expect
+			.element(band.getByRole('link', { name: 'Recapturar ahora' }))
+			.toHaveAttribute('href', '/live-preview?projectId=1&collectionId=7&recordId=1');
+	});
+
+	it('shows no band when the summary has nothing pending for the volume', async () => {
+		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(2, 2, 'approved')]);
+		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
+			pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null }
+		});
+		const screen = render(CollectionPage);
+		await expect.element(screen.getByText('Par 2')).toBeInTheDocument();
+		await expect.element(screen.getByText('por recapturar', { exact: false })).not.toBeInTheDocument();
+	});
+
 	it('uses the singular for one', async () => {
 		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(3, 3, 'rejected')]);
 		const screen = render(CollectionPage);

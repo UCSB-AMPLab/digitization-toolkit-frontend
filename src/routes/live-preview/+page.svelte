@@ -18,8 +18,9 @@
   // started. Opened with the `recordId` of a rejected record, the screen
   // guides the operator through the volume's rejected records in sequence
   // order: each successful retake opens the next, "Saltar por ahora" defers
-  // the record to the back, and the end panel shows once the volume has no
-  // rejected record left.
+  // the record to the back, and the end panel shows once the volume has
+  // nothing pending. A failed reload after a retake pauses the guide with a
+  // retry; until the next state is on screen, ordinary capture stays blocked.
   //
   // Version: 0.2.0
 
@@ -157,24 +158,58 @@
     return retakeSummary;
   }
 
-  // The guided retake: `order` is the volume's rejected records by sequence
-  // from the one the guide opened on; "Saltar por ahora" moves a record to
-  // its back, so skipped records come back last, in the order they were
-  // skipped. Null outside the guide.
-  let guide = $state<{ order: number[] } | null>(null);
-  // Set when the guide ran out of records: whether the turn is now `new`,
-  // and another volume with retakes to go on with.
+  // The guided retake. `order` holds the volume's records to retake, by
+  // sequence from the one the guide opened on; "Saltar por ahora" moves a
+  // record to its back, so skipped records come back last, in the order they
+  // were skipped. `retaken` counts the retakes done in the guide, and
+  // `total` is the most records the guide has known to do. Null outside it.
+  //
+  // To retake is the backend's pending: rejected, or captured with a current
+  // image that still carries its rejection (prepared for retake). The records
+  // do not show the second, so a prepared record is learnt from the summary,
+  // whose firstPendingRecordId for the volume is its pending record with the
+  // lowest sequence; `prepared` holds those not retaken since.
+  let guide = $state<{ order: number[]; retaken: number; total: number } | null>(null);
+  let prepared = $state<number[]>([]);
+  // Set when nothing is left to retake: whether the turn is now `new`, and
+  // another volume with retakes to go on with.
   let guideEnd = $state<{ turnNew: boolean; other: RetakeSummaryVolume | null } | null>(null);
+  // The records could not be read again after a retake: the guide waits,
+  // with the error and a retry, and opens nothing until they are.
+  let guidePaused = $state(false);
+  let guideRetrying = $state(false);
   // The folios the next record's rejection names, for the guide's footer.
   let guideNextFolios = $state<string | null>(null);
 
   function isPending(id: number): boolean {
-    return records.find(r => r.id === id)?.status === 'rejected';
+    const status = records.find(r => r.id === id)?.status;
+    return status === 'rejected' || (status === 'captured' && prepared.includes(id));
   }
 
-  let guideDone = $derived(guide ? guide.order.filter(id => !isPending(id)).length : 0);
+  function volumeEntry(): RetakeSummaryVolume | null {
+    return retakeSummary?.volumes.find(v => v.collectionId === collectionId) ?? null;
+  }
+
+  // A captured record the summary names as the volume's first pending is
+  // prepared for retake.
+  function notePrepared() {
+    const first = volumeEntry()?.firstPendingRecordId;
+    const record = first == null ? undefined : records.find(r => r.id === first);
+    if (record?.status === 'captured' && !prepared.includes(record.id)) prepared = [...prepared, record.id];
+  }
+
+  // The records the guide knows are still to retake, and the most it has
+  // known to do.
+  function updateGuideTotal() {
+    if (!guide) return;
+    const known = guide.order.filter(isPending).length;
+    const remaining = Math.max(known, volumeEntry()?.pending ?? 0);
+    guide.total = Math.max(guide.total, guide.order.length, guide.retaken + remaining);
+  }
+
+  let guideDone = $derived(guide ? guide.retaken : 0);
   // k of "Recaptura k de N": the retakes done so far, plus the open one.
-  let guidePosition = $derived(guide ? Math.min(guideDone + 1, guide.order.length) : 0);
+  let guidePosition = $derived(guide ? Math.min(guide.retaken + 1, guide.total) : 0);
 
   function openRecord(record: ApiRecord) {
     cameraMode = record.capture_mode === 'dual' ? 'double' : 'single';
@@ -182,27 +217,57 @@
     inspectedRecord = record;
   }
 
-  // Opens the next pending record of the order. The end panel shows only
-  // when the volume, as just read, has no rejected record left; a rejected
-  // record the order lacks joins its back.
+  // Opens the next record to retake in the order. The end panel shows only
+  // when the volume, as just read, has nothing pending; a pending record the
+  // order lacks joins its back. The open modal stays up until one of the two
+  // replaces it, so that capture stays blocked in between.
   async function advanceGuide() {
     if (!guide) return;
-    const rejected = records.filter(r => r.status === 'rejected');
-    if (rejected.length > 0) {
-      const missing = rejected.map(r => r.id).filter(id => !guide!.order.includes(id));
+    notePrepared();
+    const pending = records.filter(r => isPending(r.id)).map(r => r.id);
+    if (pending.length > 0) {
+      const missing = pending.filter(id => !guide!.order.includes(id));
       if (missing.length > 0) guide.order = [...guide.order, ...missing];
+      updateGuideTotal();
       const nextId = guideNextId(guide.order, isPending);
       const next = nextId === null ? undefined : records.find(r => r.id === nextId);
       if (next) openRecord(next);
       return;
     }
+    guideEnd = {
+      turnNew: retakeSummary?.turn.state === 'new',
+      other: retakeSummary?.volumes.find(v => v.collectionId !== collectionId) ?? null
+    };
     inspectedRecord = null;
     guide = null;
-    const summary = await loadRetakeSummary();
-    guideEnd = {
-      turnNew: summary?.turn.state === 'new',
-      other: summary?.volumes.find(v => v.collectionId !== collectionId) ?? null
-    };
+  }
+
+  // After a successful retake in the guide: read the records and the
+  // summary again, then go on. A failed read pauses the guide.
+  async function afterGuidedRetake(id: number) {
+    if (!guide) return;
+    guide.retaken += 1;
+    prepared = prepared.filter(x => x !== id);
+    const [loaded] = await Promise.all([loadRecords(), loadRetakeSummary()]);
+    if (!loaded) {
+      guidePaused = true;
+      inspectedRecord = null;
+      return;
+    }
+    await advanceGuide();
+  }
+
+  async function retryGuide() {
+    if (guideRetrying) return;
+    guideRetrying = true;
+    try {
+      const [loaded] = await Promise.all([loadRecords(), loadRetakeSummary()]);
+      if (!loaded) return;
+      guidePaused = false;
+      await advanceGuide();
+    } finally {
+      guideRetrying = false;
+    }
   }
 
   function skipGuided() {
@@ -251,7 +316,7 @@
     }
 
     if (collectionId) {
-      tasks.push(loadRecords());
+      tasks.push(loadRecords().then(() => {}));
       tasks.push(
         collectionsApi.get(collectionId)
           .then(c => {
@@ -272,7 +337,7 @@
     }
 
     // Not one of `tasks` either: the retake modal must not wait for it.
-    if (collectionId) loadRetakeSummary();
+    const summaryLoad = collectionId ? loadRetakeSummary() : Promise.resolve(null);
 
     await Promise.all(tasks);
 
@@ -286,19 +351,29 @@
       if (target) {
         openRecord(target);
         cameFromRecapture = true;
-        // A rejected record starts the guide through the volume's others.
-        if (target.status === 'rejected') {
+        // A record to retake starts the guide through the volume's others: a
+        // rejected one at once; a captured one only once the summary names
+        // it prepared for retake.
+        if (target.status !== 'rejected') {
+          await summaryLoad;
+          notePrepared();
+        }
+        if (isPending(target.id) && inspectedRecord?.id === target.id) {
           const bySequence = records
-            .filter(r => r.status === 'rejected')
+            .filter(r => isPending(r.id))
             .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
             .map(r => r.id);
-          guide = { order: guideOrder(bySequence, target.id) };
+          guide = { order: guideOrder(bySequence, target.id), retaken: 0, total: bySequence.length };
+          updateGuideTotal();
+          // The summary may name a prepared record, and its count, later.
+          summaryLoad.then(() => { notePrepared(); updateGuideTotal(); });
         }
       }
     }
   });
 
-  async function loadRecords() {
+  // Resolves whether the records were read.
+  async function loadRecords(): Promise<boolean> {
     try {
       isLoading = true;
       const data = await recordsApi.listAll({ collection_id: collectionId });
@@ -307,8 +382,10 @@
       if (data.length > 0 && !selectedRecordId) {
         selectedRecordId = data[0].id;
       }
+      return true;
     } catch (error) {
       console.error('[LivePreview] Error loading records:', error);
+      return false;
     } finally {
       isLoading = false;
     }
@@ -389,10 +466,10 @@
     }
 
     // In the guide, the next rejected record opens instead (0.2.0).
+    // The modal stays open, its retake still running, until the next state
+    // is on screen: LiveViewport takes no capture meanwhile.
     if (guide) {
-      inspectedRecord = null;
-      await loadRecords();
-      await advanceGuide();
+      await afterGuidedRetake(record.id);
       return;
     }
 
@@ -455,7 +532,18 @@
     </section>
   {/if}
 
-  {#if guideEnd}
+  {#if guidePaused}
+    <div class="turn-stage">
+      <section class="guide-end guide-paused" aria-labelledby="guide-paused-title">
+        <span class="material-symbols-outlined guide-paused-icon" aria-hidden="true">error</span>
+        {#if collectionName}<p class="guide-end-volume">{collectionName}</p>{/if}
+        <p id="guide-paused-title" class="guide-end-title" role="alert">{$m.retakes_load_error}</p>
+        <div class="turn-actions">
+          <button class="btn btn-recapture btn-lg" disabled={guideRetrying} onclick={retryGuide}>{$m.common_retry}</button>
+        </div>
+      </section>
+    </div>
+  {:else if guideEnd}
     <div class="turn-stage">
       <section class="guide-end" aria-labelledby="guide-end-title">
         <span class="material-symbols-outlined guide-end-icon" aria-hidden="true">check_circle</span>
@@ -561,7 +649,7 @@
 
 {#snippet guideBar(retaking: boolean)}
   {#if guide && inspectedRecord}
-    {@const total = guide.order.length}
+    {@const total = guide.total}
     <div class="lv-guide">
       <p class="lv-guide-title" id="lv-guide-title">{$m.guide_header(guidePosition, total, collectionName)}</p>
       <div class="lv-guide-progress" role="progressbar" aria-labelledby="lv-guide-title" aria-valuemin="0" aria-valuemax={total} aria-valuenow={guideDone}>
@@ -653,6 +741,8 @@
   .guide-end-volume { margin: 0; font-size: var(--text-sm); font-weight: var(--fw-bold); color: var(--color-light-grey); }
   .guide-end-title { margin: 0; font-size: var(--text-h3); font-weight: var(--fw-extrabold); line-height: 1.3; color: var(--color-light); }
   .guide-end .turn-actions { justify-content: center; }
+  .guide-paused { border-top-color: var(--color-error); }
+  .guide-paused-icon { font-size: 56px; color: var(--color-error); }
 
   /* The guide inside the retake modal. */
   .lv-guide {

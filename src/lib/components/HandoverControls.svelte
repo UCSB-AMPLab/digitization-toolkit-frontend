@@ -7,10 +7,13 @@
   // Shown to operators and admins only; the backend refuses both calls to
   // anyone else (allow_contributor in collections.py).
   //
-  // A volume with any rejected record cannot be handed over (0.2.0): the
-  // backend refuses the promotion with a 409 `recaptures_pending`, so while
-  // any record is rejected the send button is disabled, says how many
-  // retakes are left, and carries a hint underneath.
+  // A volume with any record pending a retake cannot be handed over (0.2.0):
+  // the backend refuses the promotion with a 409 `recaptures_pending`. Its
+  // pending counts the rejected records and those prepared for retake, which
+  // the records do not show, so the page passes `pending` from the recapture
+  // summary; the rejected records are the floor. While anything is pending
+  // the send button is disabled, says how many retakes are left, and carries
+  // a hint underneath.
   // ============================================================================
   //
   // Version: 0.2.0
@@ -21,15 +24,18 @@
   import { handoverCounts, handoverOffer, promoteBlockers } from '$lib/handover';
   import { recapturesPendingCount } from '$lib/recapture-turn';
 
-  let { records, collectionId, onChanged }: {
+  let { records, collectionId, pending = null, onChanged }: {
     records: Record[];
     collectionId: number;
+    // The backend's pending count for the volume, when known.
+    pending?: number | null;
     // Reloads the records; resolves false if the list could not be refreshed.
     onChanged: () => Promise<boolean>;
   } = $props();
 
   let counts = $derived(handoverCounts(records));
   let offer  = $derived(handoverOffer(counts));
+  let pendingCount = $derived(Math.max(pending ?? 0, counts.rejected));
 
   let dialog   = $state<'send' | 'take-back' | 'refused' | null>(null);
   let busy     = $state(false);
@@ -168,11 +174,11 @@
     {$m.col_handover_take_back}
   </button>
 {/if}
-{#if counts.rejected > 0}
+{#if pendingCount > 0}
   <span class="handover-blocked">
     <button class="btn btn-primary handover-btn" data-tour="entregar" disabled aria-describedby="handover-hint">
       <span class="material-symbols-outlined" style="font-size:16px" aria-hidden="true">lock</span>
-      {$m.vol_handover_disabled(counts.rejected)}
+      {$m.vol_handover_disabled(pendingCount)}
     </button>
     <span id="handover-hint" class="handover-hint">{$m.vol_handover_hint}</span>
   </span>
