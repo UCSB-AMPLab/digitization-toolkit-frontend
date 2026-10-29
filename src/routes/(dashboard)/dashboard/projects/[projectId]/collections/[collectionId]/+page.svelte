@@ -100,16 +100,23 @@
   // change can report it if not. With `inPlace` (NEH-248: what is freed in
   // the volume changed) the view skips the loading state and the selected
   // record is kept if it is still in the volume.
-  // This volume's entry in the recapture summary: undefined until the
-  // summary arrives, and when it cannot be loaded; null when it lists
-  // nothing pending for the volume.
-  let retakeEntry = $state<RetakeSummaryVolume | null | undefined>(undefined);
+  // This volume's entry in the recapture summary, keyed by the volume it was
+  // read for: `entry` is undefined until the summary arrives and when it
+  // cannot be loaded, null when it lists nothing pending for the volume. An
+  // entry for another volume counts as none, and the entry is reset when
+  // the volume changes, before its load; only the latest request may write
+  // it, so a summary that arrives for a volume no longer shown is dropped.
+  let retakeState = $state<{ forId: number; entry: RetakeSummaryVolume | null | undefined }>({ forId: 0, entry: undefined });
+  let retakeEntry = $derived(retakeState.forId === collectionId ? retakeState.entry : undefined);
+  let retakeSeq = 0;
 
   async function loadRetakeEntry(forId: number) {
+    const seq = ++retakeSeq;
+    if (retakeState.forId !== forId) retakeState = { forId, entry: undefined };
     try {
       const summary = readRetakeSummary(await recordsApi.toRetakeSummary());
-      if (forId !== collectionId) return;
-      retakeEntry = summary ? (summary.volumes.find(v => v.collectionId === forId) ?? null) : undefined;
+      if (seq !== retakeSeq || forId !== collectionId) return;
+      retakeState = { forId, entry: summary ? (summary.volumes.find(v => v.collectionId === forId) ?? null) : undefined };
     } catch (err) {
       console.error('[Gallery] Error loading the recapture summary:', err);
     }

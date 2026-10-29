@@ -149,13 +149,18 @@
   let unlockShown = $derived(isEmptyVolume && turnState === 'new' && !unlockDismissed);
   let blockNext = $derived(preferredRetakeVolume(retakeSummary, queueItems));
 
-  async function loadRetakeSummary(): Promise<RetakeSummary | null> {
+  // Resolves whether a summary of the contract's shape was read. A failed
+  // read keeps the last one for the turn's panels; the guide does not go on
+  // from it (afterGuidedRetake).
+  async function loadRetakeSummary(): Promise<boolean> {
     try {
-      retakeSummary = readRetakeSummary(await recordsApi.toRetakeSummary());
+      const summary = readRetakeSummary(await recordsApi.toRetakeSummary());
+      if (summary) retakeSummary = summary;
+      return summary !== null;
     } catch (e) {
       console.error('[LivePreview] Error loading the recapture summary:', e);
+      return false;
     }
-    return retakeSummary;
   }
 
   // The guided retake. `order` holds the volume's records to retake, by
@@ -243,13 +248,16 @@
   }
 
   // After a successful retake in the guide: read the records and the
-  // summary again, then go on. A failed read pauses the guide.
+  // summary again, then go on. If either read fails the guide pauses, and
+  // goes on only after a round in which both were read, so that it never
+  // takes the summary from before the retake (and its first pending record)
+  // as current.
   async function afterGuidedRetake(id: number) {
     if (!guide) return;
     guide.retaken += 1;
     prepared = prepared.filter(x => x !== id);
-    const [loaded] = await Promise.all([loadRecords(), loadRetakeSummary()]);
-    if (!loaded) {
+    const [loaded, summarised] = await Promise.all([loadRecords(), loadRetakeSummary()]);
+    if (!loaded || !summarised) {
       guidePaused = true;
       inspectedRecord = null;
       return;
@@ -261,8 +269,8 @@
     if (guideRetrying) return;
     guideRetrying = true;
     try {
-      const [loaded] = await Promise.all([loadRecords(), loadRetakeSummary()]);
-      if (!loaded) return;
+      const [loaded, summarised] = await Promise.all([loadRecords(), loadRetakeSummary()]);
+      if (!loaded || !summarised) return;
       guidePaused = false;
       await advanceGuide();
     } finally {
@@ -337,7 +345,7 @@
     }
 
     // Not one of `tasks` either: the retake modal must not wait for it.
-    const summaryLoad = collectionId ? loadRetakeSummary() : Promise.resolve(null);
+    const summaryLoad = collectionId ? loadRetakeSummary() : Promise.resolve(false);
 
     await Promise.all(tasks);
 

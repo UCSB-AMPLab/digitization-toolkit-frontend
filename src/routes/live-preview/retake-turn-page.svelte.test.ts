@@ -80,7 +80,8 @@ const served = {
 	nextRecords: null as null | (() => Promise<Response>),
 	// The captures that were not retakes (no record_id).
 	plainCaptures: 0,
-	summaries: [] as RetakeSummary[],
+	// 'fail' answers that call with a 500.
+	summaries: [] as (RetakeSummary | 'fail')[],
 	lists: [] as QueueList[],
 	comments: new Map<number, string>()
 };
@@ -91,7 +92,7 @@ function serve() {
 		if (path.endsWith('/records/to-retake/summary')) {
 			// Each call takes the next summary; the last one repeats.
 			const next = served.summaries.length > 1 ? served.summaries.shift()! : served.summaries[0];
-			return json(next);
+			return next === 'fail' ? json({ detail: 'boom' }, 500) : json(next);
 		}
 		if (path.endsWith('/imports/digitisation-lists')) return json(served.lists);
 		const rejections = path.match(/\/records\/(\d+)\/rejections$/);
@@ -366,6 +367,54 @@ describe('capture screen: the guided retake', () => {
 		await expect.element(dialog.getByText('Recaptura 2 de 2 · Tomo 6')).toBeVisible();
 		await expect.element(dialog.getByText('Par 1')).not.toBeInTheDocument();
 		expect(served.plainCaptures).toBe(0);
+	});
+
+	it('pauses when the summary cannot be read after a retake, and goes on only once both are read', async () => {
+		signIn('operator');
+		served.records = [rec(41, 1, 'rejected'), rec(42, 2, 'rejected')];
+		served.summaries = [summary('recaptures'), 'fail', summary('recaptures')];
+		current.url = `${BASE_URL}&recordId=41`;
+		serve();
+		const screen = render(LivePreview);
+		await expect.element(screen.getByRole('dialog').getByText('Par 1')).toBeVisible();
+
+		await retakeCurrent(screen);
+		const paused = screen.getByRole('alert').filter({ hasText: 'No se pudo cargar la lista de registros por recapturar.' });
+		await expect.element(paused).toBeVisible();
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Capturar', exact: true })).not.toBeInTheDocument();
+
+		await screen.getByRole('button', { name: 'Reintentar' }).click();
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Par 2')).toBeVisible();
+		await expect.element(dialog.getByText('Par 1')).not.toBeInTheDocument();
+	});
+
+	it("never takes a previous round's first pending record as current", async () => {
+		signIn('operator');
+		// 42 is prepared for retake; the summary from before the retake names 41 first.
+		served.records = [rec(41, 1, 'rejected'), rec(42, 2, 'captured')];
+		const volume9 = (pending: number, first: number) => ({
+			collectionId: 9, projectId: 2, name: 'Tomo 6', filenameStem: 'co-ahr-6', pending, total: 2, firstPendingRecordId: first
+		});
+		served.summaries = [
+			{ ...summary('recaptures'), volumes: [volume9(2, 41)] },
+			'fail',
+			{ ...summary('recaptures'), volumes: [volume9(1, 42)] }
+		];
+		current.url = `${BASE_URL}&recordId=41`;
+		serve();
+		const screen = render(LivePreview);
+		await expect.element(screen.getByRole('dialog').getByText('Recaptura 1 de 2 · Tomo 6')).toBeVisible();
+
+		await retakeCurrent(screen);
+		await expect.element(screen.getByRole('button', { name: 'Reintentar' })).toBeVisible();
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+
+		await screen.getByRole('button', { name: 'Reintentar' }).click();
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Par 2')).toBeVisible();
+		await expect.element(dialog.getByText('Recaptura 2 de 2 · Tomo 6')).toBeVisible();
 	});
 
 	it('counts a record prepared for retake as still to retake, as the summary says', async () => {
