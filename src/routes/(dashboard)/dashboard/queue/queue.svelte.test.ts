@@ -14,7 +14,7 @@ const gotoMock = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { importsApi, recordsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList, type RecordToRetake, type StatusCounts } from '$lib/api';
+import { importsApi, recordsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList, type RecordToRetake, type RetakeSummary, type StatusCounts } from '$lib/api';
 import { authStore, type UserRole } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import '../../../../app.css';
@@ -77,6 +77,20 @@ const older: QueueList = {
 	listFileMissing: true
 };
 
+const FREE: RetakeSummary = { pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } };
+
+// Volumes 104 (item 4) and 105 (item 5) have retakes pending.
+function turnSummary(state: 'recaptures' | 'new'): RetakeSummary {
+	return {
+		pendingRecords: 33,
+		volumes: [
+			{ collectionId: 105, projectId: 7, name: 'Tomo 5', filenameStem: 'co-ahr-aht-5', pending: 31, total: 31, firstPendingRecordId: 905 },
+			{ collectionId: 104, projectId: 8, name: 'Tomo 4', filenameStem: 'co-ahr-aht-4', pending: 2, total: 3, firstPendingRecordId: 904 }
+		],
+		turn: { state, unlockedBy: state === 'new' ? { collectionId: 77, name: 'Tomo 002' } : null }
+	};
+}
+
 function signIn(role: UserRole) {
 	authStore.setSession('tok', { id: 1, username: role, email: null, role, is_active: true });
 }
@@ -87,6 +101,7 @@ describe('Cola', () => {
 		gotoMock.mockClear();
 		signIn('operator');
 		vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([]);
+		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(FREE);
 	});
 	afterEach(() => {
 		vi.restoreAllMocks();
@@ -195,6 +210,91 @@ describe('Cola', () => {
 			const screen = render(Queue);
 			await expect.element(screen.getByText('Tomo 4')).toBeVisible();
 			expect(screen.getByRole('link', { name: /por recapturar$/ }).elements()).toHaveLength(0);
+		});
+	});
+
+	describe('recapture turn (0.2.0)', () => {
+		function sectionTitles(container: HTMLElement) {
+			return [...container.querySelectorAll('.q-row')].map((r) => r.querySelector('.q-title')?.textContent?.trim());
+		}
+
+		it('shows the retake turn, the volumes with retakes first, and the rest after with the lock line', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(turnSummary('recaptures'));
+			const screen = render(Queue);
+
+			const pill = screen.getByRole('status').filter({ hasText: 'Turno de recapturas' });
+			await expect.element(pill).toBeVisible();
+			await expect.element(pill.getByText('Termina las recapturas de un volumen y podrás empezar uno nuevo.')).toBeVisible();
+			expect(getComputedStyle(pill.element()).backgroundColor).toBe('rgb(225, 183, 120)');
+
+			const first = screen.getByRole('region', { name: 'Primero: recapturas' });
+			await expect.element(first.getByText('Estos volúmenes tienen pares de páginas que la lista de digitalización pide volver a capturar.')).toBeVisible();
+			expect(sectionTitles(first.element() as HTMLElement)).toEqual(['Tomo 4', 'Tomo 5']);
+			const row4 = first.getByRole('listitem').nth(0);
+			await expect.element(row4.getByText('2 de 3 pendientes')).toBeVisible();
+			await expect
+				.element(row4.getByRole('link', { name: 'Recapturar' }))
+				.toHaveAttribute('href', '/live-preview?projectId=8&collectionId=104&recordId=904');
+
+			const then = screen.getByRole('region', { name: 'Después: digitalización nueva' });
+			await expect.element(then.getByText('Para empezar un volumen nuevo, primero hay que terminar las recapturas de un volumen.')).toBeVisible();
+			expect(sectionTitles(then.element() as HTMLElement)).toEqual(['Tomo 1', 'Tomo 2', 'Tomo sin volumen']);
+		});
+
+		it('makes Siguiente the first item whose volume has retakes', async () => {
+			// Without the summary item 4 is next; make item 5 (given a project) the only one with retakes.
+			const summary = turnSummary('recaptures');
+			summary.volumes = summary.volumes.filter((v) => v.collectionId === 105);
+			const withProject = { ...rionegro, items: rionegro.items.map((i) => (i.position === 5 ? { ...i, projectId: 7 } : i)) };
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([withProject]);
+			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(summary);
+			const screen = render(Queue);
+			const first = screen.getByRole('region', { name: 'Primero: recapturas' });
+			await expect.element(first.getByText('Tomo 5')).toBeVisible();
+			const next = screen.container.querySelectorAll('.q-row.is-next');
+			expect(next).toHaveLength(1);
+			expect(next[0].querySelector('.q-title')?.textContent?.trim()).toBe('Tomo 5');
+			await expect.element(first.getByText('Siguiente')).toBeVisible();
+		});
+
+		it('in the new-volume turn names the volume that opened it, and shows no lock line', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(turnSummary('new'));
+			const screen = render(Queue);
+			const pill = screen.getByRole('status').filter({ hasText: 'Turno de volumen nuevo' });
+			await expect.element(pill).toBeVisible();
+			await expect.element(pill.getByText('Ya se terminaron las recapturas del volumen Tomo 002. Puedes empezar un volumen nuevo.')).toBeVisible();
+			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas' })).toBeVisible();
+			await expect.element(screen.getByRole('region', { name: 'Después: digitalización nueva' })).toBeVisible();
+			await expect.element(screen.getByText('Para empezar un volumen nuevo, primero hay que terminar', { exact: false })).not.toBeInTheDocument();
+		});
+
+		it('shows one list and no turn while nothing is pending', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			const screen = render(Queue);
+			await expect.element(screen.getByText('Tomo 5')).toBeVisible();
+			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas' })).not.toBeInTheDocument();
+			await expect.element(screen.getByText('Turno de recapturas')).not.toBeInTheDocument();
+			expect(screen.container.querySelectorAll('ol.queue')).toHaveLength(1);
+		});
+
+		it('gives a reviewer the sections but no Recapturar link', async () => {
+			signIn('reviewer');
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(turnSummary('recaptures'));
+			const screen = render(Queue);
+			const first = screen.getByRole('region', { name: 'Primero: recapturas' });
+			await expect.element(first.getByText('2 de 3 pendientes')).toBeVisible();
+			await expect.element(first.getByRole('link', { name: 'Recapturar' })).not.toBeInTheDocument();
+		});
+
+		it('keeps the page working when the summary cannot be loaded', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			vi.spyOn(recordsApi, 'toRetakeSummary').mockRejectedValue(new Error('boom'));
+			const screen = render(Queue);
+			await expect.element(screen.getByText('Tomo 5')).toBeVisible();
+			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas' })).not.toBeInTheDocument();
 		});
 	});
 

@@ -293,6 +293,26 @@ p {
 }
 .btn-danger:hover { background-color: #c25940; }
 
+/* Recapture — Sand (0.2.0): every control that leads to a retake */
+.btn-recapture {
+  background-color: var(--color-highlight);
+  border-color: var(--color-highlight);
+  color: var(--color-bg);
+  font-weight: var(--fw-bold);
+}
+.btn-recapture:hover,
+.btn-recapture:focus-visible { background-color: var(--color-highlight-hover); border-color: var(--color-highlight-hover); }
+.btn-recapture:focus-visible { outline: 2px solid var(--color-light); outline-offset: 2px; }
+
+/* Recapture outlined, for the rows of a list of volumes */
+.btn-recapture-outline {
+  background-color: transparent;
+  border-color: var(--color-highlight);
+  color: var(--color-highlight);
+}
+.btn-recapture-outline:hover,
+.btn-recapture-outline:focus-visible { background-color: var(--color-highlight); color: var(--color-bg); }
+
 /* Large touch-optimized variant */
 .btn-lg {
   padding: 14px 28px;

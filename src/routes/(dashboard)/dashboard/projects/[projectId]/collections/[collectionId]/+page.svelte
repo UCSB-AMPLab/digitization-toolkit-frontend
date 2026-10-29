@@ -4,8 +4,11 @@
   // page owns the records and the view state shared by its child views; the
   // top bar (breadcrumb, camera button) is in +layout@.svelte, and the page
   // puts its hand-over controls there through the volume top bar slot.
+  // While any record is rejected (0.2.0), a sand band above the views says
+  // how many page pairs wait for a retake and opens the capture screen on
+  // the first of them by sequence.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.2.0
 
   import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
@@ -26,6 +29,7 @@
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
   import HandoverControls from '$lib/components/HandoverControls.svelte';
   import { getVolumeTopbar } from '$lib/volume-topbar';
+  import { retakeUrl } from '$lib/queue';
   import { dismissible } from '$lib/dialog';
   import { fileHoldText } from '$lib/volume-refusals';
   import { freedExportCount } from '$lib/offsite-free';
@@ -352,6 +356,12 @@
     }
   }
 
+  // The volume's rejected records, the lowest sequence first: the band
+  // counts them and its button opens the first.
+  let rejectedRecords = $derived(
+    records.filter(r => r.status === 'rejected').sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+  );
+
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
   let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved' && hasCurrentImage(r)));
@@ -385,6 +395,18 @@
 {/snippet}
 
 <div class="gallery-wrapper">
+
+  {#if rejectedRecords.length > 0}
+    <section class="retake-band" aria-labelledby="retake-band-title">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="retake-band-icon">
+        <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" />
+      </svg>
+      <h2 id="retake-band-title" class="retake-band-title">{$m.vol_band_title(rejectedRecords.length)}</h2>
+      {#if canHandOver}
+        <a class="btn btn-recapture retake-band-cta" href={retakeUrl(projectId, collectionId, rejectedRecords[0].id)}>{$m.vol_band_cta}</a>
+      {/if}
+    </section>
+  {/if}
 
   <!-- In the list view the legend is inside the Reorder bar instead -->
   {#if viewMode !== 'list'}
@@ -733,4 +755,18 @@
   }
   .manifest-problems li { display: flex; flex-direction: column; gap: 2px; }
   .manifest-problem-records { color: var(--color-light-grey); font-size: 12.5px; }
+  /* Rejected records waiting for a retake (0.2.0). */
+  .retake-band {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 12px 24px;
+    background-color: rgba(225, 183, 120, 0.12);
+    border-bottom: 2px solid var(--color-highlight);
+    flex-shrink: 0;
+  }
+  .retake-band-icon { flex-shrink: 0; color: var(--color-highlight); }
+  .retake-band-title { flex: 1; margin: 0; font-size: var(--text-lead); font-weight: var(--fw-extrabold); color: var(--color-light); }
+  .retake-band-cta { flex-shrink: 0; }
 </style>

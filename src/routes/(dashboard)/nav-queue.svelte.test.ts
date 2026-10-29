@@ -90,6 +90,15 @@ describe('sidebar Cola and Por recapturar', () => {
 		await expect.element(link.getByText('7 registros por recapturar')).toBeInTheDocument();
 	});
 
+	it('draws the Por recapturar badge in sand with dark text (0.2.0)', async () => {
+		const { screen } = await mount('operator', 315);
+		const badge = () => screen.container.querySelector('a[href="/dashboard/retakes"] .s-badge') as HTMLElement | null;
+		await expect.poll(() => badge()?.textContent).toBe('315');
+		const style = getComputedStyle(badge()!);
+		expect(style.backgroundColor).toBe('rgb(225, 183, 120)');
+		expect(style.color).toBe('rgb(19, 17, 16)');
+	});
+
 	it('reads the count again on each navigation, and drops the badge for 0 or for a failed count', async () => {
 		const { screen, fetchSpy } = await mount('operator', 7);
 		const badge = () => screen.container.querySelector('a[href="/dashboard/retakes"] .s-badge')?.textContent ?? null;

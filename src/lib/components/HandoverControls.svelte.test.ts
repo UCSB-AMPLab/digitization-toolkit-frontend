@@ -2,7 +2,7 @@
 // buttons show for which mix of statuses, what each dialog says, and what is
 // reported after promote and take-back answer.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -107,6 +107,33 @@ describe('HandoverControls', () => {
 		await screen.getByRole('button', { name: 'Enviar', exact: true }).click();
 		await expect.element(screen.getByRole('alert')).toHaveTextContent(/^No se pudo enviar el volumen a revisión\. Intenta de nuevo\.$/);
 		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+	});
+
+	it('a volume with rejected records cannot be sent: the button is disabled and says how many retakes are left (0.2.0)', async () => {
+		const screen = mount(recs({ captured: 5, rejected: 31 }));
+		const button = screen.getByRole('button', { name: 'Faltan 31 recapturas' });
+		await expect.element(button).toBeVisible();
+		await expect.element(button).toBeDisabled();
+		await expect.element(button).toHaveAccessibleDescription('Podrás enviar el volumen a revisión cuando termines las recapturas.');
+		await expect.element(screen.getByText('Podrás enviar el volumen a revisión cuando termines las recapturas.')).toBeVisible();
+		await expect.element(screen.getByRole('button', { name: /^Enviar/ })).not.toBeInTheDocument();
+	});
+
+	it('says Falta una recaptura for one, also when nothing else is captured', async () => {
+		const screen = mount(recs({ approved: 4, rejected: 1 }));
+		await expect.element(screen.getByRole('button', { name: 'Falta una recaptura' })).toBeDisabled();
+	});
+
+	it('a send refused because retakes are pending says how many, from the refusal (0.2.0)', async () => {
+		promoteSpy.mockRejectedValue(
+			new ApiError('3 retakes left.', { code: 'recaptures_pending', pending: 3, message: '3 retakes left.' }, 409)
+		);
+		const screen = mount(recs({ captured: 2 }));
+		await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
+		await screen.getByRole('button', { name: 'Enviar', exact: true }).click();
+		await expect.element(screen.getByRole('alert')).toHaveTextContent(/^No se pudo enviar el volumen a revisión: faltan 3 recapturas\.$/);
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		expect(onChanged).toHaveBeenCalled();
 	});
 
 	it('take-back: states what returns and what stays, calls take-back, reports the result', async () => {

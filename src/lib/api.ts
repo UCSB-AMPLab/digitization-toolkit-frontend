@@ -1120,6 +1120,17 @@ export const recordsApi = {
   },
 
   /**
+   * The recaptures pending on the unit, per volume, and whose turn it is
+   * (0.2.0): `recaptures` while a new volume must wait for the retakes of
+   * one volume, `new` once they are finished, `free` with nothing pending.
+   * Read through readRetakeSummary in $lib/recapture-turn, which turns an
+   * answer of another shape into null.
+   */
+  async toRetakeSummary(): Promise<RetakeSummary> {
+    return apiRequest<RetakeSummary>('/records/to-retake/summary');
+  },
+
+  /**
    * List a record's QA annotations (flagged errors + notes), newest first.
    */
   async getAnnotations(recordId: number): Promise<RecordAnnotation[]> {
@@ -1615,6 +1626,37 @@ export interface RecordToRetake {
   rejectedBy:   string | null;
   rejectedAt:   string | null;
 }
+
+// GET /records/to-retake/summary (0.2.0). `pending` counts the volume's
+// rejected records, `total` its records with at least one rejection;
+// `firstPendingRecordId` is the rejected record with the lowest sequence.
+// Only volumes with something pending are listed, most pending first.
+export interface RetakeSummaryVolume {
+  collectionId:         number;
+  projectId:            number;
+  name:                 string;
+  filenameStem:         string | null;
+  pending:              number;
+  total:                number;
+  firstPendingRecordId: number;
+}
+
+export type RecaptureTurnState = 'free' | 'new' | 'recaptures';
+
+export interface RetakeSummary {
+  pendingRecords: number;
+  volumes:        RetakeSummaryVolume[];
+  // `unlockedBy` names the volume whose finished retakes opened a `new`
+  // turn; null otherwise.
+  turn: { state: RecaptureTurnState; unlockedBy: { collectionId: number; name: string } | null };
+}
+
+// The 409 codes of the recapture turn (0.2.0), in `detail.code`: a capture
+// that would start an empty volume during the retake turn, and the
+// promotion of a volume with rejected records (`detail.pending` is how
+// many). They are defined in $lib/recapture-turn, which reads them and
+// loads no API client, so that its tests run in plain node.
+export { RECAPTURE_TURN_CODE, RECAPTURES_PENDING_CODE } from './recapture-turn';
 
 // One item of an imported digitisation list, in list order. `action` is
 // the item's optional action field, unvalidated; `collectionId` the volume
