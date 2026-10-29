@@ -47,9 +47,12 @@ export function isItemDone(item: QueueItem): boolean {
 	return hasCapturedRecord(item) && placeVolume(item.status as StatusCounts) === 'approved';
 }
 
-/** Position of the next item to capture, or null when there is none. */
+/**
+ * Position of the next item to capture, or null when there is none. An item
+ * must have a volume and a project, as the capture link needs both.
+ */
 export function nextItemPosition(items: QueueItem[]): number | null {
-	const next = items.find((i) => i.collectionId != null && !isItemDone(i));
+	const next = items.find((i) => i.collectionId != null && i.projectId != null && !isItemDone(i));
 	return next ? next.position : null;
 }
 

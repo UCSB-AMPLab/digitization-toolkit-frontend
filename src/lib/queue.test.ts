@@ -109,6 +109,11 @@ describe('nextItemPosition', () => {
 		expect(nextItemPosition(items)).toBe(2);
 	});
 
+	it('skips an item whose volume has no project, which the queue cannot open for capture', () => {
+		const items = [item(1, { projectId: null }), item(2)];
+		expect(nextItemPosition(items)).toBe(2);
+	});
+
 	it('is null when every item is done', () => {
 		expect(nextItemPosition([item(1, { status: counts({ approved: 1 }) })])).toBeNull();
 		expect(nextItemPosition([])).toBeNull();

@@ -1308,7 +1308,7 @@ export const es = {
 	queue_done_approved: 'Todos los registros están aprobados.',
 	queue_mark_error: 'Captua no pudo guardar el cambio en este elemento.',
 	queue_mark_error_busy: 'Captua no pudo guardar el cambio en este momento. Intenta de nuevo.',
-	queue_refresh_error: 'No se pudo actualizar la cola; puede que lo que ves no esté al día.',
+	queue_refresh_error: 'No se pudo volver a cargar la cola: puede que lo que ves no esté al día.',
 	queue_next_hidden: 'El siguiente elemento no aparece con este filtro.',
 	queue_order_label: (n: number) => `Orden ${formatCount(n, 'es')}`,
 	// Import report

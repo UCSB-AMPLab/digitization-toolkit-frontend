@@ -176,8 +176,9 @@ describe('Cola', () => {
 				expect(setDone).toHaveBeenCalledWith(rionegro.listId, 4, true);
 				await expect.element(rows.nth(3).getByText(new RegExp(`^Marcado como hecho por ${role} el `))).toBeVisible();
 				await expect.element(rows.nth(3).getByText('Hecho', { exact: true })).toBeVisible();
-				// Siguiente moves on to the next item not done.
-				await expect.element(rows.nth(4).getByText('Siguiente')).toBeVisible();
+				// Siguiente does not move to item 5: its volume has no project, so
+				// the queue cannot open it for capture.
+				await expect.element(rows.nth(4).getByText('Siguiente')).not.toBeInTheDocument();
 
 				await rows.nth(1).getByRole('button', { name: 'Desmarcar' }).click();
 				expect(setDone).toHaveBeenCalledWith(rionegro.listId, 2, false);
@@ -360,7 +361,7 @@ describe('Cola', () => {
 		const input = screen.container.querySelector('input[type="file"]') as HTMLInputElement;
 		await userEvent.upload(input, new File(['{}'], 'r.json', { type: 'application/json' }));
 		await expect
-			.element(screen.getByText('No se pudo actualizar la cola; puede que lo que ves no esté al día.'))
+			.element(screen.getByText('No se pudo volver a cargar la cola: puede que lo que ves no esté al día.'))
 			.toBeVisible();
 		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
 		await expect.element(screen.getByText('No se pudo cargar la cola.')).not.toBeInTheDocument();
