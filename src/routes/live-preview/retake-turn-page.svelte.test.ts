@@ -80,6 +80,8 @@ const served = {
 	nextRecords: null as null | (() => Promise<Response>),
 	// The captures that were not retakes (no record_id).
 	plainCaptures: 0,
+	// The record ids whose rejections were asked for.
+	rejectionCalls: [] as number[],
 	// 'fail' answers that call with a 500. The open volume's entry (9) is
 	// added to each answer from the records, as the backend computes it: its
 	// pending records are the rejected ones and those in `prepared`
@@ -113,6 +115,7 @@ function serve() {
 		const rejections = path.match(/\/records\/(\d+)\/rejections$/);
 		if (rejections) {
 			const id = Number(rejections[1]);
+			served.rejectionCalls.push(id);
 			const comment = served.comments.get(id) ?? null;
 			return json([{ id: 1, record_id: id, predefined_reason: 'other', comment, rejected_by: 'revisora', rejected_at: '2026-10-28T10:00:00', images: [] }]);
 		}
@@ -150,6 +153,7 @@ beforeEach(() => {
 	served.records = [];
 	served.nextRecords = null;
 	served.plainCaptures = 0;
+	served.rejectionCalls = [];
 	served.prepared = new Set();
 	served.summaries = [summary('free')];
 	served.lists = [];
@@ -482,6 +486,32 @@ describe('capture screen: the guided retake', () => {
 		serve();
 		const screen = render(LivePreview);
 		await expect.element(screen.getByRole('dialog').getByText('Recaptura 1 de 1 · Tomo 6')).toBeVisible();
+	});
+
+	it("shows the rejection note of a prepared record the summary lists as pending", async () => {
+		signIn('operator');
+		served.records = [rec(42, 2, 'captured'), rec(43, 3, 'captured')];
+		served.prepared = new Set([42]);
+		served.comments = new Map([[42, 'Folios 10r, 9v: recaptura pedida en la lista.']]);
+		current.url = `${BASE_URL}&recordId=42`;
+		serve();
+		const screen = render(LivePreview);
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Recaptura 1 de 1 · Tomo 6')).toBeVisible();
+		await expect.element(dialog.getByText('Folios 10r, 9v: recaptura pedida en la lista.')).toBeVisible();
+	});
+
+	it('asks for no rejection of a captured record the summary does not list', async () => {
+		signIn('operator');
+		served.records = [rec(44, 1, 'captured')];
+		served.comments = new Map([[44, 'Una nota vieja.']]);
+		current.url = `${BASE_URL}&recordId=44`;
+		serve();
+		const screen = render(LivePreview);
+		await expect.element(screen.getByRole('dialog').getByText('Par 1')).toBeVisible();
+		await new Promise((r) => setTimeout(r, 200));
+		expect(served.rejectionCalls).not.toContain(44);
+		await expect.element(screen.getByText('Una nota vieja.')).not.toBeInTheDocument();
 	});
 
 	it('ends with the new-volume line when the last retake opened the turn', async () => {

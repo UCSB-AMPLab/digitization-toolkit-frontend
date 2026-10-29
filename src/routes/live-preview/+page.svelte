@@ -660,6 +660,7 @@
       onClose={closeInspected}
       onRetake={handleRetake}
       guide={guide ? guideBar : undefined}
+      pending={pendingIds.includes(inspectedRecord.id)}
     />
   {/key}
 {/if}

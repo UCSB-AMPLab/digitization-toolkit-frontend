@@ -88,6 +88,13 @@ describe('live-preview ImageViewerModal — latest rejection', () => {
     expect(screen.container.querySelector('[data-testid="lv-rejection"]')).toBeNull();
   });
 
+  it('a captured record marked pending (prepared for retake) shows the newest rejection (0.2.0)', async () => {
+    listSpy.mockResolvedValue([makeRejection()]);
+    const screen = render(ImageViewerModal, { record: makeRecord('captured'), cameraMode: 'single', onClose: vi.fn(), onRetake: vi.fn(), pending: true });
+    await expect.element(screen.getByText('Folios 28r, 27v: movidos')).toBeVisible();
+    expect(listSpy).toHaveBeenCalledWith(7);
+  });
+
   it('a failing listRejections leaves the modal usable, with nothing extra', async () => {
     listSpy.mockRejectedValue(new Error('network'));
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

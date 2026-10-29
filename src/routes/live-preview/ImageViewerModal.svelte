@@ -6,7 +6,9 @@
   // its newest rejection (reason, note, who and when), so the operator
   // retaking it does not need the Por recapturar page open beside it. In the
   // guided retake (0.2.0) the page passes `guide`, drawn under the header and
-  // told whether the retake is running.
+  // told whether the retake is running. A captured record prepared for
+  // retake is still pending (the backend's pending, which the record does
+  // not show): the page passes `pending` for it, and its rejection shows too.
   //
   // Version: 0.2.0
 
@@ -25,12 +27,15 @@
     onClose,
     onRetake,
     guide,
+    pending = false,
   }: {
     record: ApiRecord;
     cameraMode: 'single' | 'double';
     onClose: () => void;
     onRetake: (record: ApiRecord) => Promise<void>;
     guide?: Snippet<[boolean]>;
+    // The summary lists the record as pending.
+    pending?: boolean;
   } = $props();
 
   let confirmRetake = $state(false);
@@ -41,7 +46,7 @@
 
   $effect(() => {
     const id = record.id;
-    const rejected = record.status === 'rejected';
+    const rejected = record.status === 'rejected' || pending;
     rejection = null;
     if (!rejected) return;
     let stale = false;
