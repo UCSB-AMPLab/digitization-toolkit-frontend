@@ -13,7 +13,7 @@
 //   - Text that is the same in every language (brand names, acronyms, units)
 //     is not catalogued: it stays in the component.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.0
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';
@@ -83,6 +83,10 @@ export const es = {
 	nav_settings: 'Configuración',
 	nav_collapse_sidebar: 'Contraer el menú lateral',
 	nav_expand_sidebar: 'Expandir el menú lateral',
+	nav_queue: 'Cola',
+	nav_retakes: 'Por recapturar',
+	nav_retakes_count: (n: number) =>
+		n === 1 ? '1 registro por recapturar' : `${formatCount(n, 'es')} registros por recapturar`,
 	// ── First-run guided tour (NEH-95) ────────────────────────────────────────
 	// Tú, like the rest of the interface. The step texts name controls as the
 	// operator sees them: several are icons without a visible label.
@@ -1271,6 +1275,106 @@ export const es = {
 		n === 1 ? 'Captua no pudo escribir 1 archivo en la tarjeta.' : `Captua no pudo escribir ${formatCount(n, 'es')} archivos en la tarjeta.`,
 	offsite_reason_other: (n: number): string =>
 		n === 1 ? '1 archivo, por otro motivo.' : `${formatCount(n, 'es')} archivos, por otros motivos.`,
+
+	// ── Cola: imported digitisation lists (0.2.0) ────────────────────────────
+	queue_title: 'Cola de digitalización',
+	queue_subtitle: 'Los elementos de cada lista de digitalización importada, en el orden de la lista.',
+	queue_import: 'Importar lista',
+	queue_importing: 'Importando…',
+	queue_import_file_label: 'Archivo de la lista de digitalización',
+	queue_list_label: 'Lista',
+	queue_list_option: (name: string, date: string) => `${name}, importada el ${date}`,
+	queue_imported_at: (date: string) => `Importada el ${date}`,
+	queue_empty:
+		'Todavía no hay listas importadas. Importa una lista de digitalización para ver aquí sus elementos en orden.',
+	queue_list_file_missing:
+		'Captua no tiene una copia del archivo de esta lista, así que no puede mostrar sus elementos. Vuelve a importar el archivo para verlos.',
+	queue_load_error: 'No se pudo cargar la cola.',
+	queue_filter_label: 'Acción',
+	queue_filter_all: 'Todas',
+	queue_action_spot_recapture: 'Recaptura puntual',
+	queue_action_full_rescan: 'Reescaneo completo',
+	queue_action_full_digitisation: 'Digitalización completa',
+	queue_action_complete: 'Completar digitalización',
+	queue_next: 'Siguiente',
+	queue_done: 'Hecho',
+	queue_no_volume: 'Sin volumen en este equipo',
+	queue_mark_done: 'Marcar como hecho',
+	queue_unmark_done: 'Desmarcar',
+	queue_done_by: (who: string, date: string) => `Marcado como hecho por ${who} el ${date}`,
+	queue_done_by_who: (who: string) => `Marcado como hecho por ${who}`,
+	queue_done_on: (date: string) => `Marcado como hecho el ${date}`,
+	queue_done_marked: 'Marcado como hecho',
+	queue_done_approved: 'Todos los registros están aprobados.',
+	queue_mark_error: 'Captua no pudo guardar el cambio en este elemento.',
+	queue_mark_error_busy: 'Captua no pudo guardar el cambio en este momento. Intenta de nuevo.',
+	queue_refresh_error: 'No se pudo volver a cargar la cola: puede que lo que ves no esté al día.',
+	queue_next_hidden: 'El siguiente elemento no aparece con este filtro.',
+	queue_order_label: (n: number) => `Orden ${formatCount(n, 'es')}`,
+	// Import report
+	queue_report_title: (name: string) => `Lista importada: ${name}`,
+	queue_report_created: (n: number) =>
+		n === 1 ? 'Captua creó 1 volumen.' : `Captua creó ${formatCount(n, 'es')} volúmenes.`,
+	queue_report_skipped: (n: number) =>
+		n === 1 ? 'Captua omitió 1 elemento.' : `Captua omitió ${formatCount(n, 'es')} elementos.`,
+	queue_report_project_created: (name: string) => `Captua creó el proyecto ${name}.`,
+	queue_report_list_not_stored:
+		'Captua importó la lista, pero no pudo guardar una copia del archivo, así que no puede mostrarla en la cola.',
+	queue_report_item: (position: number, code: string | null) =>
+		code ? `Elemento ${formatCount(position, 'es')} (${code})` : `Elemento ${formatCount(position, 'es')}`,
+	// Why an item was skipped, one per reason code in app/core/list_import.py.
+	queue_reason_item_not_an_object: 'El elemento no es un objeto JSON.',
+	queue_reason_missing_reference_code: 'El elemento no tiene código de referencia.',
+	queue_reason_invalid_reference_code: 'El código de referencia no es texto o es demasiado largo.',
+	queue_reason_reference_code_padded: 'El código de referencia empieza o termina con espacios.',
+	queue_reason_reference_code_duplicated_in_list: 'Un elemento anterior de esta lista tiene el mismo código de referencia.',
+	queue_reason_missing_filename_stem: 'El elemento no tiene raíz.',
+	queue_reason_filename_stem_not_a_slug:
+		'La raíz solo puede tener minúsculas sin tildes ni eñe (a–z) y números, separados por guiones sencillos.',
+	queue_reason_filename_stem_too_long: 'La raíz es demasiado larga.',
+	queue_reason_filename_stem_differs_from_reference_code: 'La raíz no coincide con el código de referencia.',
+	queue_reason_filename_stem_duplicated_in_list: 'Un elemento anterior de esta lista tiene la misma raíz.',
+	queue_reason_missing_title: 'El elemento no tiene título.',
+	queue_reason_invalid_title: 'El título no es texto o es demasiado largo.',
+	queue_reason_invalid_dates: 'Las fechas no están en el formato AAAA-MM-DD.',
+	queue_reason_end_date_before_start: 'La fecha de fin es anterior a la fecha de inicio.',
+	queue_reason_invalid_sequence: 'El número de orden no es un entero válido.',
+	queue_reason_reference_code_on_unit: 'Ya hay un volumen con este código de referencia en este equipo.',
+	queue_reason_filename_stem_on_unit: 'Ya hay un volumen con esta raíz en este equipo.',
+	queue_reason_refused_by_database: 'La base de datos rechazó el volumen.',
+	queue_reason_filename_stem_is_project_directory: 'La raíz coincide con el nombre de la carpeta de un proyecto de este equipo.',
+	queue_reason_filename_stem_directory_occupied:
+		'En este equipo ya hay archivos en una carpeta con el nombre de esta raíz, y Captua nunca mezcla los archivos de dos volúmenes.',
+	queue_reason_filename_stem_held_offsite:
+		'En la copia externa ya hay imágenes con esta raíz, así que Captua no puede asignársela a un volumen nuevo.',
+	queue_reason_unknown: (code: string) => `Captua no creó este volumen (${code}).`,
+	// Why the whole file was refused, by the response's HTTP status.
+	queue_import_err_unreadable: 'Captua no pudo leer el archivo.',
+	queue_import_err_needs_admin:
+		'No hay un proyecto con el nombre de esta lista. Al importarla, Captua crearía uno, y solo un administrador puede hacerlo.',
+	queue_import_err_list_reused:
+		'Captua no importó esta lista: ya se importó otra con el mismo identificador desde un archivo distinto, o Captua no pudo comprobar la importación anterior.',
+	queue_import_err_too_large: 'El archivo pesa más de 10 MB.',
+	queue_import_err_refused: 'El archivo no es una lista de digitalización que Captua pueda importar.',
+	queue_import_err_busy: 'Captua no pudo importar la lista en este momento. Intenta de nuevo.',
+	queue_import_err_other: 'Captua no pudo importar la lista.',
+
+	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────
+	retakes_title: 'Por recapturar',
+	retakes_subtitle: 'Los registros que se rechazaron en la revisión, empezando por el rechazo más antiguo.',
+	retakes_empty: 'No hay registros por recapturar.',
+	retakes_load_error: 'No se pudo cargar la lista de registros por recapturar.',
+	retakes_retake: 'Volver a capturar',
+	retakes_sequence: (n: number) => `Secuencia ${formatCount(n, 'es')}`,
+	retakes_rejected_by: (who: string, date: string) => `Rechazado por ${who} el ${date}`,
+	retakes_rejected_on: (date: string) => `Rechazado el ${date}`,
+	retakes_no_reason: 'No quedó registrado el motivo de este rechazo.',
+	retakes_comment_label: 'Nota',
+	retakes_no_volume: 'Este registro no está en ningún volumen.',
+	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
+	lv_instruction_label: 'Instrucción de la lista',
+	lv_instruction_show_all: 'Mostrar todo',
+	lv_instruction_show_less: 'Mostrar menos',
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',
