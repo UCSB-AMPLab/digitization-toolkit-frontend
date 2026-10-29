@@ -135,6 +135,12 @@ describe('HandoverControls', () => {
 		await expect.element(screen.getByRole('button', { name: 'Enviar a revisión' })).toBeEnabled();
 	});
 
+	it('takes the pending count it is given over the rejected records it shows', async () => {
+		const screen = render(HandoverControls, { records: recs({ captured: 2, rejected: 1 }), collectionId: 7, onChanged, pending: 0 });
+		await expect.element(screen.getByRole('button', { name: /^Enviar/ })).toBeEnabled();
+		await expect.element(screen.getByRole('button', { name: /^Falta/ })).not.toBeInTheDocument();
+	});
+
 	it('a send refused because retakes are pending says how many, from the refusal (0.2.0)', async () => {
 		promoteSpy.mockRejectedValue(
 			new ApiError('3 retakes left.', { code: 'recaptures_pending', pending: 3, message: '3 retakes left.' }, 409)

@@ -52,8 +52,8 @@ function item(position: number, collectionId: number | null, projectId: number |
 const summary: RetakeSummary = {
 	pendingRecords: 33,
 	volumes: [
-		{ collectionId: 92, projectId: 24, name: 'Tomo 066', filenameStem: 'co-ahr-not-t066', pending: 31, total: 31, firstPendingRecordId: 20946 },
-		{ collectionId: 3, projectId: 24, name: 'Tomo 003', filenameStem: 'co-ahr-not-t003', pending: 2, total: 2, firstPendingRecordId: 11 }
+		{ collectionId: 92, projectId: 24, name: 'Tomo 066', filenameStem: 'co-ahr-not-t066', pending: 31, total: 31, firstPendingRecordId: 20946, pendingRecordIds: Array.from({ length: 31 }, (_, i) => 20946 + i) },
+		{ collectionId: 3, projectId: 24, name: 'Tomo 003', filenameStem: 'co-ahr-not-t003', pending: 2, total: 2, firstPendingRecordId: 11, pendingRecordIds: [11, 12] }
 	],
 	turn: { state: 'recaptures', unlockedBy: null }
 };
@@ -68,6 +68,10 @@ describe('readRetakeSummary', () => {
 		expect(readRetakeSummary(null)).toBeNull();
 		expect(readRetakeSummary({ pendingRecords: 2, volumes: [] })).toBeNull();
 		expect(readRetakeSummary({ pendingRecords: 2, volumes: [], turn: { state: 'other', unlockedBy: null } })).toBeNull();
+		// Each volume lists its pending records (0.2.0, backend/summary-pending-ids).
+		const { pendingRecordIds: _ids, ...withoutIds } = summary.volumes[0];
+		expect(readRetakeSummary({ ...summary, volumes: [withoutIds] })).toBeNull();
+		expect(readRetakeSummary({ ...summary, volumes: [{ ...summary.volumes[0], pendingRecordIds: ['20946'] }] })).toBeNull();
 	});
 });
 

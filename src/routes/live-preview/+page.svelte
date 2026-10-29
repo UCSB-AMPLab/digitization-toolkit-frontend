@@ -169,47 +169,38 @@
   // were skipped. `retaken` counts the retakes done in the guide, and
   // `total` is the most records the guide has known to do. Null outside it.
   //
-  // To retake is the backend's pending: rejected, or captured with a current
-  // image that still carries its rejection (prepared for retake). The records
-  // do not show the second, so a prepared record is learnt from the summary,
-  // whose firstPendingRecordId for the volume is its pending record with the
-  // lowest sequence; `prepared` holds those not retaken since.
+  // What is still to retake is the backend's pending: rejected, or captured
+  // with a current image that still carries its rejection (prepared for
+  // retake), which the records do not show. It comes from the volume's
+  // `pendingRecordIds` in the summary, read again after every retake; the
+  // guide goes on only from a round in which it was read.
   let guide = $state<{ order: number[]; retaken: number; total: number } | null>(null);
-  let prepared = $state<number[]>([]);
   // Set when nothing is left to retake: whether the turn is now `new`, and
   // another volume with retakes to go on with.
   let guideEnd = $state<{ turnNew: boolean; other: RetakeSummaryVolume | null } | null>(null);
-  // The records could not be read again after a retake: the guide waits,
-  // with the error and a retry, and opens nothing until they are.
+  // The records or the summary could not be read again after a retake: the
+  // guide waits, with the error and a retry, and opens nothing until both are.
   let guidePaused = $state(false);
   let guideRetrying = $state(false);
   // The folios the next record's rejection names, for the guide's footer.
   let guideNextFolios = $state<string | null>(null);
 
-  function isPending(id: number): boolean {
-    const status = records.find(r => r.id === id)?.status;
-    return status === 'rejected' || (status === 'captured' && prepared.includes(id));
-  }
-
   function volumeEntry(): RetakeSummaryVolume | null {
     return retakeSummary?.volumes.find(v => v.collectionId === collectionId) ?? null;
   }
 
-  // A captured record the summary names as the volume's first pending is
-  // prepared for retake.
-  function notePrepared() {
-    const first = volumeEntry()?.firstPendingRecordId;
-    const record = first == null ? undefined : records.find(r => r.id === first);
-    if (record?.status === 'captured' && !prepared.includes(record.id)) prepared = [...prepared, record.id];
+  // The volume's pending records, from the summary; none when the summary
+  // does not list the volume.
+  let pendingIds = $derived(volumeEntry()?.pendingRecordIds ?? []);
+
+  function isPending(id: number): boolean {
+    return pendingIds.includes(id) && records.some(r => r.id === id);
   }
 
-  // The records the guide knows are still to retake, and the most it has
-  // known to do.
+  // The most records the guide has known it must retake.
   function updateGuideTotal() {
     if (!guide) return;
-    const known = guide.order.filter(isPending).length;
-    const remaining = Math.max(known, volumeEntry()?.pending ?? 0);
-    guide.total = Math.max(guide.total, guide.order.length, guide.retaken + remaining);
+    guide.total = Math.max(guide.total, guide.retaken + pendingIds.length);
   }
 
   let guideDone = $derived(guide ? guide.retaken : 0);
@@ -223,13 +214,12 @@
   }
 
   // Opens the next record to retake in the order. The end panel shows only
-  // when the volume, as just read, has nothing pending; a pending record the
-  // order lacks joins its back. The open modal stays up until one of the two
-  // replaces it, so that capture stays blocked in between.
+  // when the summary lists nothing pending for the volume; a pending record
+  // the order lacks joins its back. The open modal stays up until one of the
+  // two replaces it, so that capture stays blocked in between.
   async function advanceGuide() {
     if (!guide) return;
-    notePrepared();
-    const pending = records.filter(r => isPending(r.id)).map(r => r.id);
+    const pending = pendingIds.filter(id => records.some(r => r.id === id));
     if (pending.length > 0) {
       const missing = pending.filter(id => !guide!.order.includes(id));
       if (missing.length > 0) guide.order = [...guide.order, ...missing];
@@ -252,10 +242,9 @@
   // goes on only after a round in which both were read, so that it never
   // takes the summary from before the retake (and its first pending record)
   // as current.
-  async function afterGuidedRetake(id: number) {
+  async function afterGuidedRetake() {
     if (!guide) return;
     guide.retaken += 1;
-    prepared = prepared.filter(x => x !== id);
     const [loaded, summarised] = await Promise.all([loadRecords(), loadRetakeSummary()]);
     if (!loaded || !summarised) {
       guidePaused = true;
@@ -359,22 +348,13 @@
       if (target) {
         openRecord(target);
         cameFromRecapture = true;
-        // A record to retake starts the guide through the volume's others: a
-        // rejected one at once; a captured one only once the summary names
-        // it prepared for retake.
-        if (target.status !== 'rejected') {
-          await summaryLoad;
-          notePrepared();
-        }
-        if (isPending(target.id) && inspectedRecord?.id === target.id) {
-          const bySequence = records
-            .filter(r => isPending(r.id))
-            .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
-            .map(r => r.id);
-          guide = { order: guideOrder(bySequence, target.id), retaken: 0, total: bySequence.length };
-          updateGuideTotal();
-          // The summary may name a prepared record, and its count, later.
-          summaryLoad.then(() => { notePrepared(); updateGuideTotal(); });
+        // A record the summary lists as pending starts the guide through the
+        // volume's others, in the summary's order. Without the summary the
+        // modal opens as a single retake.
+        const summarised = await summaryLoad;
+        if (summarised && isPending(target.id) && inspectedRecord?.id === target.id) {
+          const order = guideOrder(pendingIds.filter(id => records.some(r => r.id === id)), target.id);
+          guide = { order, retaken: 0, total: order.length };
         }
       }
     }
@@ -477,7 +457,7 @@
     // The modal stays open, its retake still running, until the next state
     // is on screen: LiveViewport takes no capture meanwhile.
     if (guide) {
-      await afterGuidedRetake(record.id);
+      await afterGuidedRetake();
       return;
     }
 

@@ -385,13 +385,18 @@
   }
 
   // The volume's rejected records, the lowest sequence first, and what is
-  // pending: the summary's count and first record when it has them, the
-  // rejected records otherwise. Never fewer than the rejected on screen.
+  // pending: the summary's count and first record; none when the summary
+  // lists nothing for the volume; the rejected records on screen only while
+  // the summary is missing or failed.
   let rejectedRecords = $derived(
     records.filter(r => r.status === 'rejected').sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
   );
-  let pendingCount = $derived(Math.max(retakeEntry?.pending ?? 0, rejectedRecords.length));
-  let firstPendingId = $derived(retakeEntry?.firstPendingRecordId ?? rejectedRecords[0]?.id ?? null);
+  let pendingCount = $derived(
+    retakeEntry ? retakeEntry.pending : retakeEntry === null ? 0 : rejectedRecords.length
+  );
+  let firstPendingId = $derived(
+    retakeEntry ? retakeEntry.firstPendingRecordId : retakeEntry === null ? null : (rejectedRecords[0]?.id ?? null)
+  );
 
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);

@@ -11,7 +11,7 @@
   // the backend refuses the promotion with a 409 `recaptures_pending`. Its
   // pending counts the rejected records and those prepared for retake, which
   // the records do not show, so the page passes `pending` from the recapture
-  // summary; the rejected records are the floor. While anything is pending
+  // summary; without it, the rejected records are counted. While anything is pending
   // the send button is disabled, says how many retakes are left, and carries
   // a hint underneath.
   // ============================================================================
@@ -35,7 +35,7 @@
 
   let counts = $derived(handoverCounts(records));
   let offer  = $derived(handoverOffer(counts));
-  let pendingCount = $derived(Math.max(pending ?? 0, counts.rejected));
+  let pendingCount = $derived(pending ?? counts.rejected);
 
   let dialog   = $state<'send' | 'take-back' | 'refused' | null>(null);
   let busy     = $state(false);

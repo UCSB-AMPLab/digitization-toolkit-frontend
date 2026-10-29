@@ -16,8 +16,8 @@ import RetakeBand from './RetakeBand.svelte';
 const summary: RetakeSummary = {
 	pendingRecords: 33,
 	volumes: [
-		{ collectionId: 92, projectId: 24, name: 'Tomo 066', filenameStem: 'co-ahr-not-t066', pending: 31, total: 31, firstPendingRecordId: 20946 },
-		{ collectionId: 3, projectId: 24, name: 'Tomo 003', filenameStem: 'co-ahr-not-t003', pending: 2, total: 4, firstPendingRecordId: 11 }
+		{ collectionId: 92, projectId: 24, name: 'Tomo 066', filenameStem: 'co-ahr-not-t066', pending: 31, total: 31, firstPendingRecordId: 20946, pendingRecordIds: Array.from({ length: 31 }, (_, i) => 20946 + i) },
+		{ collectionId: 3, projectId: 24, name: 'Tomo 003', filenameStem: 'co-ahr-not-t003', pending: 2, total: 4, firstPendingRecordId: 11, pendingRecordIds: [11, 12] }
 	],
 	turn: { state: 'recaptures', unlockedBy: null }
 };

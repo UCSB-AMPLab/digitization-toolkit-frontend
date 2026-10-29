@@ -84,8 +84,8 @@ function turnSummary(state: 'recaptures' | 'new'): RetakeSummary {
 	return {
 		pendingRecords: 33,
 		volumes: [
-			{ collectionId: 105, projectId: 7, name: 'Tomo 5', filenameStem: 'co-ahr-aht-5', pending: 31, total: 31, firstPendingRecordId: 905 },
-			{ collectionId: 104, projectId: 8, name: 'Tomo 4', filenameStem: 'co-ahr-aht-4', pending: 2, total: 3, firstPendingRecordId: 904 }
+			{ collectionId: 105, projectId: 7, name: 'Tomo 5', filenameStem: 'co-ahr-aht-5', pending: 31, total: 31, firstPendingRecordId: 905, pendingRecordIds: Array.from({ length: 31 }, (_, i) => 905 + i) },
+			{ collectionId: 104, projectId: 8, name: 'Tomo 4', filenameStem: 'co-ahr-aht-4', pending: 2, total: 3, firstPendingRecordId: 904, pendingRecordIds: [904, 906] }
 		],
 		turn: { state, unlockedBy: state === 'new' ? { collectionId: 77, name: 'Tomo 002' } : null }
 	};

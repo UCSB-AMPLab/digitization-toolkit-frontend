@@ -65,7 +65,7 @@ describe('volume page: recapture band', () => {
 		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(6, 6, 'rejected'), rec(8, 8, 'captured')]);
 		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
 			pendingRecords: 3,
-			volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 066', filenameStem: 'co-66', pending: 3, total: 3, firstPendingRecordId: 1 }],
+			volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 066', filenameStem: 'co-66', pending: 3, total: 3, firstPendingRecordId: 1, pendingRecordIds: [1, 6, 8] }],
 			turn: { state: 'recaptures', unlockedBy: null }
 		});
 		const screen = render(CollectionPage);
@@ -74,6 +74,17 @@ describe('volume page: recapture band', () => {
 		await expect
 			.element(band.getByRole('link', { name: 'Recapturar ahora' }))
 			.toHaveAttribute('href', '/live-preview?projectId=1&collectionId=7&recordId=1');
+	});
+
+	it('takes the summary over the records on screen: nothing pending there means no band, even with a rejected record shown', async () => {
+		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(2, 2, 'rejected')]);
+		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
+			pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null }
+		});
+		const screen = render(CollectionPage);
+		await expect.element(screen.getByText('Par 2')).toBeInTheDocument();
+		await expect.poll(() => (recordsApi.toRetakeSummary as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBeGreaterThan(0);
+		await expect.element(screen.getByText('por recapturar', { exact: false })).not.toBeInTheDocument();
 	});
 
 	it('shows no band when the summary has nothing pending for the volume', async () => {

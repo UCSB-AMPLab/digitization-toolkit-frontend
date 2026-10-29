@@ -50,8 +50,8 @@ function summary(state: 'free' | 'recaptures' | 'new'): RetakeSummary {
 			state === 'free'
 				? []
 				: [
-						{ collectionId: 30, projectId: 2, name: 'Tomo 030', filenameStem: 'co-30', pending: 3, total: 3, firstPendingRecordId: 300 },
-						{ collectionId: 31, projectId: 2, name: 'Tomo 002', filenameStem: 'co-31', pending: 2, total: 2, firstPendingRecordId: 310 }
+						{ collectionId: 30, projectId: 2, name: 'Tomo 030', filenameStem: 'co-30', pending: 3, total: 3, firstPendingRecordId: 300, pendingRecordIds: [300, 301, 302] },
+						{ collectionId: 31, projectId: 2, name: 'Tomo 002', filenameStem: 'co-31', pending: 2, total: 2, firstPendingRecordId: 310, pendingRecordIds: [310, 311] }
 					],
 		turn: { state, unlockedBy: state === 'new' ? { collectionId: 77, name: 'Tomo 077' } : null }
 	};
@@ -80,8 +80,13 @@ const served = {
 	nextRecords: null as null | (() => Promise<Response>),
 	// The captures that were not retakes (no record_id).
 	plainCaptures: 0,
-	// 'fail' answers that call with a 500.
+	// 'fail' answers that call with a 500. The open volume's entry (9) is
+	// added to each answer from the records, as the backend computes it: its
+	// pending records are the rejected ones and those in `prepared`
+	// (captured, with a current image that still carries its rejection), by
+	// sequence then id. A retake clears both.
 	summaries: [] as (RetakeSummary | 'fail')[],
+	prepared: new Set<number>(),
 	lists: [] as QueueList[],
 	comments: new Map<number, string>()
 };
@@ -92,7 +97,17 @@ function serve() {
 		if (path.endsWith('/records/to-retake/summary')) {
 			// Each call takes the next summary; the last one repeats.
 			const next = served.summaries.length > 1 ? served.summaries.shift()! : served.summaries[0];
-			return next === 'fail' ? json({ detail: 'boom' }, 500) : json(next);
+			if (next === 'fail') return json({ detail: 'boom' }, 500);
+			const pendingIds = served.records
+				.filter((r) => r.status === 'rejected' || (r.status === 'captured' && served.prepared.has(r.id)))
+				.sort((a, b) => a.sequence - b.sequence || a.id - b.id)
+				.map((r) => r.id);
+			if (pendingIds.length === 0) return json(next);
+			const volume9 = {
+				collectionId: 9, projectId: 2, name: 'Tomo 6', filenameStem: 'co-ahr-6',
+				pending: pendingIds.length, total: pendingIds.length, firstPendingRecordId: pendingIds[0], pendingRecordIds: pendingIds
+			};
+			return json({ ...next, pendingRecords: next.pendingRecords + pendingIds.length, volumes: [...next.volumes, volume9] });
 		}
 		if (path.endsWith('/imports/digitisation-lists')) return json(served.lists);
 		const rejections = path.match(/\/records\/(\d+)\/rejections$/);
@@ -116,6 +131,7 @@ function serve() {
 		if (path.endsWith('/cameras/capture')) {
 			const body = JSON.parse(String(init?.body ?? '{}')) as { record_id?: number };
 			if (body.record_id == null) served.plainCaptures++;
+			if (body.record_id != null) served.prepared.delete(body.record_id);
 			const target = served.records.find((r) => r.id === body.record_id);
 			if (target) target.status = 'captured';
 			return json({ success: true, record_id: body.record_id });
@@ -134,6 +150,7 @@ beforeEach(() => {
 	served.records = [];
 	served.nextRecords = null;
 	served.plainCaptures = 0;
+	served.prepared = new Set();
 	served.summaries = [summary('free')];
 	served.lists = [];
 	served.comments = new Map();
@@ -390,18 +407,12 @@ describe('capture screen: the guided retake', () => {
 		await expect.element(dialog.getByText('Par 1')).not.toBeInTheDocument();
 	});
 
-	it("never takes a previous round's first pending record as current", async () => {
+	it("never takes a previous round's pending records as current", async () => {
 		signIn('operator');
-		// 42 is prepared for retake; the summary from before the retake names 41 first.
+		// 42 is prepared for retake; the summary from before the retake lists 41 first.
 		served.records = [rec(41, 1, 'rejected'), rec(42, 2, 'captured')];
-		const volume9 = (pending: number, first: number) => ({
-			collectionId: 9, projectId: 2, name: 'Tomo 6', filenameStem: 'co-ahr-6', pending, total: 2, firstPendingRecordId: first
-		});
-		served.summaries = [
-			{ ...summary('recaptures'), volumes: [volume9(2, 41)] },
-			'fail',
-			{ ...summary('recaptures'), volumes: [volume9(1, 42)] }
-		];
+		served.prepared = new Set([42]);
+		served.summaries = [summary('recaptures'), 'fail', summary('recaptures')];
 		current.url = `${BASE_URL}&recordId=41`;
 		serve();
 		const screen = render(LivePreview);
@@ -417,18 +428,12 @@ describe('capture screen: the guided retake', () => {
 		await expect.element(dialog.getByText('Recaptura 2 de 2 · Tomo 6')).toBeVisible();
 	});
 
-	it('counts a record prepared for retake as still to retake, as the summary says', async () => {
+	it('counts a record prepared for retake as still to retake, as the summary lists it', async () => {
 		signIn('operator');
-		// 42 was prepared for retake: captured, with a current image still carrying its rejection.
+		// 43 was prepared for retake: captured, with a current image still carrying its rejection.
 		served.records = [rec(41, 1, 'rejected'), rec(42, 2, 'captured'), rec(43, 3, 'captured')];
-		const volume9 = (pending: number, first: number) => ({
-			collectionId: 9, projectId: 2, name: 'Tomo 6', filenameStem: 'co-ahr-6', pending, total: 2, firstPendingRecordId: first
-		});
-		served.summaries = [
-			{ ...summary('recaptures'), volumes: [volume9(2, 41)] },
-			{ ...summary('recaptures'), volumes: [volume9(1, 42)] },
-			summary('recaptures')
-		];
+		served.prepared = new Set([43]);
+		served.summaries = [summary('recaptures')];
 		current.url = `${BASE_URL}&recordId=41`;
 		serve();
 		const screen = render(LivePreview);
@@ -437,19 +442,42 @@ describe('capture screen: the guided retake', () => {
 
 		await retakeCurrent(screen);
 		await expect.element(dialog.getByText('Recaptura 2 de 2 · Tomo 6')).toBeVisible();
-		await expect.element(dialog.getByText('Par 2')).toBeVisible();
+		await expect.element(dialog.getByText('Par 3')).toBeVisible();
 		await expect.element(screen.getByText('Terminaste las recapturas', { exact: false })).not.toBeInTheDocument();
 
 		await retakeCurrent(screen);
 		await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
 	});
 
-	it('guides from a prepared record the summary names as the volume first pending', async () => {
+	it('with two prepared records, a skip opens the second, not the first, and both retaken end the guide', async () => {
+		signIn('operator');
+		served.records = [rec(41, 1, 'captured'), rec(42, 2, 'captured'), rec(43, 3, 'captured')];
+		served.prepared = new Set([41, 42]);
+		served.summaries = [summary('recaptures')];
+		current.url = `${BASE_URL}&recordId=41`;
+		serve();
+		const screen = render(LivePreview);
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Recaptura 1 de 2 · Tomo 6')).toBeVisible();
+		await expect.element(dialog.getByText('Par 1')).toBeVisible();
+
+		await dialog.getByRole('button', { name: 'Saltar por ahora' }).click();
+		await expect.element(dialog.getByText('Par 2')).toBeVisible();
+		await expect.element(dialog.getByText('Par 1')).not.toBeInTheDocument();
+
+		await retakeCurrent(screen);
+		// The skipped one comes back, as the only one left.
+		await expect.element(dialog.getByText('Par 1')).toBeVisible();
+		await expect.element(dialog.getByText('Recaptura 2 de 2 · Tomo 6')).toBeVisible();
+		await retakeCurrent(screen);
+		await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+	});
+
+	it('guides from a prepared record the summary lists as pending', async () => {
 		signIn('operator');
 		served.records = [rec(42, 2, 'captured'), rec(43, 3, 'captured')];
-		served.summaries = [
-			{ ...summary('recaptures'), volumes: [{ collectionId: 9, projectId: 2, name: 'Tomo 6', filenameStem: 'co-ahr-6', pending: 1, total: 1, firstPendingRecordId: 42 }] }
-		];
+		served.prepared = new Set([42]);
+		served.summaries = [summary('recaptures')];
 		current.url = `${BASE_URL}&recordId=42`;
 		serve();
 		const screen = render(LivePreview);

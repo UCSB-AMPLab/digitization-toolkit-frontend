@@ -35,7 +35,9 @@ function isVolume(v: unknown): v is RetakeSummaryVolume {
 		typeof x.name === 'string' &&
 		typeof x.pending === 'number' &&
 		typeof x.total === 'number' &&
-		typeof x.firstPendingRecordId === 'number'
+		typeof x.firstPendingRecordId === 'number' &&
+		Array.isArray(x.pendingRecordIds) &&
+		x.pendingRecordIds.every((id) => typeof id === 'number')
 	);
 }
 

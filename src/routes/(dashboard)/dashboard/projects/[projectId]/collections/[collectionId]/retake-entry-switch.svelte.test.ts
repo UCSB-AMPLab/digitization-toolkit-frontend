@@ -44,7 +44,7 @@ function rec(id: number, sequence: number, status: ApiRecord['status']): ApiReco
 // Volume 7 has three pending, its first record 1; volume 8 has none.
 const summaryA: RetakeSummary = {
 	pendingRecords: 3,
-	volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 7', filenameStem: 'co-7', pending: 3, total: 3, firstPendingRecordId: 1 }],
+	volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 7', filenameStem: 'co-7', pending: 3, total: 3, firstPendingRecordId: 1, pendingRecordIds: [1, 2, 3] }],
 	turn: { state: 'recaptures', unlockedBy: null }
 };
 

@@ -1629,7 +1629,10 @@ export interface RecordToRetake {
 
 // GET /records/to-retake/summary (0.2.0). `pending` counts the volume's
 // rejected records, `total` its records with at least one rejection;
-// `firstPendingRecordId` is the rejected record with the lowest sequence.
+// A record is pending when it is rejected, or captured with a current image
+// that still carries its rejection (prepared for retake); the records alone
+// do not show the second. `pendingRecordIds` lists every pending record of
+// the volume by sequence, then id, and `firstPendingRecordId` is its first.
 // Only volumes with something pending are listed, most pending first.
 export interface RetakeSummaryVolume {
   collectionId:         number;
@@ -1639,6 +1642,7 @@ export interface RetakeSummaryVolume {
   pending:              number;
   total:                number;
   firstPendingRecordId: number;
+  pendingRecordIds:     number[];
 }
 
 export type RecaptureTurnState = 'free' | 'new' | 'recaptures';
