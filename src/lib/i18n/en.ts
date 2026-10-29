@@ -1312,6 +1312,7 @@ export const en: Messages = {
 	queue_import_err_refused: 'The file is not a digitisation list Captua can import.',
 	queue_import_err_busy: 'Captua could not import the list just now. Try again.',
 	queue_import_err_other: 'Captua could not import the list.',
+	q_to_retake: (n: number) => (n === 1 ? '1 record to retake' : `${formatCount(n, 'en')} records to retake`),
 
 	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────
 	retakes_title: 'To retake',
@@ -1325,6 +1326,9 @@ export const en: Messages = {
 	retakes_no_reason: 'No reason was recorded for this rejection.',
 	retakes_comment_label: 'Note',
 	retakes_no_volume: 'This record is in no volume.',
+	retakes_filter_volume_label: 'Volume',
+	retakes_filter_all_volumes: 'All volumes',
+	retakes_filter_empty: 'This volume has no records to retake.',
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
 	lv_instruction_label: 'From the list',
 	lv_instruction_show_all: 'Show all',

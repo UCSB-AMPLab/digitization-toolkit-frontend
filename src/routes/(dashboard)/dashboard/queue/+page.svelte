@@ -19,7 +19,7 @@
 
   import { onMount, tick } from 'svelte';
   import { goto } from '$app/navigation';
-  import { importsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList } from '$lib/api';
+  import { importsApi, recordsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList } from '$lib/api';
   import { m, locale } from '$lib/i18n';
   import { userRole } from '$lib/stores/auth';
   import { formatApiDate } from '$lib/format-date';
@@ -70,7 +70,24 @@
     }
   }
 
-  onMount(() => { loadLists(); });
+  // Records waiting for recapture, counted per volume from
+  // GET /records/to-retake. Without them the page shows no counts.
+  let retakeCounts = $state<Map<number, number>>(new Map());
+
+  async function loadRetakeCounts() {
+    try {
+      const rows = await recordsApi.toRetake();
+      const counts = new Map<number, number>();
+      for (const row of rows) {
+        if (row.collectionId != null) counts.set(row.collectionId, (counts.get(row.collectionId) ?? 0) + 1);
+      }
+      retakeCounts = counts;
+    } catch (err) {
+      console.error('[Queue] Error loading records to retake:', err);
+    }
+  }
+
+  onMount(() => { loadLists(); loadRetakeCounts(); });
 
   let list = $derived(lists?.find(l => l.listId === selectedListId) ?? null);
   let items = $derived(list?.items ?? []);
@@ -364,6 +381,10 @@
                 <span class="q-stage">{stageTitle[placeVolume(item.status)]}</span>
                 {@render statusBar(item)}
                 <span class="pl-count">{$m.dash_records_count(recordTotal(item))}</span>
+                {@const toRetake = retakeCounts.get(item.collectionId) ?? 0}
+                {#if toRetake > 0}
+                  <a class="q-retake" href="/dashboard/retakes?collectionId={item.collectionId}">{$m.q_to_retake(toRetake)}</a>
+                {/if}
               {/if}
             </div>
 
@@ -556,6 +577,9 @@
 
   .q-progress { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .q-stage { font-size: var(--text-sm); font-weight: var(--fw-bold); color: var(--color-light); }
+  .q-retake { font-size: var(--text-sm); font-weight: var(--fw-bold); color: var(--color-error); }
+  .q-retake:hover,
+  .q-retake:focus-visible { text-decoration: underline; }
   .q-done-note { font-size: var(--text-xs); color: var(--color-success); }
   .q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .q-no-volume { font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.4; }

@@ -1358,6 +1358,7 @@ export const es = {
 	queue_import_err_refused: 'El archivo no es una lista de digitalización que Captua pueda importar.',
 	queue_import_err_busy: 'Captua no pudo importar la lista en este momento. Intenta de nuevo.',
 	queue_import_err_other: 'Captua no pudo importar la lista.',
+	q_to_retake: (n: number) => (n === 1 ? '1 registro por recapturar' : `${formatCount(n, 'es')} registros por recapturar`),
 
 	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────
 	retakes_title: 'Por recapturar',
@@ -1371,6 +1372,9 @@ export const es = {
 	retakes_no_reason: 'No quedó registrado el motivo de este rechazo.',
 	retakes_comment_label: 'Nota',
 	retakes_no_volume: 'Este registro no está en ningún volumen.',
+	retakes_filter_volume_label: 'Volumen',
+	retakes_filter_all_volumes: 'Todos los volúmenes',
+	retakes_filter_empty: 'Este volumen no tiene registros por recapturar.',
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
 	lv_instruction_label: 'Instrucción de la lista',
 	lv_instruction_show_all: 'Mostrar todo',
