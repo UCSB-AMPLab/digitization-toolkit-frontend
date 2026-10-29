@@ -23,7 +23,10 @@
   // shown only through its thumbnail (TIFF) never requests /preview, so the
   // record's master_freed_at decides there (freedFromMetadata).
   //
-  // Version: 0.1.0-beta
+  // Over a thumbnail the notice is one line, so the operator keeps the page to
+  // compare against the volume; a toggle opens the rest. On its own it is whole.
+  //
+  // Version: 0.2.0
 
   import { untrack, type Snippet } from 'svelte';
   import { recordsApi, type RecordImage } from '$lib/api';
@@ -82,6 +85,8 @@
   let master = $state<MasterCheck | 'checking'>('checking');
   // The freed file a candidate's 410 described; null otherwise.
   let freed = $state<FreedFile | null>(null);
+  // Whether the compact notice over a thumbnail shows its explanation.
+  let freedOpen = $state(false);
   // Aborts the probeFreed requests when the image changes or on unmount.
   let probes: AbortController | null = null;
 
@@ -90,6 +95,7 @@
     index = 0;
     master = 'checking';
     freed = untrack(() => freedFromMetadata(image));
+    freedOpen = false;
     probes?.abort();
     probes = null;
   });
@@ -153,16 +159,31 @@
 </script>
 
 {#snippet freedPanel(overThumbnail: boolean)}
-  <div class="freed-panel" class:freed-panel-over={overThumbnail} data-testid="image-freed" role="note">
-    <span class="material-symbols-outlined freed-panel-icon" aria-hidden="true">archive</span>
-    <strong class="freed-panel-title">{$m.freed_title}</strong>
-    <span>{$m.freed_where}</span>
-    <span>{$m.freed_nothing_lost}</span>
-    <span>{$m.freed_restore_hint}</span>
-    {#if overThumbnail}
-      <span class="freed-panel-note">{$m.freed_thumbnail_note}</span>
-    {/if}
-  </div>
+  {#if overThumbnail}
+    <div class="freed-panel freed-panel-over freed-panel-compact" data-testid="image-freed" role="note">
+      <div class="freed-panel-line">
+        <span class="material-symbols-outlined freed-panel-icon" aria-hidden="true">archive</span>
+        <strong class="freed-panel-title">{$m.freed_title}</strong>
+        <button type="button" class="freed-panel-toggle" aria-expanded={freedOpen} onclick={() => (freedOpen = !freedOpen)}>
+          {freedOpen ? $m.lv_instruction_show_less : $m.lv_instruction_show_all}
+        </button>
+      </div>
+      {#if freedOpen}
+        <span>{$m.freed_where}</span>
+        <span>{$m.freed_nothing_lost}</span>
+        <span>{$m.freed_restore_hint}</span>
+        <span class="freed-panel-note">{$m.freed_thumbnail_note}</span>
+      {/if}
+    </div>
+  {:else}
+    <div class="freed-panel" data-testid="image-freed" role="note">
+      <span class="material-symbols-outlined freed-panel-icon" aria-hidden="true">archive</span>
+      <strong class="freed-panel-title">{$m.freed_title}</strong>
+      <span>{$m.freed_where}</span>
+      <span>{$m.freed_nothing_lost}</span>
+      <span>{$m.freed_restore_hint}</span>
+    </div>
+  {/if}
 {/snippet}
 
 {#if current}
