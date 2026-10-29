@@ -545,6 +545,23 @@ describe('Cola', () => {
 			return userEvent.upload(input, file).then(() => file);
 		}
 
+		it('reads the recapture summary again after the import, so the turn and the sections follow it (0.2.0)', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			vi.spyOn(importsApi, 'importList').mockResolvedValue(report);
+			const summarySpy = vi
+				.spyOn(recordsApi, 'toRetakeSummary')
+				.mockResolvedValueOnce(FREE)
+				.mockResolvedValue(turnSummary('recaptures'));
+			const screen = render(Queue);
+			await expect.element(screen.getByText('Tomo 5')).toBeVisible();
+			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas' })).not.toBeInTheDocument();
+
+			await pickFile(screen);
+			await expect.element(screen.getByRole('status').filter({ hasText: 'Turno de recapturas' })).toBeVisible();
+			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas' })).toBeVisible();
+			expect(summarySpy).toHaveBeenCalledTimes(2);
+		});
+
 		it('posts the picked file and shows the counts and every skip with a plain reason', async () => {
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 			const importSpy = vi.spyOn(importsApi, 'importList').mockResolvedValue(report);

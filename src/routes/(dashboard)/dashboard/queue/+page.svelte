@@ -227,7 +227,9 @@
     report = null;
     try {
       report = await importsApi.importList(file);
-      await loadLists(report.listId);
+      // The import may add volumes with retakes: the turn and the sections
+      // follow it (0.2.0).
+      await Promise.all([loadLists(report.listId), loadRetakeSummary()]);
     } catch (err) {
       importing = false;
       if (err instanceof AuthError && err.status === 401) return;

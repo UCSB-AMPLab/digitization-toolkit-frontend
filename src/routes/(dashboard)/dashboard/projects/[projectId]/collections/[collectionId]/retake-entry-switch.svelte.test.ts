@@ -114,4 +114,29 @@ describe('volume page: the recapture count follows the volume', () => {
 		const actions = render(SnippetHost, { snippet: slot.actions! });
 		await expectNothingFromA(screen, actions);
 	});
+
+	it('falls back to the records just read when a refresh of the summary fails', async () => {
+		// The rejection is undone between the two loads.
+		vi.spyOn(recordsApi, 'listAll')
+			.mockResolvedValueOnce([rec(1, 1, 'captured'), rec(2, 2, 'rejected')])
+			.mockResolvedValue([rec(1, 1, 'captured'), rec(2, 2, 'captured')]);
+		vi.spyOn(recordsApi, 'toRetakeSummary')
+			.mockResolvedValueOnce({
+				pendingRecords: 1,
+				volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 7', filenameStem: 'co-7', pending: 1, total: 1, firstPendingRecordId: 2, pendingRecordIds: [2] }],
+				turn: { state: 'recaptures', unlockedBy: null }
+			})
+			.mockRejectedValue(new Error('boom'));
+		const slot: VolumeTopbarSlot = { actions: null, reloadRecords: null };
+		const screen = render(CollectionPage, { context: volumeTopbarContext(slot) });
+		await expect.element(screen.getByRole('region', { name: 'Un par de páginas por recapturar' })).toBeVisible();
+
+		await expect.poll(() => slot.reloadRecords).not.toBeNull();
+		expect(await slot.reloadRecords!()).toBe(true);
+		await expect.element(screen.getByText('por recapturar', { exact: false })).not.toBeInTheDocument();
+		await expect.poll(() => slot.actions).not.toBeNull();
+		const actions = render(SnippetHost, { snippet: slot.actions! });
+		await expect.element(actions.getByRole('button', { name: 'Enviar a revisión' })).toBeEnabled();
+		await expect.element(actions.getByRole('button', { name: /^Falta/ })).not.toBeInTheDocument();
+	});
 });

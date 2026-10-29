@@ -104,8 +104,9 @@
   // read for: `entry` is undefined until the summary arrives and when it
   // cannot be loaded, null when it lists nothing pending for the volume. An
   // entry for another volume counts as none, and the entry is reset when
-  // the volume changes, before its load; only the latest request may write
-  // it, so a summary that arrives for a volume no longer shown is dropped.
+  // the volume changes, before its load, and when a refresh fails; only the
+  // latest request may write it, so a summary that arrives for a volume no
+  // longer shown is dropped.
   let retakeState = $state<{ forId: number; entry: RetakeSummaryVolume | null | undefined }>({ forId: 0, entry: undefined });
   let retakeEntry = $derived(retakeState.forId === collectionId ? retakeState.entry : undefined);
   let retakeSeq = 0;
@@ -119,6 +120,9 @@
       retakeState = { forId, entry: summary ? (summary.volumes.find(v => v.collectionId === forId) ?? null) : undefined };
     } catch (err) {
       console.error('[Gallery] Error loading the recapture summary:', err);
+      // A failed refresh leaves no entry, so the page counts the rejected
+      // records it has just read rather than an older summary's.
+      if (seq === retakeSeq && forId === collectionId) retakeState = { forId, entry: undefined };
     }
   }
 
