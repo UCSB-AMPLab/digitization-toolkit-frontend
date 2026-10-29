@@ -2,12 +2,17 @@
   // Shows one captured record's images at full size and lets the operator
   // retake the record. Images are ordered left before right, with an L/R badge
   // in `double` mode. Retake asks for confirmation, and the modal cannot be
-  // closed while the replacement capture runs.
+  // closed while the replacement capture runs. A rejected record also shows
+  // its newest rejection (reason, note, who and when), so the operator
+  // retaking it does not need the Por recapturar page open beside it.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.2.0
 
-  import { type Record as ApiRecord } from '$lib/api';
-  import { m } from '$lib/i18n';
+  import { recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';
+  import { m, locale } from '$lib/i18n';
+  import { formatApiDate } from '$lib/format-date';
+  import { parseApiDate } from '$lib/pipeline';
+  import { rejectionReasonText } from '$lib/rejectionReasons';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import { dismissible } from '$lib/dialog';
 
@@ -24,6 +29,39 @@
   } = $props();
 
   let confirmRetake = $state(false);
+
+  // The newest rejection of a rejected record. If the history cannot be
+  // fetched, nothing extra is shown and the modal works as before.
+  let rejection = $state<RecordRejection | null>(null);
+
+  $effect(() => {
+    const id = record.id;
+    const rejected = record.status === 'rejected';
+    rejection = null;
+    if (!rejected) return;
+    let stale = false;
+    recordsApi
+      .listRejections(id)
+      .then((list) => {
+        if (!stale) rejection = list[0] ?? null;
+      })
+      .catch((err) => {
+        console.error('[ImageViewerModal] Error loading rejections:', err);
+      });
+    return () => {
+      stale = true;
+    };
+  });
+
+  const rejectionReason = $derived(
+    rejection?.predefined_reason ? rejectionReasonText($m, rejection.predefined_reason) : null,
+  );
+
+  function formatWhen(iso: string): string {
+    return formatApiDate(iso, $locale, {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  }
 
   // Blocks closing the modal while the capture runs, so that an error stays
   // in view if the capture fails.
@@ -93,6 +131,29 @@
       </div>
     {/if}
 
+    <!-- Why the record was rejected, as on the Por recapturar page -->
+    {#if rejection}
+      <div class="lv-rejection" data-testid="lv-rejection">
+        <div class="lv-rejection-reason">
+          {#if rejectionReason}
+            <span class="status-badge status-rejected">{rejectionReason.label}</span>
+            {#if rejectionReason.gloss}<span class="lv-rejection-gloss">{rejectionReason.gloss}</span>{/if}
+          {:else}
+            <span class="lv-rejection-gloss">{$m.retakes_no_reason}</span>
+          {/if}
+        </div>
+        {#if rejection.comment}
+          <p class="lv-rejection-comment"><span class="visually-hidden">{$m.retakes_comment_label}:</span>{" "}{rejection.comment}</p>
+        {/if}
+        {#if rejection.rejected_at}
+          {@const when = formatWhen(rejection.rejected_at)}
+          <time class="lv-rejection-when" datetime={parseApiDate(rejection.rejected_at).toISOString()}>
+            {rejection.rejected_by ? $m.retakes_rejected_by(rejection.rejected_by, when) : $m.retakes_rejected_on(when)}
+          </time>
+        {/if}
+      </div>
+    {/if}
+
     <div class="img-viewer-images">
       {#each images as img}
         <div class="img-viewer-frame">
@@ -157,3 +218,30 @@
 
   </div>
 </div>
+
+<style>
+  .lv-rejection {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 16px;
+    flex-shrink: 0;
+    max-height: 30vh;
+    overflow-y: auto;
+  }
+  .lv-rejection-reason { display: flex; flex-direction: column; gap: 2px; }
+  .lv-rejection-gloss { font-size: var(--text-sm); line-height: 1.4; color: var(--color-light-grey); }
+  .lv-rejection-comment {
+    margin: 0;
+    padding: 6px 10px;
+    border-left: 3px solid var(--color-error);
+    background-color: var(--color-surface-alt);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    color: var(--color-light);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .lv-rejection-when { font-size: var(--text-xs); color: var(--color-light-grey); }
+</style>

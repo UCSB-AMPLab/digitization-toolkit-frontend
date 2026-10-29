@@ -2,7 +2,7 @@
 // <img> in either inspection modal — Chromium cannot decode CR2, the operator
 // sees a broken image and retakes, and the retake supersedes the master.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -262,11 +262,34 @@ describe.each(modals)('%s — images freed from the card (NEH-248)', (_name, ren
 
     await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
     await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+    // Over a thumbnail the panel is one line; "Mostrar todo" opens the rest.
+    await expect.element(screen.getByText('No se perdió nada', { exact: false })).not.toBeInTheDocument();
+    await screen.getByRole('button', { name: 'Mostrar todo' }).click();
     await expect.element(screen.getByText('No se perdió nada', { exact: false })).toBeVisible();
     await expect.element(screen.getByText('un administrador puede restaurar el volumen', { exact: false })).toBeVisible();
     await expect.element(screen.getByText('Lo que ves es la miniatura, que Captua conserva en el equipo.')).toBeVisible();
     expect(screen.container.textContent).not.toContain('Miniatura (RAW)');
     expect(fetchSpy).toHaveBeenCalledWith(BROKEN, expect.anything());
+  });
+
+  it('over a thumbnail the panel is collapsed to its title and the toggle shows and hides the rest', async () => {
+    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+
+    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+    const toggle = screen.getByRole('button', { name: 'Mostrar todo' });
+    await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
+    for (const t of ['Este archivo está guardado fuera del equipo', 'No se perdió nada', 'un administrador puede restaurar', 'Lo que ves es la miniatura']) {
+      expect(screen.container.textContent).not.toContain(t);
+    }
+
+    await toggle.click();
+    await expect.element(screen.getByRole('button', { name: 'Mostrar menos' })).toHaveAttribute('aria-expanded', 'true');
+    for (const t of ['Este archivo está guardado fuera del equipo', 'No se perdió nada', 'un administrador puede restaurar', 'Lo que ves es la miniatura']) {
+      expect(screen.container.textContent).toContain(t);
+    }
+
+    await screen.getByRole('button', { name: 'Mostrar menos' }).click();
+    expect(screen.container.textContent).not.toContain('No se perdió nada');
   });
 
   it('a freed JPEG master: the same panel over its thumbnail', async () => {
@@ -284,6 +307,10 @@ describe.each(modals)('%s — images freed from the card (NEH-248)', (_name, ren
     await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
     await expect.element(screen.getByTestId('image-freed')).toBeVisible();
     expect(screen.container.querySelector('img')).toBeNull();
+    // With no thumbnail the panel stays whole, with no toggle.
+    await expect.element(screen.getByText('No se perdió nada', { exact: false })).toBeVisible();
+    await expect.element(screen.getByText('un administrador puede restaurar el volumen', { exact: false })).toBeVisible();
+    expect(screen.container.querySelector('[data-testid="image-freed"] button')).toBeNull();
     expect(screen.container.textContent).not.toContain('Lo que ves es la miniatura');
     expect(screen.container.textContent).not.toContain('No se encontró el archivo');
     expect(screen.container.textContent).not.toContain('No se puede mostrar');
@@ -332,6 +359,7 @@ describe.each(modals)('%s — a freed image shown only by its thumbnail (NEH-248
 
     await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
     await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+    await screen.getByRole('button', { name: 'Mostrar todo' }).click();
     await expect.element(screen.getByText('Lo que ves es la miniatura, que Captua conserva en el equipo.')).toBeVisible();
     expect(screen.container.textContent).not.toContain('Miniatura');
   });
