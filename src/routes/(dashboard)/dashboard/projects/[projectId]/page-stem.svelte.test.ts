@@ -2,8 +2,10 @@
 // "Sin raíz" mark, the stem sent on create, the translated 409 for a
 // duplicate stem, and the delete refused for a volume that reserves its stem
 // without moving its records first.
+// Its Status column shows each volume's pipeline stage, from
+// GET /activity/collections.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -18,12 +20,14 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import {
 	ApiError,
+	activityApi,
 	collectionsApi,
 	projectMembersApi,
 	projectsApi,
 	recordsApi,
 	type Collection,
-	type Project
+	type Project,
+	type StatusCounts
 } from '$lib/api';
 import { authStore, type AuthUser } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
@@ -49,6 +53,7 @@ beforeEach(() => {
 	vi.spyOn(projectsApi, 'get').mockResolvedValue({ id: 1, name: 'Rionegro' } as Project);
 	vi.spyOn(recordsApi, 'count').mockResolvedValue(3);
 	vi.spyOn(projectMembersApi, 'list').mockResolvedValue([]);
+	vi.spyOn(activityApi, 'collections').mockResolvedValue([]);
 	listSpy = vi.spyOn(collectionsApi, 'listAll').mockResolvedValue([reserved, stemless, other]);
 });
 
@@ -392,5 +397,46 @@ describe('project page: stems', () => {
 		await expect.element(page.getByText(es.pd_delete_stem_reserved)).toBeInTheDocument();
 		await expect.element(page.getByRole('button', { name: es.pd_delete_collection_title })).toBeDisabled();
 		expect(page.getByText(message, { exact: false }).elements()).toHaveLength(0);
+	});
+});
+
+describe('project page: stage', () => {
+	const act = (id: number, c: Partial<StatusCounts>) => ({
+		collection_id: id,
+		status_counts: { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c },
+		record_count: 0,
+		last_status_change_at: null
+	});
+
+	it('shows each volume\'s pipeline stage, from one request for the project', async () => {
+		const spy = vi.mocked(activityApi.collections).mockResolvedValue([
+			act(22, { captured: 1, approved: 2 }),
+			act(23, { rejected: 2, approved: 1 }),
+			act(24, { approved: 5 })
+		]);
+		render(ProjectPage);
+		const stage = (name: string) => page.getByRole('row').filter({ hasText: name });
+		await expect.element(stage('Tomo 55').getByText(es.dash_stage_capture)).toBeInTheDocument();
+		await expect.element(stage('Tomo 221').getByText(es.dash_stage_recapture)).toBeInTheDocument();
+		await expect.element(stage('Tomo 100').getByText(es.dash_stage_approved)).toBeInTheDocument();
+		expect(spy).toHaveBeenCalledTimes(1);
+		expect(spy).toHaveBeenCalledWith({ project_id: 1 });
+	});
+
+	it('puts an empty volume in capture and never shows the placeholder statuses', async () => {
+		vi.mocked(activityApi.collections).mockResolvedValue([act(22, {}), act(23, {}), act(24, {})]);
+		render(ProjectPage);
+		await expect.element(page.getByRole('row').filter({ hasText: 'Tomo 55' }).getByText(es.dash_stage_capture)).toBeInTheDocument();
+		await expect.element(page.getByText(es.pd_status_completed)).not.toBeInTheDocument();
+		await expect.element(page.getByText(es.proj_status_paused)).not.toBeInTheDocument();
+		await expect.element(page.getByText(es.pd_status_active)).not.toBeInTheDocument();
+	});
+
+	it('shows no stage, and keeps the list, when the counts cannot be loaded', async () => {
+		vi.mocked(activityApi.collections).mockRejectedValue(new ApiError('boom', undefined, 500));
+		render(ProjectPage);
+		await expect.element(page.getByText('Tomo 55')).toBeInTheDocument();
+		await expect.element(page.getByText(es.dash_stage_capture)).not.toBeInTheDocument();
+		await expect.element(page.getByText(es.pd_status_completed)).not.toBeInTheDocument();
 	});
 });

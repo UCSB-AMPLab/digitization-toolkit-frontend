@@ -10,12 +10,18 @@
   // buttons (NEH-209): the capture screen with the record's project, volume
   // and id, which opens that record's retake directly. A record with no
   // volume or project has no button.
+  //
+  // A select above the list narrows it to one volume, client-side. The volume
+  // is kept in the query (?collectionId=), which the Cola page links to. The
+  // select shows whenever the rows span two volumes or a volume is chosen, so
+  // a filter can always be cleared.
   // ============================================================================
   //
   // Version: 0.2.0
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { recordsApi, AuthError, type RecordToRetake } from '$lib/api';
   import { m, locale } from '$lib/i18n';
   import { userRole } from '$lib/stores/auth';
@@ -40,6 +46,30 @@
       loadError = true;
     }
   });
+
+  // The volume to show, from ?collectionId=; null shows every volume.
+  let volumeId = $derived.by(() => {
+    const raw = $page.url.searchParams.get('collectionId');
+    return raw && Number.isInteger(Number(raw)) ? Number(raw) : null;
+  });
+
+  // One option per volume present in the rows, by name.
+  let volumes = $derived.by(() => {
+    const seen = new Map<number, RecordToRetake>();
+    for (const row of rows ?? []) {
+      if (row.collectionId != null && !seen.has(row.collectionId)) seen.set(row.collectionId, row);
+    }
+    return [...seen.values()].sort((a, b) =>
+      (a.name ?? '').localeCompare(b.name ?? '', $locale, { numeric: true })
+    );
+  });
+
+  let shownRows = $derived(volumeId === null ? rows : (rows ?? []).filter(r => r.collectionId === volumeId));
+
+  function chooseVolume(event: Event) {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    goto(value ? `?collectionId=${value}` : '?', { replaceState: true, keepFocus: true, noScroll: true });
+  }
 
   function formatWhen(iso: string): string {
     return formatApiDate(iso, $locale, {
@@ -66,8 +96,22 @@
   {:else if rows.length === 0}
     <p class="empty">{$m.retakes_empty}</p>
   {:else}
+    {#if volumes.length > 1 || volumeId !== null}
+      <label class="filter">
+        <span class="filter-label">{$m.retakes_filter_volume_label}</span>
+        <select class="filter-select" value={volumeId === null ? '' : String(volumeId)} onchange={chooseVolume}>
+          <option value="">{$m.retakes_filter_all_volumes}</option>
+          {#each volumes as v (v.collectionId)}
+            <option value={String(v.collectionId)}>{v.name ?? '—'}{v.filenameStem ? ` ${v.filenameStem}` : ''}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
+    {#if shownRows && shownRows.length === 0}
+      <p class="empty">{$m.retakes_filter_empty}</p>
+    {:else}
     <ul class="retakes">
-      {#each rows as row (row.recordId)}
+      {#each shownRows ?? [] as row (row.recordId)}
         {@const reason = row.reason ? rejectionReasonText($m, row.reason) : null}
         <li class="rt-row">
           <div class="rt-main">
@@ -116,6 +160,7 @@
         </li>
       {/each}
     </ul>
+    {/if}
   {/if}
 </div>
 
@@ -141,6 +186,20 @@
   .notice { margin: 0 0 16px; font-size: var(--text-sm); color: var(--color-light-grey); }
   .notice.is-error { color: var(--color-error); }
   .empty { margin: 0; padding: 24px; border: 1px dashed var(--border-color); border-radius: var(--radius-md); color: var(--color-light-grey); font-size: var(--text-sm); }
+
+  .filter { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .filter-label { font-size: var(--text-xs); font-weight: var(--fw-bold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-light-grey); }
+  .filter-select {
+    min-height: var(--touch-target-min);
+    max-width: 100%;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background-color: var(--color-surface-alt-2);
+    color: var(--color-light);
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+  }
 
   .retakes {
     list-style: none;

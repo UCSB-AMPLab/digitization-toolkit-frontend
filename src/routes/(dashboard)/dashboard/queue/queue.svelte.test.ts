@@ -14,7 +14,7 @@ const gotoMock = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { importsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList, type StatusCounts } from '$lib/api';
+import { importsApi, recordsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList, type RecordToRetake, type StatusCounts } from '$lib/api';
 import { authStore, type UserRole } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import '../../../../app.css';
@@ -86,6 +86,7 @@ describe('Cola', () => {
 		locale.set('es');
 		gotoMock.mockClear();
 		signIn('operator');
+		vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([]);
 	});
 	afterEach(() => {
 		vi.restoreAllMocks();
@@ -157,6 +158,44 @@ describe('Cola', () => {
 		const row5 = screen.getByRole('listitem').nth(4);
 		await expect.element(row5.getByText('Aprobado', { exact: true })).toBeVisible();
 		await expect.element(row5.getByText('Hecho', { exact: true })).not.toBeInTheDocument();
+	});
+
+	describe('records to retake', () => {
+		function rejected(recordId: number, collectionId: number | null): RecordToRetake {
+			return {
+				recordId, title: `r${recordId}`, sequence: null, collectionId, projectId: 7,
+				name: null, filenameStem: null, reason: 'blur', comment: null, rejectedBy: null, rejectedAt: null
+			};
+		}
+
+		it('links an item whose volume has rejected records to them, with the count', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			vi.mocked(recordsApi.toRetake).mockResolvedValue([rejected(1, 104), rejected(2, 104), rejected(3, 104), rejected(4, 104), rejected(5, 102), rejected(6, null)]);
+			const screen = render(Queue);
+			const rows = screen.getByRole('listitem');
+			const link = rows.nth(3).getByRole('link', { name: '4 registros por recapturar' });
+			await expect.element(link).toBeVisible();
+			await expect.element(link).toHaveAttribute('href', '/dashboard/retakes?collectionId=104');
+			await expect.element(rows.nth(1).getByRole('link', { name: '1 registro por recapturar' })).toHaveAttribute('href', '/dashboard/retakes?collectionId=102');
+			expect(screen.getByRole('link', { name: /por recapturar$/ }).elements()).toHaveLength(2);
+		});
+
+		it('shows nothing on an item whose volume has none', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			vi.mocked(recordsApi.toRetake).mockResolvedValue([rejected(1, 104)]);
+			const screen = render(Queue);
+			await expect.element(screen.getByRole('link', { name: '1 registro por recapturar' })).toBeVisible();
+			expect(screen.getByRole('listitem').nth(0).element().querySelector('a')).toBeNull();
+			expect(screen.getByRole('listitem').nth(2).element().querySelector('a')).toBeNull();
+		});
+
+		it('shows no counts and keeps the page working when the fetch fails', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			vi.mocked(recordsApi.toRetake).mockRejectedValue(new ApiError('boom', undefined, 500));
+			const screen = render(Queue);
+			await expect.element(screen.getByText('Tomo 4')).toBeVisible();
+			expect(screen.getByRole('link', { name: /por recapturar$/ }).elements()).toHaveLength(0);
+		});
 	});
 
 	describe('done marks', () => {

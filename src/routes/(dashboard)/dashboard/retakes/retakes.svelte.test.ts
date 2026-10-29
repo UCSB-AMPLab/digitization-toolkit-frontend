@@ -8,7 +8,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 const gotoMock = vi.hoisted(() => vi.fn());
+// The page store follows goto, as the router's would: `notify` re-emits it.
+const pageUrl = vi.hoisted(() => ({ href: 'http://localhost/dashboard/retakes', notify: () => {} }));
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/stores', async () => {
+	const { writable } = await import('svelte/store');
+	const state = () => ({ params: {}, get url() { return new URL(pageUrl.href); } });
+	const store = writable(state());
+	pageUrl.notify = () => store.set(state());
+	return { page: { subscribe: store.subscribe } };
+});
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { recordsApi, collectionsApi, ApiError, type RecordToRetake } from '$lib/api';
@@ -79,7 +88,12 @@ function signIn(role: UserRole) {
 describe('Por recapturar', () => {
 	beforeEach(() => {
 		locale.set('es');
-		gotoMock.mockClear();
+		gotoMock.mockReset();
+		gotoMock.mockImplementation((to: string) => {
+			pageUrl.href = new URL(to, pageUrl.href).href;
+			pageUrl.notify();
+		});
+		pageUrl.href = 'http://localhost/dashboard/retakes';
 		signIn('operator');
 		// The volumes are not read: each row carries its project.
 		vi.spyOn(collectionsApi, 'listAll').mockRejectedValue(new Error('not called'));
@@ -172,7 +186,7 @@ describe('Por recapturar', () => {
 		signIn('reviewer');
 		vi.spyOn(recordsApi, 'toRetake').mockResolvedValue(toRetake);
 		const screen = render(Retakes);
-		await expect.element(screen.getByText('Tomo 6')).toBeVisible();
+		await expect.element(screen.getByRole('listitem').first()).toBeVisible();
 		await expect.element(screen.getByRole('button', { name: 'Volver a capturar' })).not.toBeInTheDocument();
 	});
 
@@ -186,5 +200,69 @@ describe('Por recapturar', () => {
 		vi.spyOn(recordsApi, 'toRetake').mockRejectedValue(new ApiError('boom', undefined, 500));
 		const screen = render(Retakes);
 		await expect.element(screen.getByText('No se pudo cargar la lista de registros por recapturar.')).toBeVisible();
+	});
+
+	describe('filter by volume', () => {
+		it('offers every volume present in the rows, sorted by name, after All volumes', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue(toRetake);
+			const screen = render(Retakes);
+			const select = screen.getByRole('combobox', { name: 'Volumen' });
+			await expect.element(select).toBeVisible();
+			const options = Array.from(select.element().querySelectorAll('option')).map((o) => o.textContent?.trim());
+			expect(options).toEqual(['Todos los volúmenes', 'Tomo 6 co-ahr-aht-006', 'Tomo 7 co-ahr-aht-007']);
+			expect(screen.getByRole('listitem').elements()).toHaveLength(4);
+		});
+
+		it('filters the rows by ?collectionId= and keeps the select on that volume', async () => {
+			pageUrl.href = 'http://localhost/dashboard/retakes?collectionId=6';
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue(toRetake);
+			const screen = render(Retakes);
+			await expect.element(screen.getByRole('listitem').first()).toBeVisible();
+			expect(screen.getByRole('listitem').elements()).toHaveLength(2);
+			expect((screen.getByRole('combobox', { name: 'Volumen' }).element() as HTMLSelectElement).value).toBe('6');
+		});
+
+		it('selecting a volume rewrites the query string in place and narrows the rows', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue(toRetake);
+			const screen = render(Retakes);
+			await expect.element(screen.getByRole('listitem').first()).toBeVisible();
+			await screen.getByRole('combobox', { name: 'Volumen' }).selectOptions('5');
+			expect(gotoMock).toHaveBeenCalledWith('?collectionId=5', { replaceState: true, keepFocus: true, noScroll: true });
+			expect(screen.getByRole('listitem').elements()).toHaveLength(1);
+		});
+
+		it('choosing All volumes drops the query', async () => {
+			pageUrl.href = 'http://localhost/dashboard/retakes?collectionId=5';
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue(toRetake);
+			const screen = render(Retakes);
+			await expect.element(screen.getByRole('listitem').first()).toBeVisible();
+			await screen.getByRole('combobox', { name: 'Volumen' }).selectOptions('');
+			expect(gotoMock).toHaveBeenCalledWith('?', { replaceState: true, keepFocus: true, noScroll: true });
+			expect(screen.getByRole('listitem').elements()).toHaveLength(4);
+		});
+
+		it('says so when the volume in the query has no rows', async () => {
+			pageUrl.href = 'http://localhost/dashboard/retakes?collectionId=99';
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue(toRetake);
+			const screen = render(Retakes);
+			await expect.element(screen.getByText('Este volumen no tiene registros por recapturar.')).toBeVisible();
+			expect(screen.getByRole('listitem').elements()).toHaveLength(0);
+		});
+
+		it('hides the select when the rows span a single volume', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([toRetake[0]]);
+			const screen = render(Retakes);
+			await expect.element(screen.getByText('Tomo 6')).toBeVisible();
+			expect(screen.getByRole('combobox').elements()).toHaveLength(0);
+		});
+
+		it('keeps the select while a volume is chosen, even when the rows span one volume', async () => {
+			pageUrl.href = 'http://localhost/dashboard/retakes?collectionId=5';
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([toRetake[0]]);
+			const screen = render(Retakes);
+			const select = screen.getByRole('combobox', { name: 'Volumen' });
+			await expect.element(select).toBeVisible();
+			expect((select.element() as HTMLSelectElement).value).toBe('5');
+		});
 	});
 });
