@@ -114,6 +114,20 @@ describe('nextItemPosition', () => {
 		expect(nextItemPosition(items)).toBe(2);
 	});
 
+	it('prefers the first item whose volume has retakes pending (0.2.0)', () => {
+		const items = [item(1), item(2), item(3), item(4)];
+		expect(nextItemPosition(items, new Set([3, 4]))).toBe(3);
+		// No such item: the usual rule.
+		expect(nextItemPosition(items, new Set([99]))).toBe(1);
+		expect(nextItemPosition(items, new Set())).toBe(1);
+	});
+
+	it('prefers an item with retakes even when it is marked done, but not one without a project', () => {
+		const items = [item(1), item(2, { doneMark: { by: 'a', at: null } }), item(3, { projectId: null })];
+		expect(nextItemPosition(items, new Set([2]))).toBe(2);
+		expect(nextItemPosition(items, new Set([3]))).toBe(1);
+	});
+
 	it('is null when every item is done', () => {
 		expect(nextItemPosition([item(1, { status: counts({ approved: 1 }) })])).toBeNull();
 		expect(nextItemPosition([])).toBeNull();

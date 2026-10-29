@@ -13,21 +13,29 @@
   // posts the picked file to POST /imports/digitisation-list and shows the
   // report: what was created, and each skipped item with its reason, an item
   // already on the unit apart from the errors.
+  //
+  // While recaptures are pending on the unit (0.2.0, GET
+  // /records/to-retake/summary), the page says whose turn it is, lists the
+  // items whose volume has retakes first, each with "N de M pendientes" and a
+  // Recapturar that opens its first pending record, and the rest after; during
+  // the retake turn the rest carry the line that says a new volume must wait.
+  // Siguiente is then the first item with retakes.
   // ============================================================================
   //
   // Version: 0.2.0
 
   import { onMount, tick } from 'svelte';
   import { goto } from '$app/navigation';
-  import { importsApi, recordsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList } from '$lib/api';
+  import { importsApi, recordsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList, type RetakeSummary } from '$lib/api';
   import { m, locale } from '$lib/i18n';
   import { userRole } from '$lib/stores/auth';
   import { formatApiDate } from '$lib/format-date';
   import { formatCount } from '$lib/format-count';
   import { barSegments, placeVolume, type BarStatus, type PipelineStage } from '$lib/pipeline';
   import {
-    actionsPresent, captureUrl, filterByAction, isItemDone, isOnUnitReject, nextItemPosition
+    actionsPresent, captureUrl, filterByAction, isItemDone, isOnUnitReject, nextItemPosition, retakeUrl
   } from '$lib/queue';
+  import { readRetakeSummary, retakeVolumeMap } from '$lib/recapture-turn';
   import { actionLabel, importErrorText, importReasonText } from '$lib/queue-labels';
 
   // Capture and import are admin and operator only, as the capture screen
@@ -87,17 +95,44 @@
     }
   }
 
-  onMount(() => { loadLists(); loadRetakeCounts(); });
+  // The recapture summary; null until it arrives, and when it cannot be
+  // loaded, which shows the list as one, with no turn.
+  let retakeSummary = $state<RetakeSummary | null>(null);
+
+  async function loadRetakeSummary() {
+    try {
+      retakeSummary = readRetakeSummary(await recordsApi.toRetakeSummary());
+    } catch (err) {
+      if (err instanceof AuthError && err.status === 401) return;
+      console.error('[Queue] Error loading the recapture summary:', err);
+    }
+  }
+
+  onMount(() => { loadLists(); loadRetakeCounts(); loadRetakeSummary(); });
+
+  let retakeVolumes = $derived(retakeVolumeMap(retakeSummary));
+  let turn = $derived(retakeSummary && retakeSummary.pendingRecords > 0 ? retakeSummary.turn : null);
+  // Sections only while something is pending and the turn says so.
+  // A new volume waits for the retakes of one volume.
+  let newVolumeLocked = $derived(turn?.state === 'recaptures');
+  let splitByRetakes = $derived(turn !== null && turn.state !== 'free' && retakeVolumes.size > 0);
 
   let list = $derived(lists?.find(l => l.listId === selectedListId) ?? null);
   let items = $derived(list?.items ?? []);
-  let nextPosition = $derived(nextItemPosition(items));
+  let nextPosition = $derived(nextItemPosition(items, splitByRetakes ? new Set(retakeVolumes.keys()) : undefined));
   let actions = $derived(actionsPresent(items));
 
   // null shows every item. A filter whose action the chosen list does not
   // have falls back to every item.
   let actionFilter = $state<string | null>(null);
   let shownItems = $derived(filterByAction(items, actions.includes(actionFilter ?? '') ? actionFilter : null));
+  let retakeItems = $derived(
+    splitByRetakes ? shownItems.filter(i => i.collectionId != null && retakeVolumes.has(i.collectionId)) : []
+  );
+  let otherItems = $derived(
+    splitByRetakes ? shownItems.filter(i => i.collectionId == null || !retakeVolumes.has(i.collectionId)) : shownItems
+  );
+
   // The filter hides the next item: say so, since its mark is not on screen.
   let nextHidden = $derived(nextPosition !== null && !shownItems.some(i => i.position === nextPosition));
 
@@ -192,7 +227,9 @@
     report = null;
     try {
       report = await importsApi.importList(file);
-      await loadLists(report.listId);
+      // The import may add volumes with retakes: the turn and the sections
+      // follow it (0.2.0).
+      await Promise.all([loadLists(report.listId), loadRetakeSummary()]);
     } catch (err) {
       importing = false;
       if (err instanceof AuthError && err.status === 401) return;
@@ -229,6 +266,85 @@
   {/if}
 {/snippet}
 
+{#snippet queueRow(item: QueueItem)}
+  {@const done = isItemDone(item)}
+  {@const isNext = item.position === nextPosition}
+  {@const projectId = item.projectId}
+  {@const retake = item.collectionId != null ? retakeVolumes.get(item.collectionId) : undefined}
+  <li class="q-row" class:is-next={isNext} class:is-done={done}>
+    <span class="q-order"><span aria-hidden="true">{orderOf(item)}</span><span class="visually-hidden">{$m.queue_order_label(orderOf(item))}</span></span>
+
+    <div class="q-main">
+      <div class="q-head">
+        <span class="q-title">{item.title ?? item.referenceCode ?? '—'}</span>
+        {#if isNext}
+          <span class="q-mark q-mark-next">{$m.queue_next}</span>
+        {:else if done}
+          <span class="q-mark q-mark-done">
+            <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+            <span>{$m.queue_done}</span>
+          </span>
+        {/if}
+      </div>
+      <div class="q-meta">
+        {#if item.referenceCode}<span class="q-code">{item.referenceCode}</span>{/if}
+        {#if item.action}<span class="q-action">{actionLabel($m, item.action)}</span>{/if}
+      </div>
+      {#if typeof item.notes === 'string' && item.notes.trim()}
+        <p class="q-notes">{item.notes}</p>
+      {/if}
+      {#if item.doneMark}
+        <span class="q-done-note">{markText(item)}</span>
+      {:else if done}
+        <span class="q-done-note">{$m.queue_done_approved}</span>
+      {/if}
+    </div>
+
+    <div class="q-progress">
+      {#if splitByRetakes && retake}
+        <span class="q-pending">{$m.retake_pending_of(retake.pending, retake.total)}</span>
+        <div class="q-retake-bar" aria-hidden="true">
+          <span style="width: {retake.total > 0 ? ((retake.total - retake.pending) / retake.total) * 100 : 0}%"></span>
+        </div>
+      {:else if item.collectionId == null || item.status == null}
+        <span class="q-no-volume">{$m.queue_no_volume}</span>
+      {:else}
+        <span class="q-stage">{stageTitle[placeVolume(item.status)]}</span>
+        {@render statusBar(item)}
+        <span class="pl-count">{$m.dash_records_count(recordTotal(item))}</span>
+        {@const toRetake = retakeCounts.get(item.collectionId) ?? 0}
+        {#if toRetake > 0}
+          <a class="q-retake" href="/dashboard/retakes?collectionId={item.collectionId}">{$m.q_to_retake(toRetake)}</a>
+        {/if}
+      {/if}
+    </div>
+
+    <div class="q-actions">
+      {#if splitByRetakes && retake}
+        {#if canOperate}
+          <a class="btn btn-recapture q-recapture" href={retakeUrl(retake.projectId, retake.collectionId, retake.firstPendingRecordId)}>{$m.retake_cta}</a>
+        {/if}
+      {:else if canOperate && item.collectionId != null && projectId != null}
+        <button class="btn ip-btn ip-btn-capture" onclick={() => goto(captureUrl(projectId, item.collectionId as number))}>
+          <!-- An empty volume waits for its turn (0.2.0): the capture screen says why. -->
+          <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">{newVolumeLocked && recordTotal(item) === 0 ? 'lock' : 'photo_camera'}</span>
+          <span>{$m.col_live_preview}</span>
+        </button>
+      {/if}
+      {#if canMarkDone && !done}
+        <button class="btn ip-btn ip-btn-mark" disabled={markingPosition !== null} onclick={() => setDone(item, true)}>
+          <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">check</span>
+          <span>{$m.queue_mark_done}</span>
+        </button>
+      {:else if canMarkDone && item.doneMark}
+        <button class="btn ip-btn ip-btn-unmark" disabled={markingPosition !== null} onclick={() => setDone(item, false)}>
+          {$m.queue_unmark_done}
+        </button>
+      {/if}
+    </div>
+  </li>
+{/snippet}
+
 <div class="page">
   <div class="page-header">
     <div>
@@ -253,6 +369,20 @@
       </button>
     {/if}
   </div>
+
+  {#if turn?.state === 'recaptures'}
+    <p class="turn-pill is-recaptures" role="status">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
+      <strong>{$m.turn_recap_title}</strong>
+      <span>{$m.turn_recap_body}</span>
+    </p>
+  {:else if turn?.state === 'new'}
+    <p class="turn-pill is-new" role="status">
+      <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+      <strong>{$m.turn_new_title}</strong>
+      {#if turn.unlockedBy}<span>{$m.turn_new_body(turn.unlockedBy.name)}</span>{/if}
+    </p>
+  {/if}
 
   {#if importError}
     <p class="notice is-error" role="alert">{importError}</p>
@@ -340,75 +470,43 @@
       {#if nextHidden}
         <p class="notice" role="status">{$m.queue_next_hidden}</p>
       {/if}
-      <ol class="queue">
-        {#each shownItems as item (item.position)}
-          {@const done = isItemDone(item)}
-          {@const isNext = item.position === nextPosition}
-          {@const projectId = item.projectId}
-          <li class="q-row" class:is-next={isNext} class:is-done={done}>
-            <span class="q-order"><span aria-hidden="true">{orderOf(item)}</span><span class="visually-hidden">{$m.queue_order_label(orderOf(item))}</span></span>
-
-            <div class="q-main">
-              <div class="q-head">
-                <span class="q-title">{item.title ?? item.referenceCode ?? '—'}</span>
-                {#if isNext}
-                  <span class="q-mark q-mark-next">{$m.queue_next}</span>
-                {:else if done}
-                  <span class="q-mark q-mark-done">
-                    <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
-                    <span>{$m.queue_done}</span>
-                  </span>
-                {/if}
-              </div>
-              <div class="q-meta">
-                {#if item.referenceCode}<span class="q-code">{item.referenceCode}</span>{/if}
-                {#if item.action}<span class="q-action">{actionLabel($m, item.action)}</span>{/if}
-              </div>
-              {#if typeof item.notes === 'string' && item.notes.trim()}
-                <p class="q-notes">{item.notes}</p>
-              {/if}
-              {#if item.doneMark}
-                <span class="q-done-note">{markText(item)}</span>
-              {:else if done}
-                <span class="q-done-note">{$m.queue_done_approved}</span>
-              {/if}
-            </div>
-
-            <div class="q-progress">
-              {#if item.collectionId == null || item.status == null}
-                <span class="q-no-volume">{$m.queue_no_volume}</span>
-              {:else}
-                <span class="q-stage">{stageTitle[placeVolume(item.status)]}</span>
-                {@render statusBar(item)}
-                <span class="pl-count">{$m.dash_records_count(recordTotal(item))}</span>
-                {@const toRetake = retakeCounts.get(item.collectionId) ?? 0}
-                {#if toRetake > 0}
-                  <a class="q-retake" href="/dashboard/retakes?collectionId={item.collectionId}">{$m.q_to_retake(toRetake)}</a>
-                {/if}
-              {/if}
-            </div>
-
-            <div class="q-actions">
-              {#if canOperate && item.collectionId != null && projectId != null}
-                <button class="btn ip-btn ip-btn-capture" onclick={() => goto(captureUrl(projectId, item.collectionId as number))}>
-                  <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">photo_camera</span>
-                  <span>{$m.col_live_preview}</span>
-                </button>
-              {/if}
-              {#if canMarkDone && !done}
-                <button class="btn ip-btn ip-btn-mark" disabled={markingPosition !== null} onclick={() => setDone(item, true)}>
-                  <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">check</span>
-                  <span>{$m.queue_mark_done}</span>
-                </button>
-              {:else if canMarkDone && item.doneMark}
-                <button class="btn ip-btn ip-btn-unmark" disabled={markingPosition !== null} onclick={() => setDone(item, false)}>
-                  {$m.queue_unmark_done}
-                </button>
-              {/if}
-            </div>
-          </li>
-        {/each}
-      </ol>
+      {#if splitByRetakes}
+        <section class="q-section q-first" aria-labelledby="q-first-title">
+          <h2 id="q-first-title" class="q-section-title">{$m.q_first_title}</h2>
+          <p class="q-section-sub">{$m.q_first_sub}</p>
+          {#if retakeItems.length > 0}
+            <ol class="queue">
+              {#each retakeItems as item (item.position)}
+                {@render queueRow(item)}
+              {/each}
+            </ol>
+          {/if}
+        </section>
+        <section class="q-section q-then" class:is-locked={turn?.state === 'recaptures'} aria-labelledby="q-then-title">
+          <div class="q-section-head">
+            <h2 id="q-then-title" class="q-section-title">{$m.q_then_title}</h2>
+            {#if turn?.state === 'recaptures'}
+              <span class="q-locked">
+                <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+                <span>{$m.q_new_locked}</span>
+              </span>
+            {/if}
+          </div>
+          {#if otherItems.length > 0}
+            <ol class="queue">
+              {#each otherItems as item (item.position)}
+                {@render queueRow(item)}
+              {/each}
+            </ol>
+          {/if}
+        </section>
+      {:else}
+        <ol class="queue">
+          {#each shownItems as item (item.position)}
+            {@render queueRow(item)}
+          {/each}
+        </ol>
+      {/if}
     {/if}
   {/if}
 </div>
@@ -583,6 +681,45 @@
   .q-done-note { font-size: var(--text-xs); color: var(--color-success); }
   .q-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .q-no-volume { font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.4; }
+
+  /* ── The recapture turn (0.2.0) ── */
+  .turn-pill {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 0 20px;
+    padding: 10px 16px;
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+  }
+  .turn-pill strong { font-weight: var(--fw-black); }
+  .turn-pill .material-symbols-outlined { font-size: 20px; }
+  .turn-pill.is-recaptures { background-color: var(--color-highlight); color: var(--color-bg); }
+  .turn-pill.is-new { border: 1px solid var(--color-success); color: var(--color-success); background-color: var(--color-success-bg); }
+
+  .q-section { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+  .q-first {
+    padding: 20px;
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--color-highlight);
+    background-color: rgba(225, 183, 120, 0.08);
+  }
+  .q-section-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  .q-section-title { margin: 0; font-size: var(--text-h3); font-weight: var(--fw-extrabold); color: var(--color-light); }
+  .q-first .q-section-title { color: var(--color-highlight); }
+  .q-section-sub { margin: 0; font-size: var(--text-sm); color: var(--color-light); }
+  .q-locked { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-light-grey); }
+  .q-locked .material-symbols-outlined { font-size: 18px; }
+  .q-then.is-locked .queue { opacity: 0.6; }
+  .q-first .queue { background-color: var(--color-surface); }
+  .q-recapture { padding: 8px 18px; font-size: var(--text-sm); }
+  .q-pending { font-size: var(--text-sm); font-weight: var(--fw-extrabold); color: var(--color-highlight); }
+  .q-retake-bar { width: 100%; height: 6px; border-radius: var(--radius-full); background-color: var(--color-surface-alt-2); overflow: hidden; }
+  .q-retake-bar span { display: block; height: 100%; background-color: var(--color-highlight); }
 
   /* ── Stacked status bar, as in InProgress.svelte ── */
   .pl-bar {

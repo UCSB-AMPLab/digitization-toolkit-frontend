@@ -4,10 +4,15 @@
   // in `double` mode. Retake asks for confirmation, and the modal cannot be
   // closed while the replacement capture runs. A rejected record also shows
   // its newest rejection (reason, note, who and when), so the operator
-  // retaking it does not need the Por recapturar page open beside it.
+  // retaking it does not need the Por recapturar page open beside it. In the
+  // guided retake (0.2.0) the page passes `guide`, drawn under the header and
+  // told whether the retake is running. A captured record prepared for
+  // retake is still pending (the backend's pending, which the record does
+  // not show): the page passes `pending` for it, and its rejection shows too.
   //
   // Version: 0.2.0
 
+  import type { Snippet } from 'svelte';
   import { recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';
   import { m, locale } from '$lib/i18n';
   import { formatApiDate } from '$lib/format-date';
@@ -21,11 +26,16 @@
     cameraMode,
     onClose,
     onRetake,
+    guide,
+    pending = false,
   }: {
     record: ApiRecord;
     cameraMode: 'single' | 'double';
     onClose: () => void;
     onRetake: (record: ApiRecord) => Promise<void>;
+    guide?: Snippet<[boolean]>;
+    // The summary lists the record as pending.
+    pending?: boolean;
   } = $props();
 
   let confirmRetake = $state(false);
@@ -36,7 +46,7 @@
 
   $effect(() => {
     const id = record.id;
-    const rejected = record.status === 'rejected';
+    const rejected = record.status === 'rejected' || pending;
     rejection = null;
     if (!rejected) return;
     let stale = false;
@@ -122,6 +132,8 @@
         <span class="material-symbols-outlined icon-md">close</span>
       </button>
     </div>
+
+    {#if guide}{@render guide(retaking)}{/if}
 
     <!-- Retake error; the record keeps its original images -->
     {#if retakeError}

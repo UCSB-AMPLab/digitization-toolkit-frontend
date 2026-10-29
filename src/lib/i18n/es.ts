@@ -1380,6 +1380,60 @@ export const es = {
 	lv_instruction_show_all: 'Mostrar todo',
 	lv_instruction_show_less: 'Mostrar menos',
 
+	// ── The recapture turn (0.2.0) ──────────────────────────────────────────
+	// A singular count is written as a word (un, una); plurals keep the figure.
+	// Resumen band and "Volúmenes con recapturas".
+	retake_band_title: (n: number, v: number) =>
+		`${n === 1 ? 'Un par de páginas' : `${formatCount(n, 'es')} pares de páginas`} por recapturar en ${v === 1 ? 'un volumen' : `${formatCount(v, 'es')} volúmenes`}`,
+	retake_band_body: 'La lista de digitalización pide volver a capturarlos. Termina las recapturas antes de empezar volúmenes nuevos.',
+	retake_band_most: (name: string, n: number) => `Con más pendientes: ${name} (${formatCount(n, 'es')}).`,
+	retake_band_cta: 'Empezar recapturas',
+	retake_vols_title: 'Volúmenes con recapturas',
+	retake_pending_of: (p: number, t: number) => `${formatCount(p, 'es')} de ${formatCount(t, 'es')} pendientes`,
+	retake_cta: 'Recapturar',
+	// Cola.
+	q_first_title: 'Primero: recapturas',
+	q_first_sub: 'Estos volúmenes tienen pares de páginas que la lista de digitalización pide volver a capturar.',
+	q_then_title: 'Después: digitalización nueva',
+	q_new_locked: 'Para empezar un volumen nuevo, primero hay que terminar las recapturas de un volumen.',
+	turn_recap_title: 'Turno de recapturas',
+	turn_recap_body: 'Termina las recapturas de un volumen y podrás empezar uno nuevo.',
+	turn_new_title: 'Turno de volumen nuevo',
+	turn_new_body: (name: string) => `Ya se terminaron las recapturas del volumen ${name}. Puedes empezar un volumen nuevo.`,
+	// The volume page.
+	vol_band_title: (n: number) =>
+		n === 1 ? 'Un par de páginas por recapturar' : `${formatCount(n, 'es')} pares de páginas por recapturar`,
+	vol_band_cta: 'Recapturar ahora',
+	vol_handover_disabled: (n: number) => (n === 1 ? 'Falta una recaptura' : `Faltan ${formatCount(n, 'es')} recapturas`),
+	vol_handover_hint: 'Podrás enviar el volumen a revisión cuando termines las recapturas.',
+	// The capture screen: the block, the unlock band and the guided retake.
+	block_title: 'Primero, termina las recapturas de un volumen',
+	block_body:
+		'Mientras en este equipo haya recapturas pendientes, para empezar un volumen nuevo hay que terminar antes las recapturas de un volumen. Ahora toca recapturar.',
+	block_next: (name: string, n: number) =>
+		`Siguiente en la cola: ${name}, con ${n === 1 ? 'un par de páginas' : `${formatCount(n, 'es')} pares de páginas`} por recapturar.`,
+	block_cta: (name: string) => `Recapturar ${name}`,
+	block_back: 'Volver a la cola',
+	block_admin: 'Capturar de todos modos (administrador)',
+	unlock_title: 'Puedes empezar este volumen',
+	unlock_body: (name: string) =>
+		`Ya se terminaron las recapturas del volumen ${name}. Una vez empieces este volumen, puedes capturarlo sin límite; el siguiente turno será de recapturas.`,
+	unlock_cta: 'Empezar a capturar',
+	guide_header: (k: number, n: number, name: string) => `Recaptura ${formatCount(k, 'es')} de ${formatCount(n, 'es')} · ${name}`,
+	guide_skip: 'Saltar por ahora',
+	guide_next: (f: string) => `Siguiente: folios ${f}`,
+	// `turnNew`: the turn is now `new`.
+	guide_done: (turnNew: boolean): string =>
+		turnNew
+			? 'Terminaste las recapturas de este volumen. Ya puedes empezar un volumen nuevo.'
+			: 'Terminaste las recapturas de este volumen.',
+	guide_done_queue: 'Ir a la cola',
+	guide_done_more: 'Recapturar otro volumen',
+	err_recapture_turn:
+		'No se pudo empezar el volumen: es turno de recapturas. Termina las recapturas de un volumen e intenta de nuevo.',
+	err_recaptures_pending: (n: number) =>
+		`No se pudo enviar el volumen a revisión: ${n === 1 ? 'falta una recaptura' : `faltan ${formatCount(n, 'es')} recapturas`}.`,
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',
 	api_request_failed: 'Error en la solicitud'

@@ -49,10 +49,18 @@ export function isItemDone(item: QueueItem): boolean {
 
 /**
  * Position of the next item to capture, or null when there is none. An item
- * must have a volume and a project, as the capture link needs both.
+ * must have a volume and a project, as the capture link needs both. While
+ * retakes are pending (0.2.0), the first item whose volume is in
+ * `retakeVolumes` comes first, done or not, since its retakes are still
+ * owed; the usual rule applies when no item has one.
  */
-export function nextItemPosition(items: QueueItem[]): number | null {
-	const next = items.find((i) => i.collectionId != null && i.projectId != null && !isItemDone(i));
+export function nextItemPosition(items: QueueItem[], retakeVolumes?: ReadonlySet<number>): number | null {
+	const capturable = (i: QueueItem) => i.collectionId != null && i.projectId != null;
+	if (retakeVolumes && retakeVolumes.size > 0) {
+		const retake = items.find((i) => capturable(i) && retakeVolumes.has(i.collectionId as number));
+		if (retake) return retake.position;
+	}
+	const next = items.find((i) => capturable(i) && !isItemDone(i));
 	return next ? next.position : null;
 }
 

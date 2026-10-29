@@ -1334,6 +1334,57 @@ export const en: Messages = {
 	lv_instruction_show_all: 'Show all',
 	lv_instruction_show_less: 'Show less',
 
+	// ── The recapture turn (0.2.0) ──────────────────────────────────────────
+	// Resumen band and "Volumes with retakes".
+	retake_band_title: (n: number, v: number) =>
+		`${n === 1 ? '1 page pair' : `${formatCount(n, 'en')} page pairs`} to retake in ${v === 1 ? '1 volume' : `${formatCount(v, 'en')} volumes`}`,
+	retake_band_body: 'The digitisation list asks for them to be captured again. Finish the retakes before starting new volumes.',
+	retake_band_most: (name: string, n: number) => `Most pending: ${name} (${formatCount(n, 'en')}).`,
+	retake_band_cta: 'Start retakes',
+	retake_vols_title: 'Volumes with retakes',
+	retake_pending_of: (p: number, t: number) => `${formatCount(p, 'en')} of ${formatCount(t, 'en')} pending`,
+	retake_cta: 'Retake',
+	// Cola.
+	q_first_title: 'First: retakes',
+	q_first_sub: 'These volumes have page pairs the digitisation list asks to capture again.',
+	q_then_title: 'Then: new digitisation',
+	q_new_locked: 'To start a new volume, first finish the retakes of one volume.',
+	turn_recap_title: 'Retake turn',
+	turn_recap_body: 'Finish the retakes of one volume and you can start a new one.',
+	turn_new_title: 'New volume turn',
+	turn_new_body: (name: string) => `The retakes of volume ${name} are finished. You can start a new volume.`,
+	// The volume page.
+	vol_band_title: (n: number) => (n === 1 ? '1 page pair to retake' : `${formatCount(n, 'en')} page pairs to retake`),
+	vol_band_cta: 'Retake now',
+	vol_handover_disabled: (n: number) => (n === 1 ? '1 retake left' : `${formatCount(n, 'en')} retakes left`),
+	vol_handover_hint: 'You can send the volume to review once the retakes are finished.',
+	// The capture screen: the block, the unlock band and the guided retake.
+	block_title: 'First, finish the retakes of one volume',
+	block_body:
+		'While this unit has retakes pending, a new volume can be started only after the retakes of one volume are finished. It is the retake turn now.',
+	block_next: (name: string, n: number) =>
+		`Next in the queue: ${name}, with ${n === 1 ? '1 page pair' : `${formatCount(n, 'en')} page pairs`} to retake.`,
+	block_cta: (name: string) => `Retake ${name}`,
+	block_back: 'Back to the queue',
+	block_admin: 'Capture anyway (admin)',
+	unlock_title: 'You can start this volume',
+	unlock_body: (name: string) =>
+		`The retakes of volume ${name} are finished. Once you start this volume you can capture it without limit; the next turn will be for retakes.`,
+	unlock_cta: 'Start capturing',
+	guide_header: (k: number, n: number, name: string) => `Retake ${formatCount(k, 'en')} of ${formatCount(n, 'en')} · ${name}`,
+	guide_skip: 'Skip for now',
+	guide_next: (f: string) => `Next: folios ${f}`,
+	guide_done: (turnNew: boolean) =>
+		turnNew
+			? 'You finished the retakes of this volume. You can now start a new volume.'
+			: 'You finished the retakes of this volume.',
+	guide_done_queue: 'Go to the queue',
+	guide_done_more: 'Retake another volume',
+	err_recapture_turn:
+		'The volume could not be started: it is the retake turn. Finish the retakes of one volume and try again.',
+	err_recaptures_pending: (n: number) =>
+		`The volume could not be sent to review: ${n === 1 ? '1 retake left' : `${formatCount(n, 'en')} retakes left`}.`,
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
 	api_request_failed: 'Request failed'

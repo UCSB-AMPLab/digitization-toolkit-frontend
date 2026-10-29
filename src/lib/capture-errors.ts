@@ -13,6 +13,8 @@
 //   for a volume at its 9999-capture limit (app/core/capture_naming.py), the
 //   404s for an unknown volume or record, and the 422s for a retake in the
 //   wrong capture mode and for a resolution in the file name;
+//   (and, from 0.2.0, the 409 with code `recapture_turn` for a capture that
+//   would start an empty volume during the retake turn, in recapture-turn.ts);
 // - a request answered 200 with `success: false`, which the capture screen
 //   turns into a CaptureFailed carrying the backend's `error`: a camera that
 //   is not connected, or the text of whatever failed during the capture.
@@ -22,10 +24,11 @@
 // as the wrong one. No import of api.ts, so the tests run in plain node:
 // errors are matched by shape (`status`, `message`), as volume-stem.ts does.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.0
 
 import type { Messages } from './i18n';
 import { isConflict, isVolumeRequired, isWrongRetakeVolume } from './volume-stem';
+import { isRecaptureTurnRefusal } from './recapture-turn';
 
 // STEM_REQUIRED_DETAIL in app/core/volume_stem.py.
 const STEM_REQUIRED_DETAIL = 'This volume has no file name stem. Give it one before capturing into it.';
@@ -95,6 +98,8 @@ export function captureErrorText(error: unknown, msgs: Messages): string {
 		return msgs.lv_capture_error;
 	}
 	if (!(error instanceof Error)) return msgs.lv_capture_error;
+	// The recapture turn's 409 (0.2.0) carries a code: matched on it, not on its text.
+	if (isRecaptureTurnRefusal(error)) return msgs.err_recapture_turn;
 	if (isVolumeRequired(error)) return msgs.lv_err_no_volume;
 	if (isStemRequired(error)) return msgs.lv_needs_stem;
 	if (isWrongRetakeVolume(error)) return msgs.lv_err_retake_volume;

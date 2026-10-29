@@ -6,7 +6,8 @@
 	// Queue, To retake, Users and Settings; operator and reviewer see all but
 	// Users and Settings. To retake carries a badge with the number of records
 	// waiting (GET /records/to-retake/count), reloaded on every navigation so
-	// that it follows a retake.
+	// that it follows a retake; badge and label are in the recapture sand
+	// while any is waiting (0.2.0).
 	// A new section needs its route under `src/routes/(dashboard)/` and an
 	// entry in `NAV_ITEMS` listing the roles allowed to open it.
 	//
@@ -308,6 +309,7 @@
 						href={item.path}
 						class="s-item"
 						class:active={isActive(item.path)}
+						class:is-retake={item.id === 'retakes' && !!item.badge}
 						title={!expanded ? $m[item.labelKey] : undefined}
 					>
 						{#if isActive(item.path)}
@@ -404,10 +406,10 @@
 						{#if expanded}
 							<span class="s-label">{$m[item.labelKey]}</span>
 							{#if item.badge}
-								<span class="s-badge" aria-hidden={item.id === 'retakes' ? 'true' : undefined}>{item.badge}</span>
+								<span class="s-badge" class:s-badge-retake={item.id === 'retakes'} aria-hidden={item.id === 'retakes' ? 'true' : undefined}>{item.badge}</span>
 							{/if}
 						{:else if item.badge}
-							<span class="s-badge-dot"></span>
+							<span class="s-badge-dot" class:s-badge-retake={item.id === 'retakes'}></span>
 						{/if}
 						{#if item.id === 'retakes' && item.badge}
 							<span class="visually-hidden">{$m.nav_retakes_count(item.badge)}</span>
@@ -721,6 +723,17 @@
 		border-radius: var(--radius-full);
 		flex-shrink: 0;
 	}
+
+	/* Recaptures waiting (0.2.0): sand, with dark text on the badge. */
+	.s-item.is-retake,
+	.s-item.is-retake .s-icon { color: var(--color-highlight); }
+	.s-item.is-retake .s-label { font-weight: var(--fw-bold); }
+	.s-badge.s-badge-retake {
+		background-color: var(--color-highlight);
+		color: var(--color-bg);
+		font-weight: var(--fw-extrabold);
+	}
+	.s-badge-dot.s-badge-retake { background-color: var(--color-highlight); }
 
 	.visually-hidden {
 		position: absolute;
