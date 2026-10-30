@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Version: 0.1.0-beta
+  // Version: 0.2.1
 
   import type { Record as ApiRecord } from '$lib/api';
   import { m, locale } from '$lib/i18n';
@@ -15,7 +15,8 @@
   // captured leads, because that is the order the work moves in: the
   // operator's own, then handed over, then ruled on (NEH-260).
   const statusKeys = ['captured', 'in_review', 'rejected', 'approved'] as const;
-  type S = ApiRecord['status'];
+  // Excluded records have their own count below, not a labelled one.
+  type S = (typeof statusKeys)[number];
 
   let labels = $derived<{ [K in S]: string }>({
     captured:  $m.status_captured_plural,
@@ -24,9 +25,14 @@
     approved:  $m.status_approved_plural,
   });
 
-  // Total records in the volume: shown with each count so that the number
-  // reads as a proportion.
-  let total = $derived(records.length);
+  // A record Fisqua excluded (contract 1.6) is not a page of the volume: it
+  // gets its own count after the others, shown only when there is one, and
+  // is left out of the total they read against.
+  let excluded = $derived(records.filter(r => r.status === 'excluded').length);
+
+  // The volume's records, excluded ones aside: shown with each count so that
+  // the number reads as a proportion.
+  let total = $derived(records.length - excluded);
 
   let counts = $derived(
     statusKeys.reduce((acc, s) => {
@@ -47,6 +53,12 @@
         </div>
       {/if}
     {/each}
+    {#if excluded > 0}
+      <div class="status-bar-item">
+        <div class="status-bar-dot seg-excluded"></div>
+        <span>{$m.vol_excluded_count(excluded)}</span>
+      </div>
+    {/if}
     {#if records.length === 0}
       <span class="status-bar-item">{$m.col_no_records}</span>
     {/if}

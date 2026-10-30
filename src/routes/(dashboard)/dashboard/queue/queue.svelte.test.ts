@@ -5,7 +5,7 @@
 // /imports/digitisation-lists and POST /imports/digitisation-list are
 // mocked.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
@@ -21,7 +21,7 @@ import '../../../../app.css';
 import Queue from './+page.svelte';
 
 function counts(c: Partial<StatusCounts> = {}): StatusCounts {
-	return { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c };
+	return { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0, ...c };
 }
 
 function item(position: number, over: Partial<QueueItem> = {}): QueueItem {
@@ -84,8 +84,8 @@ function turnSummary(state: 'recaptures' | 'new'): RetakeSummary {
 	return {
 		pendingRecords: 33,
 		volumes: [
-			{ collectionId: 105, projectId: 7, name: 'Tomo 5', filenameStem: 'co-ahr-aht-5', pending: 31, total: 31, firstPendingRecordId: 905, pendingRecordIds: Array.from({ length: 31 }, (_, i) => 905 + i) },
-			{ collectionId: 104, projectId: 8, name: 'Tomo 4', filenameStem: 'co-ahr-aht-4', pending: 2, total: 3, firstPendingRecordId: 904, pendingRecordIds: [904, 906] }
+			{ collectionId: 105, projectId: 7, name: 'Tomo 5', filenameStem: 'co-ahr-aht-5', pending: 31, total: 31, excluded: 0, firstPendingRecordId: 905, pendingRecordIds: Array.from({ length: 31 }, (_, i) => 905 + i) },
+			{ collectionId: 104, projectId: 8, name: 'Tomo 4', filenameStem: 'co-ahr-aht-4', pending: 2, total: 3, excluded: 0, firstPendingRecordId: 904, pendingRecordIds: [904, 906] }
 		],
 		turn: { state, unlockedBy: state === 'new' ? { collectionId: 77, name: 'Tomo 002' } : null }
 	};

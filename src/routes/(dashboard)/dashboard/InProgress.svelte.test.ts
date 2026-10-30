@@ -2,7 +2,7 @@
 // from mocked GET /activity/collections data, the actions on each card, and
 // what the block shows when the endpoint fails.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.1
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -26,7 +26,7 @@ function coll(id: number, name: string, lastActivity: string | null): Collection
 }
 
 function act(id: number, c: Partial<StatusCounts>, at: string | null): CollectionActivity {
-	const sc = { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c };
+	const sc = { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0, ...c };
 	return {
 		collection_id: id,
 		status_counts: sc,

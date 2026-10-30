@@ -12,7 +12,10 @@
 //   export asked for while files are being changed (FILES_CHANGING_MESSAGE);
 // - the 409 of a move of records whose files are already stored offsite
 //   under their volume (STORED_OFFSITE_MESSAGE in app/core/image_upload.py,
-//   and the move-records refusal in app/api/collections.py).
+//   and the move-records refusal in app/api/collections.py);
+// - the 409s for a record Fisqua excluded (contract 1.6, app/api/records.py):
+//   an image added to it, refused for every role, and a delete of the record
+//   or of one of its images, refused for every role but admin.
 //
 // The backend sends these as fixed English text with no code, so they are
 // matched on status plus the exact text (or its fixed start), as
@@ -20,7 +23,7 @@
 // caller's generic message instead of being shown as the wrong one. No import
 // of api.ts, so the tests run in plain node.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.1
 
 import type { Messages } from './i18n';
 
@@ -42,6 +45,15 @@ const STORED_OFFSITE_MESSAGE =
 	"This record's files are already stored offsite under this volume, so it cannot be moved to another volume.";
 // The start of the move-records 409; the rest carries the count and the ids.
 const STORED_OFFSITE_MOVE = /^Cannot move: \d+ record\(s\) have files already stored offsite under this volume: /;
+
+// The 409s for a record Fisqua excluded, from add_image_to_record and
+// _locked_detail in app/api/records.py.
+const UPLOAD_EXCLUDED_MESSAGE =
+	"Cannot add an image to a record with status 'excluded': Fisqua excluded it from the volume.";
+const DELETE_RECORD_EXCLUDED_MESSAGE =
+	"Cannot delete a record with status 'excluded': Fisqua excluded it from the volume, and only an admin can delete it.";
+const DELETE_IMAGE_EXCLUDED_MESSAGE =
+	"Cannot delete an image from a record with status 'excluded': Fisqua excluded it from the volume, and only an admin can delete it.";
 
 function refusal(error: unknown, status: number): string | null {
 	if (!(error instanceof Error)) return null;
@@ -107,4 +119,19 @@ export function storedOffsiteCount(error: unknown): number | null {
 	const detail = (error as { detail?: unknown }).detail;
 	const ids = typeof detail === 'object' && detail !== null ? (detail as { blocking_record_ids?: unknown }).blocking_record_ids : undefined;
 	return Array.isArray(ids) && ids.length > 0 ? ids.length : null;
+}
+
+/**
+ * The message for an upload or a delete refused because Fisqua excluded the
+ * record, or null for any other error.
+ */
+export function excludedRefusalText(error: unknown, msgs: Messages): string | null {
+	switch (refusal(error, 409)) {
+		case UPLOAD_EXCLUDED_MESSAGE:
+			return msgs.err_upload_excluded;
+		case DELETE_RECORD_EXCLUDED_MESSAGE:
+		case DELETE_IMAGE_EXCLUDED_MESSAGE:
+			return msgs.err_delete_excluded;
+	}
+	return null;
 }

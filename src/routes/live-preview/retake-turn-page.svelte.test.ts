@@ -9,7 +9,7 @@
 //   ahora", the folios of the next record, and the end panel.
 // Every request is answered by a fetch mock keyed on the path.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -50,8 +50,8 @@ function summary(state: 'free' | 'recaptures' | 'new'): RetakeSummary {
 			state === 'free'
 				? []
 				: [
-						{ collectionId: 30, projectId: 2, name: 'Tomo 030', filenameStem: 'co-30', pending: 3, total: 3, firstPendingRecordId: 300, pendingRecordIds: [300, 301, 302] },
-						{ collectionId: 31, projectId: 2, name: 'Tomo 002', filenameStem: 'co-31', pending: 2, total: 2, firstPendingRecordId: 310, pendingRecordIds: [310, 311] }
+						{ collectionId: 30, projectId: 2, name: 'Tomo 030', filenameStem: 'co-30', pending: 3, total: 3, excluded: 0, firstPendingRecordId: 300, pendingRecordIds: [300, 301, 302] },
+						{ collectionId: 31, projectId: 2, name: 'Tomo 002', filenameStem: 'co-31', pending: 2, total: 2, excluded: 0, firstPendingRecordId: 310, pendingRecordIds: [310, 311] }
 					],
 		turn: { state, unlockedBy: state === 'new' ? { collectionId: 77, name: 'Tomo 077' } : null }
 	};
@@ -107,7 +107,7 @@ function serve() {
 			if (pendingIds.length === 0) return json(next);
 			const volume9 = {
 				collectionId: 9, projectId: 2, name: 'Tomo 6', filenameStem: 'co-ahr-6',
-				pending: pendingIds.length, total: pendingIds.length, firstPendingRecordId: pendingIds[0], pendingRecordIds: pendingIds
+				pending: pendingIds.length, total: pendingIds.length, excluded: 0, firstPendingRecordId: pendingIds[0], pendingRecordIds: pendingIds
 			};
 			return json({ ...next, pendingRecords: next.pendingRecords + pendingIds.length, volumes: [...next.volumes, volume9] });
 		}

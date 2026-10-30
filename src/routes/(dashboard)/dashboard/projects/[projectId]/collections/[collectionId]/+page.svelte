@@ -12,7 +12,7 @@
   // come from GET /records/to-retake/summary, read with every load of the
   // records; without it, the rejected records are counted.
   //
-  // Version: 0.2.0
+  // Version: 0.2.1
 
   import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
@@ -36,7 +36,7 @@
   import { getVolumeTopbar } from '$lib/volume-topbar';
   import { retakeUrl } from '$lib/queue';
   import { dismissible } from '$lib/dialog';
-  import { fileHoldText } from '$lib/volume-refusals';
+  import { excludedRefusalText, fileHoldText } from '$lib/volume-refusals';
   import { freedExportCount } from '$lib/offsite-free';
   import { reconcileInspected, selectionAfterLoad } from '$lib/record-selection';
   import { freedFromBody } from '$lib/image-display';
@@ -236,7 +236,7 @@
     } catch (err) {
       // The backend's English text goes to the console only.
       console.error('[Gallery] Error deleting record:', err);
-      deleteRecordError = fileHoldText(err, $m) ?? $m.col_delete_record_retry;
+      deleteRecordError = fileHoldText(err, $m) ?? excludedRefusalText(err, $m) ?? $m.col_delete_record_retry;
     } finally {
       inspectedRecord = null;
     }
@@ -252,7 +252,9 @@
   let showBlockersModal = $state(false);
 
   const hasCurrentImage = (r: Record) => (r.images ?? []).some((i) => i.is_current);
-  let blockingRecords   = $derived(records.filter(r => r.status !== 'approved' || !hasCurrentImage(r)));
+  // A record Fisqua excluded is left out of the export (exported_records in
+  // app/core/export_service.py), so it blocks nothing.
+  let blockingRecords   = $derived(records.filter(r => r.status !== 'excluded' && (r.status !== 'approved' || !hasCurrentImage(r))));
 
   // Export/download chooser, and the image ZIP built in the browser
   let showChooserModal = $state(false);

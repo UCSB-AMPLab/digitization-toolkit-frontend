@@ -1,15 +1,15 @@
-// Version: 0.1.0-beta
+// Version: 0.2.1
 
 import { describe, expect, it } from 'vitest';
 import { handoverCounts, handoverOffer, promoteBlockers } from './handover';
 
-type S = 'captured' | 'in_review' | 'rejected' | 'approved';
+type S = 'captured' | 'in_review' | 'rejected' | 'approved' | 'excluded';
 const recs = (...statuses: S[]) => statuses.map((status) => ({ status }));
 
 describe('handoverCounts', () => {
 	it('counts each status', () => {
 		expect(handoverCounts(recs('captured', 'captured', 'in_review', 'approved', 'rejected', 'rejected'))).toEqual(
-			{ captured: 2, inReview: 1, approved: 1, rejected: 2 }
+			{ captured: 2, inReview: 1, approved: 1, rejected: 2, excluded: 0 }
 		);
 	});
 });
@@ -49,5 +49,21 @@ describe('promoteBlockers', () => {
 		expect(promoteBlockers(new Error('network'))).toBeNull();
 		expect(promoteBlockers({ detail: 'plain string' })).toBeNull();
 		expect(promoteBlockers(null)).toBeNull();
+	});
+});
+
+describe('excluded records (Fisqua contract 1.6)', () => {
+	it('are counted apart, never as rejected', () => {
+		expect(handoverCounts(recs('excluded', 'excluded', 'approved'))).toEqual(
+			{ captured: 0, inReview: 0, approved: 1, rejected: 0, excluded: 2 }
+		);
+	});
+
+	it('do not block sending new captures, and count as already sent', () => {
+		expect(handoverOffer(handoverCounts(recs('excluded', 'captured')))).toEqual({ send: 'new', takeBack: false });
+	});
+
+	it('offer nothing to send or take back on their own', () => {
+		expect(handoverOffer(handoverCounts(recs('excluded', 'approved')))).toEqual({ send: null, takeBack: false });
 	});
 });

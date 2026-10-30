@@ -1,7 +1,7 @@
 /* ============================================================================
    DIGITIZATION TOOLKIT — Global Design System
    ============================================================================ */
-/* Version: 0.2.0 */
+/* Version: 0.2.1 */
 
 /* Local Mulish — bundled variable font for offline use (Rionegro has no internet) */
 @font-face {
@@ -1231,6 +1231,8 @@ canvas, button, a, div {
 .status-badge.status-in_review { color: var(--color-warning); }
 .status-badge.status-rejected  { color: var(--color-error); }
 .status-badge.status-approved  { color: var(--color-success); }
+/* Excluded by Fisqua (contract 1.6): not a page of the volume, so muted. */
+.status-badge.status-excluded  { color: var(--color-light-grey); }
 
 .status-badge .material-symbols-outlined { font-size: 13px; line-height: 1; }
 
@@ -1272,6 +1274,7 @@ canvas, button, a, div {
 .status-bar-dot.seg-in_review { background-color: var(--color-warning); }
 .status-bar-dot.seg-rejected  { background-color: var(--color-error); }
 .status-bar-dot.seg-approved  { background-color: var(--color-success); }
+.status-bar-dot.seg-excluded  { background-color: var(--color-light-grey); }
 
 /* ── Drag handle ── */
 .drag-handle {

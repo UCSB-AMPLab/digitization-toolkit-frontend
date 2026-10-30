@@ -5,7 +5,7 @@
 // would give a different instant and the parseApiDate tests could fail. Node
 // applies a TZ change made at runtime; nothing here builds a Date before it.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.1
 process.env.TZ = 'America/Bogota';
 
 import { describe, it, expect } from 'vitest';
@@ -13,7 +13,7 @@ import { placeVolume, barSegments, groupByStage, parseApiDate } from './pipeline
 import type { CollectionActivity, StatusCounts } from './api';
 
 function counts(c: Partial<StatusCounts> = {}): StatusCounts {
-	return { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c };
+	return { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0, ...c };
 }
 
 function row(id: number, c: Partial<StatusCounts>, at: string | null = null): CollectionActivity {
@@ -21,7 +21,7 @@ function row(id: number, c: Partial<StatusCounts>, at: string | null = null): Co
 	return {
 		collection_id: id,
 		status_counts: sc,
-		record_count: sc.captured + sc.in_review + sc.rejected + sc.approved,
+		record_count: sc.captured + sc.in_review + sc.rejected + sc.approved + sc.excluded,
 		last_status_change_at: at
 	};
 }
@@ -115,5 +115,27 @@ describe('parseApiDate', () => {
 	it('leaves a string with Z or an offset as given', () => {
 		expect(parseApiDate('2026-10-22T17:03:11Z').toISOString()).toBe('2026-10-22T17:03:11.000Z');
 		expect(parseApiDate('2026-10-22T12:03:11-05:00').toISOString()).toBe('2026-10-22T17:03:11.000Z');
+	});
+});
+
+// Excluded (Fisqua contract 1.6): a record Fisqua ruled is not a page of the
+// volume. It is not pending and not a retake, so it holds no volume back.
+describe('excluded records', () => {
+	it('do not move a volume out of the stage its other records put it in', () => {
+		expect(placeVolume(counts({ captured: 1, excluded: 3 }))).toBe('capture');
+		expect(placeVolume(counts({ rejected: 1, excluded: 3 }))).toBe('recapture');
+		expect(placeVolume(counts({ in_review: 1, excluded: 3 }))).toBe('review');
+		expect(placeVolume(counts({ approved: 10, excluded: 2 }))).toBe('approved');
+	});
+
+	it('leave a volume with nothing else in it approved, not in capture', () => {
+		expect(placeVolume(counts({ excluded: 2 }))).toBe('approved');
+	});
+
+	it('are not a segment of the stacked bar, and do not count in its shares', () => {
+		expect(barSegments(counts({ approved: 3, excluded: 1 }))).toEqual([
+			{ status: 'approved', count: 3, percent: 100 }
+		]);
+		expect(barSegments(counts({ excluded: 4 }))).toEqual([]);
 	});
 });

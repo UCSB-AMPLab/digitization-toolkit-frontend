@@ -2,7 +2,7 @@
 // none before — a plain <img> with no zoom at all), and drag-to-pan on the
 // image itself.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.1
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
@@ -10,7 +10,7 @@ import '../../../../../../../app.css';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { recordsApi, type Record as ApiRecord, type RecordImage } from '$lib/api';
+import { collectionsApi, recordsApi, type Record as ApiRecord, type RecordImage } from '$lib/api';
 import ImageViewerModal from './ImageViewerModal.svelte';
 import { es } from '$lib/i18n/es';
 
@@ -198,6 +198,50 @@ describe('ImageViewerModal — retake only for a captured or rejected record', (
 
   it('still lets an admin delete a record in review', () => {
     expect(footerButtons('in_review', 'admin').some((t) => t.includes(es.common_delete))).toBe(true);
+  });
+});
+
+// An excluded record (Fisqua contract 1.6) takes no retake, and only an admin
+// may delete it (the backend's 409 otherwise); the modal says what the
+// exclusion means.
+describe('ImageViewerModal — a record Fisqua excluded', () => {
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  let changesSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(make1200x800DataUrl());
+    changesSpy = vi.spyOn(collectionsApi, 'statusChanges').mockResolvedValue([]);
+  });
+  afterEach(() => {
+    previewSpy.mockRestore();
+    changesSpy.mockRestore();
+  });
+
+  function mount(userRole: string) {
+    return render(ImageViewerModal, {
+      record: makeRecord({ status: 'excluded', collection_id: 7 }),
+      onClose: vi.fn(),
+      onRetake: vi.fn(),
+      onDelete: vi.fn(),
+      userRole,
+    });
+  }
+  const buttons = (screen: ReturnType<typeof mount>) =>
+    Array.from((screen.container.querySelector('.img-viewer-footer') as HTMLElement).querySelectorAll('button')).map(
+      (b) => b.textContent ?? ''
+    );
+
+  it('offers an operator neither retake nor delete, and shows the hint', async () => {
+    const screen = mount('operator');
+    await expect.element(screen.getByText(es.status_excluded_hint)).toBeInTheDocument();
+    expect(buttons(screen).some((t) => t.includes(es.col_retake))).toBe(false);
+    expect(buttons(screen).some((t) => t.includes(es.common_delete))).toBe(false);
+  });
+
+  it('lets an admin delete it, with no retake', async () => {
+    const screen = mount('admin');
+    await expect.element(screen.getByText(es.status_excluded_hint)).toBeInTheDocument();
+    expect(buttons(screen).some((t) => t.includes(es.col_retake))).toBe(false);
+    expect(buttons(screen).some((t) => t.includes(es.common_delete))).toBe(true);
   });
 });
 

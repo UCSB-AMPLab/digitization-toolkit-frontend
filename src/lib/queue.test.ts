@@ -2,7 +2,7 @@
 // action filter, the import report's skips, and the capture instruction a
 // volume carries from its list.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 import { describe, it, expect } from 'vitest';
 import type { QueueItem, QueueList, ImportReject, StatusCounts } from './api';
 import {
@@ -20,7 +20,7 @@ import {
 } from './queue';
 
 function counts(c: Partial<StatusCounts> = {}): StatusCounts {
-	return { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c };
+	return { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0, ...c };
 }
 
 function item(position: number, over: Partial<QueueItem> = {}): QueueItem {
@@ -245,5 +245,20 @@ describe('captureUrl and retakeUrl', () => {
 	it('are the capture screen, and the capture screen opened on one record', () => {
 		expect(captureUrl(2, 7)).toBe('/live-preview?projectId=2&collectionId=7');
 		expect(retakeUrl(2, 7, 41)).toBe('/live-preview?projectId=2&collectionId=7&recordId=41');
+	});
+});
+
+describe('excluded records (Fisqua contract 1.6)', () => {
+	it('count as records of the volume', () => {
+		expect(hasCapturedRecord(item(1, { status: counts({ excluded: 1 }) }))).toBe(true);
+	});
+
+	it('do not keep an item from being done once the rest is approved', () => {
+		expect(isItemDone(item(1, { status: counts({ approved: 8, excluded: 2 }) }))).toBe(true);
+	});
+
+	it('do not make an item done while other records are pending', () => {
+		expect(isItemDone(item(1, { status: counts({ rejected: 1, excluded: 2 }) }))).toBe(false);
+		expect(isItemDone(item(1, { status: counts({ in_review: 1, excluded: 2 }) }))).toBe(false);
 	});
 });

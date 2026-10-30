@@ -13,7 +13,7 @@
 //   - Text that is the same in every language (brand names, acronyms, units)
 //     is not catalogued: it stays in the component.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';
@@ -128,6 +128,10 @@ export const es = {
 	status_in_review: 'En revisión',
 	status_rejected: 'Rechazado',
 	status_approved: 'Aprobado',
+	// Fisqua's third QC decision (contract 1.6).
+	status_excluded: 'Excluido',
+	status_excluded_hint: 'Fisqua excluyó este registro porque no es una página del volumen. No hay que volver a capturarlo.',
+	excluded_note_label: 'Motivo:',
 
 	// ── Roles ────────────────────────────────────────────────────────────────
 	role_admin: 'Administrador',
@@ -1433,6 +1437,9 @@ export const es = {
 		'No se pudo empezar el volumen: es turno de recapturas. Termina las recapturas de un volumen e intenta de nuevo.',
 	err_recaptures_pending: (n: number) =>
 		`No se pudo enviar el volumen a revisión: ${n === 1 ? 'falta una recaptura' : `faltan ${formatCount(n, 'es')} recapturas`}.`,
+	vol_excluded_count: (n: number) => (n === 1 ? '1 excluido' : `${formatCount(n, 'es')} excluidos`),
+	err_upload_excluded: 'Fisqua excluyó este registro, así que no se le pueden agregar imágenes.',
+	err_delete_excluded: 'Fisqua excluyó este registro, así que solo un administrador puede eliminarlo.',
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',

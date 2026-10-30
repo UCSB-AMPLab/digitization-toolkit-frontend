@@ -5,9 +5,13 @@
 // The backend keeps no "submitted" flag on a collection: a volume reads as
 // handed over when none of its records is captured. So the controls are
 // derived the same way, from the counts, and never stored.
+//
+// A record Fisqua excluded (contract 1.6) has been sent and ruled on, so it
+// counts as sent before. It is not a retake and is never pending, so it
+// blocks no send, and it is not in review, so there is nothing to take back.
 // ============================================================================
 //
-// Version: 0.1.0-beta
+// Version: 0.2.1
 
 import type { Record } from '$lib/api';
 
@@ -16,15 +20,17 @@ export interface HandoverCounts {
 	inReview: number;
 	approved: number;
 	rejected: number;
+	excluded: number;
 }
 
 export function handoverCounts(records: Pick<Record, 'status'>[]): HandoverCounts {
-	const c: HandoverCounts = { captured: 0, inReview: 0, approved: 0, rejected: 0 };
+	const c: HandoverCounts = { captured: 0, inReview: 0, approved: 0, rejected: 0, excluded: 0 };
 	for (const r of records) {
 		if (r.status === 'captured') c.captured++;
 		else if (r.status === 'in_review') c.inReview++;
 		else if (r.status === 'approved') c.approved++;
 		else if (r.status === 'rejected') c.rejected++;
+		else if (r.status === 'excluded') c.excluded++;
 	}
 	return c;
 }
@@ -38,7 +44,7 @@ export interface HandoverOffer {
 }
 
 export function handoverOffer(c: HandoverCounts): HandoverOffer {
-	const sentBefore = c.inReview + c.approved + c.rejected > 0;
+	const sentBefore = c.inReview + c.approved + c.rejected + c.excluded > 0;
 	return {
 		send: c.captured === 0 ? null : sentBefore ? 'new' : 'volume',
 		takeBack: c.inReview > 0

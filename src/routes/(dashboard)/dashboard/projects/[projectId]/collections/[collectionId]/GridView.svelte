@@ -9,7 +9,7 @@
   // the notice goes up to +page.svelte and the list is reloaded from the
   // server, because the reload unmounts this view.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.2.1
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
@@ -244,6 +244,7 @@
           { id: 'approved',   label: $m.status_approved },
           { id: 'rejected',   label: $m.status_rejected },
           { id: 'in_review',  label: $m.status_in_review },
+          { id: 'excluded',   label: $m.status_excluded },
         ] as f}
       <button
             class="filter-chip"
