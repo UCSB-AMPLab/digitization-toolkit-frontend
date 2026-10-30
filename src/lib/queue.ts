@@ -11,11 +11,18 @@
 // finished: only the mark can. The list is worked from the top, so the next
 // item is the first, in list order, that is not done and has a volume on
 // this unit; an item without a volume cannot be captured.
+//
+// The digitisation queue synced with Fisqua (contract 1.7) is one more list,
+// with `source` `queue`, and Cola shows it first. Its items carry an
+// assignee: an operator sees the items assigned to them and the unassigned
+// ones, an admin every item, with a filter. A withdrawn item, and an item
+// whose volume a withdrawn entry hid (on any list), is not shown. A spot
+// recapture's retakes are named as Por recapturar names a record.
 // ============================================================================
 //
-// Version: 0.2.1
+// Version: 0.3.0
 
-import type { ImportReject, QueueItem, QueueList, StatusCounts } from '$lib/api';
+import type { ImportReject, QueueItem, QueueList, QueueRetake, RecordToRetake, StatusCounts } from '$lib/api';
 import { placeVolume } from '$lib/pipeline';
 
 // The action values a list may carry on an item (an additive field the
@@ -93,13 +100,15 @@ export interface CaptureInstruction {
 /**
  * The instruction for a volume from the stored lists: the item of the
  * newest list (the first in GET /imports/digitisation-lists) whose volume is
- * `collectionId`. Null when that item has neither notes nor an action;
+ * `collectionId`, leaving out withdrawn and hidden items. Null when that item has neither notes nor an action;
  * undefined when no list has an item for the volume, so that the caller can
  * fall back to the volume's own custom_attributes.
  */
 export function instructionForVolume(lists: QueueList[], collectionId: number): CaptureInstruction | null | undefined {
 	for (const list of lists) {
-		const item = list.items.find((i) => i.collectionId === collectionId);
+		// A withdrawn item, or one whose volume a withdrawn entry hid, gives
+		// no instruction (contract 1.7): the next list that names the volume does.
+		const item = list.items.find((i) => i.collectionId === collectionId && isItemShown(i));
 		if (!item) continue;
 		const notes = typeof item.notes === 'string' && item.notes.trim() ? item.notes : null;
 		const action = item.action || null;
@@ -140,4 +149,70 @@ export function captureUrl(projectId: number, collectionId: number): string {
  */
 export function retakeUrl(projectId: number, collectionId: number, recordId: number): string {
 	return `${captureUrl(projectId, collectionId)}&recordId=${recordId}`;
+}
+
+// ---------------------------------------------------------------------------
+// The Fisqua queue (contract 1.7)
+// ---------------------------------------------------------------------------
+
+/** Whether the list is the digitisation queue synced with Fisqua. */
+export function isQueueList(list: QueueList | null | undefined): boolean {
+	return list?.source === 'queue';
+}
+
+/** The list Cola shows first: the Fisqua queue when there is one, else the newest. */
+export function defaultListId(lists: QueueList[]): string | null {
+	return (lists.find(isQueueList) ?? lists[0])?.listId ?? null;
+}
+
+/** Whether Cola shows the item: not withdrawn, and its volume not hidden. */
+export function isItemShown(item: QueueItem): boolean {
+	return item.withdrawn !== true && item.queueHidden !== true;
+}
+
+/**
+ * The items a user sees: an operator, those assigned to them and the
+ * unassigned ones; anyone else, every item.
+ */
+export function itemsForUser(items: QueueItem[], role: string | null, username: string | null): QueueItem[] {
+	if (role !== 'operator') return items;
+	return items.filter((i) => i.assignee == null || (username !== null && i.assignee === username));
+}
+
+export type AssigneeFilter = 'mine' | 'unassigned' | 'everyone';
+
+/** The admin's filter: the items assigned to `username`, the unassigned ones, or every item. */
+export function filterByAssignee(items: QueueItem[], filter: AssigneeFilter, username: string | null): QueueItem[] {
+	if (filter === 'mine') return items.filter((i) => username !== null && i.assignee === username);
+	if (filter === 'unassigned') return items.filter((i) => i.assignee == null);
+	return items;
+}
+
+export interface RetakePair {
+	recordId: number;
+	// The record's title and sequence from GET /records/to-retake; null when
+	// the record is not there (no longer rejected, or not on this unit).
+	title: string | null;
+	sequence: number | null;
+	pairId: string | null;
+	side: QueueRetake['side'];
+}
+
+/**
+ * A spot recapture's retakes, each named from the records to retake as Por
+ * recapturar names it: those with a sequence first, by sequence; then the
+ * other records found there, then those not found, both in the entry's
+ * order.
+ */
+export function retakePairs(retakes: QueueRetake[] | undefined, rows: RecordToRetake[]): RetakePair[] {
+	const byId = new Map(rows.map((r) => [r.recordId, r]));
+	const pairs = (retakes ?? []).map((r) => {
+		const row = byId.get(r.captuaRecordId);
+		return { recordId: r.captuaRecordId, title: row?.title ?? null, sequence: row?.sequence ?? null, pairId: r.pairId, side: r.side };
+	});
+	const rank = (p: RetakePair) => (p.sequence !== null ? 0 : p.title !== null ? 1 : 2);
+	return pairs
+		.map((p, index) => ({ p, index }))
+		.sort((a, b) => rank(a.p) - rank(b.p) || (a.p.sequence ?? 0) - (b.p.sequence ?? 0) || a.index - b.index)
+		.map(({ p }) => p);
 }

@@ -1,11 +1,13 @@
 // Cola (/dashboard/queue): an imported list's items in order, with each
 // item's action, notes, stage and capture button; Siguiente, done items
 // and the manual done mark; the action filter; the list picker; and
-// importing a list, with the report and its skips. GET and PUT under
-// /imports/digitisation-lists and POST /imports/digitisation-list are
-// mocked.
+// importing a list, with the report and its skips; and the Fisqua queue
+// (contract 1.7): shown first, filtered by assignee, without withdrawn or
+// hidden items, with a spot recapture's pairs, and done marks by itemId.
+// GET and PUT under /imports/digitisation-lists and POST
+// /imports/digitisation-list are mocked.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
@@ -638,5 +640,213 @@ describe('Cola', () => {
 				await expect.poll(() => document.activeElement?.textContent?.trim()).toBe('Importar lista');
 			});
 		}
+	});
+});
+
+describe('Cola: the Fisqua queue (contract 1.7)', () => {
+	const QUEUE_ID = '5f0e3c2a-1b7d-5e4f-9a8b-0c1d2e3f4a5b';
+
+	function qitem(position: number, over: Partial<QueueItem> = {}): QueueItem {
+		return item(position, { itemId: `q-${position}`, assignee: null, withdrawn: false, queueHidden: false, retakes: [], ...over });
+	}
+
+	// Seen by an operator (username "operator"): A (theirs), B, F (unassigned).
+	// An admin (username "admin") also sees C (theirs). D is withdrawn and E
+	// hidden: nobody sees them.
+	function fisqua(): QueueList {
+		return {
+			listId: QUEUE_ID,
+			source: 'queue',
+			listName: 'Rionegro',
+			projectId: 7,
+			importedAt: '2026-10-29T09:00:00Z',
+			listFileMissing: false,
+			items: [
+				qitem(1, { title: 'Tomo A', assignee: 'operator' }),
+				qitem(2, { title: 'Tomo B' }),
+				qitem(3, { title: 'Tomo C', assignee: 'admin' }),
+				qitem(4, { title: 'Tomo D', assignee: 'operator', withdrawn: true }),
+				qitem(5, { title: 'Tomo E', queueHidden: true }),
+				qitem(6, {
+					title: 'Tomo F',
+					action: 'spot-recapture',
+					retakes: [
+						{ captuaRecordId: 906, pairId: 'p-14', side: 'both' },
+						{ captuaRecordId: 999, pairId: null, side: 'left' },
+						{ captuaRecordId: 905, pairId: null, side: 'right' }
+					]
+				})
+			]
+		};
+	}
+
+	function titles(container: Element) {
+		return [...container.querySelectorAll('.q-row')].map((r) => r.querySelector('.q-title')?.textContent?.trim());
+	}
+
+	beforeEach(() => {
+		locale.set('en');
+		gotoMock.mockClear();
+		signIn('operator');
+		vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([]);
+		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(FREE);
+	});
+	afterEach(() => {
+		vi.restoreAllMocks();
+		authStore.clearSession();
+	});
+
+	it("shows the queue by default, labelled as Fisqua's, with the file lists still selectable", async () => {
+		// The file list is the newer one, so it comes first in the answer.
+		vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro, fisqua()]);
+		const screen = render(Queue);
+		await expect.element(screen.getByText('Tomo B')).toBeVisible();
+		const select = screen.getByRole('combobox');
+		expect((select.element() as HTMLSelectElement).value).toBe(QUEUE_ID);
+		const selected = (select.element() as HTMLSelectElement).selectedOptions[0].textContent ?? '';
+		expect(selected).toMatch(/^Fisqua queue: Rionegro, updated /);
+
+		await select.selectOptions(rionegro.listId);
+		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
+		await expect.element(screen.getByText('Tomo B')).not.toBeInTheDocument();
+	});
+
+	it("labels a single queue list as Fisqua's", async () => {
+		vi.spyOn(importsApi, 'lists').mockResolvedValue([fisqua()]);
+		const screen = render(Queue);
+		await expect.element(screen.getByText('Fisqua queue: Rionegro')).toBeVisible();
+		await expect.element(screen.getByText(/^Updated /)).toBeVisible();
+	});
+
+	it('gives an operator their own and the unassigned items, with each assignee, and no filter', async () => {
+		vi.spyOn(importsApi, 'lists').mockResolvedValue([fisqua()]);
+		const screen = render(Queue);
+		await expect.element(screen.getByText('Tomo B')).toBeVisible();
+		expect(titles(screen.container)).toEqual(['Tomo A', 'Tomo B', 'Tomo F']);
+		const rows = screen.container.querySelectorAll('.q-row');
+		expect(rows[0].querySelector('.q-assignee')?.textContent?.trim()).toBe('Assigned to operator');
+		expect(rows[1].querySelector('.q-assignee')?.textContent?.trim()).toBe('Unassigned');
+		await expect.element(screen.getByRole('group', { name: 'Assigned to' })).not.toBeInTheDocument();
+	});
+
+	it("gives an admin every item, and the filters Mine, Unassigned and Everyone", async () => {
+		signIn('admin');
+		vi.spyOn(importsApi, 'lists').mockResolvedValue([fisqua()]);
+		const screen = render(Queue);
+		await expect.element(screen.getByText('Tomo B')).toBeVisible();
+		expect(titles(screen.container)).toEqual(['Tomo A', 'Tomo B', 'Tomo C', 'Tomo F']);
+
+		const group = screen.getByRole('group', { name: 'Assigned to' });
+		await expect.element(group.getByRole('button', { name: 'Everyone' })).toHaveAttribute('aria-pressed', 'true');
+		await group.getByRole('button', { name: 'Mine' }).click();
+		await expect.element(group.getByRole('button', { name: 'Mine' })).toHaveAttribute('aria-pressed', 'true');
+		expect(titles(screen.container)).toEqual(['Tomo C']);
+		await group.getByRole('button', { name: 'Unassigned' }).click();
+		expect(titles(screen.container)).toEqual(['Tomo B', 'Tomo F']);
+		await group.getByRole('button', { name: 'Everyone' }).click();
+		expect(titles(screen.container)).toEqual(['Tomo A', 'Tomo B', 'Tomo C', 'Tomo F']);
+	});
+
+	it('leaves out withdrawn and hidden items, also from Siguiente', async () => {
+		signIn('admin');
+		const list = fisqua();
+		// Without D and E, the first item not done is A; make A done so that
+		// Siguiente would fall on D if it were counted.
+		list.items[0].doneMark = { by: 'admin', at: '2026-10-29T10:00:00' };
+		list.items = [list.items[0], list.items[3], list.items[4], list.items[1]];
+		vi.spyOn(importsApi, 'lists').mockResolvedValue([list]);
+		const screen = render(Queue);
+		await expect.element(screen.getByText('Tomo B')).toBeVisible();
+		await expect.element(screen.getByText('Tomo D')).not.toBeInTheDocument();
+		await expect.element(screen.getByText('Tomo E')).not.toBeInTheDocument();
+		const next = screen.container.querySelectorAll('.q-row.is-next');
+		expect(next).toHaveLength(1);
+		expect(next[0].querySelector('.q-title')?.textContent?.trim()).toBe('Tomo B');
+	});
+
+	it("leaves out a file list's item whose volume a withdrawn entry hid", async () => {
+		const file = { ...rionegro, items: rionegro.items.map((i) => (i.position === 3 ? { ...i, queueHidden: true } : i)) };
+		vi.spyOn(importsApi, 'lists').mockResolvedValue([file]);
+		const screen = render(Queue);
+		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
+		expect(titles(screen.container)).toEqual(['Tomo 1', 'Tomo 2', 'Tomo 4', 'Tomo 5']);
+	});
+
+	it("shows a spot recapture's count and pairs, by sequence where known, and a null pairId without error", async () => {
+		const rejectedRow = (recordId: number, title: string, sequence: number | null): RecordToRetake => ({
+			recordId, title, sequence, collectionId: 106, projectId: 7,
+			name: 'Tomo F', filenameStem: 'co-ahr-aht-6', reason: 'blur', comment: null, rejectedBy: null, rejectedAt: null
+		});
+		vi.mocked(recordsApi.toRetake).mockResolvedValue([rejectedRow(906, 'f. 14', 14), rejectedRow(905, 'f. 12', 12)]);
+		vi.spyOn(importsApi, 'lists').mockResolvedValue([fisqua()]);
+		const screen = render(Queue);
+		await expect.element(screen.getByText('3 page pairs to retake')).toBeVisible();
+		await expect.element(screen.getByText('f. 12')).toBeVisible();
+		const row = screen.getByText('3 page pairs to retake').element().closest('.q-row')!;
+		const pairs = [...row.querySelectorAll('.q-pair')].map((p) => p.textContent?.replace(/\s+/g, ' ').trim());
+		expect(pairs).toEqual(['f. 12 Sequence 12', 'f. 14 Sequence 14', 'Record #999']);
+		// Only the spot recapture has the block.
+		expect(screen.container.querySelectorAll('.q-pairs')).toHaveLength(1);
+	});
+
+	it('sends the itemId with a done mark, and on a 409 reads the queue again and says so', async () => {
+		signIn('admin');
+		const lists = vi.spyOn(importsApi, 'lists').mockResolvedValue([fisqua()]);
+		const setDone = vi
+			.spyOn(importsApi, 'setDone')
+			.mockResolvedValueOnce({ by: 'admin', at: '2026-10-29T10:00:00' })
+			.mockRejectedValueOnce(new ApiError('another entry', undefined, 409));
+		const screen = render(Queue);
+		await expect.element(screen.getByText('Tomo B')).toBeVisible();
+
+		const rowB = screen.getByText('Tomo B').element().closest('.q-row') as HTMLElement;
+		(rowB.querySelector('.ip-btn-mark') as HTMLButtonElement).click();
+		await expect.poll(() => setDone.mock.calls.length).toBe(1);
+		expect(setDone).toHaveBeenCalledWith(QUEUE_ID, 2, true, 'q-2');
+		await expect.element(screen.getByText(/^Marked done by admin on /)).toBeVisible();
+		expect(lists.mock.calls.length).toBe(1);
+
+		const rowC = screen.getByText('Tomo C').element().closest('.q-row') as HTMLElement;
+		(rowC.querySelector('.ip-btn-mark') as HTMLButtonElement).click();
+		await expect.poll(() => setDone.mock.calls.length).toBe(2);
+		expect(setDone).toHaveBeenLastCalledWith(QUEUE_ID, 3, true, 'q-3');
+		await expect.poll(() => lists.mock.calls.length).toBe(2);
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent("This item has changed in Fisqua's queue. Captua has reloaded the queue: check the item and try again.");
+	});
+
+	it('keeps the recapture-turn sections on the queue list, with Siguiente on the first item with retakes', async () => {
+		signIn('admin');
+		vi.spyOn(importsApi, 'lists').mockResolvedValue([fisqua()]);
+		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
+			pendingRecords: 4,
+			volumes: [
+				{ collectionId: 106, projectId: 7, name: 'Tomo F', filenameStem: 'co-ahr-aht-6', pending: 3, total: 3, excluded: 0, firstPendingRecordId: 905, pendingRecordIds: [905, 906, 907] },
+				{ collectionId: 102, projectId: 7, name: 'Tomo B', filenameStem: 'co-ahr-aht-2', pending: 1, total: 2, excluded: 0, firstPendingRecordId: 802, pendingRecordIds: [802] }
+			],
+			turn: { state: 'recaptures', unlockedBy: null }
+		});
+		const screen = render(Queue);
+		const first = screen.getByRole('region', { name: 'First: retakes' });
+		await expect.element(first.getByText('Tomo B')).toBeVisible();
+		expect(titles(first.element())).toEqual(['Tomo B', 'Tomo F']);
+		await expect.element(first.getByText('1 of 2 pending')).toBeVisible();
+		const then = screen.getByRole('region', { name: 'Then: new digitisation' });
+		expect(titles(then.element())).toEqual(['Tomo A', 'Tomo C']);
+		await expect.element(then.getByText('To start a new volume, first finish the retakes of one volume.')).toBeVisible();
+		const next = screen.container.querySelectorAll('.q-row.is-next');
+		expect(next).toHaveLength(1);
+		expect(next[0].querySelector('.q-title')?.textContent?.trim()).toBe('Tomo B');
+	});
+
+	it('shows a file list as before: no assignee and no assignee filter', async () => {
+		signIn('admin');
+		vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+		const screen = render(Queue);
+		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
+		expect(screen.container.querySelectorAll('.q-assignee')).toHaveLength(0);
+		await expect.element(screen.getByRole('group', { name: 'Assigned to' })).not.toBeInTheDocument();
+		expect(titles(screen.container)).toEqual(['Tomo 1', 'Tomo 2', 'Tomo sin volumen', 'Tomo 4', 'Tomo 5']);
 	});
 });

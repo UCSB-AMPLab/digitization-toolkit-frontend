@@ -1,10 +1,11 @@
 // The digitisation queue's rules: which item is next, which are done, the
 // action filter, the import report's skips, and the capture instruction a
-// volume carries from its list.
+// volume carries from its list; and the Fisqua queue's (contract 1.7): the
+// list shown first, the items each user sees, and a spot recapture's pairs.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { describe, it, expect } from 'vitest';
-import type { QueueItem, QueueList, ImportReject, StatusCounts } from './api';
+import type { QueueItem, QueueList, ImportReject, RecordToRetake, StatusCounts } from './api';
 import {
 	QUEUE_ACTIONS,
 	isItemDone,
@@ -16,7 +17,13 @@ import {
 	captureInstruction,
 	instructionForVolume,
 	captureUrl,
-	retakeUrl
+	retakeUrl,
+	isQueueList,
+	defaultListId,
+	isItemShown,
+	itemsForUser,
+	filterByAssignee,
+	retakePairs
 } from './queue';
 
 function counts(c: Partial<StatusCounts> = {}): StatusCounts {
@@ -230,6 +237,24 @@ describe('instructionForVolume', () => {
 		expect(instructionForVolume([list('a', [item(1, { collectionId: 9 })])], 9)).toBeNull();
 	});
 
+	it('skips a withdrawn queue item, so the next-newest list that names the volume decides', () => {
+		const lists = [
+			list('queue', [item(1, { collectionId: 9, notes: '117r, 116v', action: 'spot-recapture', withdrawn: true })]),
+			list('old', [item(4, { collectionId: 9, notes: 'Todo el tomo', action: 'full-rescan' })])
+		];
+		expect(instructionForVolume(lists, 9)).toEqual({ notes: 'Todo el tomo', action: 'full-rescan' });
+	});
+
+	it('skips a withdrawn or hidden item, and is undefined when no other list names the volume', () => {
+		const withdrawn = [list('queue', [item(1, { collectionId: 9, notes: '117r', action: 'spot-recapture', withdrawn: true })])];
+		expect(instructionForVolume(withdrawn, 9)).toBeUndefined();
+		const hidden = [
+			list('queue', [item(1, { collectionId: 9, notes: '117r', withdrawn: true })]),
+			list('file', [item(2, { collectionId: 9, notes: 'Desde 49r', queueHidden: true })])
+		];
+		expect(instructionForVolume(hidden, 9)).toBeUndefined();
+	});
+
 	it('treats blank notes as none', () => {
 		const lists = [list('a', [item(1, { collectionId: 9, notes: '   ', action: 'complete' })])];
 		expect(instructionForVolume(lists, 9)).toEqual({ notes: null, action: 'complete' });
@@ -260,5 +285,90 @@ describe('excluded records (Fisqua contract 1.6)', () => {
 	it('do not make an item done while other records are pending', () => {
 		expect(isItemDone(item(1, { status: counts({ rejected: 1, excluded: 2 }) }))).toBe(false);
 		expect(isItemDone(item(1, { status: counts({ in_review: 1, excluded: 2 }) }))).toBe(false);
+	});
+});
+
+describe('the Fisqua queue (contract 1.7)', () => {
+	function list(listId: string, source?: 'queue' | 'file'): QueueList {
+		return { listId, source, listName: listId, projectId: 1, importedAt: null, items: [], listFileMissing: false };
+	}
+
+	it('tells the queue from a file list, and a list from an older backend is a file list', () => {
+		expect(isQueueList(list('q', 'queue'))).toBe(true);
+		expect(isQueueList(list('f', 'file'))).toBe(false);
+		expect(isQueueList(list('old'))).toBe(false);
+		expect(isQueueList(null)).toBe(false);
+	});
+
+	it('shows the queue first when there is one, wherever it is in the lists', () => {
+		expect(defaultListId([list('f1', 'file'), list('q', 'queue'), list('f2', 'file')])).toBe('q');
+		expect(defaultListId([list('f1', 'file'), list('f2')])).toBe('f1');
+		expect(defaultListId([])).toBeNull();
+	});
+
+	it('leaves out withdrawn and hidden items, and keeps an item without the fields', () => {
+		expect(isItemShown(item(1))).toBe(true);
+		expect(isItemShown(item(1, { withdrawn: false, queueHidden: false }))).toBe(true);
+		expect(isItemShown(item(1, { withdrawn: true }))).toBe(false);
+		expect(isItemShown(item(1, { queueHidden: true }))).toBe(false);
+	});
+
+	const items = [
+		item(1, { assignee: 'ana' }),
+		item(2, { assignee: null }),
+		item(3, { assignee: 'luis' }),
+		item(4)
+	];
+	const positions = (xs: QueueItem[]) => xs.map((i) => i.position);
+
+	it('gives an operator the items assigned to them and the unassigned ones', () => {
+		expect(positions(itemsForUser(items, 'operator', 'ana'))).toEqual([1, 2, 4]);
+		expect(positions(itemsForUser(items, 'operator', 'luis'))).toEqual([2, 3, 4]);
+		expect(positions(itemsForUser(items, 'operator', null))).toEqual([2, 4]);
+	});
+
+	it('gives an admin and a reviewer every item', () => {
+		expect(positions(itemsForUser(items, 'admin', 'ana'))).toEqual([1, 2, 3, 4]);
+		expect(positions(itemsForUser(items, 'reviewer', 'ana'))).toEqual([1, 2, 3, 4]);
+	});
+
+	it("filters by Mine, Unassigned and Everyone", () => {
+		expect(positions(filterByAssignee(items, 'mine', 'luis'))).toEqual([3]);
+		expect(positions(filterByAssignee(items, 'unassigned', 'luis'))).toEqual([2, 4]);
+		expect(positions(filterByAssignee(items, 'everyone', 'luis'))).toEqual([1, 2, 3, 4]);
+		expect(positions(filterByAssignee(items, 'mine', null))).toEqual([]);
+	});
+
+	function row(recordId: number, title: string, sequence: number | null): RecordToRetake {
+		return {
+			recordId, title, sequence, collectionId: 1, projectId: 1,
+			name: null, filenameStem: null, reason: null, comment: null, rejectedBy: null, rejectedAt: null
+		};
+	}
+
+	it('names each pair from the records to retake, by sequence where known, the unknown ones after', () => {
+		const pairs = retakePairs(
+			[
+				{ captuaRecordId: 30, pairId: 'p-30', side: 'both' },
+				{ captuaRecordId: 99, pairId: null, side: 'left' },
+				{ captuaRecordId: 10, pairId: null, side: 'right' },
+				{ captuaRecordId: 20, pairId: 'p-20', side: 'both' },
+				{ captuaRecordId: 98, pairId: 'p-98', side: 'both' }
+			],
+			[row(10, 'f. 10', 10), row(30, 'f. 30', 30), row(20, 'f. 20', null)]
+		);
+		expect(pairs.map((p) => [p.recordId, p.title, p.sequence])).toEqual([
+			[10, 'f. 10', 10],
+			[30, 'f. 30', 30],
+			[20, 'f. 20', null],
+			[99, null, null],
+			[98, null, null]
+		]);
+		expect(pairs[3]).toMatchObject({ pairId: null, side: 'left' });
+	});
+
+	it('has no pairs for an item without retakes', () => {
+		expect(retakePairs(undefined, [])).toEqual([]);
+		expect(retakePairs([], [row(1, 'x', 1)])).toEqual([]);
 	});
 });
