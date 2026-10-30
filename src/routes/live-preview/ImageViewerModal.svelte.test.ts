@@ -2,13 +2,14 @@
 // rejected (the newest rejection), so the operator retaking it sees the note
 // without going back to Por recapturar. Other records make no request.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';
+import { collectionsApi, recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';
+import { es } from '$lib/i18n/es';
 import { locale } from '$lib/i18n';
 import ImageViewerModal from './ImageViewerModal.svelte';
 
@@ -115,5 +116,40 @@ describe('live-preview ImageViewerModal — latest rejection', () => {
     await expect.poll(() => listSpy.mock.calls.length).toBe(1);
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.container.querySelector('[data-testid="lv-rejection"]')).toBeNull();
+  });
+});
+
+// A record Fisqua excluded (contract 1.6) takes no retake: the backend answers
+// the capture with a 409. The modal offers none and says why.
+describe('live-preview ImageViewerModal — a record Fisqua excluded', () => {
+  let changesSpy: ReturnType<typeof vi.spyOn>;
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  let thumbSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    locale.set('es');
+    changesSpy = vi.spyOn(collectionsApi, 'statusChanges').mockResolvedValue([]);
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(THUMB);
+    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB);
+  });
+  afterEach(() => {
+    changesSpy.mockRestore();
+    previewSpy.mockRestore();
+    thumbSpy.mockRestore();
+  });
+
+  it('offers no retake and shows the exclusion hint', async () => {
+    const screen = renderModal({ ...makeRecord('excluded'), collection_id: 9 } as ApiRecord);
+    await expect.element(screen.getByText(es.status_excluded_hint)).toBeInTheDocument();
+    await expect.element(screen.getByRole('button', { name: es.lvm_retake })).not.toBeInTheDocument();
+    // The footer keeps its Close button.
+    const footer = screen.container.querySelector('.img-viewer-footer') as HTMLElement;
+    expect(Array.from(footer.querySelectorAll('button')).map((b) => b.textContent ?? '').some((t) => t.includes(es.common_close))).toBe(true);
+  });
+
+  it('still offers the retake on a captured record', async () => {
+    const screen = renderModal(makeRecord('captured'));
+    await expect.element(screen.getByRole('button', { name: es.lvm_retake })).toBeInTheDocument();
+    await expect.element(screen.getByText(es.status_excluded_hint)).not.toBeInTheDocument();
   });
 });

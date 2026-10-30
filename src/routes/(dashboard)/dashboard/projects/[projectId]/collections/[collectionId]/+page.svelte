@@ -406,7 +406,10 @@
 
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
-  let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved' && hasCurrentImage(r)));
+  // The export bags every record but those Fisqua excluded (exported_records
+  // in app/core/export_service.py): it needs at least one of them, and none
+  // that blocks it.
+  let canExport      = $derived(records.some(r => r.status !== 'excluded') && blockingRecords.length === 0);
 
   // Hand-over for review (NEH-260). The controls go in the layout's top bar;
   // the page puts them there because it holds the records. Operator and
