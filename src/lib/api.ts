@@ -1,4 +1,4 @@
-// Version: 0.3.0
+// Version: 0.3.2
 
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
@@ -880,7 +880,16 @@ export interface Record {
   // current image of the record, whatever its capture_mode (reject_record,
   // records.py).
   capture_mode: 'single' | 'dual';
+  // The page of a dual opening only one camera photographed (0.3.2): set
+  // only on a dual record with one current image, which is the other page,
+  // and cleared by a dual retake. Such a record is pending until then and is
+  // never sent for review (promote leaves it captured; PATCH to in_review
+  // answers 422). Absent from a backend before 0.3.2.
+  missing_side?: MissingSide | null;
 }
+
+// The page of a dual opening never photographed.
+export type MissingSide = 'left' | 'right';
 
 // The predefined rejection reasons, mirroring the backend's
 // PREDEFINED_REJECTION_REASONS and the annotation feature's error types.
@@ -1645,10 +1654,13 @@ export function browserTimeZone(): string | null {
 // DIGITISATION LISTS AND RETAKES
 // ============================================================================
 
-// A rejected record from GET /records/to-retake, with its latest rejection.
+// A pending record from GET /records/to-retake, with its latest rejection.
 // `reason` is one of PREDEFINED_REJECTION_REASONS; the four rejection
-// fields are null when the backend has no rejection row for the record.
-// `rejectedAt` is naive UTC (read it with parseApiDate).
+// fields are null when the backend has no rejection row for the record, as
+// for a record that misses a side (0.3.2). `rejectedAt` is naive UTC (read
+// it with parseApiDate). `pendingReason` says why the record is pending:
+// rejected, prepared for retake (its rejected image still current), or
+// missing a side, which `missingSide` names (null otherwise).
 export interface RecordToRetake {
   recordId:     number;
   title:        string;
@@ -1663,17 +1675,26 @@ export interface RecordToRetake {
   comment:      string | null;
   rejectedBy:   string | null;
   rejectedAt:   string | null;
+  pendingReason: PendingReason;
+  missingSide:  MissingSide | null;
 }
 
+export type PendingReason = 'rejected' | 'prepared' | 'missing_side';
+
 // GET /records/to-retake/summary (0.2.0). `pending` counts the volume's
-// rejected records, `total` its records with at least one rejection, leaving
+// pending records, `total` its records with at least one rejection, leaving
 // out those now excluded, and `excluded` (0.2.1) its records Fisqua excluded,
-// which are never pending;
+// which are never pending.
 // A record is pending when it is rejected, or captured with a current image
 // that still carries its rejection (prepared for retake); the records alone
 // do not show the second. `pendingRecordIds` lists every pending record of
 // the volume by sequence, then id, and `firstPendingRecordId` is its first.
 // Only volumes with something pending are listed, most pending first.
+// A record that misses a side (0.3.2) is pending too: `missingSideRecordIds`
+// lists those of `pendingRecordIds`, in the same order. It counts in
+// `pending` and not in `total`, which counts rejections, so `pending` may
+// exceed `total` (read both through retakeProgress in $lib/recapture-turn).
+// The field is absent from a backend before 0.3.2.
 export interface RetakeSummaryVolume {
   collectionId:         number;
   projectId:            number;
@@ -1684,6 +1705,7 @@ export interface RetakeSummaryVolume {
   excluded:             number;
   firstPendingRecordId: number;
   pendingRecordIds:     number[];
+  missingSideRecordIds?: number[];
 }
 
 export type RecaptureTurnState = 'free' | 'new' | 'recaptures';

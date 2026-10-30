@@ -2,7 +2,7 @@
 // moved out of the image frame (below it, in static flow) so it never
 // covers foliation or marginalia at any zoom.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.2
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -10,6 +10,8 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { recordsApi, type Record as ApiRecord, type RecordImage } from '$lib/api';
 import ImageViewer from './ImageViewer.svelte';
+import { es } from '$lib/i18n/es';
+import { locale } from '$lib/i18n';
 
 // A real, decodable 1200x800 PNG (drawn on a canvas) so naturalWidth/Height
 // resolve once the <img> loads — a 1x1 placeholder would report 1x1 and
@@ -209,5 +211,39 @@ describe('ImageViewer — preview fallback (NEH-139)', () => {
       previewSpy.mockRestore();
       thumbSpy.mockRestore();
     }
+  });
+});
+
+describe('ImageViewer — an opening with a page never photographed (0.3.2)', () => {
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    locale.set('es');
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(make1200x800DataUrl());
+  });
+  afterEach(() => previewSpy.mockRestore());
+
+  function frames(container: HTMLElement): HTMLElement[] {
+    return [...container.querySelectorAll<HTMLElement>('.spread-frame')];
+  }
+
+  it('missing the left page: the left frame is empty and says so, the right image keeps its side', async () => {
+    const record = makeRecord({ missing_side: 'left', images: [makeImage({ id: 2, role: 'right', filename: 'right.jpg' })] });
+    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+    const [left, right] = frames(screen.container);
+    await expect.element(left).toHaveTextContent(es.missing_page);
+    expect(left.querySelector('[data-missing-side="left"]')).not.toBeNull();
+    expect(left.querySelector('img')).toBeNull();
+    expect(right.querySelector('img.spread-image.right')).not.toBeNull();
+    expect(right.textContent).not.toContain(es.missing_page);
+  });
+
+  it('missing the right page: the right frame is empty and says so, the left image keeps its side', async () => {
+    const record = makeRecord({ missing_side: 'right', images: [makeImage({ id: 1, role: 'left', filename: 'left.jpg' })] });
+    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+    const [left, right] = frames(screen.container);
+    await expect.element(right).toHaveTextContent(es.missing_page);
+    expect(right.querySelector('[data-missing-side="right"]')).not.toBeNull();
+    expect(left.querySelector('img.spread-image.left')).not.toBeNull();
+    expect(left.textContent).not.toContain(es.missing_page);
   });
 });

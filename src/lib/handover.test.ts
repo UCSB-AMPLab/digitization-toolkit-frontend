@@ -1,7 +1,7 @@
-// Version: 0.2.1
+// Version: 0.3.2
 
 import { describe, expect, it } from 'vitest';
-import { handoverCounts, handoverOffer, promoteBlockers } from './handover';
+import { handoverCounts, handoverLock, handoverOffer, promoteBlockers } from './handover';
 
 type S = 'captured' | 'in_review' | 'rejected' | 'approved' | 'excluded';
 const recs = (...statuses: S[]) => statuses.map((status) => ({ status }));
@@ -65,5 +65,47 @@ describe('excluded records (Fisqua contract 1.6)', () => {
 
 	it('offer nothing to send or take back on their own', () => {
 		expect(handoverOffer(handoverCounts(recs('excluded', 'approved')))).toEqual({ send: null, takeBack: false });
+	});
+});
+
+describe('records that miss a side (0.3.2)', () => {
+	const missing = (side: 'left' | 'right') => ({ status: 'captured' as const, missing_side: side });
+
+	it('are not counted as captured: a send leaves them on the unit', () => {
+		expect(handoverCounts([missing('left'), { status: 'captured' }, { status: 'approved' }])).toEqual(
+			{ captured: 1, inReview: 0, approved: 1, rejected: 0, excluded: 0 }
+		);
+	});
+
+	it('offer no send when they are the only captured records, since it would promote nothing', () => {
+		expect(handoverOffer(handoverCounts([missing('left'), missing('right')]))).toEqual({ send: null, takeBack: false });
+		expect(handoverOffer(handoverCounts([missing('left'), { status: 'in_review' }]))).toEqual({ send: null, takeBack: true });
+	});
+
+	it('leave the send of the other captured records open', () => {
+		expect(handoverOffer(handoverCounts([missing('left'), { status: 'captured' }]))).toEqual({ send: 'volume', takeBack: false });
+	});
+});
+
+describe('handoverLock', () => {
+	const offer = (send: 'volume' | 'new' | null) => ({ send, takeBack: false });
+
+	it('locks with every pending record while a retake of a rejection is left', () => {
+		expect(handoverLock(3, 1, offer('volume'))).toBe(3);
+		expect(handoverLock(2, 0, offer(null))).toBe(2);
+	});
+
+	it('does not lock over missing sides alone while other records can be sent', () => {
+		expect(handoverLock(2, 2, offer('volume'))).toBe(0);
+		expect(handoverLock(1, 1, offer('new'))).toBe(0);
+	});
+
+	it('locks over missing sides when nothing else can be sent', () => {
+		expect(handoverLock(2, 2, offer(null))).toBe(2);
+	});
+
+	it('does not lock with nothing pending', () => {
+		expect(handoverLock(0, 0, offer('volume'))).toBe(0);
+		expect(handoverLock(0, 0, offer(null))).toBe(0);
 	});
 });

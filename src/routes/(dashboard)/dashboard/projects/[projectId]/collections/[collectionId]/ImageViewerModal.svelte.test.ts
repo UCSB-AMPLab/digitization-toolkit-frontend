@@ -2,7 +2,7 @@
 // none before — a plain <img> with no zoom at all), and drag-to-pan on the
 // image itself.
 //
-// Version: 0.2.1
+// Version: 0.3.2
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
@@ -13,6 +13,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import { collectionsApi, recordsApi, type Record as ApiRecord, type RecordImage } from '$lib/api';
 import ImageViewerModal from './ImageViewerModal.svelte';
 import { es } from '$lib/i18n/es';
+import { locale } from '$lib/i18n';
 
 // A real, decodable 1200x800 PNG so naturalWidth/Height resolve — matches
 // ImageViewer.svelte.test.ts's approach for the same reason.
@@ -299,4 +300,32 @@ describe('ImageViewerModal — the footer at phone and monitor widths', () => {
     const tops = new Set(buttons.map((b) => Math.round(b.getBoundingClientRect().top)));
     expect(tops.size).toBe(1);
   });
+});
+
+describe('ImageViewerModal — an opening with a page never photographed (0.3.2)', () => {
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    locale.set('es');
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(make1200x800DataUrl());
+  });
+  afterEach(() => previewSpy.mockRestore());
+
+  function frames(container: HTMLElement): HTMLElement[] {
+    return [...container.querySelectorAll<HTMLElement>('.img-viewer-images > *')];
+  }
+
+  for (const [side, present] of [['left', 'right'], ['right', 'left']] as const) {
+    it(`missing the ${side} page: an empty frame that says so, on the ${side}, beside the ${present} image`, async () => {
+      const record = makeRecord({ capture_mode: 'dual', missing_side: side, images: [makeImage({ id: 5, role: present })] });
+      const screen = render(ImageViewerModal, { record, onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
+      await expect.element(screen.getByText(es.missing_page)).toBeVisible();
+      const all = frames(screen.container);
+      expect(all).toHaveLength(2);
+      const [first, second] = side === 'left' ? all : [all[1], all[0]];
+      expect(first.getAttribute('data-missing-side')).toBe(side);
+      expect(first.querySelector('img')).toBeNull();
+      expect(second.querySelector('img.img-viewer-img')).not.toBeNull();
+      expect(second.textContent).toContain(present === 'left' ? es.badge_left : es.badge_right);
+    });
+  }
 });

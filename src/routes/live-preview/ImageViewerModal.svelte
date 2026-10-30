@@ -18,7 +18,10 @@
   // its freed notice unchanged) under one shared pan and zoom, the model of
   // the gallery's ImageViewerModal; "Thumbnails" goes back.
   //
-  // Version: 0.3.1
+  // A dual record that misses a side (0.3.2) shows that page as an empty
+  // frame that says so (MissingPage), on its side, in both views.
+  //
+  // Version: 0.3.2
 
   import type { Snippet } from 'svelte';
   import { recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';
@@ -28,6 +31,7 @@
   import { rejectionReasonText } from '$lib/rejectionReasons';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
+  import MissingPage from '$lib/components/MissingPage.svelte';
   import { dismissible } from '$lib/dialog';
   import {
     fittedSize,
@@ -131,6 +135,9 @@
       return (order[a.role ?? 'single'] ?? 0) - (order[b.role ?? 'single'] ?? 0);
     });
   });
+
+  // The page of a dual opening never photographed, drawn on its side.
+  const missingSide = $derived(record.missing_side ?? null);
 
   // Thumbnails until the operator asks for full size; no /preview before.
   let fullSize = $state(false);
@@ -301,6 +308,9 @@
     {/if}
 
     <div class="img-viewer-images">
+      {#if missingSide === 'left'}
+        <div class="img-viewer-frame" data-missing-side="left"><MissingPage side="left" /></div>
+      {/if}
       {#each images as img, i (img.id)}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
@@ -370,6 +380,9 @@
           {/if}
         </div>
       {/each}
+      {#if missingSide === 'right'}
+        <div class="img-viewer-frame" data-missing-side="right"><MissingPage side="right" /></div>
+      {/if}
 
       {#if images.length === 0}
         <div class="img-viewer-frame">

@@ -3,7 +3,7 @@
 // who rejected it and when, and a Repetir button into the capture screen's
 // retake of that record, in the project the row gives. The API is mocked.
 //
-// Version: 0.2.0
+// Version: 0.3.2
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -23,6 +23,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import { recordsApi, collectionsApi, ApiError, type RecordToRetake } from '$lib/api';
 import { authStore, type UserRole } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
+import { es } from '$lib/i18n/es';
 import '../../../../app.css';
 import Retakes from './+page.svelte';
 
@@ -38,7 +39,9 @@ const toRetake: RecordToRetake[] = [
 		reason: 'blur',
 		comment: 'El folio 112r salió movido.',
 		rejectedBy: 'revisora',
-		rejectedAt: '2026-10-21T14:00:00'
+		rejectedAt: '2026-10-21T14:00:00',
+		pendingReason: 'rejected',
+		missingSide: null
 	},
 	{
 		recordId: 42,
@@ -51,7 +54,9 @@ const toRetake: RecordToRetake[] = [
 		reason: 'other',
 		comment: null,
 		rejectedBy: null,
-		rejectedAt: '2026-10-22T14:00:00'
+		rejectedAt: '2026-10-22T14:00:00',
+		pendingReason: 'rejected',
+		missingSide: null
 	},
 	{
 		recordId: 43,
@@ -64,7 +69,9 @@ const toRetake: RecordToRetake[] = [
 		reason: null,
 		comment: null,
 		rejectedBy: null,
-		rejectedAt: null
+		rejectedAt: null,
+		pendingReason: 'rejected',
+		missingSide: null
 	},
 	{
 		recordId: 44,
@@ -77,7 +84,9 @@ const toRetake: RecordToRetake[] = [
 		reason: 'glare',
 		comment: null,
 		rejectedBy: 'revisora',
-		rejectedAt: '2026-10-23T14:00:00'
+		rejectedAt: '2026-10-23T14:00:00',
+		pendingReason: 'rejected',
+		missingSide: null
 	}
 ];
 
@@ -263,6 +272,59 @@ describe('Por recapturar', () => {
 			const select = screen.getByRole('combobox', { name: 'Volumen' });
 			await expect.element(select).toBeVisible();
 			expect((select.element() as HTMLSelectElement).value).toBe('5');
+		});
+	});
+
+	describe('records that miss a side, and records prepared for retake (0.3.2)', () => {
+		const missingRow: RecordToRetake = {
+			recordId: 50, title: 'Par sin izquierda', sequence: 8, collectionId: 5, projectId: 3,
+			name: 'Tomo 6', filenameStem: 'co-ahr-aht-006',
+			reason: null, comment: null, rejectedBy: null, rejectedAt: null,
+			pendingReason: 'missing_side', missingSide: 'left'
+		};
+		const preparedRow: RecordToRetake = {
+			recordId: 51, title: 'Par preparado', sequence: 9, collectionId: 5, projectId: 3,
+			name: 'Tomo 6', filenameStem: 'co-ahr-aht-006',
+			reason: 'glare', comment: 'Reflejo en el folio 9v.', rejectedBy: 'revisora', rejectedAt: '2026-10-24T14:00:00',
+			pendingReason: 'prepared', missingSide: null
+		};
+
+		it('a record that misses a side says so where a rejection gives its reason, with no rejection fields', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([missingRow]);
+			const screen = render(Retakes);
+			const row = screen.getByRole('listitem').first();
+			await expect.element(row.getByText('Par sin izquierda')).toBeVisible();
+			await expect.element(row.getByText(es.missing_page_reason)).toBeVisible();
+			await expect.element(row.getByText('No quedó registrado el motivo de este rechazo.')).not.toBeInTheDocument();
+			await expect.element(row.getByText(/^Rechazado/)).not.toBeInTheDocument();
+			await expect.element(row.getByRole('button', { name: 'Volver a capturar' })).toBeVisible();
+		});
+
+		it('shows no older rejection with a missing side, should the backend send one', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([{ ...missingRow, reason: 'blur', comment: 'Una nota antigua.', rejectedBy: 'revisora', rejectedAt: '2026-10-01T14:00:00' }]);
+			const screen = render(Retakes);
+			const row = screen.getByRole('listitem').first();
+			await expect.element(row.getByText(es.missing_page_reason)).toBeVisible();
+			await expect.element(row.getByText('Una nota antigua.')).not.toBeInTheDocument();
+			await expect.element(row.getByText('Imagen movida')).not.toBeInTheDocument();
+			await expect.element(row.getByText(/^Rechazado/)).not.toBeInTheDocument();
+		});
+
+		it('lists it with the others, so the rows count it', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([...toRetake, missingRow, preparedRow]);
+			const screen = render(Retakes);
+			const rows = screen.getByRole('listitem');
+			await expect.element(rows.first()).toBeVisible();
+			expect(rows.elements()).toHaveLength(6);
+		});
+
+		it('a record prepared for retake still shows its rejection', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([preparedRow]);
+			const screen = render(Retakes);
+			const row = screen.getByRole('listitem').first();
+			await expect.element(row.getByText('Reflejo en el folio 9v.')).toBeVisible();
+			await expect.element(row.getByText(/^Rechazado por revisora el /)).toBeVisible();
+			await expect.element(row.getByText(es.missing_page_reason)).not.toBeInTheDocument();
 		});
 	});
 });

@@ -38,7 +38,7 @@
   // queue moved, so the page reads it again and says so.
   // ============================================================================
   //
-  // Version: 0.3.1
+  // Version: 0.3.2
 
   import { onMount, tick } from 'svelte';
   import { goto } from '$app/navigation';
@@ -53,7 +53,7 @@
     isLockedForTurn, isOnUnitReject, isQueueList, itemsForUser, nextItemPosition, queueSections, retakePairs, retakeUrl,
     type AssigneeFilter, type QueueSectionKey
   } from '$lib/queue';
-  import { readRetakeSummary, retakeVolumeMap } from '$lib/recapture-turn';
+  import { readRetakeSummary, retakeProgress, retakeVolumeMap } from '$lib/recapture-turn';
   import { actionLabel, importErrorText, importReasonText } from '$lib/queue-labels';
 
   // Capture and import are admin and operator only, as the capture screen
@@ -392,9 +392,12 @@
 
     <div class="q-progress">
       {#if splitByRetakes && retake}
-        <span class="q-pending">{$m.retake_pending_of(retake.pending, retake.total)}</span>
+        {@const progress = retakeProgress(retake)}
+        <!-- The records that miss a side (0.3.2) are pending with the
+             others; retakeProgress adds them to the total. -->
+        <span class="q-pending">{$m.retake_pending_of(progress.pending, progress.total)}</span>
         <div class="q-retake-bar" aria-hidden="true">
-          <span style="width: {retake.total > 0 ? ((retake.total - retake.pending) / retake.total) * 100 : 0}%"></span>
+          <span style="width: {progress.donePercent}%"></span>
         </div>
       {:else if item.collectionId == null || item.status == null}
         <span class="q-no-volume">{$m.queue_no_volume}</span>

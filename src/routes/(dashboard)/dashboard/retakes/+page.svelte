@@ -1,10 +1,13 @@
 <script lang="ts">
   // ============================================================================
-  // Por recapturar (0.2.0): every rejected record on the unit, across all
+  // Por recapturar (0.2.0): every pending record on the unit, across all
   // volumes, from GET /records/to-retake, the one rejected longest ago
   // first. Each row names the volume, the record, the reason with its gloss
   // (the nine reasons' text in $lib/rejectionReasons), the reviewer's
-  // comment, and who rejected it when.
+  // comment, and who rejected it when. A record prepared for retake shows
+  // its rejection the same way. A record that misses a side (0.3.2,
+  // `pendingReason` missing_side) has no rejection: its row says that a page
+  // is missing and asks for the whole opening, in place of the reason.
   //
   // "Volver a capturar" takes the same path as the volume view's retake
   // buttons (NEH-209): the capture screen with the record's project, volume
@@ -17,7 +20,7 @@
   // a filter can always be cleared.
   // ============================================================================
   //
-  // Version: 0.2.0
+  // Version: 0.3.2
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -129,7 +132,9 @@
             </div>
 
             <div class="rt-reason">
-              {#if reason}
+              {#if row.pendingReason === 'missing_side'}
+                <span class="rt-missing">{$m.missing_page_reason}</span>
+              {:else if reason}
                 <span class="status-badge status-rejected rt-reason-label">{reason.label}</span>
                 {#if reason.gloss}<span class="rt-gloss">{reason.gloss}</span>{/if}
               {:else}
@@ -137,11 +142,13 @@
               {/if}
             </div>
 
-            {#if row.comment}
+            <!-- A missing side is not a rejection: an older rejection of
+                 the record, if the backend sends one, is not shown with it. -->
+            {#if row.comment && row.pendingReason !== 'missing_side'}
               <p class="rt-comment"><span class="visually-hidden">{$m.retakes_comment_label}:</span>{" "}{row.comment}</p>
             {/if}
 
-            {#if row.rejectedAt}
+            {#if row.rejectedAt && row.pendingReason !== 'missing_side'}
               {@const when = formatWhen(row.rejectedAt)}
               <time class="rt-when" datetime={parseApiDate(row.rejectedAt).toISOString()}>
                 {row.rejectedBy ? $m.retakes_rejected_by(row.rejectedBy, when) : $m.retakes_rejected_on(when)}
@@ -227,6 +234,7 @@
   .rt-sequence { color: var(--color-light-grey); font-variant-numeric: tabular-nums; }
   .rt-reason { display: flex; flex-direction: column; gap: 2px; }
   .rt-gloss { font-size: var(--text-sm); line-height: 1.4; color: var(--color-light-grey); }
+  .rt-missing { font-size: var(--text-sm); font-weight: var(--fw-bold); line-height: 1.4; color: var(--color-light); }
   .rt-comment {
     margin: 0;
     padding: 6px 10px;

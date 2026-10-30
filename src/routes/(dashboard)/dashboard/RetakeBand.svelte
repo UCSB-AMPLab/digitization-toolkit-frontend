@@ -6,24 +6,23 @@
   // volumes, names the volume with most pending, and starts its retakes;
   // the list gives each volume its pending count and a Recapturar that opens
   // the capture screen on its first pending record. The links are for the
-  // roles that can capture (`canRetake`).
+  // roles that can capture (`canRetake`). The records that miss a side
+  // (0.3.2) are pending with the others; each volume's count reads them
+  // through retakeProgress, since the backend's total leaves them out.
   // ============================================================================
   //
-  // Version: 0.2.0
+  // Version: 0.3.2
 
   import type { RetakeSummary } from '$lib/api';
   import { m } from '$lib/i18n';
   import { retakeUrl } from '$lib/queue';
+  import { retakeProgress } from '$lib/recapture-turn';
 
   let { summary, canRetake }: { summary: RetakeSummary | null; canRetake: boolean } = $props();
 
   let shown = $derived(summary !== null && summary.pendingRecords > 0 && summary.volumes.length > 0);
   let most = $derived(summary?.volumes[0] ?? null);
 
-  // Share of the volume's retakes already done, for its bar.
-  function donePercent(pending: number, total: number): number {
-    return total > 0 ? Math.max(0, Math.min(100, ((total - pending) / total) * 100)) : 0;
-  }
 </script>
 
 {#if shown && summary && most}
@@ -48,11 +47,12 @@
     <h2 id="rb-vols-title" class="rb-vols-title">{$m.retake_vols_title}</h2>
     <ul class="rb-list">
       {#each summary.volumes as v (v.collectionId)}
+        {@const progress = retakeProgress(v)}
         <li class="rb-row">
           <span class="rb-name">{v.name}</span>
           {#if v.filenameStem}<span class="rb-stem">{v.filenameStem}</span>{/if}
-          <span class="rb-bar" aria-hidden="true"><span class="rb-bar-fill" style="width: {donePercent(v.pending, v.total)}%"></span></span>
-          <span class="rb-pending">{$m.retake_pending_of(v.pending, v.total)}</span>
+          <span class="rb-bar" aria-hidden="true"><span class="rb-bar-fill" style="width: {progress.donePercent}%"></span></span>
+          <span class="rb-pending">{$m.retake_pending_of(progress.pending, progress.total)}</span>
           {#if canRetake}
             <a class="btn btn-recapture-outline rb-row-cta" href={retakeUrl(v.projectId, v.collectionId, v.firstPendingRecordId)}>{$m.retake_cta}</a>
           {/if}

@@ -13,7 +13,7 @@
 //   - Text that is the same in every language (brand names, acronyms, units)
 //     is not catalogued: it stays in the component.
 //
-// Version: 0.3.1
+// Version: 0.3.2
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';
@@ -1400,6 +1400,9 @@ export const es = {
 	retakes_filter_volume_label: 'Volumen',
 	retakes_filter_all_volumes: 'Todos los volúmenes',
 	retakes_filter_empty: 'Este volumen no tiene registros por recapturar.',
+	// ── An opening with a page never photographed (0.3.2) ───────────────────
+	missing_page: 'Esta página no se capturó',
+	missing_page_reason: 'Falta una página: vuelve a capturar el par completo',
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
 	lv_instruction_label: 'Instrucción de la lista',
 	lv_instruction_show_all: 'Mostrar todo',

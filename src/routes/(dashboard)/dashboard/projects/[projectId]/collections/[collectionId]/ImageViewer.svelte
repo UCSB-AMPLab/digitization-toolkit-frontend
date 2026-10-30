@@ -8,11 +8,15 @@
   // a TIFF only as its thumbnail, and any image falls back to its thumbnail when
   // the preview fails.
   //
-  // Version: 0.1.0-beta
+  // A dual record that misses a side (0.3.2) shows that page as an empty
+  // frame that says so (MissingPage), and its one image on its own side.
+  //
+  // Version: 0.3.2
 
   import { type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
+  import MissingPage from '$lib/components/MissingPage.svelte';
   import {
     fittedSize,
     screenExtent,
@@ -59,11 +63,15 @@
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId));
 
   // Both pages come from the selected record itself (a dual capture). If no image
-  // has a role, the first image is shown as the left page.
+  // has a role, the first image is shown as the left page, unless the left page
+  // is the one never photographed: its one image is then the right page.
+  let missingSide = $derived(selectedRecord?.missing_side ?? null);
   let spreadLeftImage  = $derived(
-    selectedRecord?.images?.find(img => img.role === 'left')
-    ?? selectedRecord?.images?.[0]
-    ?? null
+    missingSide === 'left'
+      ? null
+      : selectedRecord?.images?.find(img => img.role === 'left')
+        ?? selectedRecord?.images?.[0]
+        ?? null
   );
   let spreadRightImage = $derived(
     selectedRecord?.images?.find(img => img.role === 'right') ?? null
@@ -280,7 +288,11 @@
               </span>
             {/if}
           {:else}
-            <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
+            {#if missingSide === 'left'}
+              <MissingPage side="left" />
+            {:else}
+              <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
+            {/if}
           {/if}
         </div>
         {#if spreadLeftImage}
@@ -335,7 +347,11 @@
               </span>
             {/if}
           {:else}
-            <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
+            {#if missingSide === 'right'}
+              <MissingPage side="right" />
+            {:else}
+              <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
+            {/if}
           {/if}
         </div>
         {#if spreadRightImage}

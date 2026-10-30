@@ -11,13 +11,16 @@
 //   volume during the retake turn, and the promotion of a volume with
 //   rejected records;
 // - which volume the queue offers first, the folios a rejection comment
-//   names, and which record the guided retake opens next.
+//   names, and which record the guided retake opens next;
+// - a volume's progress, counting the records that miss a side (0.3.2),
+//   which are pending without a rejection: the guide walks them with the
+//   others, since pendingRecordIds lists them.
 //
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`), as capture-errors.ts does.
 // ============================================================================
 //
-// Version: 0.3.1
+// Version: 0.3.2
 
 import type { QueueItem, RetakeSummary, RetakeSummaryVolume } from './api';
 
@@ -37,7 +40,10 @@ function isVolume(v: unknown): v is RetakeSummaryVolume {
 		typeof x.total === 'number' &&
 		typeof x.firstPendingRecordId === 'number' &&
 		Array.isArray(x.pendingRecordIds) &&
-		x.pendingRecordIds.every((id) => typeof id === 'number')
+		x.pendingRecordIds.every((id) => typeof id === 'number') &&
+		// Absent from a backend before 0.3.2, which then has none.
+		(x.missingSideRecordIds === undefined ||
+			(Array.isArray(x.missingSideRecordIds) && x.missingSideRecordIds.every((id) => typeof id === 'number')))
 	);
 }
 
@@ -68,6 +74,26 @@ export function recapturesPendingCount(error: unknown): number | null {
 	const detail = detailOf(error, 409);
 	if (detail?.code !== RECAPTURES_PENDING_CODE || typeof detail.pending !== 'number') return null;
 	return detail.pending;
+}
+
+export interface RetakeProgress {
+	pending: number;
+	total: number;
+	// Share of the volume's retakes already done, 0 to 100.
+	donePercent: number;
+}
+
+/**
+ * A volume's retakes for "p de t pendientes" and its bar. The backend counts
+ * a record that misses a side in `pending` and not in `total`, which counts
+ * the records ever rejected, so such records are added to the total here,
+ * and the total is never below the pending.
+ */
+export function retakeProgress(volume: RetakeSummaryVolume): RetakeProgress {
+	const pending = volume.pending;
+	const total = Math.max(pending, volume.total + (volume.missingSideRecordIds?.length ?? 0));
+	const donePercent = total > 0 ? ((total - pending) / total) * 100 : 0;
+	return { pending, total, donePercent };
 }
 
 /** The summary's volumes by collection id; empty without a summary. */
