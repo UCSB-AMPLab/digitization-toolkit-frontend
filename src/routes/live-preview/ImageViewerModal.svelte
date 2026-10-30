@@ -12,7 +12,13 @@
   // A record Fisqua excluded (contract 1.6) takes no retake (the backend
   // refuses the capture with a 409): the modal offers none and says why.
   //
-  // Version: 0.2.1
+  // The modal opens on each image's thumbnail (0.3.1): /preview is the master
+  // itself for a JPEG, 3–4 MB a page, which is slow over the network. "Full
+  // size" loads every image through RecordImageDisplay (its candidates and
+  // its freed notice unchanged) under one shared pan and zoom, the model of
+  // the gallery's ImageViewerModal; "Thumbnails" goes back.
+  //
+  // Version: 0.3.1
 
   import type { Snippet } from 'svelte';
   import { recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';
@@ -23,6 +29,19 @@
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
   import { dismissible } from '$lib/dialog';
+  import {
+    fittedSize,
+    screenExtent,
+    oneToOneZoom,
+    effectiveOneToOne,
+    pageScale,
+    panBounds,
+    panPixels,
+    dragToFraction,
+    transformFor,
+    type Pan,
+    type PanFraction,
+  } from '$lib/pan-zoom';
 
   let {
     record,
@@ -112,6 +131,110 @@
       return (order[a.role ?? 'single'] ?? 0) - (order[b.role ?? 'single'] ?? 0);
     });
   });
+
+  // Thumbnails until the operator asks for full size; no /preview before.
+  let fullSize = $state(false);
+  // Thumbnails that failed to load, by image id.
+  let thumbFailed = $state<{ [id: number]: boolean }>({});
+
+  // Shared pan and zoom in full size (NEH-230), the same model as the
+  // gallery's ImageViewerModal: one zoom and one pan fraction shared by every
+  // frame, from which each frame derives its own CSS scale and pixel pan with
+  // its own measured geometry. No rotation here, so rotation is always 0.
+  let zoom = $state(1);
+  let pan = $state<PanFraction>({ x: 0, y: 0 });
+
+  // Measured size of each frame and natural size of each image, by index in
+  // images.
+  let frameW    = $state<number[]>([0, 0]);
+  let frameH    = $state<number[]>([0, 0]);
+  let naturalW  = $state<number[]>([0, 0]);
+  let naturalH  = $state<number[]>([0, 0]);
+
+  function dpr(): number {
+    return typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  }
+
+  type FrameGeom = { scale: number; pan: Pan; bounds: { w: number; h: number } };
+
+  // Each image's 1:1 is clamped to >= 1, and the reference for pageScale is
+  // the largest of them (see the pageScale comment in pan-zoom.ts).
+  let oneToOnes = $derived.by((): number[] =>
+    images.map((_, i) =>
+      effectiveOneToOne(
+        oneToOneZoom({ w: naturalW[i] ?? 0, h: naturalH[i] ?? 0 }, { w: frameW[i] ?? 0, h: frameH[i] ?? 0 }, 0, dpr())
+      )
+    )
+  );
+
+  let oneToOneRef = $derived(oneToOnes.length > 0 ? Math.max(...oneToOnes) : 1);
+
+  let frameGeoms = $derived.by((): FrameGeom[] => {
+    const fitted = images.map((_, i) =>
+      fittedSize({ w: naturalW[i] ?? 0, h: naturalH[i] ?? 0 }, { w: frameW[i] ?? 0, h: frameH[i] ?? 0 }, 0)
+    );
+    return images.map((_, i) => {
+      const scale = pageScale(zoom, oneToOnes[i] ?? 1, oneToOneRef);
+      const extent = screenExtent(fitted[i], 0, scale);
+      const bounds = panBounds(extent, { w: frameW[i] ?? 0, h: frameH[i] ?? 0 });
+      return { scale, pan: panPixels(pan, bounds), bounds };
+    });
+  });
+
+  // Drag to pan, through pointer events, for mouse and touch alike; only the
+  // first pointer drags (a second finger is ignored until it ends).
+  let dragIndex = $state<number | null>(null);
+  let dragPointerId: number | null = null;
+  let dragLastX = 0;
+  let dragLastY = 0;
+
+  function handlePointerDown(e: PointerEvent, i: number) {
+    if (!fullSize || e.button !== 0) return;
+    // A press on a control inside the frame is not captured, so its click
+    // still reaches the button.
+    if ((e.target as HTMLElement).closest('button, a')) return;
+    if (dragPointerId !== null) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragIndex = i;
+    dragPointerId = e.pointerId;
+    dragLastX = e.clientX;
+    dragLastY = e.clientY;
+  }
+
+  function handlePointerMove(e: PointerEvent, i: number) {
+    if (dragIndex !== i || e.pointerId !== dragPointerId) return;
+    const deltaX = e.clientX - dragLastX;
+    const deltaY = e.clientY - dragLastY;
+    dragLastX = e.clientX;
+    dragLastY = e.clientY;
+    pan = dragToFraction(pan, { x: deltaX, y: deltaY }, frameGeoms[i]?.bounds ?? { w: 0, h: 0 });
+  }
+
+  function endDrag(e: PointerEvent) {
+    if (e.pointerId !== dragPointerId) return;
+    dragIndex = null;
+    dragPointerId = null;
+  }
+
+  function frameImageStyle(i: number): string {
+    const geom = frameGeoms[i];
+    const transition = dragIndex === null ? 'transition: transform 0.15s ease;' : '';
+    if (!geom) return `${transition} transform: ${transformFor({ x: 0, y: 0 }, 1, 0)};`;
+    return `${transition} transform: ${transformFor(geom.pan, geom.scale, 0)};`;
+  }
+
+  // "Fit" sets zoom to 1 and leaves the pan fraction, as in the gallery.
+  function handleFit() { zoom = 1; }
+  function handleActualSize() { zoom = oneToOneRef; }
+
+  // Back to the thumbnails: zoom and pan start again at fit next time.
+  function toggleFullSize() {
+    fullSize = !fullSize;
+    zoom = 1;
+    pan = { x: 0, y: 0 };
+    dragIndex = null;
+    dragPointerId = null;
+  }
 </script>
 
 <!-- Escape first cancels a pending retake, then closes; a click on the
@@ -178,26 +301,73 @@
     {/if}
 
     <div class="img-viewer-images">
-      {#each images as img}
-        <div class="img-viewer-frame">
+      {#each images as img, i (img.id)}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="img-viewer-frame"
+          class:lv-pannable={fullSize}
+          class:dragging={dragIndex === i}
+          bind:clientWidth={frameW[i]}
+          bind:clientHeight={frameH[i]}
+          onpointerdown={(e) => handlePointerDown(e, i)}
+          onpointermove={(e) => handlePointerMove(e, i)}
+          onpointerup={endDrag}
+          onpointercancel={endDrag}
+          onlostpointercapture={endDrag}
+        >
           {#if cameraMode === 'double' && img.role && img.role !== 'single'}
             <span class="img-viewer-badge">
               {img.role === 'left' ? $m.badge_left : $m.badge_right}
             </span>
           {/if}
 
-          <!-- NEH-139: a RAW image is shown through its JPEG preview or its
-               thumbnail, never as a broken image -->
-          <RecordImageDisplay image={img}>
-            {#snippet children(src, onerror)}
-              <img
-                {src}
-                {onerror}
-                alt={record.title || $m.col_image_alt(img.id)}
-                class="img-viewer-img"
-              />
-            {/snippet}
-          </RecordImageDisplay>
+          {#if fullSize}
+            <!-- NEH-139: a RAW image is shown through its JPEG preview or its
+                 thumbnail, never as a broken image; a freed master gets the
+                 calm notice (NEH-248) -->
+            <RecordImageDisplay image={img}>
+              {#snippet children(src, onerror)}
+                <img
+                  {src}
+                  {onerror}
+                  alt={record.title || $m.col_image_alt(img.id)}
+                  class="img-viewer-img"
+                  draggable="false"
+                  bind:naturalWidth={naturalW[i]}
+                  bind:naturalHeight={naturalH[i]}
+                  style={frameImageStyle(i)}
+                />
+              {/snippet}
+            </RecordImageDisplay>
+            <div class="lv-zoom-controls">
+              <button
+                class="lv-zoom-btn"
+                onclick={(e) => { e.stopPropagation(); handleFit(); }}
+                title={$m.col_fit_screen}
+                aria-label={$m.col_fit_screen_aria}
+              >
+                <span class="material-symbols-outlined icon-sm">fit_screen</span>
+              </button>
+              <button
+                class="lv-zoom-btn"
+                onclick={(e) => { e.stopPropagation(); handleActualSize(); }}
+                title={$m.col_zoom_actual}
+                aria-label={$m.col_zoom_actual_aria}
+              >
+                <span class="lv-one-to-one-glyph">1:1</span>
+              </button>
+            </div>
+          {:else if thumbFailed[img.id]}
+            <span style="--c: var(--color-light-grey)" class="material-symbols-outlined icon-lg">image_not_supported</span>
+          {:else}
+            <img
+              src={recordsApi.getImageThumbnailUrl(img.id)}
+              onerror={() => (thumbFailed[img.id] = true)}
+              alt={record.title || $m.col_image_alt(img.id)}
+              class="img-viewer-img lv-thumb-img"
+              draggable="false"
+            />
+          {/if}
         </div>
       {/each}
 
@@ -219,6 +389,12 @@
           <span class="material-symbols-outlined icon-sm">close</span>
           {$m.common_close}
         </button>
+        {#if images.length > 0}
+          <button class="btn btn-secondary" onclick={toggleFullSize} data-view-toggle>
+            <!-- No icon: the font subset (icon-names.json) has no fitting pair. -->
+            {fullSize ? $m.lvm_thumbnails : $m.lvm_full_size}
+          </button>
+        {/if}
         {#if !isExcluded}
           <button class="btn btn-danger" onclick={() => confirmRetake = true}>
             <span class="material-symbols-outlined icon-sm">refresh</span>
@@ -245,6 +421,35 @@
 </div>
 
 <style>
+  .lv-pannable { touch-action: none; cursor: grab; }
+  .lv-pannable.dragging { cursor: grabbing; }
+  /* A thumbnail is 600 px at most: it fills its frame, contained. */
+  .lv-thumb-img { width: 100%; height: 100%; }
+  /* Fit and 1:1 (NEH-230), as in the gallery modal: 32px, translucent dark. */
+  .lv-zoom-controls {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    z-index: 6;
+  }
+  .lv-zoom-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--color-light);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+  }
+  .lv-zoom-btn:hover { background: var(--color-primary); }
+  .lv-one-to-one-glyph { font-size: 11px; font-weight: var(--fw-bold); }
   .lv-excluded { padding: 8px 16px; flex-shrink: 0; }
   .lv-rejection {
     display: flex;

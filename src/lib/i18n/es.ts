@@ -987,6 +987,9 @@ export const es = {
 	lvm_retake: 'Volver a capturar',
 	lvm_retake_confirm: '¿Volver a capturar este registro? Captua guardará las imágenes actuales como versiones anteriores.',
 	lvm_retaking: 'Capturando imagen de reemplazo…',
+	// The retake modal opens on the thumbnails; these switch to full size and back (0.3.1).
+	lvm_full_size: 'Ver en tamaño completo',
+	lvm_thumbnails: 'Ver miniaturas',
 	// `message` is a sentence of its own, with or without a final period.
 	lvm_retake_error: (message: string) =>
 		`No se pudo volver a capturar el registro. ${message.endsWith('.') ? message : `${message}.`} Se conservaron las imágenes originales.`,

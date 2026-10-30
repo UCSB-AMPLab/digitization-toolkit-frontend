@@ -952,6 +952,8 @@ export const en: Messages = {
 	lvm_retake: 'Retake',
 	lvm_retake_confirm: 'Retake this record? Captua keeps the current images as earlier versions.',
 	lvm_retaking: 'Capturing replacement image…',
+	lvm_full_size: 'View full size',
+	lvm_thumbnails: 'View thumbnails',
 	lvm_retake_error: (message: string) =>
 		`Retake failed. ${message.endsWith('.') ? message : `${message}.`} The original images were kept.`,
 

@@ -1,10 +1,13 @@
 // NEH-139: a RAW (.cr2) record must never put its file URL straight into an
 // <img> in either inspection modal — Chromium cannot decode CR2, the operator
 // sees a broken image and retakes, and the retake supersedes the master.
+// The live-preview modal opens on thumbnails (0.3.1); these tests are of its
+// full-size view, so its helper presses the full-size toggle right after rendering.
 //
-// Version: 0.2.0
+// Version: 0.3.1
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { flushSync } from 'svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -48,7 +51,13 @@ function recordImgSrcs(container: HTMLElement): string[] {
 
 const modals = [
   ['gallery modal', (record: ApiRecord) => render(GalleryModal, { record, onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() })],
-  ['live-preview modal', (record: ApiRecord) => render(LiveModal, { record, cameraMode: 'single', onClose: vi.fn(), onRetake: vi.fn() })],
+  ['live-preview modal', (record: ApiRecord) => {
+    const screen = render(LiveModal, { record, cameraMode: 'single', onClose: vi.fn(), onRetake: vi.fn() });
+    // The modal opens on thumbnails; full size is what RecordImageDisplay draws.
+    const fullSize = screen.container.querySelector<HTMLButtonElement>('.img-viewer-footer button[data-view-toggle]');
+    flushSync(() => fullSize?.click());
+    return screen;
+  }],
 ] as const;
 
 describe.each(modals)('%s — RAW images (NEH-139)', (_name, renderModal) => {
