@@ -14,12 +14,17 @@
   // report: what was created, and each skipped item with its reason, an item
   // already on the unit apart from the errors.
   //
-  // While recaptures are pending on the unit (0.2.0, GET
-  // /records/to-retake/summary), the page says whose turn it is, lists the
-  // items whose volume has retakes first, each with "N de M pendientes" and a
-  // Recapturar that opens its first pending record, and the rest after; during
-  // the retake turn the rest carry the line that says a new volume must wait.
-  // Siguiente is then the first item with retakes.
+  // The items not done are shown in three sections (0.3.1), decided in
+  // $lib/queue: first what is in progress, then recaptures and rescans, then
+  // new material, each numbered among the sections shown; the done items
+  // follow, below them, except one whose volume still owes retakes, which
+  // stays in the second section. While recaptures are pending on the unit (0.2.0, GET
+  // /records/to-retake/summary), the page says whose turn it is, and each
+  // item whose volume has retakes, in the second section, shows "N de M
+  // pendientes" and a Recapturar that opens its first pending record; during
+  // the retake turn only new material carries the line that says a new
+  // volume must wait. Siguiente is the first item of the first section that
+  // has one to capture.
   //
   // The digitisation queue synced with Fisqua (contract 1.7) is one more list
   // in the answer, with `source` `queue`; the page shows it first, labelled
@@ -33,7 +38,7 @@
   // queue moved, so the page reads it again and says so.
   // ============================================================================
   //
-  // Version: 0.3.0
+  // Version: 0.3.1
 
   import { onMount, tick } from 'svelte';
   import { goto } from '$app/navigation';
@@ -45,7 +50,8 @@
   import { barSegments, placeVolume, type BarStatus, type PipelineStage } from '$lib/pipeline';
   import {
     actionsPresent, captureUrl, defaultListId, filterByAction, filterByAssignee, isItemDone, isItemShown,
-    isOnUnitReject, isQueueList, itemsForUser, nextItemPosition, retakePairs, retakeUrl, type AssigneeFilter
+    isLockedForTurn, isOnUnitReject, isQueueList, itemsForUser, nextItemPosition, queueSections, retakePairs, retakeUrl,
+    type AssigneeFilter, type QueueSectionKey
   } from '$lib/queue';
   import { readRetakeSummary, retakeVolumeMap } from '$lib/recapture-turn';
   import { actionLabel, importErrorText, importReasonText } from '$lib/queue-labels';
@@ -130,10 +136,14 @@
 
   let retakeVolumes = $derived(retakeVolumeMap(retakeSummary));
   let turn = $derived(retakeSummary && retakeSummary.pendingRecords > 0 ? retakeSummary.turn : null);
-  // Sections only while something is pending and the turn says so.
   // A new volume waits for the retakes of one volume.
   let newVolumeLocked = $derived(turn?.state === 'recaptures');
-  let splitByRetakes = $derived(turn !== null && turn.state !== 'free' && retakeVolumes.size > 0);
+  // The volumes with retakes, while something is pending and the turn says
+  // so; empty otherwise, and the second section then holds only rescans.
+  let retakeSet = $derived<ReadonlySet<number>>(
+    turn !== null && turn.state !== 'free' ? new Set(retakeVolumes.keys()) : new Set()
+  );
+  let splitByRetakes = $derived(retakeSet.size > 0);
 
   let list = $derived(lists?.find(l => l.listId === selectedListId) ?? null);
   let isQueue = $derived(isQueueList(list));
@@ -141,7 +151,7 @@
   // for an operator only their own and the unassigned ones. Siguiente and
   // the action filter count only these.
   let items = $derived(itemsForUser((list?.items ?? []).filter(isItemShown), $userRole, username));
-  let nextPosition = $derived(nextItemPosition(items, splitByRetakes ? new Set(retakeVolumes.keys()) : undefined));
+  let nextPosition = $derived(nextItemPosition(items, retakeSet));
   let actions = $derived(actionsPresent(items));
 
   // null shows every item. A filter whose action the chosen list does not
@@ -165,12 +175,12 @@
       : $userRole === 'operator' ? $m.queue_operator_empty
       : $m.queue_items_empty
   );
-  let retakeItems = $derived(
-    splitByRetakes ? shownItems.filter(i => i.collectionId != null && retakeVolumes.has(i.collectionId)) : []
-  );
-  let otherItems = $derived(
-    splitByRetakes ? shownItems.filter(i => i.collectionId == null || !retakeVolumes.has(i.collectionId)) : shownItems
-  );
+  let sectioned = $derived(queueSections(shownItems, retakeSet));
+  let sectionText = $derived<{ [K in QueueSectionKey]: { title: (n: number) => string; sub: string } }>({
+    progress: { title: $m.section_progress_title, sub: $m.section_progress_sub },
+    rework: { title: $m.section_rework_title, sub: $m.section_rework_sub },
+    new: { title: $m.section_new_title, sub: $m.section_new_sub },
+  });
 
   // The filter hides the next item: say so, since its mark is not on screen.
   let nextHidden = $derived(nextPosition !== null && !shownItems.some(i => i.position === nextPosition));
@@ -406,8 +416,8 @@
         {/if}
       {:else if canOperate && item.collectionId != null && projectId != null}
         <button class="btn ip-btn ip-btn-capture" onclick={() => goto(captureUrl(projectId, item.collectionId as number))}>
-          <!-- An empty volume waits for its turn (0.2.0): the capture screen says why. -->
-          <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">{newVolumeLocked && recordTotal(item) === 0 ? 'lock' : 'photo_camera'}</span>
+          <!-- New material waits for its turn (0.2.0, 0.3.1): the capture screen says why. -->
+          <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">{isLockedForTurn(item, retakeSet, turn?.state) ? 'lock' : 'photo_camera'}</span>
           <span>{$m.col_live_preview}</span>
         </button>
       {/if}
@@ -562,42 +572,40 @@
       {/if}
       {#if queueEmptyText}
         <p class="empty">{queueEmptyText}</p>
-      {:else if splitByRetakes}
-        <section class="q-section q-first" aria-labelledby="q-first-title">
-          <h2 id="q-first-title" class="q-section-title">{$m.q_first_title}</h2>
-          <p class="q-section-sub">{$m.q_first_sub}</p>
-          {#if retakeItems.length > 0}
-            <ol class="queue">
-              {#each retakeItems as item (item.position)}
-                {@render queueRow(item)}
-              {/each}
-            </ol>
-          {/if}
-        </section>
-        <section class="q-section q-then" class:is-locked={turn?.state === 'recaptures'} aria-labelledby="q-then-title">
-          <div class="q-section-head">
-            <h2 id="q-then-title" class="q-section-title">{$m.q_then_title}</h2>
-            {#if turn?.state === 'recaptures'}
-              <span class="q-locked">
-                <span class="material-symbols-outlined" aria-hidden="true">lock</span>
-                <span>{$m.q_new_locked}</span>
-              </span>
-            {/if}
-          </div>
-          {#if otherItems.length > 0}
-            <ol class="queue">
-              {#each otherItems as item (item.position)}
-                {@render queueRow(item)}
-              {/each}
-            </ol>
-          {/if}
-        </section>
       {:else}
-        <ol class="queue">
-          {#each shownItems as item (item.position)}
-            {@render queueRow(item)}
-          {/each}
-        </ol>
+        {#each sectioned.sections as section (section.key)}
+          {@const locked = section.key === 'new' && newVolumeLocked}
+          <section
+            class="q-section q-{section.key}"
+            class:q-first={section.ordinal === 1}
+            class:is-locked={locked}
+            aria-labelledby="q-{section.key}-title"
+          >
+            <div class="q-section-head">
+              <h2 id="q-{section.key}-title" class="q-section-title">{sectionText[section.key].title(section.ordinal)}</h2>
+              {#if locked}
+                <span class="q-locked">
+                  <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+                  <span>{$m.q_new_locked}</span>
+                </span>
+              {/if}
+            </div>
+            <p class="q-section-sub">{sectionText[section.key].sub}</p>
+            <ol class="queue">
+              {#each section.items as item (item.position)}
+                {@render queueRow(item)}
+              {/each}
+            </ol>
+          </section>
+        {/each}
+        {#if sectioned.done.length > 0}
+          <!-- The done items, below the sections and in none. -->
+          <ol class="queue q-done-list">
+            {#each sectioned.done as item (item.position)}
+              {@render queueRow(item)}
+            {/each}
+          </ol>
+        {/if}
       {/if}
     {/if}
   {/if}
@@ -814,7 +822,7 @@
   .q-section-sub { margin: 0; font-size: var(--text-sm); color: var(--color-light); }
   .q-locked { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-light-grey); }
   .q-locked .material-symbols-outlined { font-size: 18px; }
-  .q-then.is-locked .queue { opacity: 0.6; }
+  .q-section.is-locked .queue { opacity: 0.6; }
   .q-first .queue { background-color: var(--color-surface); }
   .q-recapture { padding: 8px 18px; font-size: var(--text-sm); }
   .q-pending { font-size: var(--text-sm); font-weight: var(--fw-extrabold); color: var(--color-highlight); }

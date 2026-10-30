@@ -2,12 +2,16 @@
 // `Messages` in `index.ts`): a missing or extra key here is a type error in
 // `npm run check`.
 //
-// Version: 0.3.0
+// Version: 0.3.1
 
 import type { Messages } from './index';
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';
+
+// The ordinal of Cola's sections (0.3.1): 1 to 3.
+const ORDINALS_EN = ['First', 'Second', 'Third'];
+const ordinalEn = (n: number) => ORDINALS_EN[n - 1] ?? String(n);
 
 export const en: Messages = {
 	// ── Common (shared across screens) ───────────────────────────────────────
@@ -1255,14 +1259,14 @@ export const en: Messages = {
 	queue_action_full_digitisation: 'Full digitisation',
 	queue_action_complete: 'Completion',
 	queue_next: 'Next',
-	queue_done: 'Done',
+	queue_done: 'Finished',
 	queue_no_volume: 'No volume on this unit',
-	queue_mark_done: 'Mark as done',
+	queue_mark_done: 'Mark as finished',
 	queue_unmark_done: 'Unmark',
-	queue_done_by: (who: string, date: string) => `Marked done by ${who} on ${date}`,
-	queue_done_by_who: (who: string) => `Marked done by ${who}`,
-	queue_done_on: (date: string) => `Marked done on ${date}`,
-	queue_done_marked: 'Marked done',
+	queue_done_by: (who: string, date: string) => `Marked finished by ${who} on ${date}`,
+	queue_done_by_who: (who: string) => `Marked finished by ${who}`,
+	queue_done_on: (date: string) => `Marked finished on ${date}`,
+	queue_done_marked: 'Marked finished',
 	queue_done_approved: 'Every record is approved.',
 	queue_mark_error: "Captua could not change this item's mark.",
 	queue_mark_error_busy: 'Captua could not save the change just now. Try again.',
@@ -1363,9 +1367,13 @@ export const en: Messages = {
 	retake_pending_of: (p: number, t: number) => `${formatCount(p, 'en')} of ${formatCount(t, 'en')} pending`,
 	retake_cta: 'Retake',
 	// Cola.
-	q_first_title: 'First: retakes',
-	q_first_sub: 'These volumes have page pairs the digitisation list asks to capture again.',
-	q_then_title: 'Then: new digitisation',
+	// Cola's sections (0.3.1), numbered by the sections shown.
+	section_progress_title: (n: number) => `${ordinalEn(n)}: finish what's in progress`,
+	section_progress_sub: 'Volumes whose capture has already started on this unit.',
+	section_rework_title: (n: number) => `${ordinalEn(n)}: recaptures and rescans`,
+	section_rework_sub: 'Volumes with page pairs to recapture, then the ones to digitise again in full.',
+	section_new_title: (n: number) => `${ordinalEn(n)}: new material`,
+	section_new_sub: 'Volumes never digitised before.',
 	q_new_locked: 'To start a new volume, first finish the retakes of one volume.',
 	turn_recap_title: 'Retake turn',
 	turn_recap_body: 'Finish the retakes of one volume and you can start a new one.',

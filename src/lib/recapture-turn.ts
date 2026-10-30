@@ -17,7 +17,7 @@
 // shape (`status`, `detail`), as capture-errors.ts does.
 // ============================================================================
 //
-// Version: 0.2.0
+// Version: 0.3.1
 
 import type { QueueItem, RetakeSummary, RetakeSummaryVolume } from './api';
 
@@ -77,8 +77,10 @@ export function retakeVolumeMap(summary: RetakeSummary | null): Map<number, Reta
 
 /**
  * The volume to retake next: the first item of the list, in list order,
- * whose volume has retakes pending, as Cola's Siguiente; without one, the
- * volume with most pending (the summary's first). Null when none is pending.
+ * whose volume has retakes pending; without one, the volume with most
+ * pending (the summary's first). Null when none is pending. Cola's
+ * Siguiente follows its own sections (0.3.1, $lib/queue), which put work in
+ * progress first, so the two can differ.
  */
 export function preferredRetakeVolume(summary: RetakeSummary | null, items: QueueItem[]): RetakeSummaryVolume | null {
 	const volumes = retakeVolumeMap(summary);
