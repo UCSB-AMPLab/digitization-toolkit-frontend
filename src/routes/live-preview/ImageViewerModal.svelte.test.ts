@@ -4,7 +4,7 @@
 // The modal opens on the thumbnails (0.3.1) and loads /preview only when the
 // operator asks for full size, which shows the images under a shared zoom.
 //
-// Version: 0.3.1
+// Version: 0.3.2
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -241,4 +241,46 @@ describe('live-preview ImageViewerModal — thumbnails first, full size on reque
     expect(screen.container.querySelector('[data-testid="image-missing"]')).toBeNull();
     expect(screen.container.querySelector('[data-testid="image-unviewable"]')).toBeNull();
   });
+});
+
+describe('live-preview ImageViewerModal — an opening with a page never photographed (0.3.2)', () => {
+  let thumbSpy: ReturnType<typeof vi.spyOn>;
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  let listSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    locale.set('es');
+    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB);
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(THUMB);
+    listSpy = vi.spyOn(recordsApi, 'listRejections').mockResolvedValue([]);
+  });
+  afterEach(() => {
+    thumbSpy.mockRestore();
+    previewSpy.mockRestore();
+    listSpy.mockRestore();
+  });
+
+  function missingRecord(side: 'left' | 'right'): ApiRecord {
+    const present = side === 'left' ? 'right' : 'left';
+    return {
+      id: 9, title: 'Folio 9', status: 'captured', capture_mode: 'dual', missing_side: side,
+      images: [{ id: 3, record_id: 9, filename: `${present}.jpg`, file_path: '/x', format: 'jpg', role: present, is_current: true }],
+    } as ApiRecord;
+  }
+
+  for (const side of ['left', 'right'] as const) {
+    it(`missing the ${side} page: an empty frame that says so on the ${side}, in thumbnails and full size`, async () => {
+      const screen = render(ImageViewerModal, { record: missingRecord(side), cameraMode: 'double', onClose: vi.fn(), onRetake: vi.fn(), pending: true });
+      for (const view of ['thumbnails', 'full size']) {
+        await expect.element(screen.getByText(es.missing_page)).toBeVisible();
+        const all = [...screen.container.querySelectorAll<HTMLElement>('.img-viewer-images > *')];
+        expect(all, view).toHaveLength(2);
+        const [missingFrame, imageFrame] = side === 'left' ? all : [all[1], all[0]];
+        expect(missingFrame.getAttribute('data-missing-side'), view).toBe(side);
+        expect(missingFrame.querySelector('img'), view).toBeNull();
+        expect(imageFrame.querySelector('img'), view).not.toBeNull();
+        expect(imageFrame.textContent).toContain(side === 'left' ? es.badge_right : es.badge_left);
+        if (view === 'thumbnails') await screen.getByRole('button', { name: es.lvm_full_size }).click();
+      }
+    });
+  }
 });

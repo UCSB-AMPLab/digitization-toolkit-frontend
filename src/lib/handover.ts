@@ -9,13 +9,21 @@
 // A record Fisqua excluded (contract 1.6) has been sent and ruled on, so it
 // counts as sent before. It is not a retake and is never pending, so it
 // blocks no send, and it is not in review, so there is nothing to take back.
+//
+// A record that misses a side (0.3.2, `missing_side`) stays captured: promote
+// leaves it on the unit and sends the others, so it is not counted as
+// captured here, and a volume whose only captured records miss a side
+// offers no send. It is pending, and the lock counts it with the other
+// pending records, but on its own it does not lock a volume that has other
+// records to send (handoverLock).
 // ============================================================================
 //
-// Version: 0.2.1
+// Version: 0.3.2
 
 import type { Record } from '$lib/api';
 
 export interface HandoverCounts {
+	// The captured records a send would hand over: those that miss a side are left out.
 	captured: number;
 	inReview: number;
 	approved: number;
@@ -23,10 +31,12 @@ export interface HandoverCounts {
 	excluded: number;
 }
 
-export function handoverCounts(records: Pick<Record, 'status'>[]): HandoverCounts {
+export function handoverCounts(records: Pick<Record, 'status' | 'missing_side'>[]): HandoverCounts {
 	const c: HandoverCounts = { captured: 0, inReview: 0, approved: 0, rejected: 0, excluded: 0 };
 	for (const r of records) {
-		if (r.status === 'captured') c.captured++;
+		if (r.status === 'captured') {
+			if (r.missing_side == null) c.captured++;
+		}
 		else if (r.status === 'in_review') c.inReview++;
 		else if (r.status === 'approved') c.approved++;
 		else if (r.status === 'rejected') c.rejected++;
@@ -49,6 +59,23 @@ export function handoverOffer(c: HandoverCounts): HandoverOffer {
 		send: c.captured === 0 ? null : sentBefore ? 'new' : 'volume',
 		takeBack: c.inReview > 0
 	};
+}
+
+/** The captured records that miss a side, which no send hands over. */
+export function missingSideCount(records: Pick<Record, 'status' | 'missing_side'>[]): number {
+	return records.filter((r) => r.status === 'captured' && r.missing_side != null).length;
+}
+
+/**
+ * How many pending records the locked send button names, or 0 for no lock.
+ * `pending` is the volume's pending records, `missingSide` those of them
+ * that miss a side. A retake of a rejection left locks the send, as the
+ * backend refuses it; the records that miss a side lock it only when there
+ * is nothing else to send.
+ */
+export function handoverLock(pending: number, missingSide: number, offer: HandoverOffer): number {
+	if (pending <= 0) return 0;
+	return pending - missingSide > 0 || offer.send === null ? pending : 0;
 }
 
 // The ids promote names when it refuses (422 with blocking_record_ids), or

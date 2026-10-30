@@ -10,7 +10,7 @@
 // - in the guide, the thumbnails of the next records are preloaded (0.3.1).
 // Every request is answered by a fetch mock keyed on the path.
 //
-// Version: 0.3.1
+// Version: 0.3.2
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -31,6 +31,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import type { QueueItem, QueueList, RetakeSummary } from '$lib/api';
 import { authStore, type UserRole } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
+import { es } from '$lib/i18n/es';
 import '../../app.css';
 import LivePreview from './+page.svelte';
 
@@ -90,6 +91,8 @@ const served = {
 	// sequence then id. A retake clears both.
 	summaries: [] as (RetakeSummary | 'fail')[],
 	prepared: new Set<number>(),
+	// Records that miss a side (0.3.2), pending until a retake clears it.
+	missing: new Map<number, 'left' | 'right'>(),
 	lists: [] as QueueList[],
 	comments: new Map<number, string>()
 };
@@ -102,7 +105,7 @@ function serve() {
 			const next = served.summaries.length > 1 ? served.summaries.shift()! : served.summaries[0];
 			if (next === 'fail') return json({ detail: 'boom' }, 500);
 			const pendingIds = served.records
-				.filter((r) => r.status === 'rejected' || (r.status === 'captured' && served.prepared.has(r.id)))
+				.filter((r) => r.status === 'rejected' || (r.status === 'captured' && served.prepared.has(r.id)) || served.missing.has(r.id))
 				.sort((a, b) => a.sequence - b.sequence || a.id - b.id)
 				.map((r) => r.id);
 			if (pendingIds.length === 0) return json(next);
@@ -130,12 +133,14 @@ function serve() {
 				served.nextRecords = null;
 				return once();
 			}
-			return json(served.records.map((r) => ({ ...r })));
+			return json(served.records.map((r) => ({ ...r, missing_side: served.missing.get(r.id) ?? null })));
 		}
-		if (path.endsWith('/cameras/capture')) {
+		// A pair's retake goes to the dual capture (0.3.2), answered the same way.
+		if (path.endsWith('/cameras/capture') || path.endsWith('/cameras/capture/dual')) {
 			const body = JSON.parse(String(init?.body ?? '{}')) as { record_id?: number };
 			if (body.record_id == null) served.plainCaptures++;
 			if (body.record_id != null) served.prepared.delete(body.record_id);
+			if (body.record_id != null) served.missing.delete(body.record_id);
 			const target = served.records.find((r) => r.id === body.record_id);
 			if (target) target.status = 'captured';
 			return json({ success: true, record_id: body.record_id });
@@ -156,6 +161,7 @@ beforeEach(() => {
 	served.plainCaptures = 0;
 	served.rejectionCalls = [];
 	served.prepared = new Set();
+	served.missing = new Map();
 	served.summaries = [summary('free')];
 	served.lists = [];
 	served.comments = new Map();
@@ -452,6 +458,31 @@ describe('capture screen: the guided retake', () => {
 
 		await retakeCurrent(screen);
 		await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+	});
+
+	it('walks a record that misses a side like any pending record, and retakes it as a pair (0.3.2)', async () => {
+		signIn('operator');
+		served.records = [rec(41, 1, 'rejected'), { ...rec(42, 2, 'captured'), capture_mode: 'dual' }];
+		served.missing = new Map([[42, 'left']]);
+		served.summaries = [summary('recaptures')];
+		current.url = `${BASE_URL}&recordId=41`;
+		const fetchSpy = serve();
+		const screen = render(LivePreview);
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('Recaptura 1 de 2 · Tomo 6')).toBeVisible();
+
+		await retakeCurrent(screen);
+		await expect.element(dialog.getByText('Recaptura 2 de 2 · Tomo 6')).toBeVisible();
+		await expect.element(dialog.getByText('Par 2')).toBeVisible();
+		await expect.element(dialog.getByText(es.missing_page)).toBeVisible();
+
+		await retakeCurrent(screen);
+		await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+		// The single record went to the single capture, the pair to the dual one.
+		const captures = fetchSpy.mock.calls
+			.filter(([input]) => /\/cameras\/capture(\/dual)?$/.test(new URL(String(input), 'http://localhost').pathname))
+			.map(([input, init]) => [new URL(String(input), 'http://localhost').pathname.endsWith('/dual'), (JSON.parse(String(init?.body ?? '{}')) as { record_id?: number }).record_id]);
+		expect(captures).toEqual([[false, 41], [true, 42]]);
 	});
 
 	it('with two prepared records, a skip opens the second, not the first, and both retaken end the guide', async () => {

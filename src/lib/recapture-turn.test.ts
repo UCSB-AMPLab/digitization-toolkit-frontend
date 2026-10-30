@@ -3,7 +3,7 @@
 // volume the queue offers first, the folios of the next guided retake, and
 // which record the guided retake opens next.
 //
-// Version: 0.2.1
+// Version: 0.3.2
 import { describe, expect, it } from 'vitest';
 import type { QueueItem, RetakeSummary, StatusCounts } from './api';
 import {
@@ -15,6 +15,7 @@ import {
 	preferredRetakeVolume,
 	readRetakeSummary,
 	recapturesPendingCount,
+	retakeProgress,
 	retakeVolumeMap
 } from './recapture-turn';
 
@@ -164,5 +165,36 @@ describe('the guide order', () => {
 
 	it('gives null when nothing is pending', () => {
 		expect(guideNextId([1, 2], pending([]))).toBeNull();
+	});
+});
+
+describe('records that miss a side (0.3.2)', () => {
+	const volume = summary.volumes[1];
+
+	it('keeps the ids of the records that miss a side, and reads a volume without them as one with none', () => {
+		const withMissing = { ...summary, volumes: [{ ...volume, missingSideRecordIds: [12] }] };
+		expect(readRetakeSummary(withMissing)).toEqual(withMissing);
+		expect(readRetakeSummary(summary)?.volumes[1].missingSideRecordIds ?? []).toEqual([]);
+		expect(readRetakeSummary({ ...summary, volumes: [{ ...volume, missingSideRecordIds: ['12'] }] })).toBeNull();
+	});
+
+	it('counts them in the progress: pending of the rejected and the missing sides together', () => {
+		// Two missing sides, one rejection already retaken: the backend's
+		// pending (2) is above its total (1), which counts only rejections.
+		expect(retakeProgress({ ...volume, pending: 2, total: 1, missingSideRecordIds: [11, 12] })).toEqual({ pending: 2, total: 3, donePercent: expect.closeTo(100 / 3) });
+		expect(retakeProgress({ ...volume, pending: 2, total: 0, missingSideRecordIds: [11, 12] })).toEqual({ pending: 2, total: 2, donePercent: 0 });
+	});
+
+	it('reads a volume without them as before', () => {
+		expect(retakeProgress({ ...volume, pending: 1, total: 4 })).toEqual({ pending: 1, total: 4, donePercent: 75 });
+		expect(retakeProgress({ ...volume, pending: 0, total: 0 })).toEqual({ pending: 0, total: 0, donePercent: 0 });
+	});
+
+	it('walks a record that misses a side like any pending record', () => {
+		// The guide's order and next record come from pendingRecordIds, which
+		// lists the records that miss a side with the others.
+		const order = guideOrder([11, 12, 13], 12);
+		const pending = new Set([11, 12, 13]);
+		expect(guideNextId(order, (id) => pending.has(id), 12)).toBe(13);
 	});
 });

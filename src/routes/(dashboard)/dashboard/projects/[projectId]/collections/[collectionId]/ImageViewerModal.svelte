@@ -3,14 +3,17 @@
   // images (with an L/R badge on a two-camera capture) under one shared
   // pan and zoom, and offers retake and delete within the record's lock. On a
   // record Fisqua excluded (contract 1.6) it says what the exclusion means.
+  // A dual record that misses a side (0.3.2) shows that page as an empty
+  // frame that says so (MissingPage), on its side.
   //
-  // Version: 0.2.1
+  // Version: 0.3.2
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
+  import MissingPage from '$lib/components/MissingPage.svelte';
   import { dismissible } from '$lib/dialog';
   import {
     fittedSize,
@@ -63,6 +66,9 @@
   });
 
   const isDouble = $derived(() => images().some(i => i.role === 'left' || i.role === 'right'));
+
+  // The page of a dual opening never photographed, drawn on its side.
+  const missingSide = $derived(record.missing_side ?? null);
 
   // Shared pan and zoom (NEH-230), the same model as ImageViewer.svelte: one
   // zoom and one pan fraction shared by both frames, from which each frame
@@ -206,6 +212,9 @@
     {/if}
 
     <div class="img-viewer-images">
+      {#if missingSide === 'left'}
+        <div class="img-viewer-frame missing-frame" data-missing-side="left"><MissingPage side="left" /></div>
+      {/if}
       {#each images() as img, i}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
@@ -275,6 +284,9 @@
           {/if}
         </div>
       {/each}
+      {#if missingSide === 'right'}
+        <div class="img-viewer-frame missing-frame" data-missing-side="right"><MissingPage side="right" /></div>
+      {/if}
 
       {#if images().length === 0}
         <div class="img-viewer-frame">
@@ -360,6 +372,8 @@
   cursor: grab;
 }
 .img-viewer-frame.dragging { cursor: grabbing; }
+/* The missing page has nothing to pan. */
+.img-viewer-frame.missing-frame { cursor: default; }
 
   .img-viewer-download {
     position: absolute;

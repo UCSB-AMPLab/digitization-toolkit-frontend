@@ -2,7 +2,7 @@
 // buttons show for which mix of statuses, what each dialog says, and what is
 // reported after promote and take-back answer.
 //
-// Version: 0.2.1
+// Version: 0.3.2
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -146,6 +146,41 @@ describe('HandoverControls', () => {
 		const screen = render(HandoverControls, { records: recs({ captured: 2, rejected: 1 }), collectionId: 7, onChanged, pending: 0 });
 		await expect.element(screen.getByRole('button', { name: /^Enviar/ })).toBeEnabled();
 		await expect.element(screen.getByRole('button', { name: /^Falta/ })).not.toBeInTheDocument();
+	});
+
+	describe('records that miss a side (0.3.2)', () => {
+		const missing = (side: 'left' | 'right'): ApiRecord => ({ ...rec('captured'), missing_side: side });
+
+		it('a volume whose only captured records miss a side offers no send, which would promote nothing', async () => {
+			const records = [missing('left'), missing('right'), ...recs({ approved: 3 })];
+			const screen = render(HandoverControls, { records, collectionId: 7, onChanged, pending: 2, missingSide: 2 });
+			await expect.element(screen.getByRole('button', { name: 'Faltan 2 recapturas' })).toBeDisabled();
+			await expect.element(screen.getByRole('button', { name: /^Enviar/ })).not.toBeInTheDocument();
+		});
+
+		it('without the summary, counts them from the records', async () => {
+			const screen = render(HandoverControls, { records: [missing('left')], collectionId: 7, onChanged });
+			await expect.element(screen.getByRole('button', { name: 'Falta una recaptura' })).toBeDisabled();
+			await expect.element(screen.getByRole('button', { name: /^Enviar/ })).not.toBeInTheDocument();
+		});
+
+		it('they do not hold back the send of the other captured records, which names only those', async () => {
+			promoteSpy.mockResolvedValue({ collection_id: 7, promoted: 3 });
+			const records = [missing('left'), ...recs({ captured: 3 })];
+			const screen = render(HandoverControls, { records, collectionId: 7, onChanged, pending: 1, missingSide: 1 });
+			await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
+			const dialog = screen.getByRole('dialog');
+			await expect.element(dialog.getByText('Los 3 registros capturados quedarán en revisión.', { exact: false })).toBeVisible();
+			await dialog.getByRole('button', { name: 'Enviar', exact: true }).click();
+			expect(promoteSpy).toHaveBeenCalledWith(7);
+		});
+
+		it('a retake of a rejection still locks the send, counting the missing sides among the pending', async () => {
+			const records = [missing('left'), ...recs({ captured: 3, rejected: 1 })];
+			const screen = render(HandoverControls, { records, collectionId: 7, onChanged, pending: 2, missingSide: 1 });
+			await expect.element(screen.getByRole('button', { name: 'Faltan 2 recapturas' })).toBeDisabled();
+			await expect.element(screen.getByRole('button', { name: /^Enviar/ })).not.toBeInTheDocument();
+		});
 	});
 
 	it('a send refused because retakes are pending says how many, from the refusal (0.2.0)', async () => {

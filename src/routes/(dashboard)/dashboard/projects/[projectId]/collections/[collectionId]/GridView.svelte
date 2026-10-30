@@ -9,12 +9,16 @@
   // the notice goes up to +page.svelte and the list is reloaded from the
   // server, because the reload unmounts this view.
   //
-  // Version: 0.2.1
+  // A dual record that misses a side (0.3.2) is still a pair: the half of
+  // the page never photographed is an empty frame that says so (MissingPage).
+  //
+  // Version: 0.3.2
 
   import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
   import { renumberErrorText, reorderErrorText } from '$lib/volume-refusals';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
+  import MissingPage from '$lib/components/MissingPage.svelte';
   import { dismissible } from '$lib/dialog';
   // @ts-ignore — installed in Docker, not locally
   import { dndzone } from 'svelte-dnd-action';
@@ -75,6 +79,8 @@
     image: RecordImage | null;
     role: 'L' | 'R' | null;
     thumbnailUrl: string | null;
+    // The page never photographed, for the half that stands in for it.
+    missing?: 'left' | 'right';
   }
 
   interface GridGroup {
@@ -98,12 +104,20 @@
       const order = (r?: string | null) => r === 'left' ? 0 : r === 'right' ? 1 : 2;
       return order(a.role) - order(b.role) || a.id - b.id;
     });
-    return sorted.map((img): GridItem => ({
+    const items = sorted.map((img): GridItem => ({
       record,
       image: img,
       role: imageRole(img),
       thumbnailUrl: recordsApi.getImageThumbnailUrl(img.id),
     }));
+    // The missing page takes its side of the pair: left before right.
+    if (record.missing_side === 'left') {
+      return [{ record, image: null, role: 'L', thumbnailUrl: null, missing: 'left' }, ...items];
+    }
+    if (record.missing_side === 'right') {
+      return [...items, { record, image: null, role: 'R', thumbnailUrl: null, missing: 'right' }];
+    }
+    return items;
   }
 
   function recordsToGridGroups(recs: Record[]): GridGroup[] {
@@ -366,7 +380,9 @@
 </div>
 
 {#snippet thumbContent(item: GridItem, record: Record)}
-  {#if item.thumbnailUrl}
+  {#if item.missing}
+    <MissingPage side={item.missing} />
+  {:else if item.thumbnailUrl}
     <img src={item.thumbnailUrl} alt="{record.title}{item.role ? ' ' + item.role : ''}" class="card-image" draggable="false" />
   {:else}
     <div class="card-placeholder">

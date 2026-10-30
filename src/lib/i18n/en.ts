@@ -2,7 +2,7 @@
 // `Messages` in `index.ts`): a missing or extra key here is a type error in
 // `npm run check`.
 //
-// Version: 0.3.1
+// Version: 0.3.2
 
 import type { Messages } from './index';
 
@@ -1353,6 +1353,9 @@ export const en: Messages = {
 	retakes_filter_volume_label: 'Volume',
 	retakes_filter_all_volumes: 'All volumes',
 	retakes_filter_empty: 'This volume has no records to retake.',
+	// ── An opening with a page never photographed (0.3.2) ───────────────────
+	missing_page: 'This page was not captured',
+	missing_page_reason: 'A page is missing: recapture the whole opening',
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
 	lv_instruction_label: 'From the list',
 	lv_instruction_show_all: 'Show all',

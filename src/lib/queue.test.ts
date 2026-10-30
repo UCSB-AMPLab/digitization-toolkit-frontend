@@ -5,7 +5,7 @@
 // and Cola's three sections (0.3.1): in progress, recaptures and rescans,
 // new material, with Siguiente and the recapture turn's lock.
 //
-// Version: 0.3.1
+// Version: 0.3.2
 import { describe, it, expect } from 'vitest';
 import type { QueueItem, QueueList, ImportReject, RecordToRetake, StatusCounts } from './api';
 import {
@@ -386,7 +386,8 @@ describe('the Fisqua queue (contract 1.7)', () => {
 	function row(recordId: number, title: string, sequence: number | null): RecordToRetake {
 		return {
 			recordId, title, sequence, collectionId: 1, projectId: 1,
-			name: null, filenameStem: null, reason: null, comment: null, rejectedBy: null, rejectedAt: null
+			name: null, filenameStem: null, reason: null, comment: null, rejectedBy: null, rejectedAt: null,
+			pendingReason: 'rejected', missingSide: null
 		};
 	}
 

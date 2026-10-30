@@ -4,7 +4,7 @@
 // volume that opens its first pending record, and no capture links for a
 // reviewer, who cannot capture.
 //
-// Version: 0.2.1
+// Version: 0.3.2
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -72,5 +72,19 @@ describe('RetakeBand', () => {
 		await expect.element(screen.getByText('Con más pendientes: Tomo 066 (31).')).toBeVisible();
 		await expect.element(screen.getByText('31 de 31 pendientes')).toBeVisible();
 		expect(screen.container.querySelectorAll('a')).toHaveLength(0);
+	});
+
+	it('counts the records that miss a side among the pending, never more pending than in all (0.3.2)', async () => {
+		// The backend counts a missing side in `pending` and not in `total`.
+		const missing: RetakeSummary = {
+			pendingRecords: 2,
+			volumes: [{ collectionId: 5, projectId: 24, name: 'Tomo 010', filenameStem: 'co-ahr-not-t010', pending: 2, total: 0, excluded: 0, firstPendingRecordId: 40, pendingRecordIds: [40, 41], missingSideRecordIds: [40, 41] }],
+			turn: { state: 'recaptures', unlockedBy: null }
+		};
+		const screen = render(RetakeBand, { summary: missing, canRetake: true });
+		await expect.element(screen.getByRole('region', { name: '2 pares de páginas por recapturar en un volumen' })).toBeVisible();
+		await expect.element(screen.getByText('2 de 2 pendientes')).toBeVisible();
+		const fill = screen.container.querySelector<HTMLElement>('.rb-bar-fill');
+		expect(fill?.style.width).toBe('0%');
 	});
 });

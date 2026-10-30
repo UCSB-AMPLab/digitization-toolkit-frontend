@@ -14,28 +14,38 @@
   // summary; without it, the rejected records are counted. While anything is pending
   // the send button is disabled, says how many retakes are left, and carries
   // a hint underneath.
+  //
+  // A record that misses a side (0.3.2) is pending, but the backend's promote
+  // leaves it captured and sends the others: it locks the send only when no
+  // other record is left to send ($lib/handover). The page passes how many
+  // of the pending records miss a side (`missingSide`); without it, the
+  // captured records that miss a side are counted.
   // ============================================================================
   //
-  // Version: 0.2.0
+  // Version: 0.3.2
 
   import { tick } from 'svelte';
   import { collectionsApi, type Record } from '$lib/api';
   import { m } from '$lib/i18n';
-  import { handoverCounts, handoverOffer, promoteBlockers } from '$lib/handover';
+  import { handoverCounts, handoverLock, handoverOffer, missingSideCount, promoteBlockers } from '$lib/handover';
   import { recapturesPendingCount } from '$lib/recapture-turn';
 
-  let { records, collectionId, pending = null, onChanged }: {
+  let { records, collectionId, pending = null, missingSide = null, onChanged }: {
     records: Record[];
     collectionId: number;
     // The backend's pending count for the volume, when known.
     pending?: number | null;
+    // How many of those miss a side, when known.
+    missingSide?: number | null;
     // Reloads the records; resolves false if the list could not be refreshed.
     onChanged: () => Promise<boolean>;
   } = $props();
 
   let counts = $derived(handoverCounts(records));
   let offer  = $derived(handoverOffer(counts));
-  let pendingCount = $derived(pending ?? counts.rejected);
+  let missingCount = $derived(missingSide ?? missingSideCount(records));
+  let pendingCount = $derived(pending ?? counts.rejected + missingCount);
+  let lockCount = $derived(handoverLock(pendingCount, missingCount, offer));
 
   let dialog   = $state<'send' | 'take-back' | 'refused' | null>(null);
   let busy     = $state(false);
@@ -174,11 +184,11 @@
     {$m.col_handover_take_back}
   </button>
 {/if}
-{#if pendingCount > 0}
+{#if lockCount > 0}
   <span class="handover-blocked">
     <button class="btn btn-primary handover-btn" data-tour="entregar" disabled aria-describedby="handover-hint">
       <span class="material-symbols-outlined" style="font-size:16px" aria-hidden="true">lock</span>
-      {$m.vol_handover_disabled(pendingCount)}
+      {$m.vol_handover_disabled(lockCount)}
     </button>
     <span id="handover-hint" class="handover-hint">{$m.vol_handover_hint}</span>
   </span>

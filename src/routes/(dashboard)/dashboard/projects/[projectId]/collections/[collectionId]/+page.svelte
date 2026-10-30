@@ -10,9 +10,11 @@
   // current image that still carries its rejection (prepared for retake).
   // The records do not show the second, so the count and the first record
   // come from GET /records/to-retake/summary, read with every load of the
-  // records; without it, the rejected records are counted.
+  // records; without it, the rejected records are counted. A record that
+  // misses a side (0.3.2) is pending too, and the views draw its missing
+  // page as an empty frame.
   //
-  // Version: 0.2.1
+  // Version: 0.3.2
 
   import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
@@ -390,18 +392,25 @@
     }
   }
 
-  // The volume's rejected records, the lowest sequence first, and what is
-  // pending: the summary's count and first record; none when the summary
-  // lists nothing for the volume; the rejected records on screen only while
-  // the summary is missing or failed.
-  let rejectedRecords = $derived(
-    records.filter(r => r.status === 'rejected').sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+  // The volume's rejected records and those that miss a side (0.3.2), the
+  // lowest sequence first, and what is pending: the summary's count and
+  // first record; none when the summary lists nothing for the volume; the
+  // records on screen only while the summary is missing or failed.
+  let pendingRecordsShown = $derived(
+    records
+      .filter(r => r.status === 'rejected' || (r.missing_side != null && r.status !== 'excluded'))
+      .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
   );
   let pendingCount = $derived(
-    retakeEntry ? retakeEntry.pending : retakeEntry === null ? 0 : rejectedRecords.length
+    retakeEntry ? retakeEntry.pending : retakeEntry === null ? 0 : pendingRecordsShown.length
+  );
+  // How many of the pending records miss a side; null without the summary,
+  // and HandoverControls then counts them from the records.
+  let missingSidePending = $derived(
+    retakeEntry ? (retakeEntry.missingSideRecordIds?.length ?? 0) : retakeEntry === null ? 0 : null
   );
   let firstPendingId = $derived(
-    retakeEntry ? retakeEntry.firstPendingRecordId : retakeEntry === null ? null : (rejectedRecords[0]?.id ?? null)
+    retakeEntry ? retakeEntry.firstPendingRecordId : retakeEntry === null ? null : (pendingRecordsShown[0]?.id ?? null)
   );
 
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
@@ -435,7 +444,7 @@
 {#snippet handoverActions()}
   <!-- Keyed so a dialog open on one volume does not survive into another. -->
   {#key collectionId}
-    <HandoverControls {records} {collectionId} pending={pendingCount} onChanged={loadRecords} />
+    <HandoverControls {records} {collectionId} pending={pendingCount} missingSide={missingSidePending} onChanged={loadRecords} />
   {/key}
 {/snippet}
 

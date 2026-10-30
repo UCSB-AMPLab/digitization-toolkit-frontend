@@ -2,7 +2,7 @@
 // review requires the full-size Book view, so no approve/reject control
 // (individual or bulk) may ever render in the grid toolbar or on a card.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.2
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 // .image-grid's grid-template-columns (the --grid-cols mapping) lives in the
@@ -15,6 +15,8 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import type { Record as ApiRecord } from '$lib/api';
 import GridView from './GridView.svelte';
+import { es } from '$lib/i18n/es';
+import { locale } from '$lib/i18n';
 
 function makeRecord(overrides: Partial<ApiRecord> = {}): ApiRecord {
 	return {
@@ -274,4 +276,25 @@ describe('GridView click-to-Book-view (same pattern as ListView row click)', () 
 
 		expect(onRecordClick).not.toHaveBeenCalled();
 	});
+});
+
+describe('GridView — an opening with a page never photographed (0.3.2)', () => {
+  for (const [side, present, role] of [['left', 'right', 'R'], ['right', 'left', 'L']] as const) {
+    it(`missing the ${side} page: the tile is a pair with an empty ${side} half that says so`, async () => {
+      locale.set('es');
+      const record = makePairRecord({
+        missing_side: side,
+        images: [{ id: 30, record_id: 2, filename: `${present}.jpg`, file_path: '/x', format: 'jpg', role: present, is_current: true }]
+      });
+      const screen = render(GridView, { records: [record], collectionId: 1, onRecordsUpdate: vi.fn(), onRecordClick: vi.fn() });
+      await expect.element(screen.getByText(es.missing_page)).toBeVisible();
+      const halves = [...screen.container.querySelectorAll<HTMLElement>('.grid-pair .card-image-wrapper')];
+      expect(halves).toHaveLength(2);
+      const [missingHalf, imageHalf] = side === 'left' ? halves : [halves[1], halves[0]];
+      expect(missingHalf.querySelector(`[data-missing-side="${side}"]`)).not.toBeNull();
+      expect(missingHalf.querySelector('img')).toBeNull();
+      expect(imageHalf.querySelector('img.card-image')).not.toBeNull();
+      expect(imageHalf.querySelector('.role-badge')?.textContent).toBe(role);
+    });
+  }
 });

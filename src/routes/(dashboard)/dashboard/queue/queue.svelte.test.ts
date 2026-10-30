@@ -9,7 +9,7 @@
 // GET and PUT under /imports/digitisation-lists and POST
 // /imports/digitisation-list are mocked.
 //
-// Version: 0.3.1
+// Version: 0.3.2
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
@@ -196,7 +196,8 @@ describe('Cola', () => {
 		function rejected(recordId: number, collectionId: number | null): RecordToRetake {
 			return {
 				recordId, title: `r${recordId}`, sequence: null, collectionId, projectId: 7,
-				name: null, filenameStem: null, reason: 'blur', comment: null, rejectedBy: null, rejectedAt: null
+				name: null, filenameStem: null, reason: 'blur', comment: null, rejectedBy: null, rejectedAt: null,
+				pendingReason: 'rejected', missingSide: null
 			};
 		}
 
@@ -226,6 +227,19 @@ describe('Cola', () => {
 			const screen = render(Queue);
 			await expect.element(screen.getByText('Tomo 4')).toBeVisible();
 			expect(screen.getByRole('link', { name: /por recapturar$/ }).elements()).toHaveLength(0);
+		});
+	});
+
+	describe('records that miss a side (0.3.2)', () => {
+		it('counts them among the pending of their volume, never more pending than in all', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+			const summary = turnSummary('recaptures');
+			// Tomo 4: one rejection retaken, two records that miss a side; the
+			// backend counts these in `pending` and not in `total`.
+			summary.volumes[1] = { ...summary.volumes[1], pending: 2, total: 1, missingSideRecordIds: [904, 906] };
+			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(summary);
+			const screen = render(Queue);
+			await expect.element(rowOf(screen, 'Tomo 4').getByText('2 de 3 pendientes')).toBeVisible();
 		});
 	});
 
@@ -847,7 +861,8 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 	it("shows a spot recapture's count and pairs, by sequence where known, and a null pairId without error", async () => {
 		const rejectedRow = (recordId: number, title: string, sequence: number | null): RecordToRetake => ({
 			recordId, title, sequence, collectionId: 106, projectId: 7,
-			name: 'Tomo F', filenameStem: 'co-ahr-aht-6', reason: 'blur', comment: null, rejectedBy: null, rejectedAt: null
+			name: 'Tomo F', filenameStem: 'co-ahr-aht-6', reason: 'blur', comment: null, rejectedBy: null, rejectedAt: null,
+			pendingReason: 'rejected', missingSide: null
 		});
 		vi.mocked(recordsApi.toRetake).mockResolvedValue([rejectedRow(906, 'f. 14', 14), rejectedRow(905, 'f. 12', 12)]);
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([fisqua()]);
