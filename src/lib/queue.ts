@@ -100,21 +100,29 @@ export interface CaptureInstruction {
 /**
  * The instruction for a volume from the stored lists: the item of the
  * newest list (the first in GET /imports/digitisation-lists) whose volume is
- * `collectionId`, leaving out withdrawn and hidden items. Null when that item has neither notes nor an action;
- * undefined when no list has an item for the volume, so that the caller can
- * fall back to the volume's own custom_attributes.
+ * `collectionId`, leaving out withdrawn and hidden items. Null when that item has neither notes nor an action,
+ * and when every item that names the volume is withdrawn or hidden: the
+ * backend keeps a withdrawn volume's Fisqua notes in its custom_attributes,
+ * which must not be read for the band then. Undefined only when no list has
+ * an item for the volume, so that the caller can fall back to the volume's
+ * own custom_attributes.
  */
 export function instructionForVolume(lists: QueueList[], collectionId: number): CaptureInstruction | null | undefined {
+	let suppressed = false;
 	for (const list of lists) {
 		// A withdrawn item, or one whose volume a withdrawn entry hid, gives
 		// no instruction (contract 1.7): the next list that names the volume does.
-		const item = list.items.find((i) => i.collectionId === collectionId && isItemShown(i));
-		if (!item) continue;
+		const named = list.items.filter((i) => i.collectionId === collectionId);
+		const item = named.find(isItemShown);
+		if (!item) {
+			if (named.length > 0) suppressed = true;
+			continue;
+		}
 		const notes = typeof item.notes === 'string' && item.notes.trim() ? item.notes : null;
 		const action = item.action || null;
 		return notes || action ? { notes, action } : null;
 	}
-	return undefined;
+	return suppressed ? null : undefined;
 }
 
 /**

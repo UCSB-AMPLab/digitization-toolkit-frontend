@@ -5,9 +5,12 @@
 // is neither. Opened at 800x480, the band leaves the capture button and the
 // thumbnail strip on screen and clickable. The lists never hold up the
 // retake modal of a record opened from Book view (NEH-209). Every request
-// is answered by a fetch mock keyed on the path.
+// is answered by a fetch mock keyed on the path. A volume whose every list
+// item is withdrawn or hidden (contract 1.7) shows no band, and its
+// custom_attributes are not read for one. No band shows while the lists
+// request is waiting, so that notes the lists would replace never flash.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';
@@ -138,6 +141,49 @@ describe('capture page instruction', () => {
 		serve(JSON.stringify({ fisqua: { notes: 'Todo el tomo' } }), null);
 		const screen = render(LivePreview);
 		await expect.element(screen.getByRole('note', { name: 'Instrucción de la lista' }).getByText('Todo el tomo')).toBeVisible();
+	});
+
+	it('shows no band for a withdrawn queue item, without falling back to the volume custom_attributes', async () => {
+		locale.set('es');
+		signInAdmin();
+		serve(JSON.stringify({ fisqua: { notes: 'Notas del volumen retirado', action: 'spot-recapture' } }), [
+			list('queue', [item(1, 9, { notes: 'Notas retiradas', action: 'spot-recapture', withdrawn: true })]),
+			list('file', [item(2, 9, { notes: 'Notas ocultas', queueHidden: true })])
+		]);
+		const screen = render(LivePreview);
+		await expect.element(screen.getByText('Tomo 6')).toBeVisible();
+		// The lists arrive after the volume: wait for them before checking.
+		await expect.poll(() =>
+			vi.mocked(globalThis.fetch).mock.calls.some(([input]) => String(input).includes('/imports/digitisation-lists'))
+		).toBe(true);
+		await expect.poll(() => screen.container.querySelector('[role="note"]')).toBeNull();
+		await expect.element(screen.getByText('Notas del volumen retirado')).not.toBeInTheDocument();
+		await expect.element(screen.getByText('Notas retiradas')).not.toBeInTheDocument();
+	});
+
+	it('shows the next-newest list item when the queue item for the volume is withdrawn', async () => {
+		locale.set('es');
+		signInAdmin();
+		serve(JSON.stringify({ fisqua: { notes: 'Notas del volumen retirado' } }), [
+			list('queue', [item(1, 9, { notes: 'Notas retiradas', action: 'spot-recapture', withdrawn: true })]),
+			list('file', [item(2, 9, { notes: 'Todo el tomo', action: 'full-rescan' })])
+		]);
+		const screen = render(LivePreview);
+		const band = screen.getByRole('note', { name: 'Reescaneo completo' });
+		await expect.element(band.getByText('Todo el tomo')).toBeVisible();
+		await expect.element(screen.getByText('Notas del volumen retirado')).not.toBeInTheDocument();
+		await expect.element(screen.getByText('Notas retiradas')).not.toBeInTheDocument();
+	});
+
+	it('shows no band while the lists request is waiting, even with notes in the volume custom_attributes', async () => {
+		locale.set('es');
+		signInAdmin();
+		serve(JSON.stringify({ fisqua: { notes: 'Notas del volumen' } }), 'pending');
+		const screen = render(LivePreview);
+		// The volume has loaded: its name and its attributes are in.
+		await expect.element(screen.getByText('Tomo 6')).toBeVisible();
+		expect(screen.container.querySelector('[role="note"]')).toBeNull();
+		await expect.element(screen.getByText('Notas del volumen')).not.toBeInTheDocument();
 	});
 
 	it('shows no band when neither the lists nor the volume carry an instruction', async () => {

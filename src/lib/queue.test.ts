@@ -245,14 +245,21 @@ describe('instructionForVolume', () => {
 		expect(instructionForVolume(lists, 9)).toEqual({ notes: 'Todo el tomo', action: 'full-rescan' });
 	});
 
-	it('skips a withdrawn or hidden item, and is undefined when no other list names the volume', () => {
+	it('is null, not undefined, when every item that names the volume is withdrawn or hidden', () => {
+		// Null keeps the caller from falling back to custom_attributes, where
+		// the backend keeps a withdrawn volume's Fisqua notes.
 		const withdrawn = [list('queue', [item(1, { collectionId: 9, notes: '117r', action: 'spot-recapture', withdrawn: true })])];
-		expect(instructionForVolume(withdrawn, 9)).toBeUndefined();
+		expect(instructionForVolume(withdrawn, 9)).toBeNull();
 		const hidden = [
 			list('queue', [item(1, { collectionId: 9, notes: '117r', withdrawn: true })]),
 			list('file', [item(2, { collectionId: 9, notes: 'Desde 49r', queueHidden: true })])
 		];
-		expect(instructionForVolume(hidden, 9)).toBeUndefined();
+		expect(instructionForVolume(hidden, 9)).toBeNull();
+	});
+
+	it('stays undefined when no list names the volume, with or without suppressed items of other volumes', () => {
+		const lists = [list('queue', [item(1, { collectionId: 3, notes: '117r', withdrawn: true })])];
+		expect(instructionForVolume(lists, 9)).toBeUndefined();
 	});
 
 	it('treats blank notes as none', () => {
