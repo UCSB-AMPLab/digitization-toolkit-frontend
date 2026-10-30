@@ -1,8 +1,10 @@
 // The live-preview inspection modal: a rejected record shows why it was
 // rejected (the newest rejection), so the operator retaking it sees the note
 // without going back to Por recapturar. Other records make no request.
+// The modal opens on the thumbnails (0.3.1) and loads /preview only when the
+// operator asks for full size, which shows the images under a shared zoom.
 //
-// Version: 0.2.1
+// Version: 0.3.1
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -151,5 +153,92 @@ describe('live-preview ImageViewerModal — a record Fisqua excluded', () => {
     const screen = renderModal(makeRecord('captured'));
     await expect.element(screen.getByRole('button', { name: es.lvm_retake })).toBeInTheDocument();
     await expect.element(screen.getByText(es.status_excluded_hint)).not.toBeInTheDocument();
+  });
+});
+
+// 0.3.1: the modal opens on each image's thumbnail and requests no /preview
+// until the operator asks for full size; full size goes through
+// RecordImageDisplay, with the gallery modal's fit and 1:1 controls.
+function msg(key: string): string {
+  const value = (es as unknown as { [k: string]: unknown })[key];
+  if (typeof value !== 'string') throw new Error(`missing message ${key}`);
+  return value;
+}
+
+const PREVIEW = (() => {
+  const c = document.createElement('canvas');
+  c.width = 120;
+  c.height = 80;
+  return c.toDataURL('image/png');
+})();
+const BROKEN = 'data:image/png;base64,AAAA';
+
+function freed410(): Response {
+  const detail = {
+    message: 'This file is stored offsite and has been freed from the card to make room.',
+    stored_offsite: true,
+    image_id: 1,
+    kind: 'capture',
+    key: 'rionegro/co-x/captures/IMG_0001.jpg',
+    freed_at: '2026-10-20T14:03:00+00:00',
+  };
+  return new Response(JSON.stringify({ detail }), { status: 410, headers: { 'Content-Type': 'application/json' } });
+}
+
+describe('live-preview ImageViewerModal — thumbnails first, full size on request (0.3.1)', () => {
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  let thumbSpy: ReturnType<typeof vi.spyOn>;
+  let fileSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    locale.set('es');
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW);
+    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB);
+    fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue('http://dtk.invalid/records/images/1/file');
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
+  });
+  afterEach(() => {
+    previewSpy.mockRestore();
+    thumbSpy.mockRestore();
+    fileSpy.mockRestore();
+    fetchSpy.mockRestore();
+  });
+
+  it('opens on the thumbnail and requests no /preview', async () => {
+    const screen = renderModal(makeRecord('captured'));
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB);
+    expect(thumbSpy).toHaveBeenCalledWith(1);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(previewSpy).not.toHaveBeenCalled();
+    // No zoom controls on the thumbnails.
+    expect(screen.container.querySelector('.img-viewer-zoom-controls')).toBeNull();
+  });
+
+  it('full size loads /preview with the fit and 1:1 controls, and going back returns to the thumbnails', async () => {
+    const screen = renderModal(makeRecord('captured'));
+    await screen.getByRole('button', { name: msg('lvm_full_size') }).click();
+
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW);
+    expect(previewSpy).toHaveBeenCalledWith(1);
+    await expect.element(screen.getByRole('button', { name: es.col_fit_screen_aria })).toBeVisible();
+    await expect.element(screen.getByRole('button', { name: es.col_zoom_actual_aria })).toBeVisible();
+
+    await screen.getByRole('button', { name: msg('lvm_thumbnails') }).click();
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB);
+    expect(screen.container.querySelector('.img-viewer-zoom-controls')).toBeNull();
+    await expect.element(screen.getByRole('button', { name: msg('lvm_full_size') })).toBeVisible();
+  });
+
+  it('a freed master in full size shows the calm notice over the thumbnail, never an error', async () => {
+    previewSpy.mockReturnValue(BROKEN);
+    fetchSpy.mockImplementation(() => Promise.resolve(freed410()));
+    const screen = renderModal(makeRecord('captured'));
+    await screen.getByRole('button', { name: msg('lvm_full_size') }).click();
+
+    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB);
+    expect(screen.container.querySelector('[data-testid="image-missing"]')).toBeNull();
+    expect(screen.container.querySelector('[data-testid="image-unviewable"]')).toBeNull();
   });
 });

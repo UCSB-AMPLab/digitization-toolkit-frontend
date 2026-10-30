@@ -6,10 +6,11 @@
 // - opened with the recordId of a rejected record, the screen guides the
 //   operator through the volume's rejected records: "Recaptura k de N", a
 //   progress bar, the next record opened after each retake, "Saltar por
-//   ahora", the folios of the next record, and the end panel.
+//   ahora", the folios of the next record, and the end panel;
+// - in the guide, the thumbnails of the next records are preloaded (0.3.1).
 // Every request is answered by a fetch mock keyed on the path.
 //
-// Version: 0.2.1
+// Version: 0.3.1
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -537,5 +538,51 @@ describe('capture screen: the guided retake', () => {
 		await expect.element(screen.getByRole('dialog')).toBeVisible();
 		await expect.element(screen.getByText('Recaptura 1 de', { exact: false })).not.toBeInTheDocument();
 		await expect.element(screen.getByRole('button', { name: 'Saltar por ahora' })).not.toBeInTheDocument();
+	});
+});
+
+// 0.3.1: in the guide, the next record or two have their thumbnails loaded
+// ahead (new Image().src), so the next modal opens at once; no /preview is
+// loaded ahead.
+describe('capture screen: the guided retake preloads the next thumbnails', () => {
+	function withImage(r: Rec, imageId: number): Rec {
+		const image = { id: imageId, record_id: r.id, filename: `IMG_${imageId}.jpg`, file_path: '/x', format: 'jpg', is_current: true };
+		return { ...r, images: [image] } as unknown as Rec;
+	}
+
+	it('loads the thumbnails of the next two records to retake, and no preview', async () => {
+		const preloaded: string[] = [];
+		vi.stubGlobal(
+			'Image',
+			class {
+				set src(value: string) {
+					preloaded.push(value);
+				}
+			}
+		);
+		try {
+			signIn('operator');
+			served.records = [
+				withImage(rec(41, 1, 'rejected'), 410),
+				withImage(rec(44, 2, 'captured'), 440),
+				withImage(rec(42, 3, 'rejected'), 420),
+				withImage(rec(43, 4, 'rejected'), 430),
+				withImage(rec(45, 5, 'rejected'), 450)
+			];
+			served.summaries = [summary('recaptures')];
+			current.url = `${BASE_URL}&recordId=41`;
+			serve();
+			const screen = render(LivePreview);
+
+			await expect.element(screen.getByRole('dialog').getByText('Recaptura 1 de 4 · Tomo 6')).toBeVisible();
+			await expect.poll(() => preloaded.some((u) => u.includes('/records/images/430/thumbnail'))).toBe(true);
+			expect(preloaded.some((u) => u.includes('/records/images/420/thumbnail'))).toBe(true);
+			// Only the next two; not the captured record, not the open one, no preview.
+			expect(preloaded.some((u) => u.includes('/records/images/450/'))).toBe(false);
+			expect(preloaded.some((u) => u.includes('/records/images/440/'))).toBe(false);
+			expect(preloaded.some((u) => u.includes('/preview'))).toBe(false);
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 });

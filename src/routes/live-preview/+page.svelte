@@ -21,8 +21,11 @@
   // the record to the back, and the end panel shows once the volume has
   // nothing pending. A failed reload after a retake pauses the guide with a
   // retry; until the next state is on screen, ordinary capture stays blocked.
+  // While the guide is open, the thumbnails of the next record or two are
+  // loaded ahead, so that the next modal, which opens on thumbnails, shows
+  // them at once (0.3.1). Full-size images are never loaded ahead.
   //
-  // Version: 0.3.0
+  // Version: 0.3.1
 
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
@@ -296,6 +299,26 @@
       .then(list => { if (!stale) guideNextFolios = folioHint(list[0]?.comment); })
       .catch(e => console.error('[LivePreview] Error loading the next rejection:', e));
     return () => { stale = true; };
+  });
+
+  // How many of the next records to retake have their thumbnails loaded ahead.
+  const PRELOAD_NEXT = 2;
+  // Thumbnail URLs already asked for, so that a record is not loaded twice.
+  const preloadedThumbs = new Set<string>();
+
+  $effect(() => {
+    const g = guide;
+    const current = inspectedRecord;
+    if (!g || !current) return;
+    const nextIds = g.order.filter(id => id !== current.id && isPending(id)).slice(0, PRELOAD_NEXT);
+    for (const id of nextIds) {
+      for (const img of records.find(r => r.id === id)?.images ?? []) {
+        const url = recordsApi.getImageThumbnailUrl(img.id);
+        if (preloadedThumbs.has(url)) continue;
+        preloadedThumbs.add(url);
+        new Image().src = url;
+      }
+    }
   });
 
   onMount(async () => {
