@@ -13,7 +13,7 @@
 //   - Text that is the same in every language (brand names, acronyms, units)
 //     is not catalogued: it stays in the component.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';
@@ -1362,6 +1362,20 @@ export const es = {
 	queue_import_err_refused: 'El archivo no es una lista de digitalización que Captua pueda importar.',
 	queue_import_err_busy: 'Captua no pudo importar la lista en este momento. Intenta de nuevo.',
 	queue_import_err_other: 'Captua no pudo importar la lista.',
+	// ── The Fisqua queue in Cola (contract 1.7) ──────────────────────────────
+	queue_fisqua_name: (name: string) => `Cola de Fisqua: ${name}`,
+	queue_fisqua_option: (name: string, date: string) => `Cola de Fisqua: ${name}, actualizada el ${date}`,
+	queue_updated_at: (date: string) => `Actualizada el ${date}`,
+	queue_assignee: (who: string) => `Asignado a ${who}`,
+	queue_unassigned: 'Sin asignar',
+	queue_assignee_filter_label: 'Asignación',
+	queue_assignee_mine: 'Míos',
+	queue_assignee_everyone: 'Todos',
+	queue_assignee_empty: 'Con este filtro no aparece ningún elemento de la cola.',
+	queue_operator_empty: 'En la cola no hay elementos asignados a ti ni sin asignar.',
+	queue_items_empty: 'En la cola no hay elementos que mostrar.',
+	queue_retake_record: (id: number) => `Registro #${id}`,
+	queue_mark_conflict: 'Este elemento se modificó en la cola de Fisqua. Captua volvió a cargar la cola: revisa el elemento e intenta de nuevo.',
 	q_to_retake: (n: number) => (n === 1 ? '1 registro por recapturar' : `${formatCount(n, 'es')} registros por recapturar`),
 
 	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────

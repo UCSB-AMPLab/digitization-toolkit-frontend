@@ -22,7 +22,7 @@
   // nothing pending. A failed reload after a retake pauses the guide with a
   // retry; until the next state is on screen, ordinary capture stays blocked.
   //
-  // Version: 0.2.0
+  // Version: 0.3.0
 
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
@@ -108,12 +108,17 @@
   // links to the volume's form, where an operator gives it one.
   let volumeNeedsStem = $state(false);
 
-  // The list item's notes and action. `listInstruction` is undefined until
-  // the lists arrive, and when they fail or no list has an item for this
-  // volume; the volume's custom_attributes are used then.
+  // The list item's notes and action. `listInstruction` is undefined when
+  // the lists fail or no list has an item for this volume; the volume's
+  // custom_attributes are used then. No band shows until the lists request
+  // has answered or failed (0.3.0), so that notes the lists would replace,
+  // such as a withdrawn volume's, never show for a moment.
   let listInstruction = $state<Instruction | null | undefined>(undefined);
   let attributesInstruction = $state<Instruction | null>(null);
-  let instruction = $derived(listInstruction !== undefined ? listInstruction : attributesInstruction);
+  let listsSettled = $state(false);
+  let instruction = $derived(
+    !listsSettled ? null : listInstruction !== undefined ? listInstruction : attributesInstruction
+  );
   let stemFormHref = $derived(projectId && collectionId
     ? `/dashboard/projects/${projectId}?editVolume=${collectionId}`
     : '');
@@ -330,7 +335,8 @@
           listInstruction = instructionForVolume(lists, collectionId);
           queueItems = lists.flatMap(l => l.items);
         })
-        .catch(e => console.error('[LivePreview] Error loading digitisation lists:', e));
+        .catch(e => console.error('[LivePreview] Error loading digitisation lists:', e))
+        .finally(() => { listsSettled = true; });
     }
 
     // Not one of `tasks` either: the retake modal must not wait for it.

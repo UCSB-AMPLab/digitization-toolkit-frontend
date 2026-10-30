@@ -2,7 +2,7 @@
 // `Messages` in `index.ts`): a missing or extra key here is a type error in
 // `npm run check`.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 
 import type { Messages } from './index';
 
@@ -1316,6 +1316,20 @@ export const en: Messages = {
 	queue_import_err_refused: 'The file is not a digitisation list Captua can import.',
 	queue_import_err_busy: 'Captua could not import the list just now. Try again.',
 	queue_import_err_other: 'Captua could not import the list.',
+	// ── The Fisqua queue in Cola (contract 1.7) ──────────────────────────────
+	queue_fisqua_name: (name: string) => `Fisqua queue: ${name}`,
+	queue_fisqua_option: (name: string, date: string) => `Fisqua queue: ${name}, updated ${date}`,
+	queue_updated_at: (date: string) => `Updated ${date}`,
+	queue_assignee: (who: string) => `Assigned to ${who}`,
+	queue_unassigned: 'Unassigned',
+	queue_assignee_filter_label: 'Assigned to',
+	queue_assignee_mine: 'Mine',
+	queue_assignee_everyone: 'Everyone',
+	queue_assignee_empty: 'No item in the queue matches this filter.',
+	queue_operator_empty: 'No item in the queue is assigned to you or unassigned.',
+	queue_items_empty: 'The queue has no items to show.',
+	queue_retake_record: (id: number) => `Record #${id}`,
+	queue_mark_conflict: "This item has changed in Fisqua's queue. Captua has reloaded the queue: check the item and try again.",
 	q_to_retake: (n: number) => (n === 1 ? '1 record to retake' : `${formatCount(n, 'en')} records to retake`),
 
 	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────

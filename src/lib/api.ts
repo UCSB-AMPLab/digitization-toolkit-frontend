@@ -1,4 +1,4 @@
-// Version: 0.2.1
+// Version: 0.3.0
 
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
@@ -521,6 +521,11 @@ export interface Collection {
   // can no longer change, and DELETE refuses the volume (409) even once its
   // records are moved out.
   stem_reserved?: boolean;
+  // Read-only (contract 1.7). The unit username the Fisqua queue assigned
+  // the volume to, or null; and when a withdrawn queue entry took the
+  // volume off Cola, null while it is shown.
+  assignee_username?: string | null;
+  queue_hidden_at?: string | null;
 }
 
 export interface CollectionWithChildren extends Collection {
@@ -1722,6 +1727,26 @@ export interface QueueItem {
   projectId:     number | null;
   status:        StatusCounts | null;
   doneMark:      QueueDoneMark | null;
+  // The digitisation queue synced with Fisqua (contract 1.7). `itemId` is
+  // the queue entry's id, null for a file's item; `assignee` the unit
+  // username the entry is assigned to, or null; `withdrawn` true for an
+  // entry Fisqua withdrew; `queueHidden` true when the item's volume was
+  // taken off Cola by a withdrawn entry, on a file's item too; `retakes` a
+  // spot recapture's records to capture again, [] otherwise. Optional, so
+  // that an answer from a backend before 0.3.0 still reads.
+  itemId?:       string | null;
+  assignee?:     string | null;
+  withdrawn?:    boolean;
+  queueHidden?:  boolean;
+  retakes?:      QueueRetake[];
+}
+
+// One record a spot-recapture entry of the queue asks to capture again.
+// `pairId` is Fisqua's id of the page pair, null for a single-image opening.
+export interface QueueRetake {
+  captuaRecordId: number;
+  pairId:         string | null;
+  side:           'left' | 'right' | 'both';
 }
 
 // An imported list from GET /imports/digitisation-lists. `listFileMissing`
@@ -1729,6 +1754,9 @@ export interface QueueItem {
 // then empty.
 export interface QueueList {
   listId:           string;
+  // `queue` for the digitisation queue synced with Fisqua (contract 1.7),
+  // `file` for an imported file; absent from a backend before 0.3.0.
+  source?:          'queue' | 'file';
   listName:         string;
   projectId:        number | null;
   importedAt:       string | null;
@@ -1784,10 +1812,13 @@ export const importsApi = {
    * an operator gets a 403). Returns the item's mark as the backend now
    * holds it: null once taken off.
    */
-  async setDone(listId: string, position: number, done: boolean): Promise<QueueDoneMark | null> {
+  async setDone(listId: string, position: number, done: boolean, itemId?: string): Promise<QueueDoneMark | null> {
+    // A queue item's itemId goes with the mark (contract 1.7): the backend
+    // answers 409 when the item at the position is another entry now.
+    const body = itemId ? { done, itemId } : { done };
     const result = await apiRequest<{ doneMark: QueueDoneMark | null }>(
       `/imports/digitisation-lists/${encodeURIComponent(listId)}/items/${position}/done`,
-      { method: 'PUT', body: JSON.stringify({ done }) }
+      { method: 'PUT', body: JSON.stringify(body) }
     );
     return result?.doneMark ?? null;
   },

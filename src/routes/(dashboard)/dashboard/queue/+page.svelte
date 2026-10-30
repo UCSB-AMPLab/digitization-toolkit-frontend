@@ -20,20 +20,32 @@
   // Recapturar that opens its first pending record, and the rest after; during
   // the retake turn the rest carry the line that says a new volume must wait.
   // Siguiente is then the first item with retakes.
+  //
+  // The digitisation queue synced with Fisqua (contract 1.7) is one more list
+  // in the answer, with `source` `queue`; the page shows it first, labelled
+  // as Fisqua's, and the file lists stay in the picker. An operator sees the
+  // queue items assigned to them and the unassigned ones; an admin sees every
+  // item, with a Mine / Unassigned / Everyone filter. Each queue item names
+  // its assignee. Withdrawn items, and items whose volume a withdrawn entry
+  // hid, are not shown, on any list. A spot recapture with retakes shows how
+  // many page pairs it asks for and lists them as Por recapturar names the
+  // records. A queue item's done mark sends its itemId; a 409 means the
+  // queue moved, so the page reads it again and says so.
   // ============================================================================
   //
-  // Version: 0.2.1
+  // Version: 0.3.0
 
   import { onMount, tick } from 'svelte';
   import { goto } from '$app/navigation';
-  import { importsApi, recordsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList, type RetakeSummary } from '$lib/api';
+  import { importsApi, recordsApi, ApiError, AuthError, type ImportReport, type QueueItem, type QueueList, type RecordToRetake, type RetakeSummary } from '$lib/api';
   import { m, locale } from '$lib/i18n';
-  import { userRole } from '$lib/stores/auth';
+  import { authStore, userRole } from '$lib/stores/auth';
   import { formatApiDate } from '$lib/format-date';
   import { formatCount } from '$lib/format-count';
   import { barSegments, placeVolume, type BarStatus, type PipelineStage } from '$lib/pipeline';
   import {
-    actionsPresent, captureUrl, filterByAction, isItemDone, isOnUnitReject, nextItemPosition, retakeUrl
+    actionsPresent, captureUrl, defaultListId, filterByAction, filterByAssignee, isItemDone, isItemShown,
+    isOnUnitReject, isQueueList, itemsForUser, nextItemPosition, retakePairs, retakeUrl, type AssigneeFilter
   } from '$lib/queue';
   import { readRetakeSummary, retakeVolumeMap } from '$lib/recapture-turn';
   import { actionLabel, importErrorText, importReasonText } from '$lib/queue-labels';
@@ -44,6 +56,8 @@
   // Marking an item done is a review decision: admin and reviewer, as the
   // backend allows.
   let canMarkDone = $derived($userRole === 'admin' || $userRole === 'reviewer');
+  // The signed-in user's username, for the queue's assignees (contract 1.7).
+  let username = $derived($authStore.user?.username ?? null);
 
   // ---------------------------------------------------------------------------
   // Lists
@@ -67,7 +81,8 @@
       loadError = false;
       refreshError = false;
       if (select && data.some(l => l.listId === select)) selectedListId = select;
-      else if (!data.some(l => l.listId === selectedListId)) selectedListId = data[0]?.listId ?? null;
+      // The Fisqua queue is shown first when there is one (contract 1.7).
+      else if (!data.some(l => l.listId === selectedListId)) selectedListId = defaultListId(data);
     } catch (err) {
       // A 401 is a dead session: apiRequest already sends the user to /login.
       if (sequence !== loadSequence) return;
@@ -79,8 +94,10 @@
   }
 
   // Records waiting for recapture, counted per volume from
-  // GET /records/to-retake. Without them the page shows no counts.
+  // GET /records/to-retake. Without them the page shows no counts. The rows
+  // also name a spot recapture's pairs (contract 1.7).
   let retakeCounts = $state<Map<number, number>>(new Map());
+  let retakeRows = $state<RecordToRetake[]>([]);
 
   async function loadRetakeCounts() {
     try {
@@ -90,6 +107,7 @@
         if (row.collectionId != null) counts.set(row.collectionId, (counts.get(row.collectionId) ?? 0) + 1);
       }
       retakeCounts = counts;
+      retakeRows = rows;
     } catch (err) {
       console.error('[Queue] Error loading records to retake:', err);
     }
@@ -118,14 +136,35 @@
   let splitByRetakes = $derived(turn !== null && turn.state !== 'free' && retakeVolumes.size > 0);
 
   let list = $derived(lists?.find(l => l.listId === selectedListId) ?? null);
-  let items = $derived(list?.items ?? []);
+  let isQueue = $derived(isQueueList(list));
+  // The items this user works from: withdrawn and hidden ones left out, and
+  // for an operator only their own and the unassigned ones. Siguiente and
+  // the action filter count only these.
+  let items = $derived(itemsForUser((list?.items ?? []).filter(isItemShown), $userRole, username));
   let nextPosition = $derived(nextItemPosition(items, splitByRetakes ? new Set(retakeVolumes.keys()) : undefined));
   let actions = $derived(actionsPresent(items));
 
   // null shows every item. A filter whose action the chosen list does not
   // have falls back to every item.
   let actionFilter = $state<string | null>(null);
-  let shownItems = $derived(filterByAction(items, actions.includes(actionFilter ?? '') ? actionFilter : null));
+  // The admin's assignee filter on the queue (contract 1.7); Everyone
+  // elsewhere.
+  let showAssigneeFilter = $derived(isQueue && $userRole === 'admin');
+  let assigneeFilter = $state<AssigneeFilter>('everyone');
+  let assigneeItems = $derived(filterByAssignee(items, showAssigneeFilter ? assigneeFilter : 'everyone', username));
+  let shownItems = $derived(filterByAction(assigneeItems, actions.includes(actionFilter ?? '') ? actionFilter : null));
+  let assigneeOptions = $derived<{ value: AssigneeFilter; label: string }[]>([
+    { value: 'mine', label: $m.queue_assignee_mine },
+    { value: 'unassigned', label: $m.queue_unassigned },
+    { value: 'everyone', label: $m.queue_assignee_everyone },
+  ]);
+  // What the queue says when nothing is left to show.
+  let queueEmptyText = $derived(
+    !isQueue || shownItems.length > 0 ? null
+      : showAssigneeFilter && assigneeFilter !== 'everyone' ? $m.queue_assignee_empty
+      : $userRole === 'operator' ? $m.queue_operator_empty
+      : $m.queue_items_empty
+  );
   let retakeItems = $derived(
     splitByRetakes ? shownItems.filter(i => i.collectionId != null && retakeVolumes.has(i.collectionId)) : []
   );
@@ -138,6 +177,12 @@
 
   function formatDate(iso: string): string {
     return formatApiDate(iso, $locale, { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  // A list's name in the picker; the queue is labelled as Fisqua's.
+  function listOption(l: QueueList): string {
+    if (isQueueList(l)) return l.importedAt ? $m.queue_fisqua_option(l.listName, formatDate(l.importedAt)) : $m.queue_fisqua_name(l.listName);
+    return l.importedAt ? $m.queue_list_option(l.listName, formatDate(l.importedAt)) : l.listName;
   }
 
   function formatWhen(iso: string): string {
@@ -167,14 +212,27 @@
     const listId = list.listId;
     markingPosition = item.position;
     markError = null;
+    // A queue item's mark goes by its itemId (contract 1.7); a file's item
+    // has none, and its request is as before.
+    const itemId = item.itemId ?? null;
     try {
-      const doneMark = await importsApi.setDone(listId, item.position, done);
-      const target = lists?.find(l => l.listId === listId)?.items.find(i => i.position === item.position);
+      const doneMark = itemId
+        ? await importsApi.setDone(listId, item.position, done, itemId)
+        : await importsApi.setDone(listId, item.position, done);
+      const target = lists?.find(l => l.listId === listId)?.items
+        .find(i => i.position === item.position && (itemId === null || i.itemId === itemId));
       if (target) target.doneMark = doneMark;
     } catch (err) {
       if (err instanceof AuthError && err.status === 401) return;
       console.error('[Queue] Error changing the done mark:', err);
       const status = err instanceof ApiError ? err.status : undefined;
+      if (status === 409) {
+        // The item at this position is another queue entry now: read the
+        // queue again, so that what is on screen is what Fisqua sent.
+        markError = $m.queue_mark_conflict;
+        await loadLists();
+        return;
+      }
       markError = status === 503 ? $m.queue_mark_error_busy : $m.queue_mark_error;
     } finally {
       markingPosition = null;
@@ -290,9 +348,30 @@
       <div class="q-meta">
         {#if item.referenceCode}<span class="q-code">{item.referenceCode}</span>{/if}
         {#if item.action}<span class="q-action">{actionLabel($m, item.action)}</span>{/if}
+        {#if isQueue}
+          <span class="q-assignee">{item.assignee ? $m.queue_assignee(item.assignee) : $m.queue_unassigned}</span>
+        {/if}
       </div>
       {#if typeof item.notes === 'string' && item.notes.trim()}
         <p class="q-notes">{item.notes}</p>
+      {/if}
+      {#if item.action === 'spot-recapture' && item.retakes && item.retakes.length > 0}
+        {@const pairs = retakePairs(item.retakes, retakeRows)}
+        <div class="q-pairs">
+          <span class="q-pairs-count">{$m.vol_band_title(pairs.length)}</span>
+          <ul class="q-pair-list">
+            {#each pairs as pair, i (i)}
+              <li class="q-pair">
+                {#if pair.title !== null}
+                  <span class="q-pair-title">{pair.title}</span>
+                  {#if pair.sequence !== null}<span class="q-pair-sequence">{$m.retakes_sequence(pair.sequence)}</span>{/if}
+                {:else}
+                  <span class="q-pair-title">{$m.queue_retake_record(pair.recordId)}</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        </div>
       {/if}
       {#if item.doneMark}
         <span class="q-done-note">{markText(item)}</span>
@@ -440,15 +519,25 @@
           <span class="picker-label">{$m.queue_list_label}</span>
           <select class="picker-select" bind:value={selectedListId}>
             {#each lists as l (l.listId)}
-              <option value={l.listId}>{l.importedAt ? $m.queue_list_option(l.listName, formatDate(l.importedAt)) : l.listName}</option>
+              <option value={l.listId}>{listOption(l)}</option>
             {/each}
           </select>
         </label>
       {:else}
         <p class="list-name">
-          <strong>{list.listName}</strong>
-          {#if list.importedAt}<span>{$m.queue_imported_at(formatDate(list.importedAt))}</span>{/if}
+          <strong>{isQueue ? $m.queue_fisqua_name(list.listName) : list.listName}</strong>
+          {#if list.importedAt}<span>{isQueue ? $m.queue_updated_at(formatDate(list.importedAt)) : $m.queue_imported_at(formatDate(list.importedAt))}</span>{/if}
         </p>
+      {/if}
+
+      {#if showAssigneeFilter}
+        <div class="view-switch" role="group" aria-label={$m.queue_assignee_filter_label}>
+          {#each assigneeOptions as option (option.value)}
+            <button type="button" class="view-btn" aria-pressed={assigneeFilter === option.value} onclick={() => (assigneeFilter = option.value)}>
+              {option.label}
+            </button>
+          {/each}
+        </div>
       {/if}
 
       {#if actions.length > 0}
@@ -471,7 +560,9 @@
       {#if nextHidden}
         <p class="notice" role="status">{$m.queue_next_hidden}</p>
       {/if}
-      {#if splitByRetakes}
+      {#if queueEmptyText}
+        <p class="empty">{queueEmptyText}</p>
+      {:else if splitByRetakes}
         <section class="q-section q-first" aria-labelledby="q-first-title">
           <h2 id="q-first-title" class="q-section-title">{$m.q_first_title}</h2>
           <p class="q-section-sub">{$m.q_first_sub}</p>
@@ -663,6 +754,7 @@
   .q-mark-done .material-symbols-outlined { font-size: 15px; }
   .q-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--text-sm); color: var(--color-light-grey); }
   .q-code { overflow-wrap: anywhere; }
+  .q-assignee { overflow-wrap: anywhere; }
   .q-action { color: var(--color-highlight); font-weight: var(--fw-bold); }
   /* Folio lists are read in full: they wrap, never cut. */
   .q-notes {
@@ -673,6 +765,13 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+
+  /* A spot recapture's page pairs (contract 1.7), as Por recapturar names them. */
+  .q-pairs { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+  .q-pairs-count { font-size: var(--text-sm); font-weight: var(--fw-bold); color: var(--color-highlight); }
+  .q-pair-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .q-pair { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: var(--text-sm); color: var(--color-light); }
+  .q-pair-sequence { color: var(--color-light-grey); }
 
   .q-progress { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .q-stage { font-size: var(--text-sm); font-weight: var(--fw-bold); color: var(--color-light); }
