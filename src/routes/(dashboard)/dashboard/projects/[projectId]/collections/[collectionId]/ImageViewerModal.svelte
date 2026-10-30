@@ -1,13 +1,15 @@
 <script lang="ts">
   // Inspection modal for one record in the gallery: shows all of the record's
   // images (with an L/R badge on a two-camera capture) under one shared
-  // pan and zoom, and offers retake and delete within the record's lock.
+  // pan and zoom, and offers retake and delete within the record's lock. On a
+  // record Fisqua excluded (contract 1.6) it says what the exclusion means.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.2.1
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
+  import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import { dismissible } from '$lib/dialog';
   import {
@@ -41,7 +43,9 @@
   // Lock: in_review and approved block delete for non-admins, and retake for
   // everyone: the backend refuses a retake of a record that is neither
   // captured nor rejected (409, RETAKE_STATUS_DETAIL in app/core/volume_stem.py).
-  let isLocked = $derived(record.status === 'in_review' || record.status === 'approved');
+  // A record Fisqua excluded is locked the same way (LOCKED_STATUSES in
+  // app/api/records.py); its notice says why, in place of the lock message.
+  let isLocked = $derived(record.status === 'in_review' || record.status === 'approved' || record.status === 'excluded');
 
   let confirmAction = $state<null | 'retake' | 'delete'>(null);
 
@@ -195,6 +199,12 @@
       </button>
     </div>
 
+    {#if record.status === 'excluded'}
+      <div class="img-viewer-excluded">
+        <ExcludedNotice {record} />
+      </div>
+    {/if}
+
     <div class="img-viewer-images">
       {#each images() as img, i}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -284,10 +294,12 @@
         </button>
         <div class="img-viewer-actions">
           {#if isLocked && userRole !== 'admin'}
-            <span class="img-viewer-locked-msg">
-              <span class="material-symbols-outlined icon-sm">lock</span>
-              {$m.col_record_locked(record.status === 'in_review' ? $m.col_status_in_review_lc : $m.col_status_approved_lc)}
-            </span>
+            {#if record.status !== 'excluded'}
+              <span class="img-viewer-locked-msg">
+                <span class="material-symbols-outlined icon-sm">lock</span>
+                {$m.col_record_locked(record.status === 'in_review' ? $m.col_status_in_review_lc : $m.col_status_approved_lc)}
+              </span>
+            {/if}
           {:else}
             {#if !isLocked}
               <button class="btn btn-warning" onclick={() => confirmAction = 'retake'}>
@@ -336,6 +348,12 @@
 </div>
 
 <style>
+.img-viewer-excluded {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
 .img-viewer-frame {
   position: relative;
   touch-action: none;

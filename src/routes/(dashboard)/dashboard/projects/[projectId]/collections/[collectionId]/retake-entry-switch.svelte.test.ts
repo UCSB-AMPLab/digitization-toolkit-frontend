@@ -5,7 +5,7 @@
 // from the last, its handover button is not disabled by it, and no link
 // pairs its id with the last volume's record.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -44,7 +44,7 @@ function rec(id: number, sequence: number, status: ApiRecord['status']): ApiReco
 // Volume 7 has three pending, its first record 1; volume 8 has none.
 const summaryA: RetakeSummary = {
 	pendingRecords: 3,
-	volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 7', filenameStem: 'co-7', pending: 3, total: 3, firstPendingRecordId: 1, pendingRecordIds: [1, 2, 3] }],
+	volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 7', filenameStem: 'co-7', pending: 3, total: 3, excluded: 0, firstPendingRecordId: 1, pendingRecordIds: [1, 2, 3] }],
 	turn: { state: 'recaptures', unlockedBy: null }
 };
 
@@ -123,7 +123,7 @@ describe('volume page: the recapture count follows the volume', () => {
 		vi.spyOn(recordsApi, 'toRetakeSummary')
 			.mockResolvedValueOnce({
 				pendingRecords: 1,
-				volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 7', filenameStem: 'co-7', pending: 1, total: 1, firstPendingRecordId: 2, pendingRecordIds: [2] }],
+				volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 7', filenameStem: 'co-7', pending: 1, total: 1, excluded: 0, firstPendingRecordId: 2, pendingRecordIds: [2] }],
 				turn: { state: 'recaptures', unlockedBy: null }
 			})
 			.mockRejectedValue(new Error('boom'));

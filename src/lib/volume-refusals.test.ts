@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.2.1
 
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
@@ -7,6 +7,7 @@ import {
 	fileHoldText,
 	isReorderStale,
 	isVolumeBusy,
+	excludedRefusalText,
 	renumberErrorText,
 	reorderErrorText,
 	storedOffsiteCount
@@ -128,5 +129,33 @@ describe('storedOffsiteCount', () => {
 		expect(storedOffsiteCount(new ApiError(STORED_OFFSITE, STORED_OFFSITE, 422))).toBeNull();
 		expect(storedOffsiteCount(new Error(STORED_OFFSITE))).toBeNull();
 		expect(storedOffsiteCount('boom')).toBeNull();
+	});
+});
+
+// The 409s for a record Fisqua excluded (contract 1.6), as app/api/records.py
+// sends them: an upload, refused for every role, and a delete of the record or
+// of one of its images, refused for every role but admin.
+const UPLOAD_EXCLUDED = "Cannot add an image to a record with status 'excluded': Fisqua excluded it from the volume.";
+const DELETE_RECORD_EXCLUDED =
+	"Cannot delete a record with status 'excluded': Fisqua excluded it from the volume, and only an admin can delete it.";
+const DELETE_IMAGE_EXCLUDED =
+	"Cannot delete an image from a record with status 'excluded': Fisqua excluded it from the volume, and only an admin can delete it.";
+
+describe('excludedRefusalText', () => {
+	it('maps the upload 409 to err_upload_excluded', () => {
+		expect(excludedRefusalText(new ApiError(UPLOAD_EXCLUDED, undefined, 409), es)).toBe(es.err_upload_excluded);
+		expect(excludedRefusalText(new ApiError(UPLOAD_EXCLUDED, undefined, 409), en)).toBe(en.err_upload_excluded);
+	});
+
+	it('maps both delete 409s to err_delete_excluded', () => {
+		expect(excludedRefusalText(new ApiError(DELETE_RECORD_EXCLUDED, undefined, 409), es)).toBe(es.err_delete_excluded);
+		expect(excludedRefusalText(new ApiError(DELETE_IMAGE_EXCLUDED, undefined, 409), en)).toBe(en.err_delete_excluded);
+	});
+
+	it('leaves the other delete 409 and other statuses alone', () => {
+		const locked = "Cannot delete a record with status 'approved'. Move it to 'rejected' first.";
+		expect(excludedRefusalText(new ApiError(locked, undefined, 409), es)).toBeNull();
+		expect(excludedRefusalText(new ApiError(UPLOAD_EXCLUDED, undefined, 422), es)).toBeNull();
+		expect(excludedRefusalText(new Error(UPLOAD_EXCLUDED), es)).toBeNull();
 	});
 });

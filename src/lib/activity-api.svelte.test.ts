@@ -1,7 +1,7 @@
 // activityApi.collections(): the request it sends for GET /activity/collections
 // and what it returns or throws.
 //
-// Version: 0.1.0-beta
+// Version: 0.2.1
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
@@ -12,13 +12,13 @@ import { activityApi, ApiError, type CollectionActivity } from './api';
 const body: CollectionActivity[] = [
 	{
 		collection_id: 12,
-		status_counts: { captured: 3, in_review: 10, rejected: 1, approved: 20 },
+		status_counts: { captured: 3, in_review: 10, rejected: 1, approved: 20, excluded: 0 },
 		record_count: 34,
 		last_status_change_at: '2026-10-22T17:03:11'
 	},
 	{
 		collection_id: 13,
-		status_counts: { captured: 0, in_review: 0, rejected: 0, approved: 0 },
+		status_counts: { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0 },
 		record_count: 0,
 		last_status_change_at: null
 	}

@@ -22,7 +22,7 @@
   // Siguiente is then the first item with retakes.
   // ============================================================================
   //
-  // Version: 0.2.0
+  // Version: 0.2.1
 
   import { onMount, tick } from 'svelte';
   import { goto } from '$app/navigation';
@@ -203,7 +203,8 @@
 
   function recordTotal(item: QueueItem): number {
     const s = item.status;
-    return s ? s.captured + s.in_review + s.rejected + s.approved : 0;
+    // Excluded records (Fisqua contract 1.6) count, as in record_count.
+    return s ? s.captured + s.in_review + s.rejected + s.approved + s.excluded : 0;
   }
 
   // ---------------------------------------------------------------------------

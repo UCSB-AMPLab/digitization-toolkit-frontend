@@ -3,7 +3,7 @@
 // ahora" opens the capture screen on the rejected record with the lowest
 // sequence. No band without rejected records; no link for a reviewer.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { readable } from 'svelte/store';
@@ -65,7 +65,7 @@ describe('volume page: recapture band', () => {
 		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(6, 6, 'rejected'), rec(8, 8, 'captured')]);
 		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
 			pendingRecords: 3,
-			volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 066', filenameStem: 'co-66', pending: 3, total: 3, firstPendingRecordId: 1, pendingRecordIds: [1, 6, 8] }],
+			volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 066', filenameStem: 'co-66', pending: 3, total: 3, excluded: 0, firstPendingRecordId: 1, pendingRecordIds: [1, 6, 8] }],
 			turn: { state: 'recaptures', unlockedBy: null }
 		});
 		const screen = render(CollectionPage);

@@ -1,4 +1,4 @@
-// Version: 0.2.0
+// Version: 0.2.1
 
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
@@ -746,6 +746,15 @@ export const collectionsApi = {
   },
 
   /**
+   * The status history of the collection's records, newest first (GET
+   * /collections/{id}/status-changes). A deleted record's rows stay, with
+   * record_id null.
+   */
+  async statusChanges(collectionId: number): Promise<RecordStatusChange[]> {
+    return apiRequest<RecordStatusChange[]>(`/collections/${collectionId}/status-changes`);
+  },
+
+  /**
    * Take the handover back: the collection's in_review records return to
    * captured, for an operator who handed a tomo over too early (NEH-260).
    * Records a reviewer has already approved or rejected are left alone.
@@ -828,6 +837,9 @@ export interface RecordImage {
   preview_freed_at?: string | null;
 }
 
+// Every status a record can be in; see Record.status.
+export type RecordStatus = 'captured' | 'in_review' | 'rejected' | 'approved' | 'excluded';
+
 export interface Record {
   id: number;
   title: string;
@@ -852,7 +864,11 @@ export interface Record {
   // only `in_review` and `approved`, and only for non-admins — so a rejected
   // record is deletable by any contributor, and an admin can delete one in
   // any status.
-  status: 'captured' | 'in_review' | 'rejected' | 'approved';
+  // 'excluded' is Fisqua's third QC decision (contract 1.6): the record is not
+  // a page of the volume, and no retake is asked for. Only a Fisqua decision
+  // sets it, no route moves it, and it is never pending. Only an admin may
+  // delete it or one of its images, and no one may add an image to it (409).
+  status: RecordStatus;
   sequence?: number;
   // Which camera setup produced this document — set once at capture time.
   // It does not decide what a rejection flags: the backend flags every
@@ -873,6 +889,20 @@ export type PredefinedRejectionReason = (typeof PREDEFINED_REJECTION_REASONS)[nu
 export interface RejectRecordData {
   predefined_reason: PredefinedRejectionReason;
   comment?: string;
+}
+
+// One row of GET /collections/{id}/status-changes. `changed_at` is naive UTC
+// (read it with parseApiDate). `note` is null except on a change into
+// 'excluded', where it holds Fisqua's optional reason (contract 1.6).
+export interface RecordStatusChange {
+  id:            number;
+  record_id:     number | null;
+  collection_id: number | null;
+  from_status:   RecordStatus;
+  to_status:     RecordStatus;
+  changed_by:    string | null;
+  changed_at:    string;
+  note:          string | null;
 }
 
 export interface RecordRejection {
@@ -1532,18 +1562,20 @@ export interface CameraControlsRequest {
 // ACTIVITY API
 // ============================================================================
 
-// Records per status in one collection. All four keys are always present.
+// Records per status in one collection. All five keys are always present.
+// `excluded` counts the records Fisqua excluded (contract 1.6).
 export interface StatusCounts {
   captured:  number;
   in_review: number;
   rejected:  number;
   approved:  number;
+  excluded:  number;
 }
 
 export interface CollectionActivity {
   collection_id: number;
   status_counts: StatusCounts;
-  // Sum of the four status counts.
+  // Sum of the five status counts, excluded records included.
   record_count: number;
   // Newest status change among the collection's records (deleted records
   // included), naive UTC ISO string; null when there has been none.
@@ -1554,6 +1586,7 @@ export interface CollectionActivity {
 export interface DailyActivity {
   date: string;              // YYYY-MM-DD, a local calendar day
   captured_images: number;
+  // Records approved, rejected or excluded that day.
   reviewed_records: number;
 }
 
@@ -1628,7 +1661,9 @@ export interface RecordToRetake {
 }
 
 // GET /records/to-retake/summary (0.2.0). `pending` counts the volume's
-// rejected records, `total` its records with at least one rejection;
+// rejected records, `total` its records with at least one rejection, leaving
+// out those now excluded, and `excluded` (0.2.1) its records Fisqua excluded,
+// which are never pending;
 // A record is pending when it is rejected, or captured with a current image
 // that still carries its rejection (prepared for retake); the records alone
 // do not show the second. `pendingRecordIds` lists every pending record of
@@ -1641,6 +1676,7 @@ export interface RetakeSummaryVolume {
   filenameStem:         string | null;
   pending:              number;
   total:                number;
+  excluded:             number;
   firstPendingRecordId: number;
   pendingRecordIds:     number[];
 }

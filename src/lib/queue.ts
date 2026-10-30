@@ -13,7 +13,7 @@
 // this unit; an item without a volume cannot be captured.
 // ============================================================================
 //
-// Version: 0.2.0
+// Version: 0.2.1
 
 import type { ImportReject, QueueItem, QueueList, StatusCounts } from '$lib/api';
 import { placeVolume } from '$lib/pipeline';
@@ -27,8 +27,9 @@ export function isQueueAction(value: unknown): value is QueueAction {
 	return typeof value === 'string' && (QUEUE_ACTIONS as readonly string[]).includes(value);
 }
 
+// Excluded records (Fisqua contract 1.6) are records of the volume too.
 function total(counts: StatusCounts): number {
-	return counts.captured + counts.in_review + counts.rejected + counts.approved;
+	return counts.captured + counts.in_review + counts.rejected + counts.approved + counts.excluded;
 }
 
 /** Whether the item's volume has at least one record, in any status. */

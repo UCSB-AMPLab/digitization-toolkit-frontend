@@ -5,7 +5,7 @@
 // Its Status column shows each volume's pipeline stage, from
 // GET /activity/collections.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -403,7 +403,7 @@ describe('project page: stems', () => {
 describe('project page: stage', () => {
 	const act = (id: number, c: Partial<StatusCounts>) => ({
 		collection_id: id,
-		status_counts: { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c },
+		status_counts: { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0, ...c },
 		record_count: 0,
 		last_status_change_at: null
 	});

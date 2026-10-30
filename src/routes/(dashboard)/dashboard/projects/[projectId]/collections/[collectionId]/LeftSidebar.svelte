@@ -13,7 +13,11 @@
   // Annotations are stored in the backend (`recordsApi.*Annotation*`), scoped to
   // the current record, and reloaded whenever the current record's id changes.
   //
-  // Version: 0.2.0
+  // A record Fisqua excluded (contract 1.6) takes no review here: only a later
+  // Fisqua decision moves it, so Reject and Approve stay disabled and the
+  // review section says what the exclusion means.
+  //
+  // Version: 0.2.1
 
   import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
   import { recordsApi, ApiError } from '$lib/api';
@@ -23,6 +27,7 @@
   import { REJECTION_REASONS, rejectionReasonText } from '$lib/rejectionReasons';
   import { REJECTION_COMMENT_MAX_LENGTH, isCommentTooLong, showsCommentCount } from '$lib/rejection-comment';
   import { dismissible } from '$lib/dialog';
+  import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
 
   let {
     viewMode,
@@ -221,7 +226,10 @@
   // A `captured` record has not yet been handed over for review: the backend
   // does not allow captured -> approved, and rejection requires `in_review`. So
   // neither action applies, and both buttons stay disabled.
-  let notReviewable = $derived(currentRecord?.status === 'captured');
+  // An excluded record is not reviewable either: the backend's status routes
+  // answer 422 for every move out of 'excluded'.
+  let isExcluded = $derived(currentRecord?.status === 'excluded');
+  let notReviewable = $derived(currentRecord?.status === 'captured' || isExcluded);
 
   let pendingActionMessage = $derived.by(() => {
     if (!pendingAction || !currentRecord) return '';
@@ -818,8 +826,11 @@
                  operator does not approve or reject, but may capture again.
                  Each Reject/Approve click asks for confirmation
                  (`pendingAction`) first. -->
-            {#if canReview || (canOperate && currentRecord?.status === 'rejected')}
+            {#if canReview || (canOperate && currentRecord?.status === 'rejected') || isExcluded}
               <div class="review-section">
+                {#if isExcluded && currentRecord}
+                  <div class="review-hint"><ExcludedNotice record={currentRecord} /></div>
+                {/if}
                 {#if reviewError}
                   <p class="annotations-error">{reviewError}</p>
                 {/if}
@@ -827,7 +838,7 @@
                 <!-- Why both buttons are disabled on a captured record: the
                      operator has not yet handed it over for review (NEH-260).
                      The touch screen has no tooltip. -->
-                {#if canReview && notReviewable}
+                {#if canReview && notReviewable && !isExcluded}
                   <p class="review-hint">{$m.col_review_not_sent_hint}</p>
                 {/if}
                 {#if canReview && rejectNeedsNote}

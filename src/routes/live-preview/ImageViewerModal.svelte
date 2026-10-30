@@ -9,8 +9,10 @@
   // told whether the retake is running. A captured record prepared for
   // retake is still pending (the backend's pending, which the record does
   // not show): the page passes `pending` for it, and its rejection shows too.
+  // A record Fisqua excluded (contract 1.6) takes no retake (the backend
+  // refuses the capture with a 409): the modal offers none and says why.
   //
-  // Version: 0.2.0
+  // Version: 0.2.1
 
   import type { Snippet } from 'svelte';
   import { recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';
@@ -19,6 +21,7 @@
   import { parseApiDate } from '$lib/pipeline';
   import { rejectionReasonText } from '$lib/rejectionReasons';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
+  import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
   import { dismissible } from '$lib/dialog';
 
   let {
@@ -39,6 +42,7 @@
   } = $props();
 
   let confirmRetake = $state(false);
+  let isExcluded = $derived(record.status === 'excluded');
 
   // The newest rejection of a rejected record. If the history cannot be
   // fetched, nothing extra is shown and the modal works as before.
@@ -80,6 +84,7 @@
 
   async function confirmAndRetake() {
     confirmRetake = false;
+    if (isExcluded) return;
     retaking = true;
     retakeError = null;
     try {
@@ -143,6 +148,12 @@
       </div>
     {/if}
 
+    {#if isExcluded}
+      <div class="lv-excluded">
+        <ExcludedNotice {record} />
+      </div>
+    {/if}
+
     <!-- Why the record was rejected, as on the Por recapturar page -->
     {#if rejection}
       <div class="lv-rejection" data-testid="lv-rejection">
@@ -203,15 +214,17 @@
           <span class="img-viewer-spinner"></span>
           {$m.lvm_retaking}
         </span>
-      {:else if !confirmRetake}
+      {:else if !confirmRetake || isExcluded}
         <button class="btn btn-secondary" onclick={handleClose}>
           <span class="material-symbols-outlined icon-sm">close</span>
           {$m.common_close}
         </button>
-        <button class="btn btn-danger" onclick={() => confirmRetake = true}>
-          <span class="material-symbols-outlined icon-sm">refresh</span>
-          {$m.lvm_retake}
-        </button>
+        {#if !isExcluded}
+          <button class="btn btn-danger" onclick={() => confirmRetake = true}>
+            <span class="material-symbols-outlined icon-sm">refresh</span>
+            {$m.lvm_retake}
+          </button>
+        {/if}
       {:else}
         <span class="img-viewer-confirm-msg">
           {$m.lvm_retake_confirm}
@@ -232,6 +245,7 @@
 </div>
 
 <style>
+  .lv-excluded { padding: 8px 16px; flex-shrink: 0; }
   .lv-rejection {
     display: flex;
     flex-direction: column;

@@ -12,7 +12,7 @@
   // come from GET /records/to-retake/summary, read with every load of the
   // records; without it, the rejected records are counted.
   //
-  // Version: 0.2.0
+  // Version: 0.2.1
 
   import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
@@ -36,7 +36,7 @@
   import { getVolumeTopbar } from '$lib/volume-topbar';
   import { retakeUrl } from '$lib/queue';
   import { dismissible } from '$lib/dialog';
-  import { fileHoldText } from '$lib/volume-refusals';
+  import { excludedRefusalText, fileHoldText } from '$lib/volume-refusals';
   import { freedExportCount } from '$lib/offsite-free';
   import { reconcileInspected, selectionAfterLoad } from '$lib/record-selection';
   import { freedFromBody } from '$lib/image-display';
@@ -236,7 +236,7 @@
     } catch (err) {
       // The backend's English text goes to the console only.
       console.error('[Gallery] Error deleting record:', err);
-      deleteRecordError = fileHoldText(err, $m) ?? $m.col_delete_record_retry;
+      deleteRecordError = fileHoldText(err, $m) ?? excludedRefusalText(err, $m) ?? $m.col_delete_record_retry;
     } finally {
       inspectedRecord = null;
     }
@@ -252,7 +252,9 @@
   let showBlockersModal = $state(false);
 
   const hasCurrentImage = (r: Record) => (r.images ?? []).some((i) => i.is_current);
-  let blockingRecords   = $derived(records.filter(r => r.status !== 'approved' || !hasCurrentImage(r)));
+  // A record Fisqua excluded is left out of the export (exported_records in
+  // app/core/export_service.py), so it blocks nothing.
+  let blockingRecords   = $derived(records.filter(r => r.status !== 'excluded' && (r.status !== 'approved' || !hasCurrentImage(r))));
 
   // Export/download chooser, and the image ZIP built in the browser
   let showChooserModal = $state(false);
@@ -404,7 +406,10 @@
 
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
   let selectedIndex  = $derived(records.findIndex(r => r.id === selectedRecordId) + 1);
-  let canExport      = $derived(records.length > 0 && records.every(r => r.status === 'approved' && hasCurrentImage(r)));
+  // The export bags every record but those Fisqua excluded (exported_records
+  // in app/core/export_service.py): it needs at least one of them, and none
+  // that blocks it.
+  let canExport      = $derived(records.some(r => r.status !== 'excluded') && blockingRecords.length === 0);
 
   // Hand-over for review (NEH-260). The controls go in the layout's top bar;
   // the page puts them there because it holds the records. Operator and

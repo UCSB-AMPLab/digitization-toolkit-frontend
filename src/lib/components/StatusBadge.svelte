@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Version: 0.1.0-beta
+  // Version: 0.2.1
 
   import type { Record } from '$lib/api';
   import { m } from '$lib/i18n';
@@ -13,6 +13,7 @@
     in_review: $m.status_in_review,
     rejected:  $m.status_rejected,
     approved:  $m.status_approved,
+    excluded:  $m.status_excluded,
   } satisfies { [K in RecordStatus]: string });
 
   const icons: { [K in RecordStatus]: string } = {
@@ -20,6 +21,8 @@
     in_review: 'rate_review',
     rejected:  'cancel',
     approved:  'check_circle',
+    // Fisqua's exclusion (contract 1.6): not a page of the volume.
+    excluded:  'block',
   };
 </script>
 

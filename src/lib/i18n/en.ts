@@ -2,7 +2,7 @@
 // `Messages` in `index.ts`): a missing or extra key here is a type error in
 // `npm run check`.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 
 import type { Messages } from './index';
 
@@ -117,6 +117,10 @@ export const en: Messages = {
 	status_in_review: 'In review',
 	status_rejected: 'Rejected',
 	status_approved: 'Approved',
+	// Fisqua's third QC decision (contract 1.6).
+	status_excluded: 'Excluded',
+	status_excluded_hint: 'Fisqua excluded this record: it is not a page of the volume, and no retake is asked for.',
+	excluded_note_label: 'Reason:',
 
 	// ── Roles ────────────────────────────────────────────────────────────────
 	role_admin: 'Administrator',
@@ -1384,6 +1388,9 @@ export const en: Messages = {
 		'The volume could not be started: it is the retake turn. Finish the retakes of one volume and try again.',
 	err_recaptures_pending: (n: number) =>
 		`The volume could not be sent to review: ${n === 1 ? '1 retake left' : `${formatCount(n, 'en')} retakes left`}.`,
+	vol_excluded_count: (n: number) => `${formatCount(n, 'en')} excluded`,
+	err_upload_excluded: "Fisqua excluded this record, so images can't be added to it.",
+	err_delete_excluded: 'Fisqua excluded this record, so only an administrator can delete it.',
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',

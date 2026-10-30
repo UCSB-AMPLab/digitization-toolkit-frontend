@@ -2,7 +2,7 @@
 // buttons show for which mix of statuses, what each dialog says, and what is
 // reported after promote and take-back answer.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -122,6 +122,13 @@ describe('HandoverControls', () => {
 	it('says Falta una recaptura for one, also when nothing else is captured', async () => {
 		const screen = mount(recs({ approved: 4, rejected: 1 }));
 		await expect.element(screen.getByRole('button', { name: 'Falta una recaptura' })).toBeDisabled();
+	});
+
+	it('excluded records (Fisqua contract 1.6) do not block the send: they count as sent, not as retakes', async () => {
+		const screen = mount(recs({ excluded: 2, approved: 3, captured: 1 }));
+		await expect.element(screen.getByRole('button', { name: 'Enviar 1 registro nuevo' })).toBeEnabled();
+		await expect.element(screen.getByRole('button', { name: /recaptura/ })).not.toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Retirar de revisión' })).not.toBeInTheDocument();
 	});
 
 	it('takes the pending count it is given, which counts records prepared for retake too', async () => {
