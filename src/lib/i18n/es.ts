@@ -13,10 +13,14 @@
 //   - Text that is the same in every language (brand names, acronyms, units)
 //     is not catalogued: it stays in the component.
 //
-// Version: 0.3.0
+// Version: 0.3.1
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';
+
+// The ordinal of Cola's sections (0.3.1): 1 to 3.
+const ORDINALS_ES = ['Primero', 'Segundo', 'Tercero'];
+const ordinalEs = (n: number) => ORDINALS_ES[n - 1] ?? String(n);
 
 export const es = {
 	// ── Common (shared across screens) ───────────────────────────────────────
@@ -1301,14 +1305,14 @@ export const es = {
 	queue_action_full_digitisation: 'Digitalización completa',
 	queue_action_complete: 'Completar digitalización',
 	queue_next: 'Siguiente',
-	queue_done: 'Hecho',
+	queue_done: 'Terminado',
 	queue_no_volume: 'Sin volumen en este equipo',
-	queue_mark_done: 'Marcar como hecho',
+	queue_mark_done: 'Marcar como terminado',
 	queue_unmark_done: 'Desmarcar',
-	queue_done_by: (who: string, date: string) => `Marcado como hecho por ${who} el ${date}`,
-	queue_done_by_who: (who: string) => `Marcado como hecho por ${who}`,
-	queue_done_on: (date: string) => `Marcado como hecho el ${date}`,
-	queue_done_marked: 'Marcado como hecho',
+	queue_done_by: (who: string, date: string) => `Marcado como terminado por ${who} el ${date}`,
+	queue_done_by_who: (who: string) => `Marcado como terminado por ${who}`,
+	queue_done_on: (date: string) => `Marcado como terminado el ${date}`,
+	queue_done_marked: 'Marcado como terminado',
 	queue_done_approved: 'Todos los registros están aprobados.',
 	queue_mark_error: 'Captua no pudo guardar el cambio en este elemento.',
 	queue_mark_error_busy: 'Captua no pudo guardar el cambio en este momento. Intenta de nuevo.',
@@ -1410,9 +1414,13 @@ export const es = {
 	retake_pending_of: (p: number, t: number) => `${formatCount(p, 'es')} de ${formatCount(t, 'es')} pendientes`,
 	retake_cta: 'Recapturar',
 	// Cola.
-	q_first_title: 'Primero: recapturas',
-	q_first_sub: 'Estos volúmenes tienen pares de páginas que la lista de digitalización pide volver a capturar.',
-	q_then_title: 'Después: digitalización nueva',
+	// Cola's sections (0.3.1), numbered by the sections shown.
+	section_progress_title: (n: number) => `${ordinalEs(n)}: termina lo que está en curso`,
+	section_progress_sub: 'Volúmenes que ya se empezaron a capturar en este equipo.',
+	section_rework_title: (n: number) => `${ordinalEs(n)}: recapturas y reescaneos`,
+	section_rework_sub: 'Volúmenes con pares de páginas por recapturar y, después, los que hay que volver a digitalizar completos.',
+	section_new_title: (n: number) => `${ordinalEs(n)}: nuevos materiales`,
+	section_new_sub: 'Volúmenes que nunca se han digitalizado.',
 	q_new_locked: 'Para empezar un volumen nuevo, primero hay que terminar las recapturas de un volumen.',
 	turn_recap_title: 'Turno de recapturas',
 	turn_recap_body: 'Termina las recapturas de un volumen y podrás empezar uno nuevo.',

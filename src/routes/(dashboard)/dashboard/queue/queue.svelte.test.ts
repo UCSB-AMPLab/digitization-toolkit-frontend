@@ -3,11 +3,13 @@
 // and the manual done mark; the action filter; the list picker; and
 // importing a list, with the report and its skips; and the Fisqua queue
 // (contract 1.7): shown first, filtered by assignee, without withdrawn or
-// hidden items, with a spot recapture's pairs, and done marks by itemId.
+// hidden items, with a spot recapture's pairs, and done marks by itemId;
+// and the three sections (0.3.1): in progress, recaptures and rescans, new
+// material, numbered by the sections shown, with the done items below.
 // GET and PUT under /imports/digitisation-lists and POST
 // /imports/digitisation-list are mocked.
 //
-// Version: 0.3.0
+// Version: 0.3.1
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
@@ -93,6 +95,16 @@ function turnSummary(state: 'recaptures' | 'new'): RetakeSummary {
 	};
 }
 
+// The row of the item with this title, wherever its section puts it.
+function rowOf(screen: ReturnType<typeof render>, title: string) {
+	return screen.getByRole('listitem').filter({ hasText: title });
+}
+
+// Without a turn, rionegro's sections are: in progress, Tomo 5 (a rescan
+// with records); new material, Tomo sin volumen and Tomo 4; and below them
+// the done items, Tomo 1 and Tomo 2.
+const RIONEGRO_ORDER = ['Tomo 5', 'Tomo sin volumen', 'Tomo 4', 'Tomo 1', 'Tomo 2'];
+
 function signIn(role: UserRole) {
 	authStore.setSession('tok', { id: 1, username: role, email: null, role, is_active: true });
 }
@@ -110,7 +122,7 @@ describe('Cola', () => {
 		authStore.clearSession();
 	});
 
-	it('shows the items in order with their order number, title, code, action and notes', async () => {
+	it('shows the items by section, each in list order, with their order number, title, code, action and notes', async () => {
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 		const screen = render(Queue);
 		await expect.element(screen.getByRole('heading', { level: 1, name: 'Cola de digitalización' })).toBeVisible();
@@ -118,17 +130,17 @@ describe('Cola', () => {
 		const rows = screen.getByRole('listitem');
 		await expect.element(rows.first()).toBeVisible();
 		const titles = rows.elements().map((r) => r.querySelector('.q-title')?.textContent?.trim());
-		expect(titles).toEqual(['Tomo 1', 'Tomo 2', 'Tomo sin volumen', 'Tomo 4', 'Tomo 5']);
+		expect(titles).toEqual(RIONEGRO_ORDER);
 
-		const row2 = rows.nth(1);
+		const row2 = rowOf(screen, 'Tomo 2');
 		await expect.element(row2.getByText('2', { exact: true })).toBeVisible();
 		await expect.element(row2.getByText('co-ahr-aht-2')).toBeVisible();
 		await expect.element(row2.getByText('Recaptura puntual')).toBeVisible();
-		await expect.element(rows.nth(3).getByText('Completar digitalización')).toBeVisible();
+		await expect.element(rowOf(screen, 'Tomo 4').getByText('Completar digitalización')).toBeVisible();
 		// The order number is read with its label, which is text, not an attribute.
-		expect(rows.nth(1).element().querySelector('.q-order .visually-hidden')?.textContent).toBe('Orden 2');
-		expect(rows.nth(1).element().querySelector('.q-order')?.hasAttribute('aria-label')).toBe(false);
-		await expect.element(rows.nth(2).getByText('Recaptura puntual')).not.toBeInTheDocument();
+		expect(row2.element().querySelector('.q-order .visually-hidden')?.textContent).toBe('Orden 2');
+		expect(row2.element().querySelector('.q-order')?.hasAttribute('aria-label')).toBe(false);
+		await expect.element(rowOf(screen, 'Tomo sin volumen').getByText('Recaptura puntual')).not.toBeInTheDocument();
 	});
 
 	it('shows long notes in full, wrapped and never cut', async () => {
@@ -148,33 +160,36 @@ describe('Cola', () => {
 	it('shows no notes block for an item without notes', async () => {
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 		const screen = render(Queue);
-		const row5 = screen.getByRole('listitem').nth(4);
+		const row5 = rowOf(screen, 'Tomo 5');
 		await expect.element(row5.getByText('Tomo 5')).toBeVisible();
 		expect(row5.element().querySelector('.q-notes')).toBeNull();
 	});
 
-	it('marks the first item that is not done and has a volume as Siguiente, and the done items as done', async () => {
+	it('marks the first item that can be captured as Siguiente, and the done items, below the sections, as finished', async () => {
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 		const screen = render(Queue);
-		const rows = screen.getByRole('listitem');
-		await expect.element(rows.nth(3).getByText('Siguiente')).toBeVisible();
+		// Tomo 5, in progress, has no project; Tomo sin volumen has no volume.
+		await expect.element(rowOf(screen, 'Tomo 4').getByText('Siguiente')).toBeVisible();
 		expect(screen.getByText('Siguiente', { exact: true }).elements()).toHaveLength(1);
-		await expect.element(rows.nth(0).getByText('Hecho', { exact: true })).toBeVisible();
-		await expect.element(rows.nth(1).getByText('Hecho', { exact: true })).toBeVisible();
-		expect(screen.getByText('Hecho', { exact: true }).elements()).toHaveLength(2);
-		// The done items stay in their places.
-		expect(rows.nth(0).element().querySelector('.q-title')?.textContent?.trim()).toBe('Tomo 1');
-		expect(rows.nth(1).element().querySelector('.q-title')?.textContent?.trim()).toBe('Tomo 2');
-		await expect.element(rows.nth(0).getByText('Todos los registros están aprobados.')).toBeVisible();
-		await expect.element(rows.nth(1).getByText(/^Marcado como hecho por revisora el /)).toBeVisible();
+		await expect.element(rowOf(screen, 'Tomo 1').getByText('Terminado', { exact: true })).toBeVisible();
+		await expect.element(rowOf(screen, 'Tomo 2').getByText('Terminado', { exact: true })).toBeVisible();
+		expect(screen.getByText('Terminado', { exact: true }).elements()).toHaveLength(2);
+		// The done items come after every section, in list order, in no section.
+		const done = screen.container.querySelector('.q-done-list') as HTMLElement;
+		expect(done.closest('section')).toBeNull();
+		expect([...done.querySelectorAll('.q-title')].map((t) => t.textContent?.trim())).toEqual(['Tomo 1', 'Tomo 2']);
+		const sections = screen.container.querySelectorAll('section.q-section');
+		expect(sections[sections.length - 1].compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		await expect.element(rowOf(screen, 'Tomo 1').getByText('Todos los registros están aprobados.')).toBeVisible();
+		await expect.element(rowOf(screen, 'Tomo 2').getByText(/^Marcado como terminado por revisora el /)).toBeVisible();
 	});
 
 	it('never shows a full rescan as done because its records are approved', async () => {
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 		const screen = render(Queue);
-		const row5 = screen.getByRole('listitem').nth(4);
+		const row5 = rowOf(screen, 'Tomo 5');
 		await expect.element(row5.getByText('Aprobado', { exact: true })).toBeVisible();
-		await expect.element(row5.getByText('Hecho', { exact: true })).not.toBeInTheDocument();
+		await expect.element(row5.getByText('Terminado', { exact: true })).not.toBeInTheDocument();
 	});
 
 	describe('records to retake', () => {
@@ -189,11 +204,10 @@ describe('Cola', () => {
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 			vi.mocked(recordsApi.toRetake).mockResolvedValue([rejected(1, 104), rejected(2, 104), rejected(3, 104), rejected(4, 104), rejected(5, 102), rejected(6, null)]);
 			const screen = render(Queue);
-			const rows = screen.getByRole('listitem');
-			const link = rows.nth(3).getByRole('link', { name: '4 registros por recapturar' });
+			const link = rowOf(screen, 'Tomo 4').getByRole('link', { name: '4 registros por recapturar' });
 			await expect.element(link).toBeVisible();
 			await expect.element(link).toHaveAttribute('href', '/dashboard/retakes?collectionId=104');
-			await expect.element(rows.nth(1).getByRole('link', { name: '1 registro por recapturar' })).toHaveAttribute('href', '/dashboard/retakes?collectionId=102');
+			await expect.element(rowOf(screen, 'Tomo 2').getByRole('link', { name: '1 registro por recapturar' })).toHaveAttribute('href', '/dashboard/retakes?collectionId=102');
 			expect(screen.getByRole('link', { name: /por recapturar$/ }).elements()).toHaveLength(2);
 		});
 
@@ -202,8 +216,8 @@ describe('Cola', () => {
 			vi.mocked(recordsApi.toRetake).mockResolvedValue([rejected(1, 104)]);
 			const screen = render(Queue);
 			await expect.element(screen.getByRole('link', { name: '1 registro por recapturar' })).toBeVisible();
-			expect(screen.getByRole('listitem').nth(0).element().querySelector('a')).toBeNull();
-			expect(screen.getByRole('listitem').nth(2).element().querySelector('a')).toBeNull();
+			expect(rowOf(screen, 'Tomo 1').element().querySelector('a')).toBeNull();
+			expect(rowOf(screen, 'Tomo sin volumen').element().querySelector('a')).toBeNull();
 		});
 
 		it('shows no counts and keeps the page working when the fetch fails', async () => {
@@ -215,12 +229,16 @@ describe('Cola', () => {
 		});
 	});
 
-	describe('recapture turn (0.2.0)', () => {
+	describe('sections and the recapture turn (0.3.1)', () => {
 		function sectionTitles(container: HTMLElement) {
 			return [...container.querySelectorAll('.q-row')].map((r) => r.querySelector('.q-title')?.textContent?.trim());
 		}
+		// The capture button's icon: the lock while a new volume must wait.
+		function captureIcon(row: ReturnType<typeof rowOf>) {
+			return row.element().querySelector('.ip-btn-capture .material-symbols-outlined')?.textContent?.trim();
+		}
 
-		it('shows the retake turn, the volumes with retakes first, and the rest after with the lock line', async () => {
+		it('shows the retake turn, the volumes with retakes first, then new material with the lock line, then the done items', async () => {
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(turnSummary('recaptures'));
 			const screen = render(Queue);
@@ -230,21 +248,59 @@ describe('Cola', () => {
 			await expect.element(pill.getByText('Termina las recapturas de un volumen y podrás empezar uno nuevo.')).toBeVisible();
 			expect(getComputedStyle(pill.element()).backgroundColor).toBe('rgb(225, 183, 120)');
 
-			const first = screen.getByRole('region', { name: 'Primero: recapturas' });
-			await expect.element(first.getByText('Estos volúmenes tienen pares de páginas que la lista de digitalización pide volver a capturar.')).toBeVisible();
+			// Nothing is in progress: Tomo 5 has records, but pages to recapture.
+			await expect.element(screen.getByRole('region', { name: 'Primero: termina lo que está en curso' })).not.toBeInTheDocument();
+			const first = screen.getByRole('region', { name: 'Primero: recapturas y reescaneos' });
+			await expect.element(first).toBeVisible();
+			expect(first.element().querySelector('.q-section-sub')).not.toBeNull();
 			expect(sectionTitles(first.element() as HTMLElement)).toEqual(['Tomo 4', 'Tomo 5']);
 			const row4 = first.getByRole('listitem').nth(0);
 			await expect.element(row4.getByText('2 de 3 pendientes')).toBeVisible();
 			await expect
 				.element(row4.getByRole('link', { name: 'Recapturar' }))
 				.toHaveAttribute('href', '/live-preview?projectId=8&collectionId=104&recordId=904');
+			expect(first.element().querySelector('.q-locked')).toBeNull();
 
-			const then = screen.getByRole('region', { name: 'Después: digitalización nueva' });
-			await expect.element(then.getByText('Para empezar un volumen nuevo, primero hay que terminar las recapturas de un volumen.')).toBeVisible();
-			expect(sectionTitles(then.element() as HTMLElement)).toEqual(['Tomo 1', 'Tomo 2', 'Tomo sin volumen']);
+			const second = screen.getByRole('region', { name: 'Segundo: nuevos materiales' });
+			await expect.element(second.getByText('Para empezar un volumen nuevo, primero hay que terminar las recapturas de un volumen.')).toBeVisible();
+			expect(sectionTitles(second.element() as HTMLElement)).toEqual(['Tomo sin volumen']);
+			expect(sectionTitles(screen.container.querySelector('.q-done-list') as HTMLElement)).toEqual(['Tomo 1', 'Tomo 2']);
 		});
 
-		it('makes Siguiente the first item whose volume has retakes', async () => {
+		it('puts an item in progress first, as Siguiente, and locks only new material during the recaptures turn', async () => {
+			const list: QueueList = {
+				...rionegro,
+				items: [
+					item(1, { title: 'Tomo nuevo', action: 'full-digitisation' }),
+					item(2, { title: 'Tomo reescaneo', action: 'full-rescan' }),
+					item(3, { title: 'Tomo en curso', action: 'full-digitisation', status: counts({ captured: 3 }) }),
+					item(4, { title: 'Tomo con recapturas', status: counts({ rejected: 2, approved: 1 }), projectId: 8 })
+				]
+			};
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([list]);
+			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(turnSummary('recaptures'));
+			const screen = render(Queue);
+
+			const first = screen.getByRole('region', { name: 'Primero: termina lo que está en curso' });
+			await expect.element(first).toBeVisible();
+			expect(sectionTitles(first.element() as HTMLElement)).toEqual(['Tomo en curso']);
+			await expect.element(first.getByText('Siguiente')).toBeVisible();
+			expect(screen.container.querySelectorAll('.q-row.is-next')).toHaveLength(1);
+			const second = screen.getByRole('region', { name: 'Segundo: recapturas y reescaneos' });
+			expect(sectionTitles(second.element() as HTMLElement)).toEqual(['Tomo con recapturas', 'Tomo reescaneo']);
+			const third = screen.getByRole('region', { name: 'Tercero: nuevos materiales' });
+			expect(sectionTitles(third.element() as HTMLElement)).toEqual(['Tomo nuevo']);
+
+			expect(captureIcon(rowOf(screen, 'Tomo en curso'))).toBe('photo_camera');
+			expect(captureIcon(rowOf(screen, 'Tomo reescaneo'))).toBe('photo_camera');
+			expect(captureIcon(rowOf(screen, 'Tomo nuevo'))).toBe('lock');
+			expect(screen.container.querySelectorAll('.q-locked')).toHaveLength(1);
+			expect(third.element().querySelector('.q-locked')).not.toBeNull();
+			expect(screen.container.querySelectorAll('.q-section.is-locked')).toHaveLength(1);
+			expect(third.element().classList.contains('is-locked')).toBe(true);
+		});
+
+		it('makes Siguiente the first item whose volume has retakes when nothing is in progress', async () => {
 			// Without the summary item 4 is next; make item 5 (given a project) the only one with retakes.
 			const summary = turnSummary('recaptures');
 			summary.volumes = summary.volumes.filter((v) => v.collectionId === 105);
@@ -252,7 +308,7 @@ describe('Cola', () => {
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([withProject]);
 			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(summary);
 			const screen = render(Queue);
-			const first = screen.getByRole('region', { name: 'Primero: recapturas' });
+			const first = screen.getByRole('region', { name: 'Primero: recapturas y reescaneos' });
 			await expect.element(first.getByText('Tomo 5')).toBeVisible();
 			const next = screen.container.querySelectorAll('.q-row.is-next');
 			expect(next).toHaveLength(1);
@@ -260,25 +316,40 @@ describe('Cola', () => {
 			await expect.element(first.getByText('Siguiente')).toBeVisible();
 		});
 
-		it('in the new-volume turn names the volume that opened it, and shows no lock line', async () => {
+		it('in the new-volume turn names the volume that opened it, and locks nothing', async () => {
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(turnSummary('new'));
 			const screen = render(Queue);
 			const pill = screen.getByRole('status').filter({ hasText: 'Turno de volumen nuevo' });
 			await expect.element(pill).toBeVisible();
 			await expect.element(pill.getByText('Ya se terminaron las recapturas del volumen Tomo 002. Puedes empezar un volumen nuevo.')).toBeVisible();
-			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas' })).toBeVisible();
-			await expect.element(screen.getByRole('region', { name: 'Después: digitalización nueva' })).toBeVisible();
+			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas y reescaneos' })).toBeVisible();
+			await expect.element(screen.getByRole('region', { name: 'Segundo: nuevos materiales' })).toBeVisible();
 			await expect.element(screen.getByText('Para empezar un volumen nuevo, primero hay que terminar', { exact: false })).not.toBeInTheDocument();
+			expect(screen.container.querySelectorAll('.q-section.is-locked')).toHaveLength(0);
 		});
 
-		it('shows one list and no turn while nothing is pending', async () => {
-			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
+		it('applies the same sections while nothing is pending, with only rescans in section 2, and no turn', async () => {
+			const list: QueueList = { ...rionegro, items: [...rionegro.items, item(6, { title: 'Tomo reescaneo', action: 'full-rescan' })] };
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([list]);
 			const screen = render(Queue);
-			await expect.element(screen.getByText('Tomo 5')).toBeVisible();
-			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas' })).not.toBeInTheDocument();
+			const first = screen.getByRole('region', { name: 'Primero: termina lo que está en curso' });
+			await expect.element(first).toBeVisible();
+			expect(sectionTitles(first.element() as HTMLElement)).toEqual(['Tomo 5']);
+			const second = screen.getByRole('region', { name: 'Segundo: recapturas y reescaneos' });
+			expect(sectionTitles(second.element() as HTMLElement)).toEqual(['Tomo reescaneo']);
+			const third = screen.getByRole('region', { name: 'Tercero: nuevos materiales' });
+			expect(sectionTitles(third.element() as HTMLElement)).toEqual(['Tomo sin volumen', 'Tomo 4']);
 			await expect.element(screen.getByText('Turno de recapturas')).not.toBeInTheDocument();
-			expect(screen.container.querySelectorAll('ol.queue')).toHaveLength(1);
+			expect(screen.container.querySelectorAll('.q-locked')).toHaveLength(0);
+			expect(captureIcon(rowOf(screen, 'Tomo 4'))).toBe('photo_camera');
+		});
+
+		it('leaves out an empty section and numbers the next one Primero', async () => {
+			vi.spyOn(importsApi, 'lists').mockResolvedValue([{ ...rionegro, items: [item(1, { title: 'Tomo nuevo' })] }]);
+			const screen = render(Queue);
+			await expect.element(screen.getByRole('region', { name: 'Primero: nuevos materiales' })).toBeVisible();
+			expect(screen.container.querySelectorAll('section.q-section')).toHaveLength(1);
 		});
 
 		it('gives a reviewer the sections but no Recapturar link', async () => {
@@ -286,7 +357,7 @@ describe('Cola', () => {
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 			vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue(turnSummary('recaptures'));
 			const screen = render(Queue);
-			const first = screen.getByRole('region', { name: 'Primero: recapturas' });
+			const first = screen.getByRole('region', { name: 'Primero: recapturas y reescaneos' });
 			await expect.element(first.getByText('2 de 3 pendientes')).toBeVisible();
 			await expect.element(first.getByRole('link', { name: 'Recapturar' })).not.toBeInTheDocument();
 		});
@@ -296,7 +367,8 @@ describe('Cola', () => {
 			vi.spyOn(recordsApi, 'toRetakeSummary').mockRejectedValue(new Error('boom'));
 			const screen = render(Queue);
 			await expect.element(screen.getByText('Tomo 5')).toBeVisible();
-			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas' })).not.toBeInTheDocument();
+			await expect.element(screen.getByRole('region', { name: 'Primero: termina lo que está en curso' })).toBeVisible();
+			await expect.element(screen.getByRole('region', { name: 'Primero: recapturas y reescaneos' })).not.toBeInTheDocument();
 		});
 	});
 
@@ -310,28 +382,28 @@ describe('Cola', () => {
 					.mockResolvedValueOnce({ by: role, at: '2026-10-28T15:00:00' })
 					.mockResolvedValueOnce(null);
 				const screen = render(Queue);
-				const rows = screen.getByRole('listitem');
 
 				// The mark the PUT returns goes into the item; the lists are not read again.
-				await rows.nth(3).getByRole('button', { name: 'Marcar como hecho' }).click();
+				await rowOf(screen, 'Tomo 4').getByRole('button', { name: 'Marcar como terminado' }).click();
 				expect(setDone).toHaveBeenCalledWith(rionegro.listId, 4, true);
-				await expect.element(rows.nth(3).getByText(new RegExp(`^Marcado como hecho por ${role} el `))).toBeVisible();
-				await expect.element(rows.nth(3).getByText('Hecho', { exact: true })).toBeVisible();
+				await expect.element(rowOf(screen, 'Tomo 4').getByText(new RegExp(`^Marcado como terminado por ${role} el `))).toBeVisible();
+				await expect.element(rowOf(screen, 'Tomo 4').getByText('Terminado', { exact: true })).toBeVisible();
 				// Siguiente does not move to item 5: its volume has no project, so
 				// the queue cannot open it for capture.
-				await expect.element(rows.nth(4).getByText('Siguiente')).not.toBeInTheDocument();
+				await expect.element(rowOf(screen, 'Tomo 5').getByText('Siguiente')).not.toBeInTheDocument();
 
-				await rows.nth(1).getByRole('button', { name: 'Desmarcar' }).click();
+				await rowOf(screen, 'Tomo 2').getByRole('button', { name: 'Desmarcar' }).click();
 				expect(setDone).toHaveBeenCalledWith(rionegro.listId, 2, false);
-				await expect.element(rows.nth(1).getByRole('button', { name: 'Marcar como hecho' })).toBeVisible();
-				await expect.element(rows.nth(1).getByText('Hecho', { exact: true })).not.toBeInTheDocument();
-				// Item 2, a spot recapture no longer marked, is the first not done again.
-				await expect.element(rows.nth(1).getByText('Siguiente')).toBeVisible();
+				await expect.element(rowOf(screen, 'Tomo 2').getByRole('button', { name: 'Marcar como terminado' })).toBeVisible();
+				await expect.element(rowOf(screen, 'Tomo 2').getByText('Terminado', { exact: true })).not.toBeInTheDocument();
+				// Item 2, a spot recapture with records no longer marked, is in
+				// progress, and the first that can be captured.
+				await expect.element(rowOf(screen, 'Tomo 2').getByText('Siguiente')).toBeVisible();
 				expect(lists.mock.calls.length).toBe(1);
 			});
 		}
 
-		it('offers Marcar como hecho on every item not done, and Desmarcar only where there is a mark', async () => {
+		it('offers Marcar como terminado on every item not done, and Desmarcar only where there is a mark', async () => {
 			signIn('reviewer');
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 			const screen = render(Queue);
@@ -341,16 +413,17 @@ describe('Cola', () => {
 				[...r.querySelectorAll('button')]
 					// The visible label, without the icon's ligature text.
 					.map((b) => (b.querySelector('span:not(.material-symbols-outlined)') ?? b).textContent?.trim())
-					.filter((t) => t === 'Marcar como hecho' || t === 'Desmarcar')
+					.filter((t) => t === 'Marcar como terminado' || t === 'Desmarcar')
 			);
-			expect(marks).toEqual([[], ['Desmarcar'], ['Marcar como hecho'], ['Marcar como hecho'], ['Marcar como hecho']]);
+			// In RIONEGRO_ORDER: Tomo 5, Tomo sin volumen, Tomo 4, then the done Tomo 1 and Tomo 2.
+			expect(marks).toEqual([['Marcar como terminado'], ['Marcar como terminado'], ['Marcar como terminado'], [], ['Desmarcar']]);
 		});
 
 		it('gives an operator no mark buttons', async () => {
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 			const screen = render(Queue);
 			await expect.element(screen.getByText('Tomo 4')).toBeVisible();
-			await expect.element(screen.getByRole('button', { name: 'Marcar como hecho' })).not.toBeInTheDocument();
+			await expect.element(screen.getByRole('button', { name: 'Marcar como terminado' })).not.toBeInTheDocument();
 			await expect.element(screen.getByRole('button', { name: 'Desmarcar' })).not.toBeInTheDocument();
 		});
 
@@ -359,7 +432,7 @@ describe('Cola', () => {
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 			vi.spyOn(importsApi, 'setDone').mockRejectedValue(new ApiError('boom', undefined, 500));
 			const screen = render(Queue);
-			await screen.getByRole('listitem').nth(3).getByRole('button', { name: 'Marcar como hecho' }).click();
+			await rowOf(screen, 'Tomo 4').getByRole('button', { name: 'Marcar como terminado' }).click();
 			await expect.element(screen.getByRole('alert')).toHaveTextContent('Captua no pudo guardar el cambio en este elemento.');
 		});
 
@@ -368,7 +441,7 @@ describe('Cola', () => {
 			vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 			vi.spyOn(importsApi, 'setDone').mockRejectedValue(new ApiError('busy', undefined, 503));
 			const screen = render(Queue);
-			await screen.getByRole('listitem').nth(3).getByRole('button', { name: 'Marcar como hecho' }).click();
+			await rowOf(screen, 'Tomo 4').getByRole('button', { name: 'Marcar como terminado' }).click();
 			await expect
 				.element(screen.getByRole('alert'))
 				.toHaveTextContent('Captua no pudo guardar el cambio en este momento. Intenta de nuevo.');
@@ -378,21 +451,20 @@ describe('Cola', () => {
 	it('shows each stage and bar from the status counts, and says when the unit has no volume', async () => {
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 		const screen = render(Queue);
-		const rows = screen.getByRole('listitem');
-		await expect.element(rows.nth(1).getByText('En captura')).toBeVisible();
-		await expect.element(rows.nth(1).getByText('Capturados: 2, En revisión: 3')).toBeInTheDocument();
-		await expect.element(rows.nth(1).getByText('5 registros')).toBeVisible();
-		await expect.element(rows.nth(0).getByText('Aprobado', { exact: true })).toBeVisible();
-		await expect.element(rows.nth(2).getByText('Sin volumen en este equipo')).toBeVisible();
-		await expect.element(rows.nth(2).getByRole('button', { name: 'Capturar' })).not.toBeInTheDocument();
+		await expect.element(rowOf(screen, 'Tomo 2').getByText('En captura')).toBeVisible();
+		await expect.element(rowOf(screen, 'Tomo 2').getByText('Capturados: 2, En revisión: 3')).toBeInTheDocument();
+		await expect.element(rowOf(screen, 'Tomo 2').getByText('5 registros')).toBeVisible();
+		await expect.element(rowOf(screen, 'Tomo 1').getByText('Aprobado', { exact: true })).toBeVisible();
+		await expect.element(rowOf(screen, 'Tomo sin volumen').getByText('Sin volumen en este equipo')).toBeVisible();
+		await expect.element(rowOf(screen, 'Tomo sin volumen').getByRole('button', { name: 'Capturar' })).not.toBeInTheDocument();
 	});
 
 	it("opens a volume for capture in the item's own project, and has no button without one", async () => {
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([rionegro]);
 		const screen = render(Queue);
-		await screen.getByRole('listitem').nth(3).getByRole('button', { name: 'Capturar' }).click();
+		await rowOf(screen, 'Tomo 4').getByRole('button', { name: 'Capturar' }).click();
 		expect(gotoMock).toHaveBeenCalledWith('/live-preview?projectId=8&collectionId=104');
-		await expect.element(screen.getByRole('listitem').nth(4).getByRole('button', { name: 'Capturar' })).not.toBeInTheDocument();
+		await expect.element(rowOf(screen, 'Tomo 5').getByRole('button', { name: 'Capturar' })).not.toBeInTheDocument();
 	});
 
 	it('shows a list with no import date or project without an invalid date', async () => {
@@ -433,7 +505,7 @@ describe('Cola', () => {
 		await expect.element(screen.getByText('El siguiente elemento no aparece con este filtro.')).not.toBeInTheDocument();
 
 		await group.getByRole('button', { name: 'Todas' }).click();
-		await expect.poll(titles).toEqual(['Tomo 1', 'Tomo 2', 'Tomo sin volumen', 'Tomo 4', 'Tomo 5']);
+		await expect.poll(titles).toEqual(RIONEGRO_ORDER);
 	});
 
 	it('shows the newest list first, with a picker, and says when a list file is missing', async () => {
@@ -769,7 +841,7 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([file]);
 		const screen = render(Queue);
 		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
-		expect(titles(screen.container)).toEqual(['Tomo 1', 'Tomo 2', 'Tomo 4', 'Tomo 5']);
+		expect(titles(screen.container)).toEqual(['Tomo 5', 'Tomo 4', 'Tomo 1', 'Tomo 2']);
 	});
 
 	it("shows a spot recapture's count and pairs, by sequence where known, and a null pairId without error", async () => {
@@ -803,7 +875,7 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 		(rowB.querySelector('.ip-btn-mark') as HTMLButtonElement).click();
 		await expect.poll(() => setDone.mock.calls.length).toBe(1);
 		expect(setDone).toHaveBeenCalledWith(QUEUE_ID, 2, true, 'q-2');
-		await expect.element(screen.getByText(/^Marked done by admin on /)).toBeVisible();
+		await expect.element(screen.getByText(/^Marked finished by admin on /)).toBeVisible();
 		expect(lists.mock.calls.length).toBe(1);
 
 		const rowC = screen.getByText('Tomo C').element().closest('.q-row') as HTMLElement;
@@ -816,7 +888,7 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 			.toHaveTextContent("This item has changed in Fisqua's queue. Captua has reloaded the queue: check the item and try again.");
 	});
 
-	it('keeps the recapture-turn sections on the queue list, with Siguiente on the first item with retakes', async () => {
+	it('keeps the sections on the queue list, with Siguiente on the first item with retakes', async () => {
 		signIn('admin');
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([fisqua()]);
 		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
@@ -828,12 +900,14 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 			turn: { state: 'recaptures', unlockedBy: null }
 		});
 		const screen = render(Queue);
-		const first = screen.getByRole('region', { name: 'First: retakes' });
+		const first = screen.getByRole('region', { name: 'First: recaptures and rescans' });
 		await expect.element(first.getByText('Tomo B')).toBeVisible();
 		expect(titles(first.element())).toEqual(['Tomo B', 'Tomo F']);
 		await expect.element(first.getByText('1 of 2 pending')).toBeVisible();
-		const then = screen.getByRole('region', { name: 'Then: new digitisation' });
+		await expect.element(first.getByText('Volumes with page pairs to recapture, then the ones to digitise again in full.')).toBeVisible();
+		const then = screen.getByRole('region', { name: 'Second: new material' });
 		expect(titles(then.element())).toEqual(['Tomo A', 'Tomo C']);
+		await expect.element(then.getByText('Volumes never digitised before.')).toBeVisible();
 		await expect.element(then.getByText('To start a new volume, first finish the retakes of one volume.')).toBeVisible();
 		const next = screen.container.querySelectorAll('.q-row.is-next');
 		expect(next).toHaveLength(1);
@@ -847,6 +921,6 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
 		expect(screen.container.querySelectorAll('.q-assignee')).toHaveLength(0);
 		await expect.element(screen.getByRole('group', { name: 'Assigned to' })).not.toBeInTheDocument();
-		expect(titles(screen.container)).toEqual(['Tomo 1', 'Tomo 2', 'Tomo sin volumen', 'Tomo 4', 'Tomo 5']);
+		expect(titles(screen.container)).toEqual(RIONEGRO_ORDER);
 	});
 });

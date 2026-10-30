@@ -8,9 +8,14 @@
 // volume has records and every one is approved (placeVolume's last stage).
 // A full rescan, a spot recapture or a completion works on a volume whose
 // records may all be approved already, so the records cannot say when it is
-// finished: only the mark can. The list is worked from the top, so the next
-// item is the first, in list order, that is not done and has a volume on
-// this unit; an item without a volume cannot be captured.
+// finished: only the mark can.
+//
+// Cola groups the items not done in three sections (0.3.1): work in
+// progress, then recaptures and rescans, then new material; the done items
+// come after them, except an item whose volume still owes retakes, which
+// stays in the second section. The next item is the first of the first section that has
+// one with a volume and a project on this unit; an item without them cannot
+// be captured. During the recapture turn only new material waits.
 //
 // The digitisation queue synced with Fisqua (contract 1.7) is one more list,
 // with `source` `queue`, and Cola shows it first. Its items carry an
@@ -20,7 +25,7 @@
 // recapture's retakes are named as Por recapturar names a record.
 // ============================================================================
 //
-// Version: 0.3.0
+// Version: 0.3.1
 
 import type { ImportReject, QueueItem, QueueList, QueueRetake, RecordToRetake, StatusCounts } from '$lib/api';
 import { placeVolume } from '$lib/pipeline';
@@ -53,23 +58,6 @@ export function isItemDone(item: QueueItem): boolean {
 	if (item.doneMark) return true;
 	if (!DONE_BY_RECORDS.has(item.action)) return false;
 	return hasCapturedRecord(item) && placeVolume(item.status as StatusCounts) === 'approved';
-}
-
-/**
- * Position of the next item to capture, or null when there is none. An item
- * must have a volume and a project, as the capture link needs both. While
- * retakes are pending (0.2.0), the first item whose volume is in
- * `retakeVolumes` comes first, done or not, since its retakes are still
- * owed; the usual rule applies when no item has one.
- */
-export function nextItemPosition(items: QueueItem[], retakeVolumes?: ReadonlySet<number>): number | null {
-	const capturable = (i: QueueItem) => i.collectionId != null && i.projectId != null;
-	if (retakeVolumes && retakeVolumes.size > 0) {
-		const retake = items.find((i) => capturable(i) && retakeVolumes.has(i.collectionId as number));
-		if (retake) return retake.position;
-	}
-	const next = items.find((i) => capturable(i) && !isItemDone(i));
-	return next ? next.position : null;
 }
 
 /** The distinct actions on the list's items, in order of first appearance. */
@@ -223,4 +211,93 @@ export function retakePairs(retakes: QueueRetake[] | undefined, rows: RecordToRe
 		.map((p, index) => ({ p, index }))
 		.sort((a, b) => rank(a.p) - rank(b.p) || (a.p.sequence ?? 0) - (b.p.sequence ?? 0) || a.index - b.index)
 		.map(({ p }) => p);
+}
+
+// ---------------------------------------------------------------------------
+// Cola's sections (0.3.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Cola's three sections, in the order shown: work in progress (a volume with
+ * records and no pages waiting to be recaptured, whatever its action); then
+ * recaptures and rescans (volumes with pages waiting to be recaptured, then
+ * full rescans not in progress); then new material (everything else).
+ */
+export type QueueSectionKey = 'progress' | 'rework' | 'new';
+const SECTION_ORDER: QueueSectionKey[] = ['progress', 'rework', 'new'];
+
+// The section the item's work belongs to, done or not. Section 2 holds the
+// retakes before the rescans.
+function workOf(item: QueueItem, retakeVolumes?: ReadonlySet<number>): QueueSectionKey {
+	if (item.collectionId != null && retakeVolumes?.has(item.collectionId)) return 'rework';
+	if (hasCapturedRecord(item)) return 'progress';
+	if (item.action === 'full-rescan') return 'rework';
+	return 'new';
+}
+
+function hasRetakes(item: QueueItem, retakeVolumes?: ReadonlySet<number>): boolean {
+	return item.collectionId != null && retakeVolumes?.has(item.collectionId) === true;
+}
+
+/**
+ * The item's section, or null when it is done. An item whose volume has
+ * pages waiting to be recaptured stays in section 2 even when it is marked
+ * done, since those retakes are still owed; any other done item is in none.
+ */
+export function sectionOf(item: QueueItem, retakeVolumes?: ReadonlySet<number>): QueueSectionKey | null {
+	if (hasRetakes(item, retakeVolumes)) return 'rework';
+	return isItemDone(item) ? null : workOf(item, retakeVolumes);
+}
+
+export interface QueueSection {
+	key: QueueSectionKey;
+	// 1 for the first section shown: an empty section is not shown and takes no number.
+	ordinal: number;
+	items: QueueItem[];
+}
+
+/**
+ * The items in their sections, each in list order (in section 2, the items
+ * with retakes first, done or not, then the rescans), with the empty
+ * sections left out; and the other done items apart, in list order, shown
+ * below the sections.
+ */
+export function queueSections(items: QueueItem[], retakeVolumes?: ReadonlySet<number>): { sections: QueueSection[]; done: QueueItem[] } {
+	const byKey = new Map<QueueSectionKey, QueueItem[]>(SECTION_ORDER.map((k) => [k, []]));
+	const done: QueueItem[] = [];
+	for (const item of items) {
+		const key = sectionOf(item, retakeVolumes);
+		if (key === null) done.push(item);
+		else byKey.get(key)!.push(item);
+	}
+	const rework = byKey.get('rework')!;
+	byKey.set('rework', [...rework.filter((i) => hasRetakes(i, retakeVolumes)), ...rework.filter((i) => !hasRetakes(i, retakeVolumes))]);
+	const sections = SECTION_ORDER.filter((k) => byKey.get(k)!.length > 0).map((key, index) => ({ key, ordinal: index + 1, items: byKey.get(key)! }));
+	return { sections, done };
+}
+
+/**
+ * Position of the next item to capture (Siguiente), or null when there is
+ * none: the first item of the first section that has one an operator can
+ * open, in the sections' order. An item must have a volume and a project, as
+ * the capture link needs both. `retakeVolumes` are the volumes with pages
+ * waiting to be recaptured (0.2.0).
+ */
+export function nextItemPosition(items: QueueItem[], retakeVolumes?: ReadonlySet<number>): number | null {
+	const capturable = (i: QueueItem) => i.collectionId != null && i.projectId != null;
+	for (const section of queueSections(items, retakeVolumes).sections) {
+		const next = section.items.find(capturable);
+		if (next) return next.position;
+	}
+	return null;
+}
+
+/**
+ * Whether the item's capture waits for the recapture turn: only new material,
+ * and only during the recaptures turn. Sections 1 and 2 are never locked,
+ * since the backend lets a full rescan start in any turn. A done item is
+ * locked as its work would be.
+ */
+export function isLockedForTurn(item: QueueItem, retakeVolumes: ReadonlySet<number> | undefined, turnState: string | null | undefined): boolean {
+	return turnState === 'recaptures' && workOf(item, retakeVolumes) === 'new';
 }
