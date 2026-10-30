@@ -4,9 +4,10 @@
   // volume and manage the project's members. The volume form owns the
   // filename stem rules (see `VolumeStemField`); the delete modal moves a
   // volume's records to another volume first when it has any. The Status
-  // column shows placeholder values (see `mockStatuses`).
+  // column shows the volume's pipeline stage, as Cola labels it, from one
+  // GET /activity/collections for the project.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.2.0
 
   import { onMount } from 'svelte';
   import { m, roleLabel, locale } from '$lib/i18n';
@@ -15,12 +16,13 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { projectsApi, collectionsApi, recordsApi, projectMembersApi,
-           type Project, type Collection, type ProjectMember, type UserRead } from '$lib/api';
+  import { projectsApi, collectionsApi, recordsApi, projectMembersApi, activityApi,
+           type Project, type Collection, type ProjectMember, type UserRead, type StatusCounts } from '$lib/api';
   import { stemProblem, stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
   import { volumeSaveErrorText, volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
   import VolumeStemField from './VolumeStemField.svelte';
   import { dismissible } from '$lib/dialog';
+  import { placeVolume, type PipelineStage } from '$lib/pipeline';
 
   let projectId = $derived(Number($page.params.projectId) || 0);
 
@@ -207,7 +209,9 @@
   async function loadCollections() {
     try {
       isLoading = true;
-      const data = await collectionsApi.listAll({ project_id: projectId });
+      // The stages are reloaded with the list, so a volume created, or one
+      // that received records from a deleted volume, shows its current stage.
+      const [data] = await Promise.all([collectionsApi.listAll({ project_id: projectId }), loadStages()]);
       collections = data;
     } catch (err) {
       console.error('[ProjectDetail] Error loading collections:', err);
@@ -421,15 +425,31 @@
     }
   }
 
-  // Placeholder statuses, not read from the backend: the Status column cycles
-  // through them by row index.
-  let mockStatuses = $derived([$m.pd_status_active, $m.pd_status_active, $m.proj_status_paused, $m.pd_status_active, $m.pd_status_completed]);
+  // Each volume's status counts, by collection id, from one request for the
+  // project. A volume without an entry (the request failed) shows no stage.
+  let statusCounts = $state<Map<number, StatusCounts>>(new Map());
 
-  function getStatusStyle(status: string): string {
-    if (status === $m.pd_status_active)    return 'color: var(--color-primary); background: rgba(90,140,98,0.15)';
-    if (status === $m.proj_status_paused)    return 'color: var(--color-light-grey); background: rgba(171,183,183,0.12)';
-    if (status === $m.pd_status_completed) return 'color: var(--color-success); background: rgba(111,191,115,0.15)';
-    return '';
+  async function loadStages() {
+    try {
+      const rows = await activityApi.collections({ project_id: projectId });
+      statusCounts = new Map(rows.map(r => [r.collection_id, r.status_counts]));
+    } catch (err) {
+      console.error('[ProjectDetail] Error loading volume stages:', err);
+    }
+  }
+
+  let stageTitle = $derived<{ [K in PipelineStage]: string }>({
+    capture: $m.dash_stage_capture,
+    recapture: $m.dash_stage_recapture,
+    review: $m.dash_stage_review,
+    approved: $m.dash_stage_approved,
+  });
+
+  function getStageStyle(stage: PipelineStage): string {
+    if (stage === 'capture')   return 'color: var(--color-primary); background: rgba(90,140,98,0.15)';
+    if (stage === 'recapture') return 'color: var(--color-error); background: rgba(214,103,74,0.15)';
+    if (stage === 'review')    return 'color: var(--color-warning); background: rgba(208,154,68,0.15)';
+    return 'color: var(--color-success); background: rgba(111,191,115,0.15)';
   }
 </script>
 
@@ -520,8 +540,9 @@
           </tr>
         </thead>
         <tbody>
-          {#each filteredCollections as col, i}
-            {@const status  = mockStatuses[i % mockStatuses.length]}
+          {#each filteredCollections as col}
+            {@const counts = statusCounts.get(col.id)}
+            {@const stage  = counts ? placeVolume(counts) : null}
 
             <tr class="table-row" onclick={() => handleCollectionClick(col.id)}>
               <td>
@@ -556,7 +577,9 @@
               </td>
 
               <td>
-                <span class="status-badge" style={getStatusStyle(status)}>{status}</span>
+                {#if stage}
+                  <span class="status-badge" style={getStageStyle(stage)}>{stageTitle[stage]}</span>
+                {/if}
               </td>
 
               <td>

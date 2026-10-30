@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.2.0
 
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
@@ -83,8 +83,11 @@ async function apiRequest<T>(
   const base = getApiBase();
   const token = tokenStore.get();
 
+  // A FormData body (a file upload) goes without a Content-Type, so the
+  // browser writes the multipart one with its boundary.
+  const isMultipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: { [key: string]: string } = {
-    'Content-Type': 'application/json',
+    ...(isMultipart ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as { [key: string]: string })
   };
 
@@ -1101,6 +1104,33 @@ export const recordsApi = {
   },
 
   /**
+   * Every rejected record on the unit, across all volumes, the one whose
+   * latest rejection is oldest first, each with that rejection.
+   */
+  async toRetake(): Promise<RecordToRetake[]> {
+    return apiRequest<RecordToRetake[]>('/records/to-retake');
+  },
+
+  /**
+   * How many records are waiting to be retaken, for the sidebar badge.
+   */
+  async toRetakeCount(): Promise<number> {
+    const result = await apiRequest<{ count: number }>('/records/to-retake/count');
+    return result.count;
+  },
+
+  /**
+   * The recaptures pending on the unit, per volume, and whose turn it is
+   * (0.2.0): `recaptures` while a new volume must wait for the retakes of
+   * one volume, `new` once they are finished, `free` with nothing pending.
+   * Read through readRetakeSummary in $lib/recapture-turn, which turns an
+   * answer of another shape into null.
+   */
+  async toRetakeSummary(): Promise<RetakeSummary> {
+    return apiRequest<RetakeSummary>('/records/to-retake/summary');
+  },
+
+  /**
    * List a record's QA annotations (flagged errors + notes), newest first.
    */
   async getAnnotations(recordId: number): Promise<RecordAnnotation[]> {
@@ -1572,6 +1602,160 @@ export function browserTimeZone(): string | null {
     return null;
   }
 }
+
+// ============================================================================
+// DIGITISATION LISTS AND RETAKES
+// ============================================================================
+
+// A rejected record from GET /records/to-retake, with its latest rejection.
+// `reason` is one of PREDEFINED_REJECTION_REASONS; the four rejection
+// fields are null when the backend has no rejection row for the record.
+// `rejectedAt` is naive UTC (read it with parseApiDate).
+export interface RecordToRetake {
+  recordId:     number;
+  title:        string;
+  sequence:     number | null;
+  // The volume and its project; null when the record has none.
+  collectionId: number | null;
+  projectId:    number | null;
+  // The volume's name and stem.
+  name:         string | null;
+  filenameStem: string | null;
+  reason:       string | null;
+  comment:      string | null;
+  rejectedBy:   string | null;
+  rejectedAt:   string | null;
+}
+
+// GET /records/to-retake/summary (0.2.0). `pending` counts the volume's
+// rejected records, `total` its records with at least one rejection;
+// A record is pending when it is rejected, or captured with a current image
+// that still carries its rejection (prepared for retake); the records alone
+// do not show the second. `pendingRecordIds` lists every pending record of
+// the volume by sequence, then id, and `firstPendingRecordId` is its first.
+// Only volumes with something pending are listed, most pending first.
+export interface RetakeSummaryVolume {
+  collectionId:         number;
+  projectId:            number;
+  name:                 string;
+  filenameStem:         string | null;
+  pending:              number;
+  total:                number;
+  firstPendingRecordId: number;
+  pendingRecordIds:     number[];
+}
+
+export type RecaptureTurnState = 'free' | 'new' | 'recaptures';
+
+export interface RetakeSummary {
+  pendingRecords: number;
+  volumes:        RetakeSummaryVolume[];
+  // `unlockedBy` names the volume whose finished retakes opened a `new`
+  // turn; null otherwise.
+  turn: { state: RecaptureTurnState; unlockedBy: { collectionId: number; name: string } | null };
+}
+
+// The 409 codes of the recapture turn (0.2.0), in `detail.code`: a capture
+// that would start an empty volume during the retake turn, and the
+// promotion of a volume with rejected records (`detail.pending` is how
+// many). They are defined in $lib/recapture-turn, which reads them and
+// loads no API client, so that its tests run in plain node.
+export { RECAPTURE_TURN_CODE, RECAPTURES_PENDING_CODE } from './recapture-turn';
+
+// One item of an imported digitisation list, in list order. `action` is
+// the item's optional action field, unvalidated; `collectionId` the volume
+// on this unit whose stem is the item's, null when there is none, and
+// `status` that volume's record counts, null without a volume. `notes` is
+// the item's notes, or null when it has none.
+// `projectId` is the volume's own project. `doneMark` is set when an admin
+// or reviewer marked the item done by hand, with who and when.
+export interface QueueDoneMark {
+  by: string | null;
+  at: string | null;
+}
+
+export interface QueueItem {
+  position:      number;
+  sequence:      number | null;
+  referenceCode: string | null;
+  filenameStem:  string | null;
+  title:         string | null;
+  notes:         string | null;
+  action:        string | null;
+  collectionId:  number | null;
+  projectId:     number | null;
+  status:        StatusCounts | null;
+  doneMark:      QueueDoneMark | null;
+}
+
+// An imported list from GET /imports/digitisation-lists. `listFileMissing`
+// is true when the unit has no readable copy of the file, and `items` is
+// then empty.
+export interface QueueList {
+  listId:           string;
+  listName:         string;
+  projectId:        number | null;
+  importedAt:       string | null;
+  items:            QueueItem[];
+  listFileMissing:  boolean;
+}
+
+// An item the import did not create, with the reason code from
+// app/core/list_import.py's REASONS.
+export interface ImportReject {
+  position:               number;
+  referenceCode:          string | null;
+  referenceCodeTruncated: boolean;
+  reason:                 string;
+}
+
+// The report POST /imports/digitisation-list returns.
+export interface ImportReport {
+  listId:         string;
+  listName:       string;
+  projectId:      number;
+  projectName:    string;
+  projectCreated: boolean;
+  importedAt:     string;
+  created:        number;
+  skipped:        number;
+  volumes:        { position: number; referenceCode: string; filenameStem: string; captuaCollectionId: number }[];
+  rejects:        ImportReject[];
+  reportStored:   boolean;
+  // False when the import worked but the unit could not keep the file.
+  listStored:     boolean;
+}
+
+export const importsApi = {
+  /**
+   * Import a digitisation list file, sent unchanged as a multipart upload.
+   */
+  async importList(file: File): Promise<ImportReport> {
+    const body = new FormData();
+    body.append('file', file);
+    return apiRequest<ImportReport>('/imports/digitisation-list', { method: 'POST', body });
+  },
+
+  /**
+   * Every imported list, newest import first, with its items in list order.
+   */
+  async lists(): Promise<QueueList[]> {
+    return apiRequest<QueueList[]>('/imports/digitisation-lists');
+  },
+
+  /**
+   * Mark a list item done by hand, or take the mark off (admin or reviewer;
+   * an operator gets a 403). Returns the item's mark as the backend now
+   * holds it: null once taken off.
+   */
+  async setDone(listId: string, position: number, done: boolean): Promise<QueueDoneMark | null> {
+    const result = await apiRequest<{ doneMark: QueueDoneMark | null }>(
+      `/imports/digitisation-lists/${encodeURIComponent(listId)}/items/${position}/done`,
+      { method: 'PUT', body: JSON.stringify({ done }) }
+    );
+    return result?.doneMark ?? null;
+  },
+};
 
 // ============================================================================
 // HEALTH CHECK

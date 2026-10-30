@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.2.0
 
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
@@ -83,6 +83,17 @@ describe('captureErrorText', () => {
 		]) {
 			expect(captureErrorText(error, es)).toBe(es.lv_capture_error);
 		}
+	});
+});
+
+describe('the recapture turn refusal (0.2.0)', () => {
+	it('is read by its code, whatever the English text says', () => {
+		const refusal = new ApiError('Anything at all.', { code: 'recapture_turn', message: 'Anything at all.' }, 409);
+		expect(captureErrorText(refusal, es)).toBe(es.err_recapture_turn);
+		expect(captureErrorText(refusal, en)).toBe(en.err_recapture_turn);
+		expect(es.err_recapture_turn).toBe(
+			'No se pudo empezar el volumen: es turno de recapturas. Termina las recapturas de un volumen e intenta de nuevo.'
+		);
 	});
 });
 

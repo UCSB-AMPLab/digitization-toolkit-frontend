@@ -6,24 +6,36 @@
   //
   // Shown to operators and admins only; the backend refuses both calls to
   // anyone else (allow_contributor in collections.py).
+  //
+  // A volume with any record pending a retake cannot be handed over (0.2.0):
+  // the backend refuses the promotion with a 409 `recaptures_pending`. Its
+  // pending counts the rejected records and those prepared for retake, which
+  // the records do not show, so the page passes `pending` from the recapture
+  // summary; without it, the rejected records are counted. While anything is pending
+  // the send button is disabled, says how many retakes are left, and carries
+  // a hint underneath.
   // ============================================================================
   //
-  // Version: 0.1.0-beta
+  // Version: 0.2.0
 
   import { tick } from 'svelte';
   import { collectionsApi, type Record } from '$lib/api';
   import { m } from '$lib/i18n';
   import { handoverCounts, handoverOffer, promoteBlockers } from '$lib/handover';
+  import { recapturesPendingCount } from '$lib/recapture-turn';
 
-  let { records, collectionId, onChanged }: {
+  let { records, collectionId, pending = null, onChanged }: {
     records: Record[];
     collectionId: number;
+    // The backend's pending count for the volume, when known.
+    pending?: number | null;
     // Reloads the records; resolves false if the list could not be refreshed.
     onChanged: () => Promise<boolean>;
   } = $props();
 
   let counts = $derived(handoverCounts(records));
   let offer  = $derived(handoverOffer(counts));
+  let pendingCount = $derived(pending ?? counts.rejected);
 
   let dialog   = $state<'send' | 'take-back' | 'refused' | null>(null);
   let busy     = $state(false);
@@ -103,7 +115,15 @@
         cardEl?.focus();
       } else {
         dialog = null;
-        showNotice('error', $m.col_handover_send_error);
+        const pending = recapturesPendingCount(err);
+        if (pending !== null) {
+          // The records on screen were out of date: reload, so the button
+          // says what the backend said.
+          await onChanged();
+          showNotice('error', $m.err_recaptures_pending(pending));
+        } else {
+          showNotice('error', $m.col_handover_send_error);
+        }
       }
     } finally {
       busy = false;
@@ -154,7 +174,15 @@
     {$m.col_handover_take_back}
   </button>
 {/if}
-{#if offer.send}
+{#if pendingCount > 0}
+  <span class="handover-blocked">
+    <button class="btn btn-primary handover-btn" data-tour="entregar" disabled aria-describedby="handover-hint">
+      <span class="material-symbols-outlined" style="font-size:16px" aria-hidden="true">lock</span>
+      {$m.vol_handover_disabled(pendingCount)}
+    </button>
+    <span id="handover-hint" class="handover-hint">{$m.vol_handover_hint}</span>
+  </span>
+{:else if offer.send}
   <button class="btn btn-primary handover-btn" data-tour="entregar" disabled={busy} onclick={() => openDialog('send')}>
     {offer.send === 'new' ? $m.col_handover_send_new(counts.captured) : $m.col_handover_send}
   </button>
@@ -233,6 +261,10 @@
     font-size: var(--text-sm);
     font-weight: var(--fw-bold);
   }
+
+  /* The disabled send button with its hint underneath (0.2.0). */
+  .handover-blocked { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .handover-hint { max-width: 22rem; font-size: var(--text-xs); line-height: 1.3; color: var(--color-light-grey); text-align: right; }
 
   .handover-backdrop {
     position: fixed;

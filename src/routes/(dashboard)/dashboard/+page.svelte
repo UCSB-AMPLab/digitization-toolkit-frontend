@@ -4,14 +4,16 @@
   // camera test panel for admin and operator (`canSeeCameras`). The camera
   // panel polls still frames from `/cameras/preview/{index}`; every camera
   // status write goes through `applyCameraSides` so that a reconnect and a
-  // late preview cannot overwrite each other.
+  // late preview cannot overwrite each other. While recaptures are pending
+  // (0.2.0), `RetakeBand` puts them first, from GET /records/to-retake/summary.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.2.0
 
   import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores/auth';
   import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore, getApiBase,
-           type Collection, type Project } from '$lib/api';
+           type Collection, type Project, type RetakeSummary } from '$lib/api';
+  import { readRetakeSummary } from '$lib/recapture-turn';
   import { m } from '$lib/i18n';
   import { describeCaptureFailure, describeTestCapture, type CaptureOutcome } from '$lib/capture-outcome';
   import { sidesFromDevices, type SideInfo, type SideStatus } from '$lib/camera-sides';
@@ -19,6 +21,7 @@
   import InProgress from './InProgress.svelte';
   import ActivityCalendar from './ActivityCalendar.svelte';
   import StorageAlert from './StorageAlert.svelte';
+  import RetakeBand from './RetakeBand.svelte';
 
   let currentUser = $state<any>(null);
   let userRole    = $state('');
@@ -114,9 +117,22 @@
 
   const PREVIEW_INTERVAL_MS = 2500;
 
+  // Null until it arrives, and when it cannot be loaded: then no band.
+  let retakeSummary = $state<RetakeSummary | null>(null);
+
+  async function loadRetakeSummary() {
+    try {
+      retakeSummary = readRetakeSummary(await recordsApi.toRetakeSummary());
+    } catch (err) {
+      if (err instanceof AuthError && err.status === 401) return;
+      console.error('[Dashboard] Error loading the recapture summary:', err);
+    }
+  }
+
   onMount(async () => {
     await Promise.all([
       loadStats(),
+      loadRetakeSummary(),
       canSeeCameras ? checkCamerasStatus() : Promise.resolve(),
     ]);
   });
@@ -348,6 +364,8 @@
   </div>
 
   <StorageAlert />
+
+  <RetakeBand summary={retakeSummary} canRetake={canSeeCameras} />
 
   <div class="kpi-grid">
 

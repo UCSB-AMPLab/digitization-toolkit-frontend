@@ -3,18 +3,22 @@
 	// validates the stored session against the backend before rendering any
 	// protected content, and `NAV_ITEMS` decides both which sidebar links each
 	// role sees and which routes it may open: admin sees Overview, Projects,
-	// Users and Settings; operator and reviewer see Overview and Projects.
+	// Queue, To retake, Users and Settings; operator and reviewer see all but
+	// Users and Settings. To retake carries a badge with the number of records
+	// waiting (GET /records/to-retake/count), reloaded on every navigation so
+	// that it follows a retake; badge and label are in the recapture sand
+	// while any is waiting (0.2.0).
 	// A new section needs its route under `src/routes/(dashboard)/` and an
 	// entry in `NAV_ITEMS` listing the roles allowed to open it.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.2.0
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
 	import { tour } from '$lib/tour';
-	import { usersApi } from '$lib/api';
+	import { usersApi, recordsApi } from '$lib/api';
 	import { waitForSession, sessionRetryDelay } from '$lib/session-check';
 	import { m, roleLabel, type StringMessageKey } from '$lib/i18n';
 	import logo from '$lib/assets/captua-logo.svg';
@@ -134,6 +138,20 @@
 					badge: null as number | null
 				},
 				{
+					id: 'queue',
+					labelKey: 'nav_queue',
+					icon: 'queue',
+					path: '/dashboard/queue',
+					roles: ['admin', 'operator', 'reviewer']
+				},
+				{
+					id: 'retakes',
+					labelKey: 'nav_retakes',
+					icon: 'retake',
+					path: '/dashboard/retakes',
+					roles: ['admin', 'operator', 'reviewer']
+				},
+				{
 					id: 'users',
 					labelKey: 'nav_users',
 					icon: 'users',
@@ -156,13 +174,34 @@
 		}
 	];
 
+	// Records waiting to be retaken, for the To retake badge; null until the
+	// count arrives, and when it cannot be loaded, so no badge is shown then.
+	let retakeCount = $state<number | null>(null);
+
+	$effect(() => {
+		currentPath;
+		if (isValidatingSession || !currentUser) return;
+		let cancelled = false;
+		recordsApi
+			.toRetakeCount()
+			.then((n) => {
+				if (!cancelled) retakeCount = typeof n === 'number' ? n : null;
+			})
+			.catch(() => {
+				if (!cancelled) retakeCount = null;
+			});
+		return () => {
+			cancelled = true;
+		};
+	});
+
 	// A user without a recognized role sees no restricted item.
 	let visibleNav = $derived(
 		NAV_ITEMS.map((section) => ({
 			...section,
-			items: section.items.filter(
-				(item) => item.roles.length === 0 || item.roles.includes(currentUser?.role ?? '')
-			)
+			items: section.items
+				.filter((item) => item.roles.length === 0 || item.roles.includes(currentUser?.role ?? ''))
+				.map((item) => (item.id === 'retakes' ? { ...item, badge: retakeCount } : item))
 		})).filter((section) => section.items.length > 0)
 	);
 
@@ -270,6 +309,7 @@
 						href={item.path}
 						class="s-item"
 						class:active={isActive(item.path)}
+						class:is-retake={item.id === 'retakes' && !!item.badge}
 						title={!expanded ? $m[item.labelKey] : undefined}
 					>
 						{#if isActive(item.path)}
@@ -303,6 +343,34 @@
 									<path
 										d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
 									/>
+								</svg>
+							{:else if item.icon === 'queue'}
+								<svg
+									width="18"
+									height="18"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<line x1="10" y1="6" x2="21" y2="6" />
+									<line x1="10" y1="12" x2="21" y2="12" />
+									<line x1="10" y1="18" x2="21" y2="18" />
+									<path d="M4 6h1v4" />
+									<path d="M4 10h2" />
+									<path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+								</svg>
+							{:else if item.icon === 'retake'}
+								<svg
+									width="18"
+									height="18"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path d="M3 12a9 9 0 1 0 3-6.7" />
+									<polyline points="3 3 3 9 9 9" />
 								</svg>
 							{:else if item.icon === 'users'}
 								<svg
@@ -338,10 +406,13 @@
 						{#if expanded}
 							<span class="s-label">{$m[item.labelKey]}</span>
 							{#if item.badge}
-								<span class="s-badge">{item.badge}</span>
+								<span class="s-badge" class:s-badge-retake={item.id === 'retakes'} aria-hidden={item.id === 'retakes' ? 'true' : undefined}>{item.badge}</span>
 							{/if}
 						{:else if item.badge}
-							<span class="s-badge-dot"></span>
+							<span class="s-badge-dot" class:s-badge-retake={item.id === 'retakes'}></span>
+						{/if}
+						{#if item.id === 'retakes' && item.badge}
+							<span class="visually-hidden">{$m.nav_retakes_count(item.badge)}</span>
 						{/if}
 					</a>
 				{/each}
@@ -651,6 +722,29 @@
 		padding: 1px 6px;
 		border-radius: var(--radius-full);
 		flex-shrink: 0;
+	}
+
+	/* Recaptures waiting (0.2.0): sand, with dark text on the badge. */
+	.s-item.is-retake,
+	.s-item.is-retake .s-icon { color: var(--color-highlight); }
+	.s-item.is-retake .s-label { font-weight: var(--fw-bold); }
+	.s-badge.s-badge-retake {
+		background-color: var(--color-highlight);
+		color: var(--color-bg);
+		font-weight: var(--fw-extrabold);
+	}
+	.s-badge-dot.s-badge-retake { background-color: var(--color-highlight); }
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	.s-badge-dot {
