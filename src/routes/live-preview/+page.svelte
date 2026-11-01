@@ -248,6 +248,7 @@
     filled = null;
     anotherError = null;
     refreshFailed = false;
+    refreshing = false;
     cameraMode = record.capture_mode === 'dual' ? 'double' : 'single';
     selectedRecordId = record.id;
     inspectedRecord = record;
@@ -340,17 +341,23 @@
   let refreshFailed = $state(false);
   let refreshing = $state(false);
 
+  // Each refresh belongs to the fill it started from (`filled`): if the
+  // operator has moved on meanwhile, its result is dropped, so a slow read
+  // never marks the next placeholder's panel as stale.
   async function refreshAfterFill() {
-    refreshFailed = !(await loadRecords());
+    const from = filled;
+    const ok = await loadRecords();
+    if (filled === from) refreshFailed = !ok;
   }
 
   async function retryRefresh() {
     if (refreshing) return;
+    const from = filled;
     refreshing = true;
     try {
       await refreshAfterFill();
     } finally {
-      refreshing = false;
+      if (filled === from) refreshing = false;
     }
   }
 
@@ -414,10 +421,16 @@
       // instead of staying on /live-preview: the retake is finished, and the
       // operator sees the result right where they asked for it. A retake
       // started from a thumbnail on this page does not navigate anywhere.
+      // A navigation that fails falls back to reading the records and the
+      // summary in place: the capture itself succeeded.
       try {
         if (cameFromRecapture && projectId && collectionId) {
-          await goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
-          return;
+          try {
+            await goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
+            return;
+          } catch (error) {
+            console.error('[LivePreview] Error going back to the volume:', error);
+          }
         }
         await Promise.all([loadRecords(), loadRetakeSummary()]);
       } finally {
@@ -429,6 +442,7 @@
       filled = null;
       anotherError = null;
       refreshFailed = false;
+      refreshing = false;
     }
   }
 
@@ -841,7 +855,7 @@
             {records}
             {selectedRecordId}
             {cameraMode}
-            onSelect={(record) => { filled = null; refreshFailed = false; selectedRecordId = record.id; inspectedRecord = record; }}
+            onSelect={(record) => { filled = null; refreshFailed = false; refreshing = false; selectedRecordId = record.id; inspectedRecord = record; }}
           />
         </div>
 

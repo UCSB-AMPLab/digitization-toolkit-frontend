@@ -73,13 +73,16 @@ const served = {
 	nextId: 500,
 	// When set, the next capture that inserts (afterRecordId) waits for it.
 	hold: null as null | Promise<void>,
-	recordsNext: null as null | (() => Promise<Response>)
+	recordsNext: null as null | (() => Promise<Response>),
+	recordReads: 0,
+	summaryReads: 0
 };
 
 function serve() {
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/records/to-retake/summary')) {
+			served.summaryReads++;
 			const pending = served.records.filter((r) => r.missing_side && !r.closed_reason).map((r) => r.id);
 			return json({
 				pendingRecords: pending.length,
@@ -108,6 +111,7 @@ function serve() {
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
 		if (path.endsWith('/records')) {
+			served.recordReads++;
 			// Armed by a test: the next read of the records answers through it, once.
 			const once = served.recordsNext;
 			if (once) {
@@ -149,6 +153,8 @@ beforeEach(() => {
 	served.nextId = 500;
 	served.hold = null;
 	served.recordsNext = null;
+	served.recordReads = 0;
+	served.summaryReads = 0;
 	vi.mocked(goto).mockReset();
 	authStore.setSession('tok', { id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
 });
@@ -533,6 +539,55 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await expect.element(screen.getByRole('button', { name: es.cap_nothing_link })).toBeDisabled();
 			release(true);
 			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+		});
+	});
+
+	describe('stale refreshes and a failed navigation (round 6)', () => {
+		it('a Retry still running when the operator moves on does not touch the next placeholder', async () => {
+			served.records = [pair(41, 95), placeholder(42, 96, null), pair(43, 97), placeholder(44, 98, null), pair(45, 99)];
+			serve();
+			const screen = render(LivePreview);
+			const dialog = screen.getByRole('dialog');
+			// The reload after the fill fails: the panel offers a retry.
+			served.recordsNext = async () => json({ detail: 'boom' }, 500);
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByText(es.cap_refresh_error)).toBeVisible();
+			// The retry is held, then the operator moves on.
+			let release!: () => void;
+			const gate = new Promise<void>((r) => (release = r));
+			served.recordsNext = async () => {
+				await gate;
+				return json({ detail: 'boom' }, 500);
+			};
+			await dialog.getByRole('button', { name: es.common_retry }).click();
+			await dialog.getByRole('button', { name: es.cap_last }).click();
+			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			release();
+			await new Promise((r) => setTimeout(r, 100));
+			await expect.element(dialog.getByText(es.cap_refresh_error)).not.toBeInTheDocument();
+			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await expect.element(dialog.getByRole('group', { name: es.cap_where })).toBeVisible();
+			// And the next fill offers Capture another here, not a stuck retry.
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByRole('button', { name: es.cap_another })).toBeEnabled();
+		});
+
+		it('a rejected navigation back to the volume reloads the records and the summary in place, with no error', async () => {
+			served.records[1] = { ...placeholder(42, 96, null), closed_reason: 'foliation_skip', closed_note: null };
+			vi.mocked(goto).mockRejectedValue(new Error('navigation aborted'));
+			serve();
+			const screen = render(LivePreview);
+			const dialog = screen.getByRole('dialog');
+			await expect.element(dialog).toBeVisible();
+			const records = served.recordReads;
+			const summaries = served.summaryReads;
+			await dialog.getByRole('button', { name: 'Volver a capturar' }).click();
+			await dialog.getByRole('button', { name: 'Confirmar' }).click();
+			await vi.waitFor(() => expect(goto).toHaveBeenCalled());
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+			await vi.waitFor(() => expect(served.recordReads).toBeGreaterThan(records));
+			expect(served.summaryReads).toBeGreaterThan(summaries);
+			await expect.element(screen.getByText('navigation aborted', { exact: false })).not.toBeInTheDocument();
 		});
 	});
 });
