@@ -247,6 +247,7 @@
     // A new record in the modal: no after-panel of the one before.
     filled = null;
     anotherError = null;
+    refreshFailed = false;
     cameraMode = record.capture_mode === 'dual' ? 'double' : 'single';
     selectedRecordId = record.id;
     inspectedRecord = record;
@@ -333,10 +334,34 @@
   let anotherBusy = $state(false);
   let anotherError = $state<string | null>(null);
   let closingPlaceholder = $state(false);
+  // The records could not be read again after a fill or an insertion: the
+  // panel cannot say where the next opening goes, so "Capture another here"
+  // waits for a successful retry. The record filled last is kept.
+  let refreshFailed = $state(false);
+  let refreshing = $state(false);
+
+  async function refreshAfterFill() {
+    refreshFailed = !(await loadRecords());
+  }
+
+  async function retryRefresh() {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      await refreshAfterFill();
+    } finally {
+      refreshing = false;
+    }
+  }
 
   // Shared with LiveViewport (bound): whether camera 1 takes the left page.
   let swapped = $state(false);
   let leftCameraIndex = $derived(swapped ? 1 : 0);
+
+  // Left, right, then images without a role.
+  function sideOrder(role?: string | null): number {
+    return role === 'left' ? 0 : role === 'right' ? 1 : 2;
+  }
 
   function isOpenPlaceholder(record: ApiRecord): boolean {
     return record.missing_side === 'both' && !record.closed_reason;
@@ -382,23 +407,28 @@
         await afterGuidedRetake();
         return;
       }
-      inspectedRecord = null;
 
+      // The modal stays mounted, and so locked, until the screen has moved
+      // on: while it is open LiveViewport takes no capture (otherModalOpen).
       // Coming from "Recapture image" in Book view (NEH-209), go back there
       // instead of staying on /live-preview: the retake is finished, and the
       // operator sees the result right where they asked for it. A retake
       // started from a thumbnail on this page does not navigate anywhere.
-      if (cameFromRecapture && projectId && collectionId) {
-        goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
-        return;
+      try {
+        if (cameFromRecapture && projectId && collectionId) {
+          await goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
+          return;
+        }
+        await Promise.all([loadRecords(), loadRetakeSummary()]);
+      } finally {
+        inspectedRecord = null;
       }
-
-      await Promise.all([loadRecords(), loadRetakeSummary()]);
     } finally {
       // Released whatever happened, a failed reload included.
       leaving = false;
       filled = null;
       anotherError = null;
+      refreshFailed = false;
     }
   }
 
@@ -406,7 +436,7 @@
   // right after the record just filled, which the next one follows in turn.
   async function captureAnother() {
     const start = filled;
-    if (!start || anotherBusy || leaving) return;
+    if (!start || anotherBusy || leaving || refreshFailed || refreshing) return;
     if (volumeNeedsStem) {
       anotherError = $m.lv_needs_stem;
       return;
@@ -428,7 +458,7 @@
       // Only if the screen is still where the capture started.
       if (result.record_id != null && filled === start) {
         filled = { holeId: start.holeId, lastId: result.record_id };
-        await loadRecords();
+        await refreshAfterFill();
       }
     } catch (error) {
       console.error('[LivePreview] Error capturing another opening:', error);
@@ -650,7 +680,7 @@
       // Only if the modal still shows that placeholder.
       if (inspectedRecord?.id === record.id && filled === null) {
         filled = { holeId: record.id, lastId: record.id };
-        await loadRecords();
+        await refreshAfterFill();
       }
       return;
     }
@@ -811,7 +841,7 @@
             {records}
             {selectedRecordId}
             {cameraMode}
-            onSelect={(record) => { filled = null; selectedRecordId = record.id; inspectedRecord = record; }}
+            onSelect={(record) => { filled = null; refreshFailed = false; selectedRecordId = record.id; inspectedRecord = record; }}
           />
         </div>
 
@@ -841,7 +871,8 @@
 {#snippet neighbourSpread(record: ApiRecord)}
   <div class="ph-spread">
     <div class="ph-pages">
-      {#each record.images ?? [] as img (img.id)}
+      <!-- Left before right, then images without a role, as the grid and the strip. -->
+      {#each [...(record.images ?? [])].sort((a, b) => sideOrder(a.role) - sideOrder(b.role) || a.id - b.id) as img (img.id)}
         <img class="ph-thumb" src={recordsApi.getImageThumbnailUrl(img.id)} alt="" draggable="false" />
       {/each}
     </div>
@@ -853,6 +884,7 @@
   {#if inspectedRecord}
     {@const hole = inspectedRecord}
     <div class="ph-panel">
+      {#if !refreshFailed}
       <h2 class="ph-title">{$m.cap_title(null, afterSequence)}</h2>
 
       <div class="ph-where" role="group" aria-labelledby="ph-where-label">
@@ -869,6 +901,7 @@
           {#if neighbours.next}{@render neighbourSpread(neighbours.next)}{/if}
         </div>
       </div>
+      {/if}
 
       {#if hole.missing_note || hole.missing_expected}
         <div class="ph-note">
@@ -883,17 +916,23 @@
           <span class="ph-label" id="ph-after-label">{$m.cap_after}</span>
           <p class="ph-after-q" role="status">{$m.cap_another_q(null)}</p>
           {#if anotherError}<p class="ph-error" role="alert">{$m.lvm_retake_error(anotherError)}</p>{/if}
+          {#if refreshFailed}
+            <p class="ph-error" role="alert">{$m.cap_refresh_error}</p>
+          {/if}
           <div class="ph-actions">
-            <button class="btn btn-recapture" disabled={anotherBusy || leaving} onclick={captureAnother}>{$m.cap_another}</button>
+            {#if refreshFailed}
+              <button class="btn btn-secondary" disabled={refreshing || leaving} onclick={retryRefresh}>{$m.common_retry}</button>
+            {/if}
+            <button class="btn btn-recapture" disabled={anotherBusy || leaving || refreshFailed || refreshing} onclick={captureAnother}>{$m.cap_another}</button>
             <button class="btn btn-secondary" disabled={anotherBusy || leaving} onclick={continueAfterCapture}>{$m.cap_last}</button>
           </div>
         </section>
       {/if}
 
-      <p class="ph-order">{$m.cap_order_note(afterSequence, null)}</p>
+      {#if !refreshFailed}<p class="ph-order">{$m.cap_order_note(afterSequence, null)}</p>{/if}
 
       {#if !filled}
-        <button class="ph-nothing" disabled={retaking} onclick={() => (closingPlaceholder = true)}>{$m.cap_nothing_link}</button>
+        <button class="ph-nothing" disabled={retaking || leaving} onclick={() => (closingPlaceholder = true)}>{$m.cap_nothing_link}</button>
       {/if}
     </div>
   {/if}

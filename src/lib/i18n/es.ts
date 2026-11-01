@@ -1449,6 +1449,9 @@ export const es = {
 		img
 			? `El orden y los nombres de archivo son independientes. Este par va después del registro ${formatCount(n, 'es')}; sus archivos llevan el siguiente número de captura del volumen, ${img}.`
 			: `El orden y los nombres de archivo son independientes. Este par va después del registro ${formatCount(n, 'es')}; sus archivos llevan el siguiente número de captura del volumen.`,
+	// Not yet reviewed: the records could not be read again after a capture into a placeholder.
+	cap_refresh_error:
+		'El par de páginas quedó capturado, pero no se pudieron volver a leer los registros del volumen. Reintenta para ver dónde va el siguiente.',
 	cap_nothing_link: 'Aquí no hay ningún par de páginas que capturar',
 	close_title: 'Aquí no hay nada que capturar',
 	close_body: (f: string | null) =>

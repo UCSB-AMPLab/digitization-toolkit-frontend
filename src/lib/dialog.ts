@@ -9,7 +9,7 @@
 // before page-level handlers (the guided tour, the capture key), and it marks
 // the event handled with preventDefault.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.3
 
 export interface DismissOptions {
 	/** Called on Escape or a click on the backdrop. */
@@ -72,3 +72,58 @@ export function toBody(node: HTMLElement) {
 		}
 	};
 }
+
+// Keeps the keyboard in a modal dialog, the way HandoverControls does by
+// hand: on mount the focus moves to the first enabled control (or to the
+// node, which needs tabindex="-1"); Tab and Shift+Tab wrap inside it; on
+// destroy the focus goes back to whatever had it before, if that is still
+// on the page and enabled. Apply it to the dialog card. aria-modal tells
+// assistive technology the rest is inert, but does not stop Tab leaving.
+const FOCUSABLE =
+	'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])';
+
+export function trapFocus(node: HTMLElement) {
+	const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	// The Tab stops: of a radio group, only the checked radio (or the first
+	// when none is), as the browser does.
+	const items = () =>
+		[...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => {
+			if (!(el instanceof HTMLInputElement) || el.type !== 'radio' || !el.name) return true;
+			const group = [...node.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${CSS.escape(el.name)}"]`)];
+			const checked = group.find((r) => r.checked);
+			return checked ? el === checked : el === group[0];
+		});
+
+	(items()[0] ?? node).focus();
+
+	function onKeydown(event: KeyboardEvent) {
+		if (event.key !== 'Tab') return;
+		const list = items();
+		if (list.length === 0) {
+			event.preventDefault();
+			node.focus();
+			return;
+		}
+		const first = list[0];
+		const last = list[list.length - 1];
+		const active = document.activeElement;
+		const outside = !node.contains(active);
+		if (event.shiftKey && (active === first || active === node || outside)) {
+			event.preventDefault();
+			last.focus();
+		} else if (!event.shiftKey && (active === last || outside)) {
+			event.preventDefault();
+			first.focus();
+		}
+	}
+	// On the window, so that a focus that has escaped is brought back too.
+	window.addEventListener('keydown', onKeydown, true);
+
+	return {
+		destroy() {
+			window.removeEventListener('keydown', onKeydown, true);
+			if (returnTo?.isConnected && !(returnTo as HTMLButtonElement).disabled) returnTo.focus();
+		}
+	};
+}
+

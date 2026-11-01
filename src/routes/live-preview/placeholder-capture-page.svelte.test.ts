@@ -445,4 +445,94 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 		});
 	});
+
+	describe('Copilot review of #159', () => {
+		function holdRecords() {
+			let release!: (ok: boolean) => void;
+			const gate = new Promise<boolean>((r) => (release = r));
+			served.recordsNext = async () => ((await gate) ? json(served.records) : json({ detail: 'boom' }, 500));
+			return release;
+		}
+		async function fillFrom(screen: ReturnType<typeof render>) {
+			const dialog = screen.getByRole('dialog');
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByText(es.cap_another_q(null))).toBeVisible();
+			await expect.element(dialog.getByText(es.lvm_retaking)).not.toBeInTheDocument();
+			return dialog;
+		}
+
+		it('Close after a fill opened from the strip keeps the modal mounted and locked until the records are read', async () => {
+			current.url = BASE_URL;
+			serve();
+			const screen = render(LivePreview);
+			const hole = () => [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 96'))!;
+			await vi.waitFor(() => expect(hole()).toBeTruthy());
+			hole().click();
+			const dialog = await fillFrom(screen);
+			const release = holdRecords();
+			await dialog.getByRole('button', { name: es.common_close }).first().click();
+			await new Promise((r) => setTimeout(r, 50));
+			await expect.element(screen.getByRole('dialog')).toBeVisible();
+			for (const b of dialog.getByRole('button', { name: es.common_close }).elements()) expect((b as HTMLButtonElement).disabled).toBe(true);
+			release(true);
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		});
+
+		it('back to the volume, the modal stays until the navigation has finished', async () => {
+			served.records[1] = { ...placeholder(42, 96, null), closed_reason: 'foliation_skip', closed_note: null };
+			let arrive!: () => void;
+			vi.mocked(goto).mockImplementation(() => new Promise<void>((r) => (arrive = r)));
+			serve();
+			const screen = render(LivePreview);
+			const dialog = screen.getByRole('dialog');
+			await dialog.getByRole('button', { name: 'Volver a capturar' }).click();
+			await dialog.getByRole('button', { name: 'Confirmar' }).click();
+			await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard/projects/2/collections/9'));
+			await expect.element(screen.getByRole('dialog')).toBeVisible();
+			arrive();
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		});
+
+		it('when the records cannot be read after Capture another here, it says so, keeps the new record, and offers a retry before another', async () => {
+			serve();
+			const screen = render(LivePreview);
+			const dialog = await fillFrom(screen);
+			holdRecords()(false);
+			await dialog.getByRole('button', { name: es.cap_another }).click();
+			await expect.element(dialog.getByText(es.cap_refresh_error)).toBeVisible();
+			await expect.element(dialog.getByRole('button', { name: es.cap_another })).toBeDisabled();
+			await dialog.getByRole('button', { name: es.common_retry }).click();
+			await expect.element(dialog.getByText(es.cap_refresh_error)).not.toBeInTheDocument();
+			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await expect.element(dialog.getByRole('button', { name: es.cap_another })).toBeEnabled();
+			await dialog.getByRole('button', { name: es.cap_another }).click();
+			await vi.waitFor(() => expect(served.captures).toHaveLength(3));
+			expect(served.captures[2].body.afterRecordId).toBe(500);
+		});
+
+		it('shows a neighbour\'s pages left before right, whatever order they come in', async () => {
+			served.records[0] = { ...pair(41, 95), images: [img(411, 41, 'right'), img(410, 41, 'left')] };
+			serve();
+			const screen = render(LivePreview);
+			const where = screen.getByRole('group', { name: es.cap_where });
+			await expect.element(where).toBeVisible();
+			const srcs = [...where.element().querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+			expect(srcs[0]).toContain('/records/images/410/thumbnail');
+			expect(srcs[1]).toContain('/records/images/411/thumbnail');
+		});
+
+		it('disables the close link while the screen goes on', async () => {
+			serve();
+			const screen = render(LivePreview);
+			await screen.getByRole('dialog').getByRole('button', { name: es.cap_nothing_link }).click();
+			const close = screen.getByRole('dialog', { name: es.close_title });
+			await close.getByRole('radio', { name: es.close_reason_skip }).click();
+			const release = holdRecords();
+			await close.getByRole('button', { name: es.close_submit }).click();
+			await expect.element(screen.getByRole('dialog', { name: es.close_title })).not.toBeInTheDocument();
+			await expect.element(screen.getByRole('button', { name: es.cap_nothing_link })).toBeDisabled();
+			release(true);
+			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+		});
+	});
 });

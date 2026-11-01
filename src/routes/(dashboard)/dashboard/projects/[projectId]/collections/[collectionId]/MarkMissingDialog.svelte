@@ -10,11 +10,14 @@
   // for the operator. Empty fields are sent as null. A refusal is shown in
   // the dialog, which stays open; on success `onMarked` reloads the grid.
   //
+  // The keyboard stays in the dialog (trapFocus): the focus moves in on
+  // open, Tab wraps inside, and the focus goes back on close.
+  //
   // Version: 0.3.3
 
   import { collectionsApi, type Record as ApiRecord } from '$lib/api';
   import { m } from '$lib/i18n';
-  import { dismissible } from '$lib/dialog';
+  import { dismissible, trapFocus } from '$lib/dialog';
 
   let {
     collectionId,
@@ -77,7 +80,7 @@
 </script>
 
 <div class="mm-backdrop" use:dismissible={{ onDismiss: cancel, escape: !sending }}>
-  <div class="mm-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="mm-title">
+  <div class="mm-card dialog-fit" role="dialog" aria-modal="true" tabindex="-1" use:trapFocus aria-labelledby="mm-title">
     <div class="mm-head">
       <h2 class="mm-title" id="mm-title">{$m.mark_title}</h2>
       <p class="mm-body">{$m.mark_body(n, null)}</p>
