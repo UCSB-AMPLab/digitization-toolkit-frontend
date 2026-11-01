@@ -844,18 +844,31 @@
   .card-meta { padding: 7px 2px 2px; }
 
   /* ── Placeholders and closed records (NEH-317) ──
-     The dashed frame goes round both pages and the meta. It is an outline,
-     drawn outside the card and taking no space, so the tile keeps exactly
-     the size of any other (the NEH-211 widths). */
+     The dashed frame goes round both pages and the meta, just outside the
+     card. It is a pseudo-element, absolutely placed, so it takes no space
+     and the tile keeps exactly the size of any other (the NEH-211 widths),
+     and it leaves `outline` to the global :focus-visible ring, which then
+     shows round the frame. */
   .grid-pair.is-placeholder,
   .grid-pair.is-closed,
   .grid-card.is-closed {
-    outline: 1px dashed var(--color-warning);
-    outline-offset: 4px;
     border-radius: var(--radius-lg);
   }
-  .grid-pair.is-closed,
-  .grid-card.is-closed { outline-color: var(--color-light-grey); }
+  .grid-pair.is-placeholder::after,
+  .grid-pair.is-closed::after,
+  .grid-card.is-closed::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border: 1px dashed var(--color-warning);
+    border-radius: var(--radius-lg);
+    pointer-events: none;
+  }
+  .grid-pair.is-closed::after,
+  .grid-card.is-closed::after { border-color: var(--color-light-grey); }
+  .grid-pair.is-placeholder:focus-visible,
+  .grid-pair.is-closed:focus-visible,
+  .grid-card.is-closed:focus-visible { outline-offset: 6px; }
 
   .card-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
   .card-missing {

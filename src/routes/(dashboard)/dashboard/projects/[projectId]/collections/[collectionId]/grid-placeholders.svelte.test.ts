@@ -76,9 +76,9 @@ describe('grid: placeholders and closed records (NEH-317)', () => {
 		expect(halves).toHaveLength(2);
 		expect(halves[0].querySelector('[data-missing-side="left"]')).not.toBeNull();
 		expect(halves[1].querySelector('[data-missing-side="right"]')).not.toBeNull();
-		const style = getComputedStyle(card);
-		expect(style.outlineStyle).toBe('dashed');
-		expect(style.outlineColor).toBe(SAND);
+		const frame = getComputedStyle(card, '::after');
+		expect(frame.borderTopStyle).toBe('dashed');
+		expect(frame.borderTopColor).toBe(SAND);
 		expect(card.textContent).toContain('Folios 90v y 91r');
 		expect(card.textContent).toContain('Marcado en Fisqua: parece faltar el folio 91.');
 		// Not the record's status: a placeholder is captured only in name.
@@ -107,9 +107,9 @@ describe('grid: placeholders and closed records (NEH-317)', () => {
 		expect(card.textContent).toContain('Al 90 le sigue el 92.');
 		expect(card.textContent).not.toContain(es.pill_opening_missing);
 		expect(card.classList.contains('is-closed')).toBe(true);
-		const style = getComputedStyle(card);
-		expect(style.outlineStyle).toBe('dashed');
-		expect(style.outlineColor).toMatch(/^rgba?\(171, 183, 183/);
+		const frame = getComputedStyle(card, '::after');
+		expect(frame.borderTopStyle).toBe('dashed');
+		expect(frame.borderTopColor).toMatch(/^rgba?\(171, 183, 183/);
 	});
 
 	it('closes a record missing one page the same way, whatever its side', async () => {
@@ -273,4 +273,28 @@ describe('grid: round 3 (NEH-317)', () => {
 			}
 		}
 	});
+});
+
+describe('grid: focus on a placeholder or closed tile (round 4)', () => {
+	for (const [title, extra, colour] of [
+		['Registro 96', {}, SAND],
+		['Registro 97', { closed_reason: 'foliation_skip' }, 'rgb(171, 183, 183)']
+	] as const) {
+		it(`${title}: a keyboard focus shows the primary ring, and the dashed frame stays`, async () => {
+			const seq = title === 'Registro 96' ? 96 : 97;
+			const screen = mount([placeholder(seq, seq, extra)]);
+			const card = cardOf(screen, title);
+			await userEvent.keyboard('{Tab}');
+			for (let i = 0; i < 10 && document.activeElement !== card; i++) await userEvent.keyboard('{Tab}');
+			expect(document.activeElement).toBe(card);
+			expect(card.matches(':focus-visible')).toBe(true);
+			const style = getComputedStyle(card);
+			expect(style.outlineStyle).toBe('solid');
+			expect(style.outlineColor).toBe('rgb(90, 140, 98)');
+			expect(style.outlineWidth).toBe('2px');
+			const frame = getComputedStyle(card, '::after');
+			expect(frame.borderTopStyle).toBe('dashed');
+			expect(frame.borderTopColor).toMatch(new RegExp('^rgba?\\(' + colour.slice(4, -1)));
+		});
+	}
 });

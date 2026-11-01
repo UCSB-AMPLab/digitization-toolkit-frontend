@@ -72,7 +72,8 @@ const served = {
 	closes: [] as { id: number; body: Record<string, unknown> }[],
 	nextId: 500,
 	// When set, the next capture that inserts (afterRecordId) waits for it.
-	hold: null as null | Promise<void>
+	hold: null as null | Promise<void>,
+	recordsNext: null as null | (() => Promise<Response>)
 };
 
 function serve() {
@@ -106,7 +107,15 @@ function serve() {
 			return json({ id: 9, name: 'Tomo 17', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-not-t017', custom_attributes: null });
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
-		if (path.endsWith('/records')) return json(served.records);
+		if (path.endsWith('/records')) {
+			// Armed by a test: the next read of the records answers through it, once.
+			const once = served.recordsNext;
+			if (once) {
+				served.recordsNext = null;
+				return once();
+			}
+			return json(served.records);
+		}
 		if (path.endsWith('/cameras/capture') || path.endsWith('/cameras/capture/dual')) {
 			const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
 			served.captures.push({ path, body });
@@ -139,6 +148,7 @@ beforeEach(() => {
 	served.closes = [];
 	served.nextId = 500;
 	served.hold = null;
+	served.recordsNext = null;
 	vi.mocked(goto).mockReset();
 	authStore.setSession('tok', { id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
 });
@@ -347,5 +357,92 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		await dialog.getByRole('button', { name: 'Confirmar' }).click();
 		await vi.waitFor(() => expect(served.captures).toHaveLength(1));
 		expect(served.captures[0].path).toMatch(/\/cameras\/capture\/dual$/);
+	});
+
+	describe('leaving the after-panel (round 4)', () => {
+		async function fill(screen: ReturnType<typeof render>) {
+			const dialog = screen.getByRole('dialog');
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByText(es.cap_another_q(null))).toBeVisible();
+			// The reload after the fill has answered: the capture is no longer running.
+			await expect.element(dialog.getByText(es.lvm_retaking)).not.toBeInTheDocument();
+			return dialog;
+		}
+		function slowRecords() {
+			let release!: (ok: boolean) => void;
+			const gate = new Promise<boolean>((r) => (release = r));
+			served.recordsNext = async () => ((await gate) ? json(served.records) : json({ detail: 'boom' }, 500));
+			return release;
+		}
+		function expectLocked(screen: ReturnType<typeof render>, dialog: ReturnType<ReturnType<typeof render>['getByRole']>) {
+			const capture = [...dialog.element().querySelectorAll('button')].find((b) => b.textContent?.trim() === es.retakes_capture);
+			expect(capture).toBeUndefined();
+			for (const b of dialog.getByRole('button', { name: es.common_close }).elements()) expect((b as HTMLButtonElement).disabled).toBe(true);
+			for (const name of [es.cap_another, es.cap_last]) {
+				expect((dialog.getByRole('button', { name }).element() as HTMLButtonElement).disabled).toBe(true);
+			}
+			expect((dialog.getByRole('button', { name: 'Saltar por ahora' }).element() as HTMLButtonElement).disabled).toBe(true);
+			void screen;
+		}
+
+		it('That was the last one keeps the modal locked, with no Capture, until the guide has moved on', async () => {
+			serve();
+			const screen = render(LivePreview);
+			const dialog = await fill(screen);
+			const release = slowRecords();
+			await dialog.getByRole('button', { name: es.cap_last }).click();
+			await new Promise((r) => setTimeout(r, 50));
+			expectLocked(screen, dialog);
+			await userEvent.keyboard('{Escape}');
+			await expect.element(screen.getByRole('dialog')).toBeVisible();
+			release(true);
+			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		});
+
+		it('Close in the after-panel stays locked the same way until the guide has moved on', async () => {
+			serve();
+			const screen = render(LivePreview);
+			const dialog = await fill(screen);
+			const release = slowRecords();
+			await dialog.getByRole('button', { name: es.common_close }).first().click();
+			await new Promise((r) => setTimeout(r, 50));
+			expectLocked(screen, dialog);
+			release(true);
+			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+		});
+
+		it('a failed reload in the guide pauses it, and leaves nothing locked', async () => {
+			serve();
+			const screen = render(LivePreview);
+			const dialog = await fill(screen);
+			const release = slowRecords();
+			await dialog.getByRole('button', { name: es.cap_last }).click();
+			release(false);
+			await expect.element(screen.getByText(es.retakes_load_error)).toBeVisible();
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+			await screen.getByRole('button', { name: es.common_retry }).click();
+			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+		});
+
+		it('a failed reload outside the guide leaves the next modal free to close', async () => {
+			current.url = BASE_URL;
+			serve();
+			const screen = render(LivePreview);
+			const item = () => [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 97'))!;
+			const hole = () => [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 96'))!;
+			await vi.waitFor(() => expect(hole()).toBeTruthy());
+			hole().click();
+			const dialog = await fill(screen);
+			const release = slowRecords();
+			await dialog.getByRole('button', { name: es.common_close }).first().click();
+			release(false);
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+			item().click();
+			const next = screen.getByRole('dialog');
+			await expect.element(next).toBeVisible();
+			await next.getByRole('button', { name: es.common_close }).first().click();
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		});
 	});
 });

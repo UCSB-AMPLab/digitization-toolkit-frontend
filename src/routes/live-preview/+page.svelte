@@ -39,8 +39,10 @@
   // a record and no next capture number for a volume, so the texts that
   // would name them use their variants without (cap_title, cap_another_q,
   // cap_order_note); the record the opening goes after is named by its
-  // sequence. After the fill and after each "Capture another here" the
-  // records are read again, and the panel describes the next slot: after
+  // sequence. Going on from the after-panel keeps the modal locked, with no
+  // Capture, until the guide has moved on (`leaving`). After the fill and
+  // after each "Capture another here" the records are read again, and the
+  // panel describes the next slot: after
   // the record filled last. While the after-panel shows, Skip is disabled;
   // Close goes on as "That was the last one" does, and nothing closes the
   // modal while "Capture another here" runs. Both dual captures send the
@@ -305,13 +307,13 @@
   }
 
   function skipGuided() {
-    if (!guide || !inspectedRecord || filled || anotherBusy) return;
+    if (!guide || !inspectedRecord || filled || anotherBusy || leaving) return;
     guide.order = deferToBack(guide.order, inspectedRecord.id);
     advanceGuide();
   }
 
   function closeInspected() {
-    if (anotherBusy) return;
+    if (anotherBusy || leaving) return;
     // Out of the after-panel: on as "That was the last one" goes.
     if (filled) {
       continueAfterCapture();
@@ -364,34 +366,47 @@
     neighbours.prev?.sequence ?? Math.max(0, (inspectedRecord?.sequence ?? 1) - 1)
   );
 
+  // Set while the screen goes on from a record (continueAfterCapture): the
+  // modal stays locked, and a filled placeholder keeps its after-panel with
+  // no Capture, until the guide has opened the next record, paused or ended,
+  // or the page has left.
+  let leaving = $state(false);
+
   // After a retake, or once a placeholder is done with: the guide's next
   // record, or back where the operator came from, or the records again.
   async function continueAfterCapture() {
-    filled = null;
-    anotherError = null;
-    if (guide) {
-      await afterGuidedRetake();
-      return;
-    }
-    inspectedRecord = null;
+    if (leaving) return;
+    leaving = true;
+    try {
+      if (guide) {
+        await afterGuidedRetake();
+        return;
+      }
+      inspectedRecord = null;
 
-    // Coming from "Recapture image" in Book view (NEH-209), go back there
-    // instead of staying on /live-preview: the retake is finished, and the
-    // operator sees the result right where they asked for it. A retake
-    // started from a thumbnail on this page does not navigate anywhere.
-    if (cameFromRecapture && projectId && collectionId) {
-      goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
-      return;
-    }
+      // Coming from "Recapture image" in Book view (NEH-209), go back there
+      // instead of staying on /live-preview: the retake is finished, and the
+      // operator sees the result right where they asked for it. A retake
+      // started from a thumbnail on this page does not navigate anywhere.
+      if (cameFromRecapture && projectId && collectionId) {
+        goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
+        return;
+      }
 
-    await Promise.all([loadRecords(), loadRetakeSummary()]);
+      await Promise.all([loadRecords(), loadRetakeSummary()]);
+    } finally {
+      // Released whatever happened, a failed reload included.
+      leaving = false;
+      filled = null;
+      anotherError = null;
+    }
   }
 
   // Another opening is missing at the same place: a dual capture inserted
   // right after the record just filled, which the next one follows in turn.
   async function captureAnother() {
     const start = filled;
-    if (!start || anotherBusy) return;
+    if (!start || anotherBusy || leaving) return;
     if (volumeNeedsStem) {
       anotherError = $m.lv_needs_stem;
       return;
@@ -816,7 +831,7 @@
         <span style="width: {total > 0 ? (guideDone / total) * 100 : 0}%"></span>
       </div>
       <div class="lv-guide-row">
-        <button class="btn btn-ghost" disabled={retaking || filled !== null || anotherBusy} onclick={skipGuided}>{$m.guide_skip}</button>
+        <button class="btn btn-ghost" disabled={retaking || filled !== null || anotherBusy || leaving} onclick={skipGuided}>{$m.guide_skip}</button>
         {#if guideNextFolios}<span class="lv-guide-next">{$m.guide_next(guideNextFolios)}</span>{/if}
       </div>
     </div>
@@ -869,8 +884,8 @@
           <p class="ph-after-q" role="status">{$m.cap_another_q(null)}</p>
           {#if anotherError}<p class="ph-error" role="alert">{$m.lvm_retake_error(anotherError)}</p>{/if}
           <div class="ph-actions">
-            <button class="btn btn-recapture" disabled={anotherBusy} onclick={captureAnother}>{$m.cap_another}</button>
-            <button class="btn btn-secondary" disabled={anotherBusy} onclick={continueAfterCapture}>{$m.cap_last}</button>
+            <button class="btn btn-recapture" disabled={anotherBusy || leaving} onclick={captureAnother}>{$m.cap_another}</button>
+            <button class="btn btn-secondary" disabled={anotherBusy || leaving} onclick={continueAfterCapture}>{$m.cap_last}</button>
           </div>
         </section>
       {/if}
@@ -895,8 +910,8 @@
       guide={guide ? guideBar : undefined}
       pending={pendingIds.includes(inspectedRecord.id)}
       placeholder={placeholderPanel}
-      offerCapture={filled === null}
-      busy={anotherBusy}
+      offerCapture={filled === null && !leaving}
+      busy={anotherBusy || leaving}
     />
   {/key}
 {/if}
