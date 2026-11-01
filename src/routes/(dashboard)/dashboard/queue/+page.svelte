@@ -33,12 +33,12 @@
   // item, with a Mine / Unassigned / Everyone filter. Each queue item names
   // its assignee. Withdrawn items, and items whose volume a withdrawn entry
   // hid, are not shown, on any list. A spot recapture with retakes shows how
-  // many page pairs it asks for and lists them as Por recapturar names the
-  // records. A queue item's done mark sends its itemId; a 409 means the
+  // many page pairs it asks for and lists each by its sequence, or its record
+  // when the unit does not list it, with the page when Fisqua names one. A queue item's done mark sends its itemId; a 409 means the
   // queue moved, so the page reads it again and says so.
   // ============================================================================
   //
-  // Version: 0.3.2
+  // Version: 0.3.3
 
   import { onMount, tick } from 'svelte';
   import { goto } from '$app/navigation';
@@ -371,13 +371,13 @@
           <span class="q-pairs-count">{$m.vol_band_title(pairs.length)}</span>
           <ul class="q-pair-list">
             {#each pairs as pair, i (i)}
+              <!-- The sequence, or the record when the unit does not list it, and the
+                   page when Fisqua names one. The record title is the same on every
+                   row of a volume, so it is not repeated (NEH-312). -->
               <li class="q-pair">
-                {#if pair.title !== null}
-                  <span class="q-pair-title">{pair.title}</span>
-                  {#if pair.sequence !== null}<span class="q-pair-sequence">{$m.retakes_sequence(pair.sequence)}</span>{/if}
-                {:else}
-                  <span class="q-pair-title">{$m.queue_retake_record(pair.recordId)}</span>
-                {/if}
+                <span class="q-pair-title">{pair.sequence !== null ? $m.retakes_sequence(pair.sequence) : $m.queue_retake_record(pair.recordId)}</span>
+                {#if pair.side === 'left'}<span class="q-pair-sequence">· {$m.col_left_page}</span>
+                {:else if pair.side === 'right'}<span class="q-pair-sequence">· {$m.col_right_page}</span>{/if}
               </li>
             {/each}
           </ul>
