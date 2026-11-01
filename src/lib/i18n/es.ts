@@ -1497,7 +1497,7 @@ export const es = {
 	// Resumen band and "Volúmenes con recapturas".
 	retake_band_title: (n: number, v: number) =>
 		`${n === 1 ? 'Un par de páginas' : `${formatCount(n, 'es')} pares de páginas`} por recapturar en ${v === 1 ? 'un volumen' : `${formatCount(v, 'es')} volúmenes`}`,
-	retake_band_body: 'La lista de digitalización pide volver a capturarlos. Termina las recapturas antes de empezar volúmenes nuevos.',
+	retake_band_body: 'Se rechazaron en la revisión o no se capturaron completos. Termina las recapturas de un volumen antes de empezar uno nuevo.',
 	retake_band_most: (name: string, n: number) => `Con más pendientes: ${name} (${formatCount(n, 'es')}).`,
 	retake_band_cta: 'Empezar recapturas',
 	retake_vols_title: 'Volúmenes con recapturas',

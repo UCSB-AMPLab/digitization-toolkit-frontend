@@ -1441,7 +1441,7 @@ export const en: Messages = {
 	// Resumen band and "Volumes with retakes".
 	retake_band_title: (n: number, v: number) =>
 		`${n === 1 ? '1 page pair' : `${formatCount(n, 'en')} page pairs`} to retake in ${v === 1 ? '1 volume' : `${formatCount(v, 'en')} volumes`}`,
-	retake_band_body: 'The digitisation list asks for them to be captured again. Finish the retakes before starting new volumes.',
+	retake_band_body: "They were rejected in review or not captured in full. Finish one volume's retakes before starting a new one.",
 	retake_band_most: (name: string, n: number) => `Most pending: ${name} (${formatCount(n, 'en')}).`,
 	retake_band_cta: 'Start retakes',
 	retake_vols_title: 'Volumes with retakes',

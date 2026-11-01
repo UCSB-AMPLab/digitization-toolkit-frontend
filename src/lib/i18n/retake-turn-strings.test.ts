@@ -35,7 +35,7 @@ describe('retake turn strings, Spanish', () => {
 		expect(es.guide_done(false)).toBe('Terminaste las recapturas de este volumen.');
 		expect(es.turn_new_body('Tomo 002')).toBe('Ya se terminaron las recapturas del volumen Tomo 002. Puedes empezar un volumen nuevo.');
 		expect(es.retake_band_body).toBe(
-			'La lista de digitalización pide volver a capturarlos. Termina las recapturas antes de empezar volúmenes nuevos.'
+			'Se rechazaron en la revisión o no se capturaron completos. Termina las recapturas de un volumen antes de empezar uno nuevo.'
 		);
 	});
 });
