@@ -590,4 +590,41 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await expect.element(screen.getByText('navigation aborted', { exact: false })).not.toBeInTheDocument();
 		});
 	});
+
+	describe('only the newest read of the records is kept (round 7)', () => {
+		it('a slow retry that succeeds after the operator moved on and captured leaves the newer records', async () => {
+			served.records = [pair(41, 95), placeholder(42, 96, null), pair(43, 97), placeholder(44, 98, null), pair(45, 99)];
+			serve();
+			const screen = render(LivePreview);
+			const dialog = screen.getByRole('dialog');
+			served.recordsNext = async () => json({ detail: 'boom' }, 500);
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByText(es.cap_refresh_error)).toBeVisible();
+			// The retry is held; it will answer with the records as they are now,
+			// with the second placeholder still empty.
+			let release!: () => void;
+			const gate = new Promise<void>((r) => (release = r));
+			served.recordsNext = async () => {
+				const snapshot = JSON.parse(JSON.stringify(served.records));
+				await gate;
+				return json(snapshot);
+			};
+			await dialog.getByRole('button', { name: es.common_retry }).click();
+			await dialog.getByRole('button', { name: es.cap_last }).click();
+			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByText(es.cap_another_q(null))).toBeVisible();
+			await expect.element(dialog.getByText(es.lvm_retaking)).not.toBeInTheDocument();
+			const whereImgs = () =>
+				[...dialog.getByRole('group', { name: es.cap_where }).element().querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+			await vi.waitFor(() => expect(whereImgs().some((s) => s.includes('/records/images/440/thumbnail'))).toBe(true));
+			release();
+			await new Promise((r) => setTimeout(r, 100));
+			// The filled record keeps its images; the old snapshot was dropped.
+			expect(whereImgs().some((s) => s.includes('/records/images/440/thumbnail'))).toBe(true);
+			const strip = [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 98'));
+			expect(strip?.querySelector('img')?.getAttribute('src') ?? '').toContain('/records/images/440/thumbnail');
+		});
+	});
 });
+

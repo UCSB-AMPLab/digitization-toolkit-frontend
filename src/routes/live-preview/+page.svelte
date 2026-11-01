@@ -66,6 +66,7 @@
   import { captureInstruction, instructionForVolume, retakeUrl, type CaptureInstruction as Instruction } from '$lib/queue';
   import { deferToBack, folioHint, guideNextId, guideOrder, preferredRetakeVolume, readRetakeSummary } from '$lib/recapture-turn';
   import { defaultRecordTitle } from '$lib/record-title';
+  import { newestOnly } from '$lib/newest-only';
 
   import TopBar from './TopBar.svelte';
   import CameraControls from './CameraControls.svelte';
@@ -185,18 +186,22 @@
   let unlockShown = $derived(isEmptyVolume && turnState === 'new' && !unlockDismissed);
   let blockNext = $derived(preferredRetakeVolume(retakeSummary, queueItems));
 
-  // Resolves whether a summary of the contract's shape was read. A failed
-  // read keeps the last one for the turn's panels; the guide does not go on
-  // from it (afterGuidedRetake).
-  async function loadRetakeSummary(): Promise<boolean> {
-    try {
-      const summary = readRetakeSummary(await recordsApi.toRetakeSummary());
+  // Resolves whether a summary of the contract's shape is on screen from a
+  // read started no earlier than this call. A failed read keeps the last one
+  // for the turn's panels; the guide does not go on from it
+  // (afterGuidedRetake). Of overlapping reads only the newest is assigned
+  // (newestOnly, NEH-317), so an older answer never replaces a newer one.
+  const readSummary = newestOnly(
+    () => recordsApi.toRetakeSummary(),
+    (raw) => {
+      const summary = readRetakeSummary(raw);
       if (summary) retakeSummary = summary;
       return summary !== null;
-    } catch (e) {
-      console.error('[LivePreview] Error loading the recapture summary:', e);
-      return false;
-    }
+    },
+    (e) => console.error('[LivePreview] Error loading the recapture summary:', e)
+  );
+  async function loadRetakeSummary(): Promise<boolean> {
+    return (await readSummary()).ok;
   }
 
   // The guided retake. `order` holds the volume's records to retake, by
@@ -590,22 +595,31 @@
     }
   });
 
-  // Resolves whether the records were read.
-  async function loadRecords(): Promise<boolean> {
-    try {
-      isLoading = true;
-      const data = await recordsApi.listAll({ collection_id: collectionId });
+  // Resolves whether the records on screen come from a read started no
+  // earlier than this call. Of overlapping reads (after a capture, a retry,
+  // the guide moving on) only the newest is assigned (newestOnly, NEH-317):
+  // an older answer is discarded whoever asked for it, so a slow read never
+  // puts an older snapshot over a newer one.
+  let loadsInFlight = 0;
+  const readRecords = newestOnly(
+    () => recordsApi.listAll({ collection_id: collectionId }),
+    (data) => {
       records = data;
       recordsLoaded = true;
       if (data.length > 0 && !selectedRecordId) {
         selectedRecordId = data[0].id;
       }
       return true;
-    } catch (error) {
-      console.error('[LivePreview] Error loading records:', error);
-      return false;
+    },
+    (error) => console.error('[LivePreview] Error loading records:', error)
+  );
+  async function loadRecords(): Promise<boolean> {
+    loadsInFlight++;
+    isLoading = true;
+    try {
+      return (await readRecords()).ok;
     } finally {
-      isLoading = false;
+      isLoading = --loadsInFlight > 0;
     }
   }
 
