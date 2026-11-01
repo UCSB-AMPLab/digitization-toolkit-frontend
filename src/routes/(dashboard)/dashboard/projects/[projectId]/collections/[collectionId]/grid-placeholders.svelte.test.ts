@@ -14,6 +14,7 @@ import '../../../../../../../app.css';
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { collectionsApi, type Record as ApiRecord } from '$lib/api';
+import { userEvent } from 'vitest/browser';
 import { authStore, type UserRole } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { es } from '$lib/i18n/es';
@@ -76,8 +77,8 @@ describe('grid: placeholders and closed records (NEH-317)', () => {
 		expect(halves[0].querySelector('[data-missing-side="left"]')).not.toBeNull();
 		expect(halves[1].querySelector('[data-missing-side="right"]')).not.toBeNull();
 		const style = getComputedStyle(card);
-		expect(style.borderTopStyle).toBe('dashed');
-		expect(style.borderTopColor).toBe(SAND);
+		expect(style.outlineStyle).toBe('dashed');
+		expect(style.outlineColor).toBe(SAND);
 		expect(card.textContent).toContain('Folios 90v y 91r');
 		expect(card.textContent).toContain('Marcado en Fisqua: parece faltar el folio 91.');
 		// Not the record's status: a placeholder is captured only in name.
@@ -107,8 +108,8 @@ describe('grid: placeholders and closed records (NEH-317)', () => {
 		expect(card.textContent).not.toContain(es.pill_opening_missing);
 		expect(card.classList.contains('is-closed')).toBe(true);
 		const style = getComputedStyle(card);
-		expect(style.borderTopStyle).toBe('dashed');
-		expect(style.borderTopColor).toMatch(/^rgba?\(171, 183, 183/);
+		expect(style.outlineStyle).toBe('dashed');
+		expect(style.outlineColor).toMatch(/^rgba?\(171, 183, 183/);
 	});
 
 	it('closes a record missing one page the same way, whatever its side', async () => {
@@ -224,5 +225,52 @@ describe('grid: the hover button and the legend (NEH-317, round 2)', () => {
 		const last = cardOf(screen, 'Registro 99').getBoundingClientRect();
 		const legend = view.querySelector<HTMLElement>('.grid-legend')!.getBoundingClientRect();
 		expect(last.bottom).toBeLessThanOrEqual(legend.top);
+	});
+});
+
+describe('grid: round 3 (NEH-317)', () => {
+	it('Escape cancels the choice of a record', async () => {
+		const screen = mount([pair(1, 95), pair(2, 96)]);
+		await screen.getByRole('button', { name: es.toolbar_mark_missing }).click();
+		await expect.element(screen.getByText(es.mark_pick_hint)).toBeVisible();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(screen.getByText(es.mark_pick_hint)).not.toBeInTheDocument();
+	});
+
+	it('the dashed frame of a placeholder or a closed record does not change the tile\'s size (NEH-211)', async () => {
+		const screen = mount([pair(1, 95), placeholder(2, 96), placeholder(3, 97, { closed_reason: 'other', closed_note: 'x' })]);
+		const slider = screen.getByRole('slider', { name: 'Número de columnas' });
+		for (const value of ['2', '4', '6']) {
+			await slider.fill(value);
+			const tiles = ['Registro 95', 'Registro 96', 'Registro 97'].map((t) => cardOf(screen, t));
+			// The frame takes no space: no border, and the card's padding unchanged.
+			for (const t of tiles.slice(1)) {
+				const a = getComputedStyle(t);
+				const b = getComputedStyle(tiles[0]);
+				expect(a.borderTopWidth).toBe(b.borderTopWidth);
+				expect(a.borderLeftWidth).toBe(b.borderLeftWidth);
+				expect(a.padding).toBe(b.padding);
+			}
+			// Grid tracks in different columns may differ by a layout unit
+			// (1/64 px) of rounding, whatever is in them; nothing more.
+			const close = (x: number, y: number) => expect(Math.abs(x - y)).toBeLessThanOrEqual(1 / 32);
+			const widths = tiles.map((t) => t.getBoundingClientRect().width);
+			close(widths[1], widths[0]);
+			close(widths[2], widths[0]);
+			const halves = tiles.map((t) => {
+				const top = t.getBoundingClientRect().top;
+				return [...t.querySelectorAll<HTMLElement>('.card-image-wrapper')].map((h) => {
+					const r = h.getBoundingClientRect();
+					return { width: r.width, height: r.height, top: r.top - top };
+				});
+			});
+			for (const i of [1, 2]) {
+				for (const j of [0, 1]) {
+					close(halves[i][j].width, halves[0][j].width);
+					close(halves[i][j].height, halves[0][j].height);
+					close(halves[i][j].top, halves[0][j].top);
+				}
+			}
+		}
 	});
 });

@@ -39,7 +39,14 @@
   // a record and no next capture number for a volume, so the texts that
   // would name them use their variants without (cap_title, cap_another_q,
   // cap_order_note); the record the opening goes after is named by its
-  // sequence.
+  // sequence. After the fill and after each "Capture another here" the
+  // records are read again, and the panel describes the next slot: after
+  // the record filled last. While the after-panel shows, Skip is disabled;
+  // Close goes on as "That was the last one" does, and nothing closes the
+  // modal while "Capture another here" runs. Both dual captures send the
+  // same left_camera_index as the viewport (the `swapped` state, bound to
+  // LiveViewport), and "Capture another here" the default record title
+  // (NEH-181), as the viewport's capture does.
   //
   // Version: 0.3.3
 
@@ -56,6 +63,7 @@
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
   import { captureInstruction, instructionForVolume, retakeUrl, type CaptureInstruction as Instruction } from '$lib/queue';
   import { deferToBack, folioHint, guideNextId, guideOrder, preferredRetakeVolume, readRetakeSummary } from '$lib/recapture-turn';
+  import { defaultRecordTitle } from '$lib/record-title';
 
   import TopBar from './TopBar.svelte';
   import CameraControls from './CameraControls.svelte';
@@ -234,6 +242,9 @@
   let guidePosition = $derived(guide ? Math.min(guide.retaken + 1, guide.total) : 0);
 
   function openRecord(record: ApiRecord) {
+    // A new record in the modal: no after-panel of the one before.
+    filled = null;
+    anotherError = null;
     cameraMode = record.capture_mode === 'dual' ? 'double' : 'single';
     selectedRecordId = record.id;
     inspectedRecord = record;
@@ -294,26 +305,36 @@
   }
 
   function skipGuided() {
-    if (!guide || !inspectedRecord) return;
+    if (!guide || !inspectedRecord || filled || anotherBusy) return;
     guide.order = deferToBack(guide.order, inspectedRecord.id);
     advanceGuide();
   }
 
   function closeInspected() {
+    if (anotherBusy) return;
+    // Out of the after-panel: on as "That was the last one" goes.
+    if (filled) {
+      continueAfterCapture();
+      return;
+    }
     inspectedRecord = null;
     guide = null;
-    filled = null;
   }
 
   // ---------------------------------------------------------------------------
   // Capturing into a placeholder (NEH-317)
   // ---------------------------------------------------------------------------
-  // Set once the placeholder open in the modal is filled: the record just
-  // filled, after which "Capture another here" inserts the next one.
-  let filled = $state<{ lastId: number } | null>(null);
+  // Set once the placeholder open in the modal is filled: which placeholder,
+  // and the record filled last, after which "Capture another here" inserts
+  // the next one.
+  let filled = $state<{ holeId: number; lastId: number } | null>(null);
   let anotherBusy = $state(false);
   let anotherError = $state<string | null>(null);
   let closingPlaceholder = $state(false);
+
+  // Shared with LiveViewport (bound): whether camera 1 takes the left page.
+  let swapped = $state(false);
+  let leftCameraIndex = $derived(swapped ? 1 : 0);
 
   function isOpenPlaceholder(record: ApiRecord): boolean {
     return record.missing_side === 'both' && !record.closed_reason;
@@ -323,7 +344,14 @@
   let ordered = $derived(
     [...records].sort((a, b) => (a.sequence ?? Infinity) - (b.sequence ?? Infinity) || a.id - b.id)
   );
+  // The slot the panel describes: around the placeholder, or, once it is
+  // filled, right after the record filled last.
   let neighbours = $derived.by(() => {
+    if (filled) {
+      const last = filled.lastId;
+      const i = ordered.findIndex(r => r.id === last);
+      return { prev: i >= 0 ? ordered[i] : null, next: i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null };
+    }
     const cur = inspectedRecord;
     const i = cur ? ordered.findIndex(r => r.id === cur.id) : -1;
     return {
@@ -356,13 +384,14 @@
       return;
     }
 
-    await loadRecords();
+    await Promise.all([loadRecords(), loadRetakeSummary()]);
   }
 
   // Another opening is missing at the same place: a dual capture inserted
   // right after the record just filled, which the next one follows in turn.
   async function captureAnother() {
-    if (!filled || anotherBusy) return;
+    const start = filled;
+    if (!start || anotherBusy) return;
     if (volumeNeedsStem) {
       anotherError = $m.lv_needs_stem;
       return;
@@ -370,15 +399,22 @@
     anotherBusy = true;
     anotherError = null;
     try {
+      // The same fields as LiveViewport's capture, inserted after the record filled last.
       const result = await camerasApi.captureDual({
         project_name: projectName,
         collection_id: collectionId ?? undefined,
-        afterRecordId: filled.lastId,
+        record_title: defaultRecordTitle(),
+        afterRecordId: start.lastId,
+        left_camera_index: leftCameraIndex,
         rotate_deg_cam0: rotateDeg[0] ?? 0,
         rotate_deg_cam1: rotateDeg[1] ?? 0,
       });
       if (!result.success) throw new CaptureFailed(result.error);
-      if (result.record_id != null) filled = { lastId: result.record_id };
+      // Only if the screen is still where the capture started.
+      if (result.record_id != null && filled === start) {
+        filled = { holeId: start.holeId, lastId: result.record_id };
+        await loadRecords();
+      }
     } catch (error) {
       console.error('[LivePreview] Error capturing another opening:', error);
       anotherError = captureErrorText(error, $m);
@@ -566,13 +602,16 @@
 
   async function retake(record: ApiRecord) {
     let result;
-    // A placeholder is a whole opening: only a dual capture fills it.
+    // A placeholder is a whole opening, closed or not: only a dual capture
+    // fills it. An open one gets the after-panel.
     const hole = isOpenPlaceholder(record);
-    if (cameraMode === 'double' || hole) {
+    if (cameraMode === 'double' || record.missing_side === 'both') {
       result = await camerasApi.captureDual({
         project_name: projectName,
         collection_id: collectionId ?? undefined,
         record_id: record.id,
+        // The roles of the new images: the same camera on the left as in the viewport.
+        left_camera_index: leftCameraIndex,
         rotate_deg_cam0: rotateDeg[0] ?? 0,
         rotate_deg_cam1: rotateDeg[1] ?? 0,
       });
@@ -593,7 +632,11 @@
     // A placeholder filled: the modal stays, and asks whether another
     // opening is missing there (NEH-317).
     if (hole) {
-      filled = { lastId: record.id };
+      // Only if the modal still shows that placeholder.
+      if (inspectedRecord?.id === record.id && filled === null) {
+        filled = { holeId: record.id, lastId: record.id };
+        await loadRecords();
+      }
       return;
     }
 
@@ -745,6 +788,7 @@
           needsStem={volumeNeedsStem}
           {stemFormHref}
           onStemRefused={recheckStem}
+          bind:swapped
         />
 
         <div class="thumbnail-area">
@@ -752,7 +796,7 @@
             {records}
             {selectedRecordId}
             {cameraMode}
-            onSelect={(record) => { selectedRecordId = record.id; inspectedRecord = record; }}
+            onSelect={(record) => { filled = null; selectedRecordId = record.id; inspectedRecord = record; }}
           />
         </div>
 
@@ -772,7 +816,7 @@
         <span style="width: {total > 0 ? (guideDone / total) * 100 : 0}%"></span>
       </div>
       <div class="lv-guide-row">
-        <button class="btn btn-ghost" disabled={retaking} onclick={skipGuided}>{$m.guide_skip}</button>
+        <button class="btn btn-ghost" disabled={retaking || filled !== null || anotherBusy} onclick={skipGuided}>{$m.guide_skip}</button>
         {#if guideNextFolios}<span class="lv-guide-next">{$m.guide_next(guideNextFolios)}</span>{/if}
       </div>
     </div>
@@ -805,7 +849,7 @@
               <div class="ph-empty"><MissingPage side="left" /></div>
               <div class="ph-empty"><MissingPage side="right" /></div>
             </div>
-            {#if hole.sequence != null}<span class="ph-caption">{$m.retakes_sequence(hole.sequence)}</span>{/if}
+            {#if !filled && hole.sequence != null}<span class="ph-caption">{$m.retakes_sequence(hole.sequence)}</span>{/if}
           </div>
           {#if neighbours.next}{@render neighbourSpread(neighbours.next)}{/if}
         </div>
@@ -852,6 +896,7 @@
       pending={pendingIds.includes(inspectedRecord.id)}
       placeholder={placeholderPanel}
       offerCapture={filled === null}
+      busy={anotherBusy}
     />
   {/key}
 {/if}

@@ -26,7 +26,9 @@
   // hold and the note; a record missing one page shows its pill and which
   // page. Both offer "Capture", the same path as Volver a capturar, and a
   // button that opens the close dialog (CloseMissingDialog); a closed record
-  // is taken off the list. Rejected rows are as before.
+  // is taken off the list. Rejected rows are as before; one that also
+  // misses a page or the opening shows that under its rejection, with no
+  // close button, since its rejection stands and it must be retaken.
   // ============================================================================
   //
   // Version: 0.3.3
@@ -199,6 +201,21 @@
               <time class="rt-when" datetime={parseApiDate(row.rejectedAt).toISOString()}>
                 {row.rejectedBy ? $m.retakes_rejected_by(row.rejectedBy, when) : $m.retakes_rejected_on(when)}
               </time>
+            {/if}
+
+            <!-- Rejected or prepared, and missing a page or the opening too
+                 (NEH-317): the rejection stands, so the record is retaken
+                 and there is no way to close it from here. -->
+            {#if !missing && row.missingSide}
+              <div class="rt-reason">
+                <span class="status-badge rt-pill-missing">{row.missingSide === 'both' ? $m.pill_opening_missing : $m.pill_page_missing}</span>
+                {#if row.missingSide === 'left' || row.missingSide === 'right'}
+                  <span class="rt-gloss">{$m.retakes_page_missing_row(row.missingSide)}</span>
+                {:else if row.missingExpected}
+                  <span class="rt-gloss">{row.missingExpected}</span>
+                {/if}
+                {#if row.missingNote}<p class="rt-comment rt-note-missing"><span class="visually-hidden">{$m.retakes_comment_label}:</span> {row.missingNote}</p>{/if}
+              </div>
             {/if}
           </div>
 

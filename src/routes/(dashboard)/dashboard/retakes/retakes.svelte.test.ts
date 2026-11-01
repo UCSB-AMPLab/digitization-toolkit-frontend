@@ -427,6 +427,33 @@ describe('Por recapturar', () => {
 			expect(a.fontSize).toBe(b.fontSize);
 		});
 
+		it('a rejected record that also misses a page shows the pill and the page under the rejection, with Retake and no close button', async () => {
+			const row: RecordToRetake = { ...toRetake[0], recordId: 62, missingSide: 'left' };
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([row]);
+			const screen = render(Retakes);
+			const li = screen.getByRole('listitem').first();
+			await expect.element(li.getByText('Imagen movida')).toBeVisible();
+			await expect.element(li.getByText(es.pill_page_missing)).toBeVisible();
+			await expect.element(li.getByText(es.retakes_page_missing_row('left'))).toBeVisible();
+			await expect.element(li.getByRole('button', { name: 'Volver a capturar' })).toBeVisible();
+			await expect.element(li.getByRole('button', { name: es.retakes_no_page })).not.toBeInTheDocument();
+			await expect.element(li.getByRole('button', { name: es.retakes_capture, exact: true })).not.toBeInTheDocument();
+		});
+
+		it('a prepared record that is also a placeholder shows the opening pill, with Retake and no close button', async () => {
+			const row: RecordToRetake = {
+				...toRetake[0], recordId: 63, pendingReason: 'prepared', missingSide: 'both',
+				missingExpected: 'Folios 3v y 4r', missingNote: null, requestId: null
+			};
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([row]);
+			const screen = render(Retakes);
+			const li = screen.getByRole('listitem').first();
+			await expect.element(li.getByText(es.pill_opening_missing)).toBeVisible();
+			await expect.element(li.getByText('Folios 3v y 4r')).toBeVisible();
+			await expect.element(li.getByRole('button', { name: 'Volver a capturar' })).toBeVisible();
+			await expect.element(li.getByRole('button', { name: es.retakes_no_opening })).not.toBeInTheDocument();
+		});
+
 		it('rejected rows keep their Retake button and no close button', async () => {
 			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([toRetake[0]]);
 			const screen = render(Retakes);

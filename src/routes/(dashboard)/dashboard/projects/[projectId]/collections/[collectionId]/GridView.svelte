@@ -111,6 +111,14 @@
     onRecordClick(record);
   }
 
+  // Escape gives up the choice of a record.
+  function handlePickKeydown(e: KeyboardEvent) {
+    if (picking && e.key === 'Escape' && !e.defaultPrevented) {
+      e.preventDefault();
+      picking = false;
+    }
+  }
+
   function openMarkAfter(record: Record) {
     picking = false;
     markAfter = { record, n: sequenceOf(record) };
@@ -260,6 +268,8 @@
     renumberError = null;
   }
 </script>
+
+<svelte:window onkeydown={handlePickKeydown} />
 
 <div class="grid-view">
 
@@ -834,17 +844,18 @@
   .card-meta { padding: 7px 2px 2px; }
 
   /* ── Placeholders and closed records (NEH-317) ──
-     The border sits on the card, around both pages and the meta. */
+     The dashed frame goes round both pages and the meta. It is an outline,
+     drawn outside the card and taking no space, so the tile keeps exactly
+     the size of any other (the NEH-211 widths). */
   .grid-pair.is-placeholder,
   .grid-pair.is-closed,
   .grid-card.is-closed {
-    border: 1px dashed var(--color-warning);
+    outline: 1px dashed var(--color-warning);
+    outline-offset: 4px;
     border-radius: var(--radius-lg);
-    padding-top: 6px;
-    padding-bottom: 6px;
   }
   .grid-pair.is-closed,
-  .grid-card.is-closed { border-color: var(--color-light-grey); }
+  .grid-card.is-closed { outline-color: var(--color-light-grey); }
 
   .card-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
   .card-missing {

@@ -1199,10 +1199,6 @@ export const recordsApi = {
   },
 
   /**
-   * Every rejected record on the unit, across all volumes, the one whose
-   * latest rejection is oldest first, each with that rejection.
-   */
-  /**
    * Close a missing record (a page or a whole opening never captured)
    * without capturing it (NEH-316). Returns the record, closed.
    */
@@ -1213,6 +1209,10 @@ export const recordsApi = {
     });
   },
 
+  /**
+   * Every rejected record on the unit, across all volumes, the one whose
+   * latest rejection is oldest first, each with that rejection.
+   */
   async toRetake(): Promise<RecordToRetake[]> {
     return apiRequest<RecordToRetake[]>('/records/to-retake');
   },

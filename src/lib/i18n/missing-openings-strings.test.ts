@@ -126,16 +126,12 @@ describe('placeholder openings, without a folio or a capture number (new, not ye
 describe('the close dialog for a missing page (new, not yet reviewed)', () => {
 	it('Spanish', () => {
 		expect(es.close_page_title).toBe('Aquí no hay ninguna página que capturar');
-		expect(es.close_page_body).toBe(
-			'Al cerrarla, la página que falta queda en el volumen con tu motivo, para que quienes revisan sepan qué comprobaste.'
-		);
 		expect(es.close_page_reason_elsewhere).toBe('Esta página ya está capturada en otra parte del volumen');
 		expect(es.close_page_submit).toBe('Cerrar la página');
 		expect(es.close_page_after_note).toBe(
 			'Una página cerrada ya no cuenta como recaptura, así que no impide enviar el volumen a revisión. Cuando envíes el volumen, esa página va con él a Fisqua, junto con el motivo.'
 		);
 		expect(es.close_page_err_already_closed).toBe('Esta página ya estaba cerrada.');
-		expect(es.close_page_err_failed).toBe('No se pudo cerrar la página. Inténtalo de nuevo.');
 	});
 
 	it('English', () => {
@@ -150,5 +146,20 @@ describe('the close dialog for a missing page (new, not yet reviewed)', () => {
 		);
 		expect(en.close_page_err_already_closed).toBe('This page was already closed.');
 		expect(en.close_page_err_failed).toBe('The page could not be closed. Try again.');
+	});
+});
+
+describe('reviewed changes to the new strings (round 3)', () => {
+	it('Spanish', () => {
+		expect(es.legend_never).toBe('Sin capturar: nunca se capturó una página o el par de páginas completo');
+		expect(es.legend_closed).toBe('Cerrado: tiene un motivo anotado y ya no hay que recapturarlo');
+		expect(es.mark_pick_hint).toBe('Elige el registro que va justo antes del par de páginas que falta.');
+		expect(es.mark_error).toBe('No se pudo marcar el par de páginas que falta. Intenta de nuevo.');
+		expect(es.close_err_failed).toBe('No se pudo cerrar el par de páginas. Intenta de nuevo.');
+		expect(es.close_page_err_failed).toBe('No se pudo cerrar la página. Intenta de nuevo.');
+		expect(es.close_note_required).toBe('Si eliges "Otra cosa", escribe los detalles.');
+		expect(es.close_page_body).toBe(
+			'Al cerrarla, la página que falta queda registrada en el volumen con tu motivo, para que quienes revisan sepan qué comprobaste.'
+		);
 	});
 });

@@ -25,6 +25,10 @@
   // has no image to show or replace: the page passes `placeholder`, drawn in
   // place of the images and told whether the capture is running, and the
   // footer offers "Capture" with no confirmation, while `offerCapture` holds.
+  // `busy` is the page's own capture in that panel ("Capture another here"):
+  // like a running retake, it keeps the modal from closing. A closed
+  // placeholder has no panel: its two empty pages, the Closed pill, and the
+  // usual retake with its confirmation.
   //
   // Version: 0.3.3
 
@@ -37,6 +41,7 @@
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
   import MissingPage from '$lib/components/MissingPage.svelte';
+  import MissingPill from '$lib/components/MissingPill.svelte';
   import { dismissible } from '$lib/dialog';
   import {
     fittedSize,
@@ -61,6 +66,7 @@
     pending = false,
     placeholder,
     offerCapture = true,
+    busy = false,
   }: {
     record: ApiRecord;
     cameraMode: 'single' | 'double';
@@ -73,6 +79,8 @@
     placeholder?: Snippet<[boolean]>;
     // False once the placeholder is filled: no second capture into it.
     offerCapture?: boolean;
+    // A capture the page runs from the placeholder panel.
+    busy?: boolean;
   } = $props();
 
   let isPlaceholder = $derived(!!placeholder && record.missing_side === 'both' && !record.closed_reason);
@@ -136,8 +144,11 @@
     }
   }
 
+  // Nothing closes the modal while a capture runs.
+  let locked = $derived(retaking || busy);
+
   function handleClose() {
-    if (retaking) return;
+    if (locked) return;
     onClose();
   }
 
@@ -276,7 +287,8 @@
       <span class="img-viewer-title" id="lv-img-viewer-title">
         {record.title || $m.record_fallback_title(record.id)}
       </span>
-      <button class="img-viewer-close-btn" onclick={handleClose} disabled={retaking} aria-label={$m.common_close}>
+      {#if record.closed_reason}<MissingPill {record} />{/if}
+      <button class="img-viewer-close-btn" onclick={handleClose} disabled={locked} aria-label={$m.common_close}>
         <span class="material-symbols-outlined icon-md">close</span>
       </button>
     </div>
@@ -324,7 +336,7 @@
       {@render placeholder(retaking)}
     {:else}
     <div class="img-viewer-images">
-      {#if missingSide === 'left'}
+      {#if missingSide === 'left' || missingSide === 'both'}
         <div class="img-viewer-frame" data-missing-side="left"><MissingPage side="left" /></div>
       {/if}
       {#each images as img, i (img.id)}
@@ -396,11 +408,11 @@
           {/if}
         </div>
       {/each}
-      {#if missingSide === 'right'}
+      {#if missingSide === 'right' || missingSide === 'both'}
         <div class="img-viewer-frame" data-missing-side="right"><MissingPage side="right" /></div>
       {/if}
 
-      {#if images.length === 0}
+      {#if images.length === 0 && missingSide !== 'both'}
         <div class="img-viewer-frame">
           <span style="--c: var(--color-light-grey)" class="material-symbols-outlined icon-lg">image_not_supported</span>
         </div>
@@ -415,7 +427,7 @@
           {$m.lvm_retaking}
         </span>
       {:else if isPlaceholder}
-        <button class="btn btn-secondary" onclick={handleClose}>
+        <button class="btn btn-secondary" onclick={handleClose} disabled={busy}>
           <span class="material-symbols-outlined icon-sm">close</span>
           {$m.common_close}
         </button>

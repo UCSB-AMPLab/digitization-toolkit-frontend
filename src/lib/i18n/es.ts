@@ -1413,12 +1413,12 @@ export const es = {
 	// Not yet reviewed: the legend under the grid.
 	legend_title: 'Leyenda',
 	legend_rejected: 'Rechazado en la revisión: tiene imágenes y hay que capturarlo de nuevo',
-	legend_never: 'Nunca se capturó: una página o un par de páginas completo',
-	legend_closed: 'Cerrado con un motivo: ya no hay que recapturarlo',
+	legend_never: 'Sin capturar: nunca se capturó una página o el par de páginas completo',
+	legend_closed: 'Cerrado: tiene un motivo anotado y ya no hay que recapturarlo',
 	toolbar_mark_missing: 'Marcar un par de páginas que falta',
 	hover_missing_here: 'Aquí falta un par de páginas',
 	// Not yet reviewed.
-	mark_pick_hint: 'Elige el registro después del cual falta el par de páginas.',
+	mark_pick_hint: 'Elige el registro que va justo antes del par de páginas que falta.',
 	mark_title: 'Marcar un par de páginas que falta',
 	mark_body: (n: number, f: string | null) =>
 		f
@@ -1435,7 +1435,7 @@ export const es = {
 	mark_cancel: 'Cancelar',
 	mark_submit: 'Marcar como faltante',
 	// Not yet reviewed.
-	mark_error: 'No se pudo marcar el par de páginas que falta. Inténtalo de nuevo.',
+	mark_error: 'No se pudo marcar el par de páginas que falta. Intenta de nuevo.',
 	cap_title: (f: string | null, n: number) =>
 		f ? `Falta un par de páginas después del folio ${f}` : `Falta un par de páginas después del registro ${formatCount(n, 'es')}`,
 	cap_where: 'Dónde va',
@@ -1466,20 +1466,20 @@ export const es = {
 	close_after_note:
 		'Un par de páginas cerrado ya no cuenta como recaptura, así que no impide enviar el volumen a revisión. Cuando envíes el volumen, ese par va con él a Fisqua, junto con el motivo.',
 	// Not yet reviewed: the note "other" needs, and the refusals of POST /records/{id}/close-missing.
-	close_note_required: 'Para "Otra cosa", escribe los detalles.',
+	close_note_required: 'Si eliges "Otra cosa", escribe los detalles.',
 	close_err_not_missing: 'A este registro no le falta nada, así que no hay nada que cerrar.',
 	close_err_already_closed: 'Este par de páginas ya estaba cerrado.',
-	close_err_failed: 'No se pudo cerrar el par de páginas. Inténtalo de nuevo.',
+	close_err_failed: 'No se pudo cerrar el par de páginas. Intenta de nuevo.',
 	// Not yet reviewed: the close dialog for a record missing one page.
 	close_page_title: 'Aquí no hay ninguna página que capturar',
 	close_page_body:
-		'Al cerrarla, la página que falta queda en el volumen con tu motivo, para que quienes revisan sepan qué comprobaste.',
+		'Al cerrarla, la página que falta queda registrada en el volumen con tu motivo, para que quienes revisan sepan qué comprobaste.',
 	close_page_reason_elsewhere: 'Esta página ya está capturada en otra parte del volumen',
 	close_page_submit: 'Cerrar la página',
 	close_page_after_note:
 		'Una página cerrada ya no cuenta como recaptura, así que no impide enviar el volumen a revisión. Cuando envíes el volumen, esa página va con él a Fisqua, junto con el motivo.',
 	close_page_err_already_closed: 'Esta página ya estaba cerrada.',
-	close_page_err_failed: 'No se pudo cerrar la página. Inténtalo de nuevo.',
+	close_page_err_failed: 'No se pudo cerrar la página. Intenta de nuevo.',
 	retakes_no_opening: 'Aquí no hay ningún par de páginas',
 	retakes_no_page: 'Aquí no hay ninguna página',
 	retakes_capture: 'Capturar',
