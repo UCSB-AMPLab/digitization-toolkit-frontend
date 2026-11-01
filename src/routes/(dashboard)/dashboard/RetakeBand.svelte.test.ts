@@ -36,7 +36,7 @@ describe('RetakeBand', () => {
 		const screen = render(RetakeBand, { summary, canRetake: true });
 		const band = screen.getByRole('region', { name: '33 pares de páginas por recapturar en 2 volúmenes' });
 		await expect.element(band).toBeVisible();
-		await expect.element(band.getByText('La lista de digitalización pide volver a capturarlos.', { exact: false })).toBeVisible();
+		await expect.element(band.getByText('Se rechazaron en la revisión o no se capturaron completos.', { exact: false })).toBeVisible();
 		await expect.element(band.getByText('Con más pendientes: Tomo 066 (31).')).toBeVisible();
 		await expect
 			.element(band.getByRole('link', { name: 'Empezar recapturas' }))
