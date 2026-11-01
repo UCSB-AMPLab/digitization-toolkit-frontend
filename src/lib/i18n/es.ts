@@ -13,7 +13,7 @@
 //   - Text that is the same in every language (brand names, acronyms, units)
 //     is not catalogued: it stays in the component.
 //
-// Version: 0.3.2
+// Version: 0.3.3
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';
@@ -1387,7 +1387,7 @@ export const es = {
 
 	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────
 	retakes_title: 'Por recapturar',
-	retakes_subtitle: 'Los registros que se rechazaron en la revisión, empezando por el rechazo más antiguo.',
+	retakes_subtitle: 'Los pares de páginas que hay que capturar de nuevo o por primera vez, en el orden de cada volumen.',
 	retakes_empty: 'No hay registros por recapturar.',
 	retakes_load_error: 'No se pudo cargar la lista de registros por recapturar.',
 	retakes_retake: 'Volver a capturar',
@@ -1403,6 +1403,90 @@ export const es = {
 	// ── An opening with a page never photographed (0.3.2) ───────────────────
 	missing_page: 'Esta página no se capturó',
 	missing_page_reason: 'Falta una página: vuelve a capturar el par completo',
+	// ── Openings and pages never captured: placeholders (NEH-317) ───────────
+	// A function that takes a folio `f` or a capture number `img` uses the
+	// approved text when it is given; while the app has neither (null), the
+	// variant without it, which is new and not yet reviewed.
+	pill_opening_missing: 'Par de páginas sin capturar',
+	pill_page_missing: 'Página sin capturar',
+	pill_closed: 'Cerrado',
+	// Not yet reviewed: the legend under the grid.
+	legend_title: 'Leyenda',
+	legend_rejected: 'Rechazado en la revisión: tiene imágenes y hay que capturarlo de nuevo',
+	legend_never: 'Nunca se capturó: una página o un par de páginas completo',
+	legend_closed: 'Cerrado con un motivo: ya no hay que recapturarlo',
+	toolbar_mark_missing: 'Marcar un par de páginas que falta',
+	hover_missing_here: 'Aquí falta un par de páginas',
+	// Not yet reviewed.
+	mark_pick_hint: 'Elige el registro después del cual falta el par de páginas.',
+	mark_title: 'Marcar un par de páginas que falta',
+	mark_body: (n: number, f: string | null) =>
+		f
+			? `El par que falta va después del registro ${formatCount(n, 'es')}, que termina en el folio ${f}. Captua pone ahí un par de páginas vacío y lo agrega a la lista Por recapturar.`
+			: `El par que falta va después del registro ${formatCount(n, 'es')}. Captua pone ahí un par de páginas vacío y lo agrega a la lista Por recapturar.`,
+	mark_count_legend: '¿Cuántos pares de páginas faltan?',
+	mark_count_unknown: 'No se sabe: quien capture lo verá con el volumen abierto',
+	mark_count_one: 'Uno',
+	mark_count_more: 'Más de uno',
+	// Not yet reviewed.
+	mark_count_number_aria: 'Número de pares de páginas',
+	mark_expected: 'Qué debería haber (opcional)',
+	mark_note: 'Nota para quien captura',
+	mark_cancel: 'Cancelar',
+	mark_submit: 'Marcar como faltante',
+	// Not yet reviewed.
+	mark_error: 'No se pudo marcar el par de páginas que falta. Inténtalo de nuevo.',
+	cap_title: (f: string | null, n: number) =>
+		f ? `Falta un par de páginas después del folio ${f}` : `Falta un par de páginas después del registro ${formatCount(n, 'es')}`,
+	cap_where: 'Dónde va',
+	cap_from_review: 'Marcado en la revisión de Fisqua',
+	cap_after: 'Después de capturar',
+	cap_another_q: (f: string | null) =>
+		f ? `Quedó capturado. ¿Falta otro par de páginas antes del folio ${f}?` : 'Quedó capturado. ¿Falta otro par de páginas aquí?',
+	cap_another: 'Capturar otro aquí',
+	cap_last: 'Ese era el último',
+	cap_order_note: (n: number, img: string | null) =>
+		img
+			? `El orden y los nombres de archivo son independientes. Este par va después del registro ${formatCount(n, 'es')}; sus archivos llevan el siguiente número de captura del volumen, ${img}.`
+			: `El orden y los nombres de archivo son independientes. Este par va después del registro ${formatCount(n, 'es')}; sus archivos llevan el siguiente número de captura del volumen.`,
+	cap_nothing_link: 'Aquí no hay ningún par de páginas que capturar',
+	close_title: 'Aquí no hay nada que capturar',
+	close_body: (f: string | null) =>
+		f
+			? `Al cerrarlo, el par de páginas vacío que va después del folio ${f} queda en el volumen con tu motivo, para que quienes revisan sepan qué comprobaste.`
+			: 'Al cerrarlo, el par de páginas vacío queda en el volumen con tu motivo, para que quienes revisan sepan qué comprobaste.',
+	close_legend: '¿Qué encontraste?',
+	close_reason_skip: 'La foliación salta un número; no falta ninguna hoja',
+	close_reason_leaf_missing: 'Al volumen le falta esa hoja',
+	close_reason_elsewhere: 'Estas páginas ya están capturadas en otra parte del volumen',
+	close_reason_other: 'Otra cosa',
+	close_details: 'Detalles',
+	close_back: 'Volver a la captura',
+	close_submit: 'Cerrar el par de páginas',
+	close_after_note:
+		'Un par de páginas cerrado ya no cuenta como recaptura, así que no impide enviar el volumen a revisión. Cuando envíes el volumen, ese par va con él a Fisqua, junto con el motivo.',
+	// Not yet reviewed: the note "other" needs, and the refusals of POST /records/{id}/close-missing.
+	close_note_required: 'Para "Otra cosa", escribe los detalles.',
+	close_err_not_missing: 'A este registro no le falta nada, así que no hay nada que cerrar.',
+	close_err_already_closed: 'Este par de páginas ya estaba cerrado.',
+	close_err_failed: 'No se pudo cerrar el par de páginas. Inténtalo de nuevo.',
+	// Not yet reviewed: the close dialog for a record missing one page.
+	close_page_title: 'Aquí no hay ninguna página que capturar',
+	close_page_body:
+		'Al cerrarla, la página que falta queda en el volumen con tu motivo, para que quienes revisan sepan qué comprobaste.',
+	close_page_reason_elsewhere: 'Esta página ya está capturada en otra parte del volumen',
+	close_page_submit: 'Cerrar la página',
+	close_page_after_note:
+		'Una página cerrada ya no cuenta como recaptura, así que no impide enviar el volumen a revisión. Cuando envíes el volumen, esa página va con él a Fisqua, junto con el motivo.',
+	close_page_err_already_closed: 'Esta página ya estaba cerrada.',
+	close_page_err_failed: 'No se pudo cerrar la página. Inténtalo de nuevo.',
+	retakes_no_opening: 'Aquí no hay ningún par de páginas',
+	retakes_no_page: 'Aquí no hay ninguna página',
+	retakes_capture: 'Capturar',
+	retakes_page_missing_row: (side: 'left' | 'right') =>
+		`Nunca se fotografió la página ${side === 'left' ? 'izquierda' : 'derecha'}. Vuelve a capturar el par completo con las dos cámaras: la captura nueva reemplaza la anterior.`,
+	// Not yet reviewed: a volume's count under its heading in Por recapturar.
+	retakes_volume_pending: (n: number) => (n === 1 ? '1 pendiente' : `${formatCount(n, 'es')} pendientes`),
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
 	lv_instruction_label: 'Instrucción de la lista',
 	lv_instruction_show_all: 'Mostrar todo',

@@ -21,7 +21,12 @@
   // A dual record that misses a side (0.3.2) shows that page as an empty
   // frame that says so (MissingPage), on its side, in both views.
   //
-  // Version: 0.3.2
+  // A placeholder for a whole opening (NEH-317, missing_side 'both', open)
+  // has no image to show or replace: the page passes `placeholder`, drawn in
+  // place of the images and told whether the capture is running, and the
+  // footer offers "Capture" with no confirmation, while `offerCapture` holds.
+  //
+  // Version: 0.3.3
 
   import type { Snippet } from 'svelte';
   import { recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';
@@ -54,6 +59,8 @@
     onRetake,
     guide,
     pending = false,
+    placeholder,
+    offerCapture = true,
   }: {
     record: ApiRecord;
     cameraMode: 'single' | 'double';
@@ -62,7 +69,13 @@
     guide?: Snippet<[boolean]>;
     // The summary lists the record as pending.
     pending?: boolean;
+    // What the page shows for a placeholder, in place of the images (NEH-317).
+    placeholder?: Snippet<[boolean]>;
+    // False once the placeholder is filled: no second capture into it.
+    offerCapture?: boolean;
   } = $props();
+
+  let isPlaceholder = $derived(!!placeholder && record.missing_side === 'both' && !record.closed_reason);
 
   let confirmRetake = $state(false);
   let isExcluded = $derived(record.status === 'excluded');
@@ -307,6 +320,9 @@
       </div>
     {/if}
 
+    {#if isPlaceholder && placeholder}
+      {@render placeholder(retaking)}
+    {:else}
     <div class="img-viewer-images">
       {#if missingSide === 'left'}
         <div class="img-viewer-frame" data-missing-side="left"><MissingPage side="left" /></div>
@@ -390,6 +406,7 @@
         </div>
       {/if}
     </div>
+    {/if}
 
     <div class="img-viewer-footer">
       {#if retaking}
@@ -397,6 +414,17 @@
           <span class="img-viewer-spinner"></span>
           {$m.lvm_retaking}
         </span>
+      {:else if isPlaceholder}
+        <button class="btn btn-secondary" onclick={handleClose}>
+          <span class="material-symbols-outlined icon-sm">close</span>
+          {$m.common_close}
+        </button>
+        {#if offerCapture}
+          <button class="btn btn-recapture" onclick={confirmAndRetake}>
+            <span class="material-symbols-outlined icon-sm" aria-hidden="true">photo_camera</span>
+            {$m.retakes_capture}
+          </button>
+        {/if}
       {:else if !confirmRetake || isExcluded}
         <button class="btn btn-secondary" onclick={handleClose}>
           <span class="material-symbols-outlined icon-sm">close</span>

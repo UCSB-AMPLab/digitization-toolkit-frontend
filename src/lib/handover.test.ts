@@ -1,7 +1,7 @@
-// Version: 0.3.2
+// Version: 0.3.3
 
 import { describe, expect, it } from 'vitest';
-import { handoverCounts, handoverLock, handoverOffer, promoteBlockers } from './handover';
+import { handoverCounts, handoverLock, handoverOffer, missingSideCount, promoteBlockers } from './handover';
 
 type S = 'captured' | 'in_review' | 'rejected' | 'approved' | 'excluded';
 const recs = (...statuses: S[]) => statuses.map((status) => ({ status }));
@@ -84,6 +84,22 @@ describe('records that miss a side (0.3.2)', () => {
 
 	it('leave the send of the other captured records open', () => {
 		expect(handoverOffer(handoverCounts([missing('left'), { status: 'captured' }]))).toEqual({ send: 'volume', takeBack: false });
+	});
+});
+
+describe('missing records closed without capturing (NEH-317)', () => {
+	const closed = (side: 'left' | 'right' | 'both') => ({ status: 'captured' as const, missing_side: side, closed_reason: 'foliation_skip' as const });
+	const open = (side: 'left' | 'right' | 'both') => ({ status: 'captured' as const, missing_side: side, closed_reason: null });
+
+	it('are counted as captured: a send hands them over with the volume', () => {
+		expect(handoverCounts([closed('both'), closed('left'), open('both')])).toEqual(
+			{ captured: 2, inReview: 0, approved: 0, rejected: 0, excluded: 0 }
+		);
+		expect(handoverOffer(handoverCounts([closed('both')]))).toEqual({ send: 'volume', takeBack: false });
+	});
+
+	it('are not counted as missing', () => {
+		expect(missingSideCount([closed('both'), closed('right'), open('left'), open('both')])).toBe(2);
 	});
 });
 

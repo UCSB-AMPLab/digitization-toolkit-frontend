@@ -18,14 +18,24 @@
   // is kept in the query (?collectionId=), which the Cola page links to. The
   // select shows whenever the rows span two volumes or a volume is chosen, so
   // a filter can always be cleared.
+  //
+  // Openings and pages never captured (NEH-317). The backend orders the rows
+  // by volume and then by sequence; the page groups them under a heading per
+  // volume (name, stem, how many are pending), in that order. A placeholder
+  // for a whole opening (missingSide 'both') shows its pill, what it should
+  // hold and the note; a record missing one page shows its pill and which
+  // page. Both offer "Capture", the same path as Volver a capturar, and a
+  // button that opens the close dialog (CloseMissingDialog); a closed record
+  // is taken off the list. Rejected rows are as before.
   // ============================================================================
   //
-  // Version: 0.3.2
+  // Version: 0.3.3
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { recordsApi, AuthError, type RecordToRetake } from '$lib/api';
+  import CloseMissingDialog from '$lib/components/CloseMissingDialog.svelte';
   import { m, locale } from '$lib/i18n';
   import { userRole } from '$lib/stores/auth';
   import { formatApiDate } from '$lib/format-date';
@@ -68,6 +78,28 @@
   });
 
   let shownRows = $derived(volumeId === null ? rows : (rows ?? []).filter(r => r.collectionId === volumeId));
+
+  // The shown rows by volume, in the order the backend gives (by volume,
+  // then sequence); records in no volume form one group.
+  let groups = $derived.by(() => {
+    const out: { key: string; first: RecordToRetake; rows: RecordToRetake[] }[] = [];
+    for (const row of shownRows ?? []) {
+      const key = row.collectionId == null ? 'none' : String(row.collectionId);
+      const group = out.find(g => g.key === key);
+      if (group) group.rows.push(row);
+      else out.push({ key, first: row, rows: [row] });
+    }
+    return out;
+  });
+
+  // The row whose close dialog is open.
+  let closing = $state<RecordToRetake | null>(null);
+
+  function handleClosed() {
+    const id = closing?.recordId;
+    closing = null;
+    if (rows && id != null) rows = rows.filter(r => r.recordId !== id);
+  }
 
   function chooseVolume(event: Event) {
     const value = (event.currentTarget as HTMLSelectElement).value;
@@ -113,27 +145,41 @@
     {#if shownRows && shownRows.length === 0}
       <p class="empty">{$m.retakes_filter_empty}</p>
     {:else}
+    {#each groups as group (group.key)}
+    <section class="rt-group" aria-labelledby="rt-group-{group.key}">
+    <h2 class="rt-volume" id="rt-group-{group.key}">
+      {#if group.first.collectionId != null}
+        <span class="rt-volume-name">{group.first.name ?? '—'}</span>
+        {#if group.first.filenameStem}<span class="rt-stem">{group.first.filenameStem}</span>{/if}
+        <span class="rt-count">{$m.retakes_volume_pending(group.rows.length)}</span>
+      {:else}
+        <span class="rt-no-volume">{$m.retakes_no_volume}</span>
+      {/if}
+    </h2>
     <ul class="retakes">
-      {#each shownRows ?? [] as row (row.recordId)}
+      {#each group.rows as row (row.recordId)}
         {@const reason = row.reason ? rejectionReasonText($m, row.reason) : null}
+        {@const missing = row.pendingReason === 'missing_side'}
         <li class="rt-row">
           <div class="rt-main">
-            <div class="rt-volume">
-              {#if row.collectionId != null}
-                <span class="rt-volume-name">{row.name ?? '—'}</span>
-                {#if row.filenameStem}<span class="rt-stem">{row.filenameStem}</span>{/if}
-              {:else}
-                <span class="rt-no-volume">{$m.retakes_no_volume}</span>
-              {/if}
-            </div>
             <div class="rt-record">
               <span class="rt-title">{row.title}</span>
               {#if row.sequence != null}<span class="rt-sequence">{$m.retakes_sequence(row.sequence)}</span>{/if}
             </div>
 
             <div class="rt-reason">
-              {#if row.pendingReason === 'missing_side'}
-                <span class="rt-missing">{$m.missing_page_reason}</span>
+              {#if missing && row.missingSide === 'both'}
+                <span class="status-badge rt-pill-missing">{$m.pill_opening_missing}</span>
+                {#if row.missingExpected}<span class="rt-gloss">{row.missingExpected}</span>{/if}
+                {#if row.missingNote}<p class="rt-comment rt-note-missing"><span class="visually-hidden">{$m.retakes_comment_label}:</span> {row.missingNote}</p>{/if}
+              {:else if missing}
+                <span class="status-badge rt-pill-missing">{$m.pill_page_missing}</span>
+                {#if row.missingSide === 'left' || row.missingSide === 'right'}
+                  <span class="rt-gloss">{$m.retakes_page_missing_row(row.missingSide)}</span>
+                {:else}
+                  <span class="rt-missing">{$m.missing_page_reason}</span>
+                {/if}
+                {#if row.missingNote}<p class="rt-comment rt-note-missing"><span class="visually-hidden">{$m.retakes_comment_label}:</span> {row.missingNote}</p>{/if}
               {:else if reason}
                 <span class="status-badge status-rejected rt-reason-label">{reason.label}</span>
                 {#if reason.gloss}<span class="rt-gloss">{reason.gloss}</span>{/if}
@@ -156,7 +202,19 @@
             {/if}
           </div>
 
-          {#if canOperate && row.collectionId != null && row.projectId != null}
+          {#if canOperate && missing}
+            <div class="rt-actions">
+              <button class="btn btn-ghost ip-btn" onclick={() => (closing = row)}>
+                {row.missingSide === 'both' ? $m.retakes_no_opening : $m.retakes_no_page}
+              </button>
+              {#if row.collectionId != null && row.projectId != null}
+                <button class="btn ip-btn ip-btn-capture" onclick={() => retake(row)}>
+                  <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">photo_camera</span>
+                  <span>{$m.retakes_capture}</span>
+                </button>
+              {/if}
+            </div>
+          {:else if canOperate && row.collectionId != null && row.projectId != null}
             <div class="rt-actions">
               <button class="btn ip-btn ip-btn-capture" onclick={() => retake(row)}>
                 <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">photo_camera</span>
@@ -167,9 +225,19 @@
         </li>
       {/each}
     </ul>
+    </section>
+    {/each}
     {/if}
   {/if}
 </div>
+
+{#if closing}
+  <CloseMissingDialog
+    record={{ id: closing.recordId, missing_side: closing.missingSide }}
+    onCancel={() => (closing = null)}
+    onClosed={handleClosed}
+  />
+{/if}
 
 <style>
   .page { padding: 32px; max-width: 1200px; }
@@ -207,6 +275,13 @@
     font-family: var(--font-family);
     font-size: var(--text-sm);
   }
+
+  .rt-group + .rt-group { margin-top: 24px; }
+  .rt-volume { margin: 0 0 8px; font-size: var(--text-base); font-weight: var(--fw-regular); }
+  .rt-count { font-size: var(--text-xs); color: var(--color-light-grey); font-variant-numeric: tabular-nums; }
+  .rt-pill-missing { color: var(--color-warning); }
+  .rt-note-missing { border-left-color: var(--color-warning); }
+  .rt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
   .retakes {
     list-style: none;

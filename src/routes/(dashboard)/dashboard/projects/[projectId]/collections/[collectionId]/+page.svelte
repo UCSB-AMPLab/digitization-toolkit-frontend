@@ -14,7 +14,7 @@
   // misses a side (0.3.2) is pending too, and the views draw its missing
   // page as an empty frame.
   //
-  // Version: 0.3.2
+  // Version: 0.3.3
 
   import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
@@ -392,13 +392,14 @@
     }
   }
 
-  // The volume's rejected records and those that miss a side (0.3.2), the
+  // The volume's rejected records and those that miss a side (0.3.2) and
+  // were not closed without capturing (NEH-317), the
   // lowest sequence first, and what is pending: the summary's count and
   // first record; none when the summary lists nothing for the volume; the
   // records on screen only while the summary is missing or failed.
   let pendingRecordsShown = $derived(
     records
-      .filter(r => r.status === 'rejected' || (r.missing_side != null && r.status !== 'excluded'))
+      .filter(r => r.status === 'rejected' || (r.missing_side != null && !r.closed_reason && r.status !== 'excluded'))
       .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
   );
   let pendingCount = $derived(

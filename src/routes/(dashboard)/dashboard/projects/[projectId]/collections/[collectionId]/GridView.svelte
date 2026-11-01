@@ -12,10 +12,35 @@
   // A dual record that misses a side (0.3.2) is still a pair: the half of
   // the page never photographed is an empty frame that says so (MissingPage).
   //
-  // Version: 0.3.2
+  // Placeholders (NEH-317): a record for a whole opening never captured
+  // (missing_side 'both') is a pair of two empty frames under a dashed sand
+  // border, with the "Opening not captured" pill, what it should hold and
+  // the note in place of the status. A record missing one page keeps its
+  // frame and gets the "Page not captured" pill. A closed missing record
+  // (closed_reason) has a grey dashed border, the "Closed" pill and its
+  // reason, whatever its side. A record's status shows beside those pills
+  // only when it is not captured, since a missing record is captured in
+  // name only. The legend under the grid explains the three colours. A
+  // record prepared for retake is captured like any other here: the grid
+  // does not tell it apart from one never rejected, so it keeps the
+  // ordinary status (no "Ready to retake" pill).
+  //
+  // Admin and operator, the roles that capture, can mark an opening missing
+  // (MarkMissingDialog): "Mark an opening missing" in the toolbar asks them
+  // to click the record the opening goes after (the grid has no selection),
+  // and "An opening is missing here" sits between two tiles, shown on
+  // hover. That button is a sibling of the card inside the tile's cell
+  // (.grid-cell), not inside the card, so the card's name stays its own. Neither is offered while reordering, and the hover is not
+  // offered while a filter hides records, since neighbours on screen are
+  // then not neighbours in the volume.
+  //
+  // Version: 0.3.3
 
-  import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
+  import { recordsApi, collectionsApi, type Record, type RecordImage, type ClosedReason } from '$lib/api';
   import { m } from '$lib/i18n';
+  import { userRole } from '$lib/stores/auth';
+  import MarkMissingDialog from './MarkMissingDialog.svelte';
+  import MissingPill from '$lib/components/MissingPill.svelte';
   import { renumberErrorText, reorderErrorText } from '$lib/volume-refusals';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import MissingPage from '$lib/components/MissingPage.svelte';
@@ -65,6 +90,53 @@
   let showFilterPanel   = $state(false);
   let activeStatusFilter = $state<string | null>(null);
 
+  // Marking an opening missing (NEH-317): the roles that capture.
+  let canOperate = $derived($userRole === 'admin' || $userRole === 'operator');
+  // The toolbar's mark waits for the click on the record the opening goes after.
+  let picking = $state(false);
+  // The record the mark dialog is open for, with its sequence as shown.
+  let markAfter = $state<{ record: Record; n: number } | null>(null);
+
+  // The record's sequence, or its place in the volume when it has none.
+  function sequenceOf(record: Record): number {
+    return record.sequence ?? records.findIndex(r => r.id === record.id) + 1;
+  }
+
+  function handleCardClick(record: Record) {
+    if (picking) {
+      picking = false;
+      markAfter = { record, n: sequenceOf(record) };
+      return;
+    }
+    onRecordClick(record);
+  }
+
+  function openMarkAfter(record: Record) {
+    picking = false;
+    markAfter = { record, n: sequenceOf(record) };
+  }
+
+  function handleMarked() {
+    markAfter = null;
+    onRecordsUpdate();
+  }
+
+  function isPlaceholder(record: Record): boolean {
+    return record.missing_side === 'both' && !record.closed_reason;
+  }
+  function isClosed(record: Record): boolean {
+    return record.missing_side != null && !!record.closed_reason;
+  }
+
+  function closedReasonText(reason: ClosedReason): string {
+    return {
+      foliation_skip: $m.close_reason_skip,
+      leaf_missing_from_volume: $m.close_reason_leaf_missing,
+      captured_elsewhere: $m.close_reason_elsewhere,
+      other: $m.close_reason_other,
+    }[reason];
+  }
+
   let showRenumberModal = $state(false);
   let renumbering       = $state(false);
   let renumberError     = $state<string | null>(null);
@@ -96,6 +168,13 @@
   }
 
   function gridItemsForRecord(record: Record): GridItem[] {
+    // A placeholder for a whole opening: both pages are empty frames.
+    if (record.missing_side === 'both') {
+      return [
+        { record, image: null, role: 'L', thumbnailUrl: null, missing: 'left' },
+        { record, image: null, role: 'R', thumbnailUrl: null, missing: 'right' },
+      ];
+    }
     if (!record.images || record.images.length === 0) {
       return [{ record, image: null, role: null, thumbnailUrl: null }];
     }
@@ -127,6 +206,7 @@
   function toggleReorderMode() {
     isReorderMode = !isReorderMode;
     if (isReorderMode) {
+      picking = false;
       // Record order is the archival page order and reorderRecords() persists
       // the full collection sequence. dndzone's `items` must match the #each
       // exactly (svelte-dnd-action requirement), so reordering only ever
@@ -227,6 +307,24 @@
           {isReorderMode ? $m.col_reorder_done : $m.col_reorder}
         </button>
       </div>
+
+      {#if canOperate}
+        <div class="toolbar-divider"></div>
+
+        <button
+          class="toolbar-btn"
+          class:active={picking}
+          disabled={isReorderMode}
+          aria-pressed={picking}
+          onclick={() => (picking = !picking)}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>{$m.toolbar_mark_missing}</span>
+        </button>
+      {/if}
     </div>
 
     <div class="toolbar-right">
@@ -275,6 +373,13 @@
     </div>
   {/if}
 
+  {#if picking}
+    <div class="pick-bar" role="status">
+      <span>{$m.mark_pick_hint}</span>
+      <button class="filter-chip" onclick={() => (picking = false)}>{$m.mark_cancel}</button>
+    </div>
+  {/if}
+
   {#if isReorderMode}
     <div
       class="image-grid reorder-mode"
@@ -290,7 +395,7 @@
           <!-- NEH-211: the L/R pair is dragged as one unit — the container
                that groups it in the normal view is also the single
                draggable element here, not two separate ones. -->
-          <div class="grid-pair draggable" id="record-{record.id}">
+          <div class="grid-pair draggable" class:is-placeholder={isPlaceholder(record)} class:is-closed={isClosed(record)} id="record-{record.id}">
             <div class="reorder-handle">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8">
                 <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/>
@@ -306,7 +411,7 @@
             </div>
             <div class="card-meta pair-meta">
               <span class="card-name pair-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
-              <div class="card-status-row"><StatusBadge status={record.status} /></div>
+              <div class="card-status-row">{@render statusPills(record)}</div>
             </div>
           </div>
         {:else}
@@ -323,7 +428,7 @@
             </div>
             <div class="card-meta">
               <span class="card-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
-              <div class="card-status-row"><StatusBadge status={record.status} /></div>
+              <div class="card-status-row">{@render statusPills(record)}</div>
             </div>
           </div>
         {/if}
@@ -337,11 +442,14 @@
   >
     {#each recordsToGridGroups(records.filter(r => !activeStatusFilter || r.status === activeStatusFilter)) as group, i (group.record.id)}
       {@const record = group.record}
+      <!-- Between this tile and the next, in the volume's order. -->
+      {@const insertable = canOperate && !activeStatusFilter && i < records.length - 1}
 
+      <div class="grid-cell" class:pair-cell={group.items.length > 1}>
       {#if group.items.length > 1}
         <!-- NEH-211: L/R pair wrapped in a single container -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="grid-pair" onclick={() => onRecordClick(record)} role="button" tabindex="0">
+        <div class="grid-pair" class:picking class:is-placeholder={isPlaceholder(record)} class:is-closed={isClosed(record)} onclick={() => handleCardClick(record)} role="button" tabindex="0">
           <div class="pair-thumbs">
             {#each group.items as item (item.image?.id ?? item.role)}
               <div class="card-image-wrapper">
@@ -353,14 +461,15 @@
           <div class="card-meta pair-meta">
             <span class="card-name pair-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
             <div class="card-status-row">
-              <StatusBadge status={record.status} />
+              {@render statusPills(record)}
             </div>
+            {@render missingDetails(record)}
           </div>
         </div>
       {:else}
         {@const item = group.items[0]}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="grid-card" onclick={() => onRecordClick(record)} role="button" tabindex="0">
+        <div class="grid-card" class:picking class:is-closed={isClosed(record)} onclick={() => handleCardClick(record)} role="button" tabindex="0">
           <div class="card-image-wrapper">
             {@render thumbContent(item, record)}
           </div>
@@ -368,16 +477,53 @@
           <div class="card-meta">
             <span class="card-name" title={record.title}>{record.title || $m.col_image_n(i + 1)}</span>
             <div class="card-status-row">
-              <StatusBadge status={record.status} />
+              {@render statusPills(record)}
             </div>
+            {@render missingDetails(record)}
           </div>
         </div>
       {/if}
+      {#if insertable}{@render insertHere(record)}{/if}
+      </div>
     {/each}
   </div>
   {/if}
 
+  <!-- What the colours of the grid say (NEH-317). -->
+  <ul class="grid-legend" aria-label={$m.legend_title}>
+    <li><span class="legend-swatch legend-rejected" aria-hidden="true"></span>{$m.legend_rejected}</li>
+    <li><span class="legend-swatch legend-never" aria-hidden="true"></span>{$m.legend_never}</li>
+    <li><span class="legend-swatch legend-closed" aria-hidden="true"></span>{$m.legend_closed}</li>
+  </ul>
+
 </div>
+
+{#snippet statusPills(record: Record)}
+  <MissingPill {record} />
+  {#if record.missing_side == null || record.status !== 'captured'}
+    <StatusBadge status={record.status} />
+  {/if}
+{/snippet}
+
+{#snippet missingDetails(record: Record)}
+  {#if isClosed(record) && record.closed_reason}
+    <p class="card-missing">{closedReasonText(record.closed_reason)}</p>
+    {#if record.closed_note}<p class="card-missing">{record.closed_note}</p>{/if}
+  {:else if isPlaceholder(record)}
+    {#if record.missing_expected}<p class="card-missing">{record.missing_expected}</p>{/if}
+    {#if record.missing_note}<p class="card-missing">{record.missing_note}</p>{/if}
+  {/if}
+{/snippet}
+
+{#snippet insertHere(record: Record)}
+  <button
+    class="insert-here"
+    onclick={(e) => { e.stopPropagation(); openMarkAfter(record); }}
+  >
+    <span class="insert-plus" aria-hidden="true">+</span>
+    <span class="insert-label">{$m.hover_missing_here}</span>
+  </button>
+{/snippet}
 
 {#snippet thumbContent(item: GridItem, record: Record)}
   {#if item.missing}
@@ -398,6 +544,16 @@
     <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
   {/if}
 {/snippet}
+
+{#if markAfter}
+  <MarkMissingDialog
+    {collectionId}
+    afterRecord={markAfter.record}
+    n={markAfter.n}
+    onCancel={() => (markAfter = null)}
+    onMarked={handleMarked}
+  />
+{/if}
 
 {#if showRenumberModal}
   <div class="modal-backdrop" use:dismissible={{ onDismiss: handleCloseRenumberModal }}>
@@ -556,6 +712,9 @@
     --pair-gap: 6px;
     flex: 1;
     overflow-y: auto;
+    /* The hover button of the last column ("An opening is missing here")
+       reaches past the edge; it is clipped there, not scrolled to. */
+    overflow-x: hidden;
     padding: 16px 20px;
     display: grid;
     gap: var(--grid-gap);
@@ -673,6 +832,120 @@
 
 
   .card-meta { padding: 7px 2px 2px; }
+
+  /* ── Placeholders and closed records (NEH-317) ──
+     The border sits on the card, around both pages and the meta. */
+  .grid-pair.is-placeholder,
+  .grid-pair.is-closed,
+  .grid-card.is-closed {
+    border: 1px dashed var(--color-warning);
+    border-radius: var(--radius-lg);
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .grid-pair.is-closed,
+  .grid-card.is-closed { border-color: var(--color-light-grey); }
+
+  .card-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  .card-missing {
+    margin: 4px 0 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--color-light-grey);
+    overflow-wrap: anywhere;
+  }
+
+  /* Choosing the record the opening goes after. */
+  .pick-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 20px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--color-warning);
+    background-color: var(--color-warning-bg);
+    font-size: var(--text-sm);
+    color: var(--color-light);
+  }
+  .grid-pair.picking,
+  .grid-card.picking { cursor: crosshair; }
+  .toolbar-btn.active { color: var(--color-warning); }
+
+  /* A tile's cell: the card, and beside it the button in the gap after it.
+     A pair's cell spans the two columns the pair used to span itself. */
+  .grid-cell { position: relative; display: flex; flex-direction: column; min-width: 0; }
+  .grid-cell.pair-cell { grid-column: span 2; }
+  .grid-cell > .grid-pair,
+  .grid-cell > .grid-card { flex: 1; }
+
+  /* "An opening is missing here": in the gap after the tile, on hover. */
+  .insert-here {
+    position: absolute;
+    top: 35%;
+    right: calc(var(--grid-gap) / -2);
+    transform: translateX(50%);
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: var(--font-family);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+  }
+  .grid-cell:hover > .insert-here,
+  .insert-here:focus-visible { opacity: 1; }
+  .insert-plus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px dashed var(--color-warning);
+    background-color: var(--color-surface-alt);
+    color: var(--color-warning);
+    font-size: 16px;
+    font-weight: var(--fw-bold);
+    line-height: 1;
+  }
+  .insert-label {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    background-color: var(--color-surface-alt-2);
+    border: 1px solid var(--color-warning);
+    color: var(--color-light);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+
+  /* ── Legend ── */
+  .grid-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin: 0;
+    padding: 10px 20px;
+    list-style: none;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--color-surface-alt);
+    font-size: var(--text-xs);
+    color: var(--color-light-grey);
+  }
+  .grid-legend li { display: flex; align-items: center; gap: 8px; }
+  .legend-swatch { width: 14px; height: 10px; border-radius: 3px; border: 1px solid var(--color-error); }
+  .legend-never  { border: 1px dashed var(--color-warning); }
+  .legend-closed { border: 1px dashed var(--color-light-grey); }
 
   .card-name { font-size: 11px; font-weight: var(--fw-bold); color: var(--color-light-grey); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; transition: color var(--transition-fast); }
   .grid-card:hover .card-name { color: var(--color-light); }

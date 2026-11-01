@@ -3,7 +3,7 @@
 // ahora" opens the capture screen on the rejected record with the lowest
 // sequence. No band without rejected records; no link for a reviewer.
 //
-// Version: 0.2.1
+// Version: 0.3.3
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { readable } from 'svelte/store';
@@ -117,5 +117,20 @@ describe('volume page: recapture band', () => {
 		const band = screen.getByRole('region', { name: 'Un par de páginas por recapturar' });
 		await expect.element(band).toBeVisible();
 		await expect.element(band.getByRole('link', { name: 'Recapturar ahora' })).not.toBeInTheDocument();
+	});
+
+	it('leaves a closed missing record out of the records on screen: it is not pending (NEH-317)', async () => {
+		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([
+			rec(1, 1, 'captured'),
+			{ ...rec(2, 2, 'captured'), missing_side: 'both', closed_reason: 'foliation_skip' } as ApiRecord,
+			{ ...rec(4, 4, 'captured'), missing_side: 'left', closed_reason: 'captured_elsewhere' } as ApiRecord,
+			rec(5, 5, 'rejected')
+		]);
+		const screen = render(CollectionPage);
+		const band = screen.getByRole('region', { name: 'Un par de páginas por recapturar' });
+		await expect.element(band).toBeVisible();
+		await expect
+			.element(band.getByRole('link', { name: 'Recapturar ahora' }))
+			.toHaveAttribute('href', '/live-preview?projectId=1&collectionId=7&recordId=5');
 	});
 });

@@ -6,7 +6,7 @@
   // A dual record that misses a side (0.3.2) shows that page as an empty
   // frame that says so (MissingPage), on its side.
   //
-  // Version: 0.3.2
+  // Version: 0.3.3
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
@@ -14,6 +14,7 @@
   import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import MissingPage from '$lib/components/MissingPage.svelte';
+  import MissingPill from '$lib/components/MissingPill.svelte';
   import { dismissible } from '$lib/dialog';
   import {
     fittedSize,
@@ -199,6 +200,7 @@
           {record.title || $m.record_fallback_title(record.id)}
         </span>
         <StatusBadge status={record.status} />
+        <MissingPill {record} />
       </div>
       <button class="img-viewer-close-btn" onclick={onClose} aria-label={$m.common_close}>
         <span class="material-symbols-outlined icon-md">close</span>
@@ -212,7 +214,7 @@
     {/if}
 
     <div class="img-viewer-images">
-      {#if missingSide === 'left'}
+      {#if missingSide === 'left' || missingSide === 'both'}
         <div class="img-viewer-frame missing-frame" data-missing-side="left"><MissingPage side="left" /></div>
       {/if}
       {#each images() as img, i}
@@ -284,11 +286,11 @@
           {/if}
         </div>
       {/each}
-      {#if missingSide === 'right'}
+      {#if missingSide === 'right' || missingSide === 'both'}
         <div class="img-viewer-frame missing-frame" data-missing-side="right"><MissingPage side="right" /></div>
       {/if}
 
-      {#if images().length === 0}
+      {#if images().length === 0 && missingSide !== 'both'}
         <div class="img-viewer-frame">
           <span class="material-symbols-outlined icon-lg" style="--c: var(--color-light-grey)">
             image_not_supported

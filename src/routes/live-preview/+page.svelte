@@ -25,7 +25,23 @@
   // loaded ahead, so that the next modal, which opens on thumbnails, shows
   // them at once (0.3.1). Full-size images are never loaded ahead.
   //
-  // Version: 0.3.1
+  // Capturing into a placeholder (NEH-317): a record for a whole opening
+  // never captured (missing_side 'both') opens in the same modal, which
+  // shows where the opening goes between its neighbours, the note (under
+  // "From Fisqua review" when it came from a Fisqua request), what it should
+  // hold, the line that separates order from file names, and a link to the
+  // close dialog. It is always filled by a dual capture into the record.
+  // After that capture the modal asks whether another opening is missing
+  // there: "Capture another here" inserts a new record right after the one
+  // just filled (afterRecordId) and asks again; "That was the last one" goes
+  // on as a retake does (the guide's next record, or back to the volume).
+  // Closing the placeholder goes on the same way. The app has no folio for
+  // a record and no next capture number for a volume, so the texts that
+  // would name them use their variants without (cap_title, cap_another_q,
+  // cap_order_note); the record the opening goes after is named by its
+  // sequence.
+  //
+  // Version: 0.3.3
 
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
@@ -47,6 +63,8 @@
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import ImageViewerModal from './ImageViewerModal.svelte';
   import CaptureInstruction from './CaptureInstruction.svelte';
+  import MissingPage from '$lib/components/MissingPage.svelte';
+  import CloseMissingDialog from '$lib/components/CloseMissingDialog.svelte';
 
   let projectId = $derived(Number($page.url.searchParams.get('projectId')) || 0);
   let collectionId = $derived(Number($page.url.searchParams.get('collectionId')) || 0);
@@ -284,6 +302,94 @@
   function closeInspected() {
     inspectedRecord = null;
     guide = null;
+    filled = null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Capturing into a placeholder (NEH-317)
+  // ---------------------------------------------------------------------------
+  // Set once the placeholder open in the modal is filled: the record just
+  // filled, after which "Capture another here" inserts the next one.
+  let filled = $state<{ lastId: number } | null>(null);
+  let anotherBusy = $state(false);
+  let anotherError = $state<string | null>(null);
+  let closingPlaceholder = $state(false);
+
+  function isOpenPlaceholder(record: ApiRecord): boolean {
+    return record.missing_side === 'both' && !record.closed_reason;
+  }
+
+  // The volume's records in their order, for the neighbours of a placeholder.
+  let ordered = $derived(
+    [...records].sort((a, b) => (a.sequence ?? Infinity) - (b.sequence ?? Infinity) || a.id - b.id)
+  );
+  let neighbours = $derived.by(() => {
+    const cur = inspectedRecord;
+    const i = cur ? ordered.findIndex(r => r.id === cur.id) : -1;
+    return {
+      prev: i > 0 ? ordered[i - 1] : null,
+      next: i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null,
+    };
+  });
+  // The sequence of the record the opening goes after.
+  let afterSequence = $derived(
+    neighbours.prev?.sequence ?? Math.max(0, (inspectedRecord?.sequence ?? 1) - 1)
+  );
+
+  // After a retake, or once a placeholder is done with: the guide's next
+  // record, or back where the operator came from, or the records again.
+  async function continueAfterCapture() {
+    filled = null;
+    anotherError = null;
+    if (guide) {
+      await afterGuidedRetake();
+      return;
+    }
+    inspectedRecord = null;
+
+    // Coming from "Recapture image" in Book view (NEH-209), go back there
+    // instead of staying on /live-preview: the retake is finished, and the
+    // operator sees the result right where they asked for it. A retake
+    // started from a thumbnail on this page does not navigate anywhere.
+    if (cameFromRecapture && projectId && collectionId) {
+      goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
+      return;
+    }
+
+    await loadRecords();
+  }
+
+  // Another opening is missing at the same place: a dual capture inserted
+  // right after the record just filled, which the next one follows in turn.
+  async function captureAnother() {
+    if (!filled || anotherBusy) return;
+    if (volumeNeedsStem) {
+      anotherError = $m.lv_needs_stem;
+      return;
+    }
+    anotherBusy = true;
+    anotherError = null;
+    try {
+      const result = await camerasApi.captureDual({
+        project_name: projectName,
+        collection_id: collectionId ?? undefined,
+        afterRecordId: filled.lastId,
+        rotate_deg_cam0: rotateDeg[0] ?? 0,
+        rotate_deg_cam1: rotateDeg[1] ?? 0,
+      });
+      if (!result.success) throw new CaptureFailed(result.error);
+      if (result.record_id != null) filled = { lastId: result.record_id };
+    } catch (error) {
+      console.error('[LivePreview] Error capturing another opening:', error);
+      anotherError = captureErrorText(error, $m);
+    } finally {
+      anotherBusy = false;
+    }
+  }
+
+  function handlePlaceholderClosed() {
+    closingPlaceholder = false;
+    continueAfterCapture();
   }
 
   $effect(() => {
@@ -460,7 +566,9 @@
 
   async function retake(record: ApiRecord) {
     let result;
-    if (cameraMode === 'double') {
+    // A placeholder is a whole opening: only a dual capture fills it.
+    const hole = isOpenPlaceholder(record);
+    if (cameraMode === 'double' || hole) {
       result = await camerasApi.captureDual({
         project_name: projectName,
         collection_id: collectionId ?? undefined,
@@ -482,26 +590,17 @@
       throw new CaptureFailed(result.error);
     }
 
+    // A placeholder filled: the modal stays, and asks whether another
+    // opening is missing there (NEH-317).
+    if (hole) {
+      filled = { lastId: record.id };
+      return;
+    }
+
     // In the guide, the next rejected record opens instead (0.2.0).
     // The modal stays open, its retake still running, until the next state
     // is on screen: LiveViewport takes no capture meanwhile.
-    if (guide) {
-      await afterGuidedRetake();
-      return;
-    }
-
-    inspectedRecord = null;
-
-    // Coming from "Recapture image" in Book view (NEH-209), go back there
-    // instead of staying on /live-preview: the retake is finished, and the
-    // operator sees the result right where they asked for it. A retake
-    // started from a thumbnail on this page does not navigate anywhere.
-    if (cameFromRecapture && projectId && collectionId) {
-      goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
-      return;
-    }
-
-    await loadRecords();
+    await continueAfterCapture();
   }
 
   // The only writer of `rotateDeg` (NEH-71): both the controls panel and the
@@ -680,6 +779,67 @@
   {/if}
 {/snippet}
 
+{#snippet neighbourSpread(record: ApiRecord)}
+  <div class="ph-spread">
+    <div class="ph-pages">
+      {#each record.images ?? [] as img (img.id)}
+        <img class="ph-thumb" src={recordsApi.getImageThumbnailUrl(img.id)} alt="" draggable="false" />
+      {/each}
+    </div>
+    {#if record.sequence != null}<span class="ph-caption">{$m.retakes_sequence(record.sequence)}</span>{/if}
+  </div>
+{/snippet}
+
+{#snippet placeholderPanel(retaking: boolean)}
+  {#if inspectedRecord}
+    {@const hole = inspectedRecord}
+    <div class="ph-panel">
+      <h2 class="ph-title">{$m.cap_title(null, afterSequence)}</h2>
+
+      <div class="ph-where" role="group" aria-labelledby="ph-where-label">
+        <span class="ph-label" id="ph-where-label">{$m.cap_where}</span>
+        <div class="ph-row">
+          {#if neighbours.prev}{@render neighbourSpread(neighbours.prev)}{/if}
+          <div class="ph-spread ph-this">
+            <div class="ph-pages">
+              <div class="ph-empty"><MissingPage side="left" /></div>
+              <div class="ph-empty"><MissingPage side="right" /></div>
+            </div>
+            {#if hole.sequence != null}<span class="ph-caption">{$m.retakes_sequence(hole.sequence)}</span>{/if}
+          </div>
+          {#if neighbours.next}{@render neighbourSpread(neighbours.next)}{/if}
+        </div>
+      </div>
+
+      {#if hole.missing_note || hole.missing_expected}
+        <div class="ph-note">
+          {#if hole.missing_request_id}<span class="ph-label">{$m.cap_from_review}</span>{/if}
+          {#if hole.missing_note}<p class="ph-note-text">{hole.missing_note}</p>{/if}
+          {#if hole.missing_expected}<p class="ph-expected">{hole.missing_expected}</p>{/if}
+        </div>
+      {/if}
+
+      {#if filled}
+        <section class="ph-after" aria-labelledby="ph-after-label">
+          <span class="ph-label" id="ph-after-label">{$m.cap_after}</span>
+          <p class="ph-after-q" role="status">{$m.cap_another_q(null)}</p>
+          {#if anotherError}<p class="ph-error" role="alert">{$m.lvm_retake_error(anotherError)}</p>{/if}
+          <div class="ph-actions">
+            <button class="btn btn-recapture" disabled={anotherBusy} onclick={captureAnother}>{$m.cap_another}</button>
+            <button class="btn btn-secondary" disabled={anotherBusy} onclick={continueAfterCapture}>{$m.cap_last}</button>
+          </div>
+        </section>
+      {/if}
+
+      <p class="ph-order">{$m.cap_order_note(afterSequence, null)}</p>
+
+      {#if !filled}
+        <button class="ph-nothing" disabled={retaking} onclick={() => (closingPlaceholder = true)}>{$m.cap_nothing_link}</button>
+      {/if}
+    </div>
+  {/if}
+{/snippet}
+
 {#if inspectedRecord}
   <!-- Keyed, so that the next record of the guide opens with a fresh modal. -->
   {#key inspectedRecord.id}
@@ -690,8 +850,18 @@
       onRetake={handleRetake}
       guide={guide ? guideBar : undefined}
       pending={pendingIds.includes(inspectedRecord.id)}
+      placeholder={placeholderPanel}
+      offerCapture={filled === null}
     />
   {/key}
+{/if}
+
+{#if closingPlaceholder && inspectedRecord}
+  <CloseMissingDialog
+    record={inspectedRecord}
+    onCancel={() => (closingPlaceholder = false)}
+    onClosed={handlePlaceholderClosed}
+  />
 {/if}
 
 <style>
@@ -776,4 +946,67 @@
   .lv-guide-progress span { display: block; height: 100%; background-color: var(--color-highlight); }
   .lv-guide-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
   .lv-guide-next { margin-left: auto; font-size: var(--text-sm); color: var(--color-light-grey); }
+
+  /* Capturing into a placeholder (NEH-317). */
+  .ph-panel {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+  }
+  .ph-title { margin: 0; font-size: var(--text-h3); font-weight: var(--fw-extrabold); color: var(--color-light); }
+  .ph-label {
+    font-size: var(--text-xs);
+    font-weight: var(--fw-bold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-light-grey);
+  }
+  .ph-where { display: flex; flex-direction: column; gap: 8px; }
+  .ph-row { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .ph-spread { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .ph-pages { display: flex; gap: 4px; height: 140px; }
+  .ph-thumb { height: 100%; width: auto; max-width: 110px; object-fit: contain; border-radius: var(--radius-sm); background-color: var(--color-surface-alt); }
+  .ph-empty { width: 105px; height: 100%; }
+  .ph-this .ph-pages { padding: 4px; border: 1px dashed var(--color-warning); border-radius: var(--radius-md); }
+  .ph-caption { font-size: var(--text-xs); color: var(--color-light-grey); }
+  .ph-note {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px;
+    border-left: 3px solid var(--color-warning);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-surface-alt);
+  }
+  .ph-note-text { margin: 0; font-size: var(--text-sm); line-height: 1.4; color: var(--color-light); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ph-expected { margin: 0; font-size: var(--text-sm); color: var(--color-light-grey); overflow-wrap: anywhere; }
+  .ph-after {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 2px solid var(--color-highlight);
+    border-radius: var(--radius-md);
+  }
+  .ph-after-q { margin: 0; font-size: var(--text-lead); font-weight: var(--fw-bold); color: var(--color-light); }
+  .ph-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .ph-error { margin: 0; font-size: var(--text-sm); color: var(--color-error); }
+  .ph-order { margin: 0; font-size: var(--text-sm); line-height: 1.5; color: var(--color-light-grey); }
+  .ph-nothing {
+    align-self: flex-start;
+    min-height: var(--touch-target-min);
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    color: var(--color-secondary);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .ph-nothing:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
