@@ -11,12 +11,13 @@
   // A dual record that misses a side (0.3.2) shows that page as an empty
   // frame that says so (MissingPage), and its one image on its own side.
   //
-  // Version: 0.3.2
+  // Version: 0.3.3
 
   import { type Record, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import MissingPage from '$lib/components/MissingPage.svelte';
+  import MissingPill from '$lib/components/MissingPill.svelte';
   import {
     fittedSize,
     screenExtent,
@@ -245,6 +246,10 @@
     </button>
 
     <div class="spread-wrapper">
+      <!-- A missing record's pill (NEH-317), over the spread. -->
+      {#if selectedRecord?.missing_side}
+        <div class="spread-missing-pill"><MissingPill record={selectedRecord} /></div>
+      {/if}
 
       <div class="spread-page">
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -288,7 +293,7 @@
               </span>
             {/if}
           {:else}
-            {#if missingSide === 'left'}
+            {#if missingSide === 'left' || missingSide === 'both'}
               <MissingPage side="left" />
             {:else}
               <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
@@ -347,7 +352,7 @@
               </span>
             {/if}
           {:else}
-            {#if missingSide === 'right'}
+            {#if missingSide === 'right' || missingSide === 'both'}
               <MissingPage side="right" />
             {:else}
               <div class="no-image"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="21 15 16 10 5 21"/></svg></div>
@@ -447,7 +452,20 @@
   .nav-btn:hover { background-color: rgba(90,140,98,0.3); }
   .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
+  /* A missing record's pill (NEH-317), centred over the spread. */
+  .spread-missing-pill {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-surface-alt);
+  }
+
   .spread-wrapper {
+    position: relative;
     display: flex;
     align-items: stretch;
     height: 90%;

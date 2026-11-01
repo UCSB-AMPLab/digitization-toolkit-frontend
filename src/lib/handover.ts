@@ -16,9 +16,13 @@
 // offers no send. It is pending, and the lock counts it with the other
 // pending records, but on its own it does not lock a volume that has other
 // records to send (handoverLock).
+//
+// A missing record the operator closed without capturing it (NEH-317,
+// `closed_reason`) is neither missing nor pending: promote sends it with
+// the volume, so it counts as captured and not in missingSideCount.
 // ============================================================================
 //
-// Version: 0.3.2
+// Version: 0.3.3
 
 import type { Record } from '$lib/api';
 
@@ -31,11 +35,11 @@ export interface HandoverCounts {
 	excluded: number;
 }
 
-export function handoverCounts(records: Pick<Record, 'status' | 'missing_side'>[]): HandoverCounts {
+export function handoverCounts(records: Pick<Record, 'status' | 'missing_side' | 'closed_reason'>[]): HandoverCounts {
 	const c: HandoverCounts = { captured: 0, inReview: 0, approved: 0, rejected: 0, excluded: 0 };
 	for (const r of records) {
 		if (r.status === 'captured') {
-			if (r.missing_side == null) c.captured++;
+			if (r.missing_side == null || r.closed_reason) c.captured++;
 		}
 		else if (r.status === 'in_review') c.inReview++;
 		else if (r.status === 'approved') c.approved++;
@@ -61,9 +65,9 @@ export function handoverOffer(c: HandoverCounts): HandoverOffer {
 	};
 }
 
-/** The captured records that miss a side, which no send hands over. */
-export function missingSideCount(records: Pick<Record, 'status' | 'missing_side'>[]): number {
-	return records.filter((r) => r.status === 'captured' && r.missing_side != null).length;
+/** The captured records that miss a side and are not closed, which no send hands over. */
+export function missingSideCount(records: Pick<Record, 'status' | 'missing_side' | 'closed_reason'>[]): number {
+	return records.filter((r) => r.status === 'captured' && r.missing_side != null && !r.closed_reason).length;
 }
 
 /**

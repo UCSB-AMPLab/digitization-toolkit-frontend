@@ -2,7 +2,7 @@
 // none before — a plain <img> with no zoom at all), and drag-to-pan on the
 // image itself.
 //
-// Version: 0.3.2
+// Version: 0.3.3
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
@@ -328,4 +328,14 @@ describe('ImageViewerModal — an opening with a page never photographed (0.3.2)
       expect(second.textContent).toContain(present === 'left' ? es.badge_left : es.badge_right);
     });
   }
+
+  it('a placeholder for a whole opening (NEH-317): two empty frames that say so, with its pill, and no "no image" frame', async () => {
+    const record = makeRecord({ capture_mode: 'dual', missing_side: 'both', images: [] });
+    const screen = render(ImageViewerModal, { record, onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
+    await expect.element(screen.getByText(es.pill_opening_missing)).toBeVisible();
+    const all = frames(screen.container);
+    expect(all).toHaveLength(2);
+    expect(all.map((f) => f.getAttribute('data-missing-side'))).toEqual(['left', 'right']);
+    expect(screen.container.textContent).not.toContain('image_not_supported');
+  });
 });

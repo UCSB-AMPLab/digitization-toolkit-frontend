@@ -1,4 +1,4 @@
-// Version: 0.3.2
+// Version: 0.3.3
 
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
@@ -687,6 +687,20 @@ export const collectionsApi = {
   },
 
   /**
+   * Mark openings never captured (NEH-316): the backend inserts that many
+   * placeholders (missing_side 'both') right after `afterRecordId`, moving
+   * every later record's sequence up; no file is renamed. Returns the
+   * placeholders, in order. 409 when the volume keeps changing meanwhile,
+   * 422 for a record of another volume.
+   */
+  async markMissingOpenings(collectionId: number, data: MissingOpeningsCreate): Promise<Record[]> {
+    return apiRequest<Record[]>(`/collections/${collectionId}/records/missing-opening`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
    * Renumber the volume's records: the backend sets their `sequence` to
    * 1..N in the current display order, in one transaction. No file is
    * renamed. `renumbered` is the number of records. If the commit fails
@@ -885,11 +899,48 @@ export interface Record {
   // and cleared by a dual retake. Such a record is pending until then and is
   // never sent for review (promote leaves it captured; PATCH to in_review
   // answers 422). Absent from a backend before 0.3.2.
+  // Since contract 1.9 (NEH-316) it may also be 'both': a placeholder for a
+  // whole opening never captured, a dual record with no image, inserted by
+  // POST /collections/{id}/records/missing-opening. A dual capture into the
+  // record clears it.
   missing_side?: MissingSide | null;
+  // What a placeholder should hold, the note on it and the Fisqua request
+  // it came from (kept after it is captured into), and why the operator
+  // closed a missing record without capturing it, with the note on that
+  // (POST /records/{id}/close-missing). A closed record is not pending and
+  // goes to review with its volume. Absent from a backend before 0.3.3.
+  missing_expected?: string | null;
+  missing_note?: string | null;
+  missing_request_id?: string | null;
+  closed_reason?: ClosedReason | null;
+  closed_note?: string | null;
 }
 
-// The page of a dual opening never photographed.
-export type MissingSide = 'left' | 'right';
+// The page or pages of a dual opening never photographed: one page, or
+// 'both' for a placeholder (NEH-316).
+export type MissingSide = 'left' | 'right' | 'both';
+
+// Why a missing record was closed without capturing it, as
+// POST /records/{id}/close-missing takes it. 'other' needs a note: the
+// backend answers 422 without one.
+export const CLOSED_REASONS = ['foliation_skip', 'leaf_missing_from_volume', 'captured_elsewhere', 'other'] as const;
+export type ClosedReason = (typeof CLOSED_REASONS)[number];
+
+// POST /collections/{id}/records/missing-opening. `count` is 1 to 50, or
+// null when the number is not known, which the backend takes as one.
+export interface MissingOpeningsCreate {
+  afterRecordId: number;
+  count: number | null;
+  expected: string | null;
+  note: string | null;
+}
+
+// POST /records/{id}/close-missing. A refusal is a 409 whose detail.code is
+// `not_missing` or `already_closed`.
+export interface CloseMissingRequest {
+  reason: ClosedReason;
+  note: string | null;
+}
 
 // The predefined rejection reasons, mirroring the backend's
 // PREDEFINED_REJECTION_REASONS and the annotation feature's error types.
@@ -1148,6 +1199,17 @@ export const recordsApi = {
   },
 
   /**
+   * Close a missing record (a page or a whole opening never captured)
+   * without capturing it (NEH-316). Returns the record, closed.
+   */
+  async closeMissing(id: number, data: CloseMissingRequest): Promise<Record> {
+    return apiRequest<Record>(`/records/${id}/close-missing`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
    * Every rejected record on the unit, across all volumes, the one whose
    * latest rejection is oldest first, each with that rejection.
    */
@@ -1299,6 +1361,9 @@ export interface DualCaptureRequest {
   sequence?: number;
   collection_id?: number;
   left_camera_index?: number;
+  // Inserts the new record right after this record of the volume, moving
+  // every later record's sequence up one (NEH-316). Not with record_id.
+  afterRecordId?: number;
 }
 
 export interface CaptureResponse {
@@ -1677,6 +1742,12 @@ export interface RecordToRetake {
   rejectedAt:   string | null;
   pendingReason: PendingReason;
   missingSide:  MissingSide | null;
+  // For a missing record: what it should hold, the note on it, and the
+  // Fisqua request it came from (NEH-316); null otherwise, and absent from
+  // a backend before 0.3.3. The list is ordered by volume, then by sequence.
+  missingExpected?: string | null;
+  missingNote?:     string | null;
+  requestId?:       string | null;
 }
 
 export type PendingReason = 'rejected' | 'prepared' | 'missing_side';

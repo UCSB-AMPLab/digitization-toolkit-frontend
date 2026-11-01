@@ -8,7 +8,7 @@
   // a single JPEG frame. The frame's resolution is the backend's default for
   // that endpoint, since no `resolution` parameter is sent from here.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.3.3
 
   import { onMount, onDestroy } from 'svelte';
   import { m } from '$lib/i18n';
@@ -52,6 +52,7 @@
     needsStem = false,
     stemFormHref = '',
     onStemRefused,
+    swapped = $bindable(false),
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -78,6 +79,10 @@
     // true when it has no stem, in which case the page sets needsStem and the
     // banner replaces the generic capture error.
     onStemRefused?: () => Promise<boolean>;
+    // Whether camera 1 takes the left page. Bindable, so that the page's
+    // own dual captures (a placeholder's, NEH-317) send the same
+    // left_camera_index as this viewport's.
+    swapped?: boolean;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -92,7 +97,7 @@
   let dragging = $state<'v' | 'h' | null>(null);
 
   // swapped = true puts camera 1 on the left and camera 0 on the right.
-  let swapped = $state(false);
+  // The state is the `swapped` prop, bound by the page.
   let leftIdx  = $derived(swapped ? 1 : 0);
   let rightIdx = $derived(swapped ? 0 : 1);
 

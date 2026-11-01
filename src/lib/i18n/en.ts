@@ -2,7 +2,7 @@
 // `Messages` in `index.ts`): a missing or extra key here is a type error in
 // `npm run check`.
 //
-// Version: 0.3.2
+// Version: 0.3.3
 
 import type { Messages } from './index';
 
@@ -1340,7 +1340,7 @@ export const en: Messages = {
 
 	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────
 	retakes_title: 'To retake',
-	retakes_subtitle: 'Records rejected in review, oldest rejection first.',
+	retakes_subtitle: "Openings to capture again, or for the first time, in each volume's order.",
 	retakes_empty: 'Nothing is waiting to be retaken.',
 	retakes_load_error: 'The records to retake could not be loaded.',
 	retakes_retake: 'Retake',
@@ -1356,6 +1356,80 @@ export const en: Messages = {
 	// ── An opening with a page never photographed (0.3.2) ───────────────────
 	missing_page: 'This page was not captured',
 	missing_page_reason: 'A page is missing: recapture the whole opening',
+	// ── Openings and pages never captured: placeholders (NEH-317) ───────────
+	pill_opening_missing: 'Opening not captured',
+	pill_page_missing: 'Page not captured',
+	pill_closed: 'Closed',
+	legend_title: 'Legend',
+	legend_rejected: 'Rejected in review: has images, needs a new capture',
+	legend_never: 'Never captured: a page or a whole opening',
+	legend_closed: 'Closed with a reason: no longer to retake',
+	toolbar_mark_missing: 'Mark an opening missing',
+	hover_missing_here: 'An opening is missing here',
+	mark_pick_hint: 'Choose the record the missing opening goes after.',
+	mark_title: 'Mark an opening missing',
+	mark_body: (n: number, f: string | null) =>
+		f
+			? `After record ${formatCount(n, 'en')}, which ends at folio ${f}. Captua puts an empty opening in its place, and it is listed with the retakes.`
+			: `After record ${formatCount(n, 'en')}. Captua puts an empty opening in its place, and it is listed with the retakes.`,
+	mark_count_legend: 'How many openings are missing?',
+	mark_count_unknown: 'Not known: the operator will see when the volume is open',
+	mark_count_one: 'One',
+	mark_count_more: 'More than one',
+	mark_count_number_aria: 'Number of openings',
+	mark_expected: 'What should be there (optional)',
+	mark_note: 'Note for the operator',
+	mark_cancel: 'Cancel',
+	mark_submit: 'Mark missing',
+	mark_error: 'The opening could not be marked missing. Try again.',
+	cap_title: (f: string | null, n: number) =>
+		f ? `Missing opening after folio ${f}` : `Missing opening after record ${formatCount(n, 'en')}`,
+	cap_where: 'Where it goes',
+	cap_from_review: 'From Fisqua review',
+	cap_after: 'After a capture',
+	cap_another_q: (f: string | null) =>
+		f ? `Captured. Is another opening missing before folio ${f}?` : 'Captured. Is another opening missing here?',
+	cap_another: 'Capture another here',
+	cap_last: 'That was the last one',
+	cap_order_note: (n: number, img: string | null) =>
+		img
+			? `Order and file names are separate. This opening's place is after record ${formatCount(n, 'en')}. Its files take the volume's next capture number, ${img}.`
+			: `Order and file names are separate. This opening's place is after record ${formatCount(n, 'en')}. Its files take the volume's next capture number.`,
+	cap_nothing_link: 'There is no opening to capture here',
+	close_title: 'No opening to capture here',
+	close_body: (f: string | null) =>
+		f
+			? `The empty opening after folio ${f} is closed and stays in the volume with your reason, so reviewers can see what was checked.`
+			: 'The empty opening is closed and stays in the volume with your reason, so reviewers can see what was checked.',
+	close_legend: 'What did you find?',
+	close_reason_skip: 'The foliation skips a number; no leaf is missing',
+	close_reason_leaf_missing: 'The leaf is missing from the volume',
+	close_reason_elsewhere: 'The pages are already captured elsewhere in the volume',
+	close_reason_other: 'Something else',
+	close_details: 'Details',
+	close_back: 'Back to capture',
+	close_submit: 'Close the opening',
+	close_after_note:
+		"A closed opening no longer counts as a retake, so it doesn't hold the volume back. It goes to Fisqua with the volume, carrying its reason.",
+	close_note_required: 'For "Something else", write the details.',
+	close_err_not_missing: 'This record is not missing anything, so there is nothing to close.',
+	close_err_already_closed: 'This opening was already closed.',
+	close_err_failed: 'The opening could not be closed. Try again.',
+	close_page_title: 'No page to capture here',
+	close_page_body:
+		'The missing page is closed and stays in the volume with your reason, so reviewers can see what was checked.',
+	close_page_reason_elsewhere: 'The page is already captured elsewhere in the volume',
+	close_page_submit: 'Close the page',
+	close_page_after_note:
+		"A closed page no longer counts as a retake, so it doesn't hold the volume back. It goes to Fisqua with the volume, carrying its reason.",
+	close_page_err_already_closed: 'This page was already closed.',
+	close_page_err_failed: 'The page could not be closed. Try again.',
+	retakes_no_opening: 'No opening here',
+	retakes_no_page: 'No page here',
+	retakes_capture: 'Capture',
+	retakes_page_missing_row: (side: 'left' | 'right') =>
+		`The ${side} page was never photographed. A capture with both cameras replaces the opening.`,
+	retakes_volume_pending: (n: number) => `${formatCount(n, 'en')} pending`,
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
 	lv_instruction_label: 'From the list',
 	lv_instruction_show_all: 'Show all',

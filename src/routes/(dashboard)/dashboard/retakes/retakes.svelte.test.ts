@@ -1,9 +1,11 @@
-// Por recapturar (/dashboard/retakes): every rejected record from GET
-// /records/to-retake, with its volume, sequence, reason and gloss, comment,
-// who rejected it and when, and a Repetir button into the capture screen's
-// retake of that record, in the project the row gives. The API is mocked.
+// Por recapturar (/dashboard/retakes): every pending record from GET
+// /records/to-retake, grouped under a heading per volume in the API's order
+// (NEH-317), with its sequence, reason and gloss, comment, who rejected it
+// and when, and a Repetir button into the capture screen's retake of that
+// record, in the project the row gives. Placeholders and missing pages get
+// Capture and a way to close them. The API is mocked.
 //
-// Version: 0.3.2
+// Version: 0.3.3
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -121,9 +123,11 @@ describe('Por recapturar', () => {
 		await expect.element(rows.first()).toBeVisible();
 		expect(rows.elements()).toHaveLength(4);
 
+		const tomo6 = screen.getByRole('region', { name: /^Tomo 6/ });
+		await expect.element(tomo6.getByRole('heading', { level: 2 })).toHaveTextContent('Tomo 6');
+		await expect.element(tomo6.getByText('co-ahr-aht-006')).toBeVisible();
+
 		const first = rows.nth(0);
-		await expect.element(first.getByText('Tomo 6')).toBeVisible();
-		await expect.element(first.getByText('co-ahr-aht-006')).toBeVisible();
 		await expect.element(first.getByText('2026-10-20T09:15:00')).toBeVisible();
 		await expect.element(first.getByText('Secuencia 12')).toBeVisible();
 		await expect.element(first.getByText('Imagen movida')).toBeVisible();
@@ -158,12 +162,18 @@ describe('Por recapturar', () => {
 		await expect.element(time).toHaveTextContent(/9:00/);
 	});
 
-		it('keeps the order the backend gives, oldest rejection first', async () => {
+	it('groups the rows under a heading per volume, in the order the backend gives', async () => {
 		vi.spyOn(recordsApi, 'toRetake').mockResolvedValue(toRetake);
 		const screen = render(Retakes);
 		await expect.element(screen.getByRole('listitem').first()).toBeVisible();
-		const volumes = screen.getByRole('listitem').elements().map((r) => r.querySelector('.rt-volume-name')?.textContent?.trim());
-		expect(volumes).toEqual(['Tomo 6', 'Tomo 7', 'Tomo 7', undefined]);
+		const headings = screen.getByRole('heading', { level: 2 }).elements().map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
+		expect(headings).toEqual([
+			'Tomo 6 co-ahr-aht-006 1 pendiente',
+			'Tomo 7 co-ahr-aht-007 2 pendientes',
+			'Este registro no está en ningún volumen.'
+		]);
+		const perGroup = screen.getByRole('region').elements().map((g) => g.querySelectorAll('li').length);
+		expect(perGroup).toEqual([1, 2, 1]);
 	});
 
 	it('Repetir opens the capture screen on that record, in its volume and project', async () => {
@@ -177,7 +187,7 @@ describe('Por recapturar', () => {
 		vi.spyOn(recordsApi, 'toRetake').mockResolvedValue(toRetake);
 		const screen = render(Retakes);
 		const fourth = screen.getByRole('listitem').nth(3);
-		await expect.element(fourth.getByText('Este registro no está en ningún volumen.')).toBeVisible();
+		await expect.element(screen.getByRole('heading', { name: 'Este registro no está en ningún volumen.' })).toBeVisible();
 		await expect.element(fourth.getByText('Reflejo/Brillo')).toBeVisible();
 		await expect.element(fourth.getByRole('button', { name: 'Volver a capturar' })).not.toBeInTheDocument();
 		expect(collectionsApi.listAll).not.toHaveBeenCalled();
@@ -294,17 +304,20 @@ describe('Por recapturar', () => {
 			const screen = render(Retakes);
 			const row = screen.getByRole('listitem').first();
 			await expect.element(row.getByText('Par sin izquierda')).toBeVisible();
-			await expect.element(row.getByText(es.missing_page_reason)).toBeVisible();
+			await expect.element(row.getByText(es.pill_page_missing)).toBeVisible();
+			await expect.element(row.getByText(es.retakes_page_missing_row('left'))).toBeVisible();
 			await expect.element(row.getByText('No quedó registrado el motivo de este rechazo.')).not.toBeInTheDocument();
 			await expect.element(row.getByText(/^Rechazado/)).not.toBeInTheDocument();
-			await expect.element(row.getByRole('button', { name: 'Volver a capturar' })).toBeVisible();
+			await expect.element(row.getByRole('button', { name: es.retakes_no_page })).toBeVisible();
+			await expect.element(row.getByRole('button', { name: es.retakes_capture, exact: true })).toBeVisible();
+			await expect.element(row.getByRole('button', { name: 'Volver a capturar' })).not.toBeInTheDocument();
 		});
 
 		it('shows no older rejection with a missing side, should the backend send one', async () => {
 			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([{ ...missingRow, reason: 'blur', comment: 'Una nota antigua.', rejectedBy: 'revisora', rejectedAt: '2026-10-01T14:00:00' }]);
 			const screen = render(Retakes);
 			const row = screen.getByRole('listitem').first();
-			await expect.element(row.getByText(es.missing_page_reason)).toBeVisible();
+			await expect.element(row.getByText(es.retakes_page_missing_row('left'))).toBeVisible();
 			await expect.element(row.getByText('Una nota antigua.')).not.toBeInTheDocument();
 			await expect.element(row.getByText('Imagen movida')).not.toBeInTheDocument();
 			await expect.element(row.getByText(/^Rechazado/)).not.toBeInTheDocument();
@@ -324,7 +337,140 @@ describe('Por recapturar', () => {
 			const row = screen.getByRole('listitem').first();
 			await expect.element(row.getByText('Reflejo en el folio 9v.')).toBeVisible();
 			await expect.element(row.getByText(/^Rechazado por revisora el /)).toBeVisible();
+			await expect.element(row.getByText(es.pill_page_missing)).not.toBeInTheDocument();
+		});
+	});
+
+	describe('placeholders and missing pages (NEH-317)', () => {
+		const placeholderRow: RecordToRetake = {
+			recordId: 60, title: 'Par vacío', sequence: 96, collectionId: 5, projectId: 3,
+			name: 'Tomo 6', filenameStem: 'co-ahr-aht-006',
+			reason: null, comment: null, rejectedBy: null, rejectedAt: null,
+			pendingReason: 'missing_side', missingSide: 'both',
+			missingExpected: 'Folios 90v y 91r', missingNote: 'Parece faltar el folio 91; revisa el volumen.', requestId: 'req-1'
+		};
+		const pageRow: RecordToRetake = {
+			recordId: 61, title: 'Par sin derecha', sequence: 99, collectionId: 5, projectId: 3,
+			name: 'Tomo 6', filenameStem: 'co-ahr-aht-006',
+			reason: null, comment: null, rejectedBy: null, rejectedAt: null,
+			pendingReason: 'missing_side', missingSide: 'right',
+			missingExpected: null, missingNote: null, requestId: null
+		};
+
+		it('replaces the subtitle', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([placeholderRow]);
+			const screen = render(Retakes);
+			await expect.element(screen.getByText(es.retakes_subtitle)).toBeVisible();
+		});
+
+		it('a placeholder row shows its pill, what it should hold, the note, No opening here and Capture', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([placeholderRow]);
+			const screen = render(Retakes);
+			const row = screen.getByRole('listitem').first();
+			await expect.element(row.getByText(es.pill_opening_missing)).toBeVisible();
+			await expect.element(row.getByText('Folios 90v y 91r')).toBeVisible();
+			await expect.element(row.getByText('Parece faltar el folio 91; revisa el volumen.')).toBeVisible();
 			await expect.element(row.getByText(es.missing_page_reason)).not.toBeInTheDocument();
+			await expect.element(row.getByRole('button', { name: es.retakes_no_opening })).toBeVisible();
+			await row.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			expect(gotoMock).toHaveBeenCalledWith('/live-preview?projectId=3&collectionId=5&recordId=60');
+		});
+
+		it('No opening here opens the close dialog; closing takes the row off the list', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([placeholderRow, pageRow]);
+			const spy = vi.spyOn(recordsApi, 'closeMissing').mockResolvedValue({
+				id: 60, title: 'Par vacío', status: 'captured', capture_mode: 'dual', images: [], missing_side: 'both', closed_reason: 'foliation_skip'
+			});
+			const screen = render(Retakes);
+			await screen.getByRole('listitem').first().getByRole('button', { name: es.retakes_no_opening }).click();
+			const dialog = screen.getByRole('dialog', { name: es.close_title });
+			await expect.element(dialog).toBeVisible();
+			await dialog.getByRole('radio', { name: es.close_reason_skip }).click();
+			await dialog.getByRole('button', { name: es.close_submit }).click();
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+			expect(spy).toHaveBeenCalledWith(60, { reason: 'foliation_skip', note: null });
+			expect(screen.getByRole('listitem').elements()).toHaveLength(1);
+			await expect.element(screen.getByText('Par vacío')).not.toBeInTheDocument();
+			await expect.element(screen.getByRole('heading', { level: 2 })).toHaveTextContent('1 pendiente');
+		});
+
+		it('No page here opens the close dialog for a missing page; Back to capture leaves the row', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([pageRow]);
+			const screen = render(Retakes);
+			await screen.getByRole('listitem').first().getByRole('button', { name: es.retakes_no_page }).click();
+			const dialog = screen.getByRole('dialog', { name: es.close_page_title });
+			await expect.element(dialog.getByRole('button', { name: es.close_page_submit })).toBeVisible();
+			await dialog.getByRole('button', { name: es.close_back }).click();
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+			expect(screen.getByRole('listitem').elements()).toHaveLength(1);
+		});
+
+		it('a missing-page row names its side and offers Capture', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([pageRow]);
+			const screen = render(Retakes);
+			const row = screen.getByRole('listitem').first();
+			await expect.element(row.getByText(es.retakes_page_missing_row('right'))).toBeVisible();
+			await row.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			expect(gotoMock).toHaveBeenCalledWith('/live-preview?projectId=3&collectionId=5&recordId=61');
+		});
+
+		it('writes which page is missing as plain muted text, like a rejection\'s explanation', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([toRetake[0], pageRow]);
+			const screen = render(Retakes);
+			const explanation = screen.getByText(es.retakes_page_missing_row('right'));
+			const gloss = screen.getByText('La cámara o la página se movió durante la captura y los trazos se ven arrastrados.');
+			await expect.element(explanation).toBeVisible();
+			const a = getComputedStyle(explanation.element());
+			const b = getComputedStyle(gloss.element());
+			expect(a.fontWeight).toBe(b.fontWeight);
+			expect(a.color).toBe(b.color);
+			expect(a.fontSize).toBe(b.fontSize);
+		});
+
+		it('a rejected record that also misses a page shows the pill and the page under the rejection, with Retake and no close button', async () => {
+			const row: RecordToRetake = { ...toRetake[0], recordId: 62, missingSide: 'left' };
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([row]);
+			const screen = render(Retakes);
+			const li = screen.getByRole('listitem').first();
+			await expect.element(li.getByText('Imagen movida')).toBeVisible();
+			await expect.element(li.getByText(es.pill_page_missing)).toBeVisible();
+			await expect.element(li.getByText(es.retakes_page_missing_row('left'))).toBeVisible();
+			await expect.element(li.getByRole('button', { name: 'Volver a capturar' })).toBeVisible();
+			await expect.element(li.getByRole('button', { name: es.retakes_no_page })).not.toBeInTheDocument();
+			await expect.element(li.getByRole('button', { name: es.retakes_capture, exact: true })).not.toBeInTheDocument();
+		});
+
+		it('a prepared record that is also a placeholder shows the opening pill, with Retake and no close button', async () => {
+			const row: RecordToRetake = {
+				...toRetake[0], recordId: 63, pendingReason: 'prepared', missingSide: 'both',
+				missingExpected: 'Folios 3v y 4r', missingNote: null, requestId: null
+			};
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([row]);
+			const screen = render(Retakes);
+			const li = screen.getByRole('listitem').first();
+			await expect.element(li.getByText(es.pill_opening_missing)).toBeVisible();
+			await expect.element(li.getByText('Folios 3v y 4r')).toBeVisible();
+			await expect.element(li.getByRole('button', { name: 'Volver a capturar' })).toBeVisible();
+			await expect.element(li.getByRole('button', { name: es.retakes_no_opening })).not.toBeInTheDocument();
+		});
+
+		it('rejected rows keep their Retake button and no close button', async () => {
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([toRetake[0]]);
+			const screen = render(Retakes);
+			const row = screen.getByRole('listitem').first();
+			await expect.element(row.getByRole('button', { name: 'Volver a capturar' })).toBeVisible();
+			await expect.element(row.getByRole('button', { name: es.retakes_no_opening })).not.toBeInTheDocument();
+			await expect.element(row.getByRole('button', { name: es.retakes_no_page })).not.toBeInTheDocument();
+		});
+
+		it('gives a reviewer neither Capture nor the close buttons', async () => {
+			signIn('reviewer');
+			vi.spyOn(recordsApi, 'toRetake').mockResolvedValue([placeholderRow, pageRow]);
+			const screen = render(Retakes);
+			await expect.element(screen.getByRole('listitem').first()).toBeVisible();
+			await expect.element(screen.getByRole('button', { name: es.retakes_capture, exact: true })).not.toBeInTheDocument();
+			await expect.element(screen.getByRole('button', { name: es.retakes_no_opening })).not.toBeInTheDocument();
+			await expect.element(screen.getByRole('button', { name: es.retakes_no_page })).not.toBeInTheDocument();
 		});
 	});
 });

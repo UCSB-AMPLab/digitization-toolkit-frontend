@@ -2,7 +2,7 @@
 // moved out of the image frame (below it, in static flow) so it never
 // covers foliation or marginalia at any zoom.
 //
-// Version: 0.3.2
+// Version: 0.3.3
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -245,5 +245,24 @@ describe('ImageViewer — an opening with a page never photographed (0.3.2)', ()
     expect(right.querySelector('[data-missing-side="right"]')).not.toBeNull();
     expect(left.querySelector('img.spread-image.left')).not.toBeNull();
     expect(left.textContent).not.toContain(es.missing_page);
+  });
+
+  it('a placeholder for a whole opening (NEH-317): both frames are empty and say so, with its pill', async () => {
+    const record = makeRecord({ capture_mode: 'dual', missing_side: 'both', images: [] });
+    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+    const [left, right] = frames(screen.container);
+    await expect.element(left).toHaveTextContent(es.missing_page);
+    await expect.element(right).toHaveTextContent(es.missing_page);
+    expect(left.querySelector('[data-missing-side="left"]')).not.toBeNull();
+    expect(right.querySelector('[data-missing-side="right"]')).not.toBeNull();
+    await expect.element(screen.getByText(es.pill_opening_missing)).toBeVisible();
+  });
+
+  it('a closed placeholder keeps the empty frames, with the Closed pill', async () => {
+    const record = makeRecord({ capture_mode: 'dual', missing_side: 'both', closed_reason: 'foliation_skip', images: [] });
+    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+    await expect.element(screen.getByText(es.pill_closed, { exact: true })).toBeVisible();
+    expect(screen.container.querySelectorAll('[data-missing-side]')).toHaveLength(2);
+    expect(screen.container.textContent).not.toContain(es.pill_opening_missing);
   });
 });
