@@ -9,7 +9,7 @@
 // GET and PUT under /imports/digitisation-lists and POST
 // /imports/digitisation-list are mocked.
 //
-// Version: 0.3.2
+// Version: 0.3.3
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
@@ -858,7 +858,7 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 		expect(titles(screen.container)).toEqual(['Tomo 5', 'Tomo 4', 'Tomo 1', 'Tomo 2']);
 	});
 
-	it("shows a spot recapture's count and pairs, by sequence where known, and a null pairId without error", async () => {
+	it("shows a spot recapture's count and pairs, by sequence and side, without the record title, and a null pairId without error", async () => {
 		const rejectedRow = (recordId: number, title: string, sequence: number | null): RecordToRetake => ({
 			recordId, title, sequence, collectionId: 106, projectId: 7,
 			name: 'Tomo F', filenameStem: 'co-ahr-aht-6', reason: 'blur', comment: null, rejectedBy: null, rejectedAt: null,
@@ -868,10 +868,13 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 		vi.spyOn(importsApi, 'lists').mockResolvedValue([fisqua()]);
 		const screen = render(Queue);
 		await expect.element(screen.getByText('3 page pairs to retake')).toBeVisible();
-		await expect.element(screen.getByText('f. 12')).toBeVisible();
+		await expect.element(screen.getByText('Sequence 12')).toBeVisible();
 		const row = screen.getByText('3 page pairs to retake').element().closest('.q-row')!;
 		const pairs = [...row.querySelectorAll('.q-pair')].map((p) => p.textContent?.replace(/\s+/g, ' ').trim());
-		expect(pairs).toEqual(['f. 12 Sequence 12', 'f. 14 Sequence 14', 'Record #999']);
+		// The record title, the same on every row of a volume, is not repeated (NEH-312);
+		// the side is shown when Fisqua names one page.
+		expect(pairs).toEqual(['Sequence 12 · Right page', 'Sequence 14', 'Record #999 · Left page']);
+		expect(row.textContent).not.toContain('f. 12');
 		// Only the spot recapture has the block.
 		expect(screen.container.querySelectorAll('.q-pairs')).toHaveLength(1);
 	});
