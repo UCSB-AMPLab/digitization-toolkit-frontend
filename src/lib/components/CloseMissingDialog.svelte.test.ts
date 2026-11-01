@@ -6,6 +6,7 @@
 // Version: 0.3.3
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -138,6 +139,36 @@ describe('CloseMissingDialog', () => {
 			spy.mockRejectedValueOnce(new ApiError('boom', 'boom', 500));
 			await screen.getByRole('button', { name: es.close_page_submit }).click();
 			await expect.element(screen.getByRole('alert')).toHaveTextContent(es.close_page_err_failed);
+		});
+	});
+
+	describe('focus (Copilot review of #159)', () => {
+		let opener: HTMLButtonElement;
+		beforeEach(() => {
+			opener = document.createElement('button');
+			opener.textContent = 'opener';
+			document.body.appendChild(opener);
+			opener.focus();
+		});
+		afterEach(() => opener.remove());
+
+		it('moves the focus into the dialog, keeps Tab inside it, and gives it back on cancel', async () => {
+			const screen = mount();
+			const dialog = screen.getByRole('dialog');
+			await expect.element(dialog).toBeVisible();
+			await vi.waitFor(() => expect(dialog.element().contains(document.activeElement)).toBe(true));
+			for (let i = 0; i < 15; i++) {
+				await userEvent.keyboard('{Tab}');
+				expect(dialog.element().contains(document.activeElement)).toBe(true);
+			}
+			for (let i = 0; i < 15; i++) {
+				await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+				expect(dialog.element().contains(document.activeElement)).toBe(true);
+			}
+			await dialog.getByRole('button', { name: es.close_back }).click();
+			expect(onCancel).toHaveBeenCalled();
+			screen.unmount();
+			expect(document.activeElement).toBe(opener);
 		});
 	});
 });

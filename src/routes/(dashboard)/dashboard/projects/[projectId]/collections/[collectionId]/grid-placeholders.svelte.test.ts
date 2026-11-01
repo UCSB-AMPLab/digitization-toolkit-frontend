@@ -298,3 +298,33 @@ describe('grid: focus on a placeholder or closed tile (round 4)', () => {
 		});
 	}
 });
+
+describe('grid: pick mode from the keyboard (Copilot review of #159)', () => {
+	for (const key of ['{Enter}', ' ']) {
+		it(`${key === ' ' ? 'Space' : 'Enter'} on a pair tile or a single tile chooses it`, async () => {
+			const single = { ...pair(3, 97), capture_mode: 'single', images: [{ id: 30, record_id: 3, filename: 's.jpg', file_path: '/s', format: 'jpg', role: null, is_current: true }] } as unknown as ApiRecord;
+			for (const title of ['Registro 95', 'Registro 97']) {
+				const onRecordClick = vi.fn();
+				const screen = mount([pair(1, 95), pair(2, 96), single], vi.fn(), onRecordClick);
+				await screen.getByRole('button', { name: es.toolbar_mark_missing }).click();
+				const card = cardOf(screen, title);
+				card.focus();
+				await userEvent.keyboard(key);
+				const dialog = screen.getByRole('dialog', { name: es.mark_title });
+				await expect.element(dialog.getByText(es.mark_body(title === 'Registro 95' ? 95 : 97, null))).toBeVisible();
+				expect(onRecordClick).not.toHaveBeenCalled();
+				screen.unmount();
+			}
+		});
+	}
+
+	it('Enter outside pick mode opens the record, as a click does', async () => {
+		const onRecordClick = vi.fn();
+		const screen = mount([pair(1, 95), pair(2, 96)], vi.fn(), onRecordClick);
+		const card = cardOf(screen, 'Registro 96');
+		card.focus();
+		await userEvent.keyboard('{Enter}');
+		expect(onRecordClick).toHaveBeenCalledTimes(1);
+		expect(onRecordClick.mock.calls[0][0].id).toBe(2);
+	});
+});

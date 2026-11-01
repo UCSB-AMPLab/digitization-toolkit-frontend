@@ -16,11 +16,14 @@
   //
   // It sits above the capture screen's modal, from which it can be opened.
   //
+  // The keyboard stays in the dialog (trapFocus): the focus moves in on
+  // open, Tab wraps inside, and the focus goes back on close.
+  //
   // Version: 0.3.3
 
   import { recordsApi, ApiError, CLOSED_REASONS, type ClosedReason, type Record as ApiRecord } from '$lib/api';
   import { m } from '$lib/i18n';
-  import { dismissible } from '$lib/dialog';
+  import { dismissible, trapFocus } from '$lib/dialog';
 
   let {
     record,
@@ -83,7 +86,7 @@
 </script>
 
 <div class="cm-backdrop" use:dismissible={{ onDismiss: cancel, escape: !sending }}>
-  <div class="cm-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="cm-title">
+  <div class="cm-card dialog-fit" role="dialog" aria-modal="true" tabindex="-1" use:trapFocus aria-labelledby="cm-title">
     <div class="cm-head">
       <h2 class="cm-title" id="cm-title">{isPage ? $m.close_page_title : $m.close_title}</h2>
       <p class="cm-body">{isPage ? $m.close_page_body : $m.close_body(null)}</p>

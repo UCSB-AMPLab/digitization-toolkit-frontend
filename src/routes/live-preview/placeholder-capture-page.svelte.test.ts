@@ -73,13 +73,16 @@ const served = {
 	nextId: 500,
 	// When set, the next capture that inserts (afterRecordId) waits for it.
 	hold: null as null | Promise<void>,
-	recordsNext: null as null | (() => Promise<Response>)
+	recordsNext: null as null | (() => Promise<Response>),
+	recordReads: 0,
+	summaryReads: 0
 };
 
 function serve() {
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/records/to-retake/summary')) {
+			served.summaryReads++;
 			const pending = served.records.filter((r) => r.missing_side && !r.closed_reason).map((r) => r.id);
 			return json({
 				pendingRecords: pending.length,
@@ -108,6 +111,7 @@ function serve() {
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
 		if (path.endsWith('/records')) {
+			served.recordReads++;
 			// Armed by a test: the next read of the records answers through it, once.
 			const once = served.recordsNext;
 			if (once) {
@@ -149,6 +153,8 @@ beforeEach(() => {
 	served.nextId = 500;
 	served.hold = null;
 	served.recordsNext = null;
+	served.recordReads = 0;
+	served.summaryReads = 0;
 	vi.mocked(goto).mockReset();
 	authStore.setSession('tok', { id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
 });
@@ -445,4 +451,180 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 		});
 	});
+
+	describe('Copilot review of #159', () => {
+		function holdRecords() {
+			let release!: (ok: boolean) => void;
+			const gate = new Promise<boolean>((r) => (release = r));
+			served.recordsNext = async () => ((await gate) ? json(served.records) : json({ detail: 'boom' }, 500));
+			return release;
+		}
+		async function fillFrom(screen: ReturnType<typeof render>) {
+			const dialog = screen.getByRole('dialog');
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByText(es.cap_another_q(null))).toBeVisible();
+			await expect.element(dialog.getByText(es.lvm_retaking)).not.toBeInTheDocument();
+			return dialog;
+		}
+
+		it('Close after a fill opened from the strip keeps the modal mounted and locked until the records are read', async () => {
+			current.url = BASE_URL;
+			serve();
+			const screen = render(LivePreview);
+			const hole = () => [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 96'))!;
+			await vi.waitFor(() => expect(hole()).toBeTruthy());
+			hole().click();
+			const dialog = await fillFrom(screen);
+			const release = holdRecords();
+			await dialog.getByRole('button', { name: es.common_close }).first().click();
+			await new Promise((r) => setTimeout(r, 50));
+			await expect.element(screen.getByRole('dialog')).toBeVisible();
+			for (const b of dialog.getByRole('button', { name: es.common_close }).elements()) expect((b as HTMLButtonElement).disabled).toBe(true);
+			release(true);
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		});
+
+		it('back to the volume, the modal stays until the navigation has finished', async () => {
+			served.records[1] = { ...placeholder(42, 96, null), closed_reason: 'foliation_skip', closed_note: null };
+			let arrive!: () => void;
+			vi.mocked(goto).mockImplementation(() => new Promise<void>((r) => (arrive = r)));
+			serve();
+			const screen = render(LivePreview);
+			const dialog = screen.getByRole('dialog');
+			await dialog.getByRole('button', { name: 'Volver a capturar' }).click();
+			await dialog.getByRole('button', { name: 'Confirmar' }).click();
+			await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard/projects/2/collections/9'));
+			await expect.element(screen.getByRole('dialog')).toBeVisible();
+			arrive();
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		});
+
+		it('when the records cannot be read after Capture another here, it says so, keeps the new record, and offers a retry before another', async () => {
+			serve();
+			const screen = render(LivePreview);
+			const dialog = await fillFrom(screen);
+			holdRecords()(false);
+			await dialog.getByRole('button', { name: es.cap_another }).click();
+			await expect.element(dialog.getByText(es.cap_refresh_error)).toBeVisible();
+			await expect.element(dialog.getByRole('button', { name: es.cap_another })).toBeDisabled();
+			await dialog.getByRole('button', { name: es.common_retry }).click();
+			await expect.element(dialog.getByText(es.cap_refresh_error)).not.toBeInTheDocument();
+			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await expect.element(dialog.getByRole('button', { name: es.cap_another })).toBeEnabled();
+			await dialog.getByRole('button', { name: es.cap_another }).click();
+			await vi.waitFor(() => expect(served.captures).toHaveLength(3));
+			expect(served.captures[2].body.afterRecordId).toBe(500);
+		});
+
+		it('shows a neighbour\'s pages left before right, whatever order they come in', async () => {
+			served.records[0] = { ...pair(41, 95), images: [img(411, 41, 'right'), img(410, 41, 'left')] };
+			serve();
+			const screen = render(LivePreview);
+			const where = screen.getByRole('group', { name: es.cap_where });
+			await expect.element(where).toBeVisible();
+			const srcs = [...where.element().querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+			expect(srcs[0]).toContain('/records/images/410/thumbnail');
+			expect(srcs[1]).toContain('/records/images/411/thumbnail');
+		});
+
+		it('disables the close link while the screen goes on', async () => {
+			serve();
+			const screen = render(LivePreview);
+			await screen.getByRole('dialog').getByRole('button', { name: es.cap_nothing_link }).click();
+			const close = screen.getByRole('dialog', { name: es.close_title });
+			await close.getByRole('radio', { name: es.close_reason_skip }).click();
+			const release = holdRecords();
+			await close.getByRole('button', { name: es.close_submit }).click();
+			await expect.element(screen.getByRole('dialog', { name: es.close_title })).not.toBeInTheDocument();
+			await expect.element(screen.getByRole('button', { name: es.cap_nothing_link })).toBeDisabled();
+			release(true);
+			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+		});
+	});
+
+	describe('stale refreshes and a failed navigation (round 6)', () => {
+		it('a Retry still running when the operator moves on does not touch the next placeholder', async () => {
+			served.records = [pair(41, 95), placeholder(42, 96, null), pair(43, 97), placeholder(44, 98, null), pair(45, 99)];
+			serve();
+			const screen = render(LivePreview);
+			const dialog = screen.getByRole('dialog');
+			// The reload after the fill fails: the panel offers a retry.
+			served.recordsNext = async () => json({ detail: 'boom' }, 500);
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByText(es.cap_refresh_error)).toBeVisible();
+			// The retry is held, then the operator moves on.
+			let release!: () => void;
+			const gate = new Promise<void>((r) => (release = r));
+			served.recordsNext = async () => {
+				await gate;
+				return json({ detail: 'boom' }, 500);
+			};
+			await dialog.getByRole('button', { name: es.common_retry }).click();
+			await dialog.getByRole('button', { name: es.cap_last }).click();
+			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			release();
+			await new Promise((r) => setTimeout(r, 100));
+			await expect.element(dialog.getByText(es.cap_refresh_error)).not.toBeInTheDocument();
+			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await expect.element(dialog.getByRole('group', { name: es.cap_where })).toBeVisible();
+			// And the next fill offers Capture another here, not a stuck retry.
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByRole('button', { name: es.cap_another })).toBeEnabled();
+		});
+
+		it('a rejected navigation back to the volume reloads the records and the summary in place, with no error', async () => {
+			served.records[1] = { ...placeholder(42, 96, null), closed_reason: 'foliation_skip', closed_note: null };
+			vi.mocked(goto).mockRejectedValue(new Error('navigation aborted'));
+			serve();
+			const screen = render(LivePreview);
+			const dialog = screen.getByRole('dialog');
+			await expect.element(dialog).toBeVisible();
+			const records = served.recordReads;
+			const summaries = served.summaryReads;
+			await dialog.getByRole('button', { name: 'Volver a capturar' }).click();
+			await dialog.getByRole('button', { name: 'Confirmar' }).click();
+			await vi.waitFor(() => expect(goto).toHaveBeenCalled());
+			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+			await vi.waitFor(() => expect(served.recordReads).toBeGreaterThan(records));
+			expect(served.summaryReads).toBeGreaterThan(summaries);
+			await expect.element(screen.getByText('navigation aborted', { exact: false })).not.toBeInTheDocument();
+		});
+	});
+
+	describe('only the newest read of the records is kept (round 7)', () => {
+		it('a slow retry that succeeds after the operator moved on and captured leaves the newer records', async () => {
+			served.records = [pair(41, 95), placeholder(42, 96, null), pair(43, 97), placeholder(44, 98, null), pair(45, 99)];
+			serve();
+			const screen = render(LivePreview);
+			const dialog = screen.getByRole('dialog');
+			served.recordsNext = async () => json({ detail: 'boom' }, 500);
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByText(es.cap_refresh_error)).toBeVisible();
+			// The retry is held; it will answer with the records as they are now,
+			// with the second placeholder still empty.
+			let release!: () => void;
+			const gate = new Promise<void>((r) => (release = r));
+			served.recordsNext = async () => {
+				const snapshot = JSON.parse(JSON.stringify(served.records));
+				await gate;
+				return json(snapshot);
+			};
+			await dialog.getByRole('button', { name: es.common_retry }).click();
+			await dialog.getByRole('button', { name: es.cap_last }).click();
+			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
+			await expect.element(dialog.getByText(es.cap_another_q(null))).toBeVisible();
+			await expect.element(dialog.getByText(es.lvm_retaking)).not.toBeInTheDocument();
+			const whereImgs = () =>
+				[...dialog.getByRole('group', { name: es.cap_where }).element().querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+			await vi.waitFor(() => expect(whereImgs().some((s) => s.includes('/records/images/440/thumbnail'))).toBe(true));
+			release();
+			await new Promise((r) => setTimeout(r, 100));
+			// The filled record keeps its images; the old snapshot was dropped.
+			expect(whereImgs().some((s) => s.includes('/records/images/440/thumbnail'))).toBe(true);
+			const strip = [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 98'));
+			expect(strip?.querySelector('img')?.getAttribute('src') ?? '').toContain('/records/images/440/thumbnail');
+		});
+	});
 });
+

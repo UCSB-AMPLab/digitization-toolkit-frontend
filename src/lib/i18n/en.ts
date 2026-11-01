@@ -1395,6 +1395,8 @@ export const en: Messages = {
 		img
 			? `Order and file names are separate. This opening's place is after record ${formatCount(n, 'en')}. Its files take the volume's next capture number, ${img}.`
 			: `Order and file names are separate. This opening's place is after record ${formatCount(n, 'en')}. Its files take the volume's next capture number.`,
+	cap_refresh_error:
+		"The opening was captured, but the volume's records could not be read again. Retry to see where the next one goes.",
 	cap_nothing_link: 'There is no opening to capture here',
 	close_title: 'No opening to capture here',
 	close_body: (f: string | null) =>

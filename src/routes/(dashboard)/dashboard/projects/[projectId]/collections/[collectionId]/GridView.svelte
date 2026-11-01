@@ -119,6 +119,15 @@
     }
   }
 
+  // Enter and Space on a tile act as a click: in pick mode they choose it.
+  function handleCardKeydown(e: KeyboardEvent, record: Record) {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleCardClick(record);
+    }
+  }
+
   function openMarkAfter(record: Record) {
     picking = false;
     markAfter = { record, n: sequenceOf(record) };
@@ -458,8 +467,7 @@
       <div class="grid-cell" class:pair-cell={group.items.length > 1}>
       {#if group.items.length > 1}
         <!-- NEH-211: L/R pair wrapped in a single container -->
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="grid-pair" class:picking class:is-placeholder={isPlaceholder(record)} class:is-closed={isClosed(record)} onclick={() => handleCardClick(record)} role="button" tabindex="0">
+        <div class="grid-pair" class:picking class:is-placeholder={isPlaceholder(record)} class:is-closed={isClosed(record)} onclick={() => handleCardClick(record)} onkeydown={(e) => handleCardKeydown(e, record)} role="button" tabindex="0">
           <div class="pair-thumbs">
             {#each group.items as item (item.image?.id ?? item.role)}
               <div class="card-image-wrapper">
@@ -478,8 +486,7 @@
         </div>
       {:else}
         {@const item = group.items[0]}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="grid-card" class:picking class:is-closed={isClosed(record)} onclick={() => handleCardClick(record)} role="button" tabindex="0">
+        <div class="grid-card" class:picking class:is-closed={isClosed(record)} onclick={() => handleCardClick(record)} onkeydown={(e) => handleCardKeydown(e, record)} role="button" tabindex="0">
           <div class="card-image-wrapper">
             {@render thumbContent(item, record)}
           </div>

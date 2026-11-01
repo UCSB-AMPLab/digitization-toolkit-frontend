@@ -1406,18 +1406,17 @@ export const es = {
 	// ── Openings and pages never captured: placeholders (NEH-317) ───────────
 	// A function that takes a folio `f` or a capture number `img` uses the
 	// approved text when it is given; while the app has neither (null), the
-	// variant without it, which is new and not yet reviewed.
+	// variant without it.
 	pill_opening_missing: 'Par de páginas sin capturar',
 	pill_page_missing: 'Página sin capturar',
 	pill_closed: 'Cerrado',
-	// Not yet reviewed: the legend under the grid.
+	// The legend under the grid.
 	legend_title: 'Leyenda',
 	legend_rejected: 'Rechazado en la revisión: tiene imágenes y hay que capturarlo de nuevo',
 	legend_never: 'Sin capturar: nunca se capturó una página o el par de páginas completo',
 	legend_closed: 'Cerrado: tiene un motivo anotado y ya no hay que recapturarlo',
 	toolbar_mark_missing: 'Marcar un par de páginas que falta',
 	hover_missing_here: 'Aquí falta un par de páginas',
-	// Not yet reviewed.
 	mark_pick_hint: 'Elige el registro que va justo antes del par de páginas que falta.',
 	mark_title: 'Marcar un par de páginas que falta',
 	mark_body: (n: number, f: string | null) =>
@@ -1428,13 +1427,11 @@ export const es = {
 	mark_count_unknown: 'No se sabe: quien capture lo verá con el volumen abierto',
 	mark_count_one: 'Uno',
 	mark_count_more: 'Más de uno',
-	// Not yet reviewed.
 	mark_count_number_aria: 'Número de pares de páginas',
 	mark_expected: 'Qué debería haber (opcional)',
 	mark_note: 'Nota para quien captura',
 	mark_cancel: 'Cancelar',
 	mark_submit: 'Marcar como faltante',
-	// Not yet reviewed.
 	mark_error: 'No se pudo marcar el par de páginas que falta. Intenta de nuevo.',
 	cap_title: (f: string | null, n: number) =>
 		f ? `Falta un par de páginas después del folio ${f}` : `Falta un par de páginas después del registro ${formatCount(n, 'es')}`,
@@ -1449,6 +1446,9 @@ export const es = {
 		img
 			? `El orden y los nombres de archivo son independientes. Este par va después del registro ${formatCount(n, 'es')}; sus archivos llevan el siguiente número de captura del volumen, ${img}.`
 			: `El orden y los nombres de archivo son independientes. Este par va después del registro ${formatCount(n, 'es')}; sus archivos llevan el siguiente número de captura del volumen.`,
+	// The records could not be read again after a capture into a placeholder.
+	cap_refresh_error:
+		'El par de páginas quedó capturado, pero no se pudo actualizar la lista de registros del volumen. Intenta de nuevo para ver dónde va el siguiente.',
 	cap_nothing_link: 'Aquí no hay ningún par de páginas que capturar',
 	close_title: 'Aquí no hay nada que capturar',
 	close_body: (f: string | null) =>
@@ -1465,12 +1465,12 @@ export const es = {
 	close_submit: 'Cerrar el par de páginas',
 	close_after_note:
 		'Un par de páginas cerrado ya no cuenta como recaptura, así que no impide enviar el volumen a revisión. Cuando envíes el volumen, ese par va con él a Fisqua, junto con el motivo.',
-	// Not yet reviewed: the note "other" needs, and the refusals of POST /records/{id}/close-missing.
+	// The note "other" needs, and the refusals of POST /records/{id}/close-missing.
 	close_note_required: 'Si eliges "Otra cosa", escribe los detalles.',
 	close_err_not_missing: 'A este registro no le falta nada, así que no hay nada que cerrar.',
 	close_err_already_closed: 'Este par de páginas ya estaba cerrado.',
 	close_err_failed: 'No se pudo cerrar el par de páginas. Intenta de nuevo.',
-	// Not yet reviewed: the close dialog for a record missing one page.
+	// The close dialog for a record missing one page.
 	close_page_title: 'Aquí no hay ninguna página que capturar',
 	close_page_body:
 		'Al cerrarla, la página que falta queda registrada en el volumen con tu motivo, para que quienes revisan sepan qué comprobaste.',
@@ -1485,7 +1485,7 @@ export const es = {
 	retakes_capture: 'Capturar',
 	retakes_page_missing_row: (side: 'left' | 'right') =>
 		`Nunca se fotografió la página ${side === 'left' ? 'izquierda' : 'derecha'}. Vuelve a capturar el par completo con las dos cámaras: la captura nueva reemplaza la anterior.`,
-	// Not yet reviewed: a volume's count under its heading in Por recapturar.
+	// A volume's count under its heading in Por recapturar.
 	retakes_volume_pending: (n: number) => (n === 1 ? '1 pendiente' : `${formatCount(n, 'es')} pendientes`),
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
 	lv_instruction_label: 'Instrucción de la lista',
