@@ -8,7 +8,7 @@
   //
   // A refused switch (409) shows each problem as a translated line and the
   // mode the unit stays in, with Cancelar (back to the stored mode) and
-  // Intentar de nuevo. `mode_changed` means another admin changed the
+  // Reintentar. `mode_changed` means another admin changed the
   // settings meanwhile: the state is read again, the selection goes back to
   // the stored mode, and a line says so, with no retry, so the admin picks
   // again and Guardar runs as usual (the leave-Fisqua confirmation

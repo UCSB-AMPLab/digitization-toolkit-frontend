@@ -138,7 +138,7 @@ describe('Modo del equipo', () => {
 		await expect.element(alert.getByText(es.unit_problem_catalogue_dump_not_configured)).toBeInTheDocument();
 		expect(screen.container.textContent).not.toContain('English');
 
-		// Cancelar goes back to the stored mode; Intentar de nuevo sends again.
+		// Cancelar goes back to the stored mode; Reintentar sends again.
 		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
 		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
 		await expect.element(radio('Solo copia externa')).toBeChecked();
