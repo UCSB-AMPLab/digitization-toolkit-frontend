@@ -140,6 +140,25 @@ describe('the project page while projects are hidden (NEH-313)', () => {
 		expect(page.getByTitle(es.common_actions).elements()).toHaveLength(0);
 	});
 
+	for (const [what, settle] of [
+		['cannot be read', (answer: (v: unknown) => void, fail: (e: unknown) => void) => fail(new Error('boom'))],
+		['shows projects', (answer: (v: unknown) => void) => answer(unit('offline'))]
+	] as const) {
+		it(`is blank while the unit read is pending, and renders once it ${what}`, async () => {
+			signIn('admin');
+			let answer!: (v: unknown) => void;
+			let fail!: (e: unknown) => void;
+			vi.mocked(systemApi.unit).mockReturnValue(new Promise((r, j) => { answer = r; fail = j; }) as never);
+			const screen = render(ProjectPage);
+			await new Promise((r) => setTimeout(r, 50));
+			expect(screen.container.textContent?.trim()).toBe('');
+			settle(answer, fail);
+			await expect.element(page.getByText('Tomo 097')).toBeInTheDocument();
+			await expect.element(page.getByRole('button', { name: es.pd_new_collection })).toBeInTheDocument();
+			expect(gotoMock).not.toHaveBeenCalled();
+		});
+	}
+
 	it('stays while projects are shown', async () => {
 		vi.mocked(systemApi.unit).mockResolvedValue(unit('offline') as never);
 		render(ProjectPage);

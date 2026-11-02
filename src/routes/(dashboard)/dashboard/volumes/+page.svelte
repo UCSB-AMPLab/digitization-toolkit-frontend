@@ -21,7 +21,9 @@
   // operator): the menu with Editar and Eliminar (VolumeRowMenu,
   // VolumeDeleteModal) and the "Sin raíz" shortcut to the form. In Fisqua
   // mode an operator's form keeps the stem read-only. A volume with records
-  // can be deleted once they are moved to another volume of its project.
+  // can be deleted once they are moved to any other listed volume, whatever
+  // its project: the backend takes any target attached to a project, and a
+  // volume alone in an old project would otherwise have nowhere to go.
   //
   // Version: 0.3.3
 
@@ -243,7 +245,7 @@
 {#if deletingVolume}
   <VolumeDeleteModal
     volume={deletingVolume}
-    moveTargets={volumes.filter((v) => v.project_id === deletingVolume?.project_id)}
+    moveTargets={volumes}
     onClose={() => (deletingVolume = null)}
     onChanged={loadVolumes}
   />
@@ -322,8 +324,12 @@
     background-color: var(--color-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-xl);
-    overflow-x: auto;
+    /* Visible, as on the project page, so the last row's menu is not cut. */
+    overflow: visible;
   }
+  /* Round corners without overflow: hidden, as the project page does. */
+  .volumes-table tbody tr:last-child td:first-child { border-bottom-left-radius: var(--radius-xl); }
+  .volumes-table tbody tr:last-child td:last-child  { border-bottom-right-radius: var(--radius-xl); }
   .volumes-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
   .volumes-table th {
     padding: 12px 20px;

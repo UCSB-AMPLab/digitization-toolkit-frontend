@@ -2,7 +2,8 @@
   // The delete dialog of a volume, for the project page and Volúmenes
   // (NEH-313), as the project page had it: it counts the volume's records
   // when it opens; a volume with records needs a target among `moveTargets`
-  // (its project's other volumes), and its records are moved there first; a
+  // (the project page's volumes, or every volume on Volúmenes), and its
+  // records are moved there first; a
   // volume that reserves its stem cannot be deleted, and the dialog says why;
   // sub-volumes block the delete. The backend's English goes to the console
   // only. `onChanged` reloads the page's list; `onClose` closes the dialog.

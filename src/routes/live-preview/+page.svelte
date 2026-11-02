@@ -56,7 +56,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { ensureUnit, stemFormTarget, unitState } from '$lib/unit-mode';
+  import { ensureUnit, projectsShownIn, stemFormTarget, unitState } from '$lib/unit-mode';
   import { camerasApi, recordsApi, projectsApi, collectionsApi, importsApi, type Record as ApiRecord, type CameraDevice,
            type QueueItem, type RetakeSummary, type RetakeSummaryVolume } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
@@ -747,8 +747,9 @@
 <!-- Full screen, without the dashboard sidebar -->
 <div class="live-preview-wrapper">
 
+  <!-- No project name while the unit hides projects (NEH-313). -->
   <TopBar
-    {projectName}
+    projectName={projectsShownIn($unitState) ? projectName : ''}
     {collectionName}
     onBack={handleBack}
     onGoToReview={handleGoToReview}

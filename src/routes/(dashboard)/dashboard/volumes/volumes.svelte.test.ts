@@ -255,6 +255,39 @@ describe('Volúmenes', () => {
 		await vi.waitFor(() => expect(collectionsApi.listAll).toHaveBeenCalledTimes(2));
 	});
 
+	it('offers every other listed volume as a target for a volume with records alone in its project, then moves and deletes', async () => {
+		// Tomo 093 is the only volume of project 2.
+		vi.spyOn(recordsApi, 'count').mockResolvedValue(388);
+		const move = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 388, target_collection_id: 90 });
+		vi.spyOn(collectionsApi, 'get').mockResolvedValue(volumes[1]);
+		const del = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();
+		render(Volumes);
+		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 093' }).getByTitle(es.common_actions));
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+		const dialog = page.getByRole('dialog');
+		const select = dialog.getByLabelText(es.pd_move_label);
+		await expect.element(select).toBeInTheDocument();
+		const options = [...(select.element() as HTMLSelectElement).options].filter((o) => o.value).map((o) => o.textContent?.trim());
+		expect(options).toEqual(['Tomo 090', 'Tomo 097']);
+		await userEvent.selectOptions(select, 'Tomo 090');
+		await userEvent.click(dialog.getByRole('button', { name: es.proj_move_and_delete }));
+		await vi.waitFor(() => expect(del).toHaveBeenCalledWith(93));
+		expect(move).toHaveBeenCalledWith(93, 90);
+		expect(move.mock.invocationCallOrder[0]).toBeLessThan(del.mock.invocationCallOrder[0]);
+	});
+
+	it('keeps the last row’s open menu visible: no ancestor clips it', async () => {
+		const screen = render(Volumes);
+		await expect.poll(() => names(screen)).toHaveLength(3);
+		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		const menu = screen.container.querySelector('.action-menu') as HTMLElement;
+		expect(menu).not.toBeNull();
+		for (let el = menu.parentElement; el && el !== screen.container; el = el.parentElement) {
+			const style = getComputedStyle(el);
+			expect([style.overflowX, style.overflowY], el.className).toEqual(['visible', 'visible']);
+		}
+	});
+
 	it('gives a volume without a stem the shortcut to its form', async () => {
 		vi.mocked(collectionsApi.listAll).mockResolvedValue([vol(98, 'Tomo 098', { filename_stem: null })]);
 		render(Volumes);

@@ -77,6 +77,23 @@ describe('capture screen: the needs-stem banner and the unit mode', () => {
 		expect(banner(screen.container)!.textContent).not.toContain(es.pd_fisqua_codes_readonly);
 	});
 
+	it('shows no project name in the top bar while projects are hidden', async () => {
+		signIn('operator');
+		serve('backup', false);
+		const screen = render(LivePreview);
+		await expect.poll(() => screen.container.querySelector('.bc-collection')?.textContent ?? '').toContain('Tomo 17');
+		await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/system\/unit$/), expect.anything()));
+		await expect.poll(() => screen.container.querySelector('.bc-project')).toBeNull();
+		expect(screen.container.textContent).not.toContain('AHR');
+	});
+
+	it('shows the project name in the top bar while projects are shown', async () => {
+		signIn('operator');
+		serve('offline', true);
+		const screen = render(LivePreview);
+		await expect.poll(() => screen.container.querySelector('.bc-project')?.textContent?.trim()).toBe('AHR');
+	});
+
 	it('links to the project page while projects are shown', async () => {
 		signIn('operator');
 		serve('offline', true);
