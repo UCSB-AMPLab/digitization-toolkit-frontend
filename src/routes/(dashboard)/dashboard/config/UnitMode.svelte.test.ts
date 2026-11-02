@@ -1,0 +1,182 @@
+// Configuración → Modo del equipo (NEH-311, NEH-313): the three modes as a
+// radio group, Guardar only for a change, the projects switch only with
+// "Solo en el escáner" picked, a confirmation before leaving Fisqua mode,
+// and a refused switch shown as translated lines with the mode the unit
+// stays in. GET and PUT /system/unit are mocked.
+//
+// Version: 0.3.3
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
+
+vi.mock('$env/dynamic/public', () => ({ env: {} }));
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+
+import { ApiError, systemApi } from '$lib/api';
+import { authStore } from '$lib/stores/auth';
+import { locale } from '$lib/i18n';
+import { es } from '$lib/i18n/es';
+import { resetUnit } from '$lib/unit-mode';
+import '../../../../app.css';
+import UnitModeCard from './UnitModeCard.svelte';
+import ConfigPage from './+page.svelte';
+
+type Mode = 'offline' | 'backup' | 'fisqua';
+
+function unit(mode: Mode, projectsEnabled = false) {
+	return {
+		mode,
+		projectsEnabled,
+		projectsShown: mode === 'offline' && projectsEnabled,
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
+}
+
+function refused(codes: string[]) {
+	return new ApiError(
+		'The unit cannot switch to fisqua mode.',
+		{ message: 'The unit cannot switch to fisqua mode.', problems: codes.map((code) => ({ code, message: `English ${code}` })) },
+		409
+	);
+}
+
+const radio = (label: string) => page.getByRole('radio', { name: new RegExp(`^${label}`) });
+const save = () => page.getByRole('button', { name: es.common_save, exact: true });
+const projects = () => page.getByRole('checkbox', { name: es.unit_projects_toggle });
+
+beforeEach(() => {
+	locale.set('es');
+	authStore.setSession('tok', { id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
+});
+afterEach(() => {
+	vi.restoreAllMocks();
+	authStore.clearSession();
+	resetUnit();
+});
+
+describe('Modo del equipo', () => {
+	it('shows the three modes with their descriptions, the current one checked', async () => {
+		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
+		render(UnitModeCard);
+		await expect.element(radio('Solo copia externa')).toBeChecked();
+		await expect.element(radio('Solo en el escáner')).not.toBeChecked();
+		await expect.element(radio('Fisqua')).not.toBeChecked();
+		await expect.element(page.getByText(es.unit_mode_offline_desc)).toBeInTheDocument();
+		await expect.element(page.getByText(es.unit_mode_backup_desc)).toBeInTheDocument();
+		await expect.element(page.getByText(es.unit_mode_fisqua_desc)).toBeInTheDocument();
+		await expect.element(page.getByRole('group', { name: es.unit_mode_legend })).toBeInTheDocument();
+	});
+
+	it('enables Guardar only once a different mode is picked, and sends it', async () => {
+		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
+		const put = vi.spyOn(systemApi, 'setUnit').mockResolvedValue(unit('offline') as never);
+		render(UnitModeCard);
+		await expect.element(save()).toBeDisabled();
+		await userEvent.click(radio('Solo en el escáner'));
+		await expect.element(save()).toBeEnabled();
+		await userEvent.click(radio('Solo copia externa'));
+		await expect.element(save()).toBeDisabled();
+		await userEvent.click(radio('Solo en el escáner'));
+		await userEvent.click(save());
+		await vi.waitFor(() => expect(put).toHaveBeenCalledWith({ mode: 'offline' }));
+		await expect.element(radio('Solo en el escáner')).toBeChecked();
+		await expect.element(save()).toBeDisabled();
+	});
+
+	it('enables the projects switch only with "Solo en el escáner" picked, and saves it with the same PUT', async () => {
+		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
+		const put = vi.spyOn(systemApi, 'setUnit').mockResolvedValue(unit('offline', true) as never);
+		render(UnitModeCard);
+		await expect.element(projects()).toBeDisabled();
+		await userEvent.click(radio('Solo en el escáner'));
+		await expect.element(projects()).toBeEnabled();
+		await userEvent.click(projects());
+		await userEvent.click(save());
+		await vi.waitFor(() => expect(put).toHaveBeenCalledWith({ mode: 'offline', projectsEnabled: true }));
+	});
+
+	it('saves the projects switch alone in "Solo en el escáner"', async () => {
+		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('offline') as never);
+		const put = vi.spyOn(systemApi, 'setUnit').mockResolvedValue(unit('offline', true) as never);
+		render(UnitModeCard);
+		await expect.element(projects()).toBeEnabled();
+		await expect.element(save()).toBeDisabled();
+		await userEvent.click(projects());
+		await expect.element(save()).toBeEnabled();
+		await userEvent.click(save());
+		await vi.waitFor(() => expect(put).toHaveBeenCalledWith({ projectsEnabled: true }));
+	});
+
+	it('asks before leaving Fisqua mode, and sends nothing on Cancelar', async () => {
+		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('fisqua') as never);
+		const put = vi.spyOn(systemApi, 'setUnit').mockResolvedValue(unit('backup') as never);
+		render(UnitModeCard);
+		await userEvent.click(radio('Solo copia externa'));
+		await userEvent.click(save());
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog.getByText(es.unit_leave_fisqua_title)).toBeInTheDocument();
+		await expect.element(dialog.getByText(es.unit_leave_fisqua_body)).toBeInTheDocument();
+		await userEvent.click(dialog.getByRole('button', { name: es.common_cancel }));
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+		expect(put).not.toHaveBeenCalled();
+
+		await userEvent.click(save());
+		await userEvent.click(page.getByRole('dialog').getByRole('button', { name: es.unit_leave_fisqua_confirm('Solo copia externa') }));
+		await vi.waitFor(() => expect(put).toHaveBeenCalledWith({ mode: 'backup' }));
+	});
+
+	it('shows a refused switch as translated lines and the mode the unit stays in', async () => {
+		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
+		vi.spyOn(systemApi, 'setUnit').mockRejectedValue(refused(['fisqua_unreachable', 'catalogue_dump_not_configured']));
+		const screen = render(UnitModeCard);
+		await userEvent.click(radio('Fisqua'));
+		await userEvent.click(save());
+		const alert = page.getByRole('alert');
+		await expect.element(alert.getByText(es.unit_refused_title('Fisqua', 'Solo copia externa'))).toBeInTheDocument();
+		await expect.element(alert.getByText(es.unit_problem_fisqua_unreachable)).toBeInTheDocument();
+		await expect.element(alert.getByText(es.unit_problem_catalogue_dump_not_configured)).toBeInTheDocument();
+		expect(screen.container.textContent).not.toContain('English');
+
+		// Cancelar goes back to the stored mode; Intentar de nuevo sends again.
+		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+		await expect.element(radio('Solo copia externa')).toBeChecked();
+		await userEvent.click(radio('Fisqua'));
+		await userEvent.click(save());
+		await userEvent.click(page.getByRole('button', { name: es.unit_try_again }));
+		await vi.waitFor(() => expect(systemApi.setUnit).toHaveBeenCalledTimes(3));
+	});
+
+	it('says someone else changed the mode, and reads the state again', async () => {
+		const get = vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
+		vi.spyOn(systemApi, 'setUnit').mockRejectedValue(refused(['mode_changed']));
+		render(UnitModeCard);
+		await expect.element(radio('Solo copia externa')).toBeChecked();
+		get.mockResolvedValue(unit('fisqua') as never);
+		await userEvent.click(radio('Solo en el escáner'));
+		await userEvent.click(save());
+		await expect.element(page.getByRole('alert').getByText(es.unit_problem_mode_changed)).toBeInTheDocument();
+		await vi.waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+		await expect.element(radio('Fisqua')).toBeChecked();
+	});
+
+	it('shows a translated message for any other failure', async () => {
+		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
+		vi.spyOn(systemApi, 'setUnit').mockRejectedValue(new ApiError('Internal Server Error', undefined, 500));
+		const screen = render(UnitModeCard);
+		await userEvent.click(radio('Solo en el escáner'));
+		await userEvent.click(save());
+		await expect.element(page.getByText(es.unit_err_save)).toBeInTheDocument();
+		expect(screen.container.textContent).not.toContain('Internal');
+	});
+
+	it('is the first section of Configuración', async () => {
+		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
+		const screen = render(ConfigPage);
+		await expect.element(radio('Solo copia externa')).toBeChecked();
+		const first = screen.container.querySelector('.config-section .section-title');
+		expect(first?.textContent?.trim()).toBe(es.unit_section_title);
+	});
+});

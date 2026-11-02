@@ -3,7 +3,7 @@
 // from app/core/list_import.py's REASONS; a code the catalogue does not know
 // is shown as it comes rather than hidden.
 //
-// Version: 0.2.0
+// Version: 0.3.3
 
 import type { Messages } from '$lib/i18n';
 
@@ -50,8 +50,15 @@ export function importReasonText(m: Messages, reason: string): string {
 	return key ? (m[key] as string) : m.queue_reason_unknown(reason);
 }
 
-/** The interface text for an import the backend refused, by HTTP status. */
-export function importErrorText(m: Messages, status: number | undefined): string {
+/**
+ * The interface text for an import the backend refused, by HTTP status; a
+ * 403 whose detail says volumes come from Fisqua's queue (an operator in
+ * Fisqua mode, NEH-311) has its own.
+ */
+export function importErrorText(m: Messages, status: number | undefined, detail?: unknown): string {
+	if (status === 403 && (detail as { code?: unknown } | null | undefined)?.code === 'volumes_from_fisqua') {
+		return m.queue_import_err_volumes_from_fisqua;
+	}
 	switch (status) {
 		case 400: return m.queue_import_err_unreadable;
 		case 403: return m.queue_import_err_needs_admin;

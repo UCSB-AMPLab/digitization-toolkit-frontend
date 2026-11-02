@@ -8,10 +8,14 @@
 	// waiting (GET /records/to-retake/count), reloaded on every navigation so
 	// that it follows a retake; badge and label are in the recapture sand
 	// while any is waiting (0.2.0).
+	// While the unit hides projects (NEH-313, GET /system/unit), Volúmenes
+	// takes Proyectos' place, for the same roles; both stay in `NAV_ITEMS`, so
+	// either route stays open to those roles, and with the unit's state not
+	// read Proyectos is shown, as before.
 	// A new section needs its route under `src/routes/(dashboard)/` and an
 	// entry in `NAV_ITEMS` listing the roles allowed to open it.
 	//
-	// Version: 0.2.0
+	// Version: 0.3.3
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -26,6 +30,7 @@
 	import BugReportButton from '$lib/bug-report/BugReportButton.svelte';
 	import CatalogueBackupIndicator from '$lib/components/CatalogueBackupIndicator.svelte';
 	import AccountMenu from '$lib/components/AccountMenu.svelte';
+	import { ensureUnit, projectsShownIn, unitState } from '$lib/unit-mode';
 
 	let { children } = $props();
 
@@ -138,6 +143,13 @@
 					badge: null as number | null
 				},
 				{
+					id: 'volumes',
+					labelKey: 'nav_volumes',
+					icon: 'folder',
+					path: '/dashboard/volumes',
+					roles: ['admin', 'operator', 'reviewer']
+				},
+				{
 					id: 'queue',
 					labelKey: 'nav_queue',
 					icon: 'queue',
@@ -195,12 +207,21 @@
 		};
 	});
 
+	// The unit's mode and projects setting, read once the session is valid.
+	$effect(() => {
+		if (!isValidatingSession && currentUser) ensureUnit();
+	});
+
+	// Proyectos or Volúmenes, never both (NEH-313).
+	let showProjects = $derived(projectsShownIn($unitState));
+
 	// A user without a recognized role sees no restricted item.
 	let visibleNav = $derived(
 		NAV_ITEMS.map((section) => ({
 			...section,
 			items: section.items
 				.filter((item) => item.roles.length === 0 || item.roles.includes(currentUser?.role ?? ''))
+				.filter((item) => (item.id === 'projects' ? showProjects : item.id === 'volumes' ? !showProjects : true))
 				.map((item) => (item.id === 'retakes' ? { ...item, badge: retakeCount } : item))
 		})).filter((section) => section.items.length > 0)
 	);

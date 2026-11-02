@@ -13,7 +13,7 @@
 // pages.
 // ============================================================================
 //
-// Version: 0.2.1
+// Version: 0.3.3
 
 import type { CollectionActivity, StatusCounts } from '$lib/api';
 
@@ -41,6 +41,17 @@ export function placeVolume(counts: StatusCounts): PipelineStage {
 	if (counts.in_review > 0) return 'review';
 	if (counts.approved > 0 || counts.excluded > 0) return 'approved';
 	return 'capture';
+}
+
+/**
+ * The inline style of a stage's badge, as the project page and Volúmenes
+ * (NEH-313) draw it: the stage's colour on a light wash of it.
+ */
+export function stageBadgeStyle(stage: PipelineStage): string {
+	if (stage === 'capture') return 'color: var(--color-primary); background: rgba(90,140,98,0.15)';
+	if (stage === 'recapture') return 'color: var(--color-error); background: rgba(214,103,74,0.15)';
+	if (stage === 'review') return 'color: var(--color-warning); background: rgba(208,154,68,0.15)';
+	return 'color: var(--color-success); background: rgba(111,191,115,0.15)';
 }
 
 export interface BarSegment {

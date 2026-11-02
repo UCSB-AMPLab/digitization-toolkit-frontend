@@ -5,9 +5,12 @@
   // filename stem rules (see `VolumeStemField`); the delete modal moves a
   // volume's records to another volume first when it has any. The Status
   // column shows the volume's pipeline stage, as Cola labels it, from one
-  // GET /activity/collections for the project.
+  // GET /activity/collections for the project. The volume form lives in
+  // VolumeFormModal, which Volúmenes opens too. In Fisqua mode (NEH-311) an
+  // operator has no Nuevo volumen, and the form keeps their stem
+  // read-only.
   //
-  // Version: 0.2.0
+  // Version: 0.3.3
 
   import { onMount } from 'svelte';
   import { m, roleLabel, locale } from '$lib/i18n';
@@ -18,11 +21,12 @@
   import { authStore, userRole } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, projectMembersApi, activityApi,
            type Project, type Collection, type ProjectMember, type UserRead, type StatusCounts } from '$lib/api';
-  import { stemProblem, stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
-  import { volumeSaveErrorText, volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
-  import VolumeStemField from './VolumeStemField.svelte';
+  import { stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
+  import { volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
+  import { canCreateVolumes, ensureUnit, unitState } from '$lib/unit-mode';
+  import VolumeFormModal from './VolumeFormModal.svelte';
   import { dismissible } from '$lib/dialog';
-  import { placeVolume, type PipelineStage } from '$lib/pipeline';
+  import { placeVolume, stageBadgeStyle, type PipelineStage } from '$lib/pipeline';
 
   let projectId = $derived(Number($page.params.projectId) || 0);
 
@@ -46,14 +50,20 @@
       : directRecordCount + collections.reduce((sum, c) => sum + (c.record_count ?? 0), 0)
   );
 
+  // Editing: admin and operator. A new volume: the same, but no operator
+  // in Fisqua mode (NEH-311).
   let canCreate = $derived(
     $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
   );
+  let canCreateNew = $derived(canCreateVolumes($authStore.user?.role, $unitState));
   // Only admin adds or removes members — the backend enforces it too
   // (`allow_admin` in `add_project_member`/`remove_project_member`, NEH-80).
   // Operator and reviewer cannot even read the user list (GET /auth/users is
   // admin-only), so the picker must not try to load it for them.
   let canManageMembers = $derived($authStore.user?.role === 'admin');
+
+  let showCreateModal   = $state(false);
+  let editingCollection = $state<Collection | null>(null);
 
   let filteredCollections = $derived(
     searchQuery.trim()
@@ -63,60 +73,9 @@
       : collections
   );
 
-  let showCreateModal = $state(false);
-  let colName         = $state('');
-  let colDesc         = $state('');
-  let colDateStart    = $state('');
-  let colDateEnd      = $state('');
-  let colCreator      = $state('');
-  let colSignatura    = $state('');
-  // The stem ("raíz", filename_stem). Required on a new volume; on an
-  // existing one it can be given once while empty, and is read-only once
-  // the volume reserves it (stem_reserved).
-  let colStem         = $state('');
-  let isCreating        = $state(false);
-  let createError       = $state('');
-  let editingCollection = $state<Collection | null>(null);
-
-  /** Validates a partial ISO 8601 date: YYYY, YYYY-MM, or YYYY-MM-DD. */
-  function isValidISODate(s: string): boolean {
-    // Full date: YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-      const [y, m, d] = s.split('-').map(Number);
-      if (m < 1 || m > 12 || d < 1 || d > 31) return false;
-      const daysInMonth = new Date(y, m, 0).getDate();
-      return d <= daysInMonth;
-    }
-    // Year + month: YYYY-MM
-    if (/^\d{4}-\d{2}$/.test(s)) {
-      const m = Number(s.slice(5));
-      return m >= 1 && m <= 12;
-    }
-    // Year only: YYYY
-    if (/^\d{4}$/.test(s)) {
-      return Number(s) >= 1;
-    }
-    return false;
-  }
-
-  let stemLocked = $derived(!!editingCollection?.stem_reserved);
-  // Required on a new volume and on one that already has a stem: a stem can
-  // be changed before the first capture, but never blanked. Only a volume
-  // that has never had one may be saved without it.
-  let stemRequired = $derived(!editingCollection || !!editingCollection.filename_stem);
-  let stemInvalid = $derived(!stemLocked && stemProblem(colStem, stemRequired) !== null);
-
-  let dateError = $derived(
-    (colDateStart && !isValidISODate(colDateStart))
-      ? $m.pd_val_start_date
-      : (colDateEnd && !isValidISODate(colDateEnd))
-      ? $m.pd_val_end_date
-      : (colDateStart && colDateEnd && colDateEnd < colDateStart)
-      ? $m.pd_val_date_range
-      : ''
-  );
 
   onMount(async () => {
+    ensureUnit();
     await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
     // ?editVolume=<id> opens that volume's form: the capture screen links
     // here when the volume has no stem yet.
@@ -220,68 +179,10 @@
     }
   }
 
-  async function handleCreateCollection() {
-    if (!colName.trim() || stemInvalid) return;
-    isCreating = true;
-    createError = '';
-
-    try {
-      const archMeta: Record<string, string> = {};
-      if (colDateStart)        archMeta.date_start = colDateStart;
-      if (colDateEnd)          archMeta.date_end   = colDateEnd;
-      if (colCreator.trim())   archMeta.creator    = colCreator.trim();
-      if (colSignatura.trim()) archMeta.signatura  = colSignatura.trim();
-      const archivalMetadata = Object.keys(archMeta).length > 0 ? archMeta : undefined;
-
-      const stem = colStem.trim();
-      if (editingCollection) {
-        // The stem is sent only when it changed to a non-empty value, and
-        // never once it is reserved; null is never sent.
-        const stemChanged = !stemLocked && stem !== '' && stem !== (editingCollection.filename_stem ?? '');
-        await collectionsApi.update(editingCollection.id, {
-          name: colName.trim(),
-          description: colDesc.trim() || undefined,
-          archival_metadata: archivalMetadata,
-          ...(stemChanged ? { filename_stem: stem } : {}),
-        });
-        await loadCollections();
-      } else {
-        await collectionsApi.create({
-          name: colName.trim(),
-          description: colDesc.trim() || undefined,
-          project_id: projectId,
-          created_by: $authStore.user?.username,
-          archival_metadata: archivalMetadata,
-          filename_stem: stem,
-        });
-        await loadCollections();
-      }
-
-      showCreateModal = false;
-      editingCollection = null;
-      colName = ''; colDesc = '';
-      colDateStart = ''; colDateEnd = '';
-      colCreator = ''; colSignatura = '';
-      colStem = '';
-
-    } catch (err) {
-      // Known cases have their own message, anything else a generic one; the
-      // backend's English text goes to the console only.
-      createError = volumeSaveErrorText(err, $m);
-      console.error('[ProjectDetail] Error creating collection:', err);
-    } finally {
-      isCreating = false;
-    }
-  }
 
   function closeModal() {
     showCreateModal = false;
-    createError = '';
     editingCollection = null;
-    colName = ''; colDesc = '';
-    colDateStart = ''; colDateEnd = '';
-    colCreator = ''; colSignatura = '';
-    colStem = '';
   }
 
   function handleCollectionClick(collectionId: number) {
@@ -323,15 +224,7 @@
 
   function openEditCollection(col: Collection) {
     openColMenuId = null;
-    createError = '';
     editingCollection = col;
-    colStem      = col.filename_stem ?? '';
-    colName      = col.name;
-    colDesc      = col.description ?? '';
-    colSignatura = col.archival_metadata?.signatura ?? '';
-    colCreator   = col.archival_metadata?.creator ?? '';
-    colDateStart = col.archival_metadata?.date_start ?? '';
-    colDateEnd   = col.archival_metadata?.date_end ?? '';
     showCreateModal = true;
   }
 
@@ -445,12 +338,6 @@
     approved: $m.dash_stage_approved,
   });
 
-  function getStageStyle(stage: PipelineStage): string {
-    if (stage === 'capture')   return 'color: var(--color-primary); background: rgba(90,140,98,0.15)';
-    if (stage === 'recapture') return 'color: var(--color-error); background: rgba(214,103,74,0.15)';
-    if (stage === 'review')    return 'color: var(--color-warning); background: rgba(208,154,68,0.15)';
-    return 'color: var(--color-success); background: rgba(111,191,115,0.15)';
-  }
 </script>
 
 <div class="page">
@@ -462,8 +349,8 @@
       <p class="page-subtitle">{$m.pd_subtitle}</p>
     </div>
     <!-- Only once volumes exist: the empty state has its own create button. -->
-    {#if canCreate && collections.length > 0}
-      <button class="btn-primary" data-tour="nuevo-volumen" onclick={() => showCreateModal = true}>
+    {#if canCreateNew && collections.length > 0}
+      <button class="btn-primary" data-tour="nuevo-volumen" onclick={() => { editingCollection = null; showCreateModal = true; }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -523,8 +410,8 @@
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
       </svg>
       <span>{searchQuery ? $m.pd_empty_search : $m.pd_empty}</span>
-      {#if canCreate && !searchQuery}
-        <button class="btn-primary" onclick={() => showCreateModal = true}>{$m.pd_create_first}</button>
+      {#if canCreateNew && !searchQuery}
+        <button class="btn-primary" onclick={() => { editingCollection = null; showCreateModal = true; }}>{$m.pd_create_first}</button>
       {/if}
     </div>
   {:else}
@@ -578,7 +465,7 @@
 
               <td>
                 {#if stage}
-                  <span class="status-badge" style={getStageStyle(stage)}>{stageTitle[stage]}</span>
+                  <span class="status-badge" style={stageBadgeStyle(stage)}>{stageTitle[stage]}</span>
                 {/if}
               </td>
 
@@ -637,124 +524,13 @@
 </div>
 
 {#if showCreateModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal(); }}>
-    <!-- No Escape: it would throw away what was typed. -->
-    <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
-
-      <div class="modal-header">
-        <div>
-          <h3 class="modal-title">{editingCollection ? $m.pd_modal_edit_title : $m.pd_modal_create_title}</h3>
-          <p class="modal-subtitle">{$m.pd_modal_project(project?.name ?? '—')}</p>
-        </div>
-        <button class="modal-close" onclick={closeModal}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
-      <div class="modal-body">
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_title} <span class="field-required">*</span></label>
-          <input
-            class="field-input"
-            type="text"
-            placeholder={$m.pd_ph_title}
-            bind:value={colName}
-            autofocus
-          />
-        </div>
-
-        <VolumeStemField bind:value={colStem} locked={stemLocked} required={stemRequired} />
-
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_refcode}</label>
-          <input
-            class="field-input"
-            type="text"
-            placeholder={$m.pd_ph_refcode}
-            bind:value={colSignatura}
-          />
-        </div>
-
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_creator}</label>
-          <input
-            class="field-input"
-            type="text"
-            placeholder={$m.pd_ph_creator}
-            bind:value={colCreator}
-          />
-        </div>
-
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_dates}</label>
-          <div class="date-range-row">
-            <div class="date-field">
-              <span class="date-sub-label">{$m.pd_date_from}</span>
-              <input
-                class="field-input"
-                class:field-input--error={colDateStart !== '' && !isValidISODate(colDateStart)}
-                type="text"
-                placeholder={$m.pd_ph_date_from}
-                bind:value={colDateStart}
-              />
-            </div>
-            <span class="date-sep">—</span>
-            <div class="date-field">
-              <span class="date-sub-label">{$m.pd_date_to}</span>
-              <input
-                class="field-input"
-                class:field-input--error={colDateEnd !== '' && !isValidISODate(colDateEnd)}
-                type="text"
-                placeholder={$m.pd_ph_date_to}
-                bind:value={colDateEnd}
-              />
-            </div>
-          </div>
-          {#if dateError}
-            <p class="date-error">{dateError}</p>
-          {/if}
-        </div>
-
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_notes}</label>
-          <textarea
-            class="field-textarea"
-            placeholder={$m.pd_ph_notes}
-            bind:value={colDesc}
-          ></textarea>
-        </div>
-      </div>
-
-      {#if createError}
-        <div class="create-error">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-          </svg>
-          {createError}
-        </div>
-      {/if}
-
-      <div class="modal-actions">
-        <button class="btn-ghost" onclick={closeModal}>{$m.common_cancel}</button>
-        <button
-          class="btn-crear"
-          onclick={handleCreateCollection}
-          disabled={isCreating || !colName.trim() || dateError !== '' || stemInvalid}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          </svg>
-          {isCreating ? (editingCollection ? $m.common_saving : $m.common_creating) : (editingCollection ? $m.common_save_changes : $m.pd_create_btn)}
-        </button>
-      </div>
-
-    </div>
-  </div>
+  <VolumeFormModal
+    editing={editingCollection}
+    {projectId}
+    projectName={project?.name ?? null}
+    onClose={closeModal}
+    onSaved={loadCollections}
+  />
 {/if}
 
 {#if showMembersModal}
