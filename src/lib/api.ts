@@ -27,12 +27,18 @@ export function getApiBase(): string {
 // Thrown for 401/403 responses so callers that care can distinguish an
 // auth failure from any other API error (most existing catch blocks just
 // read `.message`, which still works since this extends Error).
+// `detail` is the response's structured detail when it had one, as on
+// ApiError: the 403 for an operator in Fisqua mode carries
+// `{code: "volumes_from_fisqua", message}` (NEH-311). Undefined for a
+// string detail, which every 401 has.
 export class AuthError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  detail?: unknown;
+  constructor(status: number, message: string, detail?: unknown) {
     super(message);
     this.name = 'AuthError';
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -151,7 +157,7 @@ async function apiRequest<T>(
     if (response.status === 401 || response.status === 403) {
       // Pass the extracted string, not the raw detail: if an auth error ever
       // carries a structured detail body, Error.message must stay readable.
-      throw new AuthError(response.status, message);
+      throw new AuthError(response.status, message, isStructuredDetail ? detail : undefined);
     }
 
     throw new ApiError(
@@ -212,7 +218,7 @@ async function apiRequestBlob(
     }
 
     if (response.status === 401 || response.status === 403) {
-      throw new AuthError(response.status, message);
+      throw new AuthError(response.status, message, isStructuredDetail ? detail : undefined);
     }
 
     throw new ApiError(
@@ -2194,7 +2200,30 @@ export class PowerControlError extends Error {
   }
 }
 
+// GET /system/unit (NEH-311, NEH-313); read through $lib/unit-mode.
+export interface UnitSettings {
+  mode: 'offline' | 'backup' | 'fisqua';
+  projectsEnabled: boolean;
+  projectsShown: boolean;
+  defaultProjectId: number | null;
+  prerequisites: { backup: string[]; fisqua: string[] };
+}
+
 export const systemApi = {
+  /** The unit's mode and projects setting, for every role. */
+  async unit(): Promise<UnitSettings> {
+    return apiRequest<UnitSettings>('/system/unit');
+  },
+
+  /**
+   * Change the mode, the projects setting, or both (admin). Only the fields
+   * given are sent; the backend refuses any other key (422). A refused
+   * switch is a 409 whose detail is {message, problems: [{code, message}]}.
+   */
+  async setUnit(body: { mode?: UnitSettings['mode']; projectsEnabled?: boolean }): Promise<UnitSettings> {
+    return apiRequest<UnitSettings>('/system/unit', { method: 'PUT', body: JSON.stringify(body) });
+  },
+
   async getLogs(params?: { limit?: number; category?: string; level?: string }): Promise<SystemLogEntry[]> {
     const q = new URLSearchParams();
     if (params?.limit    !== undefined) q.set('limit',    params.limit.toString());

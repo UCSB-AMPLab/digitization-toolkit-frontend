@@ -6,7 +6,7 @@
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`, `message`), as volume-stem.ts does.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.3
 
 import type { Messages } from './i18n';
 import { FILENAME_STEM_MAX_LENGTH, stemConflict, stemConflictText } from './volume-stem';
@@ -36,8 +36,53 @@ export function referenceCodeDiffers(error: unknown): { externalId: string; stem
 	return { externalId: d.external_id, stem: d.filename_stem };
 }
 
+// Fisqua mode's refusals of a volume create or update (NEH-311,
+// app/api/collections.py): each code at the status the backend gives it.
+const FISQUA_REFUSALS: { [code: string]: number } = {
+	volumes_from_fisqua: 403,
+	unknown_reference_code: 422,
+	stem_required: 422,
+	fisqua_no_lookup: 409,
+	fisqua_unreachable: 409
+};
+
+export type FisquaVolumeRefusal =
+	| { code: 'volumes_from_fisqua' | 'stem_required' | 'fisqua_no_lookup' | 'fisqua_unreachable' }
+	| { code: 'unknown_reference_code'; referenceCode: string };
+
+/**
+ * A volume save refused in Fisqua mode: an operator (403
+ * volumes_from_fisqua), a code Fisqua does not know (422, with the code), a
+ * stem cleared (422 stem_required), or no answer from Fisqua (409
+ * fisqua_no_lookup, fisqua_unreachable). Null for any other error.
+ */
+export function fisquaVolumeRefusal(error: unknown): FisquaVolumeRefusal | null {
+	if (typeof error !== 'object' || error === null) return null;
+	const e = error as { status?: unknown; detail?: unknown };
+	if (typeof e.detail !== 'object' || e.detail === null || Array.isArray(e.detail)) return null;
+	const d = e.detail as { code?: unknown; referenceCode?: unknown };
+	if (typeof d.code !== 'string' || FISQUA_REFUSALS[d.code] !== e.status) return null;
+	if (d.code === 'unknown_reference_code') {
+		return typeof d.referenceCode === 'string' ? { code: d.code, referenceCode: d.referenceCode } : null;
+	}
+	return { code: d.code as Exclude<FisquaVolumeRefusal['code'], 'unknown_reference_code'> };
+}
+
+/** The message for a Fisqua-mode refusal. */
+export function fisquaRefusalText(refusal: FisquaVolumeRefusal, msgs: Messages): string {
+	switch (refusal.code) {
+		case 'volumes_from_fisqua': return msgs.pd_err_volumes_from_fisqua;
+		case 'unknown_reference_code': return msgs.pd_err_unknown_reference_code(refusal.referenceCode);
+		case 'stem_required': return msgs.pd_err_stem_required_fisqua;
+		case 'fisqua_no_lookup': return msgs.pd_fisqua_no_lookup_title;
+		case 'fisqua_unreachable': return msgs.pd_fisqua_unreachable_title;
+	}
+}
+
 /** The message for a failed create or update of a volume. */
 export function volumeSaveErrorText(error: unknown, msgs: Messages): string {
+	const fisqua = fisquaVolumeRefusal(error);
+	if (fisqua) return fisquaRefusalText(fisqua, msgs);
 	const differs = referenceCodeDiffers(error);
 	if (differs) return msgs.pd_err_stem_differs_from_reference_code(differs.externalId, differs.stem);
 	const conflict = stemConflict(error);

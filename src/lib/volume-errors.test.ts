@@ -1,9 +1,9 @@
-// Version: 0.1.0-beta
+// Version: 0.3.3
 
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
 import { en } from './i18n/en';
-import { isNotEmptyRefusal, moveBlockedCount, notEmptyCounts, volumeDeleteErrorText, volumeSaveErrorText } from './volume-errors';
+import { fisquaVolumeRefusal, isNotEmptyRefusal, moveBlockedCount, notEmptyCounts, volumeDeleteErrorText, volumeSaveErrorText } from './volume-errors';
 
 // A stand-in for api.ts's ApiError, as in volume-stem.test.ts.
 class ApiError extends Error {
@@ -127,5 +127,38 @@ describe('volumeDeleteErrorText', () => {
 		for (const err of [new ApiError(files, undefined, 409), new ApiError(notEmpty, undefined, 500), new Error('x')]) {
 			expect(volumeDeleteErrorText(err, es)).toBe(es.pd_err_delete_collection);
 		}
+	});
+});
+
+// Fisqua mode (NEH-311): the refusals of app/api/collections.py, each with
+// its own message; the backend's English never reaches the form.
+describe('fisquaVolumeRefusal', () => {
+	const fromFisqua = new ApiError('x', { code: 'volumes_from_fisqua', message: "In Fisqua mode, volumes come from Fisqua's queue." }, 403);
+	const unknown = new ApiError('x', { code: 'unknown_reference_code', message: 'Fisqua has no description', referenceCode: 'co-ahr-not-t099' }, 422);
+	const noLookup = new ApiError('x', { code: 'fisqua_no_lookup', message: 'This Fisqua cannot check', referenceCode: 'co-a', error: 'unsupported: HTTP 404' }, 409);
+	const unreachable = new ApiError('x', { code: 'fisqua_unreachable', message: 'Fisqua could not be reached', referenceCode: 'co-a', error: 'timeout' }, 409);
+	const stemRequired = new ApiError('x', { code: 'stem_required', message: 'In Fisqua mode a stem cannot be empty' }, 422);
+
+	it('reads each refusal by its status and code', () => {
+		expect(fisquaVolumeRefusal(fromFisqua)).toEqual({ code: 'volumes_from_fisqua' });
+		expect(fisquaVolumeRefusal(unknown)).toEqual({ code: 'unknown_reference_code', referenceCode: 'co-ahr-not-t099' });
+		expect(fisquaVolumeRefusal(noLookup)).toEqual({ code: 'fisqua_no_lookup' });
+		expect(fisquaVolumeRefusal(unreachable)).toEqual({ code: 'fisqua_unreachable' });
+		expect(fisquaVolumeRefusal(stemRequired)).toEqual({ code: 'stem_required' });
+	});
+
+	it('is null for a code at another status, and for any other error', () => {
+		expect(fisquaVolumeRefusal(new ApiError('x', { code: 'volumes_from_fisqua' }, 409))).toBeNull();
+		expect(fisquaVolumeRefusal(new ApiError('x', { code: 'unknown_reference_code' }, 422))).toBeNull();
+		expect(fisquaVolumeRefusal(new ApiError('x', [{ loc: ['body'], msg: 'x' }], 422))).toBeNull();
+		expect(fisquaVolumeRefusal(new Error('x'))).toBeNull();
+	});
+
+	it('gives each its translated message', () => {
+		expect(volumeSaveErrorText(fromFisqua, es)).toBe(es.pd_err_volumes_from_fisqua);
+		expect(volumeSaveErrorText(unknown, es)).toBe(es.pd_err_unknown_reference_code('co-ahr-not-t099'));
+		expect(volumeSaveErrorText(noLookup, es)).toBe(es.pd_fisqua_no_lookup_title);
+		expect(volumeSaveErrorText(unreachable, es)).toBe(es.pd_fisqua_unreachable_title);
+		expect(volumeSaveErrorText(stemRequired, en)).toBe(en.pd_err_stem_required_fisqua);
 	});
 });

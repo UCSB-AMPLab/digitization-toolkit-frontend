@@ -10,9 +10,12 @@
   // The page passes in the collections and projects it already loads for the
   // KPIs; this component loads the per-volume status counts itself from
   // GET /activity/collections.
+  //
+  // While the unit hides projects (NEH-313) neither view names a project:
+  // the table drops its Proyecto column and the board its project line.
   // ============================================================================
   //
-  // Version: 0.1.0-beta
+  // Version: 0.3.3
 
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
@@ -25,8 +28,11 @@
     PIPELINE_STAGES, barSegments, groupByStage, parseApiDate,
     type BarStatus, type PipelineStage
   } from '$lib/pipeline';
+  import { projectsShownIn, unitState } from '$lib/unit-mode';
 
   let { collections, projects }: { collections: Collection[]; projects: Project[] } = $props();
+
+  let showProjects = $derived(projectsShownIn($unitState));
 
   // ---------------------------------------------------------------------------
   // View switch, remembered per browser. Tabla is the default.
@@ -203,9 +209,11 @@
 
     {#if view === 'table'}
       <div class="table-wrap">
-        <div class="in-progress">
+        <div class="in-progress" class:no-project={!showProjects}>
           <span class="ip-h">{$m.dash_col_volume}</span>
-          <span class="ip-h">{$m.dash_col_project}</span>
+          {#if showProjects}
+            <span class="ip-h">{$m.dash_col_project}</span>
+          {/if}
           <span class="ip-h">{$m.dash_col_progress}</span>
           <span class="ip-h">{$m.dash_col_last_activity}</span>
           <span class="ip-h">{$m.dash_col_actions}</span>
@@ -218,7 +226,9 @@
                 {#if row.signatura}<span class="ip-signatura">{row.signatura}</span>{/if}
               </a>
 
-              <a class="ip-project" href="/dashboard/projects/{row.projectId}"><span>{row.projectName}</span></a>
+              {#if showProjects}
+                <a class="ip-project" href="/dashboard/projects/{row.projectId}"><span>{row.projectName}</span></a>
+              {/if}
 
               <div class="ip-progress">
                 {#if a}
@@ -268,7 +278,9 @@
                     <h4 id="card-{card.collection_id}" class="card-name">
                       <a href={volumeUrl(card.projectId, card.collection_id)}>{card.volumeName}</a>
                     </h4>
-                    <div class="card-project">{card.projectName}</div>
+                    {#if showProjects}
+                      <div class="card-project">{card.projectName}</div>
+                    {/if}
                   </div>
 
                   {@render statusBar(card)}
@@ -404,6 +416,10 @@
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     overflow: hidden;
+  }
+  /* Without the Proyecto column (projects hidden, NEH-313). */
+  .in-progress.no-project {
+    grid-template-columns: minmax(12rem, 3fr) minmax(8rem, 2fr) max-content max-content;
   }
 
   /* Column spacing is padding, not gap: with gap the line between rows would
@@ -543,7 +559,7 @@
      the two buttons); 54rem leaves room for longer dates and labels. */
   .table-wrap { container-type: inline-size; }
   @container (max-width: 54rem) {
-    .in-progress { grid-template-columns: 1fr; }
+    .in-progress, .in-progress.no-project { grid-template-columns: 1fr; }
     .ip-h { display: none; }
 
     .ip-row > * { padding: 3px 16px; }

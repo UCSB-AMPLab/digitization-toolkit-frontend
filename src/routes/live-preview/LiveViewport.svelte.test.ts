@@ -431,6 +431,19 @@ describe('LiveViewport — a volume without a stem', () => {
     expect(captureSpy).not.toHaveBeenCalled();
   });
 
+  it('shows the note it is given in place of the link to the form (NEH-311)', async () => {
+    stubPreviewFetch({});
+    const screen = renderViewport(baseProps({
+      needsStem: true,
+      stemFormHref: '',
+      stemNote: es.pd_fisqua_codes_readonly,
+    }));
+    const banner = screen.container.querySelector('.needs-stem-banner') as HTMLElement;
+    expect(banner.textContent).toContain(es.lv_needs_stem);
+    expect(banner.textContent).toContain(es.pd_fisqua_codes_readonly);
+    expect(banner.querySelector('a')).toBeNull();
+  });
+
   it('on a 409 for a volume without a stem, shows no backend text in the error banner', async () => {
     const backend = 'This volume has no file name stem. Give it one before capturing into it.';
     vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));

@@ -1495,6 +1495,64 @@ export const en: Messages = {
 	err_upload_excluded: "Fisqua excluded this record, so images can't be added to it.",
 	err_delete_excluded: 'Fisqua excluded this record, so only an administrator can delete it.',
 
+	// ── The unit's mode and projects setting (NEH-311, NEH-313) ─────────────
+	unit_mode_offline: 'Scanner only',
+	unit_mode_backup: 'Offsite copy only',
+	unit_mode_fisqua: 'Fisqua',
+	unit_section_title: 'Unit mode',
+	unit_section_desc: 'Decides what leaves this unit and where its volumes come from. Changing it moves no volume or record.',
+	unit_mode_legend: 'Mode',
+	unit_mode_offline_desc: 'Nothing leaves the unit: no offsite copy, no Fisqua. Volumes are created here.',
+	unit_mode_backup_desc: 'Images and the catalogue are copied to the bucket. Volumes are created here.',
+	unit_mode_fisqua_desc:
+		"Volumes come from Fisqua's queue. Handovers, status and review decisions go over the link. Operators can't create volumes; an administrator can, and each change is logged.",
+	unit_current: 'Current mode',
+	unit_projects_title: 'Projects',
+	unit_projects_desc: 'Only in "Scanner only" mode. Off: every volume is in one list.',
+	unit_projects_toggle: 'Use projects',
+	unit_try_again: 'Try again',
+	unit_leave_fisqua_title: 'Leaving Fisqua mode',
+	unit_leave_fisqua_body:
+		'Handovers not yet sent wait on the unit, and go to Fisqua if the unit returns to Fisqua mode. Nothing is deleted.',
+	unit_leave_fisqua_confirm: (label: string) => `Switch to "${label}"`,
+	unit_refused_title: (target: string, current: string) =>
+		`The unit can't switch to ${target === 'Fisqua' ? target : `"${target}"`} mode. It stays in "${current}".`,
+	unit_problem_offsite_not_configured:
+		'The offsite copy of the images is not configured on this unit. It is set when the unit is provisioned.',
+	unit_problem_catalogue_dump_not_configured:
+		"The catalogue's offsite copy is not configured or has no encryption key. It is set when the unit is provisioned.",
+	unit_problem_fisqua_not_configured: 'The link to Fisqua is not configured on this unit. It is set when the unit is provisioned.',
+	unit_problem_fisqua_unreachable: "Fisqua could not be reached. Check the unit's connection and try again.",
+	unit_problem_offsite_held: 'The offsite copy is on hold on this unit, so nothing can be sent to Fisqua until the hold is lifted.',
+	unit_problem_mode_changed: "Someone else changed the unit's settings meanwhile. Captua has read them again: check the mode and try again.",
+	unit_problem_other: "Captua couldn't change the mode, for a reason it doesn't recognise.",
+	unit_err_save: "Captua couldn't save the unit mode. Try again.",
+	unit_err_load: "Captua couldn't read the unit mode.",
+	nav_volumes: 'Volumes',
+	vols_count: (n: number) => (n === 1 ? '1 volume' : `${formatCount(n, 'en')} volumes`),
+	vols_search_label: 'Search',
+	vols_search_placeholder: 'Name, stem or reference code',
+	vols_stage_label: 'Stage',
+	vols_stage_all: 'All stages',
+	vols_col_stem: 'Stem',
+	vols_empty: 'There are no volumes on this unit.',
+	vols_load_error: "Captua couldn't load the volumes.",
+	col_back_to_volumes: 'Back to Volumes',
+	pd_field_stem_fisqua: 'FILE NAME STEM (FISQUA REFERENCE CODE)',
+	pd_fisqua_admin_note:
+		"The unit is in Fisqua mode. Volumes normally come from Fisqua's queue. The stem must be a reference code that exists in Fisqua; it is checked when you save, and the change is recorded in the log.",
+	pd_fisqua_codes_readonly: 'The unit is in Fisqua mode: the stem comes from Fisqua, and only an administrator can change it.',
+	pd_err_unknown_reference_code: (code: string) => `Fisqua has no description with the code ${code}. Check the code in Fisqua.`,
+	pd_err_stem_required_fisqua: "In Fisqua mode a volume's stem is its Fisqua reference code, so it can't be empty.",
+	pd_fisqua_unreachable_title: "Fisqua couldn't be reached to check the code",
+	pd_fisqua_no_lookup_title: "This Fisqua can't check reference codes",
+	pd_fisqua_list_instead: "The volume can't be saved now. You can import a list file exported from Fisqua in Cola instead.",
+	pd_err_volumes_from_fisqua:
+		"In Fisqua mode, volumes come from Fisqua's queue. Only an administrator can create a volume or change its stem or reference code.",
+	queue_unit_mode: (label: string) => `Unit mode: ${label}`,
+	queue_fisqua_volumes_line: "Volumes come from Fisqua's queue. To add a volume, ask for it to be added to the queue in Fisqua.",
+	queue_import_err_volumes_from_fisqua: "In Fisqua mode only an administrator can import a list: volumes come from Fisqua's queue.",
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
 	api_request_failed: 'Request failed'

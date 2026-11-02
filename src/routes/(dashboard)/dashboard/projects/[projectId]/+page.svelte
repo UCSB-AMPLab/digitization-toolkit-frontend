@@ -5,24 +5,31 @@
   // filename stem rules (see `VolumeStemField`); the delete modal moves a
   // volume's records to another volume first when it has any. The Status
   // column shows the volume's pipeline stage, as Cola labels it, from one
-  // GET /activity/collections for the project.
+  // GET /activity/collections for the project. The volume form lives in
+  // VolumeFormModal, which Volúmenes opens too. In Fisqua mode (NEH-311) an
+  // operator has no Nuevo volumen, and the form keeps their stem
+  // read-only. While the unit hides projects (NEH-313) the page goes to
+  // Volúmenes, carrying ?editVolume=, so the form opens there.
   //
-  // Version: 0.2.0
+  // Version: 0.3.3
 
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { m, roleLabel, locale } from '$lib/i18n';
   import { formatApiDate } from '$lib/format-date';
   import { formatCount } from '$lib/format-count';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { authStore, userRole } from '$lib/stores/auth';
+  import { authStore } from '$lib/stores/auth';
   import { projectsApi, collectionsApi, recordsApi, projectMembersApi, activityApi,
            type Project, type Collection, type ProjectMember, type UserRead, type StatusCounts } from '$lib/api';
-  import { stemProblem, stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
-  import { volumeSaveErrorText, volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
-  import VolumeStemField from './VolumeStemField.svelte';
+  import { needsStem } from '$lib/volume-stem';
+  import { canCreateVolumes, ensureUnit, hiddenProjectRedirect, unitState } from '$lib/unit-mode';
+  import VolumeFormModal from './VolumeFormModal.svelte';
+  import VolumeRowMenu from './VolumeRowMenu.svelte';
+  import VolumeDeleteModal from './VolumeDeleteModal.svelte';
   import { dismissible } from '$lib/dialog';
-  import { placeVolume, type PipelineStage } from '$lib/pipeline';
+  import { placeVolume, stageBadgeStyle, type PipelineStage } from '$lib/pipeline';
 
   let projectId = $derived(Number($page.params.projectId) || 0);
 
@@ -46,14 +53,20 @@
       : directRecordCount + collections.reduce((sum, c) => sum + (c.record_count ?? 0), 0)
   );
 
+  // Editing: admin and operator. A new volume: the same, but no operator
+  // in Fisqua mode (NEH-311).
   let canCreate = $derived(
     $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
   );
+  let canCreateNew = $derived(canCreateVolumes($authStore.user?.role, $unitState));
   // Only admin adds or removes members — the backend enforces it too
   // (`allow_admin` in `add_project_member`/`remove_project_member`, NEH-80).
   // Operator and reviewer cannot even read the user list (GET /auth/users is
   // admin-only), so the picker must not try to load it for them.
   let canManageMembers = $derived($authStore.user?.role === 'admin');
+
+  let showCreateModal   = $state(false);
+  let editingCollection = $state<Collection | null>(null);
 
   let filteredCollections = $derived(
     searchQuery.trim()
@@ -63,60 +76,23 @@
       : collections
   );
 
-  let showCreateModal = $state(false);
-  let colName         = $state('');
-  let colDesc         = $state('');
-  let colDateStart    = $state('');
-  let colDateEnd      = $state('');
-  let colCreator      = $state('');
-  let colSignatura    = $state('');
-  // The stem ("raíz", filename_stem). Required on a new volume; on an
-  // existing one it can be given once while empty, and is read-only once
-  // the volume reserves it (stem_reserved).
-  let colStem         = $state('');
-  let isCreating        = $state(false);
-  let createError       = $state('');
-  let editingCollection = $state<Collection | null>(null);
 
-  /** Validates a partial ISO 8601 date: YYYY, YYYY-MM, or YYYY-MM-DD. */
-  function isValidISODate(s: string): boolean {
-    // Full date: YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-      const [y, m, d] = s.split('-').map(Number);
-      if (m < 1 || m > 12 || d < 1 || d > 31) return false;
-      const daysInMonth = new Date(y, m, 0).getDate();
-      return d <= daysInMonth;
-    }
-    // Year + month: YYYY-MM
-    if (/^\d{4}-\d{2}$/.test(s)) {
-      const m = Number(s.slice(5));
-      return m >= 1 && m <= 12;
-    }
-    // Year only: YYYY
-    if (/^\d{4}$/.test(s)) {
-      return Number(s) >= 1;
-    }
-    return false;
-  }
-
-  let stemLocked = $derived(!!editingCollection?.stem_reserved);
-  // Required on a new volume and on one that already has a stem: a stem can
-  // be changed before the first capture, but never blanked. Only a volume
-  // that has never had one may be saved without it.
-  let stemRequired = $derived(!editingCollection || !!editingCollection.filename_stem);
-  let stemInvalid = $derived(!stemLocked && stemProblem(colStem, stemRequired) !== null);
-
-  let dateError = $derived(
-    (colDateStart && !isValidISODate(colDateStart))
-      ? $m.pd_val_start_date
-      : (colDateEnd && !isValidISODate(colDateEnd))
-      ? $m.pd_val_end_date
-      : (colDateStart && colDateEnd && colDateEnd < colDateStart)
-      ? $m.pd_val_date_range
-      : ''
-  );
+  // False until the unit's state is read: while projects are hidden the
+  // page goes to Volúmenes without ever showing itself (NEH-313).
+  let routeReady = $state(false);
+  let left = false;
+  onDestroy(() => (left = true));
 
   onMount(async () => {
+    const here = get(page).url.pathname;
+    const away = hiddenProjectRedirect(await ensureUnit(), get(page).url.searchParams.get('editVolume'));
+    if (away) {
+      // Only while this page is still the one shown.
+      if (!left && get(page).url.pathname === here) goto(away, { replaceState: true });
+      return;
+    }
+    if (left) return;
+    routeReady = true;
     await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
     // ?editVolume=<id> opens that volume's form: the capture screen links
     // here when the volume has no stem yet.
@@ -220,101 +196,18 @@
     }
   }
 
-  async function handleCreateCollection() {
-    if (!colName.trim() || stemInvalid) return;
-    isCreating = true;
-    createError = '';
-
-    try {
-      const archMeta: Record<string, string> = {};
-      if (colDateStart)        archMeta.date_start = colDateStart;
-      if (colDateEnd)          archMeta.date_end   = colDateEnd;
-      if (colCreator.trim())   archMeta.creator    = colCreator.trim();
-      if (colSignatura.trim()) archMeta.signatura  = colSignatura.trim();
-      const archivalMetadata = Object.keys(archMeta).length > 0 ? archMeta : undefined;
-
-      const stem = colStem.trim();
-      if (editingCollection) {
-        // The stem is sent only when it changed to a non-empty value, and
-        // never once it is reserved; null is never sent.
-        const stemChanged = !stemLocked && stem !== '' && stem !== (editingCollection.filename_stem ?? '');
-        await collectionsApi.update(editingCollection.id, {
-          name: colName.trim(),
-          description: colDesc.trim() || undefined,
-          archival_metadata: archivalMetadata,
-          ...(stemChanged ? { filename_stem: stem } : {}),
-        });
-        await loadCollections();
-      } else {
-        await collectionsApi.create({
-          name: colName.trim(),
-          description: colDesc.trim() || undefined,
-          project_id: projectId,
-          created_by: $authStore.user?.username,
-          archival_metadata: archivalMetadata,
-          filename_stem: stem,
-        });
-        await loadCollections();
-      }
-
-      showCreateModal = false;
-      editingCollection = null;
-      colName = ''; colDesc = '';
-      colDateStart = ''; colDateEnd = '';
-      colCreator = ''; colSignatura = '';
-      colStem = '';
-
-    } catch (err) {
-      // Known cases have their own message, anything else a generic one; the
-      // backend's English text goes to the console only.
-      createError = volumeSaveErrorText(err, $m);
-      console.error('[ProjectDetail] Error creating collection:', err);
-    } finally {
-      isCreating = false;
-    }
-  }
 
   function closeModal() {
     showCreateModal = false;
-    createError = '';
     editingCollection = null;
-    colName = ''; colDesc = '';
-    colDateStart = ''; colDateEnd = '';
-    colCreator = ''; colSignatura = '';
-    colStem = '';
   }
 
   function handleCollectionClick(collectionId: number) {
     goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
   }
 
-  let openColMenuId = $state<number | null>(null);
-
-  // Delete collection modal state
-  let showDeleteColModal     = $state(false);
-  let deletingCol            = $state<Collection | null>(null);
-  let deleteColRecordCount   = $state(0);
-  let deleteMoveColTarget    = $state<number | ''>('');
-  let isDeletingCol          = $state(false);
-  let deleteColError         = $state('');
-  let isLoadingDeleteColInfo = $state(false);
-  // Set when the backend refused the delete because the volume still holds
-  // sub-volumes. This screen cannot move those, so the modal offers no
-  // target, the delete stays disabled, and records are never moved.
-  let deleteBlockedBySubvolumes = $state(false);
-
-  $effect(() => {
-    if (openColMenuId !== null) {
-      const close = () => { openColMenuId = null; };
-      document.addEventListener('click', close, { once: true });
-      return () => document.removeEventListener('click', close);
-    }
-  });
-
-  function openColMenu(e: MouseEvent, id: number) {
-    e.stopPropagation();
-    openColMenuId = openColMenuId === id ? null : id;
-  }
+  // The volume whose delete dialog is open (VolumeDeleteModal).
+  let deletingCol = $state<Collection | null>(null);
 
   function startEditCollection(e: MouseEvent, col: Collection) {
     e.stopPropagation();
@@ -322,107 +215,8 @@
   }
 
   function openEditCollection(col: Collection) {
-    openColMenuId = null;
-    createError = '';
     editingCollection = col;
-    colStem      = col.filename_stem ?? '';
-    colName      = col.name;
-    colDesc      = col.description ?? '';
-    colSignatura = col.archival_metadata?.signatura ?? '';
-    colCreator   = col.archival_metadata?.creator ?? '';
-    colDateStart = col.archival_metadata?.date_start ?? '';
-    colDateEnd   = col.archival_metadata?.date_end ?? '';
     showCreateModal = true;
-  }
-
-  async function openDeleteColModal(e: MouseEvent, col: Collection) {
-    e.stopPropagation();
-    openColMenuId = null;
-    deletingCol = col;
-    deleteMoveColTarget = '';
-    deleteColError = '';
-    deleteColRecordCount = 0;
-    deleteBlockedBySubvolumes = false;
-    showDeleteColModal = true;
-    isLoadingDeleteColInfo = true;
-    try {
-      deleteColRecordCount = await recordsApi.count({ collection_id: col.id });
-    } catch (err) {
-      console.error('[ProjectDetail] Error fetching collection info:', err);
-    } finally {
-      isLoadingDeleteColInfo = false;
-    }
-  }
-
-  function closeDeleteColModal() {
-    showDeleteColModal = false;
-    deletingCol = null;
-    deleteMoveColTarget = '';
-    deleteColError = '';
-    deleteBlockedBySubvolumes = false;
-    isDeletingCol = false;
-  }
-
-  async function executeDeleteCol() {
-    if (!deletingCol || deleteRefused(deletingCol) || deleteBlockedBySubvolumes) return;
-    isDeletingCol = true;
-    deleteColError = '';
-    try {
-      if (deleteMoveColTarget !== '') {
-        // The list may be older than the volume's last capture. Moving the
-        // records out of a volume the backend then refuses to delete would
-        // leave them moved and the volume still there, so the volume is read
-        // again first and the move is skipped once it reserves its stem.
-        const fresh = await collectionsApi.get(deletingCol.id);
-        if (deleteRefused(fresh)) {
-          deletingCol = fresh;
-          isDeletingCol = false;
-          await loadCollections();
-          return;
-        }
-        await collectionsApi.moveRecords(deletingCol.id, Number(deleteMoveColTarget));
-      }
-      await collectionsApi.delete(deletingCol.id);
-      await loadCollections();
-      closeDeleteColModal();
-    } catch (err) {
-      const conflict = stemConflict(err);
-      if (conflict === 'stem_reserved' && deletingCol) {
-        // The backend refused: the modal switches to the reserved notice,
-        // which says why, and the delete stays disabled.
-        deletingCol = { ...deletingCol, stem_reserved: true };
-        await loadCollections();
-      } else if (isNotEmptyRefusal(err) && deletingCol) {
-        console.error('[ProjectDetail] Error deleting volume:', err);
-        const counts = notEmptyCounts(err);
-        if (counts && counts.subVolumes > 0) {
-          // Sub-volumes block the delete, with or without records: moving
-          // the records would not be enough, so no target is offered.
-          deleteBlockedBySubvolumes = true;
-          deleteMoveColTarget = '';
-          deleteColError = $m.pd_err_delete_has_subvolumes;
-        } else if (deleteMoveColTarget === '') {
-          // The modal opened believing the volume was empty, and it is not.
-          // The count is read again so the target select appears here.
-          try {
-            deleteColRecordCount = await recordsApi.count({ collection_id: deletingCol.id });
-          } catch (countErr) {
-            console.error('[ProjectDetail] Error fetching collection info:', countErr);
-          }
-          if (deleteColRecordCount === 0) {
-            // The count could not be read, or the records left meanwhile.
-            deleteColError = volumeDeleteErrorText(err, $m);
-          }
-        } else {
-          deleteColError = volumeDeleteErrorText(err, $m);
-        }
-      } else {
-        // The backend's English text goes to the console only.
-        deleteColError = volumeDeleteErrorText(err, $m);
-        console.error('[ProjectDetail] Error deleting volume:', err);
-      }
-      isDeletingCol = false;
-    }
   }
 
   // Each volume's status counts, by collection id, from one request for the
@@ -445,14 +239,9 @@
     approved: $m.dash_stage_approved,
   });
 
-  function getStageStyle(stage: PipelineStage): string {
-    if (stage === 'capture')   return 'color: var(--color-primary); background: rgba(90,140,98,0.15)';
-    if (stage === 'recapture') return 'color: var(--color-error); background: rgba(214,103,74,0.15)';
-    if (stage === 'review')    return 'color: var(--color-warning); background: rgba(208,154,68,0.15)';
-    return 'color: var(--color-success); background: rgba(111,191,115,0.15)';
-  }
 </script>
 
+{#if routeReady}
 <div class="page">
 
   <!-- Header -->
@@ -462,8 +251,8 @@
       <p class="page-subtitle">{$m.pd_subtitle}</p>
     </div>
     <!-- Only once volumes exist: the empty state has its own create button. -->
-    {#if canCreate && collections.length > 0}
-      <button class="btn-primary" data-tour="nuevo-volumen" onclick={() => showCreateModal = true}>
+    {#if canCreateNew && collections.length > 0}
+      <button class="btn-primary" data-tour="nuevo-volumen" onclick={() => { editingCollection = null; showCreateModal = true; }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -523,8 +312,8 @@
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
       </svg>
       <span>{searchQuery ? $m.pd_empty_search : $m.pd_empty}</span>
-      {#if canCreate && !searchQuery}
-        <button class="btn-primary" onclick={() => showCreateModal = true}>{$m.pd_create_first}</button>
+      {#if canCreateNew && !searchQuery}
+        <button class="btn-primary" onclick={() => { editingCollection = null; showCreateModal = true; }}>{$m.pd_create_first}</button>
       {/if}
     </div>
   {:else}
@@ -578,7 +367,7 @@
 
               <td>
                 {#if stage}
-                  <span class="status-badge" style={getStageStyle(stage)}>{stageTitle[stage]}</span>
+                  <span class="status-badge" style={stageBadgeStyle(stage)}>{stageTitle[stage]}</span>
                 {/if}
               </td>
 
@@ -603,29 +392,9 @@
               </td>
 
               <td class="text-right">
-                <div class="action-menu-wrap">
-                  <button
-                    class="btn-menu"
-                    onclick={(e) => openColMenu(e, col.id)}
-                    title={$m.common_actions}
-                  >
-                    <span class="material-symbols-outlined icon-sm">more_vert</span>
-                  </button>
-                  {#if openColMenuId === col.id}
-                    <div class="action-menu">
-                      <button class="action-item" onclick={(e) => startEditCollection(e, col)}>
-                        <span class="material-symbols-outlined icon-sm">edit</span>
-                        {$m.common_edit}
-                      </button>
-                      {#if $userRole === 'admin' || $userRole === 'operator'}
-                        <button class="action-item action-item-danger" onclick={(e) => openDeleteColModal(e, col)}>
-                          <span class="material-symbols-outlined icon-sm">delete</span>
-                          {$m.common_delete}
-                        </button>
-                      {/if}
-                    </div>
-                  {/if}
-                </div>
+                {#if canCreate}
+                  <VolumeRowMenu volume={col} onEdit={openEditCollection} onDelete={(v) => (deletingCol = v)} />
+                {/if}
               </td>
             </tr>
           {/each}
@@ -635,126 +404,16 @@
   {/if}
 
 </div>
+{/if}
 
 {#if showCreateModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal(); }}>
-    <!-- No Escape: it would throw away what was typed. -->
-    <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
-
-      <div class="modal-header">
-        <div>
-          <h3 class="modal-title">{editingCollection ? $m.pd_modal_edit_title : $m.pd_modal_create_title}</h3>
-          <p class="modal-subtitle">{$m.pd_modal_project(project?.name ?? '—')}</p>
-        </div>
-        <button class="modal-close" onclick={closeModal}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
-      <div class="modal-body">
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_title} <span class="field-required">*</span></label>
-          <input
-            class="field-input"
-            type="text"
-            placeholder={$m.pd_ph_title}
-            bind:value={colName}
-            autofocus
-          />
-        </div>
-
-        <VolumeStemField bind:value={colStem} locked={stemLocked} required={stemRequired} />
-
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_refcode}</label>
-          <input
-            class="field-input"
-            type="text"
-            placeholder={$m.pd_ph_refcode}
-            bind:value={colSignatura}
-          />
-        </div>
-
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_creator}</label>
-          <input
-            class="field-input"
-            type="text"
-            placeholder={$m.pd_ph_creator}
-            bind:value={colCreator}
-          />
-        </div>
-
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_dates}</label>
-          <div class="date-range-row">
-            <div class="date-field">
-              <span class="date-sub-label">{$m.pd_date_from}</span>
-              <input
-                class="field-input"
-                class:field-input--error={colDateStart !== '' && !isValidISODate(colDateStart)}
-                type="text"
-                placeholder={$m.pd_ph_date_from}
-                bind:value={colDateStart}
-              />
-            </div>
-            <span class="date-sep">—</span>
-            <div class="date-field">
-              <span class="date-sub-label">{$m.pd_date_to}</span>
-              <input
-                class="field-input"
-                class:field-input--error={colDateEnd !== '' && !isValidISODate(colDateEnd)}
-                type="text"
-                placeholder={$m.pd_ph_date_to}
-                bind:value={colDateEnd}
-              />
-            </div>
-          </div>
-          {#if dateError}
-            <p class="date-error">{dateError}</p>
-          {/if}
-        </div>
-
-        <div class="form-field">
-          <label class="field-label">{$m.pd_field_notes}</label>
-          <textarea
-            class="field-textarea"
-            placeholder={$m.pd_ph_notes}
-            bind:value={colDesc}
-          ></textarea>
-        </div>
-      </div>
-
-      {#if createError}
-        <div class="create-error">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-          </svg>
-          {createError}
-        </div>
-      {/if}
-
-      <div class="modal-actions">
-        <button class="btn-ghost" onclick={closeModal}>{$m.common_cancel}</button>
-        <button
-          class="btn-crear"
-          onclick={handleCreateCollection}
-          disabled={isCreating || !colName.trim() || dateError !== '' || stemInvalid}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          </svg>
-          {isCreating ? (editingCollection ? $m.common_saving : $m.common_creating) : (editingCollection ? $m.common_save_changes : $m.pd_create_btn)}
-        </button>
-      </div>
-
-    </div>
-  </div>
+  <VolumeFormModal
+    editing={editingCollection}
+    {projectId}
+    projectName={project?.name ?? null}
+    onClose={closeModal}
+    onSaved={loadCollections}
+  />
 {/if}
 
 {#if showMembersModal}
@@ -842,98 +501,13 @@
   </div>
 {/if}
 
-{#if showDeleteColModal && deletingCol}
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeDeleteColModal, escape: !isDeletingCol, backdrop: !isDeletingCol }}>
-    <div class="modal-card delete-modal-card dialog-fit" role="dialog" aria-modal="true">
-
-      <div class="modal-header">
-        <div>
-          <h3 class="modal-title">{$m.pd_delete_collection_title}</h3>
-          <p class="modal-subtitle">{deletingCol.name}</p>
-        </div>
-        <button class="modal-close" onclick={closeDeleteColModal}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
-      {#if deleteRefused(deletingCol)}
-        <!-- The backend refuses this delete (409); nothing is moved first. -->
-        <div class="delete-warning" role="note">
-          <div class="delete-warning-icon">
-            <span class="material-symbols-outlined icon-md">lock</span>
-          </div>
-          <p class="delete-warning-body">{$m.pd_delete_stem_reserved}</p>
-        </div>
-      {:else if deleteBlockedBySubvolumes}
-        <!-- No target select: the error below says why the delete is refused. -->
-      {:else if isLoadingDeleteColInfo}
-        <div class="delete-loading">
-          <div class="spinner"></div>
-          {$m.pd_delete_loading}
-        </div>
-      {:else if deleteColRecordCount > 0}
-        <div class="delete-warning">
-          <div class="delete-warning-icon">
-            <span class="material-symbols-outlined icon-md">warning</span>
-          </div>
-          <div>
-            <p class="delete-warning-title">{$m.pd_col_not_empty}</p>
-            <p class="delete-warning-body">
-              {$m.proj_contains_pre}<strong>{$m.pd_records_count(deleteColRecordCount)}</strong>.
-              {$m.pd_delete_warning}
-            </p>
-          </div>
-        </div>
-
-        <div class="delete-move-section">
-          <!-- The backend refuses to delete a volume that still has records,
-               so a target is required and the empty option is a placeholder. -->
-          <label class="field-label" for="delete-move-target">{$m.pd_move_label}</label>
-          <select id="delete-move-target" class="field-input" bind:value={deleteMoveColTarget} required aria-required="true">
-            <option value="" disabled>{$m.pd_move_none}</option>
-            {#each collections.filter(c => c.id !== deletingCol!.id) as c}
-              <option value={c.id}>{c.name}</option>
-            {/each}
-          </select>
-          {#if deleteMoveColTarget === ''}
-            <p class="delete-move-hint">{$m.pd_move_hint_none}</p>
-          {:else}
-            <p class="delete-move-hint">{$m.pd_move_hint_selected}</p>
-          {/if}
-        </div>
-      {:else}
-        <p class="delete-confirm-text">
-          {$m.pd_delete_confirm_pre}<strong>"{deletingCol.name}"</strong>? {$m.common_irreversible}
-        </p>
-      {/if}
-
-      {#if deleteColError}
-        <div class="create-error">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
-            <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-          </svg>
-          {deleteColError}
-        </div>
-      {/if}
-
-      <div class="modal-actions">
-        <button class="btn-ghost" onclick={closeDeleteColModal} disabled={isDeletingCol}>{$m.common_cancel}</button>
-        <button
-          class="btn-danger"
-          onclick={executeDeleteCol}
-          disabled={isDeletingCol || isLoadingDeleteColInfo || deleteRefused(deletingCol)
-            || deleteBlockedBySubvolumes
-            || (deleteColRecordCount > 0 && deleteMoveColTarget === '')}
-        >
-          <span class="material-symbols-outlined icon-sm">delete</span>
-          {isDeletingCol ? $m.common_deleting : (deleteMoveColTarget !== '' ? $m.proj_move_and_delete : $m.pd_delete_collection_title)}
-        </button>
-      </div>
-
-    </div>
-  </div>
+{#if deletingCol}
+  <VolumeDeleteModal
+    volume={deletingCol}
+    moveTargets={collections}
+    onClose={() => (deletingCol = null)}
+    onChanged={loadCollections}
+  />
 {/if}
 
 <style>

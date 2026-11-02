@@ -1,15 +1,17 @@
 <script lang="ts">
   // Settings page (/dashboard/config), admin only: the role guard in
-  // `(dashboard)/+layout.svelte` redirects every other role. Sections:
+  // `(dashboard)/+layout.svelte` redirects every other role. Sections: the
+  // unit's mode and projects setting (NEH-311, NEH-313, UnitModeCard),
   // language, storage (usage, primary path, external drive), the catalogue's
   // off-site copy, diagnostics, maintenance, and power. Everything except the
   // language choice acts on the appliance through the backend.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.3.3
 
   import { onMount } from 'svelte';
   import { m, locale, setLanguage, type Locale } from '$lib/i18n';
   import CatalogueBackupCard from './CatalogueBackupCard.svelte';
+  import UnitModeCard from './UnitModeCard.svelte';
   // Available languages. The catalogue lives in `$lib/i18n`; this list only
   // names them for the selector.
   const LANGUAGES: { code: Locale; label: string }[] = [
@@ -254,9 +256,16 @@
     </div>
   </div>
 
-  <!-- Language comes first because it is the only personal preference on
-       this page; the rest are operations on the appliance. `setLanguage`
-       writes a cookie and reloads: it does not touch the session. -->
+  <!-- The unit's mode comes first: it decides what leaves the unit and where
+       its volumes come from (NEH-311). -->
+  <div class="config-section" id="unit-mode">
+    <h2 class="section-title">{$m.unit_section_title}</h2>
+    <UnitModeCard />
+  </div>
+
+  <!-- Language is the only personal preference on this page; the rest are
+       operations on the appliance. `setLanguage` writes a cookie and
+       reloads: it does not touch the session. -->
   <div class="config-section">
     <h2 class="section-title">{$m.config_section_language}</h2>
     <div class="config-card">

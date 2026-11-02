@@ -36,6 +36,12 @@
   // many page pairs it asks for and lists each by its sequence, or its record
   // when the unit does not list it, with the page when Fisqua names one. A queue item's done mark sends its itemId; a 409 means the
   // queue moved, so the page reads it again and says so.
+  //
+  // The unit's mode (NEH-311) is shown beside the title, in every mode and
+  // for every role. In Fisqua mode a line says volumes come from Fisqua's
+  // queue, and an operator has no list import; an admin keeps it, as the
+  // fallback when the link is down. A 403 volumes_from_fisqua on an import
+  // has its own message, and the mode is read again.
   // ============================================================================
   //
   // Version: 0.3.3
@@ -55,10 +61,13 @@
   } from '$lib/queue';
   import { readRetakeSummary, retakeProgress, retakeVolumeMap } from '$lib/recapture-turn';
   import { actionLabel, importErrorText, importReasonText } from '$lib/queue-labels';
+  import { canImportList, ensureUnit, modeLabel, reloadUnit, unitState } from '$lib/unit-mode';
 
   // Capture and import are admin and operator only, as the capture screen
   // and the import route are.
   let canOperate = $derived($userRole === 'admin' || $userRole === 'operator');
+  // The list import, by role and the unit's mode (NEH-311).
+  let canImport = $derived(canImportList($userRole, $unitState));
   // Marking an item done is a review decision: admin and reviewer, as the
   // backend allows.
   let canMarkDone = $derived($userRole === 'admin' || $userRole === 'reviewer');
@@ -132,7 +141,7 @@
     }
   }
 
-  onMount(() => { loadLists(); loadRetakeCounts(); loadRetakeSummary(); });
+  onMount(() => { loadLists(); loadRetakeCounts(); loadRetakeSummary(); ensureUnit(); });
 
   let retakeVolumes = $derived(retakeVolumeMap(retakeSummary));
   let turn = $derived(retakeSummary && retakeSummary.pendingRecords > 0 ? retakeSummary.turn : null);
@@ -305,7 +314,10 @@
       // The backend's text is English; the console keeps it.
       console.error('[Queue] Import refused:', err);
       const status = err instanceof ApiError || err instanceof AuthError ? err.status : undefined;
-      importError = importErrorText($m, status);
+      const detail = err instanceof ApiError || err instanceof AuthError ? err.detail : undefined;
+      importError = importErrorText($m, status, detail);
+      // Refused because the unit is in Fisqua mode: the page follows it.
+      if (status === 403 && (detail as { code?: unknown } | undefined)?.code === 'volumes_from_fisqua') reloadUnit();
       // The button was disabled during the import, which drops its focus.
       await tick();
       importButton?.focus();
@@ -441,10 +453,21 @@
 <div class="page">
   <div class="page-header">
     <div>
-      <h1 class="page-title">{$m.queue_title}</h1>
+      <div class="title-row">
+        <h1 class="page-title">{$m.queue_title}</h1>
+        {#if $unitState}
+          <span class="unit-mode-pill" class:is-fisqua={$unitState.mode === 'fisqua'}>
+            <span class="unit-mode-dot" aria-hidden="true"></span>
+            {$m.queue_unit_mode(modeLabel($unitState.mode, $m))}
+          </span>
+        {/if}
+      </div>
       <p class="page-subtitle">{$m.queue_subtitle}</p>
+      {#if $unitState?.mode === 'fisqua'}
+        <p class="unit-fisqua-line">{$m.queue_fisqua_volumes_line}</p>
+      {/if}
     </div>
-    {#if canOperate}
+    {#if canImport}
       <input
         bind:this={fileInput}
         class="visually-hidden"
@@ -628,6 +651,20 @@
   }
   .page-title    { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
+
+  /* The unit's mode beside the title (NEH-311). */
+  .title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 4px; }
+  .title-row .page-title { margin: 0; }
+  .unit-mode-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: var(--text-sm); color: var(--color-light);
+    padding: 6px 12px; border-radius: var(--radius-full);
+    background-color: var(--color-surface-alt-2);
+    border: 1px solid var(--border-color);
+  }
+  .unit-mode-dot { width: 8px; height: 8px; border-radius: var(--radius-full); background-color: var(--color-light-grey); }
+  .unit-mode-pill.is-fisqua .unit-mode-dot { background-color: var(--color-secondary); }
+  .unit-fisqua-line { margin: 8px 0 0; font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.5; max-width: 820px; }
 
   .visually-hidden {
     position: absolute;

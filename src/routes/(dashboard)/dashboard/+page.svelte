@@ -6,14 +6,17 @@
   // status write goes through `applyCameraSides` so that a reconnect and a
   // late preview cannot overwrite each other. While recaptures are pending
   // (0.2.0), `RetakeBand` puts them first, from GET /records/to-retake/summary.
+  // While the unit hides projects (NEH-313) the "Proyectos activos" card is
+  // left out.
   //
-  // Version: 0.2.0
+  // Version: 0.3.3
 
   import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores/auth';
   import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore, getApiBase,
            type Collection, type Project, type RetakeSummary } from '$lib/api';
   import { readRetakeSummary } from '$lib/recapture-turn';
+  import { projectsShownIn, unitState } from '$lib/unit-mode';
   import { m } from '$lib/i18n';
   import { describeCaptureFailure, describeTestCapture, type CaptureOutcome } from '$lib/capture-outcome';
   import { sidesFromDevices, type SideInfo, type SideStatus } from '$lib/camera-sides';
@@ -367,13 +370,15 @@
 
   <RetakeBand summary={retakeSummary} canRetake={canSeeCameras} />
 
-  <div class="kpi-grid">
+  <div class="kpi-grid" class:no-projects={!projectsShownIn($unitState)}>
 
-    <div class="kpi-card">
-      <div class="kpi-line" style="background: var(--color-primary)"></div>
-      <div class="kpi-number">{isLoadingStats ? '—' : projectCount}</div>
-      <div class="kpi-label">{$m.dash_kpi_active_projects}</div>
-    </div>
+    {#if projectsShownIn($unitState)}
+      <div class="kpi-card">
+        <div class="kpi-line" style="background: var(--color-primary)"></div>
+        <div class="kpi-number">{isLoadingStats ? '—' : projectCount}</div>
+        <div class="kpi-label">{$m.dash_kpi_active_projects}</div>
+      </div>
+    {/if}
 
     <div class="kpi-card">
       <div class="kpi-line" style="background: var(--color-secondary)"></div>
@@ -552,6 +557,7 @@
     gap: 16px;
     margin-bottom: 36px;
   }
+  .kpi-grid.no-projects { grid-template-columns: repeat(2, 1fr); }
 
   .kpi-card {
     background-color: var(--color-surface);

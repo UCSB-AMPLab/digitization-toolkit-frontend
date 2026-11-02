@@ -3,9 +3,11 @@
   // this layout inherit from the root layout instead of the (dashboard) one,
   // so the dashboard navigation sidebar is not rendered. It holds the session
   // guard and the top bar (breadcrumb, offsite copy line, camera button); the
-  // page fills the rest of the screen.
+  // page fills the rest of the screen. While the unit hides projects
+  // (NEH-313), the breadcrumb starts with "Volúmenes", a link to the list,
+  // instead of the project's name, and the back button returns there.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.3.3
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -18,6 +20,7 @@
   import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
   import type { VolumeOffsiteState } from '$lib/api';
   import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
+  import { ensureUnit, projectsShownIn, unitState, volumeBackPath } from '$lib/unit-mode';
 
   let { children } = $props();
 
@@ -36,6 +39,7 @@
       // Shared session guard (NEH-66), also used by live-preview and the page.
       authStore.requireSession();
     });
+    ensureUnit();
     return unsub;
   });
 
@@ -86,8 +90,8 @@
     <div class="topbar-left">
       <button
         class="btn-back"
-        onclick={() => goto(`/dashboard/projects/${projectId}`)}
-        aria-label={$m.col_back_to_project}
+        onclick={() => goto(volumeBackPath($unitState, projectId))}
+        aria-label={projectsShownIn($unitState) ? $m.col_back_to_project : $m.col_back_to_volumes}
       >
         <span class="material-symbols-outlined" style="font-size:20px">arrow_back</span>
       </button>
@@ -95,7 +99,11 @@
       <!-- Breadcrumb, with the volume's offsite copy line below it (NEH-248) -->
       <div class="topbar-title">
         <nav class="breadcrumb" aria-label={$m.col_breadcrumb_nav}>
-          <span class="bc-item bc-project">{projectName}</span>
+          {#if projectsShownIn($unitState)}
+            <span class="bc-item bc-project">{projectName}</span>
+          {:else}
+            <a class="bc-item bc-project bc-link" href="/dashboard/volumes">{$m.nav_volumes}</a>
+          {/if}
           <span class="bc-sep">/</span>
           <span class="bc-item bc-collection">{collectionName}</span>
         </nav>
@@ -222,6 +230,8 @@
     font-weight: var(--fw-bold);
   }
   .bc-sep { color: var(--color-light-grey); }
+  .bc-link { text-decoration: none; }
+  .bc-link:hover { color: var(--color-light); text-decoration: underline; }
 
 
   .gallery-content {

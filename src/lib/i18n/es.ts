@@ -1553,6 +1553,79 @@ export const es = {
 	err_upload_excluded: 'Fisqua excluyó este registro, así que no se le pueden agregar imágenes.',
 	err_delete_excluded: 'Fisqua excluyó este registro, así que solo un administrador puede eliminarlo.',
 
+	// ── The unit's mode and projects setting (NEH-311, NEH-313) ─────────────
+	// The three mode labels are shared with Fisqua.
+	unit_mode_offline: 'Solo en el escáner',
+	unit_mode_backup: 'Solo copia externa',
+	unit_mode_fisqua: 'Fisqua',
+	unit_section_title: 'Modo del equipo',
+	unit_section_desc:
+		'Define qué envía Captua fuera de este equipo y de dónde vienen los volúmenes. Cambiar el modo no mueve ningún volumen ni registro.',
+	unit_mode_legend: 'Modo',
+	unit_mode_offline_desc: 'Captua no envía nada fuera del equipo: ni a una copia externa ni a Fisqua. Los volúmenes se crean en este equipo.',
+	unit_mode_backup_desc: 'Captua guarda una copia externa de las imágenes y del catálogo. Los volúmenes se crean en este equipo.',
+	unit_mode_fisqua_desc:
+		'Los volúmenes vienen de la cola de Fisqua. Por el enlace con Fisqua, Captua envía los volúmenes a revisión, consulta en qué estado están y recibe los resultados de la revisión. Los operarios no pueden crear volúmenes; un administrador sí, y Captua deja constancia de cada cambio.',
+	unit_current: 'Modo actual',
+	unit_projects_title: 'Proyectos',
+	unit_projects_desc:
+		'Disponible únicamente en el modo "Solo en el escáner". Si no usas proyectos, todos los volúmenes se muestran en una sola lista.',
+	unit_projects_toggle: 'Usar proyectos',
+	unit_try_again: 'Reintentar',
+	unit_leave_fisqua_title: 'Salir del modo Fisqua',
+	unit_leave_fisqua_body:
+		'Captua conserva en el equipo los envíos a revisión pendientes para Fisqua, y los envía si un administrador vuelve a poner el equipo en modo Fisqua. No se borra nada.',
+	unit_leave_fisqua_confirm: (label: string) => `Cambiar a "${label}"`,
+	unit_refused_title: (target: string, current: string) =>
+		`No se pudo cambiar el equipo al modo ${target}. Sigue en el modo ${current}.`,
+	// One line per problem of a refused switch (the 409 of PUT /system/unit).
+	unit_problem_offsite_not_configured:
+		'La copia externa de las imágenes no está configurada en este equipo. Se configura al instalar el equipo.',
+	unit_problem_catalogue_dump_not_configured:
+		'La copia externa del catálogo no está configurada o no tiene clave de cifrado. Se configura al instalar el equipo.',
+	unit_problem_fisqua_not_configured:
+		'El enlace con Fisqua no está configurado en este equipo. Se configura al instalar el equipo.',
+	unit_problem_fisqua_unreachable: 'Captua no pudo comunicarse con Fisqua. Revisa la conexión del equipo e intenta de nuevo.',
+	unit_problem_offsite_held:
+		'Mientras la copia externa esté en pausa en este equipo, Captua no puede enviar nada a Fisqua.',
+	unit_problem_mode_changed:
+		'Alguien más cambió la configuración del equipo mientras tanto. Captua volvió a cargarla: revisa el modo e intenta de nuevo.',
+	unit_problem_other: 'Captua no pudo cambiar el modo por un motivo que no reconoce.',
+	unit_err_save: 'Captua no pudo guardar el modo del equipo. Intenta de nuevo.',
+	unit_err_load: 'Captua no pudo leer el modo del equipo.',
+	// Volúmenes: every volume in one list while projects are hidden.
+	nav_volumes: 'Volúmenes',
+	vols_count: (n: number) => (n === 1 ? '1 volumen' : `${formatCount(n, 'es')} volúmenes`),
+	vols_search_label: 'Buscar',
+	vols_search_placeholder: 'Título, raíz o código de referencia',
+	vols_stage_label: 'Etapa',
+	vols_stage_all: 'Todas las etapas',
+	vols_col_stem: 'Raíz',
+	vols_empty: 'No hay volúmenes en este equipo.',
+	vols_load_error: 'Captua no pudo cargar los volúmenes.',
+	col_back_to_volumes: 'Volver a Volúmenes',
+	// The volume form in Fisqua mode.
+	pd_field_stem_fisqua: 'RAÍZ (CÓDIGO DE REFERENCIA DE FISQUA)',
+	pd_fisqua_admin_note:
+		'El equipo está en modo Fisqua, así que los volúmenes suelen venir de la cola de Fisqua. La raíz tiene que ser un código de referencia que exista en Fisqua: Captua lo comprueba al guardar y deja constancia del cambio.',
+	pd_fisqua_codes_readonly: 'El equipo está en modo Fisqua: la raíz viene de Fisqua y solo un administrador puede cambiarla.',
+	pd_err_unknown_reference_code: (code: string) =>
+		`Fisqua no tiene ninguna descripción con el código ${code}. Revisa el código en Fisqua.`,
+	pd_err_stem_required_fisqua:
+		'En modo Fisqua, la raíz de un volumen es su código de referencia en Fisqua, así que no puede quedar vacía.',
+	pd_fisqua_unreachable_title: 'Captua no pudo comunicarse con Fisqua para comprobar el código',
+	pd_fisqua_no_lookup_title: 'El Fisqua conectado a este equipo no permite comprobar códigos de referencia',
+	pd_fisqua_list_instead:
+		'Por ahora no se puede guardar el volumen. En su lugar, puedes exportar de Fisqua una lista de digitalización e importarla en Cola.',
+	pd_err_volumes_from_fisqua:
+		'En modo Fisqua, los volúmenes vienen de la cola de Fisqua. Solo un administrador puede crear un volumen o cambiar su raíz o su código de referencia.',
+	// Cola.
+	queue_unit_mode: (label: string) => `Modo del equipo: ${label}`,
+	queue_fisqua_volumes_line:
+		'Los volúmenes vienen de la cola de Fisqua. Para agregar un volumen, pide que lo incluyan en la cola de Fisqua.',
+	queue_import_err_volumes_from_fisqua:
+		'En modo Fisqua, solo un administrador puede importar una lista: los volúmenes vienen de la cola de Fisqua.',
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',
 	api_request_failed: 'Error en la solicitud'
