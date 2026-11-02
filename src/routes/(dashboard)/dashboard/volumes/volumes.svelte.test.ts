@@ -10,7 +10,12 @@ import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 
 const gotoMock = vi.hoisted(() => vi.fn());
+const pageUrl = vi.hoisted(() => ({ href: 'http://localhost/dashboard/volumes' }));
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+vi.mock('$app/stores', async () => {
+	const { readable } = await import('svelte/store');
+	return { page: readable({ get url() { return new URL(pageUrl.href); } }) };
+});
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { activityApi, collectionsApi, systemApi, type Collection, type StatusCounts } from '$lib/api';
@@ -53,6 +58,7 @@ function names(screen: { container: HTMLElement }) {
 beforeEach(() => {
 	locale.set('es');
 	gotoMock.mockClear();
+	pageUrl.href = 'http://localhost/dashboard/volumes';
 	signIn('admin');
 	vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
 	vi.spyOn(collectionsApi, 'listAll').mockResolvedValue(volumes);
@@ -139,6 +145,39 @@ describe('Volúmenes', () => {
 		await expect.poll(() => names(again)).toHaveLength(3);
 		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalledTimes(2));
 		await expect.element(page.getByRole('button', { name: es.pd_new_collection })).not.toBeInTheDocument();
+	});
+
+	it('opens the edit form of the volume named by ?editVolume', async () => {
+		pageUrl.href = 'http://localhost/dashboard/volumes?editVolume=97';
+		render(Volumes);
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog.getByText(es.pd_modal_edit_title)).toBeInTheDocument();
+		await expect.element(dialog.getByPlaceholder(es.pd_ph_title)).toHaveValue('Tomo 097');
+	});
+
+	it('opens ?editVolume for an operator in Fisqua mode with the stem read-only', async () => {
+		signIn('operator');
+		vi.mocked(systemApi.unit).mockResolvedValue(unit('fisqua') as never);
+		pageUrl.href = 'http://localhost/dashboard/volumes?editVolume=97';
+		render(Volumes);
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog.getByText(es.pd_modal_edit_title)).toBeInTheDocument();
+		await expect.element(dialog.getByLabelText(es.pd_field_stem_fisqua)).toHaveAttribute('readonly');
+		await expect.element(dialog.getByText(es.pd_fisqua_codes_readonly)).toBeInTheDocument();
+	});
+
+	it('does not open ?editVolume for a reviewer', async () => {
+		signIn('reviewer');
+		pageUrl.href = 'http://localhost/dashboard/volumes?editVolume=97';
+		const screen = render(Volumes);
+		await expect.poll(() => names(screen)).toHaveLength(3);
+		expect(page.getByRole('dialog').elements()).toHaveLength(0);
+	});
+
+	it('goes to Proyectos while projects are shown', async () => {
+		vi.mocked(systemApi.unit).mockResolvedValue({ ...unit('offline'), projectsEnabled: true, projectsShown: true } as never);
+		render(Volumes);
+		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard/projects', { replaceState: true }));
 	});
 
 	it('gives a reviewer no Nuevo volumen', async () => {

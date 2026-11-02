@@ -4,8 +4,12 @@
 //
 // `unitState` holds the last state read: null until it is read, and when it
 // cannot be read. It is read once per session (ensureUnit) and again after
-// a change (reloadUnit, or keepUnitState with the PUT's answer); a new session
-// reads it again. Every gate below takes null as "as before the modes":
+// a change (reloadUnit, or keepUnitState with the PUT's answer); any change of
+// session token (a logout, a new login) forgets it and drops a read still in
+// flight, and the next ensureUnit reads it for the new session. A read that
+// fails after one succeeded keeps the known state; only the first read of a
+// session can leave it null.
+// // reads it again. Every gate below takes null as "as before the modes":
 // projects shown, no Fisqua-mode restriction, since the backend enforces
 // the mode either way and its refusals are shown translated.
 //
@@ -60,8 +64,11 @@ export function readUnitState(data: unknown): UnitState | null {
 
 export const unitState = writable<UnitState | null>(null);
 
-// The token the state was read for, and the read in flight.
-let readFor: string | null = null;
+// The session token last seen (undefined before the auth store is watched),
+// the token the state belongs to, and the read in flight.
+const UNKNOWN_TOKEN = Symbol('unknown token');
+let observed: string | null | undefined = undefined;
+let readFor: string | null | typeof UNKNOWN_TOKEN = null;
 let pending: Promise<UnitState | null> | null = null;
 let watching = false;
 // Raised by resetUnit, so a read that started before it is not kept.
@@ -71,9 +78,11 @@ async function currentToken(): Promise<string | null> {
 	const { authStore } = await import('./stores/auth');
 	if (!watching) {
 		watching = true;
-		// A new session, or none, reads the state again.
+		// Any change of session token forgets the state, whether or not a
+		// read has succeeded yet.
 		authStore.subscribe((s) => {
-			if (readFor !== null && s.token !== readFor) resetUnit();
+			if (observed !== undefined && s.token !== observed) resetUnit();
+			observed = s.token;
 		});
 	}
 	return authStore.getToken();
@@ -89,7 +98,8 @@ async function read(token: string | null): Promise<UnitState | null> {
 		console.error('[Unit] Error reading the unit mode:', err);
 	}
 	if (startedIn !== generation) return get(unitState);
-	if (state) readFor = token;
+	if (!state) return get(unitState);
+	readFor = token;
 	unitState.set(state);
 	return state;
 }
@@ -98,7 +108,7 @@ async function read(token: string | null): Promise<UnitState | null> {
 export async function ensureUnit(): Promise<UnitState | null> {
 	const token = await currentToken();
 	const known = get(unitState);
-	if (known && readFor === token) return known;
+	if (known && (readFor === token || readFor === UNKNOWN_TOKEN)) return known;
 	if (!pending) {
 		const p: Promise<UnitState | null> = read(token).finally(() => {
 			if (pending === p) pending = null;
@@ -116,7 +126,10 @@ export async function reloadUnit(): Promise<UnitState | null> {
 /** Keep the state a PUT /system/unit answered. */
 export function keepUnitState(data: unknown): UnitState | null {
 	const state = readUnitState(data);
-	if (state) unitState.set(state);
+	if (state) {
+		readFor = observed === undefined ? UNKNOWN_TOKEN : observed;
+		unitState.set(state);
+	}
 	return state;
 }
 
@@ -187,6 +200,35 @@ export function volumeCodesReadOnly(role: string | null | undefined, state: Unit
 /** Whether the interface shows projects; true when the state is not known. */
 export function projectsShownIn(state: UnitState | null): boolean {
 	return state?.projectsShown ?? true;
+}
+
+/**
+ * Where a project page goes while projects are hidden: Volúmenes, carrying
+ * `?editVolume=`; null while they are shown or the state is not known.
+ */
+export function hiddenProjectRedirect(state: UnitState | null, editVolume: string | null): string | null {
+	if (projectsShownIn(state)) return null;
+	const id = Number(editVolume);
+	return Number.isInteger(id) && id > 0 ? `/dashboard/volumes?editVolume=${id}` : '/dashboard/volumes';
+}
+
+/**
+ * The capture screen's needs-stem banner: a link to the volume form (the
+ * project page, or Volúmenes while projects are hidden), or, for an operator
+ * in Fisqua mode, who cannot give a stem, a note instead; nothing without a
+ * project and volume.
+ */
+export function stemFormTarget(
+	role: string | null | undefined,
+	state: UnitState | null,
+	projectId: number,
+	collectionId: number
+): { href?: string; note?: true } {
+	if (!projectId || !collectionId) return {};
+	if (volumeCodesReadOnly(role, state)) return { note: true };
+	return projectsShownIn(state)
+		? { href: `/dashboard/projects/${projectId}?editVolume=${collectionId}` }
+		: { href: `/dashboard/volumes?editVolume=${collectionId}` };
 }
 
 /** Where a volume page's back button goes. */

@@ -56,6 +56,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
+  import { ensureUnit, stemFormTarget, unitState } from '$lib/unit-mode';
   import { camerasApi, recordsApi, projectsApi, collectionsApi, importsApi, type Record as ApiRecord, type CameraDevice,
            type QueueItem, type RetakeSummary, type RetakeSummaryVolume } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
@@ -151,9 +152,12 @@
   let instruction = $derived(
     !listsSettled ? null : listInstruction !== undefined ? listInstruction : attributesInstruction
   );
-  let stemFormHref = $derived(projectId && collectionId
-    ? `/dashboard/projects/${projectId}?editVolume=${collectionId}`
-    : '');
+  // The banner's way to a stem: the volume form on the project page, or on
+  // Volúmenes while projects are hidden (NEH-313); an operator in Fisqua
+  // mode, who cannot give one, gets a note instead (NEH-311).
+  let stemTarget = $derived(stemFormTarget($userRole, $unitState, projectId, collectionId));
+  let stemFormHref = $derived(stemTarget.href ?? '');
+  let stemNote = $derived(stemTarget.note ? $m.pd_fisqua_codes_readonly : '');
 
   let records = $state<ApiRecord[]>([]);
   let selectedRecordId = $state<number | null>(null);
@@ -528,6 +532,7 @@
   });
 
   onMount(async () => {
+    ensureUnit();
     // The capture screen is for admin and operator only. A reviewer cannot
     // trigger captures or delete (the backend answers 403 in
     // cameras.py/records.py), and this route sits outside the (dashboard)
@@ -860,6 +865,7 @@
           otherModalOpen={inspectedRecord !== null}
           needsStem={volumeNeedsStem}
           {stemFormHref}
+          {stemNote}
           onStemRefused={recheckStem}
           bind:swapped
         />

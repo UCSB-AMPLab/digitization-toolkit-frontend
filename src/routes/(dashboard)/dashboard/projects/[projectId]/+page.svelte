@@ -8,7 +8,8 @@
   // GET /activity/collections for the project. The volume form lives in
   // VolumeFormModal, which Volúmenes opens too. In Fisqua mode (NEH-311) an
   // operator has no Nuevo volumen, and the form keeps their stem
-  // read-only.
+  // read-only. While the unit hides projects (NEH-313) the page goes to
+  // Volúmenes, carrying ?editVolume=, so the form opens there.
   //
   // Version: 0.3.3
 
@@ -23,7 +24,7 @@
            type Project, type Collection, type ProjectMember, type UserRead, type StatusCounts } from '$lib/api';
   import { stemConflict, needsStem, deleteRefused } from '$lib/volume-stem';
   import { volumeDeleteErrorText, isNotEmptyRefusal, notEmptyCounts } from '$lib/volume-errors';
-  import { canCreateVolumes, ensureUnit, unitState } from '$lib/unit-mode';
+  import { canCreateVolumes, ensureUnit, hiddenProjectRedirect, unitState } from '$lib/unit-mode';
   import VolumeFormModal from './VolumeFormModal.svelte';
   import { dismissible } from '$lib/dialog';
   import { placeVolume, stageBadgeStyle, type PipelineStage } from '$lib/pipeline';
@@ -75,8 +76,15 @@
 
 
   onMount(async () => {
-    ensureUnit();
+    const unitRead = ensureUnit();
     await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
+    // Projects hidden: Volúmenes lists this project's volumes with the rest,
+    // and opens ?editVolume there.
+    const away = hiddenProjectRedirect(await unitRead, $page.url.searchParams.get('editVolume'));
+    if (away) {
+      goto(away, { replaceState: true });
+      return;
+    }
     // ?editVolume=<id> opens that volume's form: the capture screen links
     // here when the volume has no stem yet.
     const editId = Number($page.url.searchParams.get('editVolume')) || 0;

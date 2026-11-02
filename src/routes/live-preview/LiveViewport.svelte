@@ -51,6 +51,7 @@
     otherModalOpen = false,
     needsStem = false,
     stemFormHref = '',
+    stemNote = '',
     onStemRefused,
     swapped = $bindable(false),
   }: {
@@ -75,6 +76,9 @@
     // links to the volume's form at stemFormHref.
     needsStem?: boolean;
     stemFormHref?: string;
+    // Shown in the banner in place of the link, for someone who cannot give
+    // the stem (an operator in Fisqua mode, NEH-311).
+    stemNote?: string;
     // Called on a 409 from a capture. Reads the volume again and resolves
     // true when it has no stem, in which case the page sets needsStem and the
     // banner replaces the generic capture error.
@@ -671,7 +675,9 @@
         <div class="needs-stem-banner" role="alert">
           <span class="material-symbols-outlined icon-sm" aria-hidden="true">warning</span>
           <span>{$m.lv_needs_stem}</span>
-          {#if stemFormHref}
+          {#if stemNote}
+            <span class="needs-stem-note">{stemNote}</span>
+          {:else if stemFormHref}
             <a class="needs-stem-link" href={stemFormHref}>{$m.lv_needs_stem_link}</a>
           {/if}
         </div>

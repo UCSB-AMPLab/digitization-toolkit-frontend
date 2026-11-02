@@ -12,7 +12,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { AuthError, collectionsApi, systemApi } from './api';
 import { authStore, type AuthUser } from './stores/auth';
-import { ensureUnit, reloadUnit, unitState } from './unit-mode';
+import { ensureUnit, keepUnitState, reloadUnit, unitState } from './unit-mode';
 
 const admin: AuthUser = { id: 1, username: 'admin1', email: null, role: 'admin', is_active: true };
 
@@ -75,6 +75,19 @@ describe('a 403 with a structured detail', () => {
 	});
 });
 
+describe('a 401 (regression)', () => {
+	it('still ends the session and goes to /login, structured detail or not', async () => {
+		gotoMock.mockClear();
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ detail: { code: 'x', message: 'Not authenticated' } }, 401));
+		const error = await collectionsApi.create({ name: 'Tomo 1' }).catch((e) => e);
+		expect(error).toBeInstanceOf(AuthError);
+		expect(error.status).toBe(401);
+		expect(error.message).toBe('Not authenticated');
+		expect(authStore.getToken()).toBeNull();
+		expect(gotoMock).toHaveBeenCalledWith('/login');
+	});
+});
+
 describe('the unit store', () => {
 	it('reads the state once per session, and again on reload', async () => {
 		const spy = vi.spyOn(systemApi, 'unit').mockResolvedValue(unit as never);
@@ -97,6 +110,39 @@ describe('the unit store', () => {
 		authStore.setSession('tok-2', admin);
 		await ensureUnit();
 		expect(spy).toHaveBeenCalledTimes(2);
+	});
+
+	it('drops a first read still in flight when the session changes, and reads again for the new one', async () => {
+		let answer!: (v: unknown) => void;
+		const spy = vi.spyOn(systemApi, 'unit').mockReturnValueOnce(new Promise((r) => (answer = r)) as never);
+		const first = ensureUnit();
+		await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+		authStore.clearSession();
+		authStore.setSession('tok-2', { ...admin, id: 2, username: 'admin2' });
+		answer(unit);
+		await first;
+		expect(get(unitState)).toBeNull();
+		spy.mockResolvedValue({ ...unit, mode: 'fisqua' } as never);
+		expect((await ensureUnit())?.mode).toBe('fisqua');
+		expect(spy).toHaveBeenCalledTimes(2);
+	});
+
+	it('keeps the known state when a later read fails', async () => {
+		const spy = vi.spyOn(systemApi, 'unit').mockResolvedValue(unit as never);
+		await ensureUnit();
+		spy.mockRejectedValue(new Error('network down'));
+		expect((await reloadUnit())?.mode).toBe('backup');
+		expect(get(unitState)?.mode).toBe('backup');
+	});
+
+	it('takes a PUT answer as read for this session', async () => {
+		const spy = vi.spyOn(systemApi, 'unit').mockResolvedValue({ ...unit, mode: 'offline' } as never);
+		keepUnitState(unit);
+		expect((await ensureUnit())?.mode).toBe('backup');
+		expect(spy).not.toHaveBeenCalled();
+		// A new session forgets it.
+		authStore.clearSession();
+		expect(get(unitState)).toBeNull();
 	});
 
 	it('stays unread when the state cannot be read or has another shape', async () => {

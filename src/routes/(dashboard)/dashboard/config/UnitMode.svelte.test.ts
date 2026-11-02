@@ -148,9 +148,9 @@ describe('Modo del equipo', () => {
 		await vi.waitFor(() => expect(systemApi.setUnit).toHaveBeenCalledTimes(3));
 	});
 
-	it('says someone else changed the mode, and reads the state again', async () => {
+	it('says someone else changed the mode, reads the state again, and lets the admin pick again', async () => {
 		const get = vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
-		vi.spyOn(systemApi, 'setUnit').mockRejectedValue(refused(['mode_changed']));
+		const put = vi.spyOn(systemApi, 'setUnit').mockRejectedValueOnce(refused(['mode_changed']));
 		render(UnitModeCard);
 		await expect.element(radio('Solo copia externa')).toBeChecked();
 		get.mockResolvedValue(unit('fisqua') as never);
@@ -158,7 +158,20 @@ describe('Modo del equipo', () => {
 		await userEvent.click(save());
 		await expect.element(page.getByRole('alert').getByText(es.unit_problem_mode_changed)).toBeInTheDocument();
 		await vi.waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+		// The selection follows the stored mode; no refusal panel, no retry.
 		await expect.element(radio('Fisqua')).toBeChecked();
+		expect(page.getByRole('button', { name: es.unit_try_again }).elements()).toHaveLength(0);
+		expect(page.getByText(es.unit_refused_title('Solo en el escáner', 'Fisqua')).elements()).toHaveLength(0);
+		await expect.element(save()).toBeDisabled();
+
+		// A new pick goes through Guardar, and leaving Fisqua asks first.
+		put.mockResolvedValue(unit('offline') as never);
+		await userEvent.click(radio('Solo en el escáner'));
+		await expect.element(page.getByText(es.unit_problem_mode_changed)).not.toBeInTheDocument();
+		await userEvent.click(save());
+		await userEvent.click(page.getByRole('dialog').getByRole('button', { name: es.unit_leave_fisqua_confirm('Solo en el escáner') }));
+		await vi.waitFor(() => expect(put).toHaveBeenLastCalledWith({ mode: 'offline' }));
+		expect(put).toHaveBeenCalledTimes(2);
 	});
 
 	it('shows a translated message for any other failure', async () => {

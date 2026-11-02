@@ -10,7 +10,9 @@ import { en } from './i18n/en';
 import {
 	canCreateVolumes,
 	canImportList,
+	hiddenProjectRedirect,
 	modeLabel,
+	stemFormTarget,
 	modeRefusal,
 	readUnitState,
 	unitProblemText,
@@ -140,6 +142,36 @@ describe('gates', () => {
 		expect(canCreateVolumes('operator', null)).toBe(true);
 		expect(canImportList('operator', null)).toBe(true);
 		expect(volumeCodesReadOnly('operator', null)).toBe(false);
+	});
+});
+
+describe('stemFormTarget (the capture screen’s needs-stem banner)', () => {
+	const shown = state({ mode: 'offline', projectsEnabled: true, projectsShown: true });
+	it('links to the project page while projects are shown', () => {
+		expect(stemFormTarget('operator', shown, 7, 97)).toEqual({ href: '/dashboard/projects/7?editVolume=97' });
+		expect(stemFormTarget('operator', null, 7, 97)).toEqual({ href: '/dashboard/projects/7?editVolume=97' });
+	});
+	it('links to Volúmenes while projects are hidden', () => {
+		expect(stemFormTarget('admin', state(), 7, 97)).toEqual({ href: '/dashboard/volumes?editVolume=97' });
+		expect(stemFormTarget('operator', state({ mode: 'backup' }), 7, 97)).toEqual({ href: '/dashboard/volumes?editVolume=97' });
+	});
+	it('gives an operator in Fisqua mode the note instead of a link', () => {
+		expect(stemFormTarget('operator', state(), 7, 97)).toEqual({ note: true });
+	});
+	it('gives nothing without a project or volume', () => {
+		expect(stemFormTarget('admin', state(), 0, 97)).toEqual({});
+	});
+});
+
+describe('hiddenProjectRedirect', () => {
+	it('sends a project page to Volúmenes while projects are hidden, with ?editVolume', () => {
+		expect(hiddenProjectRedirect(state(), null)).toBe('/dashboard/volumes');
+		expect(hiddenProjectRedirect(state(), '97')).toBe('/dashboard/volumes?editVolume=97');
+		expect(hiddenProjectRedirect(state(), 'x')).toBe('/dashboard/volumes');
+	});
+	it('stays while projects are shown or the state is not known', () => {
+		expect(hiddenProjectRedirect(state({ mode: 'offline', projectsEnabled: true, projectsShown: true }), '97')).toBeNull();
+		expect(hiddenProjectRedirect(null, '97')).toBeNull();
 	});
 });
 

@@ -9,8 +9,10 @@
   // A refused switch (409) shows each problem as a translated line and the
   // mode the unit stays in, with Cancelar (back to the stored mode) and
   // Intentar de nuevo. `mode_changed` means another admin changed the
-  // settings meanwhile: the state is read again. The backend's English is
-  // never shown.
+  // settings meanwhile: the state is read again, the selection goes back to
+  // the stored mode, and a line says so, with no retry, so the admin picks
+  // again and Guardar runs as usual (the leave-Fisqua confirmation
+  // included). The backend's English is never shown.
   //
   // GET /system/unit does not say who set the mode or when, so the board's
   // "set by" line is left out.
@@ -32,6 +34,8 @@
   let saving = $state(false);
   let confirmOpen = $state(false);
   let saveError = $state(false);
+  // Another admin changed the settings meanwhile (mode_changed).
+  let changedElsewhere = $state(false);
   // A refused switch: the mode asked for and the problem codes.
   let refusal = $state<{ target: UnitMode; codes: string[] } | null>(null);
 
@@ -65,6 +69,7 @@
     selected = mode;
     refusal = null;
     saveError = false;
+    changedElsewhere = false;
   }
 
   function onSave() {
@@ -83,15 +88,22 @@
     const target = selected;
     saving = true;
     saveError = false;
+    changedElsewhere = false;
     refusal = null;
     try {
       keepUnitState(await systemApi.setUnit(body));
     } catch (err) {
       console.error('[UnitMode] Change refused:', err);
       const codes = modeRefusal(err);
-      if (codes) {
+      if (codes?.includes('mode_changed')) {
+        const fresh = await reloadUnit();
+        if (fresh) {
+          selected = fresh.mode;
+          projectsEnabled = fresh.projectsEnabled;
+        }
+        changedElsewhere = true;
+      } else if (codes) {
         refusal = { target, codes };
-        if (codes.includes('mode_changed')) await reloadUnit();
       } else {
         saveError = true;
       }
@@ -158,6 +170,8 @@
     {:else}
       {#if saveError}
         <p class="unit-save-error" role="alert">{$m.unit_err_save}</p>
+      {:else if changedElsewhere}
+        <p class="unit-save-error" role="alert">{$m.unit_problem_mode_changed}</p>
       {/if}
       <div class="unit-actions">
         <button type="button" class="unit-btn-save" onclick={onSave} disabled={!canSave}>

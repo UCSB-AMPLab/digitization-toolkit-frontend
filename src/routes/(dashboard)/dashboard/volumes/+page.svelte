@@ -12,16 +12,22 @@
   // A sub-volume (no project, a parent volume) is not listed: it belongs to
   // its parent, as on the project page.
   //
+  // ?editVolume=<id> opens that volume's form for an admin or operator: the
+  // capture screen's needs-stem link and a project page reached while
+  // projects are hidden send it here. While the unit shows projects, the
+  // page goes to Proyectos.
+  //
   // Version: 0.3.3
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { m, locale } from '$lib/i18n';
   import { formatCount } from '$lib/format-count';
   import { authStore } from '$lib/stores/auth';
   import { activityApi, collectionsApi, type Collection, type StatusCounts } from '$lib/api';
   import { PIPELINE_STAGES, placeVolume, stageBadgeStyle, type PipelineStage } from '$lib/pipeline';
-  import { canCreateVolumes, ensureUnit, unitState } from '$lib/unit-mode';
+  import { canCreateVolumes, ensureUnit, projectsShownIn, unitState } from '$lib/unit-mode';
   import VolumeFormModal from '../projects/[projectId]/VolumeFormModal.svelte';
 
   let volumes = $state<Collection[]>([]);
@@ -31,6 +37,8 @@
   let searchQuery = $state('');
   let stageFilter = $state<PipelineStage | ''>('');
   let showCreateModal = $state(false);
+  // The volume whose form is open for editing; null for a new volume.
+  let editingVolume = $state<Collection | null>(null);
 
   let canCreate = $derived(canCreateVolumes($authStore.user?.role, $unitState));
 
@@ -79,10 +87,30 @@
     }
   }
 
-  onMount(() => {
-    ensureUnit();
-    loadVolumes();
+  onMount(async () => {
+    const unitRead = ensureUnit();
+    await loadVolumes();
+    const state = await unitRead;
+    // Projects shown: the volumes are listed by project.
+    if (state && projectsShownIn(state)) {
+      goto('/dashboard/projects', { replaceState: true });
+      return;
+    }
+    const role = $authStore.user?.role;
+    const editId = Number($page.url.searchParams.get('editVolume')) || 0;
+    if (editId && (role === 'admin' || role === 'operator')) {
+      const target = volumes.find((v) => v.id === editId);
+      if (target) {
+        editingVolume = target;
+        showCreateModal = true;
+      }
+    }
   });
+
+  function closeForm() {
+    showCreateModal = false;
+    editingVolume = null;
+  }
 
   function openVolume(volume: Collection) {
     goto(`/dashboard/projects/${volume.project_id}/collections/${volume.id}`);
@@ -98,7 +126,7 @@
       {/if}
     </div>
     {#if canCreate}
-      <button class="btn-primary" onclick={() => (showCreateModal = true)}>
+      <button class="btn-primary" onclick={() => { editingVolume = null; showCreateModal = true; }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -164,7 +192,7 @@
 </div>
 
 {#if showCreateModal}
-  <VolumeFormModal onClose={() => (showCreateModal = false)} onSaved={loadVolumes} />
+  <VolumeFormModal editing={editingVolume} onClose={closeForm} onSaved={loadVolumes} />
 {/if}
 
 <style>

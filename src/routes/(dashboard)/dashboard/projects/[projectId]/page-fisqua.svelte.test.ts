@@ -12,9 +12,11 @@ import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 import { readable } from 'svelte/store';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+const gotoMock = vi.hoisted(() => vi.fn());
+const pageUrl = vi.hoisted(() => ({ href: 'http://localhost/dashboard/projects/1' }));
+vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/stores', () => ({
-	page: readable({ params: { projectId: '1' }, url: new URL('http://localhost/dashboard/projects/1') })
+	page: readable({ params: { projectId: '1' }, get url() { return new URL(pageUrl.href); } })
 }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -68,6 +70,8 @@ async function fillNew(stem: string) {
 
 beforeEach(() => {
 	locale.set('es');
+	gotoMock.mockClear();
+	pageUrl.href = 'http://localhost/dashboard/projects/1';
 	vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('fisqua') as never);
 	vi.spyOn(projectsApi, 'get').mockResolvedValue({ id: 1, name: 'Rionegro' } as Project);
 	vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
@@ -79,6 +83,31 @@ afterEach(() => {
 	vi.restoreAllMocks();
 	authStore.clearSession();
 	resetUnit();
+});
+
+describe('the project page while projects are hidden (NEH-313)', () => {
+	beforeEach(() => signIn('operator'));
+
+	it('goes to Volúmenes', async () => {
+		render(ProjectPage);
+		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard/volumes', { replaceState: true }));
+	});
+
+	it('carries ?editVolume through to Volúmenes', async () => {
+		pageUrl.href = 'http://localhost/dashboard/projects/1?editVolume=22';
+		render(ProjectPage);
+		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard/volumes?editVolume=22', { replaceState: true }));
+		// The project page does not open the form itself.
+		expect(page.getByText(es.pd_modal_edit_title).elements()).toHaveLength(0);
+	});
+
+	it('stays while projects are shown', async () => {
+		vi.mocked(systemApi.unit).mockResolvedValue(unit('offline') as never);
+		render(ProjectPage);
+		await expect.element(page.getByText('Tomo 097')).toBeInTheDocument();
+		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
+		expect(gotoMock).not.toHaveBeenCalledWith(expect.stringContaining('/dashboard/volumes'), expect.anything());
+	});
 });
 
 describe('Fisqua mode, operator', () => {
