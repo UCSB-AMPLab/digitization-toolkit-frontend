@@ -8,8 +8,7 @@
 // session token (a logout, a new login) forgets it and drops a read still in
 // flight, and the next ensureUnit reads it for the new session. A read that
 // fails after one succeeded keeps the known state; only the first read of a
-// session can leave it null.
-// // reads it again. Every gate below takes null as "as before the modes":
+// session can leave it null. Every gate below takes null as "as before the modes":
 // projects shown, no Fisqua-mode restriction, since the backend enforces
 // the mode either way and its refusals are shown translated.
 //

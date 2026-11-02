@@ -15,11 +15,18 @@
   // ?editVolume=<id> opens that volume's form for an admin or operator: the
   // capture screen's needs-stem link and a project page reached while
   // projects are hidden send it here. While the unit shows projects, the
-  // page goes to Proyectos.
+  // page goes to Proyectos, if it is still the page shown.
+  //
+  // Each row has the project page's actions, for the same roles (admin and
+  // operator): the menu with Editar and Eliminar (VolumeRowMenu,
+  // VolumeDeleteModal) and the "Sin raíz" shortcut to the form. In Fisqua
+  // mode an operator's form keeps the stem read-only. A volume with records
+  // can be deleted once they are moved to another volume of its project.
   //
   // Version: 0.3.3
 
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { m, locale } from '$lib/i18n';
@@ -28,7 +35,10 @@
   import { activityApi, collectionsApi, type Collection, type StatusCounts } from '$lib/api';
   import { PIPELINE_STAGES, placeVolume, stageBadgeStyle, type PipelineStage } from '$lib/pipeline';
   import { canCreateVolumes, ensureUnit, projectsShownIn, unitState } from '$lib/unit-mode';
+  import { needsStem } from '$lib/volume-stem';
   import VolumeFormModal from '../projects/[projectId]/VolumeFormModal.svelte';
+  import VolumeRowMenu from '../projects/[projectId]/VolumeRowMenu.svelte';
+  import VolumeDeleteModal from '../projects/[projectId]/VolumeDeleteModal.svelte';
 
   let volumes = $state<Collection[]>([]);
   let statusCounts = $state<Map<number, StatusCounts>>(new Map());
@@ -41,6 +51,15 @@
   let editingVolume = $state<Collection | null>(null);
 
   let canCreate = $derived(canCreateVolumes($authStore.user?.role, $unitState));
+  // Editing and deleting a volume: admin and operator, as the backend allows.
+  let canEdit = $derived($authStore.user?.role === 'admin' || $authStore.user?.role === 'operator');
+  // The volume whose delete dialog is open.
+  let deletingVolume = $state<Collection | null>(null);
+
+  function openEdit(volume: Collection) {
+    editingVolume = volume;
+    showCreateModal = true;
+  }
 
   let stageTitle = $derived<{ [K in PipelineStage]: string }>({
     capture: $m.dash_stage_capture,
@@ -87,15 +106,21 @@
     }
   }
 
+  let left = false;
+  onDestroy(() => (left = true));
+
   onMount(async () => {
+    const here = get(page).url.pathname;
     const unitRead = ensureUnit();
     await loadVolumes();
     const state = await unitRead;
-    // Projects shown: the volumes are listed by project.
+    // Projects shown: the volumes are listed by project. Only while this
+    // page is still the one shown.
     if (state && projectsShownIn(state)) {
-      goto('/dashboard/projects', { replaceState: true });
+      if (!left && get(page).url.pathname === here) goto('/dashboard/projects', { replaceState: true });
       return;
     }
+    if (left) return;
     const role = $authStore.user?.role;
     const editId = Number($page.url.searchParams.get('editVolume')) || 0;
     if (editId && (role === 'admin' || role === 'operator')) {
@@ -169,13 +194,28 @@
             <th>{$m.vols_col_stem}</th>
             <th class="text-right">{$m.pd_col_records}</th>
             <th>{$m.vols_stage_label}</th>
+            {#if canEdit}<th class="text-right">{$m.common_actions}</th>{/if}
           </tr>
         </thead>
         <tbody>
           {#each filtered as volume (volume.id)}
             {@const stage = stageOf(volume)}
             <tr class="table-row" onclick={() => openVolume(volume)}>
-              <td><span class="vol-name">{volume.name}</span></td>
+              <td>
+                <span class="vol-name">{volume.name}</span>
+                {#if needsStem(volume)}
+                  {#if canEdit}
+                    <button
+                      type="button"
+                      class="no-stem-badge"
+                      title={$m.pd_no_stem_title}
+                      onclick={(e) => { e.stopPropagation(); openEdit(volume); }}
+                    >{$m.pd_no_stem_badge}</button>
+                  {:else}
+                    <span class="no-stem-badge" title={$m.pd_no_stem_title}>{$m.pd_no_stem_badge}</span>
+                  {/if}
+                {/if}
+              </td>
               <td><span class="vol-stem">{volume.filename_stem ?? '—'}</span></td>
               <td class="text-right">{formatCount(volume.record_count ?? 0, $locale)}</td>
               <td>
@@ -183,6 +223,11 @@
                   <span class="status-badge" style={stageBadgeStyle(stage)}>{stageTitle[stage]}</span>
                 {/if}
               </td>
+              {#if canEdit}
+                <td class="text-right">
+                  <VolumeRowMenu {volume} onEdit={openEdit} onDelete={(v) => (deletingVolume = v)} />
+                </td>
+              {/if}
             </tr>
           {/each}
         </tbody>
@@ -193,6 +238,15 @@
 
 {#if showCreateModal}
   <VolumeFormModal editing={editingVolume} onClose={closeForm} onSaved={loadVolumes} />
+{/if}
+
+{#if deletingVolume}
+  <VolumeDeleteModal
+    volume={deletingVolume}
+    moveTargets={volumes.filter((v) => v.project_id === deletingVolume?.project_id)}
+    onClose={() => (deletingVolume = null)}
+    onChanged={loadVolumes}
+  />
 {/if}
 
 <style>
@@ -290,6 +344,22 @@
 
   .vol-name { font-weight: var(--fw-semibold); color: var(--color-light); }
   .vol-stem { font-family: monospace; font-size: var(--text-sm); }
+
+  .no-stem-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    font-family: var(--font-family);
+    font-size: 11px;
+    font-weight: var(--fw-bold);
+    color: var(--color-highlight);
+    background: rgba(225, 183, 120, 0.12);
+    border: 1px solid rgba(225, 183, 120, 0.4);
+    border-radius: var(--radius-md);
+    vertical-align: middle;
+  }
+  button.no-stem-badge { cursor: pointer; }
+  button.no-stem-badge:hover { background: rgba(225, 183, 120, 0.22); }
 
   .status-badge {
     display: inline-block;

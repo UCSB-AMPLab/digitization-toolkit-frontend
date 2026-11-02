@@ -1,4 +1,6 @@
-// The project page and the volume form in Fisqua mode (NEH-311). An
+// The project page and the volume form in Fisqua mode (NEH-311). Projects
+// are hidden in Fisqua mode, so the form's cases run on Volúmenes, which
+// the project page sends to. An
 // operator has no Nuevo volumen, and edits a volume with its stem
 // read-only (the signatura stays editable, as the backend gates only the
 // stem and external_id); a 403 volumes_from_fisqua that still arrives
@@ -37,6 +39,8 @@ import { locale } from '$lib/i18n';
 import { es } from '$lib/i18n/es';
 import { resetUnit } from '$lib/unit-mode';
 import ProjectPage from './+page.svelte';
+// In Fisqua mode projects are hidden, so the volume form is reached from Volúmenes.
+import Volumes from '../../volumes/+page.svelte';
 
 function vol(id: number, name: string, extra: Partial<Collection> = {}): Collection {
 	return { id, name, project_id: 1, created_at: '2026-10-01T00:00:00', record_count: 0, ...extra };
@@ -101,6 +105,41 @@ describe('the project page while projects are hidden (NEH-313)', () => {
 		expect(page.getByText(es.pd_modal_edit_title).elements()).toHaveLength(0);
 	});
 
+	it('never renders the page, Nuevo volumen included, before going', async () => {
+		signIn('admin');
+		let answer!: (v: unknown) => void;
+		vi.mocked(systemApi.unit).mockReturnValue(new Promise((r) => (answer = r)) as never);
+		const screen = render(ProjectPage);
+		await new Promise((r) => setTimeout(r, 50));
+		expect(page.getByRole('button', { name: es.pd_new_collection }).elements()).toHaveLength(0);
+		expect(screen.container.textContent).not.toContain('Tomo 097');
+		answer(unit('fisqua'));
+		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard/volumes', { replaceState: true }));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(page.getByRole('button', { name: es.pd_new_collection }).elements()).toHaveLength(0);
+		expect(collectionsApi.listAll).not.toHaveBeenCalled();
+	});
+
+	it('does not go once the route has changed', async () => {
+		let answer!: (v: unknown) => void;
+		vi.mocked(systemApi.unit).mockReturnValue(new Promise((r) => (answer = r)) as never);
+		const screen = render(ProjectPage);
+		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
+		pageUrl.href = 'http://localhost/dashboard/queue';
+		screen.unmount();
+		answer(unit('fisqua'));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(gotoMock).not.toHaveBeenCalled();
+	});
+
+	it('gives a reviewer no row actions (the backend refuses their edits and deletes)', async () => {
+		signIn('reviewer');
+		vi.mocked(systemApi.unit).mockResolvedValue(unit('offline') as never);
+		render(ProjectPage);
+		await expect.element(page.getByText('Tomo 097')).toBeInTheDocument();
+		expect(page.getByTitle(es.common_actions).elements()).toHaveLength(0);
+	});
+
 	it('stays while projects are shown', async () => {
 		vi.mocked(systemApi.unit).mockResolvedValue(unit('offline') as never);
 		render(ProjectPage);
@@ -114,7 +153,7 @@ describe('Fisqua mode, operator', () => {
 	beforeEach(() => signIn('operator'));
 
 	it('shows no Nuevo volumen', async () => {
-		render(ProjectPage);
+		render(Volumes);
 		await expect.element(page.getByText('Tomo 097')).toBeInTheDocument();
 		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
 		await expect.element(page.getByRole('button', { name: es.pd_new_collection })).not.toBeInTheDocument();
@@ -122,7 +161,7 @@ describe('Fisqua mode, operator', () => {
 
 	it('edits a volume with its stem read-only and its signatura editable, and sends no stem', async () => {
 		const update = vi.spyOn(collectionsApi, 'update').mockResolvedValue(tomo);
-		render(ProjectPage);
+		render(Volumes);
 		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
 		await openEdit();
 		await expect.element(page.getByLabelText(es.pd_field_stem)).toHaveAttribute('readonly');
@@ -144,7 +183,7 @@ describe('Fisqua mode, operator', () => {
 				detail: { code: 'volumes_from_fisqua', message: "In Fisqua mode, volumes come from Fisqua's queue." }
 			})
 		);
-		const screen = render(ProjectPage);
+		const screen = render(Volumes);
 		await userEvent.click(page.getByRole('button', { name: es.pd_new_collection }));
 		await userEvent.fill(page.getByPlaceholder(es.pd_ph_title), 'Tomo 099');
 		await userEvent.fill(page.getByLabelText(es.pd_field_stem), 'co-ahr-not-t099');
@@ -158,7 +197,7 @@ describe('Fisqua mode, admin', () => {
 	beforeEach(() => signIn('admin'));
 
 	it('keeps Nuevo volumen, with the Fisqua note and the reference-code label', async () => {
-		render(ProjectPage);
+		render(Volumes);
 		await userEvent.click(page.getByRole('button', { name: es.pd_new_collection }));
 		await expect.element(page.getByText(es.pd_fisqua_admin_note)).toBeInTheDocument();
 		await expect.element(page.getByLabelText(es.pd_field_stem_fisqua)).toBeInTheDocument();
@@ -168,7 +207,7 @@ describe('Fisqua mode, admin', () => {
 		vi.spyOn(collectionsApi, 'create').mockRejectedValue(
 			new ApiError('x', { code: 'unknown_reference_code', message: 'Fisqua has no description', referenceCode: 'co-ahr-not-t099' }, 422)
 		);
-		render(ProjectPage);
+		render(Volumes);
 		await fillNew('co-ahr-not-t099');
 		const stem = page.getByLabelText(es.pd_field_stem_fisqua);
 		await expect.element(page.getByText(es.pd_err_unknown_reference_code('co-ahr-not-t099'))).toBeInTheDocument();
@@ -183,7 +222,7 @@ describe('Fisqua mode, admin', () => {
 		vi.spyOn(collectionsApi, 'update').mockRejectedValue(
 			new ApiError('x', { code: 'stem_required', message: 'In Fisqua mode a stem cannot be empty' }, 422)
 		);
-		render(ProjectPage);
+		render(Volumes);
 		await openEdit();
 		await userEvent.fill(page.getByPlaceholder(es.pd_ph_title), 'Tomo 097 bis');
 		await userEvent.click(page.getByRole('button', { name: es.common_save_changes }));
@@ -198,7 +237,7 @@ describe('Fisqua mode, admin', () => {
 			vi.spyOn(collectionsApi, 'create').mockRejectedValue(
 				new ApiError('x', { code, message: 'English', referenceCode: 'co-ahr-not-t099' }, 409)
 			);
-			const screen = render(ProjectPage);
+			const screen = render(Volumes);
 			await fillNew('co-ahr-not-t099');
 			await expect.element(page.getByText(title)).toBeInTheDocument();
 			await expect.element(page.getByText(es.pd_fisqua_list_instead)).toBeInTheDocument();

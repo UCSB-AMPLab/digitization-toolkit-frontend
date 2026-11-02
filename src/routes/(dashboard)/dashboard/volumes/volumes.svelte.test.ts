@@ -18,7 +18,7 @@ vi.mock('$app/stores', async () => {
 });
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { activityApi, collectionsApi, systemApi, type Collection, type StatusCounts } from '$lib/api';
+import { activityApi, collectionsApi, recordsApi, systemApi, type Collection, type StatusCounts } from '$lib/api';
 import { authStore, type UserRole } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { es } from '$lib/i18n/es';
@@ -178,6 +178,88 @@ describe('Volúmenes', () => {
 		vi.mocked(systemApi.unit).mockResolvedValue({ ...unit('offline'), projectsEnabled: true, projectsShown: true } as never);
 		render(Volumes);
 		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard/projects', { replaceState: true }));
+	});
+
+	it('stays on Volúmenes when the unit’s state cannot be read', async () => {
+		vi.mocked(systemApi.unit).mockRejectedValue(new Error('boom'));
+		const screen = render(Volumes);
+		await expect.poll(() => names(screen)).toHaveLength(3);
+		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
+		await new Promise((r) => setTimeout(r, 50));
+		expect(gotoMock).not.toHaveBeenCalled();
+	});
+
+	it('does not go to Proyectos once the route has changed', async () => {
+		let answer!: (v: unknown) => void;
+		vi.mocked(systemApi.unit).mockReturnValue(new Promise((r) => (answer = r)) as never);
+		const screen = render(Volumes);
+		await expect.poll(() => names(screen)).toHaveLength(3);
+		pageUrl.href = 'http://localhost/dashboard/queue';
+		screen.unmount();
+		answer({ ...unit('offline'), projectsEnabled: true, projectsShown: true });
+		await new Promise((r) => setTimeout(r, 50));
+		expect(gotoMock).not.toHaveBeenCalled();
+	});
+
+	for (const role of ['admin', 'operator'] as const) {
+		it(`gives the ${role} role each row's Edit and Delete`, async () => {
+			signIn(role);
+			render(Volumes);
+			const row = page.getByRole('row').filter({ hasText: 'Tomo 097' });
+			await userEvent.click(row.getByTitle(es.common_actions));
+			await expect.element(page.getByRole('button', { name: es.common_edit })).toBeInTheDocument();
+			await expect.element(page.getByRole('button', { name: es.common_delete })).toBeInTheDocument();
+		});
+	}
+
+	it('gives a reviewer no row actions', async () => {
+		signIn('reviewer');
+		const screen = render(Volumes);
+		await expect.poll(() => names(screen)).toHaveLength(3);
+		expect(page.getByTitle(es.common_actions).elements()).toHaveLength(0);
+	});
+
+	it('opens a row’s form from Edit, and saves it', async () => {
+		const update = vi.spyOn(collectionsApi, 'update').mockResolvedValue(volumes[2]);
+		render(Volumes);
+		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		await userEvent.click(page.getByRole('button', { name: es.common_edit }));
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog.getByPlaceholder(es.pd_ph_title)).toHaveValue('Tomo 097');
+		await userEvent.click(dialog.getByRole('button', { name: es.common_save_changes }));
+		await vi.waitFor(() => expect(update).toHaveBeenCalledWith(97, expect.objectContaining({ name: 'Tomo 097' })));
+	});
+
+	it('opens Edit for an operator in Fisqua mode with the stem read-only', async () => {
+		signIn('operator');
+		vi.mocked(systemApi.unit).mockResolvedValue(unit('fisqua') as never);
+		render(Volumes);
+		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
+		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		await userEvent.click(page.getByRole('button', { name: es.common_edit }));
+		await expect.element(page.getByRole('dialog').getByLabelText(es.pd_field_stem_fisqua)).toHaveAttribute('readonly');
+	});
+
+	it('deletes an empty volume after the confirmation, as the project page does', async () => {
+		vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
+		const del = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();
+		render(Volumes);
+		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog.getByText(es.pd_delete_collection_title, { exact: true }).first()).toBeInTheDocument();
+		await expect.element(dialog.getByText(es.common_irreversible, { exact: false })).toBeInTheDocument();
+		expect(del).not.toHaveBeenCalled();
+		await userEvent.click(dialog.getByRole('button', { name: es.pd_delete_collection_title }));
+		await vi.waitFor(() => expect(del).toHaveBeenCalledWith(97));
+		await vi.waitFor(() => expect(collectionsApi.listAll).toHaveBeenCalledTimes(2));
+	});
+
+	it('gives a volume without a stem the shortcut to its form', async () => {
+		vi.mocked(collectionsApi.listAll).mockResolvedValue([vol(98, 'Tomo 098', { filename_stem: null })]);
+		render(Volumes);
+		await userEvent.click(page.getByRole('button', { name: es.pd_no_stem_badge }));
+		await expect.element(page.getByRole('dialog').getByText(es.pd_modal_edit_title)).toBeInTheDocument();
 	});
 
 	it('gives a reviewer no Nuevo volumen', async () => {
