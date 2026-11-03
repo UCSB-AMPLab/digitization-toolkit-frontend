@@ -20,7 +20,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { recordsApi, collectionsApi, ApiError, type Record, type RetakeSummaryVolume } from '$lib/api';
+  import { recordsApi, collectionsApi, ApiError, sessionRequestInit, type Record, type RetakeSummaryVolume } from '$lib/api';
   import { readRetakeSummary } from '$lib/recapture-turn';
   import { m, locale } from '$lib/i18n';
   import { formatCount } from '$lib/format-count';
@@ -364,7 +364,7 @@
       const zip = new JSZip();
       let done = 0;
       for (const { img, r } of items) {
-        const res = await fetch(recordsApi.getImageFileUrl(img.id));
+        const res = await fetch(recordsApi.getImageFileUrl(img.id), sessionRequestInit());
         if (res.status === 410 && freedFromBody(410, await res.json().catch(() => null))) throw new FreedFromCard();
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();

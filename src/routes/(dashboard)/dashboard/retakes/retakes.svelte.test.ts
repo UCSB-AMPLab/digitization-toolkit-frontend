@@ -93,7 +93,7 @@ const toRetake: RecordToRetake[] = [
 ];
 
 function signIn(role: UserRole) {
-	authStore.setSession('tok', { id: 1, username: role, email: null, role, is_active: true });
+	authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
 }
 
 describe('Por recapturar', () => {

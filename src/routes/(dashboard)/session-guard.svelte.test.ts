@@ -54,7 +54,7 @@ function json(status: number, body: unknown) {
 beforeEach(() => {
 	locale.set('en');
 	gotoMock.mockClear();
-	authStore.setSession('tok-1', user);
+	authStore.setSession(user);
 });
 
 afterEach(() => {
@@ -80,15 +80,17 @@ describe('(dashboard) layout with a saved session and a backend that is not answ
 		await expect.poll(() => calls).toBeGreaterThanOrEqual(3);
 		expect(screen.container.textContent).not.toContain('protected content');
 		expect(gotoMock).not.toHaveBeenCalled();
-		expect(authStore.getToken()).toBe('tok-1');
+		expect(authStore.getUser()).toEqual(user);
 
 		answer = 'up';
 
 		await expect.element(screen.getByText('protected content')).toBeVisible();
 		expect(gotoMock).not.toHaveBeenCalled();
-		expect(authStore.getToken()).toBe('tok-1');
+		expect(authStore.getUser()).toEqual(user);
+		// The session rides on the cookie, not on an Authorization header.
 		const sent = fetchSpy.mock.calls.at(-1)![1] as RequestInit;
-		expect((sent.headers as Record<string, string>)['Authorization']).toBe('Bearer tok-1');
+		expect(sent.credentials).toBe('include');
+		expect((sent.headers as Record<string, string>)['Authorization']).toBeUndefined();
 	});
 
 	it('ends the session and goes to /login on a 401', async () => {
@@ -98,7 +100,7 @@ describe('(dashboard) layout with a saved session and a backend that is not answ
 
 		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
 		expect(gotoMock).toHaveBeenCalledWith('/login');
-		expect(authStore.getToken()).toBeNull();
+		expect(authStore.getUser()).toBeNull();
 	});
 
 	it('ends the session on a 403 too, so /login does not send the operator back here', async () => {
@@ -108,6 +110,20 @@ describe('(dashboard) layout with a saved session and a backend that is not answ
 
 		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
 		expect(gotoMock).toHaveBeenCalledWith('/login');
-		expect(authStore.getToken()).toBeNull();
+		expect(authStore.getUser()).toBeNull();
+	});
+});
+
+describe('(dashboard) layout with no saved session', () => {
+	it('goes to /login once without asking the backend (a browser just migrated off the localStorage token)', async () => {
+		authStore.clearSession();
+		const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+		render(Layout, { children });
+
+		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
+		expect(gotoMock).toHaveBeenCalledTimes(1);
+		expect(gotoMock).toHaveBeenCalledWith('/login');
+		expect(fetchSpy).not.toHaveBeenCalled();
 	});
 });

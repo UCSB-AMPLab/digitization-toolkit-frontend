@@ -13,7 +13,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { m } from '$lib/i18n';
   import { browser } from '$app/environment';
-  import { camerasApi, tokenStore, getApiBase, type CameraDevice } from '$lib/api';
+  import { camerasApi, sessionRequestInit, getApiBase, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
@@ -331,11 +331,6 @@
   // does not stop polling.
   let cameraMissing = $state<Record<number, boolean>>({});
 
-  function getAuthHeader(): HeadersInit {
-    const token = tokenStore.get();
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
-  }
-
   // Calls GET /cameras/preview/{cameraIndex} (the endpoint is in the
   // backend's cameras.py). A 404 does not count toward the reconnect banner.
   // The previous object URL is revoked so frames do not leak memory.
@@ -346,7 +341,7 @@
     try {
       const response = await fetch(
         `${getApiBase()}/cameras/preview/${cameraIndex}`,
-        { headers: getAuthHeader() }
+        sessionRequestInit()
       );
 
       if (response.ok) {

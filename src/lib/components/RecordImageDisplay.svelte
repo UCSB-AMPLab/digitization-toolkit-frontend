@@ -29,7 +29,7 @@
   // Version: 0.2.0
 
   import { untrack, type Snippet } from 'svelte';
-  import { recordsApi, type RecordImage } from '$lib/api';
+  import { recordsApi, sessionRequestInit, type RecordImage } from '$lib/api';
   import { m } from '$lib/i18n';
   import {
     checkMasterStored,
@@ -90,6 +90,11 @@
   // Aborts the probeFreed requests when the image changes or on unmount.
   let probes: AbortController | null = null;
 
+  // The probes below fetch the image URLs, which carry no token, so they
+  // have to send the session cookie. The browser leaves the cookie off a
+  // cross-origin fetch made without credentials: 'include' (NEH-61).
+  const sessionFetch: typeof fetch = (u, init) => fetch(u, sessionRequestInit(init));
+
   $effect.pre(() => {
     void candidates;
     index = 0;
@@ -111,7 +116,7 @@
     if (!first || first.kind === 'thumbnail' || !untrack(() => previewFreedByMetadata(image))) return;
     probes ??= new AbortController();
     const signal = probes.signal;
-    const noStore: typeof fetch = (u, init) => fetch(u, { ...init, cache: 'no-store' });
+    const noStore: typeof fetch = (u, init) => sessionFetch(u, { ...init, cache: 'no-store' });
     probeFreed(first.url, noStore, signal).then((f) => {
       if (!f || signal.aborted) return;
       freed = f;
@@ -131,7 +136,7 @@
     if (current !== null) return;
     const id = untrack(() => image.id);
     const controller = new AbortController();
-    checkMasterStored(recordsApi.getImageFileUrl(id), fetch, controller.signal).then((r) => {
+    checkMasterStored(recordsApi.getImageFileUrl(id), sessionFetch, controller.signal).then((r) => {
       if (!controller.signal.aborted) master = r;
     });
     return () => controller.abort();
@@ -144,7 +149,7 @@
     if (current.kind !== 'thumbnail') {
       probes ??= new AbortController();
       const signal = probes.signal;
-      probeFreed(current.url, fetch, signal).then((f) => {
+      probeFreed(current.url, sessionFetch, signal).then((f) => {
         if (f && !signal.aborted) freed = f;
       });
     }

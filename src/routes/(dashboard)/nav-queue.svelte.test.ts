@@ -37,7 +37,7 @@ const reply = { count: 0, status: 200 };
 // /users/me answers the session check; the count endpoint answers `reply`.
 function signIn(role: UserRole) {
 	const user = { id: 1, username: role, email: null, role, is_active: true };
-	authStore.setSession('tok', user);
+	authStore.setSession(user);
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const url = String(input);
 		if (url.endsWith('/records/to-retake/count')) {

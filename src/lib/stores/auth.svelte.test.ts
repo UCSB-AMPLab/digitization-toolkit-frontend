@@ -1,14 +1,19 @@
-// NEH-41: authStore and tokenStore used to write the access token to
-// localStorage independently (two copies of the same key, only coincidentally
-// in sync). These tests pin authStore's session methods to actually delegate
-// to tokenStore — the single store of record — so a future change can't
-// silently reintroduce the divergence.
+// NEH-61: authStore holds who is logged in, never a token. The credential is
+// an httpOnly cookie no script can read; the user saved in localStorage is a
+// hint the dashboard layout validates against /users/me.
+//
+// A browser that still has the token an older build kept in localStorage
+// starts logged out: the token and the user saved beside it are removed, so
+// the route guards send it to /login once, and the next load finds nothing to
+// migrate.
 //
 // Version: 0.1.0-beta
-import { afterEach, describe, expect, it } from 'vitest';
-import { authStore } from './auth';
-import { tokenStore } from './token';
-import type { AuthUser } from './auth';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+
+import { goto } from '$app/navigation';
+import { authStore, readInitialUser, type AuthUser } from './auth';
 
 const user: AuthUser = {
 	id: 1,
@@ -18,38 +23,76 @@ const user: AuthUser = {
 	is_active: true
 };
 
-afterEach(() => {
-	authStore.clearSession();
+// authStore takes its starting user from readInitialUser() once, when the
+// module is imported. In browser-mode Vitest, vi.resetModules() does not run
+// the module again on the next import, so the
+// load-time behaviour is tested by calling readInitialUser() directly.
+
+beforeEach(() => {
+	localStorage.clear();
 });
 
-describe('authStore delegates token persistence to tokenStore', () => {
-	it('setSession writes the token where tokenStore reads it', () => {
-		authStore.setSession('token-abc', user);
-		expect(tokenStore.get()).toBe('token-abc');
+afterEach(() => {
+	authStore.clearSession();
+	localStorage.clear();
+	vi.mocked(goto).mockClear();
+});
+
+describe('authStore keeps the user, not a token', () => {
+	it('setSession stores the user and nothing under access_token', () => {
+		authStore.setSession(user);
+
+		expect(authStore.getUser()).toEqual(user);
+		expect(authStore.isAuthenticated()).toBe(true);
+		expect(localStorage.getItem('access_token')).toBeNull();
+		expect(JSON.parse(localStorage.getItem('auth_user')!)).toEqual(user);
+		let state: Record<string, unknown> | undefined;
+		authStore.subscribe((s) => (state = s as unknown as Record<string, unknown>))();
+		expect(state).not.toHaveProperty('token');
 	});
 
-	it('clearSession clears the token from tokenStore too', () => {
-		authStore.setSession('token-abc', user);
+	it('clearSession removes the user', () => {
+		authStore.setSession(user);
 		authStore.clearSession();
-		expect(tokenStore.get()).toBeNull();
+
+		expect(authStore.getUser()).toBeNull();
+		expect(authStore.isAuthenticated()).toBe(false);
+		expect(localStorage.getItem('auth_user')).toBeNull();
 	});
 
-	it('updateToken (the refresh path) updates tokenStore and the store state without touching the user', () => {
-		authStore.setSession('token-abc', user);
-		authStore.updateToken('token-refreshed');
+	it('a saved user, with no old token beside it, is the starting session', () => {
+		localStorage.setItem('auth_user', JSON.stringify(user));
 
-		expect(tokenStore.get()).toBe('token-refreshed');
+		expect(readInitialUser()).toEqual(user);
+	});
+});
 
-		let state: { token: string | null; user: AuthUser | null } | undefined;
-		authStore.subscribe((s) => (state = s))();
-		expect(state?.token).toBe('token-refreshed');
-		expect(state?.user).toEqual(user);
+describe('migration from the localStorage token', () => {
+	it('drops the old token and the user saved with it, and starts logged out', () => {
+		localStorage.setItem('access_token', 'old-token');
+		localStorage.setItem('auth_user', JSON.stringify(user));
+
+		expect(readInitialUser()).toBeNull();
+		expect(localStorage.getItem('access_token')).toBeNull();
+		expect(localStorage.getItem('auth_user')).toBeNull();
 	});
 
-	it('a token set directly via tokenStore is what a fresh authStore read would see (one store, not two)', () => {
-		tokenStore.set('token-set-elsewhere');
-		expect(tokenStore.get()).toBe('token-set-elsewhere');
-		// authStore's own initial-state read uses the same tokenStore.get(),
-		// so there is no second copy of the key that could disagree with it.
+	it('runs once: after a new login, the next load keeps the session', () => {
+		localStorage.setItem('access_token', 'old-token');
+		localStorage.setItem('auth_user', JSON.stringify(user));
+		expect(readInitialUser()).toBeNull();
+
+		// The operator logs in again; the cookie carries the session now.
+		authStore.setSession(user);
+
+		expect(readInitialUser()).toEqual(user);
+		expect(localStorage.getItem('access_token')).toBeNull();
+	});
+
+	it('a browser that starts with no user is sent to /login by requireSession', () => {
+		authStore.clearSession();
+
+		expect(authStore.requireSession()).toBe(false);
+		expect(goto).toHaveBeenCalledWith('/login');
 	});
 });

@@ -92,7 +92,7 @@ function serve(attributes: string | null, lists: QueueList[] | null | 'pending')
 }
 
 function signInAdmin() {
-	authStore.setSession('tok', { id: 1, username: 'admin', email: null, role: 'admin', is_active: true });
+	authStore.setSession({ id: 1, username: 'admin', email: null, role: 'admin', is_active: true });
 }
 
 beforeEach(() => {

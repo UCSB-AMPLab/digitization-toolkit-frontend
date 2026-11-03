@@ -49,7 +49,7 @@ let listSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
 	locale.set('es');
 	pageUrl.href = 'http://localhost/dashboard/projects/1';
-	authStore.setSession('tok', admin);
+	authStore.setSession(admin);
 	vi.spyOn(projectsApi, 'get').mockResolvedValue({ id: 1, name: 'Rionegro' } as Project);
 	vi.spyOn(recordsApi, 'count').mockResolvedValue(3);
 	vi.spyOn(projectMembersApi, 'list').mockResolvedValue([]);

@@ -106,7 +106,7 @@ function rowOf(screen: ReturnType<typeof render>, title: string) {
 const RIONEGRO_ORDER = ['Tomo 5', 'Tomo sin volumen', 'Tomo 4', 'Tomo 1', 'Tomo 2'];
 
 function signIn(role: UserRole) {
-	authStore.setSession('tok', { id: 1, username: role, email: null, role, is_active: true });
+	authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
 }
 
 describe('Cola', () => {

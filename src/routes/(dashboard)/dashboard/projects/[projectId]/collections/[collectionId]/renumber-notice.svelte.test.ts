@@ -43,7 +43,7 @@ const records = [rec(1, 1), rec(2, 2), rec(3, 3)];
 beforeEach(() => {
 	pageStore.value?.set(pageAt('7'));
 	locale.set('es');
-	authStore.setSession('tok', operator);
+	authStore.setSession(operator);
 });
 
 afterEach(() => {

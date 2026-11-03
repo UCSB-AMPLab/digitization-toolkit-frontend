@@ -30,7 +30,7 @@ function rec(id: number, sequence: number, status: ApiRecord['status']): ApiReco
 
 function signIn(role: UserRole) {
 	const user: AuthUser = { id: 2, username: role, email: null, role, is_active: true };
-	authStore.setSession('tok', user);
+	authStore.setSession(user);
 }
 
 beforeEach(() => {

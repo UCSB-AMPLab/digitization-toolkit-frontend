@@ -168,7 +168,7 @@ export function learnFromEvent(event: KeyboardEvent): LearnResult {
   return { ok: true, chord: chordFromEvent(event) };
 }
 
-// Persistence: a single localStorage key, following stores/token.ts —
+// Persistence: a single localStorage key, as stores/auth.ts keeps the user —
 // guarded by SvelteKit's `browser` flag and try/catch so that missing or
 // throwing storage (private mode, quota) yields the default instead of
 // breaking the page. A well-formed value whose key is not bindable

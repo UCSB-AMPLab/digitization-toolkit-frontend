@@ -29,7 +29,7 @@ function json(body: unknown, status = 200) {
 }
 
 beforeEach(() => {
-	authStore.setSession('tok', admin);
+	authStore.setSession(admin);
 });
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -63,7 +63,7 @@ describe('a 403 with a structured detail', () => {
 		expect(error.detail).toEqual(detail);
 		expect(error.message).toBe(detail.message);
 		// A 403 never ends the session.
-		expect(authStore.getToken()).toBe('tok');
+		expect(authStore.getUser()).toEqual(admin);
 	});
 
 	it('has no detail when the 403 carries a string', async () => {
@@ -83,7 +83,7 @@ describe('a 401 (regression)', () => {
 		expect(error).toBeInstanceOf(AuthError);
 		expect(error.status).toBe(401);
 		expect(error.message).toBe('Not authenticated');
-		expect(authStore.getToken()).toBeNull();
+		expect(authStore.getUser()).toBeNull();
 		expect(gotoMock).toHaveBeenCalledWith('/login');
 	});
 });
@@ -102,12 +102,31 @@ describe('the unit store', () => {
 		expect(get(unitState)?.mode).toBe('offline');
 	});
 
+	it('keeps the state when the same user is validated again', async () => {
+		const spy = vi.spyOn(systemApi, 'unit').mockResolvedValue(unit as never);
+		await ensureUnit();
+		// What the dashboard layout does on every mount after /users/me.
+		authStore.setSession({ ...admin });
+		await ensureUnit();
+		expect(spy).toHaveBeenCalledTimes(1);
+		expect(get(unitState)?.mode).toBe('backup');
+	});
+
+	it('reads it again for another user', async () => {
+		const spy = vi.spyOn(systemApi, 'unit').mockResolvedValue(unit as never);
+		await ensureUnit();
+		authStore.setSession({ ...admin, id: 2, username: 'admin2' });
+		expect(get(unitState)).toBeNull();
+		await ensureUnit();
+		expect(spy).toHaveBeenCalledTimes(2);
+	});
+
 	it('reads it again for a new session', async () => {
 		const spy = vi.spyOn(systemApi, 'unit').mockResolvedValue(unit as never);
 		await ensureUnit();
 		authStore.clearSession();
 		expect(get(unitState)).toBeNull();
-		authStore.setSession('tok-2', admin);
+		authStore.setSession(admin);
 		await ensureUnit();
 		expect(spy).toHaveBeenCalledTimes(2);
 	});
@@ -118,7 +137,7 @@ describe('the unit store', () => {
 		const first = ensureUnit();
 		await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
 		authStore.clearSession();
-		authStore.setSession('tok-2', { ...admin, id: 2, username: 'admin2' });
+		authStore.setSession({ ...admin, id: 2, username: 'admin2' });
 		answer(unit);
 		await first;
 		expect(get(unitState)).toBeNull();

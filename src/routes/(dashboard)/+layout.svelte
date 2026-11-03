@@ -54,7 +54,7 @@
 		// `apiRequest` intercepted a 401 on a later call), leave.
 		const unsub = authStore.subscribe((s) => {
 			currentUser = s.user;
-			if (!s.token && !isValidatingSession) goto('/login');
+			if (!s.user && !isValidatingSession) goto('/login');
 			// First sign-in for this account: offer the tour (NEH-95). The flag is
 			// stored when the tour opens, not when it ends — someone who closes it
 			// straight away does not want it on every start, and the help button
@@ -62,21 +62,21 @@
 			if (s.user) tour.startIfFirstTime(s.user.id);
 		});
 
-		// Validation on mount: a token in localStorage does not guarantee the
-		// backend still accepts it (it may have expired, or the user may have
-		// been deactivated), so it is checked with `/users/me` before any
-		// protected content is shown (NEH-63).
+		// Validation on mount: a user saved in localStorage does not guarantee
+		// that the backend still accepts the session cookie (it may have
+		// expired, or the user may have been deactivated), so the session is
+		// checked with `/users/me` before any protected content is shown
+		// (NEH-63).
 		//
 		// Only a 401/403 invalidates the session. Any other error must not send
 		// the user to /login with the session still set: /login, seeing the
-		// token, redirects to /, and / back to /dashboard, an endless loop while
+		// session, redirects to /, and / back to /dashboard, an endless loop while
 		// the backend does not respond — which is what happens on the kiosk at
 		// boot (NEH-219). An unresponsive backend keeps the waiting screen up and
 		// the validation is retried with a growing delay (2 s to 10 s).
 		const controller = new AbortController();
 		(async () => {
-			const token = authStore.getToken();
-			if (!token) {
+			if (!authStore.getUser()) {
 				goto('/login');
 				return;
 			}
@@ -89,7 +89,7 @@
 			if (outcome.kind === 'valid') {
 				// Refresh the user in the store (the role may have changed on the
 				// backend since the last login) before rendering.
-				authStore.setSession(token, outcome.user);
+				authStore.setSession(outcome.user);
 			} else {
 				// `apiRequest` clears the session on a 401 but not on a 403. If
 				// the session stayed set, /login would redirect back here and the
