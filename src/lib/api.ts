@@ -25,6 +25,11 @@ export function getApiBase(): string {
 // links. The backend refuses a cookie-authenticated request whose method is
 // not GET, HEAD or OPTIONS unless it carries X-Requested-With (its CSRF
 // check); every request from here carries it.
+// How long Salir waits for POST /auth/logout before it clears the local
+// session anyway, so a backend that accepts the connection and never answers
+// cannot leave the operator looking signed in.
+export const LOGOUT_TIMEOUT_MS = 5000;
+
 export const CSRF_HEADER = 'X-Requested-With';
 const CSRF_HEADER_VALUE = 'XMLHttpRequest';
 
@@ -337,15 +342,22 @@ export const authApi = {
   /**
    * Log out. The cookie is httpOnly, so only the backend can remove it:
    * POST /auth/logout clears it (204). The local user is cleared afterwards
-   * whatever the answer, and also when the backend cannot be reached; the
-   * cookie then stays until it expires.
+   * whatever the answer, and also when the backend cannot be reached or does
+   * not answer within LOGOUT_TIMEOUT_MS; the cookie then stays until it
+   * expires.
    */
   async logout(): Promise<void> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOGOUT_TIMEOUT_MS);
     try {
-      await fetch(`${getApiBase()}/auth/logout`, sessionRequestInit({ method: 'POST' }));
+      await fetch(
+        `${getApiBase()}/auth/logout`,
+        sessionRequestInit({ method: 'POST', signal: controller.signal })
+      );
     } catch {
-      // Backend unreachable: nothing more can be done from the page.
+      // Backend unreachable or too slow: nothing more can be done from the page.
     } finally {
+      clearTimeout(timer);
       authStore.clearSession();
     }
   },

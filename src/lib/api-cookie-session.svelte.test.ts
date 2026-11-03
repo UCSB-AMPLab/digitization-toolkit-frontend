@@ -19,7 +19,8 @@ import {
 	systemApi,
 	camerasApi,
 	sessionRequestInit,
-	CSRF_HEADER
+	CSRF_HEADER,
+	LOGOUT_TIMEOUT_MS
 } from './api';
 import { authStore, type AuthUser } from './stores/auth';
 
@@ -248,6 +249,29 @@ describe('logout', () => {
 		await authApi.logout();
 
 		expect(authStore.getUser()).toBeNull();
+	});
+
+	it('gives up on a backend that does not answer within the logout timeout', async () => {
+		authStore.setSession(user);
+		vi.useFakeTimers();
+		try {
+			vi.spyOn(globalThis, 'fetch').mockImplementation(
+				(_url, init) =>
+					new Promise((_resolve, reject) => {
+						init?.signal?.addEventListener('abort', () =>
+							reject(new DOMException('The operation was aborted.', 'AbortError'))
+						);
+					})
+			);
+
+			const done = authApi.logout();
+			await vi.advanceTimersByTimeAsync(LOGOUT_TIMEOUT_MS);
+			await done;
+
+			expect(authStore.getUser()).toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('clears the local session when the backend refuses the logout', async () => {
