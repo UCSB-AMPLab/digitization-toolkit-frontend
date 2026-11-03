@@ -43,10 +43,11 @@
 
   <div class="header">
 		<!-- The logo is the page's heading, named "Captua" by the image.
-		     Stacked on larger screens, side by side on the 800x480 screen;
+		     Stacked on screens 600px tall or more, side by side on the
+		     800x480 screen;
 		     the hidden one is display: none, so only one is announced. The
 		     descriptor follows the locale inside CaptuaLogo. Thin ink: the
-		     seedling is drawn well above 90px in both. -->
+		     seedling is drawn at 90px or more in both. -->
 		<h1 class="logo-heading">
 			<span class="logo-stacked">
 				<CaptuaLogo wordmark="descriptor" weight="thin" layout="stacked" class="brand-logo-stacked" />
@@ -141,10 +142,29 @@
     color: var(--color-secondary);
   }
 
-  /* The stacked lockup needs at least 640x600; below that, side by side */
+  /* On a phone the three would be squeezed into narrow columns: stacked
+     instead, seal, credit and link, centred like the rest of the splash. */
+  @media (max-width: 639px) {
+    .credit {
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px 16px 8px;
+      text-align: center;
+    }
+
+    .credit p { flex: none; }
+
+    .seal { height: 72px; }
+
+    /* A gutter, so the start buttons wrap before they reach the edges */
+    .main { padding: 0 16px; }
+  }
+
+  /* Stacked wherever the screen is at least 600px tall; side by side on
+     a short screen such as the 800x480 one */
   .logo-heading > .logo-stacked { display: none; }
 
-  @media (min-width: 640px) and (min-height: 600px) {
+  @media (min-height: 600px) {
     .logo-heading > .logo-stacked { display: block; }
     .logo-heading > .logo-beside { display: none; }
   }

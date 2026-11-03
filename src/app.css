@@ -1763,9 +1763,16 @@ LOGO and BRANDING
 	.brand-logo-stacked {
 		height: clamp(160px, calc(100vh - 230px), 420px);
 		width: auto;
-		max-width: calc(100vw - 32px);
 		display: block;
 		margin: 0 auto;
+	}
+	/* On a phone the logo is about 62% of the screen's width, less on a
+	   short one, where the start buttons and the footer take the height
+	   (346/349 is the lockup's aspect). */
+	@media (max-width: 639px) {
+		.brand-logo-stacked {
+			height: max(160px, min(calc(100vh - 500px), calc(62vw * 346 / 349)));
+		}
 	}
 /* ============================================================================
    SPACING
