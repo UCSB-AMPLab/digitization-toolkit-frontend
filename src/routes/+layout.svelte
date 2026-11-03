@@ -2,7 +2,7 @@
   // Version: 0.1.0-beta
 
   import '../app.css';
-  import favicon from '$lib/assets/favicon.svg';
+  import favicon from '$lib/assets/brand/captua-favicon.svg';
   import GuidedTour from '$lib/components/GuidedTour.svelte';
   import { locale } from '$lib/i18n';
   import { onMount } from 'svelte';
@@ -18,7 +18,9 @@
 </script>
 
 <svelte:head>
-  <link rel="icon" href={favicon} />
+  <!-- Green on a light browser theme, ivory on a dark one (the SVG's own
+       prefers-color-scheme rule). -->
+  <link rel="icon" type="image/svg+xml" href={favicon} />
 </svelte:head>
 
 {@render children?.()}

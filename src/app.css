@@ -1,7 +1,7 @@
 /* ============================================================================
    DIGITIZATION TOOLKIT — Global Design System
    ============================================================================ */
-/* Version: 0.2.1 */
+/* Version: 0.2.2 */
 
 /* Local Mulish — bundled variable font for offline use (Rionegro has no internet) */
 @font-face {
@@ -1725,24 +1725,45 @@ tr:hover .drag-handle { opacity: 1; }
 LOGO and BRANDING
    ============================================================================ */
 
+	/* Inks of the Captua logo (CaptuaLogo.svelte). They follow the current
+	   brand tokens; a new palette changes these, not the artwork. The browser
+	   favicon (assets/brand/captua-favicon.svg) is a separate file and keeps
+	   its own green and ivory. */
+	:root {
+		--logo-ink: var(--color-light);
+		--logo-seedling-ink: var(--logo-ink);
+		--logo-wordmark-ink: var(--logo-ink);
+	}
+
+	/* The logo classes size the seedling-and-wordmark lockup, which is about
+	   half as wide again as the wordmark alone. */
 	.brand-logo {
 		width: 100%;
-		max-width: 224px;
+		max-width: 300px;
 		height: auto;
 		display: block;
 		margin: 0 auto;
 	}
-  	.brand-logo-xl {
+	/* On the 800x480 screen the login card already scrolls a little; at
+	   this width the lockup is as high as the wordmark alone was. */
+	@media (max-height: 520px) {
+		.brand-logo { max-width: 244px; }
+	}
+	/* Capped at the viewport too: on the welcome screen its parent
+	   shrinks to fit, so 100% alone does not keep it on a narrow screen. */
+	.brand-logo-xl {
 		width: 100%;
-		max-width: 425px;
+		max-width: min(425px, calc(100vw - 32px));
 		height: auto;
 		display: block;
 		margin: 0 auto;
 	}
-	.brand-logo-xs {
-		width: 100%;
-		max-width: 75px;
-		height: auto;
+	/* The stacked lockup on the welcome screen: as high as the screen allows
+	   without scrolling, up to 420px. */
+	.brand-logo-stacked {
+		height: clamp(160px, calc(100vh - 230px), 420px);
+		width: auto;
+		max-width: calc(100vw - 32px);
 		display: block;
 		margin: 0 auto;
 	}

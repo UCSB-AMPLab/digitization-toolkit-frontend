@@ -54,6 +54,22 @@ describe('welcome splash', () => {
 		expect(labels).toEqual(['Get started in English', 'Empezar en español']);
 	});
 
+	it('puts each greeting over its own button, in its language', async () => {
+		const screen = await render(Page);
+		const en = screen.getByRole('group', { name: 'Hello!' });
+		const es = screen.getByRole('group', { name: '¡Hola!' });
+		expect(en.element().getAttribute('lang')).toBe('en');
+		expect(es.element().getAttribute('lang')).toBe('es');
+		await expect.element(en.getByRole('button', { name: 'Get started in English' })).toBeVisible();
+		await expect.element(es.getByRole('button', { name: 'Empezar en español' })).toBeVisible();
+		expect(screen.getByRole('heading', { level: 2 }).elements().map((h) => h.textContent)).toEqual(['Hello!', '¡Hola!']);
+	});
+
+	it('names the page heading after the logo, once', async () => {
+		const screen = await render(Page);
+		await expect.element(screen.getByRole('heading', { level: 1, name: 'Captua' })).toBeInTheDocument();
+	});
+
 	it('credits the NEH award and links to the credits page', async () => {
 		const screen = await render(Page);
 		await expect.element(screen.getByText('HAA-304052-25', { exact: false })).toBeVisible();
