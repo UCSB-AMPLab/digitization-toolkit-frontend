@@ -15,7 +15,7 @@
 	// A new section needs its route under `src/routes/(dashboard)/` and an
 	// entry in `NAV_ITEMS` listing the roles allowed to open it.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.4
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -25,8 +25,7 @@
 	import { usersApi, recordsApi } from '$lib/api';
 	import { waitForSession, sessionRetryDelay } from '$lib/session-check';
 	import { m, roleLabel, type StringMessageKey } from '$lib/i18n';
-	import logo from '$lib/assets/captua-logo.svg';
-	import favicon from '$lib/assets/favicon-light.svg';
+	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 	import BugReportButton from '$lib/bug-report/BugReportButton.svelte';
 	import CatalogueBackupIndicator from '$lib/components/CatalogueBackupIndicator.svelte';
 	import AccountMenu from '$lib/components/AccountMenu.svelte';
@@ -287,14 +286,13 @@
 	<!-- ══════════════════════ SIDEBAR ══════════════════════ -->
 	<aside class="sidebar" class:expanded>
 		<div class="s-header">
+			<!-- The seedling and wordmark when expanded, the seedling alone when
+			     collapsed. Thick ink: the seedling is drawn at about 40px. -->
 			<div class="logo-wrap">
-				<div class="logo-circle">
-				<img src={favicon} alt="icon" class="logo-icon" />
-				</div>
 				{#if expanded}
-					<div class="logo-text">
-							<img src={logo} alt="Captua" class="brand-logo-xs" />
-					</div>
+					<CaptuaLogo class="sidebar-lockup" />
+				{:else}
+					<CaptuaLogo wordmark="none" class="sidebar-mark" />
 				{/if}
 			</div>
 
@@ -586,26 +584,19 @@
 		overflow: hidden;
 	}
 
-	.logo-circle {
+	/* The lockup is 3.6 times as wide as it is high: 40px high leaves the
+	   collapse button its room in the 216px sidebar. */
+	.logo-wrap :global(.sidebar-lockup) {
+		height: 40px;
+		width: auto;
+		aspect-ratio: 460 / 128;
+		flex-shrink: 0;
+	}
+
+	.logo-wrap :global(.sidebar-mark) {
 		width: 40px;
 		height: 40px;
-		border-radius: var(--radius-md);
-		background-color: var(--color-primary);
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		flex-shrink: 0;
-		box-shadow: 0 4px 12px rgba(90, 140, 98, 0.3);
-	}
-	.logo-icon {
-		width: 25px;
-		height: 25px;
-	}
-	.logo-text {
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
-		overflow: hidden;
 	}
 
 	.collapse-btn {

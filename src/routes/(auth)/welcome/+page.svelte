@@ -7,20 +7,16 @@
   // Version: 0.1.0-beta
 
   import { authApi } from '$lib/api';
-  import { m, locale, setLanguage, type Locale } from '$lib/i18n';
-  import logoEs from '$lib/assets/captua-logo-descrp-light-esp.svg';
-  import logoEn from '$lib/assets/captua-logo-descrp-light-eng.svg';
+  import { m, setLanguage, type Locale } from '$lib/i18n';
+  import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
   import nehSeal from '$lib/assets/neh-preferred-seal-white.png';
-
-  // The descriptor in the logo is baked into the SVG, so the asset
-  // itself has to follow the locale.
-  let logo = $derived($locale === 'en' ? logoEn : logoEs);
 
   // Each label is in its own language whatever the current one is, so a unit
   // with no saved language lets the person pick theirs.
-  const STARTS: { code: Locale; label: string }[] = [
-    { code: 'en', label: 'Get started in English' },
-    { code: 'es', label: 'Empezar en español' },
+  // Each greeting stands over its own button.
+  const STARTS: { code: Locale; greeting: string; label: string }[] = [
+    { code: 'en', greeting: 'Hello!', label: 'Get started in English' },
+    { code: 'es', greeting: '¡Hola!', label: 'Empezar en español' },
   ];
 
   let isChecking = $state(false);
@@ -46,26 +42,41 @@
   <div class="main">
 
   <div class="header">
-    	<div class="card-logo-area">
-			<img src={logo} alt="Captua" class="brand-logo-xl" />
-		</div>
+		<!-- The logo is the page's heading, named "Captua" by the image.
+		     Stacked on screens 600px tall or more, side by side on the
+		     800x480 screen;
+		     the hidden one is display: none, so only one is announced. The
+		     descriptor follows the locale inside CaptuaLogo. Thin ink: the
+		     seedling is drawn at 90px or more in both. -->
+		<h1 class="logo-heading">
+			<span class="logo-stacked">
+				<CaptuaLogo wordmark="descriptor" weight="thin" layout="stacked" class="brand-logo-stacked" />
+			</span>
+			<span class="logo-beside">
+				<CaptuaLogo wordmark="descriptor" weight="thin" class="brand-logo-xl" />
+			</span>
+		</h1>
 
   </div>
 
-  <!-- In both languages, like the start buttons below. -->
-  <h1 class="title"><span lang="en">Hello!</span> <span lang="es">¡Hola!</span></h1>
-
+  <!-- One column per language: the greeting, a second-level heading, over
+       its button. Each column is a group named by its greeting, so a screen
+       reader gives the two together. The columns wrap onto two rows on a
+       narrow screen and each greeting stays with its button. -->
   <div class="starts">
     {#each STARTS as start (start.code)}
-      <button
-        class="btn"
-        lang={start.code}
-        onclick={() => handleStart(start.code)}
-        disabled={isChecking}
-        aria-busy={isChecking}
-      >
-        {start.label}
-      </button>
+      <div class="start" lang={start.code} role="group" aria-labelledby="greeting-{start.code}">
+        <h2 class="title" id="greeting-{start.code}">{start.greeting}</h2>
+        <button
+          class="btn"
+          lang={start.code}
+          onclick={() => handleStart(start.code)}
+          disabled={isChecking}
+          aria-busy={isChecking}
+        >
+          {start.label}
+        </button>
+      </div>
     {/each}
   </div>
   </div>
@@ -131,6 +142,33 @@
     color: var(--color-secondary);
   }
 
+  /* On a phone the three would be squeezed into narrow columns: stacked
+     instead, seal, credit and link, centred like the rest of the splash. */
+  @media (max-width: 639px) {
+    .credit {
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px 16px 8px;
+      text-align: center;
+    }
+
+    .credit p { flex: none; }
+
+    .seal { height: 72px; }
+
+    /* A gutter, so the start buttons wrap before they reach the edges */
+    .main { padding: 0 16px; }
+  }
+
+  /* Stacked wherever the screen is at least 600px tall; side by side on
+     a short screen such as the 800x480 one */
+  .logo-heading > .logo-stacked { display: none; }
+
+  @media (min-height: 600px) {
+    .logo-heading > .logo-stacked { display: block; }
+    .logo-heading > .logo-beside { display: none; }
+  }
+
   /* The bottom margin lifts the logo above the visual center */
   .header {
     display: flex;
@@ -149,11 +187,27 @@
     text-align: center;
   }
 
-  /* Side by side so the splash still fits at 800x480 */
+  /* Side by side so the splash still fits at 800x480; on a narrower
+     screen the columns wrap rather than run off the side. */
   .starts {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 16px;
   }
+
+  .start {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .logo-heading {
+    margin: 0;
+    font-size: inherit;
+  }
+
+  .logo-heading > span { display: block; }
 
   .btn {
     font-family: var(--font-family);

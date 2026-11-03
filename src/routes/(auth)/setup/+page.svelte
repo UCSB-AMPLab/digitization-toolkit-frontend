@@ -12,7 +12,7 @@
 	import { goto } from '$app/navigation';
 	import { authApi } from '$lib/api';
 	import { m } from '$lib/i18n';
-	import logo from '$lib/assets/captua-logo.svg';
+	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 	import { normalizeEmail, emailFormatError } from '$lib/email-field';
 
 	let username = $state('');
@@ -99,7 +99,7 @@
 		<div class="card-logo-area">
 			<div class="header">
 				<div class="card-logo-area">
-					<img src={logo} alt="Captua" class="brand-logo-xl" />
+					<CaptuaLogo class="brand-logo-xl" />
 				</div>
 			</div>
 			<p class="setup-title">{$m.setup_title}</p>

@@ -12,13 +12,8 @@
 	import { classifyLoginError, lockoutMinutes, retryAfterOf } from '$lib/login-error';
 	import { authStore, isUserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
-	import logoEs from '$lib/assets/captua-logo-descrp-light-esp.svg';
-	import logoEn from '$lib/assets/captua-logo-descrp-light-eng.svg';
-	import favicon from '$lib/assets/favicon.svg';
-
-	// the descriptor in the logo is baked into the SVG, so the asset
-	// itself has to follow the locale.
-	let logo = $derived($locale === 'en' ? logoEn : logoEs);
+	// The logo's descriptor follows the locale inside CaptuaLogo.
+	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 
 	let username = $state('');
 	let password = $state('');
@@ -166,7 +161,7 @@
 <div class="login-wrapper" onkeydown={handleKeydown} role="main">
 	<div class="login-card" class:is-loading={isLoading}>
 		<div class="card-logo-area">
-			<img src={logo} alt="Captua" class="brand-logo" />
+			<CaptuaLogo wordmark="descriptor" class="brand-logo" />
 		</div>
 
 		<div class="form-area">
@@ -403,14 +398,6 @@
 		align-items: center;
 		gap: 10px;
 		padding: 32px 24px 0;
-	}
-
-	.brand-logo {
-		width: 100%;
-		max-width: 224px;
-		height: auto;
-		display: block;
-		margin: 0 auto;
 	}
 
 	.form-area {
