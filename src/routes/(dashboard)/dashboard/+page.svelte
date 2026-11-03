@@ -13,7 +13,7 @@
 
   import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, tokenStore, getApiBase,
+  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, sessionRequestInit, getApiBase,
            type Collection, type Project, type RetakeSummary } from '$lib/api';
   import { readRetakeSummary } from '$lib/recapture-turn';
   import { projectsShownIn, unitState } from '$lib/unit-mode';
@@ -212,11 +212,6 @@
     }
   }
 
-  function getAuthHeader(): HeadersInit {
-    const token = tokenStore.get();
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
-  }
-
   async function startStream(side: 'left' | 'right') {
     streamActive = { ...streamActive, [side]: true };
     const index = side === 'left' ? 0 : 1;
@@ -248,7 +243,7 @@
     const failureCounts = () =>
       streamActive[side as 'left' | 'right'] && token !== null && cameraRefresh.previewToken() === token;
     try {
-      const res = await fetch(`${getApiBase()}/cameras/preview/${index}`, { headers: getAuthHeader() });
+      const res = await fetch(`${getApiBase()}/cameras/preview/${index}`, sessionRequestInit());
       if (res.status === 404) {
         // A preview from before/during reconnect cannot undo its result or
         // stop the stream. An accepted failure changes only this camera.

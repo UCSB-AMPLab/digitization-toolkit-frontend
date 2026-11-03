@@ -47,7 +47,7 @@ const projects = () => page.getByRole('checkbox', { name: es.unit_projects_toggl
 
 beforeEach(() => {
 	locale.set('es');
-	authStore.setSession('tok', { id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
+	authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
 });
 afterEach(() => {
 	vi.restoreAllMocks();

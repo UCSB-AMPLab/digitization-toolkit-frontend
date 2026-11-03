@@ -10,7 +10,7 @@
 //   E2E_USERNAME, E2E_PASSWORD
 //
 // Version: 0.1.0-beta
-import { test, expect, testStem, type APIRequestContext, type Page } from './fixtures';
+import { test, expect, testStem, signInBrowser, type APIRequestContext, type Page } from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh210';
@@ -105,13 +105,9 @@ async function teardown(request: APIRequestContext, token: string, projectId: nu
 }
 
 async function openGallery(page: Page, ctx: SetupResult) {
-	await page.addInitScript(
-		([token, user]) => {
-			localStorage.setItem('access_token', token as string);
-			localStorage.setItem('auth_user', user as string);
-		},
-		[ctx.token, JSON.stringify({ id: 0, username: E2E_USERNAME, email: 'e2e@example.com', role: 'admin', is_active: true })]
-	);
+	await signInBrowser(page, API_BASE, { username: E2E_USERNAME, password: E2E_PASSWORD }, {
+		id: 0, username: E2E_USERNAME, email: 'e2e@example.com', role: 'admin', is_active: true
+	});
 	await page.goto(`/dashboard/projects/${ctx.projectId}/collections/${ctx.collectionId}`);
 	// The records are fetched on the client after hydration, so a visible
 	// title means the toolbar's handlers are attached. A view switch clicked

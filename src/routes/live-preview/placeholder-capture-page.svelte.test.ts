@@ -156,7 +156,7 @@ beforeEach(() => {
 	served.recordReads = 0;
 	served.summaryReads = 0;
 	vi.mocked(goto).mockReset();
-	authStore.setSession('tok', { id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
+	authStore.setSession({ id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
 });
 
 afterEach(() => {

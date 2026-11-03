@@ -31,7 +31,7 @@ function unit(mode: string, projectsShown: boolean) {
 
 async function mount(role: UserRole, unitAnswer: Response) {
 	const user = { id: 1, username: role, email: null, role, is_active: true };
-	authStore.setSession('tok', user);
+	authStore.setSession(user);
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const url = String(input);
 		if (url.endsWith('/records/to-retake/count')) return json({ count: 0 });

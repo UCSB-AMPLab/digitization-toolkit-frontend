@@ -39,7 +39,7 @@ function unit(projectsShown: boolean) {
 beforeEach(() => {
 	locale.set('es');
 	gotoMock.mockClear();
-	authStore.setSession('tok', { id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
+	authStore.setSession({ id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
 });
 afterEach(() => {

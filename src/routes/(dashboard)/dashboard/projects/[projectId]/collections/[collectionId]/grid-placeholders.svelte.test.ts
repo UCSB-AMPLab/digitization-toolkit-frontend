@@ -43,7 +43,7 @@ function placeholder(id: number, sequence: number, extra: Partial<ApiRecord> = {
 }
 
 function signIn(role: UserRole) {
-	authStore.setSession('tok', { id: 1, username: role, email: null, role, is_active: true });
+	authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
 }
 
 function mount(records: ApiRecord[], onRecordsUpdate = vi.fn(), onRecordClick = vi.fn()) {

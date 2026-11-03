@@ -10,7 +10,6 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$env/dynamic/public', () => ({ env }));
 
 import { getApiBase, recordsApi, collectionsApi } from './api';
-import { tokenStore } from './stores/token';
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -22,7 +21,6 @@ describe('relative API base in the browser', () => {
 	});
 
 	it('starts every URL handed to an <img>, a link or a download', () => {
-		vi.spyOn(tokenStore, 'get').mockReturnValue(null);
 		expect(recordsApi.getImageThumbnailUrl(7)).toBe('/api/records/images/7/thumbnail');
 		expect(recordsApi.getImageFileUrl(7)).toBe('/api/records/images/7/file');
 		expect(recordsApi.getImagePreviewUrl(7)).toBe('/api/records/images/7/preview');

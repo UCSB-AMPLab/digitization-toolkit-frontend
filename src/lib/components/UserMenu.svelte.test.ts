@@ -14,7 +14,7 @@ import { authStore, type UserRole } from '$lib/stores/auth';
 import UserMenu from './UserMenu.svelte';
 
 function signIn(role: UserRole) {
-	authStore.setSession('token', { id: 1, username: role, email: null, role, is_active: true });
+	authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
 }
 
 describe('UserMenu power entries', () => {
@@ -71,5 +71,29 @@ describe('UserMenu power entries', () => {
 			.element(page.getByRole('alertdialog'))
 			.toHaveTextContent('El control de energía no está disponible en este equipo.');
 		await expect.element(page.getByText('Reiniciando el equipo…')).not.toBeInTheDocument();
+	});
+});
+
+// NEH-61: the session cookie is httpOnly, so only the backend can remove it.
+// Salir asks the backend to clear it, then the local user goes.
+describe('UserMenu sign-out', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+		authStore.clearSession();
+	});
+
+	it('posts /auth/logout with the CSRF header and clears the local user', async () => {
+		signIn('operator');
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+		const screen = render(UserMenu, { label: 'Usuario actual' });
+		await screen.getByRole('button', { name: 'Usuario actual' }).click();
+		await screen.getByRole('menuitem', { name: 'Salir' }).click();
+
+		await expect.poll(() => authStore.getUser()).toBeNull();
+		const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+		expect(url.endsWith('/auth/logout')).toBe(true);
+		expect(init.method).toBe('POST');
+		expect(init.credentials).toBe('include');
+		expect((init.headers as Record<string, string>)['X-Requested-With']).toBe('XMLHttpRequest');
 	});
 });

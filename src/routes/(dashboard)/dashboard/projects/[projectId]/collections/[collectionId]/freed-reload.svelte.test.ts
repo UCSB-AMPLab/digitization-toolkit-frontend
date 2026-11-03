@@ -42,7 +42,7 @@ const records = [1, 2, 3, 4, 5, 6].map((id) => rec(id));
 
 beforeEach(() => {
 	locale.set('es');
-	authStore.setSession('tok', admin);
+	authStore.setSession(admin);
 });
 afterEach(() => {
 	vi.restoreAllMocks();

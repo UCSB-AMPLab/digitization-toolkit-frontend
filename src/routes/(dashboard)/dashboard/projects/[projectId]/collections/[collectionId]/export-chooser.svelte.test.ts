@@ -42,7 +42,7 @@ const records = [1, 2].map(
 beforeEach(async () => {
 	locale.set('es');
 	vi.spyOn(recordsApi, 'listAll').mockResolvedValue(records);
-	authStore.setSession('tok', admin);
+	authStore.setSession(admin);
 	await page.viewport(800, 480);
 });
 afterEach(() => {

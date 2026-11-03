@@ -7,12 +7,6 @@ import { get } from 'svelte/store';
 import { resolveApiBase } from './api-base';
 import { m } from './i18n';
 import { authStore } from './stores/auth';
-import { tokenStore } from './stores/token';
-
-// Re-exported so the app can import tokenStore from here (login/+page.svelte
-// does). The implementation lives in stores/token.ts, the single source for
-// the access token (NEH-41).
-export { tokenStore };
 
 /**
  * Centralized API client for Digitization Toolkit
@@ -22,6 +16,63 @@ export { tokenStore };
 // See api-base.ts for which base applies where.
 export function getApiBase(): string {
   return resolveApiBase(browser, env);
+}
+
+// The session is an httpOnly cookie the backend sets at login (NEH-61). No
+// script reads it, and no URL carries a token. The browser attaches the cookie
+// to a fetch made with credentials: 'include' (needed in development, where
+// the API is on another origin) and, by itself, to <img src> and download
+// links. The backend refuses a cookie-authenticated request whose method is
+// not GET, HEAD or OPTIONS unless it carries X-Requested-With (its CSRF
+// check); every request from here carries it.
+// How long Salir waits for POST /auth/logout before it clears the local
+// session anyway, so a backend that accepts the connection and never answers
+// cannot leave the operator looking signed in.
+export const LOGOUT_TIMEOUT_MS = 5000;
+
+export const CSRF_HEADER = 'X-Requested-With';
+const CSRF_HEADER_VALUE = 'XMLHttpRequest';
+
+type HeaderMap = { [key: string]: string };
+
+// Header pairs from any HeadersInit form: a plain object, an array of pairs,
+// or a Headers object (whose names come back lower-cased).
+function headerPairs(headers: HeadersInit | undefined): [string, string][] {
+  if (!headers) return [];
+  if (headers instanceof Headers) {
+    const pairs: [string, string][] = [];
+    headers.forEach((value, name) => pairs.push([name, value]));
+    return pairs;
+  }
+  if (Array.isArray(headers)) return headers.map(([name, value]) => [name, value]);
+  return Object.entries(headers);
+}
+
+// Merges header sets into one plain object, later sets winning. Names are
+// compared without case, as HTTP compares them, so no header goes out twice.
+function mergeHeaders(...sets: (HeadersInit | undefined)[]): HeaderMap {
+  const out: HeaderMap = {};
+  for (const set of sets) {
+    for (const [name, value] of headerPairs(set)) {
+      for (const existing of Object.keys(out)) {
+        if (existing.toLowerCase() === name.toLowerCase()) delete out[existing];
+      }
+      out[name] = value;
+    }
+  }
+  return out;
+}
+
+// RequestInit for a fetch to the API outside apiRequest() (camera preview
+// polling, the image ZIP download, the image probes, logout): it sends the
+// session cookie and the CSRF header and keeps the caller's other options and
+// headers.
+export function sessionRequestInit(init: RequestInit = {}): RequestInit {
+  return {
+    ...init,
+    credentials: 'include',
+    headers: mergeHeaders(init.headers, { [CSRF_HEADER]: CSRF_HEADER_VALUE })
+  };
 }
 
 // Thrown for 401/403 responses so callers that care can distinguish an
@@ -73,12 +124,11 @@ const SESSION_EXEMPT_ENDPOINTS = ['/auth/login', '/auth/password-reset'];
 
 // Whether a failed response means this tab's session is dead and must be
 // cleared. Shared by apiRequest() and apiRequestBlob(); the reasoning is in
-// the comment above its use in apiRequest(). `sentToken` is the token the
-// request carried, read from localStorage before it went out.
-function isDeadSession(status: number, endpoint: string, sentToken: string | null): boolean {
+// the comment above its use in apiRequest().
+function isDeadSession(status: number, endpoint: string): boolean {
   if (status !== 401) return false;
   if (SESSION_EXEMPT_ENDPOINTS.some(p => endpoint.startsWith(p))) return false;
-  return !!sentToken || authStore.getToken() !== null;
+  return authStore.isAuthenticated();
 }
 
 // API request helper with authentication
@@ -87,24 +137,15 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const base = getApiBase();
-  const token = tokenStore.get();
 
   // A FormData body (a file upload) goes without a Content-Type, so the
   // browser writes the multipart one with its boundary.
   const isMultipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
-  const headers: { [key: string]: string } = {
-    ...(isMultipart ? {} : { 'Content-Type': 'application/json' }),
-    ...(options.headers as { [key: string]: string })
-  };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${base}${endpoint}`, {
+  const response = await fetch(`${base}${endpoint}`, sessionRequestInit({
     ...options,
-    headers
-  });
+    headers: mergeHeaders(isMultipart ? {} : { 'Content-Type': 'application/json' }, options.headers)
+  }));
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: get(m).api_request_failed }));
@@ -118,8 +159,8 @@ async function apiRequest<T>(
       ? (detail as { message?: string }).message || JSON.stringify(detail)
       : String(detail);
 
-    // 401 means the token itself is missing/invalid/expired (or its user was
-    // deactivated) — the session is genuinely dead, so clear it globally.
+    // 401 means the session cookie is missing/invalid/expired (or its user
+    // was deactivated) — the session is genuinely dead, so clear it globally.
     // Unless this tab had no session at all, which isDeadSession() checks.
     // A 401 cannot mean "your session died" when there was no session, and
     // reading it that way broke first-run setup: POST /auth/register on the
@@ -127,27 +168,28 @@ async function apiRequest<T>(
     // redirect fired, and the operator landed on /login — which on a fresh
     // appliance has no account to log into. The setup page has handled that
     // 401 all along and never got to render it.
-    // A missing token alone does not mean there was no session. Logging out
-    // in another tab removes the token from localStorage, which this request
-    // read, but leaves this tab's authStore holding the old session, which
-    // the route guards read. So the request goes out with no bearer and gets
-    // a 401, and this tab still shows itself as signed in. The cached session
-    // in authStore counts as a session here, so that 401 clears it.
-    // 403 means the token is fine but the role/permission check for this one
+    // Logging out in another tab clears the cookie for every tab but leaves
+    // this tab's authStore holding the old user, which the route guards read.
+    // The next request then gets a 401 while this tab still shows itself as
+    // signed in; the user in authStore counts as a session here, so that 401
+    // clears it.
+    // 403 means the session is fine but the role/permission check for this one
     // action failed (RoleChecker and every per-resource permission check in
     // the backend run strictly after get_current_user, which is what raises
     // 401 — so a 403 nearly always means a valid, active session. The
     // exceptions are POST /auth/login, which returns 403 for an inactive user
     // with no session at all, and POST /auth/register, which returns 403 when
-    // the caller's otherwise valid token belongs to an inactive user; both
-    // are harmless here, because a 403 never clears the session). Treating it the same as a dead session would silently log a
+    // the caller's otherwise valid session belongs to an inactive user; and
+    // the backend's CSRF check returns 403 for a cookie-authenticated state
+    // change without X-Requested-With. All are harmless here, because a 403
+    // never clears the session). Treating it the same as a dead session would silently log a
     // user out of a perfectly good session over a single denied action, and
     // would swallow the inline "you can't do that" errors that callers
     // (e.g. project member management, bulk status changes) already show.
     // Only meaningful in the browser: clears the stale/rejected session and
     // routes to /login so the UI never keeps rendering as a broken
-    // "logged-in" shell against a token the backend has already rejected.
-    if (isDeadSession(response.status, endpoint, token) && browser) {
+    // "logged-in" shell against a session the backend has already rejected.
+    if (isDeadSession(response.status, endpoint) && browser) {
       authStore.clearSession();
       if (!window.location.pathname.startsWith('/login')) {
         goto('/login');
@@ -179,7 +221,7 @@ async function apiRequest<T>(
 // captured image) instead of JSON. apiRequest() always calls
 // response.json() on success, which would corrupt a binary payload, so a
 // caller that needs the raw blob (and its response headers) needs its own
-// helper rather than a special case inside apiRequest(). Same auth header,
+// helper rather than a special case inside apiRequest(). Same credentials,
 // same 401/403 handling, same error-body parsing into the thrown Error's
 // message as apiRequest().
 async function apiRequestBlob(
@@ -187,20 +229,8 @@ async function apiRequestBlob(
   options: RequestInit = {}
 ): Promise<{ blob: Blob; headers: Headers }> {
   const base = getApiBase();
-  const token = tokenStore.get();
 
-  const headers: { [key: string]: string } = {
-    ...(options.headers as { [key: string]: string })
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${base}${endpoint}`, {
-    ...options,
-    headers
-  });
+  const response = await fetch(`${base}${endpoint}`, sessionRequestInit(options));
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: get(m).api_request_failed }));
@@ -210,7 +240,7 @@ async function apiRequestBlob(
       ? (detail as { message?: string }).message || JSON.stringify(detail)
       : String(detail);
 
-    if (isDeadSession(response.status, endpoint, token) && browser) {
+    if (isDeadSession(response.status, endpoint) && browser) {
       authStore.clearSession();
       if (!window.location.pathname.startsWith('/login')) {
         goto('/login');
@@ -259,8 +289,13 @@ export interface User {
 // Alias used by usersApi — same shape as what /auth/users returns
 export type UserRead = User;
 
+// What /auth/login and /auth/refresh answer. A request with X-Requested-With
+// (every request from this app) gets {access_token: null, token_type:
+// 'cookie'}: the session is the cookie set in the same response. A client
+// without the header gets a bearer token in the body; this app keeps nothing
+// from the body either way.
 export interface AuthResponse {
-  access_token: string;
+  access_token: string | null;
   token_type: string;
 }
 
@@ -286,29 +321,45 @@ export const authApi = {
   },
 
   /**
-   * Login with username and password
+   * Login with username and password. The backend answers with the session
+   * cookie; nothing from the response body is kept.
    */
-  async login(data: LoginData): Promise<AuthResponse> {
-    const response = await apiRequest<AuthResponse>('/auth/login', {
+  async login(data: LoginData): Promise<void> {
+    await apiRequest<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data)
     });
-    tokenStore.set(response.access_token);
-    return response;
   },
 
   /**
-   * Refresh authentication token. Routes through authStore.updateToken()
-   * (not tokenStore directly) so the reactive session state — and anything
-   * derived from it — stays in sync with the new token (NEH-41: the old
-   * version wrote only tokenStore, silently diverging from authStore).
+   * Renew the session cookie. The backend answers a cookie session with a
+   * new cookie and no token in the body.
    */
-  async refreshToken(): Promise<AuthResponse> {
-    const response = await apiRequest<AuthResponse>('/auth/refresh', {
-      method: 'POST'
-    });
-    authStore.updateToken(response.access_token);
-    return response;
+  async refreshSession(): Promise<void> {
+    await apiRequest<AuthResponse>('/auth/refresh', { method: 'POST' });
+  },
+
+  /**
+   * Log out. The cookie is httpOnly, so only the backend can remove it:
+   * POST /auth/logout clears it (204). The local user is cleared afterwards
+   * whatever the answer, and also when the backend cannot be reached or does
+   * not answer within LOGOUT_TIMEOUT_MS; the cookie then stays until it
+   * expires.
+   */
+  async logout(): Promise<void> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOGOUT_TIMEOUT_MS);
+    try {
+      await fetch(
+        `${getApiBase()}/auth/logout`,
+        sessionRequestInit({ method: 'POST', signal: controller.signal })
+      );
+    } catch {
+      // Backend unreachable or too slow: nothing more can be done from the page.
+    } finally {
+      clearTimeout(timer);
+      authStore.clearSession();
+    }
   },
 
   /**
@@ -339,20 +390,20 @@ export interface CreateUserData {
 export const usersApi = {
   /**
    * Get the authenticated user's own profile (including role).
-   * Used to validate a stored token is still good — on session
-   * start/reload and after login — since /users/me requires a valid,
-   * active-user token and 401s otherwise.
+   * Used to validate the session cookie — on session start/reload and
+   * after login — since /users/me requires a valid, active-user session
+   * and 401s otherwise.
    */
   async me(): Promise<User> {
     return apiRequest<User>('/users/me');
   },
 
-  /** List all users. Requires admin token. */
+  /** List all users. Requires an admin session. */
   async list(): Promise<UserRead[]> {
     return apiRequest<UserRead[]>('/auth/users');
   },
 
-  /** Get a single user by ID. Requires admin token. */
+  /** Get a single user by ID. Requires an admin session. */
   async getById(id: number): Promise<UserRead> {
     return apiRequest<UserRead>(`/auth/users/${id}`);
   },
@@ -373,7 +424,7 @@ export const usersApi = {
     return user;
   },
 
-  /** Change a user's role. Requires admin token. */
+  /** Change a user's role. Requires an admin session. */
   async updateRole(id: number, role: 'admin' | 'operator' | 'reviewer'): Promise<UserRead> {
     return apiRequest<UserRead>(`/auth/users/${id}/role`, {
       method: 'PATCH',
@@ -381,14 +432,14 @@ export const usersApi = {
     });
   },
 
-  /** Activate or deactivate a user account. Requires admin token. */
+  /** Activate or deactivate a user account. Requires an admin session. */
   async setActive(id: number, isActive: boolean): Promise<UserRead> {
     return apiRequest<UserRead>(`/auth/users/${id}/active?is_active=${isActive}`, {
       method: 'PATCH',
     });
   },
 
-  /** Delete a user permanently. Requires admin token. */
+  /** Delete a user permanently. Requires an admin session. */
   async delete(id: number): Promise<void> {
     await apiRequest(`/auth/users/${id}`, { method: 'DELETE' });
   },
@@ -823,9 +874,7 @@ export const collectionsApi = {
    * Returns the URL to download the most recent BagIt export zip.
    */
   getExportDownloadUrl(collectionId: number): string {
-    const base = getApiBase();
-    const token = tokenStore.get();
-    return `${base}/collections/${collectionId}/export/download${token ? '?token=' + token : ''}`;
+    return `${getApiBase()}/collections/${collectionId}/export/download`;
   }
 };
 
@@ -1127,9 +1176,7 @@ export const recordsApi = {
    * Get thumbnail URL for a record image
    */
   getImageThumbnailUrl(imageId: number): string {
-    const base = getApiBase();
-    const token = tokenStore.get();
-    return `${base}/records/images/${imageId}/thumbnail${token ? '?token=' + token : ''}`;
+    return `${getApiBase()}/records/images/${imageId}/thumbnail`;
   },
 
   /**
@@ -1138,9 +1185,7 @@ export const recordsApi = {
    * getImagePreviewUrl.
    */
   getImageFileUrl(imageId: number): string {
-    const base = getApiBase();
-    const token = tokenStore.get();
-    return `${base}/records/images/${imageId}/file${token ? '?token=' + token : ''}`;
+    return `${getApiBase()}/records/images/${imageId}/file`;
   },
 
   /**
@@ -1149,9 +1194,7 @@ export const recordsApi = {
    * there is none (RAW without a preview, TIFF) and never sends RAW bytes.
    */
   getImagePreviewUrl(imageId: number): string {
-    const base = getApiBase();
-    const token = tokenStore.get();
-    return `${base}/records/images/${imageId}/preview${token ? '?token=' + token : ''}`;
+    return `${getApiBase()}/records/images/${imageId}/preview`;
   },
 
   /**
@@ -2283,16 +2326,11 @@ export const systemApi = {
    * message. Calls fetch directly, not through apiRequest().
    */
   async powerControl(action: PowerAction): Promise<{ message: string }> {
-    const base  = getApiBase();
-    const token = tokenStore.get();
-    const headers: { [key: string]: string } = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const response = await fetch(`${base}/system/power`, {
-      method: 'POST',
-      headers,
-      body:   JSON.stringify({ action }),
-    });
+    const response = await fetch(`${getApiBase()}/system/power`, sessionRequestInit({
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action }),
+    }));
 
     // The body may be empty or not JSON (e.g. from a proxy); that must not
     // break the declared return type.

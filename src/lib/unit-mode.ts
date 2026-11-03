@@ -5,8 +5,10 @@
 // `unitState` holds the last state read: null until it is read, and when it
 // cannot be read. It is read once per session (ensureUnit) and again after
 // a change (reloadUnit, or keepUnitState with the PUT's answer); any change of
-// session token (a logout, a new login) forgets it and drops a read still in
-// flight, and the next ensureUnit reads it for the new session. A read that
+// signed-in user (a logout, a login as someone else) forgets it and drops a
+// read still in flight, and the next ensureUnit reads it for the new session.
+// The session itself is an httpOnly cookie no script can read (NEH-61), so
+// the user's id in the auth store marks the session. A read that
 // fails after one succeeded keeps the known state; only the first read of a
 // session can leave it null. Every gate below takes null as "as before the modes":
 // projects shown, no Fisqua-mode restriction, since the backend enforces
@@ -63,31 +65,39 @@ export function readUnitState(data: unknown): UnitState | null {
 
 export const unitState = writable<UnitState | null>(null);
 
-// The session token last seen (undefined before the auth store is watched),
-// the token the state belongs to, and the read in flight.
-const UNKNOWN_TOKEN = Symbol('unknown token');
-let observed: string | null | undefined = undefined;
-let readFor: string | null | typeof UNKNOWN_TOKEN = null;
+// The signed-in user's id last seen (null for no session, undefined before
+// the auth store is watched), the id the state belongs to, and the read in
+// flight.
+type SessionKey = number | null;
+const UNKNOWN_SESSION = Symbol('unknown session');
+let observed: SessionKey | undefined = undefined;
+let readFor: SessionKey | typeof UNKNOWN_SESSION = null;
 let pending: Promise<UnitState | null> | null = null;
 let watching = false;
 // Raised by resetUnit, so a read that started before it is not kept.
 let generation = 0;
 
-async function currentToken(): Promise<string | null> {
+function sessionKeyOf(user: { id: number } | null): SessionKey {
+	return user ? user.id : null;
+}
+
+async function currentSession(): Promise<SessionKey> {
 	const { authStore } = await import('./stores/auth');
 	if (!watching) {
 		watching = true;
-		// Any change of session token forgets the state, whether or not a
-		// read has succeeded yet.
+		// Any change of signed-in user forgets the state, whether or not a
+		// read has succeeded yet. Validating the same user again (the
+		// dashboard layout does it on every mount) changes nothing.
 		authStore.subscribe((s) => {
-			if (observed !== undefined && s.token !== observed) resetUnit();
-			observed = s.token;
+			const key = sessionKeyOf(s.user);
+			if (observed !== undefined && key !== observed) resetUnit();
+			observed = key;
 		});
 	}
-	return authStore.getToken();
+	return sessionKeyOf(authStore.getUser());
 }
 
-async function read(token: string | null): Promise<UnitState | null> {
+async function read(session: SessionKey): Promise<UnitState | null> {
 	const { systemApi } = await import('./api');
 	const startedIn = generation;
 	let state: UnitState | null = null;
@@ -98,18 +108,18 @@ async function read(token: string | null): Promise<UnitState | null> {
 	}
 	if (startedIn !== generation) return get(unitState);
 	if (!state) return get(unitState);
-	readFor = token;
+	readFor = session;
 	unitState.set(state);
 	return state;
 }
 
 /** The unit's state, read once per session. */
 export async function ensureUnit(): Promise<UnitState | null> {
-	const token = await currentToken();
+	const session = await currentSession();
 	const known = get(unitState);
-	if (known && (readFor === token || readFor === UNKNOWN_TOKEN)) return known;
+	if (known && (readFor === session || readFor === UNKNOWN_SESSION)) return known;
 	if (!pending) {
-		const p: Promise<UnitState | null> = read(token).finally(() => {
+		const p: Promise<UnitState | null> = read(session).finally(() => {
 			if (pending === p) pending = null;
 		});
 		pending = p;
@@ -119,14 +129,14 @@ export async function ensureUnit(): Promise<UnitState | null> {
 
 /** Read the unit's state again (after a change, or a refusal that says it changed). */
 export async function reloadUnit(): Promise<UnitState | null> {
-	return read(await currentToken());
+	return read(await currentSession());
 }
 
 /** Keep the state a PUT /system/unit answered. */
 export function keepUnitState(data: unknown): UnitState | null {
 	const state = readUnitState(data);
 	if (state) {
-		readFor = observed === undefined ? UNKNOWN_TOKEN : observed;
+		readFor = observed === undefined ? UNKNOWN_SESSION : observed;
 		unitState.set(state);
 	}
 	return state;

@@ -51,7 +51,7 @@ const summaryA: RetakeSummary = {
 beforeEach(() => {
 	pageStore.value?.set(pageAt('7'));
 	locale.set('es');
-	authStore.setSession('tok', operator);
+	authStore.setSession(operator);
 });
 
 afterEach(() => {

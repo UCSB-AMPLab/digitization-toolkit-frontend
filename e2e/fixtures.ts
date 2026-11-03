@@ -36,3 +36,27 @@ export function testStem(): string {
 	stemCounter += 1;
 	return `xx-test-${stemRun}-${stemCounter.toString(36)}`;
 }
+
+// Signs the browser in the way the login page does (NEH-61): POST /auth/login
+// with X-Requested-With through the page's own request context, which shares
+// its cookie store with the browser, so the backend's httpOnly session cookie
+// lands where the app's requests pick it up. The user goes where authStore
+// looks for it. The app reads no token from localStorage, and the specs make
+// no assumption about what the cookie holds.
+export async function signInBrowser(
+	page: import('@playwright/test').Page,
+	apiBase: string,
+	credentials: { username: string; password: string },
+	user: { id: number; username: string; email: string | null; role: string; is_active: boolean }
+) {
+	const resp = await page.request.post(`${apiBase}/auth/login`, {
+		headers: { 'X-Requested-With': 'XMLHttpRequest' },
+		data: credentials
+	});
+	if (!resp.ok()) {
+		throw new Error(`E2E browser sign-in failed (${resp.status()}): ${await resp.text()}`);
+	}
+	await page.addInitScript((u) => {
+		localStorage.setItem('auth_user', u as string);
+	}, JSON.stringify(user));
+}

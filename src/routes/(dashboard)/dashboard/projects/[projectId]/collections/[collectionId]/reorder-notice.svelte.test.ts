@@ -37,7 +37,7 @@ const records = [rec(1, 1), rec(2, 2), rec(3, 3)];
 
 beforeEach(() => {
 	locale.set('es');
-	authStore.setSession('tok', operator);
+	authStore.setSession(operator);
 });
 
 afterEach(() => {

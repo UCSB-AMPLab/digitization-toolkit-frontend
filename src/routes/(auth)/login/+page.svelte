@@ -8,7 +8,7 @@
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { authApi, healthApi, usersApi, tokenStore } from '$lib/api';
+	import { authApi, healthApi, usersApi } from '$lib/api';
 	import { classifyLoginError, lockoutMinutes, retryAfterOf } from '$lib/login-error';
 	import { authStore, isUserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
@@ -70,7 +70,9 @@
 		let credentialsChecked = false;
 
 		try {
-			const authResponse = await authApi.login({
+			// The backend answers with the httpOnly session cookie, which no
+			// script reads; the browser sends it with every request after this.
+			await authApi.login({
 				username: username.trim(),
 				password
 			});
@@ -79,30 +81,25 @@
 			// The role `/users/me` returns has to be in `USER_ROLES`
 			// (stores/auth.ts). If the backend adds roles, that list is the only
 			// place to add them — the role check below validates against it.
-			//
-			// `usersApi.me()` goes through `apiRequest`, which builds the
-			// Authorization header from `tokenStore`, so the new token has to be
-			// stored first for this call to pick it up.
-			tokenStore.set(authResponse.access_token);
 			const userData = await usersApi.me();
 
 			// Validate the role before opening a session. Without this check, a
 			// role the frontend does not know gets in anyway and ends up deciding
 			// navigation and camera permissions (NEH-117).
 			//
-			// The session has to be cleared: the token is already in localStorage
-			// so that `/users/me` could be called, and `authStore` reads its
-			// initial state from there — leaving it in place means a reload shows
-			// a half-open session. `clearSession` also removes any `auth_user`
-			// left over from an earlier session.
+			// The session has to be closed: the backend has already set the
+			// cookie, and leaving it means a half-open session with a role the
+			// app does not handle. `authApi.logout()` asks the backend to clear
+			// the cookie and also removes any `auth_user` left over from an
+			// earlier session.
 			if (!isUserRole(userData.role)) {
-				authStore.clearSession();
+				await authApi.logout();
 				console.error('[Login] Unrecognized role:', userData.role);
 				errorMessage = $m.login_error_unknown_role;
 				return;
 			}
 
-			authStore.setSession(authResponse.access_token, userData);
+			authStore.setSession(userData);
 
 			goto('/dashboard');
 		} catch (error) {

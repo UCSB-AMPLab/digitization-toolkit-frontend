@@ -13,10 +13,9 @@
 
   import type { Snippet } from 'svelte';
   import { goto } from '$app/navigation';
-  import { authStore } from '$lib/stores/auth';
   import { m } from '$lib/i18n';
   import { tour } from '$lib/tour';
-  import type { PowerAction } from '$lib/api';
+  import { authApi, type PowerAction } from '$lib/api';
   import PowerControl from './PowerControl.svelte';
 
   let {
@@ -57,9 +56,11 @@
     power?.ask(action);
   }
 
-  function handleLogout() {
+  // The session cookie is httpOnly, so only the backend can remove it:
+  // authApi.logout() asks it to, then clears the local user (NEH-61).
+  async function handleLogout() {
     open = false;
-    authStore.clearSession();
+    await authApi.logout();
     goto('/');
   }
 

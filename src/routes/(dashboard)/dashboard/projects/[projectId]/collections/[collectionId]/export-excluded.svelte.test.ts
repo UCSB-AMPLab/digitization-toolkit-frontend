@@ -45,7 +45,7 @@ let exportSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
 	locale.set('es');
-	authStore.setSession('tok', admin);
+	authStore.setSession(admin);
 	vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue('');
 	vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
 		pendingRecords: 0,

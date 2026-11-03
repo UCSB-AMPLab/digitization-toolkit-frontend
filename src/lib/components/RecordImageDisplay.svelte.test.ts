@@ -107,7 +107,8 @@ describe.each(modals)('%s — RAW images (NEH-139)', (_name, renderModal) => {
     await expect.element(screen.getByText('No se puede mostrar este formato')).toBeVisible();
     await expect.element(screen.getByText('IMG_0001.cr2')).toBeVisible();
     await expect.element(screen.getByText('El archivo original está guardado en el equipo.')).toBeVisible();
-    expect(fetchSpy).toHaveBeenCalledWith(FILE_URL, expect.anything());
+    // The check sends the session cookie (NEH-61): the URL carries no token.
+    expect(fetchSpy).toHaveBeenCalledWith(FILE_URL, expect.objectContaining({ credentials: 'include' }));
     expect(screen.container.querySelector('img')).toBeNull();
     expect(srcs).not.toContain(FILE_URL);
   });
@@ -278,7 +279,7 @@ describe.each(modals)('%s — images freed from the card (NEH-248)', (_name, ren
     await expect.element(screen.getByText('un administrador puede restaurar el volumen', { exact: false })).toBeVisible();
     await expect.element(screen.getByText('Lo que ves es la miniatura, que Captua conserva en el equipo.')).toBeVisible();
     expect(screen.container.textContent).not.toContain('Miniatura (RAW)');
-    expect(fetchSpy).toHaveBeenCalledWith(BROKEN, expect.anything());
+    expect(fetchSpy).toHaveBeenCalledWith(BROKEN, expect.objectContaining({ credentials: 'include' }));
   });
 
   it('over a thumbnail the panel is collapsed to its title and the toggle shows and hides the rest', async () => {

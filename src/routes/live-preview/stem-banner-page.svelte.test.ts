@@ -46,7 +46,7 @@ function serve(mode: string, projectsShown: boolean) {
 }
 
 function signIn(role: UserRole) {
-	authStore.setSession('tok', { id: 1, username: role, email: null, role, is_active: true });
+	authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
 }
 
 beforeEach(() => locale.set('es'));

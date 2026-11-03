@@ -57,7 +57,7 @@ afterEach(() => {
 });
 
 async function openChooser(role: UserRole) {
-	authStore.setSession('tok', user(role));
+	authStore.setSession(user(role));
 	const slot: VolumeTopbarSlot = { actions: null, reloadRecords: null };
 	render(CollectionPage, { context: volumeTopbarContext(slot) });
 	await expect.element(page.getByText('Folio 2')).toBeInTheDocument();

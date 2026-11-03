@@ -26,7 +26,7 @@ const children = createRawSnippet(() => ({ render: () => '<p>protected content</
 
 function signIn(role: UserRole) {
 	const user = { id: 1, username: role, email: null, role, is_active: true };
-	authStore.setSession('tok', user);
+	authStore.setSession(user);
 	vi.spyOn(globalThis, 'fetch').mockImplementation(
 		async () =>
 			new Response(JSON.stringify(user), {

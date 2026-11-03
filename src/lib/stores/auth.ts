@@ -1,13 +1,13 @@
-// Global authentication state: the access token, the signed-in user and
-// their role. The token itself is persisted through `tokenStore`
-// (stores/token.ts); this store persists only the user.
+// Global authentication state: the signed-in user and their role. The
+// credential is an httpOnly cookie the backend sets at login (NEH-61); this
+// store never sees it. There is a session when there is a user.
 //
 // Version: 0.1.0-beta
 
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-import { tokenStore } from './token';
+import { dropLegacyToken } from './legacy-token';
 
 // Roles in the system. A role the backend adds has to be added here — this
 // is the only place the list lives.
@@ -37,16 +37,34 @@ export interface AuthUser {
 
 interface AuthState {
   user: AuthUser | null;  // null = no session
-  token: string | null;   // JWT access token
 }
 
-// The token and user are restored from localStorage. With a token present,
-// the app assumes a session until the backend says otherwise.
+const AUTH_USER_KEY = 'auth_user';
+
+// The user saved in localStorage is only a hint, so routes can decide without
+// waiting for the backend: (dashboard)/+layout.svelte validates it against
+// /users/me, and only the cookie authenticates.
+//
+// A browser that still holds an earlier build's token in localStorage starts
+// without a session: the token is removed (stores/legacy-token.ts) and so is
+// the user saved with it, so the guards send it to /login once instead of
+// showing a session the backend no longer recognises.
+export function readInitialUser(): AuthUser | null {
+  if (!browser) return null;
+  try {
+    if (dropLegacyToken()) {
+      localStorage.removeItem(AUTH_USER_KEY);
+      return null;
+    }
+    const u = localStorage.getItem(AUTH_USER_KEY);
+    return u ? JSON.parse(u) : null;
+  } catch {
+    return null;
+  }
+}
+
 const initialState: AuthState = {
-  // tokenStore (stores/token.ts) is the single source for the token — the
-  // same one apiRequest() in api.ts reads on every request.
-  token: tokenStore.get(),
-  user: browser ? (() => { try { const u = localStorage.getItem('auth_user'); return u ? JSON.parse(u) : null; } catch { return null; } })() : null,
+  user: readInitialUser(),
 };
 
 function createAuthStore() {
@@ -55,38 +73,32 @@ function createAuthStore() {
   return {
     subscribe,
 
-    setSession(token: string, user: AuthUser) {
-      // The token is persisted through tokenStore (the single source); the
-      // user is persisted only by this store.
-      tokenStore.set(token);
+    // Keeps the user after a login or after /users/me validated the
+    // session. The backend has already set the cookie.
+    setSession(user: AuthUser) {
       if (browser) {
-        localStorage.setItem('auth_user', JSON.stringify(user));
+        try { localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user)); } catch { /* storage unavailable */ }
       }
-      update(state => ({ ...state, token, user }));
+      update(state => ({ ...state, user }));
     },
 
-    // Replaces only the token (e.g. after /auth/refresh); the user does not
-    // change on a refresh.
-    updateToken(token: string) {
-      tokenStore.set(token);
-      update(state => ({ ...state, token }));
-    },
-
+    // Clears this tab's record of the session. Only the backend can remove
+    // the httpOnly cookie: to log out, call authApi.logout() (api.ts), which
+    // asks the backend to clear it and then calls this.
     clearSession() {
-      tokenStore.clear();
       if (browser) {
-        localStorage.removeItem('auth_user');
+        try { localStorage.removeItem(AUTH_USER_KEY); } catch { /* storage unavailable */ }
       }
-      set({ user: null, token: null });
+      set({ user: null });
     },
 
     // For use outside Svelte components.
-    getToken(): string | null {
-      return get({ subscribe }).token;
+    getUser(): AuthUser | null {
+      return get({ subscribe }).user;
     },
 
     isAuthenticated(): boolean {
-      return get({ subscribe }).token !== null;
+      return get({ subscribe }).user !== null;
     },
 
     // Shared guard for routes outside (dashboard) (NEH-66).
@@ -98,7 +110,7 @@ function createAuthStore() {
     // Returns true when the caller can go on mounting the page.
     requireSession(roles?: UserRole[], fallback = '/dashboard'): boolean {
       const state = get({ subscribe });
-      if (!state.token) {
+      if (!state.user) {
         goto('/login');
         return false;
       }

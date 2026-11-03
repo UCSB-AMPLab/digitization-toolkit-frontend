@@ -22,7 +22,7 @@ function unit(projectsShown: boolean) {
 
 beforeEach(() => {
 	locale.set('es');
-	authStore.setSession('tok', { id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
+	authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
 });
 afterEach(() => {
