@@ -4,7 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
 import { en } from './i18n/en';
 import { formatBackupDate } from './catalogue-backup';
-import { unitOffsiteView, unitUploadState, volumeOffsiteView, type UnitImageUploadSummary, type VolumeOffsiteState } from './offsite-state';
+import {
+	fisquaLineOf,
+	unitOffsiteView,
+	unitUploadState,
+	volumeOffsiteView,
+	type UnitImageUploadSummary,
+	type VolumeOffsiteState
+} from './offsite-state';
 
 // Noon local time, so "today" and "yesterday" do not depend on the host's zone.
 const NOW = new Date(2026, 9, 24, 12, 0, 0);
@@ -312,5 +319,39 @@ describe("the unit's mode turns the copy off (NEH-319)", () => {
 		}
 		expect(en.offsite_vol_mode_off).not.toBe(en.offsite_vol_off);
 		expect(en.offsite_unit_mode_off).not.toBe(en.offsite_unit_off);
+	});
+});
+
+describe('a volume Captua keeps on the unit (NEH-320)', () => {
+	const kept = volume({ kept_on_unit: true, verified: 0, pending: 0, received: false, last_verified_at: null });
+
+	it('has a kept line of its own, whatever the unit copies', () => {
+		for (const unitState of ['on', 'off', 'misconfigured', null] as const) {
+			const view = volumeOffsiteView(loaded(kept), unitState, NOW, 'es', es);
+			expect(view).toEqual({ kind: 'kept', headline: es.offsite_vol_kept, lastVerified: null, help: null, freed: null });
+		}
+	});
+
+	it('gives way to the Scanner only line in Scanner only mode', () => {
+		expect(volumeOffsiteView(loaded(kept), 'mode_off', NOW, 'es', es)?.kind).toBe('mode_off');
+	});
+
+	it('does not show for a volume not kept, nor from an older backend', () => {
+		expect(volumeOffsiteView(loaded(volume({ kept_on_unit: false })), 'on', NOW, 'es', es)?.kind).toBe('received');
+		expect(volumeOffsiteView(loaded(volume()), 'on', NOW, 'es', es)?.kind).toBe('received');
+	});
+
+	it('shows no Fisqua line for a kept volume', () => {
+		const fisqua = { environment: 'staging', config_error: null, held: false, hold_file: '', outbox: [], status: null } as never;
+		expect(fisquaLineOf({ ...kept, fisqua })).toBeNull();
+		expect(fisquaLineOf({ ...volume(), fisqua })).toBe(fisqua);
+		expect(fisquaLineOf({ ...volume({ kept_on_unit: false }), fisqua: null })).toBeNull();
+		expect(fisquaLineOf(null)).toBeNull();
+	});
+
+	it('has its words in both catalogues, naming Captua', () => {
+		expect(es.offsite_vol_kept).toContain('Captua');
+		expect(en.offsite_vol_kept).toContain('Captua');
+		expect(en.offsite_vol_kept).not.toBe(en.offsite_vol_mode_off);
 	});
 });

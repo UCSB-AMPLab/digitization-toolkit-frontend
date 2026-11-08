@@ -16,6 +16,12 @@
   // 403 volumes_from_fisqua shows its message, and the unit's mode is read
   // again. The backend's English text goes to the console only.
   //
+  // A new volume's "keep on this unit" box (NEH-320) is the admin's, in every
+  // mode: ticked and fixed in "Solo en el escáner", where Captua keeps every
+  // new volume on the unit. Ticked in Fisqua mode, the volume is not checked
+  // with Fisqua (the backend skips the lookup), so the Fisqua note and label
+  // give way to the plain stem field.
+  //
   // Version: 0.3.3
 
   import { untrack } from 'svelte';
@@ -64,7 +70,12 @@
   // An operator in Fisqua mode: the stem comes from Fisqua.
   let codesReadOnly = $derived(!!editing && volumeCodesReadOnly(role, $unitState));
   // An admin in Fisqua mode: the override, with its note.
-  let fisquaAdmin = $derived(fisquaMode && role === 'admin');
+  // A new volume kept on the unit (NEH-320): the admin's choice, fixed in offline mode.
+  let offlineMode = $derived($unitState?.mode === 'offline');
+  let keptChoice = $state(false);
+  let showKept = $derived(!editing && role === 'admin');
+  let keptOnUnit = $derived(offlineMode || keptChoice);
+  let fisquaAdmin = $derived(fisquaMode && role === 'admin' && !(showKept && keptOnUnit));
 
   // The Fisqua refusal of the last save, and the stem it refused.
   let refusal = $state<FisquaVolumeRefusal | null>(null);
@@ -150,6 +161,7 @@
           created_by: $authStore.user?.username,
           archival_metadata: archivalMetadata,
           filename_stem: stem,
+          ...(showKept && keptOnUnit ? { kept_on_unit: true } : {}),
         });
       }
       await onSaved();
@@ -212,7 +224,7 @@
         bind:value={colStem}
         locked={stemLocked}
         required={stemRequired}
-        label={fisquaMode ? $m.pd_field_stem_fisqua : $m.pd_field_stem}
+        label={fisquaMode && !(showKept && keptOnUnit) ? $m.pd_field_stem_fisqua : $m.pd_field_stem}
         lockedNote={!stemReserved && codesReadOnly ? $m.pd_fisqua_codes_readonly : undefined}
         serverError={stemServerError}
       />
@@ -268,6 +280,21 @@
         {/if}
       </div>
 
+      {#if showKept}
+        <div class="form-field">
+          <label class="kept-toggle">
+            <input
+              type="checkbox"
+              checked={keptOnUnit}
+              disabled={offlineMode}
+              onchange={(e) => (keptChoice = (e.currentTarget as HTMLInputElement).checked)}
+            />
+            <span>{$m.pd_kept_on_unit}</span>
+          </label>
+          <p class="kept-note">{offlineMode ? $m.pd_kept_on_unit_offline : $m.pd_kept_on_unit_help}</p>
+        </div>
+      {/if}
+
       <div class="form-field">
         <label class="field-label">{$m.pd_field_notes}</label>
         <textarea
@@ -313,6 +340,15 @@
 </div>
 
 <style>
+  .kept-toggle {
+    display: flex; align-items: center; gap: 10px;
+    min-height: var(--touch-target-min);
+    font-size: var(--text-sm); color: var(--color-light);
+  }
+  .kept-toggle input { width: 20px; height: 20px; accent-color: var(--color-primary); cursor: pointer; }
+  .kept-toggle input:disabled { cursor: not-allowed; }
+  .kept-note { margin: 0; font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.45; }
+
   /* The form's styles, as the project page defined them. */
   .modal-backdrop {
     position: fixed; inset: 0;
@@ -329,6 +365,8 @@
     padding: 24px;
     width: 100%;
     max-width: 420px;
+    /* Within the backdrop's 24px padding on both sides, so Guardar stays on screen. */
+    max-height: calc(100dvh - 48px);
     box-shadow: var(--shadow-lg);
     display: flex;
     flex-direction: column;

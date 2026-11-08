@@ -4,12 +4,15 @@
 //
 // Version: 0.1.0-beta
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { page } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { collectionsApi, systemApi, type VolumeOffsiteState } from '$lib/api';
+import { locale } from '$lib/i18n';
+import { es } from '$lib/i18n/es';
 import VolumeOffsiteIndicator from './VolumeOffsiteIndicator.svelte';
 
 function state(over: Partial<VolumeOffsiteState> = {}): VolumeOffsiteState {
@@ -67,5 +70,25 @@ describe('VolumeOffsiteIndicator — refresh', () => {
 
 		await expect.poll(() => offsiteSpy.mock.calls.length).toBe(2);
 		await expect.poll(() => onState.mock.lastCall?.[0]?.freed_files).toBe(9);
+	});
+});
+
+describe('VolumeOffsiteIndicator — a volume Captua keeps on the unit (NEH-320)', () => {
+	afterEach(() => vi.restoreAllMocks());
+
+	it('shows the kept line, with no icon and no Fisqua line', async () => {
+		locale.set('es');
+		vi.spyOn(systemApi, 'getCatalogueBackup').mockReturnValue(new Promise(() => {}));
+		const fisqua = { environment: 'staging', config_error: null, held: false, hold_file: '', outbox: [], status: null, decisions: null };
+		vi.spyOn(collectionsApi, 'getOffsiteState').mockResolvedValue(
+			state({ kept_on_unit: true, verified: 0, pending: 0, received: false, fisqua } as never)
+		);
+		const screen = render(VolumeOffsiteIndicator, { collectionId: 7 });
+		await expect.element(page.getByText(es.offsite_vol_kept)).toBeInTheDocument();
+		const line = screen.container.querySelector('.offsite-indicator');
+		expect(line?.getAttribute('data-kind')).toBe('kept');
+		expect(line?.querySelector('.offsite-indicator-icon')).toBeNull();
+		expect(screen.container.textContent).not.toContain(es.fisqua_vol_label);
+		expect(screen.container.querySelectorAll('.offsite-indicator')).toHaveLength(1);
 	});
 });

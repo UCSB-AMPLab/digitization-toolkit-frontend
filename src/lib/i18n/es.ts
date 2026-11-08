@@ -471,6 +471,9 @@ export const es = {
 			? 'Un registro de este volumen está en revisión, así que no se puede mover. Primero retira el volumen con "Retirar de revisión".'
 			: `Hay ${formatCount(n, 'es')} registros de este volumen en revisión, así que no se pueden mover. Primero retira el volumen con "Retirar de revisión".`,
 	pd_err_delete_not_empty: 'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
+	// A records move between a volume Captua keeps on the unit and one it does not (NEH-320).
+	pd_err_move_kept_line:
+		'Captua guarda solo en este equipo uno de los dos volúmenes y el otro no, así que no puede mover los registros de uno al otro. Elige un volumen de destino que Captua guarde igual que este, o incluye primero en el modo actual el que Captua guarda solo en este equipo.',
 	// Refusals of a file change while another process reads the files
 	// (volume-refusals.ts).
 	vol_err_volume_busy:
@@ -1045,6 +1048,30 @@ export const es = {
 	offsite_vol_off: 'Copia externa de imágenes sin configurar',
 	offsite_vol_misconfigured: 'Copia externa de imágenes mal configurada',
 	offsite_vol_mode_off: 'Solo en el escáner: Captua guarda las imágenes de este volumen en el equipo',
+	// A volume Captua keeps on the unit (NEH-320).
+	offsite_vol_kept: 'Captua guarda las imágenes de este volumen solo en el equipo',
+	kept_release_action: 'Incluir en el modo actual',
+	kept_release_title: '¿Incluir este volumen en el modo actual?',
+	kept_release_body:
+		'Captua copiará las imágenes de este volumen fuera del equipo, como las de cualquier otro volumen. En el modo Fisqua, además, comprobará con Fisqua el código de referencia del volumen y después lo enviará a Fisqua.',
+	kept_release_inside:
+		'Si este volumen contiene otros volúmenes que Captua guarda solo en este equipo, Captua también los incluirá en el modo actual.',
+	kept_keep_action: 'Guardar solo en este equipo',
+	kept_keep_title: '¿Guardar este volumen solo en este equipo?',
+	kept_keep_body:
+		'Captua guarda las imágenes de este volumen solo en este equipo y lo envía a Fisqua solo cuando un administrador lo incluya.',
+	kept_keep_inside: 'Si este volumen contiene otros volúmenes, Captua también los guarda solo en este equipo.',
+	kept_err_already_left:
+		'Captua ya copió fuera del equipo archivos de este volumen o de algún volumen que está dentro de él, o envió alguno de estos volúmenes a Fisqua. Por eso ya no puede guardar este volumen solo en este equipo.',
+	kept_err_already_kept: 'Captua ya guarda este volumen solo en este equipo.',
+	kept_err_not_kept: 'Captua ya incluye este volumen en el modo actual.',
+	kept_err_kept_parent:
+		'Este volumen está dentro de otro que Captua guarda solo en este equipo. Incluye primero ese otro volumen en el modo actual y Captua incluirá este con él.',
+	kept_err_other: 'Captua no pudo hacer el cambio. Intenta de nuevo.',
+	pd_kept_on_unit: 'Guardar solo en este equipo',
+	pd_kept_on_unit_offline: 'En el modo "Solo en el escáner", Captua guarda cada volumen nuevo solo en este equipo.',
+	pd_kept_on_unit_help:
+		'Para volúmenes de prueba: Captua guarda sus imágenes solo en este equipo y no comprueba su código de referencia con Fisqua hasta que un administrador lo incluya.',
 	offsite_vol_unknown: 'No se pudo consultar la copia externa de este volumen',
 	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
@@ -1363,6 +1390,7 @@ export const es = {
 		'En este equipo ya hay archivos en una carpeta con el nombre de esta raíz, y Captua nunca mezcla los archivos de dos volúmenes.',
 	queue_reason_filename_stem_held_offsite:
 		'En la copia externa ya hay imágenes con esta raíz, así que Captua no puede asignársela a un volumen nuevo.',
+	queue_reason_mode_changed: 'Alguien cambió el modo del equipo durante la importación, así que Captua no creó este volumen.',
 	queue_reason_unknown: (code: string) => `Captua no creó este volumen (${code}).`,
 	// Why the whole file was refused, by the response's HTTP status.
 	queue_import_err_unreadable: 'Captua no pudo leer el archivo.',
@@ -1596,6 +1624,17 @@ export const es = {
 	unit_problem_mode_changed:
 		'Alguien más cambió la configuración del equipo mientras tanto. Captua volvió a cargarla: revisa el modo e intenta de nuevo.',
 	unit_problem_other: 'Captua no pudo cambiar el modo por un motivo que no reconoce.',
+	// Leaving "Solo en el escáner" with volumes Captua keeps on the unit (NEH-320).
+	unit_problem_kept_volumes_decision:
+		'Captua guarda solo en este equipo los volúmenes creados en el modo "Solo en el escáner". Elige si Captua los incluye o los sigue guardando aquí.',
+	unit_kept_title: 'Volúmenes que Captua guarda solo en este equipo',
+	unit_kept_body: (label: string) =>
+		`Captua guarda solo en este equipo estos volúmenes, creados en el modo "Solo en el escáner". Elige si Captua los incluye en el modo "${label}" o los sigue guardando aquí.`,
+	unit_kept_catalogue:
+		'Si eliges seguir guardándolos aquí, Captua copia sus registros con el catálogo y guarda sus imágenes solo en este equipo.',
+	unit_kept_files: (n: number) => (n === 1 ? '1 archivo' : `${formatCount(n, 'es')} archivos`),
+	unit_kept_include: 'Incluirlos',
+	unit_kept_keep: 'Seguir guardándolos aquí',
 	unit_err_save: 'Captua no pudo guardar el modo del equipo. Intenta de nuevo.',
 	unit_err_load: 'Captua no pudo leer el modo del equipo.',
 	// Volúmenes: every volume in one list while projects are hidden.

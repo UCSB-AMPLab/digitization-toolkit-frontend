@@ -17,6 +17,7 @@
   import UserMenu from '$lib/components/UserMenu.svelte';
   import VolumeOffsiteIndicator from '$lib/components/VolumeOffsiteIndicator.svelte';
   import VolumeOffsiteActions from '$lib/components/VolumeOffsiteActions.svelte';
+  import VolumeKeptActions from '$lib/components/VolumeKeptActions.svelte';
   import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
   import type { VolumeOffsiteState } from '$lib/api';
   import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
@@ -50,6 +51,8 @@
   // Space on the card (NEH-248): free and restore, admin only. The button
   // sits next to the breadcrumb and the offsite copy line, which is what
   // shows what is freed. The backend refuses these routes to other roles.
+  // Beside it, keep the volume on the unit or release it (NEH-320), admin
+  // only too; a release only once the unit mode is known and is not Scanner only (keptActionOf).
   let isAdmin = $derived(currentUser?.role === 'admin');
   // The last state the line read: a poll that fails keeps it, so an open
   // dialog is not closed under the admin; it is matched to the volume shown.
@@ -112,6 +115,9 @@
       {#if isAdmin && offsiteState && offsiteState.collection_id === collectionId}
         {#key collectionId}
           <VolumeOffsiteActions {collectionId} offsite={offsiteState} onChanged={offsiteChanged} />
+          <!-- Keep the volume on the unit, or release it (NEH-320). -->
+          <VolumeKeptActions {collectionId} offsite={offsiteState} {isAdmin} mode={$unitState?.mode ?? null}
+            onChanged={offsiteChanged} />
         {/key}
       {/if}
     </div>

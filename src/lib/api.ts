@@ -583,6 +583,10 @@ export interface Collection {
   // volume off Cola, null while it is shown.
   assignee_username?: string | null;
   queue_hidden_at?: string | null;
+  // Read-only here (NEH-320): whether Captua keeps the volume on the unit,
+  // copying none of its images offsite and sending none of its manifests.
+  // Absent from an older backend.
+  kept_on_unit?: boolean;
 }
 
 export interface CollectionWithChildren extends Collection {
@@ -611,6 +615,9 @@ export interface CreateCollectionData extends VolumeIdentityData {
   parent_collection_id?: number;
   created_by?: string;
   archival_metadata?: { [key: string]: any };
+  // Keep the new volume on the unit (NEH-320); admin only outside offline
+  // mode, where every new volume is kept whatever is sent.
+  kept_on_unit?: boolean;
 }
 
 export interface UpdateCollectionData extends VolumeIdentityData {
@@ -789,6 +796,32 @@ export const collectionsApi = {
   /** Start copying the volume's freed files back to the card; 202 with a job to poll. Admin only. */
   async startRestore(collectionId: number): Promise<OffsiteJobStart> {
     return apiRequest<OffsiteJobStart>(`/collections/${collectionId}/offsite/restore`, { method: 'POST' });
+  },
+
+  /**
+   * Release a volume Captua keeps on the unit (NEH-320), and every kept
+   * volume inside it; admin only. Answers the volume's offsite state. 409
+   * `not_kept_on_unit`; 409 `kept_parent` while the volume that holds it is
+   * kept (that one is released first, and this one with it); 409
+   * `kept_volumes_changed` when the volumes inside it changed during the
+   * request (try again). In Fisqua mode each volume's codes are checked with
+   * Fisqua first, and a refusal of any of them refuses the whole release, as
+   * on create (`unknown_reference_code`, `fisqua_unreachable`, `fisqua_no_lookup`).
+   */
+  async releaseFromUnit(collectionId: number): Promise<VolumeOffsiteState> {
+    return apiRequest<VolumeOffsiteState>(`/collections/${collectionId}/release-from-unit`, { method: 'POST' });
+  },
+
+  /**
+   * Keep a volume on the unit (NEH-320), and every volume inside it; admin
+   * only. Answers the volume's offsite state. 409 `already_kept_on_unit`;
+   * `already_left_unit` once a file of it, or of any volume inside it, was
+   * copied offsite or a manifest sent (nothing is kept then);
+   * `kept_volumes_changed` when the volumes inside it changed during the
+   * request (try again).
+   */
+  async keepOnUnit(collectionId: number): Promise<VolumeOffsiteState> {
+    return apiRequest<VolumeOffsiteState>(`/collections/${collectionId}/keep-on-unit`, { method: 'POST' });
   },
 
   /** The state of a free or restore job, with its result once done. Admin only. */
@@ -2050,6 +2083,9 @@ export interface UnitImageUploadSummary {
   pending:          number;
   refused:          number;
   last_verified_at: string | null;   // ISO 8601 datetime
+  /** The volumes Captua keeps on the unit (NEH-320), left out of every count above, and their files. Absent from an older backend. */
+  kept_volumes?:    number;
+  kept_files?:      number;
   last_run:         unknown;
 }
 
@@ -2087,6 +2123,8 @@ export interface VolumeOffsiteState {
   freed_bytes?:     number;
   /** Delivery to Fisqua (volume_fisqua_state in app/core/fisqua_outbox.py); null when the unit has no Fisqua configured, absent from an older backend. */
   fisqua?:          VolumeFisquaState | null;
+  /** Whether Captua keeps the volume on the unit (NEH-320); `pending` is then 0. Absent from an older backend. */
+  kept_on_unit?:    boolean;
 }
 
 /**
@@ -2256,7 +2294,19 @@ export interface UnitSettings {
   projectsShown: boolean;
   defaultProjectId: number | null;
   prerequisites: { backup: string[]; fisqua: string[] };
+  /** The volumes Captua keeps on the unit (NEH-320); absent from an older backend. */
+  keptVolumes?: KeptVolume[];
 }
+
+/** A volume Captua keeps on the unit: `files` is the count it would copy offsite. */
+export interface KeptVolume {
+  id: number;
+  name: string;
+  files: number;
+}
+
+/** What an admin leaving Scanner only mode decides for the kept volumes (NEH-320). */
+export type KeptVolumesDecision = 'include' | 'keep';
 
 export const systemApi = {
   /** The unit's mode and projects setting, for every role. */
@@ -2267,9 +2317,15 @@ export const systemApi = {
   /**
    * Change the mode, the projects setting, or both (admin). Only the fields
    * given are sent; the backend refuses any other key (422). A refused
-   * switch is a 409 whose detail is {message, problems: [{code, message}]}.
+   * switch is a 409 whose detail is {message, problems: [{code, message}]};
+   * leaving offline mode with kept volumes and no `keptVolumes` is such a 409
+   * with the problem `kept_volumes_decision`.
    */
-  async setUnit(body: { mode?: UnitSettings['mode']; projectsEnabled?: boolean }): Promise<UnitSettings> {
+  async setUnit(body: {
+    mode?: UnitSettings['mode'];
+    projectsEnabled?: boolean;
+    keptVolumes?: KeptVolumesDecision;
+  }): Promise<UnitSettings> {
     return apiRequest<UnitSettings>('/system/unit', { method: 'PUT', body: JSON.stringify(body) });
   },
 

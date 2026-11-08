@@ -447,6 +447,9 @@ export const en: Messages = {
 			? 'One record in this volume is under review, so it cannot be moved. First withdraw the volume from review with "Withdraw from review".'
 			: `${formatCount(n, 'en')} records in this volume are under review, so they cannot be moved. First withdraw the volume from review with "Withdraw from review".`,
 	pd_err_delete_not_empty: 'This volume still has records. Move them to another volume before deleting it.',
+	// A records move between a volume Captua keeps on the unit and one it does not (NEH-320).
+	pd_err_move_kept_line:
+		'Captua keeps one of these two volumes on this unit and not the other, so it cannot move the records from one to the other. Choose a volume that Captua keeps the same way, or include the kept volume in the current mode first.',
 	// Refusals of a file change while another process reads the files
 	// (volume-refusals.ts).
 	vol_err_volume_busy:
@@ -1005,6 +1008,30 @@ export const en: Messages = {
 	offsite_vol_off: 'Offsite copy of images not configured',
 	offsite_vol_misconfigured: 'Offsite copy of images configured incorrectly',
 	offsite_vol_mode_off: "Scanner only: Captua keeps this volume's images on the scanner",
+	// A volume Captua keeps on the unit (NEH-320).
+	offsite_vol_kept: "Captua keeps this volume's images only on the unit",
+	kept_release_action: 'Include in the current mode',
+	kept_release_title: 'Include this volume in the current mode?',
+	kept_release_body:
+		"Captua will copy this volume's images offsite, like any other volume's. In Fisqua mode it will also check the volume's reference code with Fisqua and then send it to Fisqua.",
+	kept_release_inside:
+		'If this volume holds other volumes that Captua keeps on this unit, Captua will include them in the current mode too.',
+	kept_keep_action: 'Keep on this unit',
+	kept_keep_title: 'Keep this volume on this unit?',
+	kept_keep_body:
+		"Captua keeps this volume's images on this unit, and sends it to Fisqua only once an administrator includes it.",
+	kept_keep_inside: 'If this volume holds other volumes, Captua keeps them on this unit too.',
+	kept_err_already_left:
+		"Captua has already copied files of this volume, or of a volume inside it, offsite, or sent one of these volumes to Fisqua. So it can no longer keep this volume on this unit alone.",
+	kept_err_already_kept: 'Captua already keeps this volume on this unit.',
+	kept_err_not_kept: 'Captua already includes this volume in the current mode.',
+	kept_err_kept_parent:
+		'Captua keeps the volume that holds this one on this unit. Include that volume in the current mode first, and Captua will include this one with it.',
+	kept_err_other: "Captua couldn't make the change. Try again.",
+	pd_kept_on_unit: 'Keep on this unit',
+	pd_kept_on_unit_offline: 'In "Scanner only" mode, Captua keeps every new volume on this unit.',
+	pd_kept_on_unit_help:
+		'For test volumes: Captua keeps its images only on this unit and does not check its reference code with Fisqua until an administrator includes it.',
 	offsite_vol_unknown: 'Could not check the offsite copy of this volume',
 	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		if (day === 'today') return `last verified today at ${time}`;
@@ -1316,6 +1343,7 @@ export const en: Messages = {
 		"A folder named as this file name stem already holds files on this unit, and Captua never merges two volumes' files.",
 	queue_reason_filename_stem_held_offsite:
 		'The offsite copy holds images under this file name stem, so Captua cannot give it to a new volume.',
+	queue_reason_mode_changed: "Someone changed the unit's mode during the import, so Captua did not create this volume.",
 	queue_reason_unknown: (code: string) => `Captua did not create this volume (${code}).`,
 	// Why the whole file was refused, by the response's HTTP status.
 	queue_import_err_unreadable: 'Captua could not read the file.',
@@ -1531,6 +1559,17 @@ export const en: Messages = {
 	unit_problem_offsite_held: 'The offsite copy is on hold on this unit, so nothing can be sent to Fisqua until the hold is lifted.',
 	unit_problem_mode_changed: "Someone else changed the unit's settings meanwhile. Captua has read them again: check the mode and try again.",
 	unit_problem_other: "Captua couldn't change the mode, for a reason it doesn't recognise.",
+	// Leaving "Scanner only" with volumes Captua keeps on the unit (NEH-320).
+	unit_problem_kept_volumes_decision:
+		'Captua keeps volumes made in "Scanner only" mode on this unit. Choose whether Captua includes them or keeps them here.',
+	unit_kept_title: 'Volumes Captua keeps on this unit',
+	unit_kept_body: (label: string) =>
+		`Captua keeps these volumes, made in "Scanner only" mode, on this unit. Choose whether Captua includes them in "${label}" mode or keeps them here.`,
+	unit_kept_catalogue:
+		'If you choose to keep them here, Captua copies their records with the catalogue and keeps their images only on this unit.',
+	unit_kept_files: (n: number) => (n === 1 ? '1 file' : `${formatCount(n, 'en')} files`),
+	unit_kept_include: 'Include them',
+	unit_kept_keep: 'Keep them here',
 	unit_err_save: "Captua couldn't save the unit mode. Try again.",
 	unit_err_load: "Captua couldn't read the unit mode.",
 	nav_volumes: 'Volumes',

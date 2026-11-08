@@ -11,7 +11,9 @@ import {
 	canCreateVolumes,
 	canImportList,
 	hiddenProjectRedirect,
+	keptDecisionNeeded,
 	modeLabel,
+	unitChangeBody,
 	stemFormTarget,
 	modeRefusal,
 	readUnitState,
@@ -46,7 +48,8 @@ class ApiError extends Error {
 
 describe('readUnitState', () => {
 	it('reads the GET /system/unit body', () => {
-		expect(readUnitState(body)).toEqual(body);
+		// keptVolumes (NEH-320) is absent from this body, and read as none.
+		expect(readUnitState(body)).toEqual({ ...body, keptVolumes: [] });
 	});
 
 	it('refuses a body of any other shape', () => {
@@ -60,7 +63,12 @@ describe('readUnitState', () => {
 		const rest: { [k: string]: unknown } = { ...body };
 		delete rest.defaultProjectId;
 		delete rest.prerequisites;
-		expect(readUnitState(rest)).toEqual({ ...rest, defaultProjectId: null, prerequisites: { backup: [], fisqua: [] } });
+		expect(readUnitState(rest)).toEqual({
+			...rest,
+			defaultProjectId: null,
+			prerequisites: { backup: [], fisqua: [] },
+			keptVolumes: []
+		});
 	});
 });
 
@@ -180,5 +188,43 @@ describe('volumeBackPath', () => {
 		expect(volumeBackPath(state({ projectsShown: false }), 7)).toBe('/dashboard/volumes');
 		expect(volumeBackPath(state({ mode: 'offline', projectsEnabled: true, projectsShown: true }), 7)).toBe('/dashboard/projects/7');
 		expect(volumeBackPath(null, 7)).toBe('/dashboard/projects/7');
+	});
+});
+
+describe('kept volumes (NEH-320)', () => {
+	const kept = [
+		{ id: 4, name: 'Tomo 4', files: 120 },
+		{ id: 9, name: 'Tomo 9', files: 0 }
+	];
+
+	it('reads keptVolumes, dropping entries of any other shape', () => {
+		const read = readUnitState({ ...body, keptVolumes: [...kept, { id: 'x', name: 'y' }, null, { id: 5, name: 'T' }] });
+		expect(read?.keptVolumes).toEqual([...kept, { id: 5, name: 'T', files: 0 }]);
+	});
+
+	it('needs a decision only when leaving Scanner only mode with kept volumes', () => {
+		const offline = state({ mode: 'offline', keptVolumes: kept });
+		expect(keptDecisionNeeded(offline, 'backup')).toBe(true);
+		expect(keptDecisionNeeded(offline, 'fisqua')).toBe(true);
+		expect(keptDecisionNeeded(offline, 'offline')).toBe(false);
+		expect(keptDecisionNeeded(state({ mode: 'offline', keptVolumes: [] }), 'backup')).toBe(false);
+		expect(keptDecisionNeeded(state({ mode: 'backup', keptVolumes: kept }), 'offline')).toBe(false);
+		expect(keptDecisionNeeded(state({ mode: 'backup', keptVolumes: kept }), 'fisqua')).toBe(false);
+		expect(keptDecisionNeeded(null, 'backup')).toBe(false);
+	});
+
+	it('sends the decision only with a switch that needs it', () => {
+		const offline = state({ mode: 'offline', projectsEnabled: false, keptVolumes: kept });
+		expect(unitChangeBody(offline, 'backup', false, 'include')).toEqual({ mode: 'backup', keptVolumes: 'include' });
+		expect(unitChangeBody(offline, 'fisqua', false, 'keep')).toEqual({ mode: 'fisqua', keptVolumes: 'keep' });
+		expect(unitChangeBody(offline, 'backup', false)).toEqual({ mode: 'backup' });
+		expect(unitChangeBody(offline, 'offline', true, 'include')).toEqual({ projectsEnabled: true });
+		const backup = state({ mode: 'backup', keptVolumes: kept });
+		expect(unitChangeBody(backup, 'offline', false, 'include')).toEqual({ mode: 'offline' });
+	});
+
+	it('translates the kept_volumes_decision problem', () => {
+		expect(unitProblemText('kept_volumes_decision', es)).toBe(es.unit_problem_kept_volumes_decision);
+		expect(unitProblemText('kept_volumes_decision', en)).toBe(en.unit_problem_kept_volumes_decision);
 	});
 });

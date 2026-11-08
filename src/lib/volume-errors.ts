@@ -100,6 +100,21 @@ export function volumeSaveErrorText(error: unknown, msgs: Messages): string {
 	return msgs.pd_err_create_collection;
 }
 
+/**
+ * Whether a records move was refused because Captua keeps one of the two
+ * volumes on the unit and not the other (NEH-320: 409 `kept_on_unit_move`
+ * from POST /collections/{id}/move-records, refuse_kept_move in
+ * app/core/kept_volumes.py). The delete modal's move is the only caller
+ * that can meet it: no screen re-parents a volume, or moves a single record
+ * between volumes, so the re-parent refusal of the same code has no string.
+ */
+export function isKeptMoveRefusal(error: unknown): boolean {
+	if (typeof error !== 'object' || error === null) return false;
+	const e = error as { status?: unknown; detail?: unknown };
+	const code = typeof e.detail === 'object' && e.detail !== null ? (e.detail as { code?: unknown }).code : undefined;
+	return e.status === 409 && code === 'kept_on_unit_move';
+}
+
 // The start of the backend's 409 detail for a volume that still holds
 // records or sub-volumes (delete_collection in app/api/collections.py). The
 // rest of the text carries the counts, so only the start is matched.
@@ -146,6 +161,7 @@ export function moveBlockedCount(error: unknown): number | null {
 
 /** The message for a failed delete (or the move of records before it). */
 export function volumeDeleteErrorText(error: unknown, msgs: Messages): string {
+	if (isKeptMoveRefusal(error)) return msgs.pd_err_move_kept_line;
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
 	const stored = storedOffsiteCount(error);
