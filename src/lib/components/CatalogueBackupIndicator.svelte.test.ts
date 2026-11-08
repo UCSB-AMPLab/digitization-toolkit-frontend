@@ -20,7 +20,7 @@ import Card from '../../routes/(dashboard)/dashboard/config/CatalogueBackupCard.
 const NOW = new Date('2026-10-22T17:00:00Z');
 const HOUR = 60 * 60 * 1000;
 
-type Body = { enabled: boolean; last_verified_at: string | null; object: string | null; detail: string | null };
+type Body = { enabled: boolean; last_verified_at: string | null; object: string | null; detail: string | null; mode_allows?: boolean };
 
 function body(over: Partial<Body> = {}): Body {
 	return { enabled: true, last_verified_at: null, object: null, detail: null, ...over };
@@ -238,5 +238,55 @@ describe('Configuración card', () => {
 		answer(body({ last_verified_at: '2026-10-22T06:30:00Z' }));
 		const screen = render(Card);
 		await expect.element(screen.getByText('Copia verificada hoy a la 01:30.')).toBeVisible();
+	});
+});
+
+// NEH-319: in Scanner only (offline) mode the backend takes no dump, so the age
+// of the last one says nothing; the pill and the card say where the catalogue is.
+describe('Scanner only mode (mode_allows false)', () => {
+	const LOCAL_PILL = 'Catálogo solo en el escáner';
+	const LOCAL_CARD = 'En el modo actual, Captua guarda el catálogo solo en este equipo.';
+	const DESC = 'Una vez al día, Captua copia el catálogo al destino que se configuró al instalar el equipo y verifica que la copia está completa.';
+	const CATALOGUE = 'El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.';
+	const SCOPE = 'Esta copia no incluye los archivos de imagen.';
+
+	it.each([
+		['an old copy', body({ last_verified_at: ago(96 * HOUR), object: 'catalogue-2026-10-18.sql.gz.age', mode_allows: false })],
+		['no copy ever', body({ mode_allows: false })]
+	])('the pill is neutral with %s', async (_name, b) => {
+		answer(b);
+		const screen = render(Indicator, { expanded: true, href: null });
+		await expect.element(screen.getByText(LOCAL_PILL, { exact: true })).toBeVisible();
+		const pill = screen.container.querySelector('[data-level]') as HTMLElement;
+		expect(pill.getAttribute('data-level')).toBe('local');
+		expect(pill.classList.contains('level-local')).toBe(true);
+	});
+
+	it('the card says where the catalogue is, with no retry text, no file and only the catalogue sentence', async () => {
+		answer(body({ last_verified_at: ago(96 * HOUR), object: 'catalogue-2026-10-18.sql.gz.age', mode_allows: false }));
+		const screen = render(Card);
+		await expect.element(screen.getByText(LOCAL_CARD, { exact: true })).toBeVisible();
+		expect(screen.container.querySelector('.state')?.getAttribute('data-level')).toBe('local');
+		const text = screen.container.textContent ?? '';
+		expect(text).not.toMatch(/vuelve a intentar/);
+		expect(text).not.toMatch(/Archivo de la última copia|catalogue-2026-10-18/);
+		expect(screen.container.querySelector('.desc')?.textContent?.trim()).toBe(CATALOGUE);
+		expect(text).not.toContain(DESC);
+		expect(text).not.toContain(SCOPE);
+	});
+
+	it('the card keeps all three sentences of the description when the mode allows the dump', async () => {
+		answer(body({ last_verified_at: ago(HOUR), mode_allows: true }));
+		const screen = render(Card);
+		await expect.element(screen.getByText('Copia verificada hoy a las 11:00.')).toBeVisible();
+		expect(screen.container.querySelector('.desc')?.textContent?.trim()).toBe(`${DESC} ${CATALOGUE} ${SCOPE}`);
+	});
+
+	it('the card shows the new retry wording on a late copy', async () => {
+		answer(body({ last_verified_at: ago(48 * HOUR), mode_allows: true }));
+		const screen = render(Card);
+		await expect
+			.element(screen.getByText('Mientras el equipo está encendido, Captua vuelve a intentar la copia cada cierto tiempo.', { exact: true }))
+			.toBeVisible();
 	});
 });

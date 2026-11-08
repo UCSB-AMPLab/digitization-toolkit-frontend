@@ -968,10 +968,12 @@ export const en: Messages = {
 		day === 'yesterday' ? 'No catalogue copy since yesterday' : `No catalogue copy since ${date}`,
 	backup_ind_never: 'No verified catalogue copy',
 	backup_ind_off: 'Offsite copy not configured',
+	backup_ind_local: 'Catalogue on the scanner only',
 	backup_ind_unknown: 'Could not check the state of the offsite copy',
 	backup_section_title: 'Offsite copy',
 	backup_section_desc:
-		'Once a day, the scanner copies the catalogue to the destination configured when it was installed, and checks that the destination received it complete. The catalogue is the database that links each image to its project, its volume and its place in that volume.',
+		'Once a day, Captua copies the catalogue to the destination configured when the scanner was installed, and verifies that the copy is complete.',
+	backup_section_catalogue: 'The catalogue is the database that links each image to its project, its volume and its place in that volume.',
 	backup_section_scope: 'This copy does not include the image files.',
 	backup_cfg_current: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string) => {
 		if (day === 'today') return `Copy verified today at ${time}.`;
@@ -981,8 +983,9 @@ export const en: Messages = {
 	backup_cfg_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
 		day === 'yesterday' ? 'The last verified copy is from yesterday.' : `The last verified copy is from ${date}.`,
 	backup_cfg_never: 'No copy has been verified yet.',
-	backup_cfg_retry: 'The scanner tries the copy again from time to time while it is on.',
+	backup_cfg_retry: 'While the scanner is on, Captua retries the copy from time to time.',
 	backup_cfg_off: 'The offsite copy is not configured on this scanner.',
+	backup_cfg_local: 'In the current mode, Captua keeps the catalogue only on this scanner.',
 	backup_cfg_unknown: 'Could not check the state of the offsite copy.',
 	backup_cfg_last_file: 'File of the last copy',
 	backup_cfg_locked: 'This is set up when the scanner is installed and cannot be changed here.',

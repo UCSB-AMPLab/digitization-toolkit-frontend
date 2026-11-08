@@ -28,11 +28,12 @@ export const MAX_CLOCK_SKEW_MS = HOUR_MS;
 
 /**
  * current → green, late → amber, overdue → red, off → grey (not configured,
- * not a fault). `unknown` is for a response this module cannot read; the
- * components also use it when the request fails. It never stands in for one
- * of the other four.
+ * not a fault), local → neutral (the unit's mode takes no dump, NEH-319, so
+ * the age of the last one says nothing). `unknown` is for a response this
+ * module cannot read; the components also use it when the request fails. It
+ * never stands in for one of the other five.
  */
-export type BackupLevel = 'current' | 'late' | 'overdue' | 'off' | 'unknown';
+export type BackupLevel = 'current' | 'late' | 'overdue' | 'off' | 'local' | 'unknown';
 
 export interface BackupClassification {
 	level: BackupLevel;
@@ -42,6 +43,9 @@ export interface BackupClassification {
 
 /**
  * Classify the endpoint's answer at `now`.
+ *
+ * `mode_allows: false` is local before anything else is read: in a mode that
+ * takes no dump, a copy that has stopped is not a fault, configured or not.
  *
  * Age is `now − last_verified_at`. Both boundaries are inclusive on the
  * fresher side: exactly 36 h is current, exactly 72 h is late.
@@ -54,6 +58,8 @@ export interface BackupClassification {
  */
 export function classifyBackup(status: CatalogueBackupStatus, now: Date | number): BackupClassification {
 	if (!status || typeof status.enabled !== 'boolean') return { level: 'unknown', verifiedAt: null };
+	// Scanner only (offline) mode takes no dump. A missing field (older backend) counts as allowed.
+	if (status.mode_allows === false) return { level: 'local', verifiedAt: null };
 	if (!status.enabled) return { level: 'off', verifiedAt: null };
 	if (status.last_verified_at === null) return { level: 'overdue', verifiedAt: null };
 	if (typeof status.last_verified_at !== 'string') return { level: 'unknown', verifiedAt: null };

@@ -1008,10 +1008,12 @@ export const es = {
 		day === 'yesterday' ? 'Catálogo sin copia desde ayer' : `Catálogo sin copia desde el ${date}`,
 	backup_ind_never: 'Catálogo sin copia verificada',
 	backup_ind_off: 'Copia externa sin configurar',
+	backup_ind_local: 'Catálogo solo en el escáner',
 	backup_ind_unknown: 'No se pudo consultar el estado de la copia externa',
 	backup_section_title: 'Copia externa',
 	backup_section_desc:
-		'Una vez al día, el equipo copia el catálogo al destino que se configuró al instalarlo, y comprueba que el destino la recibió completa. El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.',
+		'Una vez al día, Captua copia el catálogo al destino que se configuró al instalar el equipo y verifica que la copia está completa.',
+	backup_section_catalogue: 'El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.',
 	backup_section_scope: 'Esta copia no incluye los archivos de imagen.',
 	backup_cfg_current: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string) => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
@@ -1022,8 +1024,9 @@ export const es = {
 	backup_cfg_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
 		day === 'yesterday' ? 'La última copia verificada es de ayer.' : `La última copia verificada es del ${date}.`,
 	backup_cfg_never: 'Todavía no se ha verificado ninguna copia.',
-	backup_cfg_retry: 'El equipo vuelve a intentar la copia cada cierto tiempo mientras está encendido.',
+	backup_cfg_retry: 'Mientras el equipo está encendido, Captua vuelve a intentar la copia cada cierto tiempo.',
 	backup_cfg_off: 'La copia externa no está configurada en este equipo.',
+	backup_cfg_local: 'En el modo actual, Captua guarda el catálogo solo en este equipo.',
 	backup_cfg_unknown: 'No se pudo consultar el estado de la copia externa.',
 	backup_cfg_last_file: 'Archivo de la última copia',
 	backup_cfg_locked: 'Esta configuración se define al instalar el equipo y no se puede cambiar desde aquí.',
