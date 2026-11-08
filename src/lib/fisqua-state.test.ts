@@ -395,4 +395,25 @@ describe('unitFisquaView', () => {
 		expect(view.level).toBe('attention');
 		expect(view.warning).toBe(en.fisqua_cfg_not_found);
 	});
+	it("shows no Fisqua row when the unit's mode does not use the link, configured or not (NEH-319)", () => {
+		expect(unitFisquaView(summary({ mode_allows: false }), en)).toBeNull();
+		const withError = summary({
+			mode_allows: false,
+			config_error: { at: '2026-10-24T09:30:00', status_code: 404, reason: 'not_found', config_fingerprint: 'ab12cd34' }
+		});
+		expect(unitFisquaView(withError, en)).toBeNull();
+		expect(unitFisquaView(summary({ configured: false, environment: null, mode_allows: false }), en)).toBeNull();
+	});
+
+	it('says Fisqua is not configured on an unconfigured unit whose mode would use it', () => {
+		const view = unitFisquaView(summary({ configured: false, environment: null }), en)!;
+		expect(view.lines).toEqual([en.fisqua_unit_off]);
+	});
+
+	it('is on when the mode allows the link, or the backend does not send the field', () => {
+		expect(unitFisquaView(summary({ mode_allows: true }), en)!.level).toBe('on');
+		const older = summary();
+		delete older.mode_allows;
+		expect(unitFisquaView(older, en)!.level).toBe('on');
+	});
 });

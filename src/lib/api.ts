@@ -2037,6 +2037,8 @@ export interface CatalogueBackupStatus {
  */
 export interface UnitImageUploadSummary {
   enabled:          boolean;
+  /** Whether the unit's mode copies images offsite (backup and fisqua; NEH-319). Absent from an older backend: allowed. */
+  mode_allows?:     boolean;
   tenant:           string | null;
   misconfigured:    string | null;
   volumes:          number;
@@ -2147,6 +2149,8 @@ export interface VolumeFisquaState {
 /** `fisqua` of GET /system/catalogue-backup: unit_fisqua_summary in app/core/fisqua_outbox.py. */
 export interface UnitFisquaSummary {
   configured:   boolean;
+  /** Whether the unit's mode calls Fisqua (fisqua mode only; NEH-319). Absent from an older backend: allowed. */
+  mode_allows?: boolean;
   environment:  'production' | 'staging' | string | null;
   config_error: FisquaConfigError | null;
   /** run_fisqua_outbox's result since the backend started; null before the first run. */

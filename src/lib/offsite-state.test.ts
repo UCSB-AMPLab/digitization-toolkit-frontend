@@ -256,4 +256,61 @@ describe('unitUploadState', () => {
 		expect(unitUploadState(unit())).toBe('on');
 		expect(unitUploadState(undefined)).toBeNull();
 	});
+
+	it("is mode_off when the unit's mode sends nothing, before a misconfiguration (NEH-319)", () => {
+		expect(unitUploadState(unit({ mode_allows: false }))).toBe('mode_off');
+		expect(unitUploadState(unit({ mode_allows: false, misconfigured: 'bad prefix' }))).toBe('mode_off');
+		expect(unitUploadState(unit({ mode_allows: false, enabled: false }))).toBe('mode_off');
+	});
+
+	it('follows the configuration when the mode allows the copy, or the backend does not say', () => {
+		expect(unitUploadState(unit({ mode_allows: true }))).toBe('on');
+		expect(unitUploadState(unit({ mode_allows: true, misconfigured: 'bad prefix' }))).toBe('misconfigured');
+		expect(unitUploadState(unit({ mode_allows: true, enabled: false }))).toBe('off');
+		// An older backend sends no mode_allows: the copy counts as allowed.
+		const older = unit();
+		delete older.mode_allows;
+		expect(unitUploadState(older)).toBe('on');
+	});
+});
+
+describe("the unit's mode turns the copy off (NEH-319)", () => {
+	it('says so for a volume with pending files, instead of counting them as uploading', () => {
+		const state = volume({ verified: 0, pending: 412, received: false, last_verified_at: null });
+		expect(volumeOffsiteView(loaded(state), 'mode_off', NOW, 'es', es)).toEqual({
+			kind: 'mode_off',
+			headline: es.offsite_vol_mode_off,
+			lastVerified: null,
+			help: null,
+			freed: null
+		});
+		expect(volumeOffsiteView(loaded(state), 'mode_off', NOW, 'en', en)?.headline).toBe(en.offsite_vol_mode_off);
+	});
+
+	it('gives the unit its own line, level local (not drawn as off), whatever the configuration', () => {
+		expect(unitOffsiteView(unit({ mode_allows: false }), NOW, 'es', es)).toEqual({
+			level: 'local',
+			lines: [es.offsite_unit_mode_off]
+		});
+		expect(unitOffsiteView(unit({ mode_allows: false, misconfigured: 'bad prefix' }), NOW, 'en', en)).toEqual({
+			level: 'local',
+			lines: [en.offsite_unit_mode_off]
+		});
+	});
+
+	it('keeps the counts for a unit whose backend does not send the field', () => {
+		const older = unit();
+		delete older.mode_allows;
+		expect(unitOffsiteView(older, NOW, 'es', es)?.level).toBe('attention');
+	});
+
+	it('has its own wording in both languages', () => {
+		for (const key of ['offsite_vol_mode_off', 'offsite_unit_mode_off'] as const) {
+			expect(en[key]).toBeTruthy();
+			expect(es[key]).toBeTruthy();
+			expect(es[key]).not.toBe(en[key]);
+		}
+		expect(en.offsite_vol_mode_off).not.toBe(en.offsite_vol_off);
+		expect(en.offsite_unit_mode_off).not.toBe(en.offsite_unit_off);
+	});
 });
