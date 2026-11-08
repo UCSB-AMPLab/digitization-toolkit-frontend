@@ -6,6 +6,13 @@
   // which sends only what changed. Leaving Fisqua mode asks first, since
   // handovers not yet sent wait on the unit.
   //
+  // Leaving "Solo en el escáner" while Captua keeps volumes on the unit
+  // (NEH-320, `keptVolumes` of GET /system/unit) asks the admin to include
+  // them all or keep them on the unit, listing each with its files, and
+  // says that the catalogue copy carries every volume's records. The choice
+  // goes in the PUT as `keptVolumes`. A 409 `kept_volumes_decision` (a volume
+  // kept since the state was read) reads the state again and asks again.
+  //
   // A refused switch (409) shows each problem as a translated line and the
   // mode the unit stays in, with Cancelar (back to the stored mode) and
   // Reintentar. `mode_changed` means another admin changed the
@@ -19,13 +26,13 @@
   //
   // Version: 0.3.3
 
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { m } from '$lib/i18n';
   import { systemApi } from '$lib/api';
   import { dismissible, toBody } from '$lib/dialog';
   import {
-    UNIT_MODES, ensureUnit, keepUnitState, modeLabel, modeRefusal, reloadUnit, unitProblemText, unitState,
-    type UnitMode
+    UNIT_MODES, ensureUnit, keepUnitState, keptDecisionNeeded, modeLabel, modeRefusal, reloadUnit,
+    unitChangeBody, unitProblemText, unitState, type KeptVolumesDecision, type UnitMode
   } from '$lib/unit-mode';
 
   let loaded = $state(false);
@@ -33,6 +40,10 @@
   let projectsEnabled = $state(false);
   let saving = $state(false);
   let confirmOpen = $state(false);
+  // The kept volumes' question (NEH-320).
+  let keptOpen = $state(false);
+  // The decision the last PUT carried, so Reintentar sends it again.
+  let lastKept: KeptVolumesDecision | null = null;
   let saveError = $state(false);
   // Another admin changed the settings meanwhile (mode_changed).
   let changedElsewhere = $state(false);
@@ -74,16 +85,17 @@
 
   function onSave() {
     if (!canSave || !$unitState) return;
-    if (modeChanged && $unitState.mode === 'fisqua') confirmOpen = true;
+    if (keptDecisionNeeded($unitState, selected)) keptOpen = true;
+    else if (modeChanged && $unitState.mode === 'fisqua') confirmOpen = true;
     else submit();
   }
 
-  async function submit() {
+  async function submit(kept: KeptVolumesDecision | null = null) {
     if (!$unitState || selected === null) return;
     confirmOpen = false;
-    const body: { mode?: UnitMode; projectsEnabled?: boolean } = {};
-    if (modeChanged) body.mode = selected;
-    if (projectsChanged) body.projectsEnabled = projectsEnabled;
+    keptOpen = false;
+    lastKept = kept;
+    const body = unitChangeBody($unitState, selected, projectsEnabled, kept);
     if (Object.keys(body).length === 0) return;
     const target = selected;
     saving = true;
@@ -95,7 +107,18 @@
     } catch (err) {
       console.error('[UnitMode] Change refused:', err);
       const codes = modeRefusal(err);
-      if (codes?.includes('mode_changed')) {
+      if (codes?.includes('kept_volumes_decision')) {
+        // Captua kept a volume since the state was read: read the list as it is now.
+        const fresh = await reloadUnit();
+        // The read resets the form to the stored mode; the admin's pick stands.
+        await tick();
+        selected = target;
+        const alone = codes.every((c) => c === 'kept_volumes_decision');
+        if (alone && fresh && keptDecisionNeeded(fresh, target)) keptOpen = true;
+        // With other problems the refusal is shown; Reintentar asks the
+        // kept volumes' question first (retry), so it never resends without a choice.
+        else refusal = { target, codes };
+      } else if (codes?.includes('mode_changed')) {
         const fresh = await reloadUnit();
         if (fresh) {
           selected = fresh.mode;
@@ -110,6 +133,15 @@
     } finally {
       saving = false;
     }
+  }
+
+  // Reintentar: the same decision again, or, when the switch needs one and
+  // none was given (a refusal that carried kept_volumes_decision), the question.
+  function retry() {
+    if (lastKept === null && keptDecisionNeeded($unitState, selected)) {
+      refusal = null;
+      keptOpen = true;
+    } else submit(lastKept);
   }
 
   function cancelRefusal() {
@@ -163,7 +195,7 @@
       </div>
       <div class="unit-actions">
         <button type="button" class="unit-btn-ghost" onclick={cancelRefusal} disabled={saving}>{$m.common_cancel}</button>
-        <button type="button" class="unit-btn-save" onclick={submit} disabled={saving}>
+        <button type="button" class="unit-btn-save" onclick={retry} disabled={saving}>
           {saving ? $m.common_saving : $m.unit_try_again}
         </button>
       </div>
@@ -193,6 +225,26 @@
   </div>
 {/if}
 
+{#if keptOpen && selected && $unitState}
+  <div class="modal-backdrop" use:toBody use:dismissible={{ onDismiss: () => (keptOpen = false) }}>
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="kept-volumes-title" aria-describedby="kept-volumes-desc">
+      <h3 class="confirm-title" id="kept-volumes-title">{$m.unit_kept_title}</h3>
+      <p class="confirm-desc" id="kept-volumes-desc">{$m.unit_kept_body(modeLabel(selected, $m))}</p>
+      <ul class="kept-list">
+        {#each $unitState.keptVolumes as volume (volume.id)}
+          <li><span class="kept-name">{volume.name}</span> <span class="kept-files">{$m.unit_kept_files(volume.files)}</span></li>
+        {/each}
+      </ul>
+      <p class="confirm-desc">{$m.unit_kept_catalogue}</p>
+      <div class="modal-actions kept-actions">
+        <button type="button" class="unit-btn-ghost" onclick={() => (keptOpen = false)}>{$m.common_cancel}</button>
+        <button type="button" class="unit-btn-ghost" onclick={() => submit('keep')}>{$m.unit_kept_keep}</button>
+        <button type="button" class="unit-btn-save" onclick={() => submit('include')}>{$m.unit_kept_include}</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 {#if confirmOpen && selected}
   <div class="modal-backdrop" use:toBody use:dismissible={{ onDismiss: () => (confirmOpen = false) }}>
     <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="leave-fisqua-title" aria-describedby="leave-fisqua-desc">
@@ -200,7 +252,7 @@
       <p class="confirm-desc" id="leave-fisqua-desc">{$m.unit_leave_fisqua_body}</p>
       <div class="modal-actions">
         <button type="button" class="unit-btn-ghost" onclick={() => (confirmOpen = false)}>{$m.common_cancel}</button>
-        <button type="button" class="unit-btn-save" onclick={submit}>{$m.unit_leave_fisqua_confirm(modeLabel(selected, $m))}</button>
+        <button type="button" class="unit-btn-save" onclick={() => submit()}>{$m.unit_leave_fisqua_confirm(modeLabel(selected, $m))}</button>
       </div>
     </div>
   </div>
@@ -325,4 +377,12 @@
   .modal-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
   .modal-actions .unit-btn-save { margin-left: 0; flex: 1; }
   .modal-actions .unit-btn-ghost { flex: 1; }
+  .kept-actions { flex-wrap: wrap; }
+  .kept-list {
+    margin: 0; padding: 0 0 0 20px;
+    max-height: 200px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: var(--text-sm); color: var(--color-light); line-height: 1.45;
+  }
+  .kept-files { color: var(--color-light-grey); }
 </style>

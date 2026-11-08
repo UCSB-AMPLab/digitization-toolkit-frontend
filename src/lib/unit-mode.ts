@@ -34,7 +34,18 @@ export interface UnitState {
 	defaultProjectId: number | null;
 	// The codes of what the configuration lacks for each mode; empty when the switch may be tried.
 	prerequisites: { backup: string[]; fisqua: string[] };
+	// The volumes Captua keeps on the unit (NEH-320); empty from an older backend.
+	keptVolumes: KeptVolume[];
 }
+
+export interface KeptVolume {
+	id: number;
+	name: string;
+	// The files Captua would copy offsite.
+	files: number;
+}
+
+export type KeptVolumesDecision = 'include' | 'keep';
 
 function isMode(value: unknown): value is UnitMode {
 	return typeof value === 'string' && (UNIT_MODES as readonly string[]).includes(value);
@@ -42,6 +53,16 @@ function isMode(value: unknown): value is UnitMode {
 
 function codes(value: unknown): string[] {
 	return Array.isArray(value) ? value.filter((c): c is string => typeof c === 'string') : [];
+}
+
+function keptList(value: unknown): KeptVolume[] {
+	if (!Array.isArray(value)) return [];
+	return value.flatMap((v) => {
+		if (!v || typeof v !== 'object') return [];
+		const k = v as { id?: unknown; name?: unknown; files?: unknown };
+		if (typeof k.id !== 'number' || typeof k.name !== 'string') return [];
+		return [{ id: k.id, name: k.name, files: typeof k.files === 'number' ? k.files : 0 }];
+	});
 }
 
 /** The GET /system/unit body, or null for an answer of any other shape. */
@@ -55,8 +76,34 @@ export function readUnitState(data: unknown): UnitState | null {
 		projectsEnabled: d.projectsEnabled,
 		projectsShown: d.projectsShown,
 		defaultProjectId: typeof d.defaultProjectId === 'number' ? d.defaultProjectId : null,
-		prerequisites: { backup: codes(pre.backup), fisqua: codes(pre.fisqua) }
+		prerequisites: { backup: codes(pre.backup), fisqua: codes(pre.fisqua) },
+		keptVolumes: keptList(d.keptVolumes)
 	};
+}
+
+/**
+ * Whether switching to `target` needs the admin's decision for the kept
+ * volumes (NEH-320): leaving Scanner only mode while Captua keeps any.
+ */
+export function keptDecisionNeeded(state: UnitState | null, target: UnitMode | null): boolean {
+	return !!state && state.mode === 'offline' && target !== null && target !== 'offline' && state.keptVolumes.length > 0;
+}
+
+/**
+ * The PUT /system/unit body for the form's change: only what changed, and
+ * the kept volumes' decision only when the switch needs it.
+ */
+export function unitChangeBody(
+	state: UnitState,
+	selected: UnitMode,
+	projectsEnabled: boolean,
+	kept: KeptVolumesDecision | null = null
+): { mode?: UnitMode; projectsEnabled?: boolean; keptVolumes?: KeptVolumesDecision } {
+	const body: { mode?: UnitMode; projectsEnabled?: boolean; keptVolumes?: KeptVolumesDecision } = {};
+	if (selected !== state.mode) body.mode = selected;
+	if (selected === 'offline' && projectsEnabled !== state.projectsEnabled) body.projectsEnabled = projectsEnabled;
+	if (kept && keptDecisionNeeded(state, selected)) body.keptVolumes = kept;
+	return body;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +226,7 @@ export function unitProblemText(code: string, msgs: Messages): string {
 		case 'fisqua_unreachable': return msgs.unit_problem_fisqua_unreachable;
 		case 'offsite_held': return msgs.unit_problem_offsite_held;
 		case 'mode_changed': return msgs.unit_problem_mode_changed;
+		case 'kept_volumes_decision': return msgs.unit_problem_kept_volumes_decision;
 		default: return msgs.unit_problem_other;
 	}
 }

@@ -87,6 +87,13 @@ describe('volumeDeleteErrorText', () => {
 		expect(volumeDeleteErrorText(new ApiError(subs, undefined, 409), es)).toBe(es.pd_err_delete_has_subvolumes);
 	});
 
+	it('says a records move across the kept line is refused, never in English (NEH-320)', () => {
+		const err = new ApiError('x', { code: 'kept_on_unit_move', message: 'English' }, 409);
+		expect(volumeDeleteErrorText(err, es)).toBe(es.pd_err_move_kept_line);
+		const other = new ApiError('x', { code: 'kept_on_unit_move', message: 'English' }, 500);
+		expect(volumeDeleteErrorText(other, es)).toBe(es.pd_err_delete_collection);
+	});
+
 	it('says records under review block a move, with their number', () => {
 		const message =
 			'Cannot move: 2 record(s) have been handed over for review: [4, 5]. Take this collection back first.';

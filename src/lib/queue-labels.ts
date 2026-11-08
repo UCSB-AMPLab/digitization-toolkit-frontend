@@ -41,7 +41,9 @@ const REASON_KEYS: { [reason: string]: keyof Messages } = {
 	refused_by_database: 'queue_reason_refused_by_database',
 	filename_stem_is_project_directory: 'queue_reason_filename_stem_is_project_directory',
 	filename_stem_directory_occupied: 'queue_reason_filename_stem_directory_occupied',
-	filename_stem_held_offsite: 'queue_reason_filename_stem_held_offsite'
+	filename_stem_held_offsite: 'queue_reason_filename_stem_held_offsite',
+	// NEH-320: a switch of mode committed while the list was being imported.
+	mode_changed: 'queue_reason_mode_changed'
 };
 
 /** The plain-language reason an import skipped an item. */

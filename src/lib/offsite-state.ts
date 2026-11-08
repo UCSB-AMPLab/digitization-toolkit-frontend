@@ -13,6 +13,11 @@
 // a received volume with freed files is shown as stored offsite, with what
 // was freed. A freed file is a healthy state, never an attention one.
 //
+// A volume Captua keeps on the unit (NEH-320, `kept_on_unit`) has a line of
+// its own, `kept`, with the neutral treatment of `mode_off`; in Scanner only
+// mode the unit-wide `mode_off` line comes first. Its Fisqua line is not
+// shown (fisquaLineOf).
+//
 // The module imports only types from the API client, so the wording is tested
 // in the server project.
 //
@@ -40,6 +45,7 @@ export type VolumeOffsiteKind =
 	| 'no_stem'
 	| 'off'
 	| 'mode_off'
+	| 'kept'
 	| 'misconfigured'
 	| 'unknown';
 
@@ -112,6 +118,7 @@ export function volumeOffsiteView(
 		freed
 	});
 	if (unit === 'mode_off') return only('mode_off', msgs.offsite_vol_mode_off);
+	if (s.kept_on_unit) return only('kept', msgs.offsite_vol_kept);
 	if (unit === 'misconfigured') return only('misconfigured', msgs.offsite_vol_misconfigured);
 	if (unit === 'off') return only('off', msgs.offsite_vol_off);
 	if (!s.uploadable) return only('no_stem', msgs.offsite_vol_no_stem);
@@ -131,6 +138,12 @@ export function volumeOffsiteView(
 	if (s.received && freed) return { kind: 'freed', headline: msgs.offsite_vol_stored, lastVerified, help: null, freed };
 	if (s.received) return { kind: 'received', headline: msgs.offsite_vol_received(s.verified, s.total), lastVerified, help: null, freed };
 	return { kind: 'uploading', headline: msgs.offsite_vol_uploading(s.verified, s.total, s.pending), lastVerified, help: null, freed };
+}
+
+/** The volume's Fisqua state for VolumeFisquaLine: none for a volume Captua keeps on the unit (NEH-320). */
+export function fisquaLineOf(state: VolumeOffsiteState | null | undefined): VolumeOffsiteState['fisqua'] | null {
+	if (!state || state.kept_on_unit) return null;
+	return state.fisqua ?? null;
 }
 
 /** `local`: Scanner only mode keeps the files on the scanner by design, so it is not drawn as off (NEH-319). */

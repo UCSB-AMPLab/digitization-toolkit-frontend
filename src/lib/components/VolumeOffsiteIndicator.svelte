@@ -15,7 +15,9 @@
 	// of them to ask again at once.
 	//
 	// The same answer carries the volume's delivery to Fisqua (`fisqua`),
-	// shown under the line by VolumeFisquaLine, with no request of its own.
+	// shown under the line by VolumeFisquaLine, with no request of its own;
+	// not for a volume Captua keeps on the unit (NEH-320), whose line,
+	// `kept`, has no icon either.
 	//
 	// Version: 0.1.0-beta
 	import { untrack } from 'svelte';
@@ -25,6 +27,7 @@
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
 	import { POLL_INTERVAL_MS, REQUEST_TIMEOUT_MS, startPolling } from '$lib/catalogue-backup';
 	import {
+		fisquaLineOf,
 		unitUploadState,
 		volumeOffsiteView,
 		type VolumeOffsiteKind,
@@ -94,7 +97,7 @@
 			: ''
 	);
 	let icon = $derived(view ? icons[view.kind] : undefined);
-	let fisqua = $derived(snapshot.kind === 'loaded' ? snapshot.state.fisqua : null);
+	let fisqua = $derived(snapshot.kind === 'loaded' ? fisquaLineOf(snapshot.state) : null);
 </script>
 
 {#if view}

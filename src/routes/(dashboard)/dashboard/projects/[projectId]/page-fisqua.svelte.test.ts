@@ -38,6 +38,9 @@ import { authStore, type UserRole } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { es } from '$lib/i18n/es';
 import { resetUnit } from '$lib/unit-mode';
+// The global stylesheet, as the app loads it (src/routes/+layout.svelte): the
+// form's .dialog-fit, which caps the card at the viewport and scrolls it, is there.
+import '../../../../../app.css';
 import ProjectPage from './+page.svelte';
 // In Fisqua mode projects are hidden, so the volume form is reached from Volúmenes.
 import Volumes from '../../volumes/+page.svelte';
@@ -72,7 +75,10 @@ async function fillNew(stem: string) {
 	await userEvent.click(page.getByRole('button', { name: es.pd_create_btn }));
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+	// The unit's kiosk screen (800x480), where the new-volume form is taller
+	// than the screen and scrolls inside its card.
+	await page.viewport(800, 480);
 	locale.set('es');
 	gotoMock.mockClear();
 	pageUrl.href = 'http://localhost/dashboard/projects/1';
@@ -263,4 +269,53 @@ describe('Fisqua mode, admin', () => {
 			expect(screen.container.textContent).not.toContain('English');
 		});
 	}
+});
+
+describe('keeping a new volume on the unit (NEH-320)', () => {
+	const box = () => page.getByRole('checkbox', { name: es.pd_kept_on_unit });
+
+	it('lets an admin in Fisqua mode keep it, with the plain stem field and no Fisqua note', async () => {
+		signIn('admin');
+		const create = vi.spyOn(collectionsApi, 'create').mockResolvedValue(vol(30, 'Tomo 099'));
+		render(Volumes);
+		await userEvent.click(page.getByRole('button', { name: es.pd_new_collection }));
+		await expect.element(box()).not.toBeChecked();
+		await userEvent.click(box());
+		await expect.element(page.getByText(es.pd_fisqua_admin_note)).not.toBeInTheDocument();
+		await userEvent.fill(page.getByPlaceholder(es.pd_ph_title), 'Tomo 099');
+		await userEvent.fill(page.getByLabelText(es.pd_field_stem), 'xx-test-099');
+		await userEvent.click(page.getByRole('button', { name: es.pd_create_btn }));
+		await vi.waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({
+			filename_stem: 'xx-test-099', kept_on_unit: true
+		})));
+	});
+
+	it('sends no flag when the admin leaves it unticked', async () => {
+		signIn('admin');
+		const create = vi.spyOn(collectionsApi, 'create').mockResolvedValue(vol(30, 'Tomo 099'));
+		render(Volumes);
+		await fillNew('co-ahr-not-t099');
+		await vi.waitFor(() => expect(create).toHaveBeenCalled());
+		expect(create.mock.calls[0][0]).not.toHaveProperty('kept_on_unit');
+	});
+
+	it('is ticked and fixed in "Solo en el escáner"', async () => {
+		signIn('admin');
+		// Projects off, so the form is on Volúmenes.
+		vi.mocked(systemApi.unit).mockResolvedValue({ ...unit('offline'), projectsEnabled: false, projectsShown: false } as never);
+		render(Volumes);
+		await userEvent.click(page.getByRole('button', { name: es.pd_new_collection }));
+		await expect.element(box()).toBeChecked();
+		await expect.element(box()).toBeDisabled();
+		await expect.element(page.getByText(es.pd_kept_on_unit_offline)).toBeInTheDocument();
+	});
+
+	it('is not shown to an operator', async () => {
+		signIn('operator');
+		vi.mocked(systemApi.unit).mockResolvedValue(unit('backup') as never);
+		render(Volumes);
+		await userEvent.click(page.getByRole('button', { name: es.pd_new_collection }));
+		await expect.element(page.getByPlaceholder(es.pd_ph_title)).toBeInTheDocument();
+		expect(box().elements()).toHaveLength(0);
+	});
 });

@@ -33,6 +33,15 @@ function unit(mode: Mode, projectsEnabled = false) {
 	};
 }
 
+const KEPT = [
+	{ id: 4, name: 'Tomo 4', files: 120 },
+	{ id: 9, name: 'Tomo 9', files: 1 }
+];
+
+function withKept(mode: Mode, keptVolumes = KEPT) {
+	return { ...unit(mode), keptVolumes };
+}
+
 function refused(codes: string[]) {
 	return new ApiError(
 		'The unit cannot switch to fisqua mode.',
@@ -191,5 +200,108 @@ describe('Modo del equipo', () => {
 		await expect.element(radio('Solo copia externa')).toBeChecked();
 		const first = screen.container.querySelector('.config-section .section-title');
 		expect(first?.textContent?.trim()).toBe(es.unit_section_title);
+	});
+
+	describe('leaving "Solo en el escáner" with volumes Captua keeps on the unit (NEH-320)', () => {
+		it('lists the kept volumes with their files and says what the catalogue copy carries', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(withKept('offline') as never);
+			const put = vi.spyOn(systemApi, 'setUnit');
+			render(UnitModeCard);
+			await userEvent.click(radio('Solo copia externa'));
+			await userEvent.click(save());
+			const dialog = page.getByRole('dialog');
+			await expect.element(dialog.getByText(es.unit_kept_title)).toBeInTheDocument();
+			await expect.element(dialog.getByText(es.unit_kept_body('Solo copia externa'))).toBeInTheDocument();
+			await expect.element(dialog.getByText('Tomo 4')).toBeInTheDocument();
+			await expect.element(dialog.getByText(es.unit_kept_files(120))).toBeInTheDocument();
+			await expect.element(dialog.getByText(es.unit_kept_files(1))).toBeInTheDocument();
+			await expect.element(dialog.getByText(es.unit_kept_catalogue)).toBeInTheDocument();
+			expect(put).not.toHaveBeenCalled();
+		});
+
+		it.each([
+			['include', () => es.unit_kept_include],
+			['keep', () => es.unit_kept_keep]
+		] as const)('sends keptVolumes: %s with the switch', async (decision, label) => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(withKept('offline') as never);
+			const put = vi.spyOn(systemApi, 'setUnit').mockResolvedValue(withKept('backup', decision === 'keep' ? KEPT : []) as never);
+			render(UnitModeCard);
+			await userEvent.click(radio('Solo copia externa'));
+			await userEvent.click(save());
+			await userEvent.click(page.getByRole('dialog').getByRole('button', { name: label(), exact: true }));
+			await vi.waitFor(() => expect(put).toHaveBeenCalledWith({ mode: 'backup', keptVolumes: decision }));
+			await expect.element(radio('Solo copia externa')).toBeChecked();
+		});
+
+		it('sends nothing on Cancelar', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(withKept('offline') as never);
+			const put = vi.spyOn(systemApi, 'setUnit');
+			render(UnitModeCard);
+			await userEvent.click(radio('Fisqua'));
+			await userEvent.click(save());
+			await userEvent.click(page.getByRole('dialog').getByRole('button', { name: es.common_cancel }));
+			await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+			expect(put).not.toHaveBeenCalled();
+		});
+
+		it('does not ask with no kept volume, nor when switching into "Solo en el escáner"', async () => {
+			const get = vi.spyOn(systemApi, 'unit').mockResolvedValue(withKept('offline', []) as never);
+			const put = vi.spyOn(systemApi, 'setUnit').mockResolvedValue(unit('backup') as never);
+			render(UnitModeCard);
+			await userEvent.click(radio('Solo copia externa'));
+			await userEvent.click(save());
+			await vi.waitFor(() => expect(put).toHaveBeenCalledWith({ mode: 'backup' }));
+			expect(get).toHaveBeenCalledTimes(1);
+		});
+
+		it('on a 409 kept_volumes_decision reads the state again and asks with the new list', async () => {
+			const get = vi.spyOn(systemApi, 'unit').mockResolvedValue(withKept('offline', []) as never);
+			const put = vi
+				.spyOn(systemApi, 'setUnit')
+				.mockRejectedValueOnce(refused(['kept_volumes_decision']))
+				.mockResolvedValue(unit('backup') as never);
+			render(UnitModeCard);
+			await userEvent.click(radio('Solo copia externa'));
+			get.mockResolvedValue(withKept('offline') as never);
+			await userEvent.click(save());
+			await vi.waitFor(() => expect(put).toHaveBeenCalledWith({ mode: 'backup' }));
+			const dialog = page.getByRole('dialog');
+			await expect.element(dialog.getByText('Tomo 9')).toBeInTheDocument();
+			await userEvent.click(dialog.getByRole('button', { name: es.unit_kept_include, exact: true }));
+			await vi.waitFor(() => expect(put).toHaveBeenLastCalledWith({ mode: 'backup', keptVolumes: 'include' }));
+		});
+
+		it('with other problems shows the refusal, and Reintentar asks the kept volumes question before resending', async () => {
+			const get = vi.spyOn(systemApi, 'unit').mockResolvedValue(withKept('offline', []) as never);
+			const put = vi
+				.spyOn(systemApi, 'setUnit')
+				.mockRejectedValueOnce(refused(['offsite_not_configured', 'kept_volumes_decision']))
+				.mockResolvedValue(unit('backup') as never);
+			render(UnitModeCard);
+			await userEvent.click(radio('Solo copia externa'));
+			get.mockResolvedValue(withKept('offline') as never);
+			await userEvent.click(save());
+			await vi.waitFor(() => expect(put).toHaveBeenCalledWith({ mode: 'backup' }));
+			await expect.element(page.getByText(es.unit_problem_offsite_not_configured)).toBeInTheDocument();
+			await expect.element(page.getByText(es.unit_problem_kept_volumes_decision)).toBeInTheDocument();
+			await expect.element(radio('Solo copia externa')).toBeChecked();
+			await userEvent.click(page.getByRole('button', { name: es.unit_try_again }));
+			const dialog = page.getByRole('dialog');
+			await expect.element(dialog.getByText('Tomo 4')).toBeInTheDocument();
+			expect(put).toHaveBeenCalledTimes(1);
+			await userEvent.click(dialog.getByRole('button', { name: es.unit_kept_keep, exact: true }));
+			await vi.waitFor(() => expect(put).toHaveBeenLastCalledWith({ mode: 'backup', keptVolumes: 'keep' }));
+		});
+
+		it('shows the decision problem as a translated line beside others', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(withKept('offline') as never);
+			vi.spyOn(systemApi, 'setUnit').mockRejectedValue(refused(['offsite_not_configured']));
+			const screen = render(UnitModeCard);
+			await userEvent.click(radio('Solo copia externa'));
+			await userEvent.click(save());
+			await userEvent.click(page.getByRole('dialog').getByRole('button', { name: es.unit_kept_keep, exact: true }));
+			await expect.element(page.getByText(es.unit_problem_offsite_not_configured)).toBeInTheDocument();
+			expect(screen.container.textContent).not.toContain('English');
+		});
 	});
 });
