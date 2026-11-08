@@ -69,6 +69,26 @@ describe('classifyBackup', () => {
 		expect(classifyBackup(status(100 * HOUR, false), NOW).level).toBe('off');
 	});
 
+	it('is local when the unit mode takes no dump (NEH-319), whatever the timestamp or configuration', () => {
+		const local = (s: CatalogueBackupStatus) => classifyBackup({ ...s, mode_allows: false }, NOW);
+		expect(local(status(null))).toEqual({ level: 'local', verifiedAt: null });
+		expect(local(status(HOUR))).toEqual({ level: 'local', verifiedAt: null });
+		expect(local(status(100 * HOUR))).toEqual({ level: 'local', verifiedAt: null });
+		expect(local(status(100 * HOUR, false))).toEqual({ level: 'local', verifiedAt: null });
+	});
+
+	it('classifies by age when the mode allows the dump, or the field is absent (older backend)', () => {
+		expect(classifyBackup({ ...status(100 * HOUR), mode_allows: true }, NOW).level).toBe('overdue');
+		expect(classifyBackup({ ...status(HOUR), mode_allows: true }, NOW).level).toBe('current');
+		expect(classifyBackup(status(100 * HOUR), NOW).level).toBe('overdue');
+		expect(classifyBackup({ ...status(HOUR, false), mode_allows: true }, NOW).level).toBe('off');
+	});
+
+	it('is still unknown for an answer it cannot read, even when the mode takes no dump', () => {
+		const s = { ...status(HOUR), enabled: 'yes' as unknown as boolean, mode_allows: false };
+		expect(classifyBackup(s, NOW).level).toBe('unknown');
+	});
+
 	it('treats a timestamp up to 1 h in the future (clock skew) as current', () => {
 		expect(MAX_CLOCK_SKEW_MS).toBe(HOUR);
 		expect(classifyBackup(status(-10 * 60 * SECOND), NOW).level).toBe('current');
@@ -131,6 +151,11 @@ describe('classifySnapshot (the answer held, classified at the current time)', (
 			level: 'unknown',
 			verifiedAt: null
 		});
+	});
+
+	it('is local for a fresh answer from a unit whose mode takes no dump', () => {
+		const snap = { kind: 'loaded' as const, status: { ...status(100 * HOUR), mode_allows: false }, receivedAt: NOW.getTime() };
+		expect(classifySnapshot(snap, NOW.getTime())).toEqual({ level: 'local', verifiedAt: null });
 	});
 
 	it('is unknown for an answer older than two poll intervals even when not configured', () => {

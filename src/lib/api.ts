@@ -2021,6 +2021,8 @@ export interface StorageDevice {
  */
 export interface CatalogueBackupStatus {
   enabled:          boolean;
+  /** Whether the unit's mode takes the catalogue dump (backup and fisqua; NEH-319). Absent from an older backend: allowed. */
+  mode_allows?:     boolean;
   last_verified_at: string | null;   // ISO 8601 datetime
   object:           string | null;
   detail:           string | null;

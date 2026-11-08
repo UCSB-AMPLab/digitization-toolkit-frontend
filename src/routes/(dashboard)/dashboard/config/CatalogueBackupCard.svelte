@@ -35,6 +35,7 @@
 		const { level, verifiedAt } = result;
 		const none = { retry: false, object: null };
 		if (level === 'off') return { level, headline: $m.backup_cfg_off, ...none };
+		if (level === 'local') return { level, headline: $m.backup_cfg_local, ...none };
 		if (level === 'unknown' || snapshot.kind !== 'loaded') return { level: 'unknown', headline: $m.backup_cfg_unknown, ...none };
 		if (!verifiedAt) return { level, headline: $m.backup_cfg_never, ...none, retry: true };
 
@@ -65,7 +66,12 @@
 </script>
 
 <div class="backup-card">
-	<p class="desc">{$m.backup_section_desc} {$m.backup_section_scope}</p>
+	{#if view?.level === 'local'}
+		<!-- Scanner only mode (NEH-319): no daily copy to describe, only what the catalogue is. -->
+		<p class="desc">{$m.backup_section_catalogue}</p>
+	{:else}
+		<p class="desc">{$m.backup_section_desc} {$m.backup_section_catalogue} {$m.backup_section_scope}</p>
+	{/if}
 
 	{#if view === null}
 		<p class="muted">{$m.common_loading_ellipsis}</p>
@@ -81,6 +87,8 @@
 					<circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
 				{:else if view.level === 'off'}
 					<circle cx="12" cy="12" r="9" /><path d="M8 12h8" />
+				{:else if view.level === 'local'}
+					<rect x="4" y="5" width="16" height="11" rx="2" /><path d="M9 20h6M12 16v4" />
 				{:else}
 					<circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" />
 				{/if}
@@ -215,6 +223,13 @@
 		--state-bg: var(--color-surface-alt-2);
 		--state-border: rgba(171, 183, 183, 0.35);
 		--state-icon: var(--color-light-grey);
+	}
+	/* The mode takes no dump (NEH-319): the page's ordinary text and border
+	   colours, without the grey of "not configured". */
+	.level-local {
+		--state-bg: transparent;
+		--state-border: var(--border-color);
+		--state-icon: var(--color-light);
 	}
 	/* Could not check: no fill, so it reads as neither a level nor "not
 	   configured". */
