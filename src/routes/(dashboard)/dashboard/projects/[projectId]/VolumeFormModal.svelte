@@ -22,12 +22,19 @@
   // with Fisqua (the backend skips the lookup), so the Fisqua note and label
   // give way to the plain stem field.
   //
+  // On a new volume in Fisqua mode, while it is not kept on the unit, the
+  // stem field searches Fisqua's descriptions (NEH-321, contract 1.10):
+  // choosing a match fills the stem with its reference code, and the name
+  // with its title when the name is still empty. Saving runs the 1.8 check
+  // as before.
+  //
   // Version: 0.3.3
 
   import { untrack } from 'svelte';
   import { m } from '$lib/i18n';
   import { authStore } from '$lib/stores/auth';
-  import { collectionsApi, type Collection } from '$lib/api';
+  import { collectionsApi, type Collection, type DescriptionMatch } from '$lib/api';
+  import { NAME_MAX_LENGTH, nameFromTitle } from '$lib/description-search';
   import { stemProblem } from '$lib/volume-stem';
   import { fisquaRefusalText, fisquaVolumeRefusal, volumeSaveErrorText, type FisquaVolumeRefusal } from '$lib/volume-errors';
   import { reloadUnit, unitState, volumeCodesReadOnly } from '$lib/unit-mode';
@@ -76,6 +83,13 @@
   let showKept = $derived(!editing && role === 'admin');
   let keptOnUnit = $derived(offlineMode || keptChoice);
   let fisquaAdmin = $derived(fisquaMode && role === 'admin' && !(showKept && keptOnUnit));
+  // The search of Fisqua's descriptions: a new volume only.
+  let searchFisqua = $derived(!editing && fisquaAdmin);
+
+  function chooseMatch(match: DescriptionMatch) {
+    // Never over a name already typed; a long title cut at a word boundary.
+    if (!colName.trim()) colName = nameFromTitle(match.title);
+  }
 
   // The Fisqua refusal of the last save, and the stem it refused.
   let refusal = $state<FisquaVolumeRefusal | null>(null);
@@ -215,6 +229,7 @@
           class="field-input"
           type="text"
           placeholder={$m.pd_ph_title}
+          maxlength={NAME_MAX_LENGTH}
           bind:value={colName}
           autofocus
         />
@@ -227,6 +242,8 @@
         label={fisquaMode && !(showKept && keptOnUnit) ? $m.pd_field_stem_fisqua : $m.pd_field_stem}
         lockedNote={!stemReserved && codesReadOnly ? $m.pd_fisqua_codes_readonly : undefined}
         serverError={stemServerError}
+        search={searchFisqua}
+        onchoose={chooseMatch}
       />
 
       <div class="form-field">

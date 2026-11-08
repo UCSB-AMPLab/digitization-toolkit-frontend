@@ -2308,6 +2308,31 @@ export interface KeptVolume {
 /** What an admin leaving Scanner only mode decides for the kept volumes (NEH-320). */
 export type KeptVolumesDecision = 'include' | 'keep';
 
+/** One of Fisqua's descriptions, in the shape of its 1.8 and 1.10 answers. */
+export interface DescriptionMatch {
+  referenceCode: string;
+  title: string;
+  // The ISAD(G) level (src/lib/description-search.ts, levelLabel).
+  level: string | null;
+  dates: { display: string | null; start: string | null; end: string | null };
+}
+
+/** The search's answer: `search` is false from a Fisqua without contract 1.10. */
+export interface DescriptionSearchAnswer {
+  results: DescriptionMatch[];
+  search?: boolean;
+}
+
+export const fisquaApi = {
+  /**
+   * Fisqua's descriptions matching `q` (NEH-321, contract 1.10), for the
+   * new-volume form. `signal` lets the form abort an older query.
+   */
+  async searchDescriptions(q: string, signal?: AbortSignal): Promise<DescriptionSearchAnswer> {
+    return apiRequest<DescriptionSearchAnswer>(`/fisqua/descriptions?q=${encodeURIComponent(q)}`, { signal });
+  },
+};
+
 export const systemApi = {
   /** The unit's mode and projects setting, for every role. */
   async unit(): Promise<UnitSettings> {
