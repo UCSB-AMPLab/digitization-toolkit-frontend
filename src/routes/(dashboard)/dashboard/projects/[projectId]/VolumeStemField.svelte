@@ -61,16 +61,25 @@
   let open = $state(false);
   let active = $state(-1);
   let listEl = $state<HTMLUListElement | null>(null);
+  let inputEl = $state<HTMLInputElement | null>(null);
   // The code a choice put in the field, which is not searched again.
   let chosen: string | null = null;
   const searcher = createDescriptionSearch(
     (q, signal) => fisquaApi.searchDescriptions(q, signal),
     (next) => {
       view = next;
-      open = next.state === 'results';
+      // A result opens the list only while the admin is still in the field.
+      open = next.state === 'results' && inputEl !== null && document.activeElement === inputEl;
       active = -1;
     }
   );
+
+  // Leaving the field or pressing Esc drops a search still waiting or out,
+  // so its answer cannot open the list afterwards (Codex review of PR #169).
+  function dropPending() {
+    searcher.cancel();
+    if (view.state === 'searching') view = idle;
+  }
 
   $effect(() => {
     const current = value;
@@ -137,6 +146,7 @@
       event.preventDefault();
       choose(view.results[active]);
     } else if (event.key === 'Escape') {
+      dropPending();
       if (!expanded) return;
       event.preventDefault();
       event.stopPropagation();
@@ -170,6 +180,7 @@
     class:field-input--locked={locked}
     type="text"
     placeholder={locked ? undefined : $m.pd_ph_stem}
+    bind:this={inputEl}
     bind:value
     readonly={locked}
     aria-readonly={locked}
@@ -187,7 +198,7 @@
     spellcheck="false"
     oninput={() => (touched = true)}
     onkeydown={onKeydown}
-    onblur={() => { touched = true; open = false; active = -1; }}
+    onblur={() => { touched = true; open = false; active = -1; if (search) dropPending(); }}
   />
   {#if expanded}
     <!-- Pressing the list (its scrollbar too) keeps the focus in the field. -->

@@ -235,6 +235,63 @@ describe('the reference-code field searches Fisqua on a new volume', () => {
 	});
 });
 
+describe('leaving the field or pressing Esc while a search is pending', () => {
+	// A search the admin has left behind must not open the list afterwards.
+	function pending() {
+		let answer!: (v: DescriptionSearchAnswer) => void;
+		searchMock.mockReturnValue(new Promise((r) => (answer = r)));
+		return (v: DescriptionSearchAnswer) => answer(v);
+	}
+
+	it('tabbing out during the 400 ms wait cancels the search', async () => {
+		await openNew();
+		await userEvent.fill(stem(), 'co-ahr-con');
+		await userEvent.tab();
+		await new Promise((r) => setTimeout(r, 700));
+		expect(searchMock).not.toHaveBeenCalled();
+		expect(list().elements()).toHaveLength(0);
+		await expect.element(stem()).toHaveAttribute('aria-expanded', 'false');
+	});
+
+	it('clicking out while the answer is out keeps the list closed when it arrives', async () => {
+		const answer = pending();
+		await openNew();
+		await userEvent.fill(stem(), 'co-ahr-con');
+		await vi.waitFor(() => expect(searchMock).toHaveBeenCalledTimes(1));
+		await userEvent.click(name());
+		answer({ results: MATCHES });
+		await new Promise((r) => setTimeout(r, 100));
+		expect(list().elements()).toHaveLength(0);
+		expect(page.getByText(es.pd_search_searching).elements()).toHaveLength(0);
+		await expect.element(stem()).toHaveAttribute('aria-expanded', 'false');
+	});
+
+	it('Esc during the 400 ms wait cancels the search', async () => {
+		await openNew();
+		await userEvent.fill(stem(), 'co-ahr-con');
+		await userEvent.keyboard('{Escape}');
+		await new Promise((r) => setTimeout(r, 700));
+		expect(searchMock).not.toHaveBeenCalled();
+		expect(list().elements()).toHaveLength(0);
+	});
+
+	it('Esc while the answer is out keeps the list closed when it arrives', async () => {
+		const answer = pending();
+		await openNew();
+		await userEvent.fill(stem(), 'co-ahr-con');
+		await vi.waitFor(() => expect(searchMock).toHaveBeenCalledTimes(1));
+		await userEvent.keyboard('{Escape}');
+		answer({ results: MATCHES });
+		await new Promise((r) => setTimeout(r, 100));
+		expect(list().elements()).toHaveLength(0);
+		expect(page.getByText(es.pd_search_searching).elements()).toHaveLength(0);
+		// The field still has the focus, and typing searches again.
+		searchMock.mockResolvedValue({ results: MATCHES });
+		await userEvent.type(stem(), '-c');
+		await expect.element(list()).toBeInTheDocument();
+	});
+});
+
 describe('the lines under the field', () => {
 	const region = () => document.getElementById('volume-stem-search-status') as HTMLElement;
 
