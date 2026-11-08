@@ -1535,7 +1535,7 @@ export const en: Messages = {
 	unit_section_title: 'Unit mode',
 	unit_section_desc: 'Decides what leaves this unit and where its volumes come from. Changing it moves no volume or record.',
 	unit_mode_legend: 'Mode',
-	unit_mode_offline_desc: 'Nothing leaves the unit: no offsite copy, no Fisqua. Volumes are created here.',
+	unit_mode_offline_desc: 'Captua keeps the images and the catalogue only on this unit. Volumes are created here.',
 	unit_mode_backup_desc: 'Images and the catalogue are copied to the bucket. Volumes are created here.',
 	unit_mode_fisqua_desc:
 		"Volumes come from Fisqua's queue. Handovers, status and review decisions go over the link. Operators can't create volumes; an administrator can, and each change is logged.",

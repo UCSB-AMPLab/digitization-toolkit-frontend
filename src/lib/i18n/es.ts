@@ -1595,7 +1595,7 @@ export const es = {
 	unit_section_desc:
 		'Define qué envía Captua fuera de este equipo y de dónde vienen los volúmenes. Cambiar el modo no mueve ningún volumen ni registro.',
 	unit_mode_legend: 'Modo',
-	unit_mode_offline_desc: 'Captua no envía nada fuera del equipo: ni a una copia externa ni a Fisqua. Los volúmenes se crean en este equipo.',
+	unit_mode_offline_desc: 'Captua guarda las imágenes y el catálogo solo en este equipo. Los volúmenes se crean aquí.',
 	unit_mode_backup_desc: 'Captua guarda una copia externa de las imágenes y del catálogo. Los volúmenes se crean en este equipo.',
 	unit_mode_fisqua_desc:
 		'Los volúmenes vienen de la cola de Fisqua. Por el enlace con Fisqua, Captua envía los volúmenes a revisión, consulta en qué estado están y recibe los resultados de la revisión. Los operarios no pueden crear volúmenes; un administrador sí, y Captua deja constancia de cada cambio.',
