@@ -1001,6 +1001,7 @@ export const en: Messages = {
 	offsite_vol_no_stem: 'Not stored offsite: this volume has no stem',
 	offsite_vol_off: 'Offsite copy of images not configured',
 	offsite_vol_misconfigured: 'Offsite copy of images configured incorrectly',
+	offsite_vol_mode_off: "Scanner only: Captua keeps this volume's images on the scanner",
 	offsite_vol_unknown: 'Could not check the offsite copy of this volume',
 	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		if (day === 'today') return `last verified today at ${time}`;
@@ -1009,6 +1010,7 @@ export const en: Messages = {
 	},
 	offsite_unit_title: 'Image files',
 	offsite_unit_off: 'The offsite copy of the image files is not configured on this scanner.',
+	offsite_unit_mode_off: 'In the current mode, Captua keeps the image files only on this scanner.',
 	offsite_unit_misconfigured:
 		'The offsite copy of the image files is not configured correctly on this scanner. Let whoever administers it know.',
 	offsite_unit_empty: 'There are no image files to copy yet.',

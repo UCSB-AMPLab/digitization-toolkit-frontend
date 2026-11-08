@@ -446,9 +446,16 @@ function pollLine(run: FisquaRunResult | null | undefined, msgs: Messages): stri
 	}
 }
 
-/** The unit's Fisqua row for Configuración, or null when the backend sends no Fisqua summary. */
+/**
+ * The unit's Fisqua row for Configuración, or null when there is none to show:
+ * the backend sends no Fisqua summary, or the unit's mode does not use the
+ * link (Scanner only, Offsite copy only; NEH-319). Fisqua is one of three
+ * modes, so the other two say nothing about it. A backend that sends no
+ * mode_allows predates the modes and counts as using the link.
+ */
 export function unitFisquaView(summary: UnitFisquaSummary | null | undefined, msgs: Messages): UnitFisquaView | null {
 	if (!summary || typeof summary.configured !== 'boolean') return null;
+	if (summary.mode_allows === false) return null;
 	if (!summary.configured) return { level: 'off', lines: [msgs.fisqua_unit_off], warning: null };
 	const env = summary.environment === 'staging' ? msgs.fisqua_unit_env_staging : msgs.fisqua_unit_env_production;
 	const warning = fisquaConfigErrorText(summary.config_error, msgs);

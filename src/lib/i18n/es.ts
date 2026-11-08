@@ -1041,6 +1041,7 @@ export const es = {
 	offsite_vol_no_stem: 'Sin copia externa: este volumen no tiene raíz',
 	offsite_vol_off: 'Copia externa de imágenes sin configurar',
 	offsite_vol_misconfigured: 'Copia externa de imágenes mal configurada',
+	offsite_vol_mode_off: 'Solo en el escáner: Captua guarda las imágenes de este volumen en el equipo',
 	offsite_vol_unknown: 'No se pudo consultar la copia externa de este volumen',
 	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
@@ -1050,6 +1051,7 @@ export const es = {
 	},
 	offsite_unit_title: 'Archivos de imagen',
 	offsite_unit_off: 'La copia externa de los archivos de imagen no está configurada en este equipo.',
+	offsite_unit_mode_off: 'En el modo actual, Captua guarda los archivos de imagen solo en este equipo.',
 	offsite_unit_misconfigured:
 		'La copia externa de los archivos de imagen no está bien configurada en este equipo. Avisa al administrador.',
 	offsite_unit_empty: 'Todavía no hay archivos de imagen para copiar.',

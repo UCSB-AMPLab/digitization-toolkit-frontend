@@ -4,8 +4,9 @@
 	//
 	// Polls GET /collections/{id}/offsite on the schedule of the catalogue
 	// backup poll, and reads the unit's image copy state from that poll's
-	// shared store, so a unit with the image copy off or misconfigured says
-	// so instead of showing every volume as pending. A failed request shows "could not
+	// shared store, so a unit with the image copy off, misconfigured, or off in
+	// the unit's mode (NEH-319) says so instead of showing every volume as
+	// pending. `mode_off`, like `off`, has no icon. A failed request shows "could not
 	// check", never a guessed state (NEH-138).
 	//
 	// A volume whose files were freed from the card says so, with the count and

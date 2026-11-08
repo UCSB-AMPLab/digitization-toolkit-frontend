@@ -39,19 +39,24 @@ export type VolumeOffsiteKind =
 	| 'empty'
 	| 'no_stem'
 	| 'off'
+	| 'mode_off'
 	| 'misconfigured'
 	| 'unknown';
 
 /**
- * The unit's image copy: on, off, or misconfigured. The backend's
- * is_enabled() is false for an invalid tenant prefix too, so a reason in
- * `misconfigured` comes before `enabled`. Null when the backend sends no
- * image summary or it is not known yet.
+ * The unit's image copy: on, off, misconfigured, or off in the unit's mode.
+ * `mode_off` comes first: in a mode that sends nothing (offline), a
+ * misconfiguration is not the operator's problem (NEH-319). A backend that
+ * sends no `mode_allows` predates the modes, and counts as allowing the copy.
+ * The backend's is_enabled() is false for an invalid tenant prefix too, so a
+ * reason in `misconfigured` comes before `enabled`. Null when the backend
+ * sends no image summary or it is not known yet.
  */
-export type UnitUploadState = 'on' | 'off' | 'misconfigured';
+export type UnitUploadState = 'on' | 'off' | 'mode_off' | 'misconfigured';
 
 export function unitUploadState(images: UnitImageUploadSummary | null | undefined): UnitUploadState | null {
 	if (!images || typeof images.enabled !== 'boolean') return null;
+	if (images.mode_allows === false) return 'mode_off';
 	if (images.misconfigured) return 'misconfigured';
 	return images.enabled ? 'on' : 'off';
 }
@@ -81,8 +86,8 @@ function lastVerifiedArgs(iso: string | null, now: Date, locale: string) {
 
 /**
  * The volume's line. `unit` is unitUploadState of the unit's summary, or
- * null when it is not known; off or misconfigured means no file of any
- * volume is being copied, which the counts alone would not say.
+ * null when it is not known; off, mode_off or misconfigured means no file of
+ * any volume is being copied, which the counts alone would not say.
  */
 export function volumeOffsiteView(
 	snapshot: VolumeOffsiteSnapshot,
@@ -106,6 +111,7 @@ export function volumeOffsiteView(
 		help: null,
 		freed
 	});
+	if (unit === 'mode_off') return only('mode_off', msgs.offsite_vol_mode_off);
 	if (unit === 'misconfigured') return only('misconfigured', msgs.offsite_vol_misconfigured);
 	if (unit === 'off') return only('off', msgs.offsite_vol_off);
 	if (!s.uploadable) return only('no_stem', msgs.offsite_vol_no_stem);
@@ -127,7 +133,8 @@ export function volumeOffsiteView(
 	return { kind: 'uploading', headline: msgs.offsite_vol_uploading(s.verified, s.total, s.pending), lastVerified, help: null, freed };
 }
 
-export type UnitOffsiteLevel = 'received' | 'uploading' | 'attention' | 'empty' | 'off';
+/** `local`: Scanner only mode keeps the files on the scanner by design, so it is not drawn as off (NEH-319). */
+export type UnitOffsiteLevel = 'received' | 'uploading' | 'attention' | 'empty' | 'off' | 'local';
 
 export interface UnitOffsiteView {
 	level: UnitOffsiteLevel;
@@ -143,6 +150,7 @@ export function unitOffsiteView(
 ): UnitOffsiteView | null {
 	const state = unitUploadState(images);
 	if (!images || state === null) return null;
+	if (state === 'mode_off') return { level: 'local', lines: [msgs.offsite_unit_mode_off] };
 	if (state === 'misconfigured') return { level: 'attention', lines: [msgs.offsite_unit_misconfigured] };
 	if (state === 'off') return { level: 'off', lines: [msgs.offsite_unit_off] };
 	if (images.total === 0) return { level: 'empty', lines: [msgs.offsite_unit_empty] };
