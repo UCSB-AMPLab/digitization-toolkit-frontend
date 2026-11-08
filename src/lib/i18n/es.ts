@@ -1663,6 +1663,25 @@ export const es = {
 		'Por ahora no se puede guardar el volumen. En su lugar, puedes exportar de Fisqua una lista de digitalización e importarla en Cola.',
 	pd_err_volumes_from_fisqua:
 		'En modo Fisqua, los volúmenes vienen de la cola de Fisqua. Solo un administrador puede crear un volumen o cambiar su raíz o su código de referencia.',
+	// The new-volume form's search of Fisqua's descriptions (NEH-321).
+	pd_search_list_label: 'Descripciones de Fisqua',
+	pd_search_searching: 'Captua está buscando en Fisqua…',
+	pd_search_none: 'Fisqua no tiene ninguna descripción que coincida con lo que escribiste.',
+	pd_search_count: (n: number) => (n === 1 ? '1 descripción' : `${formatCount(n, 'es')} descripciones`),
+	pd_search_unavailable:
+		'Captua no puede buscar en Fisqua en este momento. De todos modos, puedes escribir el código de referencia completo.',
+	pd_stem_search_help:
+		'Escribe al menos 3 caracteres del código de referencia o del título y elige la descripción de Fisqua que corresponda.',
+	// Fisqua's description levels (ISAD(G)), with Fisqua's own Spanish labels.
+	pd_level_fonds: 'Fondo',
+	pd_level_subfonds: 'Subfondo',
+	pd_level_series: 'Serie',
+	pd_level_subseries: 'Subserie',
+	pd_level_file: 'Unidad documental compuesta',
+	pd_level_item: 'Unidad documental simple',
+	pd_level_collection: 'Colección',
+	pd_level_section: 'Sección',
+	pd_level_volume: 'Volumen',
 	// Cola.
 	queue_unit_mode: (label: string) => `Modo del equipo: ${label}`,
 	queue_fisqua_volumes_line:
