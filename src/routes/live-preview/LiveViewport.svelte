@@ -110,6 +110,7 @@
   let showGrid = $state(false);
   let showGuides = $state(true);
   let showGridModal = $state(false);
+  let showCaptureKeyModal = $state(false);
 
   // ---------------------------------------------------------------------------
   // CAPTURE KEY (NEH-228)
@@ -156,16 +157,39 @@
   let pendingModifier = $state<'Control' | 'Alt' | 'Shift' | 'Meta' | null>(null);
   let learnMessage = $state<string | null>(null);
 
-  // Any modal takes the keyboard away from capture. The grid settings modal
-  // is local; the image-inspection modal lives in the page (+page.svelte) and
-  // arrives as a prop; the power confirmation, opened from the top bar's
-  // avatar menu, is reported through a store.
-  let modalOpen = $derived(showGridModal || otherModalOpen || $powerControlOpen);
+  // Any modal takes the keyboard away from capture. The grid settings and
+  // capture key modals are local; the image-inspection modal lives in the
+  // page (+page.svelte) and arrives as a prop; the power confirmation,
+  // opened from the top bar's avatar menu, is reported through a store.
+  let modalOpen = $derived(showGridModal || showCaptureKeyModal || otherModalOpen || $powerControlOpen);
+
+  // The floating controls are one column while it fits under the panel's
+  // top offset; on a shorter viewport (the unit's 800x480 leaves this one
+  // about 268px) they fold into a grid filled column by column. The height is
+  // that of `.mat-board`, the panel's positioned parent, which sits inside
+  // `.viewport-outer`'s padding; it is kept current by Svelte's
+  // `bind:clientHeight` (a ResizeObserver). 0 means not yet measured.
+  let boardW = $state(0);
+  let boardH = $state(0);
+  const PANEL_TOP = 75;      // keep in step with `.floating-controls { top }`
+  const PANEL_FRAME = 14;    // 2 x 6px padding + 2 x 1px border
+  const BTN = 44;            // --touch-target-min
+  const BTN_GAP = 4;
+  let controlsOpen = $state(true);
+  let panelButtons = $derived(!controlsOpen ? 1 : cameraMode === 'double' ? 7 : 6);
+  let panelDividers = $derived(!controlsOpen ? 0 : cameraMode === 'double' ? 3 : 2);
+  let panelOneColumnH = $derived(
+    panelButtons * BTN + panelDividers + (panelButtons + panelDividers - 1) * BTN_GAP + PANEL_FRAME
+  );
+  let panelAvailH = $derived(boardH - PANEL_TOP);
+  let panelOneColumn = $derived(boardH === 0 || panelOneColumnH <= panelAvailH);
+  let panelRows = $derived(
+    Math.max(1, Math.floor((panelAvailH - PANEL_FRAME + BTN_GAP) / (BTN + BTN_GAP)))
+  );
 
   // Collapsible controls panel, open by default; collapsing it gives the feed
   // back the space the panel covers. The collapse button is always visible:
   // the Pi's touchscreen has no hover that could reveal it.
-  let controlsOpen = $state(true);
 
   let isCapturing = $state(false);
   let captureFlash = $state(false);
@@ -211,9 +235,8 @@
   // Measured size of the board (`.mat-board`): the viewport is sized in
   // pixels within it (a definite width: 100% defeats aspect-ratio
   // when height is the limit, so the viewport gets explicit dimensions
-  // instead of relying on CSS to derive them).
-  let boardW = $state(0);
-  let boardH = $state(0);
+  // instead of relying on CSS to derive them). boardW and boardH are
+  // declared above, with the floating controls, which also read boardH.
 
   // Viewport shape: the frame's in single mode; in double mode, the sum of
   // the two panels' widths at a common height.
@@ -637,9 +660,12 @@
 
   function closeGridModal() {
     showGridModal = false;
-    // Closing the grid settings in the middle of an assignment must not
-    // leave the window's next keydown captured by a control that is no
-    // longer visible.
+  }
+
+  function closeCaptureKeyModal() {
+    showCaptureKeyModal = false;
+    // Closing the dialog in the middle of an assignment must not leave the
+    // window's next keydown captured by a control that is no longer visible.
     cancelLearningChord();
   }
 
@@ -862,7 +888,12 @@
 
     </div><!-- /camera-viewport -->
 
-    <div class="floating-controls" class:collapsed={!controlsOpen}>
+    <div
+      class="floating-controls"
+      class:collapsed={!controlsOpen}
+      class:folded={!panelOneColumn}
+      style={panelOneColumn ? undefined : `grid-template-rows: repeat(${panelRows}, ${BTN}px);`}
+    >
       <button
         class="float-btn float-btn-toggle"
         onclick={() => controlsOpen = !controlsOpen}
@@ -879,7 +910,7 @@
         </svg>
       </button>
       {#if controlsOpen}
-        <div class="float-divider"></div>
+        {#if panelOneColumn}<div class="float-divider"></div>{/if}
         <button class="float-btn" onclick={zoomIn} aria-label={$m.lv_zoom_in} title={$m.lv_zoom_in}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -897,15 +928,18 @@
             <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
           </svg>
         </button>
-        <div class="float-divider"></div>
+        {#if panelOneColumn}<div class="float-divider"></div>{/if}
         <button class="float-btn" onclick={() => showGridModal = true} aria-label={$m.lv_grid_settings} title={$m.lv_grid_settings}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
             <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
           </svg>
         </button>
+        <button class="float-btn" onclick={() => showCaptureKeyModal = true} aria-label={$m.lv_capture_key_settings} title={$m.lv_capture_key_settings}>
+          <span class="material-symbols-outlined" style="font-size:22px">keyboard</span>
+        </button>
         {#if cameraMode === 'double'}
-          <div class="float-divider"></div>
+          {#if panelOneColumn}<div class="float-divider"></div>{/if}
           <button
             class="float-btn"
             class:float-btn-active={swapped}
@@ -938,8 +972,7 @@
 </div><!-- /viewport-outer -->
 
 {#if showGridModal}
-  <!-- No Escape while a key is being assigned: a pedal may send Escape. -->
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeGridModal, escape: !learning }}>
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeGridModal }}>
     <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="grid-modal-title">
       <h3 class="modal-title" id="grid-modal-title">{$m.lv_grid_modal_title}</h3>
       <p class="modal-subtitle">{$m.lv_grid_modal_subtitle}</p>
@@ -962,7 +995,20 @@
             <div class="toggle-thumb" class:on={showGuides}></div>
           </button>
         </div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn confirm" onclick={closeGridModal}>{$m.common_close}</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
+{#if showCaptureKeyModal}
+  <!-- No Escape while a key is being assigned: a pedal may send Escape. -->
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeCaptureKeyModal, escape: !learning }}>
+    <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="capture-key-modal-title">
+      <h3 class="modal-title" id="capture-key-modal-title">{$m.lv_capture_key_settings}</h3>
+      <div class="modal-body">
         <!-- NEH-228: the capture key — assigned once and stored in this
              browser. -->
         <div class="modal-toggle-row capture-key-row">
@@ -988,7 +1034,7 @@
         <p class="modal-toggle-sub capture-key-note">{$m.lv_capture_key_note}</p>
       </div>
       <div class="modal-actions">
-        <button class="modal-btn confirm" onclick={closeGridModal}>{$m.common_close}</button>
+        <button class="modal-btn confirm" onclick={closeCaptureKeyModal}>{$m.common_close}</button>
       </div>
     </div>
   </div>
@@ -1288,6 +1334,21 @@
   /* Collapsed: only the toggle button, to give the area back to the feed */
   .floating-controls.collapsed {
     background-color: rgba(26,24,21,0.6);
+  }
+
+  /* Folded: a grid filled column by column, its row count set inline from the
+     height available. `direction: rtl` starts the first column at the right
+     edge, so the collapse toggle stays where it is when the panel opens, and
+     the panel grows leftwards. */
+  .floating-controls.folded {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: var(--touch-target-min);
+    gap: 4px;
+    width: auto;
+    direction: rtl;
+    justify-items: center;
+    align-items: center;
   }
 
   .float-btn-toggle { color: var(--color-light); }
