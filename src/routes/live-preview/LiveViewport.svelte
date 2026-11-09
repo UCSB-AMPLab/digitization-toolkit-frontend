@@ -1064,6 +1064,10 @@
     border-radius: var(--radius-sm);
   }
 
+  /* The banners are centred with margin-inline: auto between left: 0 and
+     right: 0, not with left: 50% and a transform: left: 50% leaves a box only
+     the right half of the feed to size itself in, so on the unit's narrow
+     feed the text wrapped to a word per line (NEH-324). */
   /* Failed-capture banner — the same visual language as the reconnect
      banner, but opaque and without the pulse: it is a state that calls for
      action, not a wait. z-index 60 puts it above everything drawn in the
@@ -1072,8 +1076,10 @@
   .capture-error-banner {
     position: absolute;
     top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    width: fit-content;
     z-index: 60;
     display: flex;
     align-items: center;
@@ -1093,8 +1099,10 @@
   .needs-stem-banner {
     position: absolute;
     top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    width: fit-content;
     z-index: 60;
     display: flex;
     align-items: center;
@@ -1118,12 +1126,15 @@
   .reconnect-banner {
     position: absolute;
     top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    width: fit-content;
     z-index: 30;
     display: flex;
     align-items: center;
     gap: 8px;
+    max-width: 80%;
     padding: 6px 14px;
     background: rgba(220, 80, 60, 0.88);
     color: #fff;
