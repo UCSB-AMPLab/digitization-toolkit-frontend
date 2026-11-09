@@ -7,7 +7,7 @@
 // Version: 0.1.0-beta
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { userEvent } from '@vitest/browser/context';
+import { page, userEvent } from '@vitest/browser/context';
 import { tick } from 'svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
@@ -22,6 +22,7 @@ import '../../app.css';
 import LiveViewport from './LiveViewport.svelte';
 import { ApiError, camerasApi, type CaptureResponse } from '$lib/api';
 import { locale } from '$lib/i18n';
+import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import { cameraStatus } from '$lib/stores/cameras';
 import { clearChord, writeChord } from '$lib/capture-key';
@@ -538,5 +539,128 @@ describe('LiveViewport — a volume without a stem', () => {
       .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
       .toContain(es.lv_err_camera_not_connected(0));
     expect(screen.container.textContent).not.toContain('Camera 0 is not connected');
+  });
+});
+
+// NEH-323: the capture key has its own button and dialog, apart from the
+// grid and guides.
+describe('LiveViewport — capture key button and dialog (NEH-323)', () => {
+  beforeEach(() => {
+    locale.set('en');
+    stubPreviewFetch({});
+  });
+  afterEach(() => {
+    clearChord();
+  });
+
+  const keyButton = () => page.getByRole('button', { name: en.lv_capture_key_settings });
+  const gridButton = () => page.getByRole('button', { name: en.lv_grid_settings });
+  const dialog = () => document.querySelector('[role="dialog"]') as HTMLElement | null;
+  const dialogText = () => dialog()?.textContent ?? '';
+
+  it('has a button labelled for the capture key that opens its dialog', async () => {
+    renderViewport(baseProps());
+    await expect.element(keyButton()).toBeVisible();
+    expect(keyButton().element().getAttribute('title')).toBe(en.lv_capture_key_settings);
+    expect(dialog()).toBeNull();
+    await userEvent.click(keyButton());
+    await expect.poll(() => dialogText()).toContain(en.lv_capture_key_settings);
+    expect(dialog()?.getAttribute('aria-modal')).toBe('true');
+    expect(dialog()?.getAttribute('aria-labelledby')).toBeTruthy();
+  });
+
+  it('sits directly after the grid button', async () => {
+    renderViewport(baseProps());
+    const grid = gridButton().element();
+    expect(grid.nextElementSibling).toBe(keyButton().element());
+  });
+
+  it('the dialog holds the learn and reset buttons and the note', async () => {
+    renderViewport(baseProps());
+    await userEvent.click(keyButton());
+    await expect.element(page.getByRole('button', { name: en.lv_capture_key_learn })).toBeVisible();
+    await expect.element(page.getByRole('button', { name: en.lv_capture_key_reset })).toBeVisible();
+    expect(dialogText()).toContain(en.lv_capture_key_note);
+  });
+
+  it('the grid dialog no longer holds them', async () => {
+    renderViewport(baseProps());
+    await userEvent.click(gridButton());
+    await expect.poll(() => dialogText()).toContain(en.lv_grid_modal_title);
+    expect(dialogText()).not.toContain(en.lv_capture_key_learn);
+    expect(dialogText()).not.toContain(en.lv_capture_key_reset);
+    expect(dialogText()).not.toContain(en.lv_capture_key_note);
+    expect(dialog()?.querySelector('.capture-key-row')).toBeNull();
+  });
+
+  it('Escape closes the dialog when no key is being learned', async () => {
+    renderViewport(baseProps());
+    await userEvent.click(keyButton());
+    await expect.poll(() => dialog()).not.toBeNull();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+    await expect.poll(() => dialog()).toBeNull();
+  });
+
+  it('Escape does not close the dialog while a key is being learned', async () => {
+    renderViewport(baseProps());
+    await userEvent.click(keyButton());
+    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
+    await expect.element(page.getByText(en.lv_capture_key_learning)).toBeVisible();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+    await tick();
+    expect(dialog()).not.toBeNull();
+  });
+
+  it('closing with Close stops learning', async () => {
+    renderViewport(baseProps());
+    await userEvent.click(keyButton());
+    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
+    await userEvent.click(page.getByRole('button', { name: en.common_close }));
+    await expect.poll(() => dialog()).toBeNull();
+    // Learning is over: a key now neither re-binds nor is swallowed by it.
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+  });
+
+  it('closing by the backdrop stops learning', async () => {
+    renderViewport(baseProps());
+    await userEvent.click(keyButton());
+    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
+    (document.querySelector('.modal-backdrop') as HTMLElement).click();
+    await expect.poll(() => dialog()).toBeNull();
+    await userEvent.click(keyButton());
+    await expect.element(page.getByRole('button', { name: en.lv_capture_key_learn })).toBeVisible();
+    expect(dialogText()).not.toContain(en.lv_capture_key_learning);
+  });
+
+  it('with the dialog open the capture key does not trigger a capture', async () => {
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    renderViewport(baseProps());
+    await userEvent.click(keyButton());
+    await expect.poll(() => dialog()).not.toBeNull();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    await tick();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(captureSpy).not.toHaveBeenCalled();
+  });
+
+  it('at 800x480 the button is visible and the dialog fits with its Close button', async () => {
+    await page.viewport(800, 480);
+    const target = document.createElement('div');
+    target.style.cssText = 'width: 800px; height: 480px; display: flex;';
+    document.body.appendChild(target);
+    render(LiveViewport, { target, props: baseProps() });
+    await expect.element(keyButton()).toBeVisible();
+    const b = keyButton().element().getBoundingClientRect();
+    expect(b.bottom).toBeLessThanOrEqual(480);
+    await userEvent.click(keyButton());
+    await expect.poll(() => dialog()).not.toBeNull();
+    const card = dialog()!.getBoundingClientRect();
+    const close = page.getByRole('button', { name: en.common_close }).element().getBoundingClientRect();
+    expect(card.top).toBeGreaterThanOrEqual(0);
+    expect(card.bottom).toBeLessThanOrEqual(480);
+    expect(close.bottom).toBeLessThanOrEqual(480);
+    expect(close.right).toBeLessThanOrEqual(800);
   });
 });
