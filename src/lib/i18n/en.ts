@@ -228,7 +228,7 @@ export const en: Messages = {
 	config_badge_experimental: 'experimental',
 	config_badge_active: 'active',
 	config_storage_device: 'Storage drive',
-	config_storage_device_desc: 'Connect a USB drive or SD card as additional storage',
+	config_storage_device_desc: 'Connect a USB drive or SD card to save images on it',
 	config_external_active_pre: 'Using external storage. New images are saved to ',
 	config_storage_override_invalid: 'The external storage setting was invalid and could not be read; using internal storage.',
 	config_restore_progress: 'Restoring…',
@@ -237,7 +237,7 @@ export const en: Messages = {
 	config_experimental_body:
 		'Compatibility depends on the drive’s format (exFAT, ext4). Drives formatted for Windows (NTFS) or macOS (APFS) may not work correctly. Do not use it as your only backup.',
 	config_new_projects_note:
-		'Only new projects will be saved to the selected drive. Existing projects stay where they are.',
+		'While an external drive is active, Captua saves every new image to it, including new images for volumes you started on internal storage. Activate a drive or restore internal storage only between volumes; if you switch while a volume is in progress, its images are split across two disks.',
 	config_detecting_devices: 'Detecting drives…',
 	config_no_partitions: 'No available partitions detected.',
 	config_not_mounted: 'not mounted',
