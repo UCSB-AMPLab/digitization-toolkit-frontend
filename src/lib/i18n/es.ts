@@ -129,9 +129,16 @@ export const es = {
 	tour_s2_vol_where: 'Ve a Volúmenes › Nuevo volumen.',
 	tour_s2_vol_body: 'Cada libro, caja o legajo es un volumen. Las imágenes se guardan dentro.',
 	// Fisqua mode: volumes come from Fisqua's queue, so the step points at Cola.
+	// Then capture from Cola, and Fisqua's review in place of approve and export.
 	tour_s2_fisqua_title: 'Elegir un volumen',
 	tour_s2_fisqua_where: 'Ve a Cola.',
-	tour_s2_fisqua_body: 'Los volúmenes vienen de la cola de Fisqua. Elige un volumen en Cola y presiona Capturar.',
+	tour_s2_fisqua_body: 'Los volúmenes vienen de la cola de Fisqua. Elige un volumen en Cola.',
+	tour_s3_fisqua_title: 'Capturar',
+	tour_s3_fisqua_body:
+		'En Cola, presiona Capturar al lado del volumen que elegiste. Así vas directo a la pantalla de captura, sin pasar por la página del volumen.',
+	tour_s5_fisqua_title: 'Ver cómo va la revisión',
+	tour_s5_fisqua_body:
+		'La revisión la hace Fisqua. En la barra de arriba de la página del volumen ves en qué estado está, por ejemplo: "Fisqua está revisando la captura del volumen". Si Fisqua pide volver a capturar algunos registros, los encuentras en Por recapturar.',
 	tour_s3_where_vol: 'Ve a Volúmenes › tu volumen › Capturar.',
 	tour_s4_where_vol: 'Ve a Volúmenes › tu volumen › Enviar a revisión.',
 	tour_s5_where_vol: 'Ve a Volúmenes › tu volumen.',

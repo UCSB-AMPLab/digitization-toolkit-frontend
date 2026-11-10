@@ -16,7 +16,8 @@
   //    box goes where the step asks and is clamped to the edges.
   //
   // The steps, and so the counter, follow the unit's mode (NEH-318): without
-  // projects there are five, not six (see $lib/tour.ts).
+  // projects there are five, not six, and in Fisqua mode, for whoever cannot
+  // create volumes there, four (see $lib/tour.ts).
   //
   // Version: 0.1.0-beta
 
@@ -39,6 +40,14 @@
   // could not answer it. While one is open the tour hides and waits; the
   // step resumes when the dialog closes.
   let modalOpen = $state(false);
+
+  // The same for a panel the highlighted control opens in place: the Fisqua
+  // line's details (VolumeFisquaLine) open below the line, at the left of
+  // the volume's top bar, where every side the box could take is the
+  // panel's or the screen's edge. Read from the control's own aria-expanded,
+  // so the tour needs nothing from the component.
+  let targetExpanded = $state(false);
+  let paused = $derived(modalOpen || targetExpanded);
 
   // The catalogue is typed with literal keys; the steps build theirs at
   // runtime (tour_s1_title…), so here it is read as a map.
@@ -74,9 +83,11 @@
     modalOpen = document.querySelector('[aria-modal="true"]') !== null;
     if (!$tour.active || !onRoute || !step?.target) {
       rect = null;
+      targetExpanded = false;
       return;
     }
     const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+    targetExpanded = !!el && (el.matches('[aria-expanded="true"]') || el.querySelector('[aria-expanded="true"]') !== null);
     // A control inside a collapsed or hidden panel has no boxes.
     if (!el || el.getClientRects().length === 0) {
       rect = null;
@@ -120,7 +131,7 @@
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'hidden', 'aria-modal', 'open', 'disabled'],
+      attributeFilter: ['class', 'hidden', 'aria-modal', 'aria-expanded', 'open', 'disabled'],
     });
     // Panels slide open with a CSS transition; measure once it ends.
     document.addEventListener('transitionend', schedule, true);
@@ -148,8 +159,8 @@
   });
 
   function onKey(event: KeyboardEvent) {
-    // Keys belong to the open dialog, not to the tour hidden behind it.
-    if (!$tour.active || modalOpen) return;
+    // Keys belong to the open dialog or panel, not to the tour hidden behind it.
+    if (!$tour.active || paused) return;
     if (event.key === 'Escape') tour.stop();
     if (event.key === 'ArrowRight') tour.next();
     if (event.key === 'ArrowLeft') tour.prev();
@@ -158,7 +169,7 @@
 
 <svelte:window bind:innerWidth={innerW} bind:innerHeight={innerH} onkeydown={onKey} />
 
-{#if $tour.active && step && !modalOpen}
+{#if $tour.active && step && !paused}
   <!-- Highlight. pointer-events:none on purpose: the control underneath has
        to stay pressable while the tour is open. -->
   {#if rect}

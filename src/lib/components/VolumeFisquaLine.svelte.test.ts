@@ -93,6 +93,23 @@ describe('VolumeFisquaLine', () => {
 		expect(screen.container.querySelector('[data-fisqua]')).toBeNull();
 	});
 
+	// The guided tour's follow step (NEH-318) highlights the line; the volume
+	// view renders it once, in its top bar.
+	it('carries the one tour anchor of the line, around the status, and none without Fisqua', async () => {
+		const screen = await shown(
+			offsite(fisqua({ status: { status: 'in_capture_qc', status_at: null, status_checked_at: '2026-10-24T15:00:00', problems: null, manifest_id: MID } }))
+		);
+		const anchors = screen.container.querySelectorAll('[data-tour="fisqua-estado"]');
+		expect(anchors).toHaveLength(1);
+		expect(anchors[0].contains(screen.container.querySelector('[data-fisqua]'))).toBe(true);
+		expect(anchors[0].textContent).toContain(es.fisqua_st_in_capture_qc);
+		screen.unmount();
+		vi.restoreAllMocks();
+		vi.spyOn(systemApi, 'getCatalogueBackup').mockReturnValue(new Promise(() => {}));
+		const none = await shown(offsite(null));
+		expect(none.container.querySelector('[data-tour="fisqua-estado"]')).toBeNull();
+	});
+
 	it("shows Fisqua's status with a chip in the offsite line's style, from the same request", async () => {
 		const screen = await shown(
 			offsite(fisqua({ status: { status: 'published', status_at: null, status_checked_at: '2026-10-24T15:00:00', problems: null, manifest_id: MID } }))

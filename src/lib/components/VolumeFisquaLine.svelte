@@ -13,6 +13,10 @@
 	// opens a panel under it, with a height cap and its own scroll. The panel
 	// follows UserMenu: it closes on Escape and on a touch or click outside.
 	//
+	// The root carries the guided tour's anchor for the step on following
+	// Fisqua's review (NEH-318, $lib/tour.ts). The volume view renders the
+	// line once, in its top bar.
+	//
 	// Version: 0.1.0-beta
 	import { m, locale } from '$lib/i18n';
 	import type { VolumeFisquaState } from '$lib/api';
@@ -80,7 +84,7 @@
 {/snippet}
 
 {#if view}
-	<div class="fisqua-line" bind:this={root}>
+	<div class="fisqua-line" data-tour="fisqua-estado" bind:this={root}>
 		{#if hasDetails}
 			<button
 				type="button"
