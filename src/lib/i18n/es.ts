@@ -124,6 +124,18 @@ export const es = {
 	tour_s6_where: 'Ve a Proyectos › tu proyecto › tu volumen y presiona el ícono de la caja de archivo, el último de la barra derecha.',
 	tour_s6_body:
 		'Con todo aprobado, el volumen se empaqueta y queda disponible para descargarlo.',
+	// Without projects (NEH-318): no project step, and every route from Volúmenes.
+	tour_s2_vol_title: 'Crear un volumen',
+	tour_s2_vol_where: 'Ve a Volúmenes › Nuevo volumen.',
+	tour_s2_vol_body: 'Cada libro, caja o legajo es un volumen. Las imágenes se guardan dentro.',
+	// Fisqua mode: volumes come from Fisqua's queue, so the step points at Cola.
+	tour_s2_fisqua_title: 'Elegir un volumen',
+	tour_s2_fisqua_where: 'Ve a Cola.',
+	tour_s2_fisqua_body: 'Los volúmenes vienen de la cola de Fisqua. Elige un volumen en Cola y presiona Capturar.',
+	tour_s3_where_vol: 'Ve a Volúmenes › tu volumen › Capturar.',
+	tour_s4_where_vol: 'Ve a Volúmenes › tu volumen › Enviar a revisión.',
+	tour_s5_where_vol: 'Ve a Volúmenes › tu volumen.',
+	tour_s6_where_vol: 'Ve a Volúmenes › tu volumen y presiona el ícono de la caja de archivo, el último de la barra derecha.',
 
 	nav_logout: 'Salir',
 

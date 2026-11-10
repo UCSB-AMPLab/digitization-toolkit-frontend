@@ -15,12 +15,15 @@
   // 2. The box never leaves the screen. At 800x480 there is no spare room: the
   //    box goes where the step asks and is clamped to the edges.
   //
+  // The steps, and so the counter, follow the unit's mode (NEH-318): without
+  // projects there are five, not six (see $lib/tour.ts).
+  //
   // Version: 0.1.0-beta
 
   import { onDestroy, tick } from 'svelte';
   import { page } from '$app/stores';
   import { m } from '$lib/i18n';
-  import { tour, TOUR_STEPS } from '$lib/tour';
+  import { tour, currentTourSteps, tourKeys } from '$lib/tour';
   import { placeTourBox, type TourRect } from '$lib/tour-position';
 
   const BOX_W = 264;
@@ -41,7 +44,14 @@
   // runtime (tour_s1_title…), so here it is read as a map.
   let textos = $derived($m as unknown as Record<string, string>);
 
-  let step  = $derived(TOUR_STEPS[$tour.index]);
+  let steps = $derived($currentTourSteps);
+  // The tour store moves its index to the same lesson when the steps change
+  // with the tour open (see $lib/tour.ts); the clamp only guards the render
+  // between the two updates.
+  let lastIndex = $derived(steps.length - 1);
+  let index = $derived(Math.min($tour.index, lastIndex));
+  let step  = $derived(steps[index]);
+  let keys  = $derived(step ? tourKeys(step) : { title: '', body: '', where: '' });
   let onRoute = $derived(step ? step.match.test($page.url.pathname) : false);
 
   let innerW = $state(0);
@@ -93,7 +103,7 @@
 
   // Measure again when the step, the route or the window size changes.
   $effect(() => {
-    void [$tour.active, $tour.index, $page.url.pathname, innerW, innerH];
+    void [$tour.active, step, $page.url.pathname, innerW, innerH];
     scrolledTo = null;
     tick().then(measure);
   });
@@ -168,28 +178,28 @@
     aria-modal="false"
     aria-label={$m.tour_aria}
   >
-    <h3>{textos[`${step.id}_title`]}</h3>
-    <p>{textos[`${step.id}_body`]}</p>
+    <h3>{textos[keys.title]}</h3>
+    <p>{textos[keys.body]}</p>
 
     {#if !onRoute}
       <!-- Away from the step's screen, the box gives the exact path, with the
            labels as they appear in the menu and on the buttons. -->
-      <p class="tour-hint">{textos[`${step.id}_where`]}</p>
+      <p class="tour-hint">{textos[keys.where]}</p>
     {/if}
 
     <div class="tour-foot">
-      <span class="tour-count">{$tour.index + 1} / {TOUR_STEPS.length}</span>
+      <span class="tour-count">{index + 1} / {steps.length}</span>
       <div class="tour-nav">
         <button
           onclick={() => tour.prev()}
-          disabled={$tour.index === 0}
+          disabled={index === 0}
           aria-label={$m.tour_prev}
         >‹</button>
         <button
           class="go"
           onclick={() => tour.next()}
-          aria-label={$tour.index === TOUR_STEPS.length - 1 ? $m.tour_finish : $m.tour_next}
-        >{$tour.index === TOUR_STEPS.length - 1 ? '✓' : '›'}</button>
+          aria-label={index === lastIndex ? $m.tour_finish : $m.tour_next}
+        >{index === lastIndex ? '✓' : '›'}</button>
       </div>
     </div>
 
