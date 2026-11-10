@@ -919,9 +919,9 @@
                 title={$m.cam_wb_calibrate_aria}
               >
                 {#if isWbCalibrating}
-                  <span class="material-symbols-outlined icon-sm">sync</span>
+                  <span class="material-symbols-outlined icon-sm" aria-hidden="true">sync</span>
                 {:else}
-                  <span class="material-symbols-outlined icon-sm">wb_auto</span>
+                  <span class="material-symbols-outlined icon-sm" aria-hidden="true">wb_auto</span>
                 {/if}
               </button>
               <!-- colorize: click-to-neutralize (experimental) -->
@@ -934,7 +934,7 @@
                 title={isWbPickerActive ? $m.cam_wb_cancel_aria : $m.cam_wb_sample_aria}
                 aria-pressed={isWbPickerActive}
               >
-                <span class="material-symbols-outlined icon-sm">colorize</span>
+                <span class="material-symbols-outlined icon-sm" aria-hidden="true">colorize</span>
                 <span class="wb-exp-badge">exp</span>
               </button>
             </div>

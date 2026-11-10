@@ -289,7 +289,7 @@
       </span>
       {#if record.closed_reason}<MissingPill {record} />{/if}
       <button class="img-viewer-close-btn" onclick={handleClose} disabled={locked} aria-label={$m.common_close}>
-        <span class="material-symbols-outlined icon-md">close</span>
+        <span class="material-symbols-outlined icon-md" aria-hidden="true">close</span>
       </button>
     </div>
 
@@ -384,7 +384,7 @@
                 title={$m.col_fit_screen}
                 aria-label={$m.col_fit_screen_aria}
               >
-                <span class="material-symbols-outlined icon-sm">fit_screen</span>
+                <span class="material-symbols-outlined icon-sm" aria-hidden="true">fit_screen</span>
               </button>
               <button
                 class="lv-zoom-btn"
@@ -428,7 +428,7 @@
         </span>
       {:else if isPlaceholder}
         <button class="btn btn-secondary" onclick={handleClose} disabled={busy}>
-          <span class="material-symbols-outlined icon-sm">close</span>
+          <span class="material-symbols-outlined icon-sm" aria-hidden="true">close</span>
           {$m.common_close}
         </button>
         {#if offerCapture}
@@ -439,7 +439,7 @@
         {/if}
       {:else if !confirmRetake || isExcluded}
         <button class="btn btn-secondary" onclick={handleClose}>
-          <span class="material-symbols-outlined icon-sm">close</span>
+          <span class="material-symbols-outlined icon-sm" aria-hidden="true">close</span>
           {$m.common_close}
         </button>
         {#if images.length > 0}
@@ -450,7 +450,7 @@
         {/if}
         {#if !isExcluded}
           <button class="btn btn-danger" onclick={() => confirmRetake = true}>
-            <span class="material-symbols-outlined icon-sm">refresh</span>
+            <span class="material-symbols-outlined icon-sm" aria-hidden="true">refresh</span>
             {$m.lvm_retake}
           </button>
         {/if}
@@ -463,7 +463,7 @@
             {$m.common_cancel}
           </button>
           <button class="btn btn-danger" onclick={confirmAndRetake}>
-            <span class="material-symbols-outlined icon-sm">check</span>
+            <span class="material-symbols-outlined icon-sm" aria-hidden="true">check</span>
             {$m.common_confirm}
           </button>
         </div>
