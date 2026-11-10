@@ -387,19 +387,44 @@
     return Math.round(parseFloat(s) * 1_000_000);
   }
 
-  // Debounce timer for live-slider settings
+  // Live settings from the sliders and the shutter and ISO pickers are
+  // coalesced. `pendingControls` holds every key requested since the last
+  // send (a later value for a key replaces an earlier one) and
+  // `pendingCamera` the camera those keys were requested for. One timer
+  // sends the merged request, so settings of different kinds changed within
+  // the debounce window all reach the camera.
   let settingsDebounce: ReturnType<typeof setTimeout> | null = null;
+  let pendingControls: CameraControlsRequest | null = null;
+  let pendingCamera = 0;
 
-  /** Send camera controls to the backend (debounced by default 200ms) */
+  /** Send the pending request now, to the camera it was made for. */
+  function flushSettings() {
+    if (settingsDebounce) {
+      clearTimeout(settingsDebounce);
+      settingsDebounce = null;
+    }
+    if (!pendingControls) return;
+    const controls = pendingControls;
+    const index = pendingCamera;
+    pendingControls = null;
+    camerasApi.setCameraControls(index, controls).catch(() => {
+      // Fail silently; the camera may be unavailable.
+    });
+  }
+
+  /** Queue camera controls for the backend. A 0 ms delay sends at once. */
   function applySettings(controls: CameraControlsRequest, debounceMs = 200) {
+    // A request for another camera is never merged into this one.
+    if (pendingControls && pendingCamera !== selectedCameraIndex) flushSettings();
+    pendingCamera = selectedCameraIndex;
+    pendingControls = { ...pendingControls, ...controls };
     if (settingsDebounce) clearTimeout(settingsDebounce);
-    settingsDebounce = setTimeout(async () => {
-      try {
-        await camerasApi.setCameraControls(selectedCameraIndex, controls);
-      } catch {
-        // Fail silently; the camera may be unavailable.
-      }
-    }, debounceMs);
+    settingsDebounce = null;
+    if (debounceMs <= 0) {
+      flushSettings();
+    } else {
+      settingsDebounce = setTimeout(flushSettings, debounceMs);
+    }
   }
 
   /** Base AWB gains from calibration (fallback to neutral [2.0, 1.5]) */
@@ -473,6 +498,8 @@
     return () => {
       unmounted = true;
       if (deviceRetryTimer) clearTimeout(deviceRetryTimer);
+      // Settings still waiting for the debounce are sent, not dropped.
+      flushSettings();
     };
   });
 
