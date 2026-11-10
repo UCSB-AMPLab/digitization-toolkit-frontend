@@ -20,11 +20,17 @@
 // come from Fisqua's queue, so for whoever cannot create one there (the
 // rule that shows or hides Nuevo volumen, canCreateVolumes) the volume step
 // points at Cola in the side menu instead; an administrator, who still can,
-// gets the Volúmenes steps. The steps are derived from the unit state the
-// dashboard layout reads (unitState) and the signed-in user's role: while
-// the state is unknown the tour is the one with projects, as every other
-// gate takes an unknown state, and it changes to the unit's own as soon as
-// the state arrives.
+// gets the Volúmenes steps. For that user the later steps follow Fisqua's
+// part too: pressing Capturar beside the volume in Cola goes to the capture
+// screen without the volume page (captureUrl, $lib/queue), so the capture
+// step stays on Cola; Fisqua reviews the volume, so in place of approving,
+// the step says where the operator sees Fisqua's status (VolumeFisquaLine,
+// in the volume's top bar). Fisqua's decisions approve the records on the
+// unit (fisqua_decisions), so the export step stays, from Volúmenes. The steps are
+// derived from the unit state the dashboard layout reads (unitState) and
+// the signed-in user's role: while the state is unknown the tour is the
+// one with projects, as every other gate takes an unknown state, and it
+// changes to the unit's own as soon as the state arrives.
 //
 // Version: 0.1.0-beta
 
@@ -38,8 +44,13 @@ import { userRole } from '$lib/stores/auth';
  * What a step teaches, in the order of the work. Variants of one step share
  * a lesson (the volume step is `tour_s2`, `tour_s2_vol` or `tour_s2_fisqua`),
  * so the tour keeps its place by lesson when the steps change.
+ *
+ * `follow` (following Fisqua's review) and `approve` are never in the same
+ * steps: the review is either Fisqua's or the unit's. They hold the same
+ * place in the work (lessonRank), so a switch between the two tours moves
+ * from one to the other (reconcileTourIndex).
  */
-export const TOUR_LESSONS = ['project', 'volume', 'capture', 'send', 'approve', 'export'] as const;
+export const TOUR_LESSONS = ['project', 'volume', 'capture', 'send', 'follow', 'approve', 'export'] as const;
 export type TourLesson = (typeof TOUR_LESSONS)[number];
 
 export type TourStep = {
@@ -70,6 +81,7 @@ const PROJECTS    = /^\/dashboard\/projects\/?$/;
 const PROJECT     = /^\/dashboard\/projects\/\d+\/?$/;
 const COLLECTION  = /^\/dashboard\/projects\/\d+\/collections\/\d+/;
 const VOLUMES     = /^\/dashboard\/volumes\/?$/;
+const QUEUE       = /^\/dashboard\/queue\/?$/;
 // Every dashboard screen with the side menu. The volume screen and the
 // capture screen have their own layout, without it.
 const WITH_MENU   = /^\/dashboard(?!\/projects\/\d+\/collections\/)(\/.*)?$/;
@@ -107,10 +119,22 @@ const STEPS_WITHOUT_PROJECTS: TourStep[] = [
   ...FROM_VOLUMES,
 ];
 
-// The side menu is on the left, so the box goes to its right.
+const [SEND_FROM_VOLUMES] = FROM_VOLUMES.filter((s) => s.lesson === 'send');
+const [EXPORT_FROM_VOLUMES] = FROM_VOLUMES.filter((s) => s.lesson === 'export');
+
+// The side menu is on the left, so the box goes to its right. Capturar is
+// one button per volume in Cola, so the capture step points at none of them
+// and gives its route as the volume step does. The follow step points at the
+// Fisqua line in the volume's top bar, so its box goes below. The line exists
+// only once Fisqua is configured; until then the step is explained without
+// a highlight. Its details panel opens where the box sits, so GuidedTour
+// steps aside while it is open.
 const STEPS_FISQUA: TourStep[] = [
-  { lesson: 'volume', id: 'tour_s2_fisqua', match: WITH_MENU, target: 'cola', side: 'right' },
-  ...FROM_VOLUMES,
+  { lesson: 'volume',  id: 'tour_s2_fisqua', match: WITH_MENU,  target: 'cola', side: 'right' },
+  { lesson: 'capture', id: 'tour_s3_fisqua', match: QUEUE,      target: null,   side: 'bottom', where: 'tour_s2_fisqua_where' },
+  SEND_FROM_VOLUMES,
+  { lesson: 'follow',  id: 'tour_s5_fisqua', match: COLLECTION, target: 'fisqua-estado', side: 'bottom', where: 'tour_s5_where_vol' },
+  EXPORT_FROM_VOLUMES,
 ];
 
 /** The tour's steps for the unit's state and the user's role; the full tour while the state is not known. */
@@ -131,11 +155,15 @@ function lastIndex(): number {
  * same lesson, or, when that lesson was dropped (the project step once
  * projects are hidden), the first lesson after it that `next` has.
  */
+function lessonRank(lesson: TourLesson): number {
+  return TOUR_LESSONS.indexOf(lesson === 'follow' ? 'approve' : lesson);
+}
+
 export function reconcileTourIndex(prev: TourStep[], next: TourStep[], index: number): number {
   const was = prev[Math.min(Math.max(0, index), prev.length - 1)];
   if (!was || next.length === 0) return 0;
-  const order = TOUR_LESSONS.indexOf(was.lesson);
-  const found = next.findIndex((s) => TOUR_LESSONS.indexOf(s.lesson) >= order);
+  const order = lessonRank(was.lesson);
+  const found = next.findIndex((s) => lessonRank(s.lesson) >= order);
   return found === -1 ? next.length - 1 : found;
 }
 

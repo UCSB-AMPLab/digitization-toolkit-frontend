@@ -118,9 +118,16 @@ export const en: Messages = {
 	tour_s2_vol_where: 'Go to Volumes › New volume.',
 	tour_s2_vol_body: 'Each book, box or bundle is a volume. The images are stored inside it.',
 	// Fisqua mode: volumes come from Fisqua's queue, so the step points at Queue.
+	// Then capture from Queue, and Fisqua's review in place of approve and export.
 	tour_s2_fisqua_title: 'Choose a volume',
 	tour_s2_fisqua_where: 'Go to Queue.',
-	tour_s2_fisqua_body: "Volumes come from Fisqua's queue. In Queue, choose a volume and press Capture.",
+	tour_s2_fisqua_body: "Volumes come from Fisqua's queue. Choose a volume in Queue.",
+	tour_s3_fisqua_title: 'Capture',
+	tour_s3_fisqua_body:
+		'In Queue, press Capture beside the volume you chose. You go straight to the capture screen, without going through the volume page.',
+	tour_s5_fisqua_title: 'Follow the review',
+	tour_s5_fisqua_body:
+		'Fisqua does the review. In the top bar of the volume page you can see its state, for example: "Fisqua is reviewing the volume\'s capture". If Fisqua asks for some records to be captured again, you will find them in To retake.',
 	tour_s3_where_vol: 'Go to Volumes › your volume › Capture.',
 	tour_s4_where_vol: 'Go to Volumes › your volume › Send for review.',
 	tour_s5_where_vol: 'Go to Volumes › your volume.',
