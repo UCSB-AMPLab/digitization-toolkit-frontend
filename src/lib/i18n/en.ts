@@ -113,6 +113,18 @@ export const en: Messages = {
 	tour_s6_where: 'Go to Projects › your project › your volume, then press the archive-box icon, the last one in the right-hand bar.',
 	tour_s6_body:
 		'With everything approved, the volume is packaged and becomes available to download.',
+	// Without projects (NEH-318): no project step, and every route from Volumes.
+	tour_s2_vol_title: 'Create a volume',
+	tour_s2_vol_where: 'Go to Volumes › New volume.',
+	tour_s2_vol_body: 'Each book, box or bundle is a volume. The images are stored inside it.',
+	// Fisqua mode: volumes come from Fisqua's queue, so the step points at Queue.
+	tour_s2_fisqua_title: 'Choose a volume',
+	tour_s2_fisqua_where: 'Go to Queue.',
+	tour_s2_fisqua_body: "Volumes come from Fisqua's queue. In Queue, choose a volume and press Capture.",
+	tour_s3_where_vol: 'Go to Volumes › your volume › Capture.',
+	tour_s4_where_vol: 'Go to Volumes › your volume › Send for review.',
+	tour_s5_where_vol: 'Go to Volumes › your volume.',
+	tour_s6_where_vol: 'Go to Volumes › your volume, then press the archive-box icon, the last one in the right-hand bar.',
 
 	nav_logout: 'Log out',
 

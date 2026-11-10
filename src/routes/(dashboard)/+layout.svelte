@@ -329,6 +329,7 @@
 						class="s-item"
 						class:active={isActive(item.path)}
 						class:is-retake={item.id === 'retakes' && !!item.badge}
+						data-tour={item.id === 'queue' ? 'cola' : undefined}
 						title={!expanded ? $m[item.labelKey] : undefined}
 					>
 						{#if isActive(item.path)}
