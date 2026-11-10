@@ -936,7 +936,7 @@
           </svg>
         </button>
         <button class="float-btn" onclick={() => showCaptureKeyModal = true} aria-label={$m.lv_capture_key_settings} title={$m.lv_capture_key_settings}>
-          <span class="material-symbols-outlined" style="font-size:22px">keyboard</span>
+          <span class="material-symbols-outlined" style="font-size:22px" aria-hidden="true">keyboard</span>
         </button>
         {#if cameraMode === 'double'}
           {#if panelOneColumn}<div class="float-divider"></div>{/if}
@@ -947,7 +947,7 @@
             aria-label={$m.lv_swap_orientation}
             title={swapped ? $m.lv_orientation_swapped : $m.lv_orientation_normal}
           >
-            <span class="material-symbols-outlined" style="font-size:22px">swap_horiz</span>
+            <span class="material-symbols-outlined" style="font-size:22px" aria-hidden="true">swap_horiz</span>
           </button>
         {/if}
       {/if}
@@ -982,7 +982,7 @@
             <p class="modal-toggle-title">{$m.lv_grid}</p>
             <p class="modal-toggle-sub">{$m.lv_grid_desc}</p>
           </div>
-          <button class="toggle-btn" class:on={showGrid} onclick={() => showGrid = !showGrid}>
+          <button class="toggle-btn" class:on={showGrid} onclick={() => showGrid = !showGrid} aria-label={$m.lv_grid} aria-pressed={showGrid}>
             <div class="toggle-thumb" class:on={showGrid}></div>
           </button>
         </div>
@@ -991,7 +991,7 @@
             <p class="modal-toggle-title">{$m.lv_guides}</p>
             <p class="modal-toggle-sub">{$m.lv_guides_desc}</p>
           </div>
-          <button class="toggle-btn" class:on={showGuides} onclick={() => showGuides = !showGuides}>
+          <button class="toggle-btn" class:on={showGuides} onclick={() => showGuides = !showGuides} aria-label={$m.lv_guides} aria-pressed={showGuides}>
             <div class="toggle-thumb" class:on={showGuides}></div>
           </button>
         </div>
