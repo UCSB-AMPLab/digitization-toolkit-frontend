@@ -19,11 +19,11 @@
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
   import { viewportAspect as computeViewportAspect, fitBox, frameAspect, panelGrowFactor } from '$lib/viewport-aspect';
   import {
-    DEFAULT_CHORD,
-    describeChord,
+    DEFAULT_CHORDS,
+    describeChords,
     learnFromEvent,
     ownsEvent,
-    readChord,
+    readChords,
     shouldTrigger,
     writeChord,
     clearChord as clearStoredChord,
@@ -117,10 +117,11 @@
   // A USB digitization pedal behaves as a keyboard that sends a single key,
   // different for each device. Instead of manual configuration, the operator
   // assigns it by pressing the pedal once in the control in the grid settings
-  // modal, and the key is stored in that browser. The default is the space
-  // bar, so an ordinary keyboard works without any setup.
+  // modal, and the key is stored in that browser. With nothing stored, the
+  // space bar (an ordinary keyboard) and b (the project's foot pedal) both
+  // trigger a capture; once a key is stored, only that key does.
   // ---------------------------------------------------------------------------
-  let chord = $state<CaptureChord>(readChord());
+  let chords = $state<readonly CaptureChord[]>(readChords());
 
   // Held-key latch: set when a key press starts a capture and released on the
   // matching keyup. If the keyup never arrives (the window lost focus in the
@@ -129,7 +130,7 @@
   // page is reloaded.
   let chordHeld = $state(false);
   // The release is compared against the physical `code` of the key that set
-  // the latch, never against `chord.key`: releasing the modifier before the
+  // the latch, never against the chord's key: releasing the modifier before the
   // key changes what that key reports (Shift+2 sets the latch with key "@"
   // and releases with key "2"), and `code` does not change with modifiers.
   // null when the latch is not set, or when the device reported no usable
@@ -565,7 +566,7 @@
 
   function ownsEventContext(): OwnsEventContext {
     return {
-      chord,
+      chords,
       modalOpen,
       activeElement: browser ? document.activeElement : null,
     };
@@ -589,7 +590,7 @@
     event.preventDefault();
     if (shouldTrigger(event, { ...ctx, keyHeld: chordHeld, capturing: isCapturing, ready: canCapture })) {
       chordHeld = true;
-      // The physical `code` is stored, not `chord.key`: it is the only thing
+      // The physical `code` is stored, not the chord's key: it is the only thing
       // that still identifies this key when the release arrives with the
       // modifiers already up. If the event carries no usable `code`,
       // heldCode stays null and the next keyup of any key releases the latch.
@@ -621,8 +622,8 @@
     event.preventDefault();
     const result = learnFromEvent(event);
     if (result.ok) {
-      chord = result.chord;
-      writeChord(chord);
+      chords = [result.chord];
+      writeChord(result.chord);
       learning = false;
       pendingModifier = null;
       learnMessage = null;
@@ -654,7 +655,7 @@
 
   function resetChord() {
     clearStoredChord();
-    chord = DEFAULT_CHORD;
+    chords = DEFAULT_CHORDS;
     cancelLearningChord();
   }
 
@@ -1013,7 +1014,7 @@
              browser. -->
         <div class="modal-toggle-row capture-key-row">
           <div>
-            <p class="modal-toggle-title">{$m.lv_capture_key_current(describeChord(chord, $m.lv_capture_key_space))}</p>
+            <p class="modal-toggle-title">{$m.lv_capture_key_current(describeChords(chords, $m.lv_capture_key_space))}</p>
             <p class="modal-toggle-sub">{$m.lv_capture_key_desc}</p>
           </div>
           <div class="capture-key-buttons">

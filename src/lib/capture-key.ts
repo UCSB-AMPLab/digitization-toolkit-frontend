@@ -1,8 +1,10 @@
 // Keyboard trigger for capture (NEH-228). A USB digitization foot pedal acts
-// as a keyboard that sends a single key, and the key differs from device to
-// device, so the operator assigns it by pressing the pedal once and the
-// browser stores it. The default (space bar) lets an ordinary keyboard work
-// with no setup.
+// as a keyboard that sends a single key. Two keys work with no setup: the
+// space bar, for an ordinary keyboard, and b, the key the project's foot
+// pedal (RDing FootSwitch1F1) sends. An operator with another device assigns
+// its key by pressing it once, and the browser stores it. From then on only
+// that key triggers a capture. Letter case is ignored when keys are compared,
+// so Caps Lock on the unit's keyboard does not disable the pedal.
 //
 // No Svelte imports and no direct `window` references — everything comes in
 // through arguments, so the Node test project can test the module without
@@ -29,18 +31,16 @@ export type CaptureChord = {
   shift: boolean;
 };
 
-export const DEFAULT_CHORD: CaptureChord = {
-  key: ' ',
-  ctrl: false,
-  alt: false,
-  meta: false,
-  shift: false
-};
+// With nothing stored, either of these triggers a capture.
+export const DEFAULT_CHORDS: readonly CaptureChord[] = [
+  { key: ' ', ctrl: false, alt: false, meta: false, shift: false },
+  { key: 'b', ctrl: false, alt: false, meta: false, shift: false }
+];
 
 // What ownsEvent needs to decide whether the event belongs to capture,
 // regardless of whether it should actually start one.
 export interface OwnsEventContext {
-  chord: CaptureChord;
+  chords: readonly CaptureChord[];
   modalOpen: boolean;
   activeElement: Element | null;
 }
@@ -69,8 +69,12 @@ export function chordFromEvent(event: KeyboardEvent): CaptureChord {
   };
 }
 
+// Letter case is ignored in the key (with Caps Lock on, the browser reports
+// 'B' for the pedal's b with shift false, and the pedal must still trigger).
+// The four modifier flags are compared exactly, so Shift+b (key 'B', shift
+// true) does not match b.
 export function chordsMatch(a: CaptureChord, b: CaptureChord): boolean {
-  return a.key === b.key && a.ctrl === b.ctrl && a.alt === b.alt && a.meta === b.meta && a.shift === b.shift;
+  return a.key.toLowerCase() === b.key.toLowerCase() && a.ctrl === b.ctrl && a.alt === b.alt && a.meta === b.meta && a.shift === b.shift;
 }
 
 // For display: a space is shown with the given label (default 'Space';
@@ -86,6 +90,11 @@ export function describeChord(chord: CaptureChord, spaceLabel = 'Space'): string
   if (chord.meta) parts.push('Meta');
   parts.push(chord.key === ' ' ? spaceLabel : chord.key);
   return parts.join('+');
+}
+
+// For display: the descriptions of every chord, joined with " / ".
+export function describeChords(chords: readonly CaptureChord[], spaceLabel = 'Space'): string {
+  return chords.map((chord) => describeChord(chord, spaceLabel)).join(' / ');
 }
 
 // <input> types that accept typed text. checkbox/radio/range/button/submit
@@ -118,12 +127,13 @@ export function isTextEntry(element: Element | null): boolean {
   return false;
 }
 
-// Deliberately ignores repeat, the held-key latch and whether a capture is
-// in progress: those decide whether to start a capture, not whether the
+// True when the event matches any of the chords. Deliberately ignores
+// repeat, the held-key latch and whether a capture is in progress: those decide whether to start a capture, not whether the
 // event belongs to capture. The caller calls preventDefault whenever this
 // returns true.
 export function ownsEvent(event: KeyboardEvent, ctx: OwnsEventContext): boolean {
-  return chordsMatch(chordFromEvent(event), ctx.chord) && !ctx.modalOpen && !isTextEntry(ctx.activeElement);
+  const pressed = chordFromEvent(event);
+  return ctx.chords.some((chord) => chordsMatch(pressed, chord)) && !ctx.modalOpen && !isTextEntry(ctx.activeElement);
 }
 
 export function shouldTrigger(event: KeyboardEvent, ctx: ShouldTriggerContext): boolean {
@@ -139,7 +149,7 @@ const UNBINDABLE_KEYS = new Set(['Dead', 'Unidentified']);
 // An empty key, a modifier on its own (Control/Alt/Shift/Meta with no other
 // key), or Dead/Unidentified can never trigger a capture — neither when
 // newly assigned nor when read back from storage. learnFromEvent and
-// readChord both use this one predicate so that the two paths cannot drift
+// readChords both use this one predicate so that the two paths cannot drift
 // apart.
 function isBindableKey(key: string): boolean {
   return key.length > 0 && !MODIFIER_KEYS.has(key as 'Control' | 'Alt' | 'Shift' | 'Meta') && !UNBINDABLE_KEYS.has(key);
@@ -170,10 +180,11 @@ export function learnFromEvent(event: KeyboardEvent): LearnResult {
 
 // Persistence: a single localStorage key, as stores/auth.ts keeps the user —
 // guarded by SvelteKit's `browser` flag and try/catch so that missing or
-// throwing storage (private mode, quota) yields the default instead of
+// throwing storage (private mode, quota) yields the defaults instead of
 // breaking the page. A well-formed value whose key is not bindable
-// (isBindableChord) falls back to the default just like a malformed one;
-// otherwise no key could trigger a capture.
+// (isBindableChord) falls back to the defaults just like a malformed one;
+// otherwise no key could trigger a capture. One chord is stored; with none
+// stored, both default chords apply.
 
 const STORAGE_KEY = STORAGE_KEYS.captureChord;
 
@@ -189,16 +200,16 @@ function isValidChord(value: unknown): value is CaptureChord {
   );
 }
 
-export function readChord(): CaptureChord {
-  if (!browser) return DEFAULT_CHORD;
+export function readChords(): readonly CaptureChord[] {
+  if (!browser) return DEFAULT_CHORDS;
   try {
     const raw = readStored(STORAGE_KEY);
-    if (!raw) return DEFAULT_CHORD;
+    if (!raw) return DEFAULT_CHORDS;
     const parsed = JSON.parse(raw);
-    if (!isValidChord(parsed) || !isBindableChord(parsed)) return DEFAULT_CHORD;
-    return parsed;
+    if (!isValidChord(parsed) || !isBindableChord(parsed)) return DEFAULT_CHORDS;
+    return [parsed];
   } catch {
-    return DEFAULT_CHORD;
+    return DEFAULT_CHORDS;
   }
 }
 
