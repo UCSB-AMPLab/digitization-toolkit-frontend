@@ -305,6 +305,72 @@ describe('LiveViewport — capture key (NEH-228)', () => {
     await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
   });
 
+  it('with nothing stored, b starts exactly one capture', async () => {
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    stubPreviewFetch({});
+    renderViewport(baseProps());
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
+    await tick();
+    expect(captureSpy.mock.calls.length).toBe(1);
+  });
+
+  it('with nothing stored, B with shift off (Caps Lock on) starts one capture', async () => {
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    stubPreviewFetch({});
+    renderViewport(baseProps());
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'B', code: 'KeyB' }));
+    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+  });
+
+  it('Shift+B does not start a capture', async () => {
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    stubPreviewFetch({});
+    renderViewport(baseProps());
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'B', code: 'KeyB', shiftKey: true }));
+    await tick();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(captureSpy.mock.calls.length).toBe(0);
+  });
+
+  it('a keyup that reports a different case from the keydown still releases the latch', async () => {
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    stubPreviewFetch({});
+    renderViewport(baseProps());
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+
+    // Caps Lock was switched on while the key was down: the release reports 'B'.
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'B', code: 'KeyB' }));
+    await tick();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+    await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
+  });
+
+  it('after another key is stored, neither space nor b starts a capture', async () => {
+    writeChord({ key: 'x', ctrl: false, alt: false, meta: false, shift: false });
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    stubPreviewFetch({});
+    renderViewport(baseProps());
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
+    await tick();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(captureSpy.mock.calls.length).toBe(0);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code: 'KeyX' }));
+    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+  });
+
   it('a keyup for a different physical key leaves the latch alone', async () => {
     const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
     stubPreviewFetch({});
@@ -581,6 +647,34 @@ describe('LiveViewport — capture key button and dialog (NEH-323)', () => {
     await expect.element(page.getByRole('button', { name: en.lv_capture_key_learn })).toBeVisible();
     await expect.element(page.getByRole('button', { name: en.lv_capture_key_reset })).toBeVisible();
     expect(dialogText()).toContain(en.lv_capture_key_note);
+  });
+
+  it('shows both default keys', async () => {
+    renderViewport(baseProps());
+    await userEvent.click(keyButton());
+    await expect.poll(() => dialogText()).toContain(en.lv_capture_key_current(`${en.lv_capture_key_space} / b`));
+  });
+
+  it('learning a key replaces both defaults, and reset restores both', async () => {
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    renderViewport(baseProps());
+    await userEvent.click(keyButton());
+    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', cancelable: true }));
+    await expect.poll(() => dialogText()).toContain(en.lv_capture_key_current('x'));
+    expect(dialogText()).not.toContain('/ b');
+
+    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_reset }));
+    await expect.poll(() => dialogText()).toContain(en.lv_capture_key_current(`${en.lv_capture_key_space} / b`));
+
+    // The dialog is open, so close it, then both defaults capture again.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+    await expect.poll(() => dialog()).toBeNull();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+    await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
   });
 
   it('the grid dialog no longer holds them', async () => {
