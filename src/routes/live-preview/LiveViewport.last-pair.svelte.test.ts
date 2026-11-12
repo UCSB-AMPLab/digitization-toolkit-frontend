@@ -992,3 +992,46 @@ describe('LiveViewport — failing polls before a late switch (NEH-334)', () => 
     expect(paneSource(screen.container, 0)).toBe(en.lv_preview_unsaved);
   });
 });
+
+// A capture the page makes from its own dialogs (a retake, a placeholder)
+// keeps the cameras busy like the viewport's own: no preview frame is asked
+// for while it runs.
+describe('LiveViewport — a page capture in flight (NEH-334)', () => {
+  it('disables "Refresh preview" while pageCapturing is true; a click then sends nothing', async () => {
+    capsWith(false);
+    const { previewCalls } = stubFetch({ preview: { 0: { w: 400, h: 300 } } });
+    const screen = renderViewport(baseProps({ pageCapturing: false }));
+    await waitForPane(screen.container, 0, 400);
+    await expect.element(refreshButton()).toBeEnabled();
+
+    await screen.rerender({ pageCapturing: true });
+    await expect.element(refreshButton()).toBeDisabled();
+    (refreshButton().element() as HTMLButtonElement).click();
+    await settle();
+    expect(previewCalls).toEqual([0]);
+
+    await screen.rerender({ pageCapturing: false });
+    await expect.element(refreshButton()).toBeEnabled();
+    expect(previewCalls).toEqual([0]);
+  });
+
+  it('after the page capture, the pageCaptures signal still clears the last capture and refills the panes', async () => {
+    capsWith(false);
+    const sizes: Record<number, Size> = { 0: { w: 400, h: 300 } };
+    const { previewCalls } = stubFetch({ preview: sizes, thumbs: { 11: { w: 222, h: 300 } } });
+    vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true, record_id: 5, image_ids: [11] });
+    const screen = renderViewport(baseProps({ pageCapturing: false, pageCaptures: 0 }));
+    await waitForPane(screen.container, 0, 400);
+    await userEvent.click(page.getByRole('button', { name: en.lv_capture_btn, exact: true }));
+    await waitForPane(screen.container, 0, 222);
+
+    await screen.rerender({ pageCapturing: true });
+    await expect.element(refreshButton()).toBeDisabled();
+    sizes[0] = { w: 410, h: 300 };
+    await screen.rerender({ pageCapturing: false, pageCaptures: 1 });
+    await waitForPane(screen.container, 0, 410);
+    expect(paneSource(screen.container, 0)).toBe(en.lv_preview_unsaved);
+    expect(previewCalls).toEqual([0, 0]);
+    await expect.element(refreshButton()).toBeEnabled();
+  });
+});
