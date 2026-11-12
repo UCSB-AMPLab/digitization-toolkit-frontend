@@ -104,8 +104,12 @@
   // The mode each stage asks for: a tick for each camera that reads it.
   let wanted = $derived<FocusModeKind | null>(stage === 0 ? 'auto' : stage === 2 ? 'manual' : null);
 
-  // Only the newest reading of each camera is kept.
-  const readSeq: Record<number, number> = { 0: 0, 1: 0 };
+  // At most one settings request per camera is in flight; a poll tick for a
+  // camera that is still waiting starts nothing. The token names the request
+  // whose answer may be recorded: invalidating a camera clears it, so that
+  // an answer sent before then is dropped.
+  const inFlight: Record<number, number | null> = { 0: null, 1: null };
+  let requestToken = 0;
 
   function setReading(cam: number, kind: FocusModeKind) {
     modes = { ...modes, [cam]: kind };
@@ -114,19 +118,33 @@
 
   function readModes() {
     for (const cam of [0, 1]) {
-      const seq = ++readSeq[cam];
+      if (inFlight[cam] !== null) continue;
+      const token = ++requestToken;
+      inFlight[cam] = token;
+      const settled = () => {
+        if (destroyed || inFlight[cam] !== token) return false;
+        inFlight[cam] = null;
+        return true;
+      };
       camerasApi
         .getDSLRSettings(cam)
         .then((s) => {
-          if (destroyed || seq !== readSeq[cam]) return;
-          setReading(cam, describeFocusMode(s.focus_mode));
+          if (settled()) setReading(cam, describeFocusMode(s.focus_mode));
         })
         .catch(() => {
           // A camera that does not answer has no reading.
-          if (destroyed || seq !== readSeq[cam]) return;
-          setReading(cam, 'unknown');
+          if (settled()) setReading(cam, 'unknown');
         });
     }
+  }
+
+  // Entering the MF stage: what was read before may predate a lens switch, so
+  // no reading carries over and no answer already on its way is recorded.
+  function forgetReadings() {
+    modes = { 0: 'unknown', 1: 'unknown' };
+    failures = { 0: 0, 1: 0 };
+    inFlight[0] = null;
+    inFlight[1] = null;
   }
 
   // ---------------------------------------------------------------------------
@@ -343,6 +361,7 @@
   // ---------------------------------------------------------------------------
   function next() {
     if (capturing || stage === 2) return;
+    if (stage === 1) forgetReadings();
     stage = (stage + 1) as 0 | 1 | 2;
   }
 

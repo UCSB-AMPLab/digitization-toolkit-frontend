@@ -506,9 +506,12 @@ describe('RefocusModal: manual focus', () => {
 	it('a camera with no reading keeps "Continue" disabled; after two failed readings in a row "Continue anyway" appears', async () => {
 		modes = { 0: 'Manual', 1: 'fail' };
 		const { onClose } = await toMfStage();
-		// One failed reading on the AF stage, one on entering this one.
+		// Entering this stage clears the count: one failed reading so far.
 		expect(reading('right')).toBe(en.focus_mode_unknown);
 		expect(button(en.focus_continue)?.disabled).toBe(true);
+		expect(button(en.focus_continue_anyway)).toBeNull();
+		await vi.advanceTimersByTimeAsync(3000);
+		await settle();
 		const anyway = button(en.focus_continue_anyway);
 		expect(anyway).not.toBeNull();
 		expect(anyway?.classList.contains('btn-secondary')).toBe(true);
@@ -534,6 +537,112 @@ describe('RefocusModal: manual focus', () => {
 		expect(button(en.focus_continue)?.disabled).toBe(false);
 		await click(en.focus_continue);
 		expect(onClose).toHaveBeenCalledWith('completed');
+	});
+});
+
+describe('RefocusModal: slow and stale readings', () => {
+	type Pending = { cam: number; answer: ReturnType<typeof deferred<DSLRSettings>> };
+	let pending: Pending[];
+
+	// Every request waits until the test answers it.
+	function holdRequests() {
+		pending = [];
+		settingsSpy.mockImplementation((i: number) => {
+			const answer = deferred<DSLRSettings>();
+			pending.push({ cam: i, answer });
+			return answer.promise;
+		});
+	}
+	const open = (cam: number) => pending.filter((p) => p.cam === cam);
+	const mode = (focus_mode: string) => ({ focus_mode }) as DSLRSettings;
+
+	it('records an answer that takes longer than a poll, with one request per camera pending at a time', async () => {
+		holdRequests();
+		renderModal();
+		await settle();
+		expect(pending.map((p) => p.cam).sort()).toEqual([0, 1]);
+
+		await vi.advanceTimersByTimeAsync(3000);
+		await vi.advanceTimersByTimeAsync(3000);
+		await settle();
+		expect(settingsSpy).toHaveBeenCalledTimes(2);
+
+		pending[0].answer.resolve(mode('One Shot'));
+		pending[1].answer.resolve(mode('One Shot'));
+		await settle();
+		expect(ticked('left')).toBe(true);
+		expect(ticked('right')).toBe(true);
+
+		await vi.advanceTimersByTimeAsync(3000);
+		await settle();
+		expect(settingsSpy).toHaveBeenCalledTimes(4);
+	});
+
+	it('slow failures still count, so "Continue anyway" appears on the MF stage', async () => {
+		holdRequests();
+		renderModal();
+		await settle();
+		await click(en.focus_next);
+		await click(en.focus_next);
+		await settle();
+		// Entering the MF stage started a fresh pair; the AF stage's are void.
+		// A poll tick goes by before they fail, and starts nothing.
+		const fresh = pending.slice(-2);
+		await vi.advanceTimersByTimeAsync(3000);
+		await settle();
+		expect(pending.length).toBe(fresh.length + 2);
+		for (const p of fresh) p.answer.reject(new Error('slow'));
+		await settle();
+		expect(button(en.focus_continue_anyway)).toBeNull();
+
+		await vi.advanceTimersByTimeAsync(3000);
+		await settle();
+		for (const p of pending.slice(-2)) p.answer.reject(new Error('slow'));
+		await settle();
+		expect(button(en.focus_continue_anyway)).not.toBeNull();
+		expect(button(en.focus_continue)?.disabled).toBe(true);
+	});
+
+	it('entering the MF stage drops the cached readings: "Continue" waits for a fresh answer', async () => {
+		modes = { 0: 'Manual', 1: 'Manual' };
+		renderModal();
+		await settle();
+		expect(ticked('left')).toBe(false);
+		expect(reading('left')).toBe(en.focus_mode_manual);
+		await click(en.focus_next);
+		holdRequests();
+		await click(en.focus_next);
+		await settle();
+		expect(reading('left')).toBe(en.focus_mode_unknown);
+		expect(button(en.focus_continue)?.disabled).toBe(true);
+		expect(pending.map((p) => p.cam).sort()).toEqual([0, 1]);
+
+		pending[0].answer.resolve(mode('Manual'));
+		pending[1].answer.resolve(mode('Manual'));
+		await settle();
+		expect(button(en.focus_continue)?.disabled).toBe(false);
+	});
+
+	it('an answer to a request sent before the MF stage is ignored', async () => {
+		holdRequests();
+		renderModal();
+		await settle();
+		const old = [...pending];
+		await click(en.focus_next);
+		await click(en.focus_next);
+		await settle();
+		expect(pending.length).toBe(4);
+
+		old[0].answer.resolve(mode('Manual'));
+		old[1].answer.resolve(mode('Manual'));
+		await settle();
+		expect(reading('left')).toBe(en.focus_mode_unknown);
+		expect(button(en.focus_continue)?.disabled).toBe(true);
+
+		pending[2].answer.resolve(mode('Manual'));
+		pending[3].answer.resolve(mode('Manual'));
+		await settle();
+		expect(button(en.focus_continue)?.disabled).toBe(false);
 	});
 });
 
