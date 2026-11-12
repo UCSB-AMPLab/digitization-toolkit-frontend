@@ -795,3 +795,66 @@ describe('LiveViewport — last pair, review round (NEH-334)', () => {
     await expect.element(refreshButton()).toBeEnabled();
   });
 });
+
+// External review: a fetch that lost its pane to a capture must not raise a
+// failure notice over that capture.
+describe('LiveViewport — a stale fetch changes no notice (NEH-334)', () => {
+  const captureButton = () => page.getByRole('button', { name: en.lv_capture_btn, exact: true });
+
+  for (const status of [500, 404] as const) {
+    it(`an entry fetch that answers ${status} after a capture took the pane leaves the capture as it is`, async () => {
+      capsWith(false);
+      const hold = deferred<void>();
+      const { previewCalls } = stubFetch({
+        thumbs: { 11: { w: 222, h: 300 } },
+        hold: { promise: hold.promise },
+        previewStatus: { 0: status },
+      });
+      vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true, record_id: 5, image_ids: [11] });
+      const screen = renderViewport(baseProps());
+      await expect.poll(() => previewCalls).toEqual([0]);
+
+      await userEvent.click(captureButton());
+      await waitForPane(screen.container, 0, 222);
+      expect(paneSource(screen.container, 0)).toBe(en.lv_last_capture);
+
+      hold.resolve();
+      await settle();
+      expect(screen.container.textContent).not.toContain(en.lv_preview_failed);
+      expect(screen.container.querySelector('.camera-missing')).toBeNull();
+      expect(paneImg(screen.container, 0)?.naturalWidth).toBe(222);
+      expect(paneSource(screen.container, 0)).toBe(en.lv_last_capture);
+    });
+
+    it(`a refresh that answers ${status} after a capture took the pane leaves the capture as it is`, async () => {
+      capsWith(false);
+      const opts = {
+        preview: { 0: { w: 400, h: 300 } },
+        thumbs: { 11: { w: 222, h: 300 } },
+        hold: null as { promise: Promise<void> } | null,
+        previewStatus: {} as Partial<Record<number, number>>,
+      };
+      const { previewCalls } = stubFetch(opts);
+      vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true, record_id: 5, image_ids: [11] });
+      const screen = renderViewport(baseProps());
+      await waitForPane(screen.container, 0, 400);
+
+      const hold = deferred<void>();
+      opts.hold = { promise: hold.promise };
+      opts.previewStatus = { 0: status };
+      await userEvent.click(refreshButton());
+      await expect.poll(() => previewCalls.length).toBe(2);
+
+      await userEvent.click(captureButton());
+      await waitForPane(screen.container, 0, 222);
+      expect(paneSource(screen.container, 0)).toBe(en.lv_last_capture);
+
+      hold.resolve();
+      await settle();
+      expect(screen.container.textContent).not.toContain(en.lv_preview_failed);
+      expect(screen.container.querySelector('.camera-missing')).toBeNull();
+      expect(paneImg(screen.container, 0)?.naturalWidth).toBe(222);
+      expect(paneSource(screen.container, 0)).toBe(en.lv_last_capture);
+    });
+  }
+});

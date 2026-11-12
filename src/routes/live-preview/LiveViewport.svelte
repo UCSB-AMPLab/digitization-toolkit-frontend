@@ -456,7 +456,9 @@
 
         previewUrls = { ...previewUrls, [cameraIndex]: newUrl };
         previewErrorCount = 0;  // reset on success
-        if (cameraMissing[cameraIndex]) {
+        // In last-pair mode fetchFrames sets the overlay, and only for a
+        // pane its operation still holds.
+        if (!lastPair && cameraMissing[cameraIndex]) {
           cameraMissing = { ...cameraMissing, [cameraIndex]: false };
         }
         return 'ok';
@@ -464,7 +466,7 @@
         // 404: the camera is not connected or its frame could not be
         // captured. It does not count as an error, but it shows in the
         // per-camera overlay (NEH-229).
-        cameraMissing = { ...cameraMissing, [cameraIndex]: true };
+        if (!lastPair) cameraMissing = { ...cameraMissing, [cameraIndex]: true };
         return 'missing';
       } else {
         // Other errors (500, etc.) count toward the banner.
@@ -503,13 +505,27 @@
     try {
       const results = await Promise.all(cams.map(cam => fetchPreview(cam)));
       if (destroyed) return;
-      if (results.includes('error')) previewFailed = true;
-      else if (results.includes('ok')) previewFailed = false;
-      const next = { ...paneKind };
-      cams.forEach((cam, i) => {
-        if (results[i] === 'ok' && holdsTicket(cam, ticket)) next[cam] = 'preview';
-      });
-      paneKind = next;
+      // A result for a pane this operation no longer holds (a capture or a
+      // newer fetch took it meanwhile) changes nothing for that pane: not
+      // what it shows, not its missing-camera overlay, not the failure
+      // notice. A stale failure would otherwise sit over a good capture,
+      // with nothing polling to clear it.
+      const held = results.map((result, i) => ({ cam: cams[i], result })).filter(({ cam }) => holdsTicket(cam, ticket));
+      if (held.length === 0) return;
+      if (held.some(({ result }) => result === 'error')) previewFailed = true;
+      else if (held.some(({ result }) => result === 'ok')) previewFailed = false;
+      const nextKind = { ...paneKind };
+      const nextMissing = { ...cameraMissing };
+      for (const { cam, result } of held) {
+        if (result === 'ok') {
+          nextKind[cam] = 'preview';
+          nextMissing[cam] = false;
+        } else if (result === 'missing') {
+          nextMissing[cam] = true;
+        }
+      }
+      paneKind = nextKind;
+      cameraMissing = nextMissing;
     } finally {
       framesInFlight -= 1;
     }
