@@ -966,6 +966,12 @@ export const en: Messages = {
 	lv_capture_btn: 'Capture',
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',
+	// NEH-334: units without a continuous preview show the last capture and
+	// fetch a live frame only on request.
+	lv_refresh_preview: 'Refresh preview',
+	lv_last_capture: 'Last capture',
+	lv_preview_unsaved: 'Preview (not saved)',
+	lv_preview_failed: 'Could not get a preview. Press "Refresh preview" to try again.',
 	lv_thumb_empty: 'No captures yet — use the capture button',
 	tb_go_to_review: 'Review',
 	tb_go_to_review_title: 'Back to reviewing this volume',

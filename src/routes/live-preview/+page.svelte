@@ -372,6 +372,10 @@
 
   // Shared with LiveViewport (bound): whether camera 1 takes the left page.
   let swapped = $state(false);
+  // Counts the captures made here rather than in LiveViewport (retakes and
+  // placeholders). LiveViewport clears the last capture it shows on each, as
+  // such a capture may have superseded it (NEH-334).
+  let pageCaptures = $state(0);
   let leftCameraIndex = $derived(swapped ? 1 : 0);
 
   // Left, right, then images without a role.
@@ -478,6 +482,7 @@
         rotate_deg_cam1: rotateDeg[1] ?? 0,
       });
       if (!result.success) throw new CaptureFailed(result.error);
+      pageCaptures += 1;
       // Only if the screen is still where the capture started.
       if (result.record_id != null && filled === start) {
         filled = { holeId: start.holeId, lastId: result.record_id };
@@ -706,6 +711,7 @@
     if (!result.success) {
       throw new CaptureFailed(result.error);
     }
+    pageCaptures += 1;
 
     // A placeholder filled: the modal stays, and asks whether another
     // opening is missing there (NEH-317).
@@ -868,6 +874,7 @@
           {stemFormHref}
           {stemNote}
           onStemRefused={recheckStem}
+          {pageCaptures}
           bind:swapped
         />
 
