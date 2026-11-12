@@ -61,6 +61,7 @@
     onStemRefused,
     swapped = $bindable(false),
     pageCaptures = 0,
+    pageCapturing = false,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -98,6 +99,10 @@
     // placeholders, NEH-334). Each increase clears the last capture shown in
     // last-pair mode, which such a capture may have superseded.
     pageCaptures?: number;
+    // True while the page's own capture request (a retake, a placeholder)
+    // is in flight. The cameras are busy with it, so no preview frame is
+    // asked for meanwhile, as during this viewport's own capture.
+    pageCapturing?: boolean;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -204,6 +209,9 @@
   // the Pi's touchscreen has no hover that could reveal it.
 
   let isCapturing = $state(false);
+  // A capture of this viewport's or of the page's is in flight: the cameras
+  // are busy, so "Refresh preview" waits.
+  let camerasBusy = $derived(isCapturing || pageCapturing);
   let captureFlash = $state(false);
 
   // Ready only once projectId and collectionId have resolved, so no capture
@@ -539,7 +547,7 @@
   // "Refresh preview": one frame from each active camera. Never while a
   // capture or another last-pair fetch is in flight.
   function refreshPreview() {
-    if (!lastPair || framesInFlight > 0 || isCapturing) return;
+    if (!lastPair || framesInFlight > 0 || camerasBusy) return;
     fetchFrames(activeCameras());
   }
 
@@ -1337,7 +1345,7 @@
         <button
           class="float-btn refresh-preview-btn"
           onclick={refreshPreview}
-          disabled={framesInFlight > 0 || isCapturing}
+          disabled={framesInFlight > 0 || camerasBusy}
           aria-label={$m.lv_refresh_preview}
           title={$m.lv_refresh_preview}
         >

@@ -376,6 +376,9 @@
   // placeholders). LiveViewport clears the last capture it shows on each, as
   // such a capture may have superseded it (NEH-334).
   let pageCaptures = $state(0);
+  // True while one of the captures made here is in flight, so LiveViewport
+  // asks the cameras for no preview frame meanwhile (NEH-334).
+  let pageCapturing = $state(false);
   let leftCameraIndex = $derived(swapped ? 1 : 0);
 
   // Left, right, then images without a role.
@@ -472,15 +475,21 @@
     anotherError = null;
     try {
       // The same fields as LiveViewport's capture, inserted after the record filled last.
-      const result = await camerasApi.captureDual({
-        project_name: projectName,
-        collection_id: collectionId ?? undefined,
-        record_title: defaultRecordTitle(),
-        afterRecordId: start.lastId,
-        left_camera_index: leftCameraIndex,
-        rotate_deg_cam0: rotateDeg[0] ?? 0,
-        rotate_deg_cam1: rotateDeg[1] ?? 0,
-      });
+      let result;
+      pageCapturing = true;
+      try {
+        result = await camerasApi.captureDual({
+          project_name: projectName,
+          collection_id: collectionId ?? undefined,
+          record_title: defaultRecordTitle(),
+          afterRecordId: start.lastId,
+          left_camera_index: leftCameraIndex,
+          rotate_deg_cam0: rotateDeg[0] ?? 0,
+          rotate_deg_cam1: rotateDeg[1] ?? 0,
+        });
+      } finally {
+        pageCapturing = false;
+      }
       if (!result.success) throw new CaptureFailed(result.error);
       pageCaptures += 1;
       // Only if the screen is still where the capture started.
@@ -688,24 +697,29 @@
     // A placeholder is a whole opening, closed or not: only a dual capture
     // fills it. An open one gets the after-panel.
     const hole = isOpenPlaceholder(record);
-    if (cameraMode === 'double' || record.missing_side === 'both') {
-      result = await camerasApi.captureDual({
-        project_name: projectName,
-        collection_id: collectionId ?? undefined,
-        record_id: record.id,
-        // The roles of the new images: the same camera on the left as in the viewport.
-        left_camera_index: leftCameraIndex,
-        rotate_deg_cam0: rotateDeg[0] ?? 0,
-        rotate_deg_cam1: rotateDeg[1] ?? 0,
-      });
-    } else {
-      result = await camerasApi.capture({
-        project_name: projectName,
-        camera_index: 0,
-        collection_id: collectionId ?? undefined,
-        record_id: record.id,
-        rotate_deg: rotateDeg[0] ?? 0,
-      });
+    pageCapturing = true;
+    try {
+      if (cameraMode === 'double' || record.missing_side === 'both') {
+        result = await camerasApi.captureDual({
+          project_name: projectName,
+          collection_id: collectionId ?? undefined,
+          record_id: record.id,
+          // The roles of the new images: the same camera on the left as in the viewport.
+          left_camera_index: leftCameraIndex,
+          rotate_deg_cam0: rotateDeg[0] ?? 0,
+          rotate_deg_cam1: rotateDeg[1] ?? 0,
+        });
+      } else {
+        result = await camerasApi.capture({
+          project_name: projectName,
+          camera_index: 0,
+          collection_id: collectionId ?? undefined,
+          record_id: record.id,
+          rotate_deg: rotateDeg[0] ?? 0,
+        });
+      }
+    } finally {
+      pageCapturing = false;
     }
 
     if (!result.success) {
@@ -875,6 +889,7 @@
           {stemNote}
           onStemRefused={recheckStem}
           {pageCaptures}
+          {pageCapturing}
           bind:swapped
         />
 
