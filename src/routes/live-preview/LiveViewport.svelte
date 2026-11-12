@@ -261,6 +261,11 @@
   // Set when the timeout chose the continuous preview before the
   // capabilities answered; a later answer may still switch to last-pair.
   let modeByTimeout = false;
+  // The most recent successful capture's image ids on this visit, kept in
+  // every mode (pending included) so that entering last-pair mode later can
+  // show it; null before any capture and after a capture by the page, which
+  // may have superseded it.
+  let lastCaptureIds: number[] | null = null;
   let destroyed = false;
 
   function showsCapture(cam: number): boolean {
@@ -608,7 +613,8 @@
         // A newer operation owns the pane, so this image is discarded.
         if (url) URL.revokeObjectURL(url);
         // Invariant: a pane labelled "Last capture" shows an image of the
-        // most recent capture. If the pane still shows a capture older than
+        // most recent capture, also when last-pair mode is entered after it
+        // (enterLastPair shows lastCaptureIds through this same path). If the pane still shows a capture older than
         // this one, that capture is superseded: it goes, and the pane is
         // filled below like any empty one. A newer capture's image stays.
         if (nextKind[cam] === 'capture' && (captureTicketOf[cam] ?? 0) < ticket) {
@@ -641,6 +647,7 @@
   // may have been superseded, so the capture images go and each active
   // camera gets a fresh frame.
   function pageCaptured() {
+    lastCaptureIds = null;
     if (!lastPair) return;
     takeTicket([0, 1]);
     dropCaptures([0, 1]);
@@ -663,6 +670,15 @@
     }
     framesAvailable = frames;
     previewMode = continuous && frames ? 'continuous' : 'last-pair';
+    if (previewMode === 'last-pair') enterLastPair();
+  }
+
+  // Entering last-pair mode, at the first settle or on a late answer: a
+  // capture made before then shows as the last capture, through the same
+  // path as a capture's own result. Its pending ticket keeps the `$effect`'s
+  // fill off the panes it covers; the rest are filled with fetched frames.
+  function enterLastPair() {
+    if (lastCaptureIds && lastCaptureIds.length > 0) showCapturedPair(lastCaptureIds);
   }
 
   // The capabilities answered after the timeout had chosen the continuous
@@ -678,10 +694,17 @@
       previewInterval = null;
     }
     framesAvailable = frames;
+    // Polls that were failing would lose their notice with the reconnect
+    // banner, which last-pair mode does not show: they carry over as the
+    // last-pair failure message, cleared as usual by the next good frame or
+    // capture. The counter starts again, so it affects nothing later.
+    if (previewErrorCount > 0) previewFailed = true;
+    previewErrorCount = 0;
     const kinds: Record<number, 'capture' | 'preview'> = {};
     for (const cam of [0, 1]) if (previewUrls[cam]) kinds[cam] = 'preview';
     paneKind = kinds;
     previewMode = 'last-pair';
+    enterLastPair();
   }
 
   // The first of the capabilities answer and CAPABILITIES_TIMEOUT_MS
@@ -858,6 +881,7 @@
       cameraStatus.reportSuccess();
       onCaptureDone();
       // Not awaited: the thumbnails must not hold up the next capture.
+      lastCaptureIds = result.image_ids ?? [];
       if (lastPair) showCapturedPair(result.image_ids);
 
     } catch (error) {

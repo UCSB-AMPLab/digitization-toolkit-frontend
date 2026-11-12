@@ -858,3 +858,137 @@ describe('LiveViewport — a stale fetch changes no notice (NEH-334)', () => {
     });
   }
 });
+
+// External review: a capture made before last-pair mode is entered (the
+// capabilities still pending, or the timeout's continuous preview before a
+// late answer) is shown when the mode is entered.
+describe('LiveViewport — a capture before last-pair mode is entered (NEH-334)', () => {
+  const captureButton = () => page.getByRole('button', { name: en.lv_capture_btn, exact: true });
+  const pair = { 0: { w: 400, h: 300 }, 1: { w: 300, h: 400 } };
+  const thumbs = { 11: { w: 222, h: 300 }, 12: { w: 233, h: 300 } };
+
+  for (const answer of [{ continuous_preview: false }, { live_preview: false }] as const) {
+    const name = JSON.stringify(answer);
+
+    it(`capture while the capabilities are pending, then ${name}: the capture shows as the last capture`, async () => {
+      const caps = deferred<CameraCapabilities>();
+      vi.spyOn(camerasApi, 'getCapabilities').mockReturnValue(caps.promise);
+      const { previewCalls, thumbCalls } = stubFetch({ preview: pair, thumbs });
+      const dual = vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true, record_id: 5, image_ids: [11, 12] });
+      const screen = renderViewport(baseProps({ cameraMode: 'double' }));
+      await userEvent.click(captureButton());
+      await expect.poll(() => dual.mock.calls.length).toBe(1);
+      await settle();
+      expect(thumbCalls).toEqual([]);
+
+      caps.resolve({ ...CAPS, ...answer });
+      await waitForPane(screen.container, 0, 222);
+      await waitForPane(screen.container, 1, 233);
+      expect(paneSource(screen.container, 0)).toBe(en.lv_last_capture);
+      expect(paneSource(screen.container, 1)).toBe(en.lv_last_capture);
+      vi.advanceTimersByTime(10_000);
+      await settle();
+      expect([...thumbCalls].sort()).toEqual([11, 12]);
+      expect(previewCalls).toEqual([]);
+    });
+
+    it(`capture after the timeout started the continuous preview, then a late ${name}: the capture shows`, async () => {
+      fakeTimeoutToo();
+      const caps = deferred<CameraCapabilities>();
+      vi.spyOn(camerasApi, 'getCapabilities').mockReturnValue(caps.promise);
+      const { previewCalls, thumbCalls } = stubFetch({ preview: pair, thumbs });
+      vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true, record_id: 5, image_ids: [11, 12] });
+      const screen = renderViewport(baseProps({ cameraMode: 'double' }));
+      await runCapabilitiesTimeout(previewCalls);
+      await waitForPane(screen.container, 0, 400);
+      await waitForPane(screen.container, 1, 300);
+      await settle();
+
+      await userEvent.click(captureButton());
+      await settle();
+      expect(thumbCalls).toEqual([]);
+      const polled = previewCalls.length;
+
+      caps.resolve({ ...CAPS, ...answer });
+      await waitForPane(screen.container, 0, 222);
+      await waitForPane(screen.container, 1, 233);
+      expect(paneSource(screen.container, 0)).toBe(en.lv_last_capture);
+      expect(paneSource(screen.container, 1)).toBe(en.lv_last_capture);
+      vi.advanceTimersByTime(10_000);
+      await settle();
+      expect([...thumbCalls].sort()).toEqual([11, 12]);
+      expect(previewCalls.length).toBe(polled);
+    });
+  }
+
+  it('capture while pending, then a page capture, then false: a fetched frame, not the superseded capture', async () => {
+    const caps = deferred<CameraCapabilities>();
+    vi.spyOn(camerasApi, 'getCapabilities').mockReturnValue(caps.promise);
+    const { previewCalls, thumbCalls } = stubFetch({ preview: pair, thumbs });
+    const dual = vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true, record_id: 5, image_ids: [11, 12] });
+    const screen = renderViewport(baseProps({ cameraMode: 'double', pageCaptures: 0 }));
+    await userEvent.click(captureButton());
+    await expect.poll(() => dual.mock.calls.length).toBe(1);
+    await screen.rerender({ pageCaptures: 1 });
+    await settle();
+
+    caps.resolve({ ...CAPS, continuous_preview: false });
+    await waitForPane(screen.container, 0, 400);
+    await waitForPane(screen.container, 1, 300);
+    expect(paneSource(screen.container, 0)).toBe(en.lv_preview_unsaved);
+    expect(thumbCalls).toEqual([]);
+    expect([...previewCalls].sort()).toEqual([0, 1]);
+  });
+
+  it('capture while pending, then a continuous answer: nothing changes', async () => {
+    const caps = deferred<CameraCapabilities>();
+    vi.spyOn(camerasApi, 'getCapabilities').mockReturnValue(caps.promise);
+    const { previewCalls, thumbCalls } = stubFetch({ preview: pair, thumbs });
+    const dual = vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true, record_id: 5, image_ids: [11, 12] });
+    const screen = renderViewport(baseProps({ cameraMode: 'double' }));
+    await userEvent.click(captureButton());
+    await expect.poll(() => dual.mock.calls.length).toBe(1);
+
+    caps.resolve({ ...CAPS, continuous_preview: true });
+    await waitForPane(screen.container, 0, 400);
+    await waitForPane(screen.container, 1, 300);
+    vi.advanceTimersByTime(2000);
+    await expect.poll(() => previewCalls.length).toBe(4);
+    expect(thumbCalls).toEqual([]);
+    expect(screen.container.querySelector('.feed-source')).toBeNull();
+  });
+});
+
+describe('LiveViewport — failing polls before a late switch (NEH-334)', () => {
+  it('a late false after failed polls shows the refresh message, not the reconnect banner; a good refresh clears it', async () => {
+    fakeTimeoutToo();
+    const caps = deferred<CameraCapabilities>();
+    vi.spyOn(camerasApi, 'getCapabilities').mockReturnValue(caps.promise);
+    const opts = { preview: { 0: { w: 400, h: 300 } }, previewStatus: {} as Partial<Record<number, number>> };
+    const { previewCalls } = stubFetch(opts);
+    const screen = renderViewport(baseProps());
+    await runCapabilitiesTimeout(previewCalls);
+    await waitForPane(screen.container, 0, 400);
+    await settle();
+
+    // Two failed polls: below the reconnect banner's three, but failures.
+    opts.previewStatus = { 0: 500 };
+    vi.advanceTimersByTime(2000);
+    await expect.poll(() => previewCalls.length).toBe(2);
+    await settle();
+    vi.advanceTimersByTime(2000);
+    await expect.poll(() => previewCalls.length).toBe(3);
+    await settle();
+
+    caps.resolve({ ...CAPS, continuous_preview: false });
+    await expect.element(refreshButton()).toBeVisible();
+    await expect.poll(() => screen.container.textContent ?? '').toContain(en.lv_preview_failed);
+    expect(screen.container.textContent).not.toContain(en.lv_reconnecting);
+    expect(previewCalls.length).toBe(3);
+
+    opts.previewStatus = {};
+    await userEvent.click(refreshButton());
+    await expect.poll(() => screen.container.textContent ?? '').not.toContain(en.lv_preview_failed);
+    expect(paneSource(screen.container, 0)).toBe(en.lv_preview_unsaved);
+  });
+});
