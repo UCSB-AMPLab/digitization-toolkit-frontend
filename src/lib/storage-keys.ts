@@ -12,7 +12,9 @@ export const STORAGE_KEYS = {
   captureChord: `${PREFIX}capture_chord`,
   activityView: `${PREFIX}activity_view`,
   inProgressView: `${PREFIX}dashboard_in_progress_view`,
-  tourSeen: (userId: number | string) => `${PREFIX}tour_visto:${userId}`
+  tourSeen: (userId: number | string) => `${PREFIX}tour_visto:${userId}`,
+  // NEH-339: the time (ms since the epoch) of the user's last focus check or capture.
+  focusCheck: (userId: number | string) => `${PREFIX}focus_check:${userId}`
 } as const;
 
 function legacyName(key: string): string {

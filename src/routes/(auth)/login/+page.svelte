@@ -94,7 +94,7 @@
 				return;
 			}
 
-			authStore.setSession(userData);
+			authStore.setSession(userData, { signIn: true });
 
 			goto('/dashboard');
 		} catch (error) {

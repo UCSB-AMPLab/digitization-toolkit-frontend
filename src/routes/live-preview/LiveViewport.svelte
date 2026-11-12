@@ -62,6 +62,7 @@
     swapped = $bindable(false),
     pageCaptures = 0,
     pageCapturing = false,
+    onRefocus,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -103,6 +104,9 @@
     // is in flight. The cameras are busy with it, so no preview frame is
     // asked for meanwhile, as during this viewport's own capture.
     pageCapturing?: boolean;
+    // NEH-339: opens the page's focus check. Passed only on a unit whose
+    // capabilities report DSLR settings; without it there is no button.
+    onRefocus?: () => void;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -1352,6 +1356,22 @@
           <span class="material-symbols-outlined" style="font-size:22px" aria-hidden="true">refresh</span>
         </button>
       {/if}
+      {#if onRefocus}
+        <!-- NEH-339: the focus check, on the other side of the capture button,
+             in the same panel style. Not while the cameras are capturing. -->
+        <button
+          class="float-btn refocus-btn"
+          onclick={onRefocus}
+          disabled={camerasBusy}
+          aria-label={$m.focus_refocus}
+          title={$m.focus_refocus}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      {/if}
     </div>
 
   </div><!-- /mat-board -->
@@ -1831,6 +1851,21 @@
 
   .refresh-preview-btn:hover:not(:disabled) { background-color: rgba(26,24,21,0.9); }
   .refresh-preview-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* "Refocus" (NEH-339): the mirror of "Refresh preview", to the left of
+     the capture button. */
+  .refocus-btn {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 16px);
+    transform: translateY(-50%);
+    background-color: rgba(26,24,21,0.9);
+    border: 1px solid rgba(90,140,98,0.3);
+    border-radius: 50%;
+  }
+
+  .refocus-btn:hover:not(:disabled) { background-color: rgba(26,24,21,0.9); }
+  .refocus-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .capture-ring {
     position: absolute;

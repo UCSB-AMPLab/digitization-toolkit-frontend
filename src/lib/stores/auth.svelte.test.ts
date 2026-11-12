@@ -14,6 +14,7 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 import { goto } from '$app/navigation';
 import { authStore, readInitialUser, type AuthUser } from './auth';
+import { readFocusActivity, recordFocusActivity } from '$lib/focus-check';
 
 const user: AuthUser = {
 	id: 1,
@@ -94,5 +95,24 @@ describe('migration from the localStorage token', () => {
 
 		expect(authStore.requireSession()).toBe(false);
 		expect(goto).toHaveBeenCalledWith('/login');
+	});
+});
+
+// NEH-339: every sign-in asks for a focus check on the capture screen again.
+// The dashboard's revalidation of a session already open (setSession without
+// signIn) keeps the last check, so returning to the capture screen within 15
+// minutes does not ask again.
+describe('the focus check and the sign-in', () => {
+	it('a sign-in clears the last focus check of that user', () => {
+		recordFocusActivity(user.id, Date.now());
+		authStore.setSession(user, { signIn: true });
+		expect(readFocusActivity(user.id)).toBeNull();
+	});
+
+	it('revalidating a session keeps it', () => {
+		const at = Date.now();
+		recordFocusActivity(user.id, at);
+		authStore.setSession(user);
+		expect(readFocusActivity(user.id)).toBe(at);
 	});
 });

@@ -20,6 +20,7 @@ vi.mock('$app/stores', () => ({
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { authStore } from '$lib/stores/auth';
+import { clearFocusActivity, recordFocusActivity } from '$lib/focus-check';
 import { locale } from '$lib/i18n';
 import { es } from '$lib/i18n/es';
 import '../../app.css';
@@ -70,11 +71,14 @@ beforeEach(() => {
 	locale.set('es');
 	current.url = 'http://localhost/live-preview?projectId=2&collectionId=9&recordId=41';
 	authStore.setSession({ id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
+	// A focus check just done, so the DSLR unit's check (NEH-339) does not open over the retake.
+	recordFocusActivity(1, Date.now());
 });
 
 afterEach(() => {
 	vi.restoreAllMocks();
 	authStore.clearSession();
+	clearFocusActivity(1);
 });
 
 describe('capture screen: "Refresh preview" during a retake (NEH-334)', () => {
