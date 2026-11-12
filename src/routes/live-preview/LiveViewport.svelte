@@ -8,12 +8,18 @@
   // a single JPEG frame. The frame's resolution is the backend's default for
   // that endpoint, since no `resolution` parameter is sent from here.
   //
+  // A unit whose capabilities report `continuous_preview: false` (DSLR and
+  // compact bodies, NEH-334) is not polled: each pane shows one frame
+  // fetched on entry, then the last capture's image for its camera, and
+  // "Refresh preview" fetches one new frame from each camera on request.
+  // A label on each pane says which of the two it shows.
+  //
   // Version: 0.3.3
 
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import { m } from '$lib/i18n';
   import { browser } from '$app/environment';
-  import { camerasApi, sessionRequestInit, getApiBase, type CameraDevice } from '$lib/api';
+  import { camerasApi, recordsApi, hasContinuousPreview, sessionRequestInit, getApiBase, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
@@ -54,6 +60,7 @@
     stemNote = '',
     onStemRefused,
     swapped = $bindable(false),
+    pageCaptures = 0,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -87,6 +94,10 @@
     // own dual captures (a placeholder's, NEH-317) send the same
     // left_camera_index as this viewport's.
     swapped?: boolean;
+    // Counts the captures the page makes outside this viewport (retakes and
+    // placeholders, NEH-334). Each increase clears the last capture shown in
+    // last-pair mode, which such a capture may have superseded.
+    pageCaptures?: number;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -214,6 +225,61 @@
   // index. Which index shows on the left depends on `swapped`.
   let previewUrls = $state<Record<number, string>>({});
 
+  // How the panes are fed (NEH-334): 'pending' until the capabilities
+  // answer, then 'continuous' (polled, as before) or 'last-pair' (one frame
+  // on entry, the last capture after each capture, a frame on request). A
+  // missing field, a failed request or no answer within
+  // CAPABILITIES_TIMEOUT_MS means 'continuous'.
+  let previewMode = $state<'pending' | 'continuous' | 'last-pair'>('pending');
+  let lastPair = $derived(previewMode === 'last-pair');
+  // False when the backend reports `live_preview: false` (it cannot return a
+  // frame): last-pair mode then fetches nothing and has no refresh button.
+  let framesAvailable = $state(true);
+  const CAPABILITIES_TIMEOUT_MS = 5000;
+  let capabilitiesTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // In last-pair mode: object URLs of the most recent capture's thumbnails,
+  // and what each camera's pane shows (nothing when absent), both keyed by
+  // camera index. captureUrls only ever holds images of the most recent
+  // capture, so a pane labelled "Last capture" never shows an older one.
+  let captureUrls = $state<Record<number, string>>({});
+  let paneKind = $state<Record<number, 'capture' | 'preview'>>({});
+  // Last-pair fetches in flight; the refresh button waits for them.
+  let framesInFlight = $state(0);
+  // A last-pair fetch failed (other than a 404); cleared by the next good
+  // frame or capture. Nothing retries, so the reconnect banner would mislead.
+  let previewFailed = $state(false);
+  // Each operation that sets panes takes a ticket and writes it against the
+  // cameras it covers; on completion it sets a pane only if that pane's
+  // ticket is still its own, so a slow answer never covers a newer one.
+  let ticketSeq = 0;
+  const paneTicket: Record<number, number> = {};
+  // The ticket of the capture whose image each pane shows, and the tickets
+  // of captures whose thumbnails are still loading.
+  const captureTicketOf: Record<number, number> = {};
+  const pendingCaptures = new Set<number>();
+  // Set when the timeout chose the continuous preview before the
+  // capabilities answered; a later answer may still switch to last-pair.
+  let modeByTimeout = false;
+  let destroyed = false;
+
+  function showsCapture(cam: number): boolean {
+    return lastPair && paneKind[cam] === 'capture' && !!captureUrls[cam];
+  }
+
+  function shownUrl(cam: number): string | undefined {
+    if (!lastPair) return previewUrls[cam];
+    if (paneKind[cam] === 'capture') return captureUrls[cam];
+    if (paneKind[cam] === 'preview') return previewUrls[cam];
+    return undefined;
+  }
+
+  // A stored capture's thumbnail is already upright (the backend writes the
+  // rotation into the file), so only a live frame is rotated on screen.
+  function paneRotation(cam: number): number {
+    return showsCapture(cam) ? 0 : rotateDeg[cam] ?? 0;
+  }
+
   // References to the live preview <img> elements for pixel sampling.
   let imgEl0: HTMLImageElement | null = $state(null);
   let imgEl1: HTMLImageElement | null = $state(null);
@@ -243,9 +309,9 @@
   // the two panels' widths at a common height.
   let viewportAspect = $derived(computeViewportAspect(
     [
-      naturalW0 && naturalH0 ? { w: naturalW0, h: naturalH0, rotation: rotateDeg[leftIdx] ?? 0 } : null,
+      naturalW0 && naturalH0 ? { w: naturalW0, h: naturalH0, rotation: paneRotation(leftIdx) } : null,
       cameraMode === 'double' && naturalW1 && naturalH1
-        ? { w: naturalW1, h: naturalH1, rotation: rotateDeg[rightIdx] ?? 0 }
+        ? { w: naturalW1, h: naturalH1, rotation: paneRotation(rightIdx) }
         : null,
     ],
     cameraMode
@@ -260,10 +326,10 @@
   // other panel's shape instead of an even 1:1 — it falls back to 1 only when
   // neither has one.
   let leftFrameAspect = $derived(
-    frameAspect({ w: naturalW0, h: naturalH0, rotation: rotateDeg[leftIdx] ?? 0 })
+    frameAspect({ w: naturalW0, h: naturalH0, rotation: paneRotation(leftIdx) })
   );
   let rightFrameAspect = $derived(
-    frameAspect({ w: naturalW1, h: naturalH1, rotation: rotateDeg[rightIdx] ?? 0 })
+    frameAspect({ w: naturalW1, h: naturalH1, rotation: paneRotation(rightIdx) })
   );
   let leftFeedAspect = $derived(panelGrowFactor(leftFrameAspect, rightFrameAspect));
   let rightFeedAspect = $derived(panelGrowFactor(rightFrameAspect, leftFrameAspect));
@@ -337,8 +403,10 @@
   // tabs, to save resources on the Raspberry Pi.
   let previewActive = $state(true);
 
-  // One fetch in flight per camera, so requests never overlap.
-  let fetchingPreview: Record<number, boolean> = { 0: false, 1: false };
+  // One fetch in flight per camera, so requests never overlap: a second
+  // caller while one is in flight shares its answer.
+  type PreviewResult = 'ok' | 'missing' | 'error' | 'skipped';
+  const previewInFlight: Record<number, Promise<PreviewResult> | undefined> = {};
 
   // Consecutive preview errors — the reconnect banner shows after 3.
   let previewErrorCount = $state(0);
@@ -358,10 +426,20 @@
   // Calls GET /cameras/preview/{cameraIndex} (the endpoint is in the
   // backend's cameras.py). A 404 does not count toward the reconnect banner.
   // The previous object URL is revoked so frames do not leak memory.
-  async function fetchPreview(cameraIndex: number) {
-    if (fetchingPreview[cameraIndex] || !previewActive) return;
+  // Resolves 'ok' when a new frame arrived, 'missing' on a 404, 'error' on
+  // any other failure and 'skipped' while the tab is hidden.
+  function fetchPreview(cameraIndex: number): Promise<PreviewResult> {
+    const inFlight = previewInFlight[cameraIndex];
+    if (inFlight) return inFlight;
+    if (!previewActive) return Promise.resolve('skipped');
+    const request = requestPreview(cameraIndex).finally(() => {
+      previewInFlight[cameraIndex] = undefined;
+    });
+    previewInFlight[cameraIndex] = request;
+    return request;
+  }
 
-    fetchingPreview[cameraIndex] = true;
+  async function requestPreview(cameraIndex: number): Promise<PreviewResult> {
     try {
       const response = await fetch(
         `${getApiBase()}/cameras/preview/${cameraIndex}`,
@@ -381,21 +459,235 @@
         if (cameraMissing[cameraIndex]) {
           cameraMissing = { ...cameraMissing, [cameraIndex]: false };
         }
+        return 'ok';
       } else if (response.status === 404) {
         // 404: the camera is not connected or its frame could not be
         // captured. It does not count as an error, but it shows in the
         // per-camera overlay (NEH-229).
         cameraMissing = { ...cameraMissing, [cameraIndex]: true };
+        return 'missing';
       } else {
         // Other errors (500, etc.) count toward the banner.
         previewErrorCount += 1;
+        return 'error';
       }
     } catch {
       // A network error counts toward the reconnect banner.
       previewErrorCount += 1;
-    } finally {
-      fetchingPreview[cameraIndex] = false;
+      return 'error';
     }
+  }
+
+  function activeCameras(): number[] {
+    return cameraMode === 'double' ? [0, 1] : [0];
+  }
+
+  function takeTicket(cams: number[]): number {
+    const ticket = ++ticketSeq;
+    for (const cam of cams) paneTicket[cam] = ticket;
+    return ticket;
+  }
+
+  function holdsTicket(cam: number, ticket: number): boolean {
+    return !destroyed && paneTicket[cam] === ticket;
+  }
+
+  // Last-pair mode: fetches one frame for each of the given cameras and
+  // shows the ones that arrived as a preview, on the panes no newer
+  // operation has taken over. A 404 marks the camera missing; any other
+  // failure shows the refresh message; nothing asks again by itself.
+  async function fetchFrames(cams: number[]) {
+    if (!framesAvailable || cams.length === 0) return;
+    const ticket = takeTicket(cams);
+    framesInFlight += 1;
+    try {
+      const results = await Promise.all(cams.map(cam => fetchPreview(cam)));
+      if (destroyed) return;
+      if (results.includes('error')) previewFailed = true;
+      else if (results.includes('ok')) previewFailed = false;
+      const next = { ...paneKind };
+      cams.forEach((cam, i) => {
+        if (results[i] === 'ok' && holdsTicket(cam, ticket)) next[cam] = 'preview';
+      });
+      paneKind = next;
+    } finally {
+      framesInFlight -= 1;
+    }
+  }
+
+  // "Refresh preview": one frame from each active camera. Never while a
+  // capture or another last-pair fetch is in flight.
+  function refreshPreview() {
+    if (!lastPair || framesInFlight > 0 || isCapturing) return;
+    fetchFrames(activeCameras());
+  }
+
+  // Last-pair mode, on entry, when the camera mode changes, when the tab
+  // becomes visible and after a capture: a frame for each active camera
+  // whose pane has nothing to show, unless a capture whose thumbnails are
+  // still loading owns the pane and will fill it.
+  function fillEmptyPanes() {
+    fetchFrames(activeCameras().filter(cam => !shownUrl(cam) && !pendingCaptures.has(paneTicket[cam])));
+  }
+
+  // Drops the capture images of the given cameras; their panes show nothing
+  // until a frame arrives.
+  function dropCaptures(cams: number[]) {
+    const nextUrls = { ...captureUrls };
+    const nextKind = { ...paneKind };
+    for (const cam of cams) {
+      if (nextUrls[cam]) URL.revokeObjectURL(nextUrls[cam]);
+      delete nextUrls[cam];
+      if (nextKind[cam] === 'capture') delete nextKind[cam];
+    }
+    captureUrls = nextUrls;
+    paneKind = nextKind;
+  }
+
+  // Fetches a stored image's thumbnail as an object URL, as the preview
+  // frames are, so the pane's <img> and the histogram read it the same way.
+  // null when it cannot be had (a RAW master without a preview has none).
+  async function fetchThumbnail(imageId: number): Promise<string | null> {
+    try {
+      const response = await fetch(recordsApi.getImageThumbnailUrl(imageId), sessionRequestInit());
+      if (!response.ok) return null;
+      return URL.createObjectURL(await response.blob());
+    } catch {
+      return null;
+    }
+  }
+
+  // Last-pair mode, after a successful capture: each pane shows the
+  // capture's image from its own camera. The backend lists image_ids in
+  // camera order (camera 0, then camera 1), whichever page each took, so
+  // the pane of the camera on the left shows the left page. A camera the
+  // capture did not use loses its older capture image; a camera whose
+  // thumbnail cannot be had loses it too and gets a fresh frame instead, so
+  // "Last capture" only ever labels this capture's images.
+  async function showCapturedPair(imageIds: number[] | undefined) {
+    const ids = imageIds ?? [];
+    const ticket = takeTicket([0, 1]);
+    previewFailed = false;
+    // Counted as a fetch in flight, so "Refresh preview" waits for the
+    // thumbnails instead of racing them.
+    pendingCaptures.add(ticket);
+    framesInFlight += 1;
+    let urls: (string | null)[];
+    try {
+      urls = await Promise.all(ids.map(id => fetchThumbnail(id)));
+    } finally {
+      pendingCaptures.delete(ticket);
+      framesInFlight -= 1;
+    }
+    if (destroyed) {
+      urls.forEach(url => { if (url) URL.revokeObjectURL(url); });
+      return;
+    }
+    const nextUrls = { ...captureUrls };
+    const nextKind = { ...paneKind };
+    const nextMissing = { ...cameraMissing };
+    for (const cam of [0, 1]) {
+      const url = urls[cam] ?? null;
+      if (!holdsTicket(cam, ticket)) {
+        // A newer operation owns the pane, so this image is discarded.
+        if (url) URL.revokeObjectURL(url);
+        // Invariant: a pane labelled "Last capture" shows an image of the
+        // most recent capture. If the pane still shows a capture older than
+        // this one, that capture is superseded: it goes, and the pane is
+        // filled below like any empty one. A newer capture's image stays.
+        if (nextKind[cam] === 'capture' && (captureTicketOf[cam] ?? 0) < ticket) {
+          if (nextUrls[cam]) URL.revokeObjectURL(nextUrls[cam]);
+          delete nextUrls[cam];
+          delete nextKind[cam];
+        }
+        continue;
+      }
+      if (nextUrls[cam]) URL.revokeObjectURL(nextUrls[cam]);
+      delete nextUrls[cam];
+      if (url) {
+        nextUrls[cam] = url;
+        nextKind[cam] = 'capture';
+        captureTicketOf[cam] = ticket;
+        nextMissing[cam] = false;
+      } else if (cam < ids.length || nextKind[cam] === 'capture') {
+        // In this capture without a thumbnail, or showing an older capture.
+        delete nextKind[cam];
+      }
+    }
+    captureUrls = nextUrls;
+    paneKind = nextKind;
+    cameraMissing = nextMissing;
+    // The cameras whose thumbnail failed are empty now, so this covers them.
+    fillEmptyPanes();
+  }
+
+  // The page captured outside this viewport (NEH-334): what the panes show
+  // may have been superseded, so the capture images go and each active
+  // camera gets a fresh frame.
+  function pageCaptured() {
+    if (!lastPair) return;
+    takeTicket([0, 1]);
+    dropCaptures([0, 1]);
+    fetchFrames(activeCameras());
+  }
+
+  let seenPageCaptures = untrack(() => pageCaptures);
+  $effect(() => {
+    const count = pageCaptures;
+    if (count === seenPageCaptures) return;
+    seenPageCaptures = count;
+    untrack(pageCaptured);
+  });
+
+  function settlePreviewMode(continuous: boolean, frames: boolean) {
+    if (destroyed || previewMode !== 'pending') return;
+    if (capabilitiesTimer) {
+      clearTimeout(capabilitiesTimer);
+      capabilitiesTimer = null;
+    }
+    framesAvailable = frames;
+    previewMode = continuous && frames ? 'continuous' : 'last-pair';
+  }
+
+  // The capabilities answered after the timeout had chosen the continuous
+  // preview. The answer is authoritative: if it rules out polling, the
+  // polling stops, the frames already on screen are labelled as previews,
+  // and the `$effect` below fills the empty panes. Otherwise nothing changes.
+  function lateAnswer(continuous: boolean, frames: boolean) {
+    if (destroyed || !modeByTimeout || previewMode !== 'continuous') return;
+    modeByTimeout = false;
+    if (continuous && frames) return;
+    if (previewInterval) {
+      clearInterval(previewInterval);
+      previewInterval = null;
+    }
+    framesAvailable = frames;
+    const kinds: Record<number, 'capture' | 'preview'> = {};
+    for (const cam of [0, 1]) if (previewUrls[cam]) kinds[cam] = 'preview';
+    paneKind = kinds;
+    previewMode = 'last-pair';
+  }
+
+  // The first of the capabilities answer and CAPABILITIES_TIMEOUT_MS
+  // decides the mode; an answer after the timeout goes to lateAnswer.
+  async function loadPreviewMode() {
+    capabilitiesTimer = setTimeout(() => {
+      capabilitiesTimer = null;
+      if (destroyed || previewMode !== 'pending') return;
+      modeByTimeout = true;
+      settlePreviewMode(true, true);
+    }, CAPABILITIES_TIMEOUT_MS);
+    let continuous = true;
+    let frames = true;
+    try {
+      const caps = await camerasApi.getCapabilities();
+      continuous = hasContinuousPreview(caps);
+      frames = caps?.live_preview !== false;
+    } catch {
+      // No capabilities: the continuous preview, as before.
+    }
+    if (modeByTimeout) lateAnswer(continuous, frames);
+    else settlePreviewMode(continuous, frames);
   }
 
   // Called by the `$effect` below (on mount and whenever cameraMode changes)
@@ -422,7 +714,10 @@
   function handleVisibilityChange() {
     previewActive = !document.hidden;
     if (previewActive) {
-      startPreviewPolling();
+      // Only the continuous preview resumes; last-pair mode never polls,
+      // but fills a pane left empty while the tab was hidden.
+      if (previewMode === 'continuous') startPreviewPolling();
+      else if (previewMode === 'last-pair') fillEmptyPanes();
     } else {
       if (previewInterval) {
         clearInterval(previewInterval);
@@ -435,25 +730,35 @@
   }
 
   onMount(() => {
-    // Only the visibility listener is registered here. startPreviewPolling()
-    // is called from the `$effect` below, which also runs on mount; calling
-    // it here as well would start two polling cycles.
+    // Only the visibility listener and the capabilities request start here.
+    // startPreviewPolling() is called from the `$effect` below once the
+    // capabilities have answered; calling it here as well would start two
+    // polling cycles.
     if (browser) {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
+    loadPreviewMode();
   });
 
-  // Restart polling when the camera mode changes (e.g. from single to double,
-  // so camera 1 is fetched as well).
+  // Once the capabilities have answered, and whenever the camera mode
+  // changes: the continuous preview (re)starts polling (e.g. from single to
+  // double, so camera 1 is fetched as well); last-pair mode fetches a frame
+  // only for a pane that has nothing to show.
   $effect(() => {
     const _mode = cameraMode; // read to subscribe the effect to cameraMode
-    startPreviewPolling();
+    if (previewMode === 'continuous') {
+      startPreviewPolling();
+    } else if (previewMode === 'last-pair') {
+      untrack(fillEmptyPanes);
+    }
   });
 
   onDestroy(() => {
+    destroyed = true;
     if (previewInterval) clearInterval(previewInterval);
+    if (capabilitiesTimer) clearTimeout(capabilitiesTimer);
 
-    Object.values(previewUrls).forEach(url => {
+    [...Object.values(previewUrls), ...Object.values(captureUrls)].forEach(url => {
       try { URL.revokeObjectURL(url); } catch {}
     });
 
@@ -536,6 +841,8 @@
 
       cameraStatus.reportSuccess();
       onCaptureDone();
+      // Not awaited: the thumbnails must not hold up the next capture.
+      if (lastPair) showCapturedPair(result.image_ids);
 
     } catch (error) {
       console.error('[LiveViewport] Capture error:', error);
@@ -712,7 +1019,16 @@
         </div>
       {/if}
 
-      {#if previewConnectError}
+      {#if lastPair}
+        <!-- NEH-334: nothing retries in last-pair mode, so one failure says
+             how to try again instead of "Reconnecting". -->
+        {#if previewFailed}
+          <div class="reconnect-banner preview-failed" class:stacked={$cameraStatus.captureError} role="status">
+            <span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span>
+            {$m.lv_preview_failed}
+          </div>
+        {/if}
+      {:else if previewConnectError}
         <div class="reconnect-banner" class:stacked={$cameraStatus.captureError}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
@@ -724,19 +1040,19 @@
       <div class="camera-feeds-wrapper" style="transform: scale({zoom})">
 
         <div class="camera-feed" bind:clientWidth={feedW0} bind:clientHeight={feedH0} style="flex-grow: {leftFeedAspect}">
-          {#if previewUrls[leftIdx]}
+          {#if shownUrl(leftIdx)}
             <img
               bind:this={imgEl0}
               bind:naturalWidth={naturalW0}
               bind:naturalHeight={naturalH0}
-              src={previewUrls[leftIdx]}
+              src={shownUrl(leftIdx)}
               alt={$m.lv_camera_left_alt}
               class="feed-img"
-              style={feedRotateStyle(rotateDeg[leftIdx] ?? 0, feedW0, feedH0)}
+              style={feedRotateStyle(paneRotation(leftIdx), feedW0, feedH0)}
               onload={() => { if (imgEl0) histogramStore.update(s => ({ ...s, [leftIdx]: computeHistogram(imgEl0!) })); }}
             />
             <!-- WB sampling overlay: visible only when picker is active for this camera -->
-            {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === leftIdx}
+            {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === leftIdx && !showsCapture(leftIdx)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
@@ -764,6 +1080,11 @@
             <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
           {/if}
           <div class="feed-label">{cameraLabel(leftIdx)}</div>
+          <!-- Last-pair mode (NEH-334): whether the pane shows the last capture
+               or a frame fetched on request, which is not saved. -->
+          {#if lastPair && shownUrl(leftIdx)}
+            <div class="feed-source">{showsCapture(leftIdx) ? $m.lv_last_capture : $m.lv_preview_unsaved}</div>
+          {/if}
           <!-- Floating rotation overlay -->
           <div class="feed-rotate-overlay">
             <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, -90)} aria-label={$m.lv_rotate_ccw} title={$m.lv_rotate_ccw}>
@@ -784,18 +1105,18 @@
 
         {#if cameraMode === 'double'}
           <div class="camera-feed" bind:clientWidth={feedW1} bind:clientHeight={feedH1} style="flex-grow: {rightFeedAspect}">
-            {#if previewUrls[rightIdx]}
+            {#if shownUrl(rightIdx)}
               <img
                 bind:this={imgEl1}
                 bind:naturalWidth={naturalW1}
                 bind:naturalHeight={naturalH1}
-                src={previewUrls[rightIdx]}
+                src={shownUrl(rightIdx)}
                 alt={$m.lv_camera_right_alt}
                 class="feed-img"
-                style={feedRotateStyle(rotateDeg[rightIdx] ?? 0, feedW1, feedH1)}
+                style={feedRotateStyle(paneRotation(rightIdx), feedW1, feedH1)}
                 onload={() => { if (imgEl1) histogramStore.update(s => ({ ...s, [rightIdx]: computeHistogram(imgEl1!) })); }}
               />
-              {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === rightIdx}
+              {#if $wbSamplingStore.active && $wbSamplingStore.cameraIndex === rightIdx && !showsCapture(rightIdx)}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
@@ -823,6 +1144,9 @@
               <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
             {/if}
             <div class="feed-label right">{cameraLabel(rightIdx)}</div>
+            {#if lastPair && shownUrl(rightIdx)}
+              <div class="feed-source right">{showsCapture(rightIdx) ? $m.lv_last_capture : $m.lv_preview_unsaved}</div>
+            {/if}
             <!-- Floating rotation overlay -->
             <div class="feed-rotate-overlay">
               <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, -90)} aria-label={$m.lv_rotate_ccw} title={$m.lv_rotate_ccw}>
@@ -967,6 +1291,19 @@
         <div class="capture-ring middle"></div>
         <div class="capture-circle"></div>
       </button>
+      {#if lastPair && framesAvailable}
+        <!-- NEH-334: one live frame from each camera, never a capture. It sits
+             beside the capture button, smaller and in the panel's colours. -->
+        <button
+          class="float-btn refresh-preview-btn"
+          onclick={refreshPreview}
+          disabled={framesInFlight > 0 || isCapturing}
+          aria-label={$m.lv_refresh_preview}
+          title={$m.lv_refresh_preview}
+        >
+          <span class="material-symbols-outlined" style="font-size:22px" aria-hidden="true">refresh</span>
+        </button>
+      {/if}
     </div>
 
   </div><!-- /mat-board -->
@@ -1151,6 +1488,10 @@
      it is not hidden under the failed-capture banner. */
   .reconnect-banner.stacked { top: 52px; }
 
+  /* Last-pair mode's failed fetch: the same banner, still, since nothing is
+     being retried. */
+  .reconnect-banner.preview-failed { animation: none; }
+
   @keyframes pulse-opacity {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.6; }
@@ -1253,6 +1594,26 @@
   }
 
   .feed-label.right { left: auto; right: 8px; }
+
+  /* What a pane shows in last-pair mode (NEH-334), under the camera's
+     label and in its style, lighter. */
+  .feed-source {
+    position: absolute;
+    top: 44px;
+    left: 8px;
+    background: rgba(19,17,16,0.75);
+    backdrop-filter: blur(2px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: var(--fw-medium);
+    color: var(--color-light-grey);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .feed-source.right { left: auto; right: 8px; }
 
   .no-stream {
     display: flex;
@@ -1406,6 +1767,22 @@
   }
 
   .capture-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* "Refresh preview" (NEH-334): a panel button to the right of the capture
+     button, which stays centred; the background and border are the
+     floating panel's, so it reads as a control, not a second shutter. */
+  .refresh-preview-btn {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 16px);
+    transform: translateY(-50%);
+    background-color: rgba(26,24,21,0.9);
+    border: 1px solid rgba(90,140,98,0.3);
+    border-radius: 50%;
+  }
+
+  .refresh-preview-btn:hover:not(:disabled) { background-color: rgba(26,24,21,0.9); }
+  .refresh-preview-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .capture-ring {
     position: absolute;

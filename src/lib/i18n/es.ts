@@ -1001,6 +1001,12 @@ export const es = {
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
 	lv_zoom_out: 'Alejar',
+	// NEH-334: units without a continuous preview show the last capture and
+	// fetch a live frame only on request.
+	lv_refresh_preview: 'Actualizar previsualización',
+	lv_last_capture: 'Última captura',
+	lv_preview_unsaved: 'Previsualización (sin guardar)',
+	lv_preview_failed: 'No se pudo obtener la previsualización. Presiona "Actualizar previsualización" para intentar de nuevo.',
 	lv_thumb_empty: 'Sin capturas aún — usa el botón de captura',
 	tb_go_to_review: 'Revisar',
 	tb_go_to_review_title: 'Volver a la revisión de este volumen',

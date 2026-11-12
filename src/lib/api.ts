@@ -1506,6 +1506,18 @@ export interface CameraCapabilities {
   zoom: boolean;
   autofocus_calibration: boolean;
   dslr_settings: boolean;
+  // NEH-334: false on units whose cameras should not be polled for a
+  // preview (DSLR and compact bodies); the capture screen then shows the
+  // last capture and fetches a live frame only on request. Absent from a
+  // backend that predates it, which polls as before.
+  continuous_preview?: boolean;
+}
+
+// Whether the capture screen polls the preview continuously. Only an
+// explicit false turns it off; a missing field or no capabilities at all
+// keep the continuous preview.
+export function hasContinuousPreview(caps: CameraCapabilities | null | undefined): boolean {
+  return caps?.continuous_preview !== false;
 }
 
 export interface DSLRSettings {
