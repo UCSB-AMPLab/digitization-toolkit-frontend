@@ -1418,6 +1418,13 @@ export interface CameraDevice {
   // Capabilities
   has_aperture_control?: boolean;
   supports_zoom?: boolean;
+  // NEH-339: the stepped zoom of a CHDK camera. zoom_steps is the count of
+  // steps (64 on the PowerShot A2500, so the steps run 0..zoom_steps - 1);
+  // zoom_step is the step the camera last confirmed. Both are null until the
+  // camera has entered shooting mode, which a preview or a test capture
+  // causes, and absent from a backend that predates them.
+  zoom_steps?: number | null;
+  zoom_step?: number | null;
 }
 
 export interface CaptureRequest {
@@ -1514,6 +1521,15 @@ export interface CameraCapabilities {
   // last capture and fetches a live frame only on request. Absent from a
   // backend that predates it, which polls as before.
   continuous_preview?: boolean;
+  // NEH-339: true only for CHDK cameras, whose zoom is set in steps
+  // (camerasApi.setZoomStep). Unrelated to `zoom`, the digital crop.
+  zoom_steps?: boolean;
+}
+
+// The answer to camerasApi.setZoomStep(): the step the camera confirmed.
+export interface ZoomStepResponse {
+  detail: string;
+  zoom_step: number;
 }
 
 // Whether the capture screen polls the preview continuously. Only an
@@ -1671,6 +1687,22 @@ export const camerasApi = {
     await apiRequest(`/cameras/settings/${cameraIndex}`, {
       method: 'POST',
       body: JSON.stringify(controls)
+    });
+  },
+
+  /**
+   * Set the zoom of a CHDK camera to a step, 0..zoom_steps - 1 (NEH-339).
+   * Resolves with the step the camera confirmed; a move takes about a
+   * second. Refusals keep the backend's status and detail: 422 for a step
+   * out of range or not an integer (a string detail, or pydantic's list,
+   * kept in ApiError.detail), 501 for a backend without stepped zoom, 404
+   * for no camera at that index, 502 when the camera did not move the lens
+   * or did not answer.
+   */
+  async setZoomStep(cameraIndex: number, step: number): Promise<ZoomStepResponse> {
+    return apiRequest<ZoomStepResponse>(`/cameras/settings/${cameraIndex}`, {
+      method: 'POST',
+      body: JSON.stringify({ zoom_step: step })
     });
   },
 

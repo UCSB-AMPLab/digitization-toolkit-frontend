@@ -15,9 +15,10 @@
   //    fire, which on AF means it found no focus. The backend never stores
   //    these pictures; here they live as object URLs, revoked when replaced
   //    and when the dialog closes. The pair opens at 1:1 on the centre,
-  //    under one shared zoom and pan (src/lib/pan-zoom.ts, as in
+  //    under one shared zoom and pan (src/lib/pair-pan-zoom.svelte.ts, as in
   //    ImageViewerModal). Each picture shows its focal length when the
-  //    backend sends one, and two different ones get a line saying so.
+  //    backend sends one, and two different ones get a line saying so
+  //    (focalMismatch, shared with the camera check).
   // 3. Manual focus: both switches back to MF, the focus ring untouched.
   //    "Continue" waits until both cameras read MF (REQUIRE_MF_READING); a
   //    camera whose reading has failed CONTINUE_ANYWAY_AFTER times in a row
@@ -48,24 +49,12 @@
     FOCUS_POLL_MS,
     REQUIRE_MF_READING,
     canContinue,
+    focalMismatch as mismatchOf,
     mfWarning,
     nextFailedReadings,
   } from '$lib/focus-check';
   import { dismissible, toBody, trapFocus } from '$lib/dialog';
-  import {
-    fittedSize,
-    screenExtent,
-    oneToOneZoom,
-    effectiveOneToOne,
-    pageScale,
-    panBounds,
-    panPixels,
-    dragToFraction,
-    stepZoom,
-    transformFor,
-    type Pan,
-    type PanFraction,
-  } from '$lib/pan-zoom';
+  import { PairPanZoom } from '$lib/pair-pan-zoom.svelte';
 
   let {
     leftIndex = 0,
@@ -169,8 +158,7 @@
     const left = shots[cameraOf('left')];
     const right = shots[cameraOf('right')];
     if (left.status !== 'ok' || right.status !== 'ok') return null;
-    if (left.focal == null || right.focal == null || left.focal === right.focal) return null;
-    return { left: left.focal, right: right.focal };
+    return mismatchOf(left.focal, right.focal);
   });
 
   // A pair has answered, with a picture or a failure from each camera.
@@ -223,10 +211,7 @@
     if (capturing) return;
     revokeShots();
     shots = { 0: { status: 'busy' }, 1: { status: 'busy' } };
-    naturalW = [0, 0];
-    naturalH = [0, 0];
-    zoom = 1;
-    pan = { x: 0, y: 0 };
+    pz.reset();
     wantOneToOne = true;
     stepsExpanded = false;
     elapsed = 0;
@@ -275,41 +260,14 @@
   // ---------------------------------------------------------------------------
   // Shared pan and zoom over the pair, by pane (0 left, 1 right)
   // ---------------------------------------------------------------------------
-  let zoom = $state(1);
-  let pan = $state<PanFraction>({ x: 0, y: 0 });
-  let frameW = $state<number[]>([0, 0]);
-  let frameH = $state<number[]>([0, 0]);
-  let naturalW = $state<number[]>([0, 0]);
-  let naturalH = $state<number[]>([0, 0]);
+  const pz = new PairPanZoom((i) => shotOf(i).status === 'ok');
   // Set by each new pair: once every picture of it is measured, the zoom goes
   // to 1:1 on the centre.
   let wantOneToOne = $state(false);
 
-  function dpr(): number {
-    return typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  }
-
   function shotOf(pane: number): Shot {
     return shots[cameraOf(SIDES[pane])];
   }
-
-  let oneToOnes = $derived(
-    [0, 1].map((i) =>
-      effectiveOneToOne(
-        oneToOneZoom({ w: naturalW[i] ?? 0, h: naturalH[i] ?? 0 }, { w: frameW[i] ?? 0, h: frameH[i] ?? 0 }, 0, dpr())
-      )
-    )
-  );
-  let oneToOneRef = $derived(Math.max(...oneToOnes));
-
-  let frameGeoms = $derived(
-    [0, 1].map((i) => {
-      const fitted = fittedSize({ w: naturalW[i] ?? 0, h: naturalH[i] ?? 0 }, { w: frameW[i] ?? 0, h: frameH[i] ?? 0 }, 0);
-      const scale = pageScale(zoom, oneToOnes[i] ?? 1, oneToOneRef);
-      const bounds = panBounds(screenExtent(fitted, 0, scale), { w: frameW[i] ?? 0, h: frameH[i] ?? 0 });
-      return { scale, pan: panPixels(pan, bounds) as Pan, bounds };
-    })
-  );
 
   $effect(() => {
     if (!wantOneToOne || capturing) return;
@@ -318,50 +276,10 @@
       wantOneToOne = false;
       return;
     }
-    if (shown.some((i) => !(naturalW[i] > 0 && frameW[i] > 0))) return;
-    zoom = oneToOneRef;
-    pan = { x: 0, y: 0 };
+    if (!pz.measured(shown)) return;
+    pz.centreOneToOne();
     wantOneToOne = false;
   });
-
-  // Drag to pan, as in ImageViewerModal: the first pointer only.
-  let dragIndex = $state<number | null>(null);
-  let dragPointerId: number | null = null;
-  let dragLastX = 0;
-  let dragLastY = 0;
-
-  function handlePointerDown(e: PointerEvent, i: number) {
-    if (shotOf(i).status !== 'ok' || e.button !== 0 || dragPointerId !== null) return;
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {
-      // A pointer that is no longer active cannot be captured; the drag works without.
-    }
-    dragIndex = i;
-    dragPointerId = e.pointerId;
-    dragLastX = e.clientX;
-    dragLastY = e.clientY;
-  }
-
-  function handlePointerMove(e: PointerEvent, i: number) {
-    if (dragIndex !== i || e.pointerId !== dragPointerId) return;
-    const delta = { x: e.clientX - dragLastX, y: e.clientY - dragLastY };
-    dragLastX = e.clientX;
-    dragLastY = e.clientY;
-    pan = dragToFraction(pan, delta, frameGeoms[i]?.bounds ?? { w: 0, h: 0 });
-  }
-
-  function endDrag(e: PointerEvent) {
-    if (e.pointerId !== dragPointerId) return;
-    dragIndex = null;
-    dragPointerId = null;
-  }
-
-  function imageStyle(i: number): string {
-    const geom = frameGeoms[i];
-    const transition = dragIndex === null ? 'transition: transform 0.15s ease;' : '';
-    return `${transition} transform: ${transformFor(geom.pan, geom.scale, 0)};`;
-  }
 
   // ---------------------------------------------------------------------------
   // Stages and closing
@@ -486,16 +404,16 @@
             </button>
           {/if}
           {#if hasPicture}
-            <button class="btn btn-secondary rf-icon-btn" onclick={() => (zoom = 1)} title={$m.col_fit_screen} aria-label={$m.col_fit_screen_aria}>
+            <button class="btn btn-secondary rf-icon-btn" onclick={() => pz.fit()} title={$m.col_fit_screen} aria-label={$m.col_fit_screen_aria}>
               <span class="material-symbols-outlined icon-sm" aria-hidden="true">fit_screen</span>
             </button>
-            <button class="btn btn-secondary rf-icon-btn" onclick={() => (zoom = oneToOneRef)} title={$m.col_zoom_actual} aria-label={$m.col_zoom_actual_aria}>
+            <button class="btn btn-secondary rf-icon-btn" onclick={() => pz.oneToOne()} title={$m.col_zoom_actual} aria-label={$m.col_zoom_actual_aria}>
               <span class="rf-glyph" aria-hidden="true">1:1</span>
             </button>
-            <button class="btn btn-secondary rf-icon-btn" onclick={() => (zoom = stepZoom(zoom, -1, oneToOneRef))} title={$m.lv_zoom_out} aria-label={$m.lv_zoom_out}>
+            <button class="btn btn-secondary rf-icon-btn" onclick={() => pz.step(-1)} title={$m.lv_zoom_out} aria-label={$m.lv_zoom_out}>
               <span class="rf-glyph" aria-hidden="true">−</span>
             </button>
-            <button class="btn btn-secondary rf-icon-btn" onclick={() => (zoom = stepZoom(zoom, 1, oneToOneRef))} title={$m.lv_zoom_in} aria-label={$m.lv_zoom_in}>
+            <button class="btn btn-secondary rf-icon-btn" onclick={() => pz.step(1)} title={$m.lv_zoom_in} aria-label={$m.lv_zoom_in}>
               <span class="rf-glyph" aria-hidden="true">+</span>
             </button>
           {/if}
@@ -523,14 +441,14 @@
               <div
                 class="img-viewer-frame rf-frame"
                 class:rf-pannable={shot.status === 'ok'}
-                class:dragging={dragIndex === i}
-                bind:clientWidth={frameW[i]}
-                bind:clientHeight={frameH[i]}
-                onpointerdown={(e) => handlePointerDown(e, i)}
-                onpointermove={(e) => handlePointerMove(e, i)}
-                onpointerup={endDrag}
-                onpointercancel={endDrag}
-                onlostpointercapture={endDrag}
+                class:dragging={pz.dragIndex === i}
+                bind:clientWidth={pz.frameW[i]}
+                bind:clientHeight={pz.frameH[i]}
+                onpointerdown={(e) => pz.pointerDown(e, i)}
+                onpointermove={(e) => pz.pointerMove(e, i)}
+                onpointerup={(e) => pz.endDrag(e)}
+                onpointercancel={(e) => pz.endDrag(e)}
+                onlostpointercapture={(e) => pz.endDrag(e)}
               >
                 <span class="img-viewer-badge rf-badge">{side === 'left' ? $m.badge_left : $m.badge_right}</span>
                 {#if shot.status === 'ok' && shot.url}
@@ -539,9 +457,9 @@
                     alt={side === 'left' ? $m.focus_camera_left : $m.focus_camera_right}
                     class="img-viewer-img"
                     draggable="false"
-                    bind:naturalWidth={naturalW[i]}
-                    bind:naturalHeight={naturalH[i]}
-                    style={imageStyle(i)}
+                    bind:naturalWidth={pz.naturalW[i]}
+                    bind:naturalHeight={pz.naturalH[i]}
+                    style={pz.imageStyle(i)}
                   />
                 {:else if shot.status === 'busy'}
                   <span class="img-viewer-spinner" aria-hidden="true"></span>
