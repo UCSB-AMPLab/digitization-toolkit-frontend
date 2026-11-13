@@ -877,3 +877,34 @@ describe('CameraCheck: a device listing never overwrites a newer zoom step', () 
 		expect(zoomValue('both')).toBe('26');
 	});
 });
+
+describe('CameraCheck: "Change which camera is which" (NEH-343)', () => {
+	it('the camera details offer it; pressing it closes the details and asks the capture screen', async () => {
+		const onChangeRoles = vi.fn();
+		render(CameraCheck, { leftIndex: 0, rotateDeg: { 0: 0, 1: 0 }, onClose: vi.fn(), onChangeRoles });
+		await settle();
+		await press(chip('right'));
+		const details = document.querySelector('[role="dialog"][aria-labelledby="cd-title"]')!;
+		await click(en.camwhich_open, details);
+		expect(onChangeRoles).toHaveBeenCalledTimes(1);
+		expect(document.querySelector('[role="dialog"][aria-labelledby="cd-title"]')).toBeNull();
+	});
+
+	it('no such button when the capture screen does not offer it', async () => {
+		renderCheck();
+		await settle();
+		await press(chip('left'));
+		expect(button(en.camwhich_open)).toBeNull();
+	});
+
+	it('while the step covers it, the capture key takes no test captures', async () => {
+		const screen = renderCheck();
+		await settle();
+		await screen.screen.rerender({ covered: true });
+		await settle();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', bubbles: true }));
+		await settle();
+		expect(captureSpy).not.toHaveBeenCalled();
+	});
+});

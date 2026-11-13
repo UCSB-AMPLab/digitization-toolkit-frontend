@@ -64,6 +64,8 @@
     pageCapturing = false,
     onRefocus,
     capturing = $bindable(false),
+    captureBlocked = false,
+    swapLocked = false,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -111,6 +113,12 @@
     // True while this viewport's own capture is in flight. Bindable, so the
     // page's automatic focus check waits for it (NEH-339).
     capturing?: boolean;
+    // NEH-343: the unit needs to be told which camera is which. The capture
+    // button is disabled and the capture key takes no capture until it has.
+    captureBlocked?: boolean;
+    // NEH-343: the saved camera roles decide left and right (the page sets
+    // `swapped` from them), so the swap control is not shown.
+    swapLocked?: boolean;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -232,9 +240,9 @@
   // Ready only once projectId and collectionId have resolved, so no capture
   // starts from an empty or malformed URL.
   const captureReady = $derived(projectId > 0 && collectionId > 0);
-  // Ready and with a stem: the only state that enables the capture button
-  // and the capture key.
-  const canCapture = $derived(captureReady && !needsStem);
+  // Ready, with a stem, and nothing blocking capture (NEH-343): the only
+  // state that enables the capture button and the capture key.
+  const canCapture = $derived(captureReady && !needsStem && !captureBlocked);
 
   // Its rect turns pointer positions into guide percentages.
   let viewportEl = $state<HTMLElement | null>(null);
@@ -1335,7 +1343,7 @@
         <button class="float-btn" onclick={() => showCaptureKeyModal = true} aria-label={$m.lv_capture_key_settings} title={$m.lv_capture_key_settings}>
           <span class="material-symbols-outlined" style="font-size:22px" aria-hidden="true">keyboard</span>
         </button>
-        {#if cameraMode === 'double'}
+        {#if cameraMode === 'double' && !swapLocked}
           {#if panelOneColumn}<div class="float-divider"></div>{/if}
           <button
             class="float-btn"

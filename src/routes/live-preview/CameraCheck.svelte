@@ -46,8 +46,14 @@
   //   both. A camera missing from the device list is one
   //   Captua cannot reach.
   //
+  // - Which camera is which (NEH-343): the camera details offer "Change
+  //   which camera is which" when the capture screen passes onChangeRoles;
+  //   the capture screen then opens that step over the check, and passes
+  //   `covered` while the step is over it, so the capture key takes no test
+  //   captures here meanwhile.
+  //
   // Nothing closes the check while the cameras are working. The layout
-  // section and "Which camera is this?" of the mock-up are not part of it.
+  // section of the mock-up is not part of it.
   //
   // Version: 0.3.3
 
@@ -72,6 +78,8 @@
     savingOrientation = {},
     onClose,
     onRefocusClosed,
+    onChangeRoles,
+    covered = false,
   }: {
     // The camera that takes the left page: 1 when the viewport is swapped.
     leftIndex?: number;
@@ -85,6 +93,10 @@
     onClose: () => void;
     // The Refocus dialog opened from here has closed, completed or skipped.
     onRefocusClosed?: () => void;
+    // Opens "Which camera is this?" by hand (NEH-343).
+    onChangeRoles?: () => void;
+    // That step, or another screen of the capture screen's, is over the check.
+    covered?: boolean;
   } = $props();
 
   type Side = 'left' | 'right';
@@ -341,6 +353,12 @@
     onClose();
   }
 
+  function changeRoles() {
+    if (busy) return;
+    detailsOpen = false;
+    onChangeRoles?.();
+  }
+
   // The capture key and the pedal take the test captures. While something is
   // open over the check, they are that dialog's. LiveViewport ignores them
   // while the check is open (its otherModalOpen).
@@ -355,7 +373,7 @@
   const closesOnEscape = (event: KeyboardEvent) => !busy && !isCaptureKey(event);
 
   function handleKeydown(event: KeyboardEvent) {
-    if (viewerOpen || detailsOpen || refocusOpen) return;
+    if (covered || viewerOpen || detailsOpen || refocusOpen) return;
     if (!isCaptureKey(event)) return;
     event.preventDefault();
     if (!event.repeat && !busy) void takePictures();
@@ -671,6 +689,9 @@
           {/each}
         </div>
         <div class="modal-actions">
+          {#if onChangeRoles}
+            <button class="modal-btn change" onclick={changeRoles} disabled={busy}>{$m.camwhich_open}</button>
+          {/if}
           <button class="modal-btn cancel" onclick={() => (detailsOpen = false)}>{$m.common_close}</button>
         </div>
       </div>
@@ -940,6 +961,8 @@
     border: 1px solid var(--border-color);
   }
   .modal-btn.cancel { background-color: var(--color-surface); color: var(--color-light-grey); }
+  .modal-btn.change { background-color: transparent; border-color: var(--color-secondary); color: var(--color-secondary); padding: 0 12px; }
+  .modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .cd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0 20px; }
   .cd-cam { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background-color: var(--color-surface-alt-2); min-width: 0; }
   .cd-cam dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; font-size: var(--text-sm); }

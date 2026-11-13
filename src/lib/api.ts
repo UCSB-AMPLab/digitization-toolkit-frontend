@@ -1425,6 +1425,50 @@ export interface CameraDevice {
   // causes, and absent from a backend that predates them.
   zoom_steps?: number | null;
   zoom_step?: number | null;
+  // NEH-342: the page this body photographs, stored per body. `role` is
+  // the one on record (null when none), `role_confirmed` whether an operator
+  // confirmed it; `role_guess` is the backend's guess for a body without a
+  // confirmed role, and `role_guess_source` what it is based on. A guess is
+  // never a role: nothing is chosen or saved from it. Absent from a backend
+  // that predates them.
+  role?: CameraRole | null;
+  role_confirmed?: boolean;
+  role_guess?: CameraRole | null;
+  role_guess_source?: string | null;
+}
+
+// NEH-342: the page a camera photographs.
+export type CameraRole = 'left' | 'right';
+
+// Why GET /cameras/setup says an answer is needed. `message` is the
+// backend's English, for the console only; the screen maps `code`.
+export type CameraSetupCode =
+  | 'identity_missing'
+  | 'identity_ambiguous'
+  | 'role_unconfirmed'
+  | 'role_conflict'
+  | 'pair_changed'
+  | 'port_changed';
+
+export interface CameraSetupReason {
+  code: CameraSetupCode;
+  message: string;
+  hardware_ids: (string | null)[];
+}
+
+export interface CameraSetup {
+  needs_setup: boolean;
+  reasons: CameraSetupReason[];
+  // The bodies last confirmed as the left and the right page; null when
+  // no pair has been confirmed on this unit.
+  confirmed_pair: { left: string; right: string } | null;
+}
+
+// The answer to camerasApi.setRoles(): the device rows with their new
+// roles, and the set-up as it stands after the save.
+export interface CameraRolesResponse {
+  devices: CameraDevice[];
+  setup: CameraSetup;
 }
 
 export interface CaptureRequest {
@@ -1758,6 +1802,47 @@ export const camerasApi = {
       method: 'PUT',
       body: JSON.stringify({ orientation, hardware_id: hardwareId }),
     });
+  },
+
+  /**
+   * Whether the unit needs to be told which camera photographs which page
+   * (NEH-342), and why. A backend that predates the route answers 404,
+   * which reads as "no set-up needed", so the capture screen behaves as it
+   * did before; any other failure throws.
+   */
+  async getSetup(): Promise<CameraSetup> {
+    try {
+      return await apiRequest<CameraSetup>('/cameras/setup');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        return { needs_setup: false, reasons: [], confirmed_pair: null };
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Save both roles in one request (PUT /cameras/roles, NEH-342): the body
+   * that photographs the left page and the one that photographs the right.
+   * Refusals keep the backend's status and detail: 422 for equal or empty
+   * ids; 409 with `{code: "camera_not_connected" | "camera_identity_unusable",
+   * message}`; 503 when the storage or the camera listing is unavailable.
+   */
+  async setRoles(leftHardwareId: string, rightHardwareId: string): Promise<CameraRolesResponse> {
+    return apiRequest<CameraRolesResponse>('/cameras/roles', {
+      method: 'PUT',
+      body: JSON.stringify({ left: { hardware_id: leftHardwareId }, right: { hardware_id: rightHardwareId } }),
+    });
+  },
+
+  /**
+   * One preview frame from a camera: GET /cameras/preview/{n}, the request
+   * the capture screen polls (LiveViewport), asked for once. Throws on any
+   * non-ok answer; a 404 means the camera is not connected or gave no frame.
+   */
+  async previewFrame(cameraIndex: number): Promise<Blob> {
+    const { blob } = await apiRequestBlob(`/cameras/preview/${cameraIndex}`);
+    return blob;
   },
 };
 
