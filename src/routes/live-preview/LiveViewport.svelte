@@ -14,6 +14,10 @@
   // "Refresh preview" fetches one new frame from each camera on request.
   // A label on each pane says which of the two it shows.
   //
+  // In single-camera mode one pane shows camera 0, the camera that is
+  // previewed and captured; the swap state orders the two cameras of a pair
+  // only, and has no effect until dual mode again.
+  //
   // Version: 0.3.3
 
   import { onMount, onDestroy, untrack } from 'svelte';
@@ -95,9 +99,9 @@
     // true when it has no stem, in which case the page sets needsStem and the
     // banner replaces the generic capture error.
     onStemRefused?: () => Promise<boolean>;
-    // Whether camera 1 takes the left page. Bindable, so that the page's
-    // own dual captures (a placeholder's, NEH-317) send the same
-    // left_camera_index as this viewport's.
+    // Whether camera 1 takes the left page of a pair. Bindable, so that the
+    // page's own dual captures (a placeholder's, NEH-317) send the same
+    // left_camera_index as this viewport's. No effect in single-camera mode.
     swapped?: boolean;
     // Counts the captures the page makes outside this viewport (retakes and
     // placeholders, NEH-334). Each increase clears the last capture shown in
@@ -133,9 +137,12 @@
   let dragging = $state<'v' | 'h' | null>(null);
 
   // swapped = true puts camera 1 on the left and camera 0 on the right.
-  // The state is the `swapped` prop, bound by the page.
-  let leftIdx  = $derived(swapped ? 1 : 0);
-  let rightIdx = $derived(swapped ? 0 : 1);
+  // The state is the `swapped` prop, bound by the page. It orders a pair
+  // only: in single-camera mode the pane, the preview and the capture all
+  // use camera 0, so every reader of leftIdx gets 0 there, and `swapped` is
+  // kept unchanged for the return to dual mode.
+  let leftIdx  = $derived(cameraMode === 'double' && swapped ? 1 : 0);
+  let rightIdx = $derived(cameraMode === 'double' && swapped ? 0 : 1);
 
   let gridRows = 3;
   let gridCols = 3;

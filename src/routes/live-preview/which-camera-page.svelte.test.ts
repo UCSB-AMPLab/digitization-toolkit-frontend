@@ -491,6 +491,78 @@ describe('capture screen: the saved roles decide left and right', () => {
 		expect(orientationPuts()[0].endsWith('/cameras/1/orientation')).toBe(true);
 	});
 
+	it('in single-camera mode the pane and the capture use camera index 0 whatever the roles; a pair follows the roles in either mode', async () => {
+		const chooseMode = async (label: string) => {
+			const expand = document.querySelector(`button[aria-label="${en.cam_panel_expand_aria}"]`) as HTMLButtonElement | null;
+			if (expand) {
+				expand.click();
+				await settle();
+			}
+			const option = [...document.querySelectorAll('label.radio-label')].find((l) => l.textContent?.trim() === label);
+			(option!.querySelector('input') as HTMLInputElement).click();
+			await settle();
+		};
+		// The set-up, naming camera 2 as the left page, answers only once the
+		// operator is in single-camera mode.
+		let release!: () => void;
+		const held = new Promise<void>((r) => (release = r));
+		setupAnswers = [async () => {
+			await held;
+			return json(B_LEFT);
+		}];
+		deviceLists = [[row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })]];
+		render(LivePreview);
+		await expect.poll(() => setupCalls).toBeGreaterThanOrEqual(1);
+		await expect.poll(() => viewportDegrees()).toEqual(['90°', '180°']);
+		await chooseMode(en.cam_mode_single);
+		await expect.poll(() => viewportDegrees()).toEqual(['90°']);
+		release();
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		await settle();
+		// As without roles: camera index 0 on screen and in the capture, no swap control.
+		expect(viewportDegrees()).toEqual(['90°']);
+		expect(swapControl()).toBeNull();
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(1);
+		expect(captures[0].endsWith('/cameras/capture')).toBe(true);
+		expect(captureBodies[0].camera_index).toBe(0);
+
+		// The camera check shows the pair, in single mode too: the left page
+		// camera (index 1) on its left, so "Turn" there saves camera 1.
+		const orientationPuts = () =>
+			vi.mocked(globalThis.fetch).mock.calls.map((c) => new URL(String(c[0]), 'http://localhost').pathname).filter((p) => p.endsWith('/orientation'));
+		await expect.poll(() => openCheck()?.disabled).toBe(false);
+		openCheck()!.click();
+		await expect.poll(() => check()).not.toBeNull();
+		await expect.poll(() => (check()!.querySelector('[data-frame="left"] button[data-turn]') as HTMLButtonElement | null)?.disabled).toBe(false);
+		(check()!.querySelector('[data-frame="left"] button[data-turn]') as HTMLButtonElement).click();
+		await expect.poll(() => orientationPuts().length).toBe(1);
+		expect(orientationPuts()[0].endsWith('/cameras/1/orientation')).toBe(true);
+		// The check closes once the save is done.
+		await expect.poll(() => (check()!.querySelector('[data-frame="left"] button[data-turn]') as HTMLButtonElement | null)?.disabled).toBe(false);
+		buttonIn(check(), en.camcheck_back)!.click();
+		await expect.poll(() => check()).toBeNull();
+
+		// Two cameras capture a pair again: the roles decide.
+		await chooseMode(en.cam_mode_double);
+		await expect.poll(() => viewportDegrees()).toEqual(['270°', '90°']);
+		expect(swapControl()).toBeNull();
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(2);
+		expect(captureBodies[1].left_camera_index).toBe(1);
+
+		// Single again: camera index 0's frame and rotation, and its capture.
+		await chooseMode(en.cam_mode_single);
+		await expect.poll(() => viewportDegrees()).toEqual(['90°']);
+		expect(swapControl()).toBeNull();
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(3);
+		expect(captures[2].endsWith('/cameras/capture')).toBe(true);
+		expect(captureBodies[2].camera_index).toBe(0);
+	});
+
 	it('with a backend without /cameras/setup the swap control is there and works as before', async () => {
 		setupAnswers = [() => json({ detail: 'Not Found' }, 404)];
 		deviceLists = [[row(0, 'a', { orientation: 90 }), row(1, 'b', { orientation: 180 })]];

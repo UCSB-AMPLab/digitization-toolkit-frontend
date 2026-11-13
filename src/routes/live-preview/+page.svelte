@@ -86,10 +86,12 @@
   // over the check. A save returns to where the operator was. While set-up
   // is needed the step's "Leave the capture screen" goes where the top
   // bar's back button goes (handleBack); coming back shows the step again.
-  // The saved roles decide left and right: when set-up is not needed and the
-  // set-up's confirmed pair names two bodies that the latest listing has
-  // (leftIndexFromRoles), `swapped` is set from them, and LiveViewport hides
-  // its swap control (swapLocked). Everything that reads leftCameraIndex
+  // The saved roles decide left and right: when set-up is not needed and the set-up's confirmed pair names two bodies that the
+  // latest listing has (leftIndexFromRoles), `swapped` is set from them, and
+  // LiveViewport hides its swap control (swapLocked). They order the pair in
+  // either mode; in single-camera mode LiveViewport's pane, preview and
+  // capture use camera 0 whatever `swapped` says, and `swapped` is kept for
+  // the return to dual mode. Everything that reads leftCameraIndex
   // then follows the roles. With an old backend, or without a confirmed
   // pair, `swapped` and the control are as before. `swapped` is not stored.
   //
@@ -111,7 +113,9 @@
   //   readSetup.supersede()): every read started before that answer arrived
   //   is discarded, and a read started after it is newer and counts.
   // So cameraSetup is written only in readSetup's apply and in rolesSaved,
-  // and setupAnswered only in checkSetup and rolesSaved.
+  // and setupAnswered only in checkSetup and rolesSaved. rolesLeft is
+  // derived from cameraSetup and `devices`, and `swapped` follows it in one
+  // effect, only while it is not null.
   //
   // Version: 0.3.3
 
@@ -510,7 +514,11 @@
 
   // The left camera the saved roles decide; null when they decide nothing.
   // The roles come from the set-up alone (its confirmed pair); `devices`
-  // only says at which index each body is.
+  // only says at which index each body is. They order the pair in either
+  // mode: in single-camera mode LiveViewport shows and captures camera 0
+  // whatever `swapped` says, while the pair views and captures the page
+  // makes there (the camera check, the focus check, a placeholder missing
+  // both pages) still read leftCameraIndex.
   let rolesLeft = $derived(leftIndexFromRoles(devices, cameraSetup));
   // The only place `swapped` follows the roles. The manual control is
   // hidden meanwhile, so nothing else writes it.
