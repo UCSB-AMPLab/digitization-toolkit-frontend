@@ -119,13 +119,22 @@
   let devices = $state<CameraDevice[] | null>(null);
   let devicesFailed = $state(false);
   let deviceSeq = 0;
-  // Counts the zoom writes started. A listing requested before the latest
-  // write began reports steps older than what the cameras have confirmed
-  // since, so it never touches the zoom steps.
-  let zoomWrites = 0;
-  // The listing that follows a pair of test captures is out: the zoom
-  // controls wait for it, since it brings the steps the captures set.
-  let afterCapturesListing = $state(false);
+  // One operation runs at a time on this screen: a pair of test captures with
+  // the listing that follows it, a zoom write with any re-read it triggers, an
+  // orientation save. `running` counts the first two (always 0 or 1); every
+  // control that could start another reads `operating`.
+  let running = $state(0);
+  let saving = $derived(Object.values(savingOrientation).some(Boolean));
+  let operating = $derived(running > 0 || saving);
+
+  async function operate<T>(run: () => Promise<T>): Promise<T> {
+    running += 1;
+    try {
+      return await run();
+    } finally {
+      running -= 1;
+    }
+  }
 
   function deviceOf(side: Side): CameraDevice | null {
     return devices?.find((d) => d.index === cameraOf(side)) ?? null;
@@ -141,13 +150,12 @@
 
   async function readDevices() {
     const seq = ++deviceSeq;
-    const writes = zoomWrites;
     try {
       const list = await camerasApi.listDevices();
       if (destroyed || seq !== deviceSeq) return;
       devices = list;
       devicesFailed = false;
-      if (writes === zoomWrites) takeSteps(list);
+      takeSteps(list);
     } catch (err) {
       if (destroyed || seq !== deviceSeq) return;
       console.error('[CameraCheck] Could not read the devices:', err);
@@ -182,7 +190,11 @@
   }
 
   async function takePictures() {
-    if (busy) return;
+    if (operating) return;
+    await operate(captureAndList);
+  }
+
+  async function captureAndList() {
     revokeShots();
     shots = { 0: { status: 'busy' }, 1: { status: 'busy' } };
     stale = false;
@@ -204,12 +216,7 @@
     );
     if (destroyed) return;
     // A capture puts a CHDK camera in shooting mode, which gives it a step.
-    afterCapturesListing = true;
-    try {
-      await readDevices();
-    } finally {
-      afterCapturesListing = false;
-    }
+    await readDevices();
   }
 
   // ---------------------------------------------------------------------------
@@ -221,9 +228,8 @@
   let stepsKnown = $derived(lastStep !== null && steps[0] != null && steps[1] != null);
   let stepsDiffer = $derived(stepsKnown && steps[0] !== steps[1]);
   let linked = $state(true);
-  let zoomBusy = $state(false);
   let zoomError = $state<string | null>(null);
-  let zoomDisabled = $derived(!stepsKnown || zoomBusy || capturing || afterCapturesListing);
+  let zoomDisabled = $derived(!stepsKnown || operating);
 
   // The steps the device list reports; two different ones unlink the control.
   function takeSteps(list: CameraDevice[]) {
@@ -254,8 +260,10 @@
   // the first refusal and reads the devices again.
   async function zoomTo(targets: [Side, number][]) {
     if (zoomDisabled) return false;
-    zoomWrites += 1;
-    zoomBusy = true;
+    return operate(() => writeSteps(targets));
+  }
+
+  async function writeSteps(targets: [Side, number][]) {
     zoomError = null;
     let ok = true;
     for (const [side, step] of targets) {
@@ -265,7 +273,6 @@
       }
     }
     if (destroyed) return false;
-    zoomBusy = false;
     if (steps[0] !== steps[1]) linked = false;
     if (!ok) await readDevices();
     return ok;
@@ -327,7 +334,7 @@
   );
 
   function turnDisabled(side: Side): boolean {
-    return busy || reach(side) !== 'ok' || savingOrientation[cameraOf(side)] === true;
+    return running > 0 || reach(side) !== 'ok' || savingOrientation[cameraOf(side)] === true;
   }
 
   function turn(side: Side) {
@@ -341,7 +348,6 @@
   let viewerOpen = $state(false);
   let detailsOpen = $state(false);
   let refocusOpen = $state(false);
-  let busy = $derived(capturing || zoomBusy);
 
   function closeRefocus() {
     refocusOpen = false;
@@ -349,12 +355,12 @@
   }
 
   function close() {
-    if (busy) return;
+    if (operating) return;
     onClose();
   }
 
   function changeRoles() {
-    if (busy) return;
+    if (operating) return;
     detailsOpen = false;
     onChangeRoles?.();
   }
@@ -370,13 +376,15 @@
   // Escape takes the test captures and never closes it; with the pedal on
   // Ctrl+Escape, plain Escape still closes it. Nothing closes it while the
   // cameras work.
-  const closesOnEscape = (event: KeyboardEvent) => !busy && !isCaptureKey(event);
+  const closesOnEscape = (event: KeyboardEvent) => !operating && !isCaptureKey(event);
 
   function handleKeydown(event: KeyboardEvent) {
+    // A press a nested dialog already consumed (Escape closing it) takes nothing.
+    if (event.defaultPrevented) return;
     if (covered || viewerOpen || detailsOpen || refocusOpen) return;
     if (!isCaptureKey(event)) return;
     event.preventDefault();
-    if (!event.repeat && !busy) void takePictures();
+    if (!event.repeat && !operating) void takePictures();
   }
 
   onMount(() => {
@@ -474,7 +482,7 @@
     </div>
 
     <div class="topbar-right">
-      <button class="btn-review" onclick={close} disabled={busy}>
+      <button class="btn-review" onclick={close} disabled={operating}>
         <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
         <span>{$m.camcheck_back}</span>
       </button>
@@ -571,7 +579,7 @@
               <div class="ck-row">
                 {@render zoomControl('both', stepOf('left'))}
                 <span class="ck-spacer"></span>
-                <button class="btn btn-ghost" onclick={() => (linked = false)} disabled={zoomBusy}>{$m.camcheck_adjust_separately}</button>
+                <button class="btn btn-ghost" onclick={() => (linked = false)} disabled={operating}>{$m.camcheck_adjust_separately}</button>
               </div>
             {:else}
               <div class="zc-pair">
@@ -586,7 +594,7 @@
                 {#if stepsDiffer}
                   <button class="btn btn-secondary" onclick={match} disabled={zoomDisabled}>{$m.camcheck_match}</button>
                 {/if}
-                <button class="btn btn-ghost" onclick={together} disabled={stepsDiffer || zoomBusy}>{$m.camcheck_adjust_together}</button>
+                <button class="btn btn-ghost" onclick={together} disabled={stepsDiffer || operating}>{$m.camcheck_adjust_together}</button>
               </div>
             {/if}
             {#if !stepsKnown}
@@ -634,7 +642,7 @@
           <div class="ck-row ck-focus">
             <p class="sf-small">{$m.camcheck_focus_hint}</p>
             {#if dslr}
-              <button class="btn btn-secondary" onclick={() => (refocusOpen = true)} disabled={busy}>
+              <button class="btn btn-secondary" onclick={() => (refocusOpen = true)} disabled={operating}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
                   <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
                   <circle cx="12" cy="12" r="3" />
@@ -650,7 +658,7 @@
     <div class="sf-foot">
       <span class="sf-small">{$m.camcheck_discarded}</span>
       <span class="ck-spacer"></span>
-      <button class="btn btn-primary" onclick={takePictures} disabled={busy}>
+      <button class="btn btn-primary" onclick={takePictures} disabled={operating}>
         <span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
         <span>{$m.camcheck_take}</span>
       </button>
@@ -690,7 +698,7 @@
         </div>
         <div class="modal-actions">
           {#if onChangeRoles}
-            <button class="modal-btn change" onclick={changeRoles} disabled={busy}>{$m.camwhich_open}</button>
+            <button class="modal-btn change" onclick={changeRoles} disabled={operating}>{$m.camwhich_open}</button>
           {/if}
           <button class="modal-btn cancel" onclick={() => (detailsOpen = false)}>{$m.common_close}</button>
         </div>

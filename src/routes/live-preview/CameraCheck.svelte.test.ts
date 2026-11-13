@@ -765,6 +765,50 @@ describe('CameraCheck: Escape as the assigned capture key', () => {
 		expect(view()).not.toBeNull();
 	});
 
+	it('with the pedal on Escape, Escape closes the 1:1 viewer without taking captures; a second Escape takes them', async () => {
+		writeChord(chord());
+		captureSpy.mockImplementation(() => shot(3000, 2000));
+		const { onClose } = renderCheck();
+		await settle();
+		await click(en.camcheck_take);
+		await expect.poll(() => button(en.camcheck_full_size_aria('left'))).not.toBeNull();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		await click(en.camcheck_full_size_aria('left'));
+		const viewer = () => document.querySelector('[role="dialog"][aria-labelledby="fv-title"]');
+		expect(viewer()).not.toBeNull();
+
+		escape();
+		await settle();
+		expect(viewer()).toBeNull();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		expect(onClose).not.toHaveBeenCalled();
+
+		escape();
+		await settle();
+		expect(captureSpy).toHaveBeenCalledTimes(4);
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
+	it('with the pedal on Escape, Escape closes the camera details without taking captures; a second Escape takes them', async () => {
+		writeChord(chord());
+		const { onClose } = renderCheck();
+		await settle();
+		await press(chip('left'));
+		const details = () => document.querySelector('[role="dialog"][aria-labelledby="cd-title"]');
+		expect(details()).not.toBeNull();
+
+		escape();
+		await settle();
+		expect(details()).toBeNull();
+		expect(captureSpy).not.toHaveBeenCalled();
+		expect(onClose).not.toHaveBeenCalled();
+
+		escape();
+		await settle();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
 	it('with the pedal on Ctrl+Escape, plain Escape closes and Ctrl+Escape takes the test captures', async () => {
 		writeChord(chord({ ctrl: true }));
 		const { onClose } = renderCheck();
@@ -849,31 +893,17 @@ describe('CameraCheck: a device listing never overwrites a newer zoom step', () 
 		expect(zoomValue('both')).toBe('30');
 	});
 
-	it('a listing requested before a zoom write is not applied to the steps; one requested after it is', async () => {
+	it('a refused zoom step keeps the controls disabled until its re-read arrives, and that listing applies', async () => {
 		const held = holdListings();
 		renderCheck();
 		await settle();
-		// A refused step reads the devices again: that listing is held.
 		zoomSpy.mockRejectedValueOnce(failure(502, 'The camera did not answer'));
 		await press(zoomButton('both', 'in'));
 		await expect.poll(() => held.length).toBe(1);
+		expect(zoomButton('both', 'in')?.disabled).toBe(true);
+		held[0].resolve(a2500([26, 26]));
+		await settle();
 		expect(zoomButton('both', 'in')?.disabled).toBe(false);
-
-		// The operator zooms in while that listing is still out.
-		await press(zoomButton('both', 'in'));
-		await expect.poll(() => zoomValue('both')).toBe('25');
-
-		// The older listing arrives with the step from before the write.
-		held[0].resolve(a2500([24, 24]));
-		await settle();
-		expect(zoomValue('both')).toBe('25');
-		expect(zoomControl('both')).not.toBeNull();
-
-		// A listing requested after the write applies.
-		await click(en.camcheck_take);
-		await expect.poll(() => held.length).toBe(2);
-		held[1].resolve(a2500([26, 26]));
-		await settle();
 		expect(zoomValue('both')).toBe('26');
 	});
 });
@@ -906,5 +936,130 @@ describe('CameraCheck: "Change which camera is which" (NEH-343)', () => {
 		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', bubbles: true }));
 		await settle();
 		expect(captureSpy).not.toHaveBeenCalled();
+	});
+});
+
+describe('CameraCheck: one operation at a time', () => {
+	const turnBtn = (side: 'left' | 'right') => frame(side)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
+	const takeBtn = () => button(en.camcheck_take);
+
+	// Every listing after the first waits until the test answers it.
+	function holdListings() {
+		const held: ReturnType<typeof deferred<CameraDevice[]>>[] = [];
+		let first = true;
+		listSpy.mockImplementation(async () => {
+			if (first) {
+				first = false;
+				return devices.map((d) => ({ ...d }));
+			}
+			const d = deferred<CameraDevice[]>();
+			held.push(d);
+			return d.promise;
+		});
+		return held;
+	}
+
+	function captureKey() {
+		const event = new KeyboardEvent('keydown', { key: 'F9', bubbles: true, cancelable: true });
+		document.body.dispatchEvent(event);
+		document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'F9', bubbles: true }));
+	}
+
+	afterEach(() => clearChord());
+
+	it('a second pair of test captures cannot start while the first pair\'s listing is pending', async () => {
+		writeChord({ key: 'F9', ctrl: false, alt: false, meta: false, shift: false });
+		const held = holdListings();
+		renderCheck();
+		await settle();
+		await click(en.camcheck_take);
+		await expect.poll(() => held.length).toBe(1);
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+
+		expect(takeBtn()?.disabled).toBe(true);
+		takeBtn()!.click();
+		captureKey();
+		await settle();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		expect(held.length).toBe(1);
+
+		held[0].resolve(a2500([30, 30]));
+		await settle();
+		expect(takeBtn()?.disabled).toBe(false);
+		captureKey();
+		await settle();
+		expect(captureSpy).toHaveBeenCalledTimes(4);
+	});
+
+	it('the zoom controls stay disabled for the whole operation, then show the steps from the listing', async () => {
+		const held = holdListings();
+		renderCheck();
+		await settle();
+		await click(en.camcheck_take);
+		await expect.poll(() => held.length).toBe(1);
+		for (const dir of ['in', 'out'] as const) expect(zoomButton('both', dir)?.disabled).toBe(true);
+		takeBtn()!.click();
+		await settle();
+		for (const dir of ['in', 'out'] as const) expect(zoomButton('both', dir)?.disabled).toBe(true);
+		expect(button(en.camcheck_adjust_separately)?.disabled).toBe(true);
+
+		held[0].resolve(a2500([30, 30]));
+		await settle();
+		for (const dir of ['in', 'out'] as const) expect(zoomButton('both', dir)?.disabled).toBe(false);
+		expect(zoomValue('both')).toBe('30');
+	});
+
+	it('a zoom write disables the test captures and "Turn" until it and its re-read finish', async () => {
+		const held = holdListings();
+		const step = deferred<ZoomStepResponse>();
+		zoomSpy.mockImplementation(() => step.promise);
+		renderCheck();
+		await settle();
+		await press(zoomButton('both', 'in'));
+		expect(takeBtn()?.disabled).toBe(true);
+		expect(turnBtn('left')?.disabled).toBe(true);
+		expect(turnBtn('right')?.disabled).toBe(true);
+
+		// A refused step reads the devices again; the operation is still open.
+		step.reject(failure(502, 'The camera did not answer'));
+		await expect.poll(() => held.length).toBe(1);
+		expect(takeBtn()?.disabled).toBe(true);
+		expect(turnBtn('left')?.disabled).toBe(true);
+		expect(zoomButton('both', 'in')?.disabled).toBe(true);
+
+		held[0].resolve(a2500([24, 24]));
+		await settle();
+		expect(takeBtn()?.disabled).toBe(false);
+		expect(turnBtn('left')?.disabled).toBe(false);
+		expect(zoomButton('both', 'in')?.disabled).toBe(false);
+	});
+
+	it('an orientation save disables the test captures and the zoom until it finishes', async () => {
+		const { screen } = renderCheck();
+		await settle();
+		await screen.rerender({ savingOrientation: { 0: true } });
+		await settle();
+		expect(takeBtn()?.disabled).toBe(true);
+		expect(zoomButton('both', 'in')?.disabled).toBe(true);
+		expect(turnBtn('left')?.disabled).toBe(true);
+		await screen.rerender({ savingOrientation: { 0: false } });
+		await settle();
+		expect(takeBtn()?.disabled).toBe(false);
+		expect(zoomButton('both', 'in')?.disabled).toBe(false);
+		expect(turnBtn('left')?.disabled).toBe(false);
+	});
+
+	it('a failed listing ends the operation and the controls come back, with the failure message', async () => {
+		const held = holdListings();
+		renderCheck();
+		await settle();
+		await click(en.camcheck_take);
+		await expect.poll(() => held.length).toBe(1);
+		expect(takeBtn()?.disabled).toBe(true);
+		held[0].reject(new Error('unreachable'));
+		await settle();
+		expect(takeBtn()?.disabled).toBe(false);
+		expect(zoomButton('both', 'in')?.disabled).toBe(false);
+		expect(text()).toContain(en.camcheck_devices_failed);
 	});
 });
