@@ -24,7 +24,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
-import { FOCUS_CHECK_AFTER_MS, readFocusActivity, recordFocusActivity } from '$lib/focus-check';
+import { FOCUS_CHECK_AFTER_MS, clearFocusActivity, readFocusActivity, recordFocusActivity } from '$lib/focus-check';
 import { clearChord, readChords, DEFAULT_CHORDS } from '$lib/capture-key';
 import '../../app.css';
 import LivePreview from './+page.svelte';
@@ -89,6 +89,13 @@ function serve(dslr: boolean, served: Served = {}) {
 		return json([]);
 	});
 	return Object.assign(captures, { testCaptures });
+}
+
+// The activity is kept in memory as well as in storage, so a test makes it
+// stale by clearing both and recording an old time.
+function setStaleActivity() {
+	clearFocusActivity(USER);
+	recordFocusActivity(USER, Date.now() - FOCUS_CHECK_AFTER_MS - MIN);
 }
 
 const refocusButton = () => document.querySelector(`button[aria-label="${en.focus_refocus}"]`) as HTMLButtonElement | null;
@@ -173,7 +180,7 @@ describe('capture screen: "Refocus" (NEH-339)', () => {
 		expect(refocusDialog()).toBeNull();
 
 		// The tab comes back after a break.
-		localStorage.setItem(`captua_focus_check:${USER}`, String(Date.now() - FOCUS_CHECK_AFTER_MS - MIN));
+		setStaleActivity();
 		document.dispatchEvent(new Event('visibilitychange'));
 		await expect.poll(() => refocusDialog()).not.toBeNull();
 	});
@@ -192,6 +199,23 @@ describe('capture screen: "Refocus" (NEH-339)', () => {
 		expect(refocusDialog()).toBeNull();
 	});
 
+	it('with storage refusing writes, "Skip" closes the check and it does not reopen', async () => {
+		serve(true);
+		render(LivePreview);
+		await expect.poll(() => refocusDialog()).not.toBeNull();
+		vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+			throw new Error('quota exceeded');
+		});
+		skip();
+		await expect.poll(() => refocusDialog()).toBeNull();
+		await settle();
+		expect(refocusDialog()).toBeNull();
+
+		document.dispatchEvent(new Event('visibilitychange'));
+		await settle();
+		expect(refocusDialog()).toBeNull();
+	});
+
 	it('the capture key does not capture while the check is open, and does after it closes; a capture counts as activity', async () => {
 		const captures = serve(true);
 		render(LivePreview);
@@ -204,7 +228,7 @@ describe('capture screen: "Refocus" (NEH-339)', () => {
 
 		skip();
 		await expect.poll(() => refocusDialog()).toBeNull();
-		localStorage.removeItem(`captua_focus_check:${USER}`);
+		clearFocusActivity(USER);
 		pressCaptureKey();
 		await expect.poll(() => captures.length).toBe(1);
 		await expect.poll(() => readFocusActivity(USER)).not.toBeNull();
@@ -316,7 +340,7 @@ describe('the check waits for a capture in flight (NEH-339)', () => {
 		pressCaptureKey();
 		await expect.poll(() => captures.length).toBe(1);
 
-		localStorage.setItem(`captua_focus_check:${USER}`, String(Date.now() - FOCUS_CHECK_AFTER_MS - MIN));
+		setStaleActivity();
 		document.dispatchEvent(new Event('visibilitychange'));
 		await settle();
 		expect(refocusDialog()).toBeNull();
@@ -335,7 +359,7 @@ describe('the check waits for a capture in flight (NEH-339)', () => {
 		pressCaptureKey();
 		await expect.poll(() => captures.length).toBe(1);
 
-		localStorage.setItem(`captua_focus_check:${USER}`, String(Date.now() - FOCUS_CHECK_AFTER_MS - MIN));
+		setStaleActivity();
 		document.dispatchEvent(new Event('visibilitychange'));
 		await settle();
 		expect(refocusDialog()).toBeNull();
@@ -372,7 +396,7 @@ describe('the check waits for any open dialog (NEH-339)', () => {
 	const modalByTitle = (id: string) => document.querySelector(`[role="dialog"][aria-labelledby="${id}"]`);
 	const closeIn = (id: string) =>
 		[...(modalByTitle(id)?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((b) => b.textContent?.trim() === en.common_close)!;
-	const makeDue = () => localStorage.setItem(`captua_focus_check:${USER}`, String(Date.now() - FOCUS_CHECK_AFTER_MS - MIN));
+	const makeDue = () => setStaleActivity();
 
 	for (const [name, label, titleId] of [
 		['grid settings', en.lv_grid_settings, 'grid-modal-title'],
