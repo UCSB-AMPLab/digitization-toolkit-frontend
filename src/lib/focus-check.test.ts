@@ -45,6 +45,8 @@ describe('the activity kept per user', () => {
 
 	beforeEach(() => {
 		store = {};
+		clearFocusActivity(7);
+		clearFocusActivity(8);
 		vi.stubGlobal('localStorage', {
 			getItem: (k: string) => (k in store ? store[k] : null),
 			setItem: (k: string, v: string) => {
@@ -121,6 +123,63 @@ describe('the activity kept per user', () => {
 		expect(focusCheckNeeded(7, T0)).toBe(true);
 		expect(() => recordFocusActivity(7, T0)).not.toThrow();
 		expect(() => clearFocusActivity(7)).not.toThrow();
+	});
+});
+
+describe.each([
+	['storage that refuses writes', true],
+	['working storage', false]
+])('the activity is also kept in memory (%s)', (_name, refuses) => {
+	let store: Record<string, string>;
+
+	beforeEach(() => {
+		store = {};
+		vi.stubGlobal('localStorage', {
+			getItem: (k: string) => (k in store ? store[k] : null),
+			setItem: (k: string, v: string) => {
+				if (refuses) throw new Error('quota exceeded');
+				store[k] = v;
+			},
+			removeItem: (k: string) => {
+				delete store[k];
+			}
+		});
+		clearFocusActivity(21);
+		clearFocusActivity(22);
+	});
+
+	afterEach(() => {
+		clearFocusActivity(21);
+		clearFocusActivity(22);
+		vi.unstubAllGlobals();
+	});
+
+	it('is not due after activity, and is due again after the interval', () => {
+		expect(focusCheckNeeded(21, T0)).toBe(true);
+		recordFocusActivity(21, T0);
+		expect(readFocusActivity(21)).toBe(T0);
+		expect(focusCheckNeeded(21, T0 + 10 * MIN)).toBe(false);
+		expect(focusCheckNeeded(21, T0 + 15 * MIN + 1)).toBe(true);
+	});
+
+	it('keeps the later of two recordings', () => {
+		recordFocusActivity(21, T0 + 10 * MIN);
+		recordFocusActivity(21, T0);
+		expect(readFocusActivity(21)).toBe(T0 + 10 * MIN);
+	});
+
+	it('a sign-in clears it even though memory held a value', () => {
+		recordFocusActivity(21, T0);
+		clearFocusActivity(21);
+		expect(readFocusActivity(21)).toBeNull();
+		expect(focusCheckNeeded(21, T0 + MIN)).toBe(true);
+	});
+
+	it('does not share the value between two users', () => {
+		recordFocusActivity(21, T0);
+		expect(readFocusActivity(22)).toBeNull();
+		expect(focusCheckNeeded(22, T0 + MIN)).toBe(true);
+		expect(focusCheckNeeded(21, T0 + MIN)).toBe(false);
 	});
 });
 

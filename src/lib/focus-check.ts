@@ -43,23 +43,41 @@ export function focusCheckDue(last: number | null, now: number): boolean {
 	return last === null || now - last > FOCUS_CHECK_AFTER_MS;
 }
 
-/** The last activity of the user, or null when none is stored (or it cannot be read). */
+// The activity is also kept in memory, per user, for the life of the page, so
+// that storage which refuses writes (full, or private mode) does not make the
+// check due again at once after it was completed or dismissed.
+const remembered = new Map<string, number>();
+
+function later(a: number | null, b: number | null): number | null {
+	if (a === null) return b;
+	if (b === null) return a;
+	return a > b ? a : b;
+}
+
+/**
+ * The last activity of the user: the later of the stored time and the one
+ * remembered in memory, or null when there is none.
+ */
 export function readFocusActivity(userId: UserId): number | null {
 	if (userId == null) return null;
 	const raw = readStored(STORAGE_KEYS.focusCheck(userId));
-	if (raw === null || !/^\d+$/.test(raw)) return null;
-	return Number(raw);
+	const stored = raw !== null && /^\d+$/.test(raw) ? Number(raw) : null;
+	return later(stored, remembered.get(String(userId)) ?? null);
 }
 
-/** Records activity at `now`, keeping the later of it and what is stored. */
+/** Records activity at `now`, keeping the later of it and what is known. Memory first, then storage. */
 export function recordFocusActivity(userId: UserId, now: number): void {
 	if (userId == null) return;
 	const last = readFocusActivity(userId);
-	writeStored(STORAGE_KEYS.focusCheck(userId), String(last !== null && last > now ? last : now));
+	const value = last !== null && last > now ? last : now;
+	remembered.set(String(userId), value);
+	writeStored(STORAGE_KEYS.focusCheck(userId), String(value));
 }
 
+/** Forgets the activity, in memory and in storage, so the next check is due. */
 export function clearFocusActivity(userId: UserId): void {
 	if (userId == null) return;
+	remembered.delete(String(userId));
 	removeStored(STORAGE_KEYS.focusCheck(userId));
 }
 
