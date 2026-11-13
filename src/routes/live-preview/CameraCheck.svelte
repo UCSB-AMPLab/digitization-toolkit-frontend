@@ -48,9 +48,10 @@
   //
   // - Which camera is which (NEH-343): the camera details offer "Change
   //   which camera is which" when the capture screen passes onChangeRoles;
-  //   the capture screen then opens that step over the check, and passes
-  //   `covered` while the step is over it, so the capture key takes no test
-  //   captures here meanwhile.
+  //   the capture screen then opens that step over the check. While any
+  //   dialog is open over the check (the step, the camera details, the
+  //   viewer, the Refocus dialog), the capture key takes no test captures
+  //   here (dialogsAbove, src/lib/dialog.ts).
   //
   // Nothing closes the check while the cameras are working. The layout
   // section of the mock-up is not part of it.
@@ -64,7 +65,7 @@
   import { ownsEvent, readChords } from '$lib/capture-key';
   import { focalMismatch } from '$lib/focus-check';
   import { clampStep, stepRange, zoomFailureDetail } from '$lib/zoom-steps';
-  import { dismissible, toBody, trapFocus } from '$lib/dialog';
+  import { dialogsAbove, dismissible, toBody, trapFocus } from '$lib/dialog';
   import { PairPanZoom } from '$lib/pair-pan-zoom.svelte';
   import RefocusModal from './RefocusModal.svelte';
   import CameraCheckViewer from './CameraCheckViewer.svelte';
@@ -79,7 +80,6 @@
     onClose,
     onRefocusClosed,
     onChangeRoles,
-    covered = false,
   }: {
     // The camera that takes the left page: 1 when the viewport is swapped.
     leftIndex?: number;
@@ -95,8 +95,6 @@
     onRefocusClosed?: () => void;
     // Opens "Which camera is this?" by hand (NEH-343).
     onChangeRoles?: () => void;
-    // That step, or another screen of the capture screen's, is over the check.
-    covered?: boolean;
   } = $props();
 
   type Side = 'left' | 'right';
@@ -378,10 +376,14 @@
   // cameras work.
   const closesOnEscape = (event: KeyboardEvent) => !operating && !isCaptureKey(event);
 
+  let viewEl = $state<HTMLElement | null>(null);
+
   function handleKeydown(event: KeyboardEvent) {
     // A press a nested dialog already consumed (Escape closing it) takes nothing.
     if (event.defaultPrevented) return;
-    if (covered || viewerOpen || detailsOpen || refocusOpen) return;
+    // Whatever is opened over the check has the keyboard: one rule for its
+    // own dialogs and for the capture screen's.
+    if (!viewEl || dialogsAbove(viewEl) > 0) return;
     if (!isCaptureKey(event)) return;
     event.preventDefault();
     if (!event.repeat && !operating) void takePictures();
@@ -436,6 +438,7 @@
 
 <div
   class="ck-view"
+  bind:this={viewEl}
   data-camera-check
   role="dialog"
   aria-modal="true"

@@ -25,6 +25,7 @@ import {
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { clearChord, writeChord } from '$lib/capture-key';
+import { dismissible, trapFocus } from '$lib/dialog';
 import '../../app.css';
 import CameraCheck from './CameraCheck.svelte';
 
@@ -927,15 +928,25 @@ describe('CameraCheck: "Change which camera is which" (NEH-343)', () => {
 		expect(button(en.camwhich_open)).toBeNull();
 	});
 
-	it('while the step covers it, the capture key takes no test captures', async () => {
-		const screen = renderCheck();
+	it('under a dialog opened over it (the step), the capture key takes no test captures', async () => {
+		renderCheck();
 		await settle();
-		await screen.screen.rerender({ covered: true });
-		await settle();
+		const over = document.createElement('div');
+		over.tabIndex = -1;
+		document.body.append(over);
+		const trap = trapFocus(over);
+		const dismiss = dismissible(over, { onDismiss: () => {}, escape: false });
 		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
 		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', bubbles: true }));
 		await settle();
 		expect(captureSpy).not.toHaveBeenCalled();
+		dismiss.destroy();
+		trap.destroy();
+		over.remove();
+		await settle();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', bubbles: true }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBeGreaterThan(0);
 	});
 });
 

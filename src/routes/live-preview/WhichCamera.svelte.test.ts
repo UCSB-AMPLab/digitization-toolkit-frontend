@@ -300,6 +300,13 @@ describe('WhichCamera: what cannot be answered here', () => {
 		expect(listSpy).toHaveBeenCalledTimes(1);
 	});
 
+	it('passes the listing it reads on opening to the capture screen', async () => {
+		const { onDevices } = renderWhich();
+		await settle();
+		expect(onDevices).toHaveBeenCalledTimes(1);
+		expect(onDevices).toHaveBeenCalledWith([device(0), device(1)]);
+	});
+
 	it('"Check again" is busy while the cameras are reconnected, and passes the new listing to the capture screen', async () => {
 		devices = [device(0)];
 		const rescan = deferred<CameraDevice[]>();
@@ -378,6 +385,17 @@ describe('WhichCamera: a save refused', () => {
 		// The choice is cleared: choose again.
 		expect(pick(0)?.getAttribute('aria-pressed')).toBe('false');
 		expect(button(en.camwhich_confirm)?.disabled).toBe(true);
+	});
+
+	it('409: passes the listing it reads again to the capture screen', async () => {
+		rolesSpy.mockRejectedValueOnce(failure(409, { code: 'camera_not_connected', message: 'English' }));
+		const { onDevices } = renderWhich();
+		await settle();
+		pick(0)!.click();
+		await settle();
+		devices = [device(0), device(1, { hardware_id: 'hw9' })];
+		await click(en.camwhich_confirm);
+		expect(onDevices).toHaveBeenLastCalledWith([device(0), device(1, { hardware_id: 'hw9' })]);
 	});
 
 	it('409 identity unusable: says so and reads again', async () => {

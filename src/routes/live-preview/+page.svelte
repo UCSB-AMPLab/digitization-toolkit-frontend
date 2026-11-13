@@ -74,12 +74,14 @@
   // set-up is needed, WhichCamera opens by itself over everything and
   // cannot be dismissed, and nothing here captures: LiveViewport's capture
   // button is disabled and its capture key ignored (captureBlocked, and
-  // otherModalOpen), and a retake or placeholder capture is refused with
-  // the step's message. Capture is held the same way, with nothing shown,
+  // otherModalOpen), a retake or placeholder capture is refused with the
+  // step's message, and the camera check and the Refocus dialog under the
+  // step leave their capture key to it (dialogsAbove in src/lib/dialog.ts). Capture is held the same way, with nothing shown,
   // from loading until the first answer has arrived (captureHeld); a 404
   // counts as an answer (no set-up needed), and so does a read that fails
   // otherwise, which ends the hold and leaves capture as before. A read
-  // that fails keeps the last answer. "Change which camera is
+  // that fails keeps the last answer, and the set-up a save returns
+  // supersedes every read started before the save. "Change which camera is
   // which" in the camera check's details opens the same step by hand,
   // cancellable, over the check. A save returns to where the operator was.
   // While set-up is needed the step's "Leave the capture screen" goes where
@@ -496,10 +498,14 @@
     if (rolesLeft !== null) swapped = rolesLeft === 1;
   });
 
-  // The roles were saved: back to where the operator was.
+  // The roles were saved: back to where the operator was. The save's
+  // set-up supersedes every read started before it, so a read still pending
+  // cannot put the set-up from before the save back on screen.
   function rolesSaved(answer: CameraRolesResponse) {
     if (Array.isArray(answer.devices) && answer.devices.length > 0) roleDevices = answer.devices;
+    readSetup.supersede();
     cameraSetup = answer.setup;
+    setupAnswered = true;
     whichByHand = false;
   }
   // Set once the first load has settled (records, volume, recapture summary,
@@ -1239,7 +1245,6 @@
     onClose={() => (cameraCheckOpen = false)}
     onRefocusClosed={noteFocusActivity}
     onChangeRoles={() => (whichByHand = true)}
-    covered={setupNeeded || whichByHand}
   />
 {/if}
 

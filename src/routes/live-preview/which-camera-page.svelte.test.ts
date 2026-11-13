@@ -220,6 +220,36 @@ describe('capture screen: set-up needed', () => {
 		await expect.poll(() => captures.length).toBe(1);
 	});
 
+	it('a read started before a save that answers after it does not reopen the step', async () => {
+		let release!: () => void;
+		const held = new Promise<void>((r) => (release = r));
+		setupAnswers = [
+			() => json(needed('role_unconfirmed')),
+			() => json(needed('role_unconfirmed')),
+			async () => {
+				await held;
+				return json(needed('role_unconfirmed'));
+			},
+			() => json(NOT_NEEDED)
+		];
+		roleAnswers = [() => json({ devices: [row(0, 'a', { role: 'right', role_confirmed: true }), row(1, 'b', { role: 'left', role_confirmed: true })], setup: NOT_NEEDED })];
+		render(LivePreview);
+		await expect.poll(() => card(1)).not.toBeNull();
+		await expect.poll(() => setupCalls).toBe(2);
+		// The tab comes back: a read that is still pending when the save answers.
+		document.dispatchEvent(new Event('visibilitychange'));
+		await expect.poll(() => setupCalls).toBe(3);
+		(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+		await settle();
+		buttonIn(step(), en.camwhich_confirm)!.click();
+		await expect.poll(() => step()).toBeNull();
+		release();
+		await settle();
+		await settle();
+		expect(step()).toBeNull();
+		expect(captureButton()?.disabled).toBe(false);
+	});
+
 	it('a 503 on saving says so and capture stays blocked', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		setupAnswers = [() => json(needed('role_unconfirmed'))];

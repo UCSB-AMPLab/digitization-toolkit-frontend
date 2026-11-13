@@ -14,8 +14,8 @@
   // the device list itself on opening and after a refused save, and calls
   // `onReread` then so the capture screen asks for the set-up again. "Check
   // again" reconnects the cameras (POST /cameras/rescan, as "Reconnect
-  // cameras" does), hands the listing to the capture screen (`onDevices`),
-  // then asks for the set-up.
+  // cameras" does), then asks for the set-up. Every listing it reads, either
+  // way, goes to the capture screen too (`onDevices`).
   //
   // What it says follows the most specific reason (src/lib/camera-roles.ts),
   // never the backend's English:
@@ -76,7 +76,8 @@
     onReread?: () => Promise<void> | void;
     // Leave the capture screen, while set-up is needed.
     onLeave?: () => void;
-    // The listing "Check again" got from the rescan.
+    // Each listing this screen reads: on opening, after a refused save, and
+    // from "Check again".
     onDevices?: (devices: CameraDevice[]) => void;
   } = $props();
 
@@ -102,13 +103,21 @@
     return [...devices].sort((a, b) => a.index - b.index).slice(0, 2);
   });
 
+  // Every listing this screen reads (on opening, after a refused save, from
+  // "Check again") goes through here, and the capture screen gets each one
+  // that is still the newest (`onDevices`), so its devices and rotations
+  // never lag behind the ones shown here.
+  function listed(seq: number, list: CameraDevice[]) {
+    if (destroyed || seq !== deviceSeq) return;
+    devices = list;
+    devicesFailed = false;
+    onDevices?.(list);
+  }
+
   async function readDevices(): Promise<void> {
     const seq = ++deviceSeq;
     try {
-      const list = await camerasApi.listDevices();
-      if (destroyed || seq !== deviceSeq) return;
-      devices = list;
-      devicesFailed = false;
+      listed(seq, await camerasApi.listDevices());
     } catch (err) {
       if (destroyed || seq !== deviceSeq) return;
       console.error('[WhichCamera] Could not read the devices:', err);
@@ -144,11 +153,7 @@
     try {
       const list = await camerasApi.rescan();
       if (destroyed) return;
-      if (seq === deviceSeq) {
-        devices = list;
-        devicesFailed = false;
-      }
-      onDevices?.(list);
+      listed(seq, list);
     } catch (err) {
       if (destroyed) return;
       console.error('[WhichCamera] Could not reconnect the cameras:', err);

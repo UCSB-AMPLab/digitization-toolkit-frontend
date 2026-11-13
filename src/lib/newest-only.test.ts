@@ -75,6 +75,27 @@ describe('newestOnly', () => {
 		expect(onError).toHaveBeenCalledTimes(1);
 	});
 
+	it('supersede: a value assigned elsewhere supersedes every load started before it', async () => {
+		const pending = [deferred<string>(), deferred<string>()];
+		const responses = [...pending];
+		const apply = vi.fn(() => true);
+		const load = newestOnly(() => responses.shift()!.promise, apply);
+
+		const older = load();
+		load.supersede();
+		pending[0].resolve('before');
+		// What is on screen is the value assigned by supersede: usable, not its own.
+		await expect(older).resolves.toEqual({ ok: true, own: false });
+		expect(apply).not.toHaveBeenCalled();
+
+		// A load started after it is applied as usual.
+		const later = load();
+		pending[1].resolve('after');
+		await expect(later).resolves.toEqual({ ok: true, own: true });
+		expect(apply).toHaveBeenCalledWith('after');
+		expect(apply).toHaveBeenCalledTimes(1);
+	});
+
 	it('a single load reports its own outcome, failure included', async () => {
 		const apply = vi.fn((v: number) => v > 0);
 		let next: () => Promise<number> = () => Promise.resolve(3);

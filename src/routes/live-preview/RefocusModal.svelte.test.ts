@@ -17,6 +17,7 @@ import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { clearChord, writeChord } from '$lib/capture-key';
 import { REQUIRE_MF_READING } from '$lib/focus-check';
+import { dismissible, trapFocus } from '$lib/dialog';
 import '../../app.css';
 import RefocusModal from './RefocusModal.svelte';
 
@@ -449,6 +450,29 @@ describe('RefocusModal: the pedal and the capture key', () => {
 		await settle();
 		// "Take again" by the space bar.
 		expect(captureSpy).toHaveBeenCalledTimes(4);
+	});
+
+	it('under a dialog opened over it, they take nothing, and leave the key to that dialog', async () => {
+		captureSpy.mockImplementation(() => new Promise(() => {}));
+		await toTestStage();
+		// Any dialog of the registry: here one that refuses Escape and has no
+		// capture key, as the set-up step while set-up is needed.
+		const over = document.createElement('div');
+		over.tabIndex = -1;
+		document.body.append(over);
+		const trap = trapFocus(over);
+		const dismiss = dismissible(over, { onDismiss: () => {}, escape: false });
+		const event = press('b');
+		press(' ');
+		await settle();
+		expect(captureSpy).not.toHaveBeenCalled();
+		expect(event.defaultPrevented).toBe(false);
+		dismiss.destroy();
+		trap.destroy();
+		over.remove();
+		press('b');
+		await settle();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
 	});
 
 	it('a held key (repeat) does not take the pair', async () => {
