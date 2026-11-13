@@ -58,6 +58,10 @@ let setupCalls: number;
 let roleAnswers: (() => Response)[];
 let rolePuts: unknown[];
 let deviceLists: Row[][];
+// Lets a test hold the answer to a given device listing (1 = the first); the
+// rows are chosen when the listing starts.
+let deviceCalls: number;
+let holdListing: ((call: number) => Promise<void> | null) | null;
 let captures: string[];
 let captureBodies: Record<string, unknown>[];
 
@@ -90,7 +94,10 @@ function serve() {
 		}
 		if (path.includes('/cameras/preview/')) return new Response(null, { status: 404 });
 		if (path.endsWith('/cameras/devices') || path.endsWith('/cameras/rescan')) {
+			deviceCalls += 1;
 			const list = deviceLists.length > 1 ? deviceLists.shift()! : deviceLists[0];
+			const hold = holdListing?.(deviceCalls);
+			if (hold) await hold;
 			return json(list);
 		}
 		if (/\/cameras\/\d\/orientation$/.test(path)) return json({});
@@ -135,6 +142,8 @@ function press(key: string, code = key) {
 beforeEach(() => {
 	setupAnswers = [() => json(NOT_NEEDED)];
 	setupCalls = 0;
+	deviceCalls = 0;
+	holdListing = null;
 	roleAnswers = [];
 	rolePuts = [];
 	captures = [];
@@ -429,9 +438,12 @@ describe('capture screen: "Leave the capture screen" while set-up is needed', ()
 describe('capture screen: the saved roles decide left and right', () => {
 	const swapControl = () => document.querySelector(`button[aria-label="${en.lv_swap_orientation}"]`) as HTMLButtonElement | null;
 	const viewportDegrees = () => [...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
+	// The set-up as the backend reports it once body "b" is confirmed as the left page.
+	const B_LEFT = { needs_setup: false, reasons: [], confirmed_pair: { left: 'b', right: 'a' } };
 
 	it('the body confirmed as the left page is on the left and in the captures; no swap control', async () => {
 		deviceLists = [[row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })]];
+		setupAnswers = [() => json(B_LEFT)];
 		render(LivePreview);
 		await expect.poll(() => viewportDegrees()).toEqual(['180°', '90°']);
 		expect(swapControl()).toBeNull();
@@ -444,7 +456,7 @@ describe('capture screen: the saved roles decide left and right', () => {
 	it('after a confirm that makes camera 2 the left page, the next capture and the panes follow', async () => {
 		deviceLists = [[row(0, 'a', { orientation: 90 }), row(1, 'b', { orientation: 180 })]];
 		setupAnswers = [() => json(needed('role_unconfirmed'))];
-		roleAnswers = [() => json({ devices: [row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })], setup: NOT_NEEDED })];
+		roleAnswers = [() => json({ devices: [row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })], setup: B_LEFT })];
 		render(LivePreview);
 		await expect.poll(() => card(1)).not.toBeNull();
 		expect(viewportDegrees()).toEqual(['90°', '180°']);
@@ -462,6 +474,7 @@ describe('capture screen: the saved roles decide left and right', () => {
 
 	it('the camera check then has the left page camera on its left', async () => {
 		deviceLists = [[row(0, 'a', { role: 'right', role_confirmed: true }), row(1, 'b', { role: 'left', role_confirmed: true })]];
+		setupAnswers = [() => json(B_LEFT)];
 		render(LivePreview);
 		await expect.poll(() => setupCalls).toBe(2);
 		await settle();
@@ -492,12 +505,132 @@ describe('capture screen: the saved roles decide left and right', () => {
 		expect(captureBodies[0].left_camera_index).toBe(1);
 	});
 
-	it('with roles that are not both confirmed the swap control stays', async () => {
-		deviceLists = [[row(0, 'a', { role: 'left', role_confirmed: true }), row(1, 'b', { role: 'right', role_confirmed: false })]];
+	it('without a confirmed pair in the set-up the swap control stays, whatever roles the listing carries', async () => {
+		deviceLists = [[row(0, 'a', { role: 'left', role_confirmed: true }), row(1, 'b', { role: 'right', role_confirmed: true })]];
+		setupAnswers = [() => json({ ...NOT_NEEDED, confirmed_pair: null })];
 		render(LivePreview);
 		await expect.poll(() => setupCalls).toBe(2);
 		await settle();
 		expect(swapControl()).not.toBeNull();
+	});
+});
+
+// What the capture screen knows about the set-up and the roles changes only
+// through answers, and an answer counts only when nothing started later has
+// answered: set-up reads, device listings and role saves share one order.
+describe('capture screen: answers that started before a newer one', () => {
+	const viewportDegrees = () => [...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
+	// A pair confirmed with camera 2 (body "b") as the left page.
+	const SAVED_B_LEFT = { needs_setup: false, reasons: [], confirmed_pair: { left: 'b', right: 'a' } };
+	const savedRows = () => [row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })];
+	const oldRows = () => [row(0, 'a', { role: 'left', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'right', role_confirmed: true, orientation: 180 })];
+
+	it('a failed read does not end the capture hold while a read started after it is pending', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		let release!: () => void;
+		const held = new Promise<void>((r) => (release = r));
+		setupAnswers = [
+			() => json({ detail: 'boom' }, 500),
+			async () => {
+				await held;
+				return json(needed('role_unconfirmed'));
+			}
+		];
+		render(LivePreview);
+		await expect.poll(() => setupCalls).toBe(2);
+		await expect.poll(() => captureButton()).not.toBeNull();
+		await settle();
+		await settle();
+		expect(captureButton()!.disabled).toBe(true);
+		press(' ', 'Space');
+		await settle();
+		expect(captures.length).toBe(0);
+		release();
+		await expect.poll(() => step()).not.toBeNull();
+		expect(captureButton()!.disabled).toBe(true);
+	});
+
+	it('a device listing started before a save that answers after it does not undo the saved roles', async () => {
+		// The panel's first listing, with the roles from before, answers last.
+		let release!: () => void;
+		const held = new Promise<void>((r) => (release = r));
+		holdListing = (call) => (call === 1 ? held : null);
+		deviceLists = [oldRows()];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [() => json({ devices: savedRows(), setup: SAVED_B_LEFT })];
+		render(LivePreview);
+		await expect.poll(() => card(1)).not.toBeNull();
+		(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+		await settle();
+		buttonIn(step(), en.camwhich_confirm)!.click();
+		await expect.poll(() => step()).toBeNull();
+		await expect.poll(() => viewportDegrees()).toEqual(['180°', '90°']);
+		release();
+		await settle();
+		await settle();
+		expect(viewportDegrees()).toEqual(['180°', '90°']);
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(1);
+		expect(captureBodies[0].left_camera_index).toBe(1);
+	});
+
+	it('the rule: a read and a listing started before a save, answering after it in either order, change nothing; a read started after it counts', async () => {
+		for (const listingFirst of [true, false]) {
+			let releaseListing!: () => void;
+			const listingHeld = new Promise<void>((r) => (releaseListing = r));
+			let releaseRead!: () => void;
+			const readHeld = new Promise<void>((r) => (releaseRead = r));
+			// The panel's first listing answers last; so does the read the tab's
+			// return starts. Both carry what was true before the save.
+			holdListing = (call) => (call === 1 ? listingHeld : null);
+			deviceLists = [oldRows()];
+			setupCalls = 0;
+			deviceCalls = 0;
+			rolePuts = [];
+			captureBodies = [];
+			// On loading, and after the step's own listing (the panel's is held).
+			setupAnswers = [
+				() => json(needed('role_unconfirmed')),
+				() => json(needed('role_unconfirmed')),
+				async () => {
+					await readHeld;
+					return json(needed('role_unconfirmed'));
+				},
+				() => json(needed('pair_changed'))
+			];
+			roleAnswers = [() => json({ devices: savedRows(), setup: SAVED_B_LEFT })];
+			const screen = render(LivePreview);
+			await expect.poll(() => card(1)).not.toBeNull();
+			await expect.poll(() => setupCalls).toBe(2);
+			document.dispatchEvent(new Event('visibilitychange'));
+			await expect.poll(() => setupCalls).toBe(3);
+			(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+			await settle();
+			buttonIn(step(), en.camwhich_confirm)!.click();
+			await expect.poll(() => step()).toBeNull();
+			if (listingFirst) {
+				releaseListing();
+				await settle();
+				releaseRead();
+			} else {
+				releaseRead();
+				await settle();
+				releaseListing();
+			}
+			await settle();
+			await settle();
+			expect(step()).toBeNull();
+			expect(viewportDegrees()).toEqual(['180°', '90°']);
+			await expect.poll(() => captureButton()?.disabled).toBe(false);
+			press(' ', 'Space');
+			await expect.poll(() => captureBodies.length).toBe(1);
+			expect(captureBodies[0].left_camera_index).toBe(1);
+			// A read started after the save is newer than it, and counts.
+			document.dispatchEvent(new Event('visibilitychange'));
+			await expect.poll(() => step()?.textContent ?? '').toContain(en.camwhich_lead_pair_changed);
+			screen.unmount();
+		}
 	});
 });
 

@@ -76,23 +76,42 @@
   // button is disabled and its capture key ignored (captureBlocked, and
   // otherModalOpen), a retake or placeholder capture is refused with the
   // step's message, and the camera check and the Refocus dialog under the
-  // step leave their capture key to it (dialogsAbove in src/lib/dialog.ts). Capture is held the same way, with nothing shown,
-  // from loading until the first answer has arrived (captureHeld); a 404
-  // counts as an answer (no set-up needed), and so does a read that fails
-  // otherwise, which ends the hold and leaves capture as before. A read
-  // that fails keeps the last answer, and the set-up a save returns
-  // supersedes every read started before the save. "Change which camera is
-  // which" in the camera check's details opens the same step by hand,
-  // cancellable, over the check. A save returns to where the operator was.
-  // While set-up is needed the step's "Leave the capture screen" goes where
-  // the top bar's back button goes (handleBack); coming back shows the step
-  // again. The saved roles decide left and right: when set-up is not needed
-  // and the latest device rows (from CameraControls, from the step's rescan,
-  // or from a save) confirm one body as the left page and one as the right
+  // step leave their capture key to it (dialogsAbove in src/lib/dialog.ts).
+  // Capture is held the same way, with nothing shown, from loading until the
+  // newest set-up request outstanding has settled (captureHeld); a 404
+  // counts as an answer (no set-up needed), and so does a newest request
+  // that fails otherwise, which ends the hold and leaves capture as before.
+  // A read that fails keeps the last answer. "Change which camera is which"
+  // in the camera check's details opens the same step by hand, cancellable,
+  // over the check. A save returns to where the operator was. While set-up
+  // is needed the step's "Leave the capture screen" goes where the top
+  // bar's back button goes (handleBack); coming back shows the step again.
+  // The saved roles decide left and right: when set-up is not needed and the
+  // set-up's confirmed pair names two bodies that the latest listing has
   // (leftIndexFromRoles), `swapped` is set from them, and LiveViewport hides
   // its swap control (swapLocked). Everything that reads leftCameraIndex
-  // then follows the roles. With an old backend, or without two confirmed
-  // roles, `swapped` and the control are as before. `swapped` is not stored.
+  // then follows the roles. With an old backend, or without a confirmed
+  // pair, `swapped` and the control are as before. `swapped` is not stored.
+  //
+  // What the capture screen knows about the cameras' set-up and roles
+  // (cameraSetup, setupAnswered) changes only through answers, and an answer
+  // is applied only if no newer answer has been applied or is outstanding
+  // from a later start. Why the writers below are complete:
+  // - Only two kinds of answer carry roles: GET /cameras/setup and the
+  //   answer to a save (PUT /cameras/roles). Device listings carry none that
+  //   is read here: leftIndexFromRoles takes the roles from the set-up's
+  //   confirmed pair and reads a listing only for each body's index, so a
+  //   listing, whenever it started, cannot put roles from before a save back.
+  //   Listings still reach `devices` and the rotations as they arrive.
+  // - Set-up reads are ordered by newestOnly (readSetup): only the newest
+  //   read's answer is assigned; checkSetup ends the first hold only once
+  //   the newest request outstanding has settled, so an overtaken read's
+  //   failure ends nothing.
+  // - A save's answer takes its place in the same order (rolesSaved calls
+  //   readSetup.supersede()): every read started before that answer arrived
+  //   is discarded, and a read started after it is newer and counts.
+  // So cameraSetup is written only in readSetup's apply and in rolesSaved,
+  // and setupAnswered only in checkSetup and rolesSaved.
   //
   // Version: 0.3.3
 
@@ -474,24 +493,25 @@
     () => camerasApi.getSetup(),
     (setup) => {
       cameraSetup = setup;
-      setupAnswered = true;
       return true;
     },
-    (e) => {
-      // Capture must not depend on the health of this route.
-      setupAnswered = true;
-      console.error('[LivePreview] Error reading the camera set-up:', e);
-    }
+    (e) => console.error('[LivePreview] Error reading the camera set-up:', e)
   );
+  // Resolves once the newest set-up request outstanding has settled,
+  // answered or failed (newestOnly makes a caller whose own request was
+  // discarded wait for that one), so only then does the first hold end. A
+  // failed request that a newer one has overtaken ends nothing. Capture must
+  // not depend on the health of this route: the newest failing ends the
+  // hold too.
   async function checkSetup(): Promise<void> {
     await readSetup();
+    setupAnswered = true;
   }
 
-  // The latest device rows, with their roles: CameraControls' listings,
-  // the step's rescan, and the rows a save returns.
-  let roleDevices = $state<CameraDevice[]>([]);
   // The left camera the saved roles decide; null when they decide nothing.
-  let rolesLeft = $derived(leftIndexFromRoles(roleDevices, cameraSetup));
+  // The roles come from the set-up alone (its confirmed pair); `devices`
+  // only says at which index each body is.
+  let rolesLeft = $derived(leftIndexFromRoles(devices, cameraSetup));
   // The only place `swapped` follows the roles. The manual control is
   // hidden meanwhile, so nothing else writes it.
   $effect(() => {
@@ -502,7 +522,6 @@
   // set-up supersedes every read started before it, so a read still pending
   // cannot put the set-up from before the save back on screen.
   function rolesSaved(answer: CameraRolesResponse) {
-    if (Array.isArray(answer.devices) && answer.devices.length > 0) roleDevices = answer.devices;
     readSetup.supersede();
     cameraSetup = answer.setup;
     setupAnswered = true;
@@ -951,7 +970,6 @@
   // listed change (NEH-343).
   function applyDevices(d: CameraDevice[]) {
     devices = d;
-    roleDevices = d;
     const seeded = seedRotation(rotateDeg, d, rotateTouched);
     const settled = settlePendingRotations(rotatePending, d);
     rotatePending = settled.remaining;

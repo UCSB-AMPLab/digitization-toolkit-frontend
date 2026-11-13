@@ -55,16 +55,21 @@ export function whichScreen(setup: CameraSetup | null, devices: CameraDevice[]):
 }
 
 // The camera index the saved roles put on the left page, or null when they
-// decide nothing: while set-up is needed or unknown, and unless the listing
-// has exactly one body confirmed as the left page and one as the right
-// (an old backend reports no roles; a guess is never a role).
+// decide nothing: while set-up is needed or unknown, without a confirmed
+// pair (an old backend), and unless both bodies of the pair are listed.
+// The roles come from the set-up alone (its confirmed_pair, which the
+// backend reports with needs_setup false only when the pair is exactly the
+// bodies connected, each confirmed in its role); the listing only says at
+// which index each body is. A listing's own role fields are never read, so
+// a listing that started before a save cannot carry the roles from before it.
 export function leftIndexFromRoles(devices: CameraDevice[], setup: CameraSetup | null): number | null {
-	if (!setup || setup.needs_setup) return null;
-	const confirmed = devices.filter((d) => d.role_confirmed === true);
-	const left = confirmed.filter((d) => d.role === 'left');
-	const right = confirmed.filter((d) => d.role === 'right');
-	if (left.length !== 1 || right.length !== 1) return null;
-	return left[0].index;
+	if (!setup || setup.needs_setup || !setup.confirmed_pair) return null;
+	const { left, right } = setup.confirmed_pair;
+	if (left === right) return null;
+	const leftBody = devices.find((d) => d.hardware_id === left);
+	const rightBody = devices.find((d) => d.hardware_id === right);
+	if (!leftBody || !rightBody) return null;
+	return leftBody.index;
 }
 
 // The bodies a listing reports, whatever their order or index.

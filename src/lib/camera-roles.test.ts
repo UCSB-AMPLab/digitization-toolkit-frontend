@@ -85,23 +85,30 @@ describe('hardwareKey', () => {
 
 describe('leftIndexFromRoles', () => {
 	const notNeeded: CameraSetup = { needs_setup: false, reasons: [], confirmed_pair: { left: 'hw1', right: 'hw0' } };
-	const confirmed = [device(0, { role: 'right', role_confirmed: true }), device(1, { role: 'left', role_confirmed: true })];
 
-	it('the index of the body confirmed as the left page, when set-up is not needed', () => {
-		expect(leftIndexFromRoles(confirmed, notNeeded)).toBe(1);
-		expect(leftIndexFromRoles(pair, notNeeded)).toBe(0);
+	it('the index of the body the set-up names as the left page, when set-up is not needed', () => {
+		expect(leftIndexFromRoles([device(0), device(1)], notNeeded)).toBe(1);
+		expect(leftIndexFromRoles([device(0), device(1)], { ...notNeeded, confirmed_pair: { left: 'hw0', right: 'hw1' } })).toBe(0);
+		// The bodies are found by identity, whatever their index.
+		expect(leftIndexFromRoles([device(0, { hardware_id: 'hw1' }), device(1, { hardware_id: 'hw0' })], notNeeded)).toBe(0);
+	});
+
+	it('the roles a listing carries decide nothing: only the set-up does', () => {
+		const older = [device(0, { role: 'left', role_confirmed: true }), device(1, { role: 'right', role_confirmed: true })];
+		expect(leftIndexFromRoles(older, notNeeded)).toBe(1);
+		expect(leftIndexFromRoles(older, { ...notNeeded, confirmed_pair: null })).toBeNull();
 	});
 
 	it('nothing while set-up is needed or unknown', () => {
-		expect(leftIndexFromRoles(confirmed, { ...notNeeded, needs_setup: true })).toBeNull();
-		expect(leftIndexFromRoles(confirmed, null)).toBeNull();
+		expect(leftIndexFromRoles([device(0), device(1)], { ...notNeeded, needs_setup: true })).toBeNull();
+		expect(leftIndexFromRoles([device(0), device(1)], null)).toBeNull();
 	});
 
-	it('nothing without one confirmed left and one confirmed right (an old backend, a guess, one camera)', () => {
-		expect(leftIndexFromRoles([device(0), device(1)], notNeeded)).toBeNull();
-		expect(leftIndexFromRoles([device(0, { role: 'right', role_confirmed: false }), device(1, { role: 'left', role_confirmed: true })], notNeeded)).toBeNull();
-		expect(leftIndexFromRoles([device(0, { role_guess: 'left' }), device(1, { role_guess: 'right' })], notNeeded)).toBeNull();
-		expect(leftIndexFromRoles([device(0, { role: 'left', role_confirmed: true }), device(1, { role: 'left', role_confirmed: true })], notNeeded)).toBeNull();
-		expect(leftIndexFromRoles([device(1, { role: 'left', role_confirmed: true })], notNeeded)).toBeNull();
+	it('nothing without a confirmed pair whose two bodies are both listed (an old backend, one camera)', () => {
+		expect(leftIndexFromRoles([device(0), device(1)], { ...notNeeded, confirmed_pair: null })).toBeNull();
+		expect(leftIndexFromRoles([device(1)], notNeeded)).toBeNull();
+		expect(leftIndexFromRoles([device(0), device(2)], notNeeded)).toBeNull();
+		expect(leftIndexFromRoles([device(0), device(1)], { ...notNeeded, confirmed_pair: { left: 'hw1', right: 'hw1' } })).toBeNull();
 	});
 });
+
