@@ -25,7 +25,7 @@ import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { FOCUS_CHECK_AFTER_MS, readFocusActivity, recordFocusActivity } from '$lib/focus-check';
-import { clearChord } from '$lib/capture-key';
+import { clearChord, readChords, DEFAULT_CHORDS } from '$lib/capture-key';
 import '../../app.css';
 import LivePreview from './+page.svelte';
 
@@ -361,5 +361,85 @@ describe('the check waits for a capture in flight (NEH-339)', () => {
 		await settle();
 		expect(refocusDialog()).toBeNull();
 		shutter.open();
+	});
+});
+
+// NEH-339: the check waits for every dialog on the screen, through the
+// registry in src/lib/dialog.ts, LiveViewport's own included, and opens once
+// the last one has closed if it is still due.
+describe('the check waits for any open dialog (NEH-339)', () => {
+	const floatButton = (label: string) => document.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement | null;
+	const modalByTitle = (id: string) => document.querySelector(`[role="dialog"][aria-labelledby="${id}"]`);
+	const closeIn = (id: string) =>
+		[...(modalByTitle(id)?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((b) => b.textContent?.trim() === en.common_close)!;
+	const makeDue = () => localStorage.setItem(`captua_focus_check:${USER}`, String(Date.now() - FOCUS_CHECK_AFTER_MS - MIN));
+
+	for (const [name, label, titleId] of [
+		['grid settings', en.lv_grid_settings, 'grid-modal-title'],
+		['capture key', en.lv_capture_key_settings, 'capture-key-modal-title']
+	] as const) {
+		it(`does not open over LiveViewport's ${name} dialog, and opens once it closes if still due`, async () => {
+			recordFocusActivity(USER, Date.now() - MIN);
+			serve(true);
+			render(LivePreview);
+			await expect.poll(() => refocusButton()).not.toBeNull();
+			await settle();
+			expect(refocusDialog()).toBeNull();
+
+			floatButton(label)!.click();
+			await expect.poll(() => modalByTitle(titleId)).not.toBeNull();
+			makeDue();
+			document.dispatchEvent(new Event('visibilitychange'));
+			await settle();
+			expect(refocusDialog()).toBeNull();
+
+			closeIn(titleId).click();
+			await expect.poll(() => modalByTitle(titleId)).toBeNull();
+			await expect.poll(() => refocusDialog()).not.toBeNull();
+		});
+
+		it(`does not open on its own once LiveViewport's ${name} dialog closes if no longer due`, async () => {
+			recordFocusActivity(USER, Date.now() - MIN);
+			serve(true);
+			render(LivePreview);
+			await expect.poll(() => refocusButton()).not.toBeNull();
+			floatButton(label)!.click();
+			await expect.poll(() => modalByTitle(titleId)).not.toBeNull();
+			closeIn(titleId).click();
+			await expect.poll(() => modalByTitle(titleId)).toBeNull();
+			await settle();
+			expect(refocusDialog()).toBeNull();
+		});
+	}
+
+	it('a key pressed in the focus check does not reassign the pedal, even while LiveViewport is learning one', async () => {
+		recordFocusActivity(USER, Date.now() - MIN);
+		serve(true);
+		render(LivePreview);
+		await expect.poll(() => refocusButton()).not.toBeNull();
+		floatButton(en.lv_capture_key_settings)!.click();
+		await expect.poll(() => modalByTitle('capture-key-modal-title')).not.toBeNull();
+		const learn = [...modalByTitle('capture-key-modal-title')!.querySelectorAll<HTMLButtonElement>('button')].find(
+			(b) => b.textContent?.trim() === en.lv_capture_key_learn
+		)!;
+		learn.click();
+		await expect.poll(() => document.querySelector('.capture-key-status')?.textContent).toBe(en.lv_capture_key_learning);
+
+		// The focus check over the learning dialog: its button, under the backdrop.
+		refocusButton()!.click();
+		await expect.poll(() => refocusDialog()).not.toBeNull();
+		const key = new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', bubbles: true, cancelable: true });
+		document.body.dispatchEvent(key);
+		document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'x', code: 'KeyX', bubbles: true }));
+		await settle();
+		expect(readChords()).toEqual(DEFAULT_CHORDS);
+		expect(key.defaultPrevented).toBe(false);
+		expect(document.querySelector('.capture-key-status')?.textContent).toBe(en.lv_capture_key_learning);
+
+		// Once the check has closed, the learning dialog takes the next key.
+		skip();
+		await expect.poll(() => refocusDialog()).toBeNull();
+		document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', bubbles: true, cancelable: true }));
+		await expect.poll(() => readChords()[0]?.key).toBe('x');
 	});
 });

@@ -39,7 +39,7 @@
   import { defaultRecordTitle } from '$lib/record-title';
   import { isConflict } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
-  import { dismissible } from '$lib/dialog';
+  import { dismissible, openDialogsOutside } from '$lib/dialog';
   import { powerControlOpen } from '$lib/stores/power';
 
   let {
@@ -135,6 +135,10 @@
   let showGuides = $state(true);
   let showGridModal = $state(false);
   let showCaptureKeyModal = $state(false);
+  // The two dialogs' backdrops: any open dialog outside them is not this
+  // component's (NEH-339).
+  let gridBackdrop = $state<HTMLElement | null>(null);
+  let captureKeyBackdrop = $state<HTMLElement | null>(null);
 
   // ---------------------------------------------------------------------------
   // CAPTURE KEY (NEH-228)
@@ -943,7 +947,15 @@
     heldCode = null;
   }
 
+  // A dialog that is not this component's (the focus check, the page's
+  // viewer, the power confirmation) has the keyboard: no capture, and no
+  // capture key learnt from a key pressed in it (NEH-339).
+  function foreignDialogOpen(): boolean {
+    return openDialogsOutside([gridBackdrop, captureKeyBackdrop]) > 0;
+  }
+
   function handleWindowKeydown(event: KeyboardEvent) {
+    if (foreignDialogOpen()) return;
     if (learning) {
       handleLearnKeydown(event);
       return;
@@ -967,6 +979,7 @@
 
   function handleWindowKeyup(event: KeyboardEvent) {
     if (learning) {
+      if (foreignDialogOpen()) return;
       // The device sent only a modifier and is now releasing it with no
       // other key having arrived with it: tell the operator instead of
       // leaving the control in "assigning" forever.
@@ -1385,7 +1398,7 @@
 </div><!-- /viewport-outer -->
 
 {#if showGridModal}
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeGridModal }}>
+  <div class="modal-backdrop" bind:this={gridBackdrop} use:dismissible={{ onDismiss: closeGridModal }}>
     <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="grid-modal-title">
       <h3 class="modal-title" id="grid-modal-title">{$m.lv_grid_modal_title}</h3>
       <p class="modal-subtitle">{$m.lv_grid_modal_subtitle}</p>
@@ -1418,7 +1431,7 @@
 
 {#if showCaptureKeyModal}
   <!-- No Escape while a key is being assigned: a pedal may send Escape. -->
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeCaptureKeyModal, escape: !learning }}>
+  <div class="modal-backdrop" bind:this={captureKeyBackdrop} use:dismissible={{ onDismiss: closeCaptureKeyModal, escape: !learning }}>
     <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="capture-key-modal-title">
       <h3 class="modal-title" id="capture-key-modal-title">{$m.lv_capture_key_settings}</h3>
       <div class="modal-body">

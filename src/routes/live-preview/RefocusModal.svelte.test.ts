@@ -722,4 +722,54 @@ describe('RefocusModal: Escape as the assigned capture key', () => {
 		expect(onClose).toHaveBeenCalledWith('dismissed');
 		expect(captureSpy).not.toHaveBeenCalled();
 	});
+
+	it('with no key assigned, Escape closes the dialog and starts no request', async () => {
+		const { onClose } = await toTestStage();
+		const event = pressEscape();
+		await settle();
+		expect(onClose).toHaveBeenCalledWith('dismissed');
+		expect(captureSpy).not.toHaveBeenCalled();
+		expect(event.defaultPrevented).toBe(true);
+	});
+
+	// The whole chord decides, modifiers included: with the pedal on
+	// Ctrl+Escape, plain Escape is no capture key and closes the dialog.
+	describe('with the pedal on Ctrl+Escape', () => {
+		function pressCtrlEscape(): KeyboardEvent {
+			const event = new KeyboardEvent('keydown', { key: 'Escape', ctrlKey: true, bubbles: true, cancelable: true });
+			document.body.dispatchEvent(event);
+			document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }));
+			return event;
+		}
+
+		it('plain Escape closes the dialog and starts no request', async () => {
+			writeChord({ ...escapeChord, ctrl: true });
+			const { onClose } = await toTestStage();
+			pressEscape();
+			await settle();
+			expect(onClose).toHaveBeenCalledWith('dismissed');
+			expect(captureSpy).not.toHaveBeenCalled();
+		});
+
+		it('Ctrl+Escape takes the test pair and does not close the dialog', async () => {
+			writeChord({ ...escapeChord, ctrl: true });
+			captureSpy.mockImplementation(() => new Promise(() => {}));
+			const { onClose } = await toTestStage();
+			const event = pressCtrlEscape();
+			await settle();
+			expect(captureSpy).toHaveBeenCalledTimes(2);
+			expect(onClose).not.toHaveBeenCalled();
+			expect(event.defaultPrevented).toBe(true);
+		});
+
+		it('Ctrl+Escape on a stage without a capture action neither closes nor requests', async () => {
+			writeChord({ ...escapeChord, ctrl: true });
+			const { onClose } = renderModal();
+			await settle();
+			pressCtrlEscape();
+			await settle();
+			expect(onClose).not.toHaveBeenCalled();
+			expect(captureSpy).not.toHaveBeenCalled();
+		});
+	});
 });
