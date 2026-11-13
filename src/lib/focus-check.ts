@@ -89,3 +89,16 @@ export function canContinue(readings: SideReadings, requireMf: boolean): boolean
 	if (!requireMf) return true;
 	return readings.left === 'manual' && readings.right === 'manual';
 }
+
+/**
+ * Two focal lengths, in millimetres, that are both known and differ: the two
+ * lenses are zoomed apart. Null otherwise. Used by the Refocus dialog and the
+ * camera check, which read them from the test captures.
+ */
+export function focalMismatch(
+	left: number | null | undefined,
+	right: number | null | undefined
+): { left: number; right: number } | null {
+	if (left == null || right == null || left === right) return null;
+	return { left, right };
+}

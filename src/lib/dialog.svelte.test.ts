@@ -4,7 +4,7 @@
 //
 // Version: 0.1.0-beta
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { dismissible, type DismissOptions } from './dialog';
+import { dismissible, trapFocus, type DismissOptions } from './dialog';
 
 const opened: { destroy: () => void }[] = [];
 
@@ -91,5 +91,55 @@ describe('dismissible', () => {
 		const dialog = openDialog({ backdrop: false });
 		dialog.backdrop.click();
 		expect(dialog.onDismiss).not.toHaveBeenCalled();
+	});
+});
+
+// NEH-339: the camera check is a dialog that opens others over it (the
+// details, the full-size viewer, the Refocus dialog). Tab belongs to the top
+// one only; the one underneath gets it back once the top one has gone.
+describe('trapFocus, one dialog over another', () => {
+	function card(labels: string[]) {
+		const node = document.createElement('div');
+		node.tabIndex = -1;
+		for (const label of labels) {
+			const b = document.createElement('button');
+			b.textContent = label;
+			node.append(b);
+		}
+		document.body.append(node);
+		return node;
+	}
+	const pressTab = (shiftKey = false) => {
+		const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+		document.activeElement?.dispatchEvent(event);
+		return event;
+	};
+	const focused = () => document.activeElement?.textContent;
+
+	it('moves Tab inside the top dialog only, without the one underneath pulling it back', () => {
+		const lower = card(['a', 'b']);
+		const lowerTrap = trapFocus(lower);
+		const upper = card(['x', 'y', 'z']);
+		const upperTrap = trapFocus(upper);
+		expect(focused()).toBe('x');
+		// The middle of the upper dialog: the browser moves the focus.
+		(upper.children[1] as HTMLElement).focus();
+		const middle = pressTab();
+		expect(middle.defaultPrevented).toBe(false);
+		expect(focused()).toBe('y');
+		// The last one wraps to the first of the upper dialog.
+		(upper.children[2] as HTMLElement).focus();
+		pressTab();
+		expect(focused()).toBe('x');
+		pressTab(true);
+		expect(focused()).toBe('z');
+
+		upperTrap.destroy();
+		upper.remove();
+		(lower.children[1] as HTMLElement).focus();
+		pressTab();
+		expect(focused()).toBe('a');
+		lowerTrap.destroy();
+		lower.remove();
 	});
 });

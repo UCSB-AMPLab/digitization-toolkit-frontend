@@ -10,6 +10,7 @@ import {
 	nextFailedReadings,
 	canContinue,
 	clearFocusActivity,
+	focalMismatch,
 	focusCheckDue,
 	focusCheckNeeded,
 	mfWarning,
@@ -156,5 +157,19 @@ describe('the MF reading', () => {
 		expect(nextFailedReadings(1, 'unknown')).toBe(2);
 		expect(nextFailedReadings(2, 'manual')).toBe(0);
 		expect(nextFailedReadings(2, 'auto')).toBe(0);
+	});
+});
+
+describe('focalMismatch', () => {
+	it('names both focal lengths when they are known and differ', () => {
+		expect(focalMismatch(27, 35)).toEqual({ left: 27, right: 35 });
+		expect(focalMismatch(35, 27.5)).toEqual({ left: 35, right: 27.5 });
+	});
+
+	it('is null when they match or either is unknown', () => {
+		expect(focalMismatch(27, 27)).toBeNull();
+		expect(focalMismatch(27, null)).toBeNull();
+		expect(focalMismatch(undefined, 35)).toBeNull();
+		expect(focalMismatch(null, null)).toBeNull();
 	});
 });

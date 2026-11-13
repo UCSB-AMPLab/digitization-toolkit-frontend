@@ -58,6 +58,15 @@
   // completed or skipped, and every capture made here record the activity.
   // While it is open the capture key and the pedal do not capture.
   //
+  // The camera check (NEH-339): "Check cameras" in the top bar opens
+  // CameraCheck over the screen, with the same left camera as the viewport;
+  // only the operator opens it and closes it. While it is open the capture
+  // key and the pedal take no capture, and the focus check waits. Its
+  // "Refocus" counts as a focus check done. It shows each capture at the
+  // camera's rotation here, and its "Turn" goes through
+  // handleRotateDegChange, so it is saved as the viewport's rotate buttons
+  // save it.
+  //
   // Version: 0.3.3
 
   import { onMount, untrack } from 'svelte';
@@ -85,6 +94,7 @@
   import ImageViewerModal from './ImageViewerModal.svelte';
   import CaptureInstruction from './CaptureInstruction.svelte';
   import RefocusModal from './RefocusModal.svelte';
+  import CameraCheck from './CameraCheck.svelte';
   import MissingPage from '$lib/components/MissingPage.svelte';
   import CloseMissingDialog from '$lib/components/CloseMissingDialog.svelte';
 
@@ -132,10 +142,22 @@
   // on screen, so a reseed from an incomplete listing does not undo it.
   let rotatePending = new Map<number, number>();
 
+  // PUTs of the orientation in flight, by camera index: the camera check
+  // (NEH-339) holds that camera's "Turn" while one is.
+  let orientationPuts = $state<Record<number, number>>({});
+  let savingOrientation = $derived(
+    Object.fromEntries(Object.entries(orientationPuts).map(([cam, n]) => [cam, n > 0])) as Record<number, boolean>
+  );
+
   // Persists a rotation change to the backend, coalescing quick repeat taps
   // on the same camera into a single in-flight PUT.
   const saveOrientation = createOrientationSaver(
-    (i, hw, deg) => camerasApi.setOrientation(i, hw, deg),
+    (i, hw, deg) => {
+      orientationPuts = { ...orientationPuts, [i]: (orientationPuts[i] ?? 0) + 1 };
+      return camerasApi.setOrientation(i, hw, deg).finally(() => {
+        orientationPuts = { ...orientationPuts, [i]: (orientationPuts[i] ?? 1) - 1 };
+      });
+    },
     (i, e) => console.error('[LivePreview] Error saving orientation:', i, e)
   );
 
@@ -398,6 +420,8 @@
   // "Refocus" button and an automatic check.
   let dslrUnit = $state(false);
   let refocusOpen = $state(false);
+  // The camera check (NEH-339), opened from the top bar.
+  let cameraCheckOpen = $state(false);
   // Set once the first load has settled (records, volume, recapture summary,
   // and the retake modal of a `recordId`), so the check never opens before
   // the screen knows whether something else is on it.
@@ -406,7 +430,8 @@
   // modal, the close dialog, the recapture-turn block panel, the guide's
   // pause or end panel. The check waits until none shows.
   let focusCheckWaits = $derived(
-    !screenSettled || inspectedRecord !== null || closingPlaceholder || blocked || guidePaused || guideEnd !== null
+    !screenSettled || inspectedRecord !== null || closingPlaceholder || blocked || guidePaused || guideEnd !== null ||
+      cameraCheckOpen
   );
 
   function askForFocusIfDue() {
@@ -844,6 +869,8 @@
     {collectionName}
     onBack={handleBack}
     onGoToReview={handleGoToReview}
+    onCheckCameras={() => (cameraCheckOpen = true)}
+    checkCamerasDisabled={pageCapturing}
   />
 
   <CaptureInstruction {instruction} />
@@ -954,7 +981,7 @@
           {rotateDeg}
           onCaptureDone={handleCaptureDone}
           onRotateDegChange={handleRotateDegChange}
-          otherModalOpen={inspectedRecord !== null || refocusOpen}
+          otherModalOpen={inspectedRecord !== null || refocusOpen || cameraCheckOpen}
           needsStem={volumeNeedsStem}
           {stemFormHref}
           {stemNote}
@@ -1086,6 +1113,19 @@
 
 {#if refocusOpen}
   <RefocusModal leftIndex={leftCameraIndex} onClose={closeRefocus} />
+{/if}
+
+{#if cameraCheckOpen}
+  <CameraCheck
+    leftIndex={leftCameraIndex}
+    projectName={projectsShownIn($unitState) ? projectName : ''}
+    {collectionName}
+    {rotateDeg}
+    onRotateDegChange={handleRotateDegChange}
+    {savingOrientation}
+    onClose={() => (cameraCheckOpen = false)}
+    onRefocusClosed={noteFocusActivity}
+  />
 {/if}
 
 {#if closingPlaceholder && inspectedRecord}

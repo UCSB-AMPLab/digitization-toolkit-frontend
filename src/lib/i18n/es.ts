@@ -1063,6 +1063,69 @@ export const es = {
 	focus_mf_step_ring: 'No toques el anillo de enfoque: si lo giras, se pierde el enfoque que acabas de ajustar.',
 	focus_mf_step_tick: 'Cuando Captua lea MF en una cámara, lo indica aquí, junto a esa cámara.',
 	focus_continue_anyway: 'Continuar de todos modos',
+	// NEH-339: the camera check, opened from the capture screen with
+	// "Revisar cámaras". Side is the page a camera takes.
+	camcheck_open: 'Revisar cámaras',
+	camcheck_title: 'Revisión de cámaras',
+	camcheck_back: 'Volver a la pantalla de captura',
+	camcheck_left_page: 'Página izquierda',
+	camcheck_right_page: 'Página derecha',
+	camcheck_chip_aria: (side: 'left' | 'right') =>
+		`Cámara de la página ${side === 'left' ? 'izquierda' : 'derecha'}: ver detalles`,
+	camcheck_not_reachable: 'sin conexión',
+	camcheck_no_capture: 'Todavía no hay captura de prueba',
+	camcheck_taking: 'Haciendo la captura de prueba…',
+	// The detail is dash_camera_capture_not_connected or _timeout, in lowercase.
+	camcheck_test_failed: (detail?: string) =>
+		detail ? `Captua no pudo hacer la captura de prueba: ${detail}` : 'Captua no pudo hacer la captura de prueba',
+	camcheck_frame_unreachable: 'Captua no pudo comunicarse con esta cámara.',
+	camcheck_unreachable_title: (side: 'left' | 'right') =>
+		`Captua no pudo comunicarse con la cámara de la página ${side === 'left' ? 'izquierda' : 'derecha'}.`,
+	camcheck_unreachable_body: 'Revisa que la cámara esté encendida y que el cable USB esté conectado. Luego repite las capturas de prueba.',
+	camcheck_devices_failed: 'Captua no pudo leer la lista de cámaras.',
+	camcheck_idle: 'Haz capturas de prueba para revisar el zoom y el enfoque.',
+	camcheck_zoom: 'Zoom',
+	camcheck_zoom_both: 'Zoom · las dos cámaras',
+	camcheck_zoom_each: 'Zoom · cada cámara',
+	camcheck_zoom_in: (who: 'both' | 'left' | 'right') =>
+		who === 'both' ? 'Acercar' : `Acercar, cámara de la página ${who === 'left' ? 'izquierda' : 'derecha'}`,
+	camcheck_zoom_out: (who: 'both' | 'left' | 'right') =>
+		who === 'both' ? 'Alejar' : `Alejar, cámara de la página ${who === 'left' ? 'izquierda' : 'derecha'}`,
+	// After the step shown: the last step, from the cameras' zoom_steps.
+	camcheck_zoom_of: (last: number) => `de ${last}`,
+	camcheck_adjust_separately: 'Ajustar por separado',
+	camcheck_adjust_together: 'Ajustar juntas',
+	camcheck_match: 'Igualar',
+	camcheck_zoom_first: 'Primero haz capturas de prueba: Captua puede ajustar el zoom cuando cada cámara haya hecho una.',
+	// The detail is the backend's, in English.
+	camcheck_zoom_failed: (side: 'left' | 'right', detail?: string) => {
+		const camera = `la cámara de la página ${side === 'left' ? 'izquierda' : 'derecha'}`;
+		return detail ? `Captua no pudo ajustar el zoom de ${camera}: ${detail}` : `Captua no pudo ajustar el zoom de ${camera}.`;
+	},
+	camcheck_stale: 'Se cambió el zoom después de estas capturas. Repite las capturas de prueba.',
+	camcheck_focal_hint: 'Captua lee la distancia focal de cada cámara en las capturas de prueba. Para cambiarla, gira el anillo de zoom del lente.',
+	camcheck_focal_read: 'Captua leyó estas distancias en las capturas de prueba.',
+	camcheck_focal_value: (mm: number) => String(mm).replace('.', ','),
+	camcheck_mm: 'mm',
+	camcheck_focal_differ_title: 'Las dos cámaras tienen distinta distancia focal.',
+	camcheck_focal_differ_body: 'Gira el anillo de zoom de uno de los lentes hasta que las dos cifras coincidan. Luego repite las capturas de prueba.',
+	camcheck_focus: 'Enfoque',
+	camcheck_focus_hint: 'Presiona "1:1" en una captura para verla en tamaño real. El texto debe verse nítido.',
+	camcheck_full_size_aria: (side: 'left' | 'right') =>
+		`Página ${side === 'left' ? 'izquierda' : 'derecha'}: tamaño real (1:1)`,
+	camcheck_discarded: 'Captua no guarda las capturas de prueba en el volumen.',
+	camcheck_take: 'Hacer capturas de prueba',
+	camcheck_viewer_title: 'Capturas de prueba en tamaño real',
+	camcheck_viewer_hint: 'Arrastra una captura para mover las dos. Revisa que el texto se vea nítido en las dos páginas.',
+	camcheck_details_title: 'Cámaras',
+	camcheck_details_camera: (side: 'left' | 'right') => `Cámara de la página ${side === 'left' ? 'izquierda' : 'derecha'}`,
+	camcheck_connection: 'Conexión',
+	camcheck_connected: 'Conectada',
+	camcheck_cannot_reach: 'Captua no puede comunicarse con la cámara',
+	camcheck_model: 'Modelo',
+	camcheck_turn_aria: (side: 'left' | 'right') =>
+		`Girar 90° a la derecha la captura de la página ${side === 'left' ? 'izquierda' : 'derecha'}`,
+	camcheck_turn_title: 'Girar 90° a la derecha',
 	tb_go_to_review: 'Revisar',
 	tb_go_to_review_title: 'Volver a la revisión de este volumen',
 	tb_breadcrumb_nav: 'Proyecto y volumen en curso',

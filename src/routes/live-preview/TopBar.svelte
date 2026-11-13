@@ -3,9 +3,12 @@
   // breadcrumb on the left, the go-to-review button and the user menu on the
   // right. The breadcrumb mirrors the collection view's on purpose, so the
   // operator can see where the images are being stored while capturing.
-  // projectName and collectionName are '' while they load.
+  // projectName and collectionName are '' while they load. With
+  // onCheckCameras, "Check cameras" opens the camera check (NEH-339), in the
+  // review button's shape, outlined so that it reads as secondary to Review;
+  // below 600px wide it shows its icon only.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.3.3
 
   import { m } from '$lib/i18n';
   import UserMenu from '$lib/components/UserMenu.svelte';
@@ -13,11 +16,15 @@
   let {
     onBack,
     onGoToReview,
+    onCheckCameras,
+    checkCamerasDisabled = false,
     projectName = '',
     collectionName = '',
   }: {
     onBack: () => void;
     onGoToReview: () => void;
+    onCheckCameras?: () => void;
+    checkCamerasDisabled?: boolean;
     projectName?: string;
     collectionName?: string;
   } = $props();
@@ -53,6 +60,13 @@
   </div>
 
   <div class="topbar-right">
+    {#if onCheckCameras}
+      <button class="btn-review is-quiet" onclick={onCheckCameras} disabled={checkCamerasDisabled} aria-label={$m.camcheck_open} title={$m.camcheck_open}>
+        <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">photo_camera</span>
+        <span class="tb-check-label">{$m.camcheck_open}</span>
+      </button>
+    {/if}
+
     <!-- Symmetric with the collection view's go-to-capture button: same
          corner, same style, opposite direction. -->
     <button
@@ -143,6 +157,29 @@
 
   .btn-review:hover {
     background-color: var(--color-primary-hover);
+  }
+
+  /* The review button's shape, outlined: secondary to Review. */
+  .btn-review.is-quiet {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--color-light-grey);
+    font-weight: var(--fw-semibold);
+  }
+  .btn-review.is-quiet:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--color-light);
+  }
+  .btn-review:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Narrower than the unit's 800px screen, the icon alone, so that the
+     breadcrumb keeps its room. */
+  @media (max-width: 600px) {
+    .tb-check-label { display: none; }
+    .btn-review.is-quiet { padding: 10px 12px; }
   }
 
   /* Same values as the collection view's breadcrumb */

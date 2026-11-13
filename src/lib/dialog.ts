@@ -79,10 +79,17 @@ export function toBody(node: HTMLElement) {
 // destroy the focus goes back to whatever had it before, if that is still
 // on the page and enabled. Apply it to the dialog card. aria-modal tells
 // assistive technology the rest is inert, but does not stop Tab leaving.
+// With one dialog open over another (the camera check's details, viewer and
+// Refocus dialog, NEH-339), only the most recently opened one handles Tab,
+// as `dismissible` does with Escape; the one underneath takes it back once
+// the top one has gone.
 const FOCUSABLE =
 	'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])';
 
+const traps: HTMLElement[] = [];
+
 export function trapFocus(node: HTMLElement) {
+	traps.push(node);
 	const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 	// The Tab stops: of a radio group, only the checked radio (or the first
 	// when none is), as the browser does.
@@ -97,7 +104,7 @@ export function trapFocus(node: HTMLElement) {
 	(items()[0] ?? node).focus();
 
 	function onKeydown(event: KeyboardEvent) {
-		if (event.key !== 'Tab') return;
+		if (event.key !== 'Tab' || traps[traps.length - 1] !== node) return;
 		const list = items();
 		if (list.length === 0) {
 			event.preventDefault();
@@ -122,6 +129,8 @@ export function trapFocus(node: HTMLElement) {
 	return {
 		destroy() {
 			window.removeEventListener('keydown', onKeydown, true);
+			const i = traps.lastIndexOf(node);
+			if (i !== -1) traps.splice(i, 1);
 			if (returnTo?.isConnected && !(returnTo as HTMLButtonElement).disabled) returnTo.focus();
 		}
 	};

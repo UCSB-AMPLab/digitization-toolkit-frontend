@@ -1415,6 +1415,11 @@ tr:hover .drag-handle { opacity: 1; }
   border-color: var(--color-success);
   background-color: var(--color-success-bg);
 }
+/* NEH-339: something Captua could not do, in the error tokens (the camera check). */
+.action-notice.is-error {
+  border-color: var(--color-error);
+  background-color: var(--color-error-bg);
+}
 .action-notice-text { flex: 1; min-width: 0; }
 .action-notice-close {
   display: flex;
