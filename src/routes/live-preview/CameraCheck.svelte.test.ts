@@ -24,7 +24,7 @@ import {
 } from '$lib/api';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
-import { clearChord } from '$lib/capture-key';
+import { clearChord, writeChord } from '$lib/capture-key';
 import '../../app.css';
 import CameraCheck from './CameraCheck.svelte';
 
@@ -737,5 +737,143 @@ describe('CameraCheck: EXIF orientation', () => {
 		const imgs = document.querySelectorAll('[role="dialog"][aria-labelledby="fv-title"] img');
 		expect(imgs).toHaveLength(2);
 		for (const img of imgs) expect(getComputedStyle(img).imageOrientation).toBe('none');
+	});
+});
+
+describe('CameraCheck: Escape as the assigned capture key', () => {
+	const chord = (over: Partial<{ ctrl: boolean }> = {}) => ({ key: 'Escape', ctrl: false, alt: false, meta: false, shift: false, ...over });
+	// On the focused element, as a real key press: the window's capture-phase
+	// listener (dismissible) then runs before its bubble-phase one (the key).
+	function escape(ctrlKey = false) {
+		const target = document.activeElement ?? document.body;
+		const event = new KeyboardEvent('keydown', { key: 'Escape', ctrlKey, bubbles: true, cancelable: true });
+		target.dispatchEvent(event);
+		target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', ctrlKey, bubbles: true }));
+		return event;
+	}
+
+	afterEach(() => clearChord());
+
+	it('with the pedal on Escape, Escape takes the test captures and the check stays open', async () => {
+		writeChord(chord());
+		const { onClose } = renderCheck();
+		await settle();
+		escape();
+		await settle();
+		expect(onClose).not.toHaveBeenCalled();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		expect(view()).not.toBeNull();
+	});
+
+	it('with the pedal on Ctrl+Escape, plain Escape closes and Ctrl+Escape takes the test captures', async () => {
+		writeChord(chord({ ctrl: true }));
+		const { onClose } = renderCheck();
+		await settle();
+		escape(true);
+		await settle();
+		expect(onClose).not.toHaveBeenCalled();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+
+		escape();
+		await settle();
+		expect(onClose).toHaveBeenCalledTimes(1);
+		// The press that closed it started nothing.
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+	});
+
+	it('with no pedal on Escape, Escape closes and starts no request', async () => {
+		writeChord({ ...chord(), key: 'F7' });
+		const { onClose } = renderCheck();
+		await settle();
+		escape();
+		await settle();
+		expect(onClose).toHaveBeenCalledTimes(1);
+		expect(captureSpy).not.toHaveBeenCalled();
+	});
+
+	it('while the cameras work, the pedal on Escape neither closes the check nor takes captures', async () => {
+		writeChord(chord());
+		captureSpy.mockImplementation(() => new Promise(() => {}));
+		const { onClose } = renderCheck();
+		await settle();
+		await click(en.camcheck_take);
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		escape();
+		await settle();
+		expect(onClose).not.toHaveBeenCalled();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+	});
+
+	it('while the cameras work, with no pedal on Escape, Escape does not close the check', async () => {
+		captureSpy.mockImplementation(() => new Promise(() => {}));
+		const { onClose } = renderCheck();
+		await settle();
+		await click(en.camcheck_take);
+		escape();
+		await settle();
+		expect(onClose).not.toHaveBeenCalled();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('CameraCheck: a device listing never overwrites a newer zoom step', () => {
+	// Every listing after the first waits until the test answers it.
+	function holdListings() {
+		const held: ReturnType<typeof deferred<CameraDevice[]>>[] = [];
+		let first = true;
+		listSpy.mockImplementation(async () => {
+			if (first) {
+				first = false;
+				return devices.map((d) => ({ ...d }));
+			}
+			const d = deferred<CameraDevice[]>();
+			held.push(d);
+			return d.promise;
+		});
+		return held;
+	}
+
+	it('the zoom controls wait while the listing that follows the test captures is pending', async () => {
+		const held = holdListings();
+		renderCheck();
+		await settle();
+		expect(zoomButton('both', 'in')?.disabled).toBe(false);
+		await click(en.camcheck_take);
+		await expect.poll(() => held.length).toBe(1);
+		expect(zoomButton('both', 'in')?.disabled).toBe(true);
+		expect(zoomButton('both', 'out')?.disabled).toBe(true);
+
+		held[0].resolve(a2500([30, 30]));
+		await settle();
+		expect(zoomButton('both', 'in')?.disabled).toBe(false);
+		expect(zoomValue('both')).toBe('30');
+	});
+
+	it('a listing requested before a zoom write is not applied to the steps; one requested after it is', async () => {
+		const held = holdListings();
+		renderCheck();
+		await settle();
+		// A refused step reads the devices again: that listing is held.
+		zoomSpy.mockRejectedValueOnce(failure(502, 'The camera did not answer'));
+		await press(zoomButton('both', 'in'));
+		await expect.poll(() => held.length).toBe(1);
+		expect(zoomButton('both', 'in')?.disabled).toBe(false);
+
+		// The operator zooms in while that listing is still out.
+		await press(zoomButton('both', 'in'));
+		await expect.poll(() => zoomValue('both')).toBe('25');
+
+		// The older listing arrives with the step from before the write.
+		held[0].resolve(a2500([24, 24]));
+		await settle();
+		expect(zoomValue('both')).toBe('25');
+		expect(zoomControl('both')).not.toBeNull();
+
+		// A listing requested after the write applies.
+		await click(en.camcheck_take);
+		await expect.poll(() => held.length).toBe(2);
+		held[1].resolve(a2500([26, 26]));
+		await settle();
+		expect(zoomValue('both')).toBe('26');
 	});
 });

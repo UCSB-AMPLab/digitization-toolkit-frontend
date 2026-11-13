@@ -2,8 +2,9 @@
   // The camera check (NEH-339): one screen, over the capture screen, where
   // the operator takes a pair of test captures and checks the cameras before
   // going on capturing. The capture screen opens it with "Check cameras" in
-  // its top bar; "Back to capturing" and Escape close it. Nothing opens it by
-  // itself.
+  // its top bar; "Back to capturing" and Escape close it, except when Escape
+  // is the assigned capture key, which takes the test captures instead.
+  // Nothing opens it by itself.
   //
   // - Captures: "Take test captures", the capture key or the pedal take one
   //   test capture from each camera at once (POST /cameras/test-capture/{n},
@@ -20,8 +21,11 @@
   //   camera takes the left page camera's step) while they differ. The check
   //   opens separate when the two steps differ. A step is null until the
   //   camera has entered shooting mode, so the control waits for the first
-  //   pair. A refused step shows the backend's detail and re-reads the
-  //   devices. Any zoom change marks the captures on screen out of date. A
+  //   pair, and waits for the device listing that follows each pair; a
+  //   listing requested before a zoom write never overwrites the steps the
+  //   cameras confirmed since. A refused step shows the backend's detail and
+  //   re-reads the devices. Any zoom change marks the captures on screen out
+  //   of date. A
   //   DSLR's zoom ring is on the lens: the check shows the focal length the
   //   backend reads from each capture, and says when the two differ
   //   (focalMismatch, shared with the Refocus dialog).
@@ -103,6 +107,13 @@
   let devices = $state<CameraDevice[] | null>(null);
   let devicesFailed = $state(false);
   let deviceSeq = 0;
+  // Counts the zoom writes started. A listing requested before the latest
+  // write began reports steps older than what the cameras have confirmed
+  // since, so it never touches the zoom steps.
+  let zoomWrites = 0;
+  // The listing that follows a pair of test captures is out: the zoom
+  // controls wait for it, since it brings the steps the captures set.
+  let afterCapturesListing = $state(false);
 
   function deviceOf(side: Side): CameraDevice | null {
     return devices?.find((d) => d.index === cameraOf(side)) ?? null;
@@ -118,12 +129,13 @@
 
   async function readDevices() {
     const seq = ++deviceSeq;
+    const writes = zoomWrites;
     try {
       const list = await camerasApi.listDevices();
       if (destroyed || seq !== deviceSeq) return;
       devices = list;
       devicesFailed = false;
-      takeSteps(list);
+      if (writes === zoomWrites) takeSteps(list);
     } catch (err) {
       if (destroyed || seq !== deviceSeq) return;
       console.error('[CameraCheck] Could not read the devices:', err);
@@ -180,7 +192,12 @@
     );
     if (destroyed) return;
     // A capture puts a CHDK camera in shooting mode, which gives it a step.
-    await readDevices();
+    afterCapturesListing = true;
+    try {
+      await readDevices();
+    } finally {
+      afterCapturesListing = false;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -194,7 +211,7 @@
   let linked = $state(true);
   let zoomBusy = $state(false);
   let zoomError = $state<string | null>(null);
-  let zoomDisabled = $derived(!stepsKnown || zoomBusy || capturing);
+  let zoomDisabled = $derived(!stepsKnown || zoomBusy || capturing || afterCapturesListing);
 
   // The steps the device list reports; two different ones unlink the control.
   function takeSteps(list: CameraDevice[]) {
@@ -225,6 +242,7 @@
   // the first refusal and reads the devices again.
   async function zoomTo(targets: [Side, number][]) {
     if (zoomDisabled) return false;
+    zoomWrites += 1;
     zoomBusy = true;
     zoomError = null;
     let ok = true;
@@ -327,10 +345,18 @@
   // open over the check, they are that dialog's. LiveViewport ignores them
   // while the check is open (its otherModalOpen).
   const chords = readChords();
+  // The whole assigned chord, modifiers included, as in the Refocus dialog.
+  const isCaptureKey = (event: KeyboardEvent) =>
+    ownsEvent(event, { chords, modalOpen: false, activeElement: document.activeElement });
+  // Escape closes the check unless that press is the capture key: a pedal on
+  // Escape takes the test captures and never closes it; with the pedal on
+  // Ctrl+Escape, plain Escape still closes it. Nothing closes it while the
+  // cameras work.
+  const closesOnEscape = (event: KeyboardEvent) => !busy && !isCaptureKey(event);
 
   function handleKeydown(event: KeyboardEvent) {
     if (viewerOpen || detailsOpen || refocusOpen) return;
-    if (!ownsEvent(event, { chords, modalOpen: false, activeElement: document.activeElement })) return;
+    if (!isCaptureKey(event)) return;
     event.preventDefault();
     if (!event.repeat && !busy) void takePictures();
   }
@@ -391,7 +417,7 @@
   tabindex="-1"
   use:toBody
   use:trapFocus
-  use:dismissible={{ onDismiss: close, escape: !busy, backdrop: false }}
+  use:dismissible={{ onDismiss: close, escape: closesOnEscape, backdrop: false }}
 >
   <div class="topbar">
     <div class="topbar-left">
