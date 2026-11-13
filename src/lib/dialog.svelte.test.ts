@@ -5,7 +5,7 @@
 // Version: 0.1.0-beta
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { dialogOpen, dismissible, openDialogCount, openDialogsOutside, trapFocus, type DismissOptions } from './dialog';
+import { dialogOpen, dialogsAbove, dismissible, openDialogCount, openDialogsOutside, trapFocus, type DismissOptions } from './dialog';
 
 const opened: { destroy: () => void }[] = [];
 
@@ -255,5 +255,29 @@ describe('the open-dialog registry', () => {
 		expect(openDialogsOutside([mine.backdrop, other.backdrop])).toBe(0);
 		expect(openDialogsOutside([null, undefined])).toBe(2);
 		other.destroy();
+	});
+
+	it('counts the dialogs opened above a given one, wherever they sit in the page, and none below it', () => {
+		const lower = openDialog();
+		const mine = trapped(true);
+		expect(dialogsAbove(mine.backdrop)).toBe(0);
+		// An element inside a dialog belongs to that dialog.
+		expect(dialogsAbove(mine.backdrop.firstElementChild as HTMLElement)).toBe(0);
+		expect(dialogsAbove(lower.backdrop)).toBe(1);
+		// A dialog opened later is above, whether it is a sibling in <body> ...
+		const sibling = trapped(false);
+		expect(dialogsAbove(mine.backdrop)).toBe(1);
+		// ... or nested inside this one.
+		const nestedBackdrop = document.createElement('div');
+		mine.backdrop.firstElementChild!.append(nestedBackdrop);
+		const nested = dismissible(nestedBackdrop, { onDismiss: () => {} });
+		expect(dialogsAbove(mine.backdrop)).toBe(2);
+		expect(dialogsAbove(nestedBackdrop)).toBe(0);
+		nested.destroy();
+		sibling.destroy();
+		expect(dialogsAbove(mine.backdrop)).toBe(0);
+		mine.destroy();
+		// An element in no open dialog has every open dialog above it.
+		expect(dialogsAbove(document.body)).toBe(1);
 	});
 });

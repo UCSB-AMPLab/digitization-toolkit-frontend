@@ -53,7 +53,7 @@
     mfWarning,
     nextFailedReadings,
   } from '$lib/focus-check';
-  import { dismissible, toBody, trapFocus } from '$lib/dialog';
+  import { dialogsAbove, dismissible, toBody, trapFocus } from '$lib/dialog';
   import { PairPanZoom } from '$lib/pair-pan-zoom.svelte';
 
   let {
@@ -241,8 +241,11 @@
   // The capture key and the pedal: on the test-pictures stage they take the
   // pair; on the others they do nothing. Either way the key is taken from
   // the focused button. LiveViewport ignores it while this dialog is open
-  // (its otherModalOpen), so it never starts a real capture.
+  // (its otherModalOpen), so it never starts a real capture. Under a dialog
+  // opened over this one (the set-up step, NEH-343) they do nothing here and
+  // the key is left to that dialog (dialogsAbove, src/lib/dialog.ts).
   const chords = readChords();
+  let backdropEl = $state<HTMLElement | null>(null);
   const isCaptureKey = (event: KeyboardEvent) =>
     ownsEvent(event, { chords, modalOpen: false, activeElement: document.activeElement });
   // Escape closes the dialog unless that press is the capture key, the whole
@@ -252,6 +255,7 @@
   const closesOnEscape = (event: KeyboardEvent) => !capturing && !isCaptureKey(event);
 
   function handleKeydown(event: KeyboardEvent) {
+    if (!backdropEl || dialogsAbove(backdropEl) > 0) return;
     if (!isCaptureKey(event)) return;
     event.preventDefault();
     if (stage === 1 && !event.repeat && !capturing) void takePictures();
@@ -356,6 +360,7 @@
 
 <div
   class="img-viewer-backdrop"
+  bind:this={backdropEl}
   use:toBody
   use:dismissible={{ onDismiss: dismiss, escape: closesOnEscape, backdrop: false }}
 >

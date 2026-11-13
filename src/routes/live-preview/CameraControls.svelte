@@ -30,6 +30,7 @@
     onDevicesChange,
     onRotateDegChange,
     rotateDeg = {},
+    onRescan,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -42,6 +43,9 @@
     onDevicesChange?: (devices: CameraDevice[]) => void;
     onRotateDegChange?: (cam: number, deg: number) => void;
     rotateDeg?: Record<number, number>;
+    // Called after "Reconnect cameras" has rescanned and the devices are
+    // published (NEH-343: the page asks again which camera is which).
+    onRescan?: () => void;
   } = $props();
 
   // Index of the camera the panel controls: 0 = left, 1 = right.
@@ -515,6 +519,7 @@
     try {
       await cameraRefresh.reconnect(() => camerasApi.rescan());
       rescanError = null;
+      onRescan?.();
       // Reconnecting is the remedy the failure message offers, so the
       // capabilities are asked for again once the cameras are back.
       await loadCapabilities();

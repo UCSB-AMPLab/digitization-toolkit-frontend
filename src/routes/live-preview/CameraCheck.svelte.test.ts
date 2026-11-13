@@ -25,6 +25,7 @@ import {
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { clearChord, writeChord } from '$lib/capture-key';
+import { dismissible, trapFocus } from '$lib/dialog';
 import '../../app.css';
 import CameraCheck from './CameraCheck.svelte';
 
@@ -905,6 +906,47 @@ describe('CameraCheck: a device listing never overwrites a newer zoom step', () 
 		await settle();
 		expect(zoomButton('both', 'in')?.disabled).toBe(false);
 		expect(zoomValue('both')).toBe('26');
+	});
+});
+
+describe('CameraCheck: "Change which camera is which" (NEH-343)', () => {
+	it('the camera details offer it; pressing it closes the details and asks the capture screen', async () => {
+		const onChangeRoles = vi.fn();
+		render(CameraCheck, { leftIndex: 0, rotateDeg: { 0: 0, 1: 0 }, onClose: vi.fn(), onChangeRoles });
+		await settle();
+		await press(chip('right'));
+		const details = document.querySelector('[role="dialog"][aria-labelledby="cd-title"]')!;
+		await click(en.camwhich_open, details);
+		expect(onChangeRoles).toHaveBeenCalledTimes(1);
+		expect(document.querySelector('[role="dialog"][aria-labelledby="cd-title"]')).toBeNull();
+	});
+
+	it('no such button when the capture screen does not offer it', async () => {
+		renderCheck();
+		await settle();
+		await press(chip('left'));
+		expect(button(en.camwhich_open)).toBeNull();
+	});
+
+	it('under a dialog opened over it (the step), the capture key takes no test captures', async () => {
+		renderCheck();
+		await settle();
+		const over = document.createElement('div');
+		over.tabIndex = -1;
+		document.body.append(over);
+		const trap = trapFocus(over);
+		const dismiss = dismissible(over, { onDismiss: () => {}, escape: false });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', bubbles: true }));
+		await settle();
+		expect(captureSpy).not.toHaveBeenCalled();
+		dismiss.destroy();
+		trap.destroy();
+		over.remove();
+		await settle();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', bubbles: true }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBeGreaterThan(0);
 	});
 });
 

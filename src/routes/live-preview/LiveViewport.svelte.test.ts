@@ -758,3 +758,42 @@ describe('LiveViewport — capture key button and dialog (NEH-323)', () => {
     expect(close.right).toBeLessThanOrEqual(800);
   });
 });
+
+// In single-camera mode the pane, the preview and the capture use camera
+// index 0; `swapped` orders a pair only, and is kept for the return to dual.
+describe('LiveViewport — the swap orders a pair only', () => {
+  beforeEach(() => {
+    locale.set('en');
+    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+  });
+
+  const degrees = () => [...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
+  const swapButton = () => document.querySelector(`button[aria-label="${en.lv_swap_orientation}"]`) as HTMLButtonElement | null;
+
+  it('swapped in dual mode, then single: shows, turns and captures camera 0; back in dual it is still swapped', async () => {
+    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+    const dualSpy = vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true });
+    const onRotateDegChange = vi.fn();
+    const screen = renderViewport(baseProps({ cameraMode: 'double', rotateDeg: { 0: 90, 1: 180 }, onRotateDegChange }));
+    await expect.poll(() => degrees()).toEqual(['90°', '180°']);
+    swapButton()!.click();
+    await expect.poll(() => degrees()).toEqual(['180°', '90°']);
+
+    await screen.rerender({ cameraMode: 'single' });
+    await expect.poll(() => degrees()).toEqual(['90°']);
+    (document.querySelector(`.feed-rotate-btn[aria-label="${en.lv_rotate_cw}"]`) as HTMLButtonElement).click();
+    expect(onRotateDegChange).toHaveBeenLastCalledWith(0, 180);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+    expect(captureSpy.mock.calls[0][0].camera_index).toBe(0);
+
+    await screen.rerender({ cameraMode: 'double' });
+    await expect.poll(() => degrees()).toEqual(['180°', '90°']);
+    expect(swapButton()?.classList.contains('float-btn-active')).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+    await expect.poll(() => dualSpy.mock.calls.length).toBe(1);
+    expect(dualSpy.mock.calls[0][0].left_camera_index).toBe(1);
+  });
+});

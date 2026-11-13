@@ -13,7 +13,9 @@
 // `openDialogCount` and the `dialogOpen` store say whether any dialog is open
 // anywhere, so that something that opens by itself (the capture screen's
 // focus check) can wait until none is, without a list of which ones to wait
-// for. A dialog that uses both helpers counts once.
+// for. A dialog that uses both helpers counts once. `dialogsAbove` says
+// how many were opened over a given one, so that a screen's capture key acts
+// only while nothing covers it.
 //
 // Version: 0.3.3
 
@@ -35,9 +37,14 @@ export interface DismissOptions {
 interface Entry {
 	node: HTMLElement;
 	options: DismissOptions;
+	/** When it opened, in the order of both stacks together. */
+	order: number;
 }
 
 const open: Entry[] = [];
+// Counts the dialogs opened by either helper, so that each one knows which
+// opened after it (`dialogsAbove`).
+let opened = 0;
 
 function onKeydown(event: KeyboardEvent) {
 	if (event.key !== 'Escape' || event.defaultPrevented) return;
@@ -51,7 +58,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 export function dismissible(node: HTMLElement, options: DismissOptions) {
-	const entry: Entry = { node, options };
+	const entry: Entry = { node, options, order: ++opened };
 	open.push(entry);
 	if (open.length === 1) window.addEventListener('keydown', onKeydown, true);
 	publish();
@@ -104,9 +111,11 @@ const FOCUSABLE =
 	'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])';
 
 const traps: HTMLElement[] = [];
+const trapOrder = new Map<HTMLElement, number>();
 
 export function trapFocus(node: HTMLElement) {
 	traps.push(node);
+	trapOrder.set(node, ++opened);
 	publish();
 	const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 	// The Tab stops: of a radio group, only the checked radio (or the first
@@ -149,6 +158,7 @@ export function trapFocus(node: HTMLElement) {
 			window.removeEventListener('keydown', onKeydown, true);
 			const i = traps.lastIndexOf(node);
 			if (i !== -1) traps.splice(i, 1);
+			if (!traps.includes(node)) trapOrder.delete(node);
 			publish();
 			if (returnTo?.isConnected && !(returnTo as HTMLButtonElement).disabled) returnTo.focus();
 		}
@@ -161,8 +171,22 @@ export function trapFocus(node: HTMLElement) {
 // Read from the two stacks above: every `dismissible` backdrop, and every
 // `trapFocus` card that is not inside one of those backdrops (a card inside
 // a backdrop is the same dialog).
+interface OpenDialog {
+	node: HTMLElement;
+	order: number;
+}
+
+function openDialogs(): OpenDialog[] {
+	return [
+		...open.map((entry) => ({ node: entry.node, order: entry.order })),
+		...traps
+			.filter((card) => !open.some((entry) => entry.node.contains(card)))
+			.map((card) => ({ node: card, order: trapOrder.get(card) ?? 0 }))
+	];
+}
+
 function openDialogNodes(): HTMLElement[] {
-	return [...open.map((entry) => entry.node), ...traps.filter((card) => !open.some((entry) => entry.node.contains(card)))];
+	return openDialogs().map((dialog) => dialog.node);
 }
 
 /** How many dialogs are open now, nested ones included. */
@@ -176,6 +200,25 @@ export function openDialogCount(): number {
  */
 export function openDialogsOutside(own: readonly (Node | null | undefined)[]): number {
 	return openDialogNodes().filter((dialog) => !own.some((mine) => mine?.contains(dialog))).length;
+}
+
+/**
+ * How many open dialogs were opened after the dialog that holds `node` (the
+ * innermost open dialog that is or contains it), wherever they sit in the
+ * page: zero means that dialog is the top one. For a node in no open dialog,
+ * every open dialog counts.
+ *
+ * A screen's capture key acts only while this is zero for the screen's own
+ * dialog, as Escape and Tab go only to the top dialog: whatever is opened
+ * over a screen has the keyboard, so no handler underneath can take a
+ * capture while a dialog covers it.
+ */
+export function dialogsAbove(node: Node): number {
+	const dialogs = openDialogs();
+	const holders = dialogs.filter((dialog) => dialog.node.contains(node));
+	if (holders.length === 0) return dialogs.length;
+	const mine = Math.max(...holders.map((dialog) => dialog.order));
+	return dialogs.filter((dialog) => dialog.order > mine).length;
 }
 
 const anyOpen = writable(false);

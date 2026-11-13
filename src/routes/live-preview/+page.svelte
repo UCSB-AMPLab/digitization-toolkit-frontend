@@ -67,6 +67,56 @@
   // handleRotateDegChange, so it is saved as the viewport's rotate buttons
   // save it.
   //
+  // Which camera is which (NEH-343): the page asks GET /cameras/setup on
+  // loading, once it has its devices, after "Reconnect cameras", when the camera check
+  // opens, when the tab comes back into view, and after a device listing
+  // that reports other bodies than the one before; never on a timer. When
+  // set-up is needed, WhichCamera opens by itself over everything and
+  // cannot be dismissed, and nothing here captures: LiveViewport's capture
+  // button is disabled and its capture key ignored (captureBlocked, and
+  // otherModalOpen), a retake or placeholder capture is refused with the
+  // step's message, and the camera check and the Refocus dialog under the
+  // step leave their capture key to it (dialogsAbove in src/lib/dialog.ts).
+  // Capture is held the same way, with nothing shown, from loading until the
+  // newest set-up request outstanding has settled (captureHeld); a 404
+  // counts as an answer (no set-up needed), and so does a newest request
+  // that fails otherwise, which ends the hold and leaves capture as before.
+  // A read that fails keeps the last answer. "Change which camera is which"
+  // in the camera check's details opens the same step by hand, cancellable,
+  // over the check. A save returns to where the operator was. While set-up
+  // is needed the step's "Leave the capture screen" goes where the top
+  // bar's back button goes (handleBack); coming back shows the step again.
+  // The saved roles decide left and right: when set-up is not needed and the set-up's confirmed pair names two bodies that the
+  // latest listing has (leftIndexFromRoles), `swapped` is set from them, and
+  // LiveViewport hides its swap control (swapLocked). They order the pair in
+  // either mode; in single-camera mode LiveViewport's pane, preview and
+  // capture use camera 0 whatever `swapped` says, and `swapped` is kept for
+  // the return to dual mode. Everything that reads leftCameraIndex
+  // then follows the roles. With an old backend, or without a confirmed
+  // pair, `swapped` and the control are as before. `swapped` is not stored.
+  //
+  // What the capture screen knows about the cameras' set-up and roles
+  // (cameraSetup, setupAnswered) changes only through answers, and an answer
+  // is applied only if no newer answer has been applied or is outstanding
+  // from a later start. Why the writers below are complete:
+  // - Only two kinds of answer carry roles: GET /cameras/setup and the
+  //   answer to a save (PUT /cameras/roles). Device listings carry none that
+  //   is read here: leftIndexFromRoles takes the roles from the set-up's
+  //   confirmed pair and reads a listing only for each body's index, so a
+  //   listing, whenever it started, cannot put roles from before a save back.
+  //   Listings still reach `devices` and the rotations as they arrive.
+  // - Set-up reads are ordered by newestOnly (readSetup): only the newest
+  //   read's answer is assigned; checkSetup ends the first hold only once
+  //   the newest request outstanding has settled, so an overtaken read's
+  //   failure ends nothing.
+  // - A save's answer takes its place in the same order (rolesSaved calls
+  //   readSetup.supersede()): every read started before that answer arrived
+  //   is discarded, and a read started after it is newer and counts.
+  // So cameraSetup is written only in readSetup's apply and in rolesSaved,
+  // and setupAnswered only in checkSetup and rolesSaved. rolesLeft is
+  // derived from cameraSetup and `devices`, and `swapped` follows it in one
+  // effect, only while it is not null.
+  //
   // Version: 0.3.3
 
   import { onMount, tick, untrack } from 'svelte';
@@ -76,7 +126,7 @@
   import { authStore, userRole } from '$lib/stores/auth';
   import { ensureUnit, projectsShownIn, stemFormTarget, unitState } from '$lib/unit-mode';
   import { camerasApi, recordsApi, projectsApi, collectionsApi, importsApi, type Record as ApiRecord, type CameraDevice,
-           type QueueItem, type RetakeSummary, type RetakeSummaryVolume } from '$lib/api';
+           type CameraRolesResponse, type CameraSetup, type QueueItem, type RetakeSummary, type RetakeSummaryVolume } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { m } from '$lib/i18n';
   import { seedRotation, createOrientationSaver, canSaveRotation, settlePendingRotations } from '$lib/camera-orientation';
@@ -95,6 +145,8 @@
   import CaptureInstruction from './CaptureInstruction.svelte';
   import RefocusModal from './RefocusModal.svelte';
   import CameraCheck from './CameraCheck.svelte';
+  import WhichCamera from './WhichCamera.svelte';
+  import { hardwareKey, leftIndexFromRoles } from '$lib/camera-roles';
   import { dialogOpen } from '$lib/dialog';
   import MissingPage from '$lib/components/MissingPage.svelte';
   import CloseMissingDialog from '$lib/components/CloseMissingDialog.svelte';
@@ -425,6 +477,64 @@
   let cameraCheckOpen = $state(false);
   // True while LiveViewport's own capture is in flight (bound from it).
   let viewportCapturing = $state(false);
+
+  // ---------------------------------------------------------------------------
+  // Which camera is which (NEH-343)
+  // ---------------------------------------------------------------------------
+  // The last answer from GET /cameras/setup; null until one arrives.
+  let cameraSetup = $state<CameraSetup | null>(null);
+  let setupNeeded = $derived(cameraSetup?.needs_setup === true);
+  // The first read of the set-up has settled, answered or failed. Until it
+  // has, capture is held as while set-up is needed, with nothing on screen.
+  let setupAnswered = $state(false);
+  let captureHeld = $derived(setupNeeded || !setupAnswered);
+  // "Change which camera is which", from the camera check.
+  let whichByHand = $state(false);
+  // The bodies of the last device listing, to ask again when they change.
+  let lastHardwareKey: string | null = null;
+
+  const readSetup = newestOnly(
+    () => camerasApi.getSetup(),
+    (setup) => {
+      cameraSetup = setup;
+      return true;
+    },
+    (e) => console.error('[LivePreview] Error reading the camera set-up:', e)
+  );
+  // Resolves once the newest set-up request outstanding has settled,
+  // answered or failed (newestOnly makes a caller whose own request was
+  // discarded wait for that one), so only then does the first hold end. A
+  // failed request that a newer one has overtaken ends nothing. Capture must
+  // not depend on the health of this route: the newest failing ends the
+  // hold too.
+  async function checkSetup(): Promise<void> {
+    await readSetup();
+    setupAnswered = true;
+  }
+
+  // The left camera the saved roles decide; null when they decide nothing.
+  // The roles come from the set-up alone (its confirmed pair); `devices`
+  // only says at which index each body is. They order the pair in either
+  // mode: in single-camera mode LiveViewport shows and captures camera 0
+  // whatever `swapped` says, while the pair views and captures the page
+  // makes there (the camera check, the focus check, a placeholder missing
+  // both pages) still read leftCameraIndex.
+  let rolesLeft = $derived(leftIndexFromRoles(devices, cameraSetup));
+  // The only place `swapped` follows the roles. The manual control is
+  // hidden meanwhile, so nothing else writes it.
+  $effect(() => {
+    if (rolesLeft !== null) swapped = rolesLeft === 1;
+  });
+
+  // The roles were saved: back to where the operator was. The save's
+  // set-up supersedes every read started before it, so a read still pending
+  // cannot put the set-up from before the save back on screen.
+  function rolesSaved(answer: CameraRolesResponse) {
+    readSetup.supersede();
+    cameraSetup = answer.setup;
+    setupAnswered = true;
+    whichByHand = false;
+  }
   // Set once the first load has settled (records, volume, recapture summary,
   // and the retake modal of a `recordId`), so the check never opens before
   // the screen knows whether something else is on it.
@@ -465,9 +575,14 @@
 
   onMount(() => {
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') askForFocusIfDue();
+      if (document.visibilityState === 'visible') {
+        askForFocusIfDue();
+        void checkSetup();
+      }
     };
     document.addEventListener('visibilitychange', onVisibility);
+    // The first answer ends the capture hold, whether the devices load or not.
+    void checkSetup();
     return () => document.removeEventListener('visibilitychange', onVisibility);
   });
 
@@ -559,6 +674,10 @@
     if (!start || anotherBusy || leaving || refreshFailed || refreshing) return;
     if (volumeNeedsStem) {
       anotherError = $m.lv_needs_stem;
+      return;
+    }
+    if (captureHeld) {
+      anotherError = $m.camwhich_needed;
       return;
     }
     anotherBusy = true;
@@ -784,6 +903,7 @@
   async function handleRetake(record: ApiRecord) {
     // The modal shows a thrown error's message; this one is the catalogue's.
     if (volumeNeedsStem) throw new Error($m.lv_needs_stem);
+    if (captureHeld) throw new Error($m.camwhich_needed);
     try {
       await retake(record);
     } catch (error) {
@@ -853,6 +973,26 @@
   // disconnected, the mode is single and the right camera is selected, or the
   // body is reported under a placeholder id), only the local state changes,
   // and the change waits in `rotatePending` until a body is identified there.
+  // Every device listing, from CameraControls: reseeds the rotations, and
+  // asks for the camera set-up on the first listing and whenever the bodies
+  // listed change (NEH-343).
+  function applyDevices(d: CameraDevice[]) {
+    devices = d;
+    const seeded = seedRotation(rotateDeg, d, rotateTouched);
+    const settled = settlePendingRotations(rotatePending, d);
+    rotatePending = settled.remaining;
+    rotateDeg = { ...seeded.rotation, ...Object.fromEntries(settled.remaining) };
+    rotateTouched = seeded.touched;
+    // Applied through the single writer so the change counts as touched
+    // and is saved against the body now identified at that index.
+    for (const [cam, deg] of settled.apply) handleRotateDegChange(cam, deg);
+    const key = hardwareKey(d);
+    if (key !== lastHardwareKey) {
+      lastHardwareKey = key;
+      void checkSetup();
+    }
+  }
+
   function handleRotateDegChange(cam: number, deg: number) {
     const device = devices.find(d => d.index === cam);
     if (!canSaveRotation(device)) {
@@ -876,7 +1016,11 @@
     {collectionName}
     onBack={handleBack}
     onGoToReview={handleGoToReview}
-    onCheckCameras={() => { if (!viewportCapturing && !pageCapturing) cameraCheckOpen = true; }}
+    onCheckCameras={() => {
+      if (viewportCapturing || pageCapturing) return;
+      cameraCheckOpen = true;
+      void checkSetup();
+    }}
     checkCamerasDisabled={pageCapturing || viewportCapturing}
   />
 
@@ -959,19 +1103,10 @@
         onShutterSpeedChange={(v) => shutterSpeed = v}
         onIsoChange={(v) => iso = v}
         onApertureChange={(v) => aperture = v}
-        onDevicesChange={(d) => {
-          devices = d;
-          const seeded = seedRotation(rotateDeg, d, rotateTouched);
-          const settled = settlePendingRotations(rotatePending, d);
-          rotatePending = settled.remaining;
-          rotateDeg = { ...seeded.rotation, ...Object.fromEntries(settled.remaining) };
-          rotateTouched = seeded.touched;
-          // Applied through the single writer so the change counts as touched
-          // and is saved against the body now identified at that index.
-          for (const [cam, deg] of settled.apply) handleRotateDegChange(cam, deg);
-        }}
+        onDevicesChange={applyDevices}
         onRotateDegChange={handleRotateDegChange}
         {rotateDeg}
+        onRescan={() => void checkSetup()}
       />
 
       <div class="center-column">
@@ -988,7 +1123,9 @@
           {rotateDeg}
           onCaptureDone={handleCaptureDone}
           onRotateDegChange={handleRotateDegChange}
-          otherModalOpen={inspectedRecord !== null || refocusOpen || cameraCheckOpen}
+          otherModalOpen={inspectedRecord !== null || refocusOpen || cameraCheckOpen || setupNeeded || whichByHand}
+          captureBlocked={captureHeld}
+          swapLocked={rolesLeft !== null}
           needsStem={volumeNeedsStem}
           {stemFormHref}
           {stemNote}
@@ -1133,6 +1270,24 @@
     {savingOrientation}
     onClose={() => (cameraCheckOpen = false)}
     onRefocusClosed={noteFocusActivity}
+    onChangeRoles={() => (whichByHand = true)}
+  />
+{/if}
+
+{#if setupNeeded || whichByHand}
+  <WhichCamera
+    setup={cameraSetup}
+    cancellable={!setupNeeded}
+    projectName={projectsShownIn($unitState) ? projectName : ''}
+    {collectionName}
+    {rotateDeg}
+    onRotateDegChange={handleRotateDegChange}
+    {savingOrientation}
+    onSaved={rolesSaved}
+    onCancel={() => (whichByHand = false)}
+    onReread={checkSetup}
+    onLeave={handleBack}
+    onDevices={applyDevices}
   />
 {/if}
 

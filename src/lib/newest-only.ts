@@ -14,6 +14,10 @@
 // nothing on screen that the caller can rely on). A failed request is
 // passed to `onError` and counts as not ok.
 //
+// `supersede()` is for a value that arrives by another way (the answer to a
+// save): the caller assigns it, and every load started before it is then
+// discarded as if a newer load had answered with a usable value.
+//
 // No import of api.ts, so the tests run in plain node.
 //
 // Version: 0.3.3
@@ -23,11 +27,17 @@ export interface LoadResult {
 	own: boolean;
 }
 
+export interface NewestLoad {
+	(): Promise<LoadResult>;
+	/** Discards every load started before now; what is on screen counts as ok. */
+	supersede(): void;
+}
+
 export function newestOnly<T>(
 	request: () => Promise<T>,
 	apply: (value: T) => boolean,
 	onError?: (error: unknown) => void
-): () => Promise<LoadResult> {
+): NewestLoad {
 	let newestId = 0;
 	// The newest call's own outcome: whether its response was applied and usable.
 	let newest: Promise<boolean> = Promise.resolve(false);
@@ -41,7 +51,7 @@ export function newestOnly<T>(
 		}
 	}
 
-	return function load(): Promise<LoadResult> {
+	function load(): Promise<LoadResult> {
 		const id = ++newestId;
 		const mine = (async (): Promise<boolean> => {
 			let value: T;
@@ -59,5 +69,12 @@ export function newestOnly<T>(
 			if (id === newestId) return { ok, own: ok };
 			return { ok: await newestOutcome(), own: false };
 		});
+	}
+
+	load.supersede = (): void => {
+		++newestId;
+		newest = Promise.resolve(true);
 	};
+
+	return load;
 }
