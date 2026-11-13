@@ -577,9 +577,21 @@
   .id-q { margin: 0; font-size: var(--text-h4); font-weight: var(--fw-bold); line-height: 1.25; color: var(--color-light); }
 
   /* The mock-up's two cards: the image, its role or name, its camera */
-  .id-cards { flex: 1; min-height: 0; display: flex; justify-content: center; gap: 24px; }
-  .id-card { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
-  .id-stage { position: relative; flex: 1; min-height: 0; aspect-ratio: 2 / 3; }
+  /* The stage's size is stated outright, from the size of .id-cards. Its
+     contents are positioned absolutely, so a width taken from an aspect ratio
+     did not widen the card: the card was as wide as its caption, the stage
+     overflowed it, and the second picture covered half of the first. The
+     height leaves 48px for the caption and the guess below the picture, and
+     is limited so that two stages and the gap fit the width. */
+  .id-cards { flex: 1; min-height: 0; display: flex; justify-content: center; gap: 24px; container-type: size; }
+  .id-card { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; }
+  .id-stage {
+    position: relative;
+    flex: none;
+    --stage-h: min(calc(100cqh - 48px), calc((100cqw - 24px) * 3 / 4));
+    height: var(--stage-h);
+    width: calc(var(--stage-h) * 2 / 3);
+  }
   .id-pick {
     position: absolute;
     inset: 0;
