@@ -39,7 +39,7 @@
   import { defaultRecordTitle } from '$lib/record-title';
   import { isConflict } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
-  import { dismissible } from '$lib/dialog';
+  import { dismissible, openDialogsOutside } from '$lib/dialog';
   import { powerControlOpen } from '$lib/stores/power';
 
   let {
@@ -62,6 +62,8 @@
     swapped = $bindable(false),
     pageCaptures = 0,
     pageCapturing = false,
+    onRefocus,
+    capturing = $bindable(false),
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -103,6 +105,12 @@
     // is in flight. The cameras are busy with it, so no preview frame is
     // asked for meanwhile, as during this viewport's own capture.
     pageCapturing?: boolean;
+    // NEH-339: opens the page's focus check. Passed only on a unit whose
+    // capabilities report DSLR settings; without it there is no button.
+    onRefocus?: () => void;
+    // True while this viewport's own capture is in flight. Bindable, so the
+    // page's automatic focus check waits for it (NEH-339).
+    capturing?: boolean;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -127,6 +135,10 @@
   let showGuides = $state(true);
   let showGridModal = $state(false);
   let showCaptureKeyModal = $state(false);
+  // The two dialogs' backdrops: any open dialog outside them is not this
+  // component's (NEH-339).
+  let gridBackdrop = $state<HTMLElement | null>(null);
+  let captureKeyBackdrop = $state<HTMLElement | null>(null);
 
   // ---------------------------------------------------------------------------
   // CAPTURE KEY (NEH-228)
@@ -209,6 +221,9 @@
   // the Pi's touchscreen has no hover that could reveal it.
 
   let isCapturing = $state(false);
+  $effect.pre(() => {
+    capturing = isCapturing;
+  });
   // A capture of this viewport's or of the page's is in flight: the cameras
   // are busy, so "Refresh preview" waits.
   let camerasBusy = $derived(isCapturing || pageCapturing);
@@ -932,7 +947,15 @@
     heldCode = null;
   }
 
+  // A dialog that is not this component's (the focus check, the page's
+  // viewer, the power confirmation) has the keyboard: no capture, and no
+  // capture key learnt from a key pressed in it (NEH-339).
+  function foreignDialogOpen(): boolean {
+    return openDialogsOutside([gridBackdrop, captureKeyBackdrop]) > 0;
+  }
+
   function handleWindowKeydown(event: KeyboardEvent) {
+    if (foreignDialogOpen()) return;
     if (learning) {
       handleLearnKeydown(event);
       return;
@@ -956,6 +979,7 @@
 
   function handleWindowKeyup(event: KeyboardEvent) {
     if (learning) {
+      if (foreignDialogOpen()) return;
       // The device sent only a modifier and is now releasing it with no
       // other key having arrived with it: tell the operator instead of
       // leaving the control in "assigning" forever.
@@ -1352,13 +1376,29 @@
           <span class="material-symbols-outlined" style="font-size:22px" aria-hidden="true">refresh</span>
         </button>
       {/if}
+      {#if onRefocus}
+        <!-- NEH-339: the focus check, on the other side of the capture button,
+             in the same panel style. Not while the cameras are capturing. -->
+        <button
+          class="float-btn refocus-btn"
+          onclick={onRefocus}
+          disabled={camerasBusy}
+          aria-label={$m.focus_refocus}
+          title={$m.focus_refocus}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      {/if}
     </div>
 
   </div><!-- /mat-board -->
 </div><!-- /viewport-outer -->
 
 {#if showGridModal}
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeGridModal }}>
+  <div class="modal-backdrop" bind:this={gridBackdrop} use:dismissible={{ onDismiss: closeGridModal }}>
     <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="grid-modal-title">
       <h3 class="modal-title" id="grid-modal-title">{$m.lv_grid_modal_title}</h3>
       <p class="modal-subtitle">{$m.lv_grid_modal_subtitle}</p>
@@ -1391,7 +1431,7 @@
 
 {#if showCaptureKeyModal}
   <!-- No Escape while a key is being assigned: a pedal may send Escape. -->
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeCaptureKeyModal, escape: !learning }}>
+  <div class="modal-backdrop" bind:this={captureKeyBackdrop} use:dismissible={{ onDismiss: closeCaptureKeyModal, escape: !learning }}>
     <div class="modal-card dialog-fit" role="dialog" aria-modal="true" aria-labelledby="capture-key-modal-title">
       <h3 class="modal-title" id="capture-key-modal-title">{$m.lv_capture_key_settings}</h3>
       <div class="modal-body">
@@ -1831,6 +1871,21 @@
 
   .refresh-preview-btn:hover:not(:disabled) { background-color: rgba(26,24,21,0.9); }
   .refresh-preview-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* "Refocus" (NEH-339): the mirror of "Refresh preview", to the left of
+     the capture button. */
+  .refocus-btn {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 16px);
+    transform: translateY(-50%);
+    background-color: rgba(26,24,21,0.9);
+    border: 1px solid rgba(90,140,98,0.3);
+    border-radius: 50%;
+  }
+
+  .refocus-btn:hover:not(:disabled) { background-color: rgba(26,24,21,0.9); }
+  .refocus-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .capture-ring {
     position: absolute;

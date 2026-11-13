@@ -8,6 +8,7 @@ import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { dropLegacyToken } from './legacy-token';
+import { clearFocusActivity } from '$lib/focus-check';
 
 // Roles in the system. A role the backend adds has to be added here — this
 // is the only place the list lives.
@@ -74,10 +75,15 @@ function createAuthStore() {
     subscribe,
 
     // Keeps the user after a login or after /users/me validated the
-    // session. The backend has already set the cookie.
-    setSession(user: AuthUser) {
+    // session. The backend has already set the cookie. The login page passes
+    // `signIn`: a sign-in clears the user's last focus check, so the capture
+    // screen of a DSLR unit asks for one again (NEH-339). The dashboard's
+    // revalidation of an open session does not, or every return to the
+    // capture screen through the dashboard would ask.
+    setSession(user: AuthUser, options: { signIn?: boolean } = {}) {
       if (browser) {
         try { localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user)); } catch { /* storage unavailable */ }
+        if (options.signIn) clearFocusActivity(user.id);
       }
       update(state => ({ ...state, user }));
     },

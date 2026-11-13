@@ -1466,6 +1466,9 @@ export interface TestCaptureResult {
   blob: Blob;
   seconds: number | null;
   bytes: number | null;
+  // NEH-339: the lens's focal length in millimetres (X-Focal-Length), when
+  // the backend sends it.
+  focalLength: number | null;
 }
 
 export interface CalibrationRequest {
@@ -1581,8 +1584,12 @@ export const camerasApi = {
    * route also takes ?resolution= and defaults to medium; this client has no
    * way to pass it.
    */
-  async testCapture(cameraIndex: number): Promise<TestCaptureResult> {
-    const { blob, headers } = await apiRequestBlob(`/cameras/test-capture/${cameraIndex}`, {
+  async testCapture(cameraIndex: number, options: { focusCheck?: boolean } = {}): Promise<TestCaptureResult> {
+    // The focus check (NEH-339) asks for the bounded mode: the backend
+    // answers within about 20 s, with a 504 when no picture arrived (a lens
+    // on AF that cannot find focus does not fire). The dashboard does not.
+    const query = options.focusCheck ? '?focus_check=true' : '';
+    const { blob, headers } = await apiRequestBlob(`/cameras/test-capture/${cameraIndex}${query}`, {
       method: 'POST'
     });
     const parseNumericHeader = (value: string | null): number | null => {
@@ -1590,10 +1597,12 @@ export const camerasApi = {
       const n = Number(value);
       return Number.isNaN(n) ? null : n;
     };
+    const focal = parseNumericHeader(headers.get('X-Focal-Length'));
     return {
       blob,
       seconds: parseNumericHeader(headers.get('X-Capture-Seconds')),
-      bytes: parseNumericHeader(headers.get('X-Capture-Bytes'))
+      bytes: parseNumericHeader(headers.get('X-Capture-Bytes')),
+      focalLength: focal !== null && focal > 0 ? focal : null
     };
   },
 

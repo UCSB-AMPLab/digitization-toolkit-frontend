@@ -1008,6 +1008,61 @@ export const es = {
 	lv_preview_unsaved: 'Previsualización (sin guardar)',
 	lv_preview_failed: 'No se pudo obtener la previsualización. Presiona "Actualizar previsualización" para intentar de nuevo.',
 	lv_thumb_empty: 'Sin capturas aún — usa el botón de captura',
+	// NEH-339: the focus check of a DSLR unit, opened with "Reenfocar" or
+	// by itself at the start of a session or after a break.
+	focus_refocus: 'Reenfocar',
+	focus_title: 'Revisar el enfoque',
+	focus_step: (n: number, total: number) => `Paso ${n} de ${total}`,
+	focus_af_title: 'Pon los lentes en AF',
+	focus_camera_left: 'Cámara izquierda',
+	focus_camera_right: 'Cámara derecha',
+	focus_mode_auto: 'AF',
+	focus_mode_manual: 'MF',
+	focus_mode_unknown: 'Sin lectura',
+	focus_test_title: 'Capturas de prueba',
+	focus_take: 'Hacer capturas de prueba',
+	focus_take_again: 'Repetir las capturas',
+	focus_taking: (s: number) => `Haciendo las capturas de prueba… ${s} s`,
+	// The detail is dash_camera_capture_not_connected, in lowercase; a 504 has the focus_no_focus_ list instead.
+	focus_test_failed: (detail?: string) =>
+		detail ? `No se pudo hacer la captura de prueba: ${detail}` : 'No se pudo hacer la captura de prueba',
+	focus_test_empty: 'Todavía no hay captura de prueba',
+	focus_mf_title: 'Pon los lentes en MF',
+	focus_mf_warning: (side: 'left' | 'right' | 'both') =>
+		side === 'both'
+			? 'Las dos cámaras todavía marcan AF. Pon los dos lentes en MF antes de continuar.'
+			: `La cámara ${side === 'left' ? 'izquierda' : 'derecha'} todavía marca AF. Pon su lente en MF antes de continuar.`,
+	focus_mf_required: 'Para continuar, las dos cámaras tienen que marcar MF.',
+	focus_next: 'Siguiente',
+	focus_back: 'Atrás',
+	focus_skip: 'Omitir',
+	focus_continue: 'Continuar',
+	focus_af_step_light:
+		'Enciende la luz del equipo, abre el libro en un par de páginas con texto y ponlo debajo de las cámaras. No uses una página en blanco: la cámara enfocaría el vidrio y no el libro.',
+	focus_af_step_switch: 'En un costado de cada lente hay un interruptor marcado AF / MF: córrelo a AF.',
+	focus_af_step_tick: 'Cuando Captua lea AF en una cámara, lo indica aquí, junto a esa cámara.',
+	focus_test_step_hold: 'Pon la página contra el vidrio, como cuando capturas, y sostenla ahí.',
+	focus_test_step_take:
+		'Presiona el pedal o "Hacer capturas de prueba". Cada cámara enfoca y luego hace la captura; esto puede tardar hasta 20 segundos.',
+	focus_test_step_zoom: 'Acerca las dos capturas y revisa que el texto de la página se vea nítido.',
+	focus_test_step_again: 'Si el texto no se ve nítido, repite las capturas.',
+	focus_test_not_saved: 'Captua no guarda estas capturas.',
+	// A camera on AF that found no focus (HTTP 504): a lead, four checks and a closing line.
+	focus_no_focus_lead: 'La cámara no pudo enfocar y no hizo la captura. Revisa que:',
+	focus_no_focus_cap: 'el lente no tenga la tapa puesta',
+	focus_no_focus_light: 'la luz del equipo esté encendida',
+	focus_no_focus_glass: 'la página esté contra el vidrio',
+	focus_no_focus_page: 'haya una página con texto debajo de la cámara',
+	focus_no_focus_again: 'Luego repite las capturas.',
+	focus_focal: (mm: number) => `${String(mm).replace('.', ',')} mm`,
+	focus_focal_mismatch: (left: number, right: number) =>
+		`Las dos cámaras tienen distinto zoom (izquierda ${String(left).replace('.', ',')} mm, derecha ${String(right).replace('.', ',')} mm). Gira el anillo de zoom de uno de los lentes hasta que las dos cifras coincidan y repite las capturas.`,
+	focus_steps_show: 'Ver los pasos',
+	focus_steps_hide: 'Ocultar los pasos',
+	focus_mf_step_switch: 'Vuelve a correr el interruptor de cada lente a MF.',
+	focus_mf_step_ring: 'No toques el anillo de enfoque: si lo giras, se pierde el enfoque que acabas de ajustar.',
+	focus_mf_step_tick: 'Cuando Captua lea MF en una cámara, lo indica aquí, junto a esa cámara.',
+	focus_continue_anyway: 'Continuar de todos modos',
 	tb_go_to_review: 'Revisar',
 	tb_go_to_review_title: 'Volver a la revisión de este volumen',
 	tb_breadcrumb_nav: 'Proyecto y volumen en curso',

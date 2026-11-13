@@ -50,9 +50,18 @@
   // LiveViewport), and "Capture another here" the default record title
   // (NEH-181), as the viewport's capture does.
   //
+  // The focus check (NEH-339): on a unit whose capabilities report DSLR
+  // settings, "Refocus" in the viewport opens RefocusModal, and the page
+  // opens it by itself when the screen is opened or the tab comes back into
+  // view and no check or capture is recorded since the sign-in, or the last
+  // one is more than 15 minutes old (src/lib/focus-check.ts). Closing it,
+  // completed or skipped, and every capture made here record the activity.
+  // While it is open the capture key and the pedal do not capture.
+  //
   // Version: 0.3.3
 
-  import { onMount } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
+  import { focusCheckNeeded, recordFocusActivity } from '$lib/focus-check';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
@@ -75,6 +84,8 @@
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import ImageViewerModal from './ImageViewerModal.svelte';
   import CaptureInstruction from './CaptureInstruction.svelte';
+  import RefocusModal from './RefocusModal.svelte';
+  import { dialogOpen } from '$lib/dialog';
   import MissingPage from '$lib/components/MissingPage.svelte';
   import CloseMissingDialog from '$lib/components/CloseMissingDialog.svelte';
 
@@ -381,6 +392,61 @@
   let pageCapturing = $state(false);
   let leftCameraIndex = $derived(swapped ? 1 : 0);
 
+  // ---------------------------------------------------------------------------
+  // The focus check (NEH-339)
+  // ---------------------------------------------------------------------------
+  // Set once the capabilities report DSLR settings; only then is there a
+  // "Refocus" button and an automatic check.
+  let dslrUnit = $state(false);
+  let refocusOpen = $state(false);
+  // True while LiveViewport's own capture is in flight (bound from it).
+  let viewportCapturing = $state(false);
+  // Set once the first load has settled (records, volume, recapture summary,
+  // and the retake modal of a `recordId`), so the check never opens before
+  // the screen knows whether something else is on it.
+  let screenSettled = $state(false);
+  // Something that must be dealt with first: any open dialog, wherever it
+  // comes from (the registry in src/lib/dialog.ts, which every dialog joins
+  // through `dismissible` or `trapFocus`), the recapture-turn block panel,
+  // the guide's pause or end panel; or a capture in flight. The check waits
+  // until none shows.
+  let focusCheckWaits = $derived(
+    !screenSettled || $dialogOpen || blocked || guidePaused || guideEnd !== null ||
+      viewportCapturing || pageCapturing
+  );
+
+  function askForFocusIfDue() {
+    if (!dslrUnit || refocusOpen || focusCheckWaits) return;
+    if (focusCheckNeeded(authStore.getUser()?.id, Date.now())) refocusOpen = true;
+  }
+
+  function noteFocusActivity() {
+    recordFocusActivity(authStore.getUser()?.id, Date.now());
+  }
+
+  // Completed or skipped, the check counts as done for the next 15 minutes.
+  function closeRefocus() {
+    refocusOpen = false;
+    noteFocusActivity();
+  }
+
+  // On the first settle, once the capabilities report DSLR settings, and
+  // whenever what it waits for has gone (the last dialog closing included),
+  // the check opens if it is still due. It asks after the update has been
+  // applied, so that a dialog mounted in the same update has registered.
+  $effect(() => {
+    if (!dslrUnit || focusCheckWaits) return;
+    void tick().then(() => untrack(askForFocusIfDue));
+  });
+
+  onMount(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') askForFocusIfDue();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  });
+
   // Left, right, then images without a role.
   function sideOrder(role?: string | null): number {
     return role === 'left' ? 0 : role === 'right' ? 1 : 2;
@@ -492,6 +558,7 @@
       }
       if (!result.success) throw new CaptureFailed(result.error);
       pageCaptures += 1;
+      noteFocusActivity();
       // Only if the screen is still where the capture started.
       if (result.record_id != null && filled === start) {
         filled = { holeId: start.holeId, lastId: result.record_id };
@@ -555,6 +622,13 @@
       return;
     }
 
+    // Not one of `tasks`: nothing waits for the focus check.
+    camerasApi.getCapabilities()
+      .then(caps => {
+        dslrUnit = caps?.dslr_settings === true;
+      })
+      .catch(e => console.error('[LivePreview] Error loading camera capabilities:', e));
+
     const tasks: Promise<void>[] = [];
 
     if (projectId) {
@@ -612,6 +686,9 @@
         }
       }
     }
+    // The recapture turn decides whether the block panel shows.
+    await summaryLoad;
+    screenSettled = true;
   });
 
   // Resolves whether the records on screen come from a read started no
@@ -648,6 +725,7 @@
   }
 
   async function handleCaptureDone() {
+    noteFocusActivity();
     await loadRecords();
   }
 
@@ -726,6 +804,7 @@
       throw new CaptureFailed(result.error);
     }
     pageCaptures += 1;
+    noteFocusActivity();
 
     // A placeholder filled: the modal stays, and asks whether another
     // opening is missing there (NEH-317).
@@ -883,14 +962,16 @@
           {rotateDeg}
           onCaptureDone={handleCaptureDone}
           onRotateDegChange={handleRotateDegChange}
-          otherModalOpen={inspectedRecord !== null}
+          otherModalOpen={inspectedRecord !== null || refocusOpen}
           needsStem={volumeNeedsStem}
           {stemFormHref}
           {stemNote}
           onStemRefused={recheckStem}
           {pageCaptures}
           {pageCapturing}
+          onRefocus={dslrUnit ? () => { if (!viewportCapturing && !pageCapturing) refocusOpen = true; } : undefined}
           bind:swapped
+          bind:capturing={viewportCapturing}
         />
 
         <div class="thumbnail-area">
@@ -1010,6 +1091,10 @@
       busy={anotherBusy || leaving}
     />
   {/key}
+{/if}
+
+{#if refocusOpen}
+  <RefocusModal leftIndex={leftCameraIndex} onClose={closeRefocus} />
 {/if}
 
 {#if closingPlaceholder && inspectedRecord}
