@@ -63,6 +63,7 @@
     pageCaptures = 0,
     pageCapturing = false,
     onRefocus,
+    capturing = $bindable(false),
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -107,6 +108,9 @@
     // NEH-339: opens the page's focus check. Passed only on a unit whose
     // capabilities report DSLR settings; without it there is no button.
     onRefocus?: () => void;
+    // True while this viewport's own capture is in flight. Bindable, so the
+    // page's automatic focus check waits for it (NEH-339).
+    capturing?: boolean;
   } = $props();
 
   function stepRotation(camIdx: number, delta: number) {
@@ -213,6 +217,9 @@
   // the Pi's touchscreen has no hover that could reveal it.
 
   let isCapturing = $state(false);
+  $effect.pre(() => {
+    capturing = isCapturing;
+  });
   // A capture of this viewport's or of the page's is in flight: the cameras
   // are busy, so "Refresh preview" waits.
   let camerasBusy = $derived(isCapturing || pageCapturing);

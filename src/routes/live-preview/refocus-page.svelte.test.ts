@@ -44,7 +44,15 @@ async function settle() {
 	}
 }
 
-type Served = { records?: unknown[]; summary?: unknown };
+type Served = {
+	records?: unknown[];
+	summary?: unknown;
+	// Held until released: the capabilities answer, and a real capture's answer.
+	capsGate?: Promise<void>;
+	captureGate?: Promise<void>;
+	// When set, the capture answers with this error status once released.
+	captureFails?: boolean;
+};
 
 function serve(dslr: boolean, served: Served = {}) {
 	const captures: string[] = [];
@@ -52,6 +60,7 @@ function serve(dslr: boolean, served: Served = {}) {
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/cameras/capabilities')) {
+			await served.capsGate;
 			return json({ backend: dslr ? 'gphoto2' : 'picamera2', live_preview: true, focus_control: !dslr, live_controls: !dslr, zoom: false, autofocus_calibration: !dslr, dslr_settings: dslr, continuous_preview: !dslr });
 		}
 		if (path.includes('/cameras/preview/')) return new Response(null, { status: 404 });
@@ -73,6 +82,8 @@ function serve(dslr: boolean, served: Served = {}) {
 		if (path.endsWith('/records')) return json(served.records ?? [{ id: 41, title: 'Par 1', status: 'captured', sequence: 1, capture_mode: 'dual', collection_id: 9, images: [] }]);
 		if (path.endsWith('/cameras/capture/dual') || path.endsWith('/cameras/capture')) {
 			captures.push(path);
+			await served.captureGate;
+			if (served.captureFails) return json({ detail: 'camera error' }, 500);
 			return json({ success: true, record_id: 42, image_ids: [] });
 		}
 		return json([]);
@@ -247,5 +258,108 @@ describe('capture screen: "Refocus" (NEH-339)', () => {
 
 		admin()!.click();
 		await expect.poll(() => refocusDialog()).not.toBeNull();
+	});
+});
+
+function gate() {
+	let open!: () => void;
+	const promise = new Promise<void>((resolve) => (open = resolve));
+	return { promise, open };
+}
+
+describe('the check waits for a capture in flight (NEH-339)', () => {
+	it('capabilities arriving during a capture do not open it; it opens once the capture has failed and the check is still due', async () => {
+		const caps = gate();
+		const shutter = gate();
+		const captures = serve(true, { capsGate: caps.promise, captureGate: shutter.promise, captureFails: true });
+		render(LivePreview);
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		pressCaptureKey();
+		await expect.poll(() => captures.length).toBe(1);
+
+		caps.open();
+		await expect.poll(() => refocusButton()).not.toBeNull();
+		await settle();
+		expect(refocusDialog()).toBeNull();
+
+		shutter.open();
+		await expect.poll(() => refocusDialog()).not.toBeNull();
+	});
+
+	it('capabilities arriving during a capture that succeeds: the capture counts as activity, so the check does not open', async () => {
+		const caps = gate();
+		const shutter = gate();
+		const captures = serve(true, { capsGate: caps.promise, captureGate: shutter.promise });
+		render(LivePreview);
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		pressCaptureKey();
+		await expect.poll(() => captures.length).toBe(1);
+
+		caps.open();
+		await expect.poll(() => refocusButton()).not.toBeNull();
+		await settle();
+		expect(refocusDialog()).toBeNull();
+
+		shutter.open();
+		await expect.poll(() => readFocusActivity(USER)).not.toBeNull();
+		await settle();
+		expect(refocusDialog()).toBeNull();
+	});
+
+	it('the tab becoming visible during a capture does not open it; it opens after the capture, if still due', async () => {
+		recordFocusActivity(USER, Date.now() - MIN);
+		const shutter = gate();
+		const captures = serve(true, { captureGate: shutter.promise, captureFails: true });
+		render(LivePreview);
+		await expect.poll(() => refocusButton()).not.toBeNull();
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		pressCaptureKey();
+		await expect.poll(() => captures.length).toBe(1);
+
+		localStorage.setItem(`captua_focus_check:${USER}`, String(Date.now() - FOCUS_CHECK_AFTER_MS - MIN));
+		document.dispatchEvent(new Event('visibilitychange'));
+		await settle();
+		expect(refocusDialog()).toBeNull();
+
+		shutter.open();
+		await expect.poll(() => refocusDialog()).not.toBeNull();
+	});
+
+	it('the tab becoming visible during a capture that succeeds: no longer due, so it does not open', async () => {
+		recordFocusActivity(USER, Date.now() - MIN);
+		const shutter = gate();
+		const captures = serve(true, { captureGate: shutter.promise });
+		render(LivePreview);
+		await expect.poll(() => refocusButton()).not.toBeNull();
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		pressCaptureKey();
+		await expect.poll(() => captures.length).toBe(1);
+
+		localStorage.setItem(`captua_focus_check:${USER}`, String(Date.now() - FOCUS_CHECK_AFTER_MS - MIN));
+		document.dispatchEvent(new Event('visibilitychange'));
+		await settle();
+		expect(refocusDialog()).toBeNull();
+
+		shutter.open();
+		await expect.poll(() => readFocusActivity(USER)).toBeGreaterThan(Date.now() - MIN);
+		await settle();
+		expect(refocusDialog()).toBeNull();
+	});
+
+	it('the "Refocus" button does not open it during a capture', async () => {
+		recordFocusActivity(USER, Date.now() - MIN);
+		const shutter = gate();
+		const captures = serve(true, { captureGate: shutter.promise });
+		render(LivePreview);
+		await expect.poll(() => refocusButton()).not.toBeNull();
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		pressCaptureKey();
+		await expect.poll(() => captures.length).toBe(1);
+
+		expect(refocusButton()!.disabled).toBe(true);
+		refocusButton()!.click();
+		await settle();
+		expect(refocusDialog()).toBeNull();
+		shutter.open();
 	});
 });

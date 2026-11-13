@@ -398,15 +398,18 @@
   // "Refocus" button and an automatic check.
   let dslrUnit = $state(false);
   let refocusOpen = $state(false);
+  // True while LiveViewport's own capture is in flight (bound from it).
+  let viewportCapturing = $state(false);
   // Set once the first load has settled (records, volume, recapture summary,
   // and the retake modal of a `recordId`), so the check never opens before
   // the screen knows whether something else is on it.
   let screenSettled = $state(false);
   // Something that must be dealt with first: the retake or placeholder
   // modal, the close dialog, the recapture-turn block panel, the guide's
-  // pause or end panel. The check waits until none shows.
+  // pause or end panel; or a capture in flight. The check waits until none shows.
   let focusCheckWaits = $derived(
-    !screenSettled || inspectedRecord !== null || closingPlaceholder || blocked || guidePaused || guideEnd !== null
+    !screenSettled || inspectedRecord !== null || closingPlaceholder || blocked || guidePaused || guideEnd !== null ||
+      viewportCapturing || pageCapturing
   );
 
   function askForFocusIfDue() {
@@ -961,8 +964,9 @@
           onStemRefused={recheckStem}
           {pageCaptures}
           {pageCapturing}
-          onRefocus={dslrUnit ? () => (refocusOpen = true) : undefined}
+          onRefocus={dslrUnit ? () => { if (!viewportCapturing && !pageCapturing) refocusOpen = true; } : undefined}
           bind:swapped
+          bind:capturing={viewportCapturing}
         />
 
         <div class="thumbnail-area">

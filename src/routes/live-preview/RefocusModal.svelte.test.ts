@@ -15,7 +15,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import { camerasApi, type DSLRSettings, type TestCaptureResult } from '$lib/api';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
-import { clearChord } from '$lib/capture-key';
+import { clearChord, writeChord } from '$lib/capture-key';
 import { REQUIRE_MF_READING } from '$lib/focus-check';
 import '../../app.css';
 import RefocusModal from './RefocusModal.svelte';
@@ -669,5 +669,57 @@ describe('RefocusModal: closing', () => {
 		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
 		expect(button(en.focus_skip)?.disabled).toBe(true);
 		expect(onClose).not.toHaveBeenCalled();
+	});
+});
+
+describe('RefocusModal: Escape as the assigned capture key', () => {
+	const escapeChord = { key: 'Escape', ctrl: false, alt: false, meta: false, shift: false };
+
+	afterEach(() => clearChord());
+
+	// A real key press starts at the focused element, so the window's capture
+	// listener (the dialog's Escape) runs before the page's own. Dispatching on
+	// the window itself would reverse that order.
+	function pressEscape(): KeyboardEvent {
+		const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+		document.body.dispatchEvent(event);
+		document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }));
+		return event;
+	}
+
+	it('takes the test pair on the test-pictures stage and does not close the dialog', async () => {
+		writeChord(escapeChord);
+		captureSpy.mockImplementation(() => new Promise(() => {}));
+		const { onClose } = await toTestStage();
+		const event = pressEscape();
+		await settle();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		expect(onClose).not.toHaveBeenCalled();
+		expect(event.defaultPrevented).toBe(true);
+	});
+
+	it('does nothing on a stage without a capture action: no close, no request', async () => {
+		writeChord(escapeChord);
+		const { onClose } = renderModal();
+		await settle();
+		pressEscape();
+		await settle();
+		expect(onClose).not.toHaveBeenCalled();
+		expect(captureSpy).not.toHaveBeenCalled();
+		await click(en.focus_next);
+		await click(en.focus_next);
+		pressEscape();
+		await settle();
+		expect(onClose).not.toHaveBeenCalled();
+		expect(captureSpy).not.toHaveBeenCalled();
+	});
+
+	it('when Escape is not the assigned key, it closes the dialog and starts no request', async () => {
+		writeChord({ ...escapeChord, key: 'F7' });
+		const { onClose } = await toTestStage();
+		pressEscape();
+		await settle();
+		expect(onClose).toHaveBeenCalledWith('dismissed');
+		expect(captureSpy).not.toHaveBeenCalled();
 	});
 });

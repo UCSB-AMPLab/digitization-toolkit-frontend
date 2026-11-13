@@ -258,6 +258,9 @@
   // the focused button. LiveViewport ignores it while this dialog is open
   // (its otherModalOpen), so it never starts a real capture.
   const chords = readChords();
+  // An operator may have assigned Escape to the pedal. Then it takes the test
+  // pair where that is the stage's action and never closes the dialog.
+  const escapeIsCaptureKey = chords.some((chord) => chord.key.toLowerCase() === 'escape');
 
   function handleKeydown(event: KeyboardEvent) {
     if (!ownsEvent(event, { chords, modalOpen: false, activeElement: document.activeElement })) return;
@@ -432,7 +435,7 @@
 <div
   class="img-viewer-backdrop"
   use:toBody
-  use:dismissible={{ onDismiss: dismiss, escape: !capturing, backdrop: false }}
+  use:dismissible={{ onDismiss: dismiss, escape: !capturing && !escapeIsCaptureKey, backdrop: false }}
 >
   <div
     class="img-viewer-content rf-card"
