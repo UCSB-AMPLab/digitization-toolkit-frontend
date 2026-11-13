@@ -876,8 +876,8 @@
     {collectionName}
     onBack={handleBack}
     onGoToReview={handleGoToReview}
-    onCheckCameras={() => (cameraCheckOpen = true)}
-    checkCamerasDisabled={pageCapturing}
+    onCheckCameras={() => { if (!viewportCapturing && !pageCapturing) cameraCheckOpen = true; }}
+    checkCamerasDisabled={pageCapturing || viewportCapturing}
   />
 
   <CaptureInstruction {instruction} />

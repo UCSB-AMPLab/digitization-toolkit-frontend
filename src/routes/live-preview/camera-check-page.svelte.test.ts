@@ -54,7 +54,7 @@ function deferredResponse() {
 	return { promise, resolve };
 }
 
-function serve(dslr: boolean) {
+function serve(dslr: boolean, captureGate?: Promise<void>) {
 	const captures: string[] = [];
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
@@ -83,6 +83,7 @@ function serve(dslr: boolean) {
 		if (path.endsWith('/records')) return json([]);
 		if (path.endsWith('/cameras/capture/dual') || path.endsWith('/cameras/capture')) {
 			captures.push(path);
+			await captureGate;
 			return json({ success: true, record_id: 42, image_ids: [] });
 		}
 		return json([]);
@@ -171,6 +172,27 @@ describe('capture screen: "Check cameras" (NEH-339)', () => {
 		document.dispatchEvent(new Event('visibilitychange'));
 		await settle();
 		expect(refocusDialog()).toBeNull();
+	});
+
+	it('is disabled while the viewport has a capture in flight, and opens the check once the capture is done', async () => {
+		let release!: () => void;
+		const gate = new Promise<void>((r) => (release = r));
+		const captures = serve(false, gate);
+		render(LivePreview);
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		await expect.poll(() => openButton()?.disabled).toBe(false);
+
+		pressCaptureKey();
+		await expect.poll(() => captures.length).toBe(1);
+		await expect.poll(() => openButton()?.disabled).toBe(true);
+		openButton()!.click();
+		await settle();
+		expect(check()).toBeNull();
+
+		release();
+		await expect.poll(() => openButton()?.disabled).toBe(false);
+		openButton()!.click();
+		await expect.poll(() => check()).not.toBeNull();
 	});
 });
 
