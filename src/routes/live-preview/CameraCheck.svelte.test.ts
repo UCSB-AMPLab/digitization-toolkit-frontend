@@ -765,6 +765,50 @@ describe('CameraCheck: Escape as the assigned capture key', () => {
 		expect(view()).not.toBeNull();
 	});
 
+	it('with the pedal on Escape, Escape closes the 1:1 viewer without taking captures; a second Escape takes them', async () => {
+		writeChord(chord());
+		captureSpy.mockImplementation(() => shot(3000, 2000));
+		const { onClose } = renderCheck();
+		await settle();
+		await click(en.camcheck_take);
+		await expect.poll(() => button(en.camcheck_full_size_aria('left'))).not.toBeNull();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		await click(en.camcheck_full_size_aria('left'));
+		const viewer = () => document.querySelector('[role="dialog"][aria-labelledby="fv-title"]');
+		expect(viewer()).not.toBeNull();
+
+		escape();
+		await settle();
+		expect(viewer()).toBeNull();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		expect(onClose).not.toHaveBeenCalled();
+
+		escape();
+		await settle();
+		expect(captureSpy).toHaveBeenCalledTimes(4);
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
+	it('with the pedal on Escape, Escape closes the camera details without taking captures; a second Escape takes them', async () => {
+		writeChord(chord());
+		const { onClose } = renderCheck();
+		await settle();
+		await press(chip('left'));
+		const details = () => document.querySelector('[role="dialog"][aria-labelledby="cd-title"]');
+		expect(details()).not.toBeNull();
+
+		escape();
+		await settle();
+		expect(details()).toBeNull();
+		expect(captureSpy).not.toHaveBeenCalled();
+		expect(onClose).not.toHaveBeenCalled();
+
+		escape();
+		await settle();
+		expect(captureSpy).toHaveBeenCalledTimes(2);
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
 	it('with the pedal on Ctrl+Escape, plain Escape closes and Ctrl+Escape takes the test captures', async () => {
 		writeChord(chord({ ctrl: true }));
 		const { onClose } = renderCheck();

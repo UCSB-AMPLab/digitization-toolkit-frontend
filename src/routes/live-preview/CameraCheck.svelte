@@ -355,6 +355,8 @@
   const closesOnEscape = (event: KeyboardEvent) => !busy && !isCaptureKey(event);
 
   function handleKeydown(event: KeyboardEvent) {
+    // A press a nested dialog already consumed (Escape closing it) takes nothing.
+    if (event.defaultPrevented) return;
     if (viewerOpen || detailsOpen || refocusOpen) return;
     if (!isCaptureKey(event)) return;
     event.preventDefault();
