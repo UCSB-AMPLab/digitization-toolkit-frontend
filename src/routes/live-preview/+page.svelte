@@ -69,7 +69,7 @@
   //
   // Version: 0.3.3
 
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { focusCheckNeeded, recordFocusActivity } from '$lib/focus-check';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -95,6 +95,7 @@
   import CaptureInstruction from './CaptureInstruction.svelte';
   import RefocusModal from './RefocusModal.svelte';
   import CameraCheck from './CameraCheck.svelte';
+  import { dialogOpen } from '$lib/dialog';
   import MissingPage from '$lib/components/MissingPage.svelte';
   import CloseMissingDialog from '$lib/components/CloseMissingDialog.svelte';
 
@@ -422,16 +423,20 @@
   let refocusOpen = $state(false);
   // The camera check (NEH-339), opened from the top bar.
   let cameraCheckOpen = $state(false);
+  // True while LiveViewport's own capture is in flight (bound from it).
+  let viewportCapturing = $state(false);
   // Set once the first load has settled (records, volume, recapture summary,
   // and the retake modal of a `recordId`), so the check never opens before
   // the screen knows whether something else is on it.
   let screenSettled = $state(false);
-  // Something that must be dealt with first: the retake or placeholder
-  // modal, the close dialog, the recapture-turn block panel, the guide's
-  // pause or end panel. The check waits until none shows.
+  // Something that must be dealt with first: any open dialog, wherever it
+  // comes from (the registry in src/lib/dialog.ts, which every dialog joins
+  // through `dismissible` or `trapFocus`), the recapture-turn block panel,
+  // the guide's pause or end panel; or a capture in flight. The check waits
+  // until none shows.
   let focusCheckWaits = $derived(
-    !screenSettled || inspectedRecord !== null || closingPlaceholder || blocked || guidePaused || guideEnd !== null ||
-      cameraCheckOpen
+    !screenSettled || $dialogOpen || blocked || guidePaused || guideEnd !== null ||
+      viewportCapturing || pageCapturing || cameraCheckOpen
   );
 
   function askForFocusIfDue() {
@@ -450,10 +455,12 @@
   }
 
   // On the first settle, once the capabilities report DSLR settings, and
-  // whenever what it waits for has gone, the check opens if it is still due.
+  // whenever what it waits for has gone (the last dialog closing included),
+  // the check opens if it is still due. It asks after the update has been
+  // applied, so that a dialog mounted in the same update has registered.
   $effect(() => {
     if (!dslrUnit || focusCheckWaits) return;
-    untrack(askForFocusIfDue);
+    void tick().then(() => untrack(askForFocusIfDue));
   });
 
   onMount(() => {
@@ -988,8 +995,9 @@
           onStemRefused={recheckStem}
           {pageCaptures}
           {pageCapturing}
-          onRefocus={dslrUnit ? () => (refocusOpen = true) : undefined}
+          onRefocus={dslrUnit ? () => { if (!viewportCapturing && !pageCapturing) refocusOpen = true; } : undefined}
           bind:swapped
+          bind:capturing={viewportCapturing}
         />
 
         <div class="thumbnail-area">

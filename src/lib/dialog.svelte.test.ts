@@ -4,7 +4,8 @@
 //
 // Version: 0.1.0-beta
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { dismissible, trapFocus, type DismissOptions } from './dialog';
+import { get } from 'svelte/store';
+import { dialogOpen, dismissible, openDialogCount, openDialogsOutside, trapFocus, type DismissOptions } from './dialog';
 
 const opened: { destroy: () => void }[] = [];
 
@@ -141,5 +142,118 @@ describe('trapFocus, one dialog over another', () => {
 		expect(focused()).toBe('a');
 		lowerTrap.destroy();
 		lower.remove();
+	});
+});
+
+// NEH-339: Escape refused key by key. The Refocus dialog leaves to the capture
+// key a press that matches it, modifiers included, and closes on any other
+// Escape.
+describe('dismissible, Escape decided per key press', () => {
+	it('asks the predicate for each Escape; a refusal keeps it from the dialog underneath', () => {
+		const lower = openDialog();
+		const escape = vi.fn((event: KeyboardEvent) => !event.ctrlKey);
+		const upper = openDialog({ escape });
+		const ctrl = new KeyboardEvent('keydown', { key: 'Escape', ctrlKey: true, bubbles: true, cancelable: true });
+		document.body.dispatchEvent(ctrl);
+		expect(escape).toHaveBeenCalledWith(ctrl);
+		expect(upper.onDismiss).not.toHaveBeenCalled();
+		expect(lower.onDismiss).not.toHaveBeenCalled();
+		expect(ctrl.defaultPrevented).toBe(false);
+
+		const plain = pressEscape();
+		expect(upper.onDismiss).toHaveBeenCalledTimes(1);
+		expect(lower.onDismiss).not.toHaveBeenCalled();
+		expect(plain.defaultPrevented).toBe(true);
+	});
+
+	it('does not ask the predicate about other keys', () => {
+		const escape = vi.fn(() => true);
+		openDialog({ escape });
+		document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+		expect(escape).not.toHaveBeenCalled();
+	});
+});
+
+// NEH-339: the registry of open dialogs. Both helpers register the dialog
+// they are attached to, so the capture screen can wait until none is open
+// without listing them.
+describe('the open-dialog registry', () => {
+	function trapped(withBackdrop: boolean) {
+		const backdrop = document.createElement('div');
+		const card = document.createElement('div');
+		card.tabIndex = -1;
+		card.append(document.createElement('button'));
+		backdrop.append(card);
+		document.body.append(backdrop);
+		const trap = trapFocus(card);
+		const dismiss = withBackdrop ? dismissible(backdrop, { onDismiss: () => {} }) : null;
+		return {
+			backdrop,
+			destroy() {
+				dismiss?.destroy();
+				trap.destroy();
+				backdrop.remove();
+			}
+		};
+	}
+
+	it('counts a dialog when its action mounts and stops when it is destroyed', () => {
+		expect(openDialogCount()).toBe(0);
+		const dialog = openDialog();
+		expect(openDialogCount()).toBe(1);
+		dialog.destroy();
+		opened.pop();
+		expect(openDialogCount()).toBe(0);
+	});
+
+	it('counts nested dialogs one by one, down to none', () => {
+		const lower = openDialog();
+		const upper = openDialog();
+		const third = trapped(false);
+		expect(openDialogCount()).toBe(3);
+		third.destroy();
+		expect(openDialogCount()).toBe(2);
+		upper.destroy();
+		expect(openDialogCount()).toBe(1);
+		lower.destroy();
+		expect(openDialogCount()).toBe(0);
+		opened.length = 0;
+	});
+
+	it('counts once a dialog that uses both helpers, in either order of destruction', () => {
+		const one = trapped(true);
+		expect(openDialogCount()).toBe(1);
+		one.destroy();
+		expect(openDialogCount()).toBe(0);
+		const two = trapped(true);
+		expect(openDialogCount()).toBe(1);
+		two.destroy();
+		expect(openDialogCount()).toBe(0);
+	});
+
+	it('publishes "any dialog open" to subscribers as dialogs open and close', () => {
+		const seen: boolean[] = [];
+		const stop = dialogOpen.subscribe((value) => seen.push(value));
+		expect(get(dialogOpen)).toBe(false);
+		const lower = openDialog();
+		const upper = trapped(true);
+		expect(get(dialogOpen)).toBe(true);
+		upper.destroy();
+		expect(get(dialogOpen)).toBe(true);
+		lower.destroy();
+		opened.length = 0;
+		expect(get(dialogOpen)).toBe(false);
+		stop();
+		expect(seen).toEqual([false, true, false]);
+	});
+
+	it('counts the dialogs outside the given elements: those that are not the caller\'s own', () => {
+		const mine = openDialog();
+		expect(openDialogsOutside([mine.backdrop])).toBe(0);
+		const other = trapped(true);
+		expect(openDialogsOutside([mine.backdrop])).toBe(1);
+		expect(openDialogsOutside([mine.backdrop, other.backdrop])).toBe(0);
+		expect(openDialogsOutside([null, undefined])).toBe(2);
+		other.destroy();
 	});
 });

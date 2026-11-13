@@ -9,18 +9,31 @@
 // before page-level handlers (the guided tour, the capture key), and it marks
 // the event handled with preventDefault.
 //
+// Both helpers also register the dialog they are attached to (NEH-339):
+// `openDialogCount` and the `dialogOpen` store say whether any dialog is open
+// anywhere, so that something that opens by itself (the capture screen's
+// focus check) can wait until none is, without a list of which ones to wait
+// for. A dialog that uses both helpers counts once.
+//
 // Version: 0.3.3
+
+import { writable, type Readable } from 'svelte/store';
 
 export interface DismissOptions {
 	/** Called on Escape or a click on the backdrop. */
 	onDismiss: () => void;
-	/** False while closing would lose something, such as a job in progress. */
-	escape?: boolean;
+	/**
+	 * False while closing would lose something, such as a job in progress. A
+	 * function decides for each Escape press: false leaves that press to the
+	 * page (the Refocus dialog leaves it to an Escape capture key).
+	 */
+	escape?: boolean | ((event: KeyboardEvent) => boolean);
 	/** False for dialogs that a stray tap outside should not close. */
 	backdrop?: boolean;
 }
 
 interface Entry {
+	node: HTMLElement;
 	options: DismissOptions;
 }
 
@@ -30,15 +43,18 @@ function onKeydown(event: KeyboardEvent) {
 	if (event.key !== 'Escape' || event.defaultPrevented) return;
 	const top = open[open.length - 1];
 	// A top dialog that refuses Escape keeps it from the dialogs underneath.
-	if (!top || top.options.escape === false) return;
+	if (!top) return;
+	const escape = top.options.escape;
+	if (escape === false || (typeof escape === 'function' && !escape(event))) return;
 	event.preventDefault();
 	top.options.onDismiss();
 }
 
 export function dismissible(node: HTMLElement, options: DismissOptions) {
-	const entry: Entry = { options };
+	const entry: Entry = { node, options };
 	open.push(entry);
 	if (open.length === 1) window.addEventListener('keydown', onKeydown, true);
+	publish();
 
 	// Only a click on the backdrop itself: clicks inside the card bubble up
 	// to it too.
@@ -57,6 +73,7 @@ export function dismissible(node: HTMLElement, options: DismissOptions) {
 			const i = open.indexOf(entry);
 			if (i !== -1) open.splice(i, 1);
 			if (open.length === 0) window.removeEventListener('keydown', onKeydown, true);
+			publish();
 		}
 	};
 }
@@ -90,6 +107,7 @@ const traps: HTMLElement[] = [];
 
 export function trapFocus(node: HTMLElement) {
 	traps.push(node);
+	publish();
 	const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 	// The Tab stops: of a radio group, only the checked radio (or the first
 	// when none is), as the browser does.
@@ -131,8 +149,43 @@ export function trapFocus(node: HTMLElement) {
 			window.removeEventListener('keydown', onKeydown, true);
 			const i = traps.lastIndexOf(node);
 			if (i !== -1) traps.splice(i, 1);
+			publish();
 			if (returnTo?.isConnected && !(returnTo as HTMLButtonElement).disabled) returnTo.focus();
 		}
 	};
 }
 
+// ---------------------------------------------------------------------------
+// The registry of open dialogs (NEH-339)
+// ---------------------------------------------------------------------------
+// Read from the two stacks above: every `dismissible` backdrop, and every
+// `trapFocus` card that is not inside one of those backdrops (a card inside
+// a backdrop is the same dialog).
+function openDialogNodes(): HTMLElement[] {
+	return [...open.map((entry) => entry.node), ...traps.filter((card) => !open.some((entry) => entry.node.contains(card)))];
+}
+
+/** How many dialogs are open now, nested ones included. */
+export function openDialogCount(): number {
+	return openDialogNodes().length;
+}
+
+/**
+ * How many open dialogs lie outside the given elements: with a component's
+ * own dialogs passed, the dialogs that are not its own.
+ */
+export function openDialogsOutside(own: readonly (Node | null | undefined)[]): number {
+	return openDialogNodes().filter((dialog) => !own.some((mine) => mine?.contains(dialog))).length;
+}
+
+const anyOpen = writable(false);
+
+function publish() {
+	anyOpen.set(openDialogCount() > 0);
+}
+
+/**
+ * True while any dialog is open. A store, as in src/lib/stores, so that a
+ * component reads it as `$dialogOpen` in `$derived` and `$effect`.
+ */
+export const dialogOpen: Readable<boolean> = { subscribe: anyOpen.subscribe };
