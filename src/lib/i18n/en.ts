@@ -1842,6 +1842,7 @@ export const en: Messages = {
 		'Captua did not finish freeing space on the SD card or restoring files to it within ten minutes, so it changed nothing. Get a new code once that has finished.',
 	fisqua_link_prepare_failed: 'Captua could not prepare the link settings and changed nothing. Get a new code.',
 	fisqua_link_shutting_down: 'Captua was shutting down and changed nothing. Get a new code once it is running again.',
+	fisqua_link_cancel_failed: 'Captua could not cancel the code. Try again.',
 	fisqua_link_generic: 'Captua could not link the unit, for a reason it does not recognise.',
 	fisqua_link_err_read: 'Captua could not read the state of the link. It tries again every few seconds.',
 

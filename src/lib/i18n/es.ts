@@ -1925,6 +1925,7 @@ export const es = {
 	fisqua_link_prepare_failed: 'Captua no pudo preparar los datos de la vinculación y no cambió nada. Obtén un código nuevo.',
 	fisqua_link_shutting_down:
 		'Captua no cambió nada: la aprobación llegó durante el apagado. Obtén un código nuevo cuando Captua vuelva a estar en marcha.',
+	fisqua_link_cancel_failed: 'Captua no pudo cancelar el código. Intenta de nuevo.',
 	fisqua_link_generic: 'Captua no pudo vincular el equipo por un motivo que no reconoce.',
 	fisqua_link_err_read: 'Captua no pudo comprobar si el equipo está vinculado. Lo vuelve a intentar cada pocos segundos.',
 

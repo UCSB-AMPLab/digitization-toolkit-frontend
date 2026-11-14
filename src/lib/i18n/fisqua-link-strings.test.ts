@@ -102,6 +102,8 @@ describe('Fisqua link strings', () => {
 		expect(es.fisqua_link_prepare_failed).toBe('Captua no pudo preparar los datos de la vinculación y no cambió nada. Obtén un código nuevo.');
 		expect(es.fisqua_link_err_read).toBe('Captua no pudo comprobar si el equipo está vinculado. Lo vuelve a intentar cada pocos segundos.');
 		expect(es.fisqua_link_shutting_down).toBe('Captua no cambió nada: la aprobación llegó durante el apagado. Obtén un código nuevo cuando Captua vuelva a estar en marcha.');
+		expect(es.fisqua_link_cancel_failed).toBe('Captua no pudo cancelar el código. Intenta de nuevo.');
+		expect(en.fisqua_link_cancel_failed).toBe('Captua could not cancel the code. Try again.');
 		expect(en.fisqua_link_shutting_down).toBe('Captua was shutting down and changed nothing. Get a new code once it is running again.');
 	});
 

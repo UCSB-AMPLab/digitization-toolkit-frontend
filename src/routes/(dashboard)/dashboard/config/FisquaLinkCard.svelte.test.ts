@@ -465,6 +465,115 @@ describe('Conectar con Fisqua: restart required', () => {
 	});
 });
 
+describe('Conectar con Fisqua: answers that arrive late', () => {
+	function deferred<T>() {
+		let resolve!: (v: T) => void;
+		const promise = new Promise<T>((r) => (resolve = r));
+		return { promise, resolve };
+	}
+
+	it('drops a GET sent before an action that answers after it', async () => {
+		const showing = status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' });
+		const { getSpy } = mount(showing);
+		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
+		const held = deferred<PairingStatus>();
+		getSpy.mockImplementation(() => held.promise);
+		const before = getSpy.mock.calls.length;
+		await vi.waitFor(() => expect(getSpy.mock.calls.length).toBeGreaterThan(before));
+		vi.spyOn(systemApi, 'cancelPairing').mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
+		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
+		await expect.element(getCode()).toBeInTheDocument();
+		// Later GETs never answer, so a stale answer that got through would stay on screen.
+		getSpy.mockImplementation(() => new Promise<PairingStatus>(() => {}));
+		held.resolve(showing);
+		await sleep(POLL * 3);
+		expect(page.getByText('ABC-DEF', { exact: true }).elements()).toHaveLength(0);
+		await expect.element(getCode()).toBeInTheDocument();
+	});
+
+	it('drops a GET sent while an action is in flight that answers after it', async () => {
+		const showing = status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' });
+		const { getSpy } = mount(showing);
+		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
+		const action = deferred<PairingStatus>();
+		vi.spyOn(systemApi, 'cancelPairing').mockImplementation(() => action.promise);
+		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
+		const held = deferred<PairingStatus>();
+		getSpy.mockImplementation(() => held.promise);
+		const before = getSpy.mock.calls.length;
+		await vi.waitFor(() => expect(getSpy.mock.calls.length).toBeGreaterThan(before));
+		action.resolve(status({ state: 'cancelled', unitName: 'Sala 2' }));
+		await expect.element(getCode()).toBeInTheDocument();
+		// Later GETs never answer, so a stale answer that got through would stay on screen.
+		getSpy.mockImplementation(() => new Promise<PairingStatus>(() => {}));
+		held.resolve(showing);
+		await sleep(POLL * 3);
+		expect(page.getByText('ABC-DEF', { exact: true }).elements()).toHaveLength(0);
+	});
+
+	it('drops a failure of a GET sent before an action, so it does not show a read error', async () => {
+		const { getSpy } = mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' }));
+		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
+		let fail!: (e: unknown) => void;
+		getSpy.mockImplementation(() => new Promise<PairingStatus>((_, reject) => (fail = reject)));
+		const before = getSpy.mock.calls.length;
+		await vi.waitFor(() => expect(getSpy.mock.calls.length).toBeGreaterThan(before));
+		vi.spyOn(systemApi, 'cancelPairing').mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
+		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
+		await expect.element(getCode()).toBeInTheDocument();
+		fail(new TypeError('Failed to fetch'));
+		await sleep(POLL * 2);
+		expect(page.getByText(es.fisqua_link_err_read).elements()).toHaveLength(0);
+	});
+});
+
+describe('Conectar con Fisqua: each action shows its own refusal', () => {
+	it.each([
+		['requesting', status({ state: 'requesting', unitName: 'Sala 2' })],
+		['showing', status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' })]
+	])('a failed Cancel in %s is shown beside Cancel', async (_, s) => {
+		mount(s);
+		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(new ApiError('Internal Server Error', undefined, 500));
+		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
+		await expect.element(page.getByRole('alert').getByText(es.fisqua_link_cancel_failed)).toBeInTheDocument();
+		expect(page.getByText(es.fisqua_link_generic).elements()).toHaveLength(0);
+	});
+
+	it('a Cancel refused with a code this version does not know says Cancel failed', async () => {
+		mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' }));
+		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(refused('something_new'));
+		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
+		await expect.element(page.getByRole('alert').getByText(es.fisqua_link_cancel_failed)).toBeInTheDocument();
+	});
+
+	it('a Cancel refused with a known code shows that code\'s line', async () => {
+		mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' }));
+		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(refused('restart_required'));
+		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
+		await expect.element(page.getByRole('alert').getByText(es.fisqua_link_restart_required)).toBeInTheDocument();
+	});
+
+	it('a failed Cancel is not shown later beside Get a code', async () => {
+		const { getSpy } = mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' }));
+		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(new ApiError('Internal Server Error', undefined, 500));
+		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
+		await expect.element(page.getByRole('alert')).toBeInTheDocument();
+		getSpy.mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
+		await expect.element(getCode()).toBeInTheDocument();
+		expect(page.getByRole('alert').elements()).toHaveLength(0);
+	});
+
+	it('a failed Get a code is not shown beside Cancel once a session runs', async () => {
+		const { getSpy } = mount(status({ state: 'cancelled', unitName: 'Sala 2' }));
+		vi.spyOn(systemApi, 'startPairing').mockRejectedValue(refused('busy_capturing'));
+		await userEvent.click(getCode());
+		await expect.element(page.getByRole('alert').getByText(es.fisqua_link_busy_capturing)).toBeInTheDocument();
+		getSpy.mockResolvedValue(status({ state: 'requesting', unitName: 'Sala 2' }));
+		await expect.element(page.getByText(es.fisqua_link_requesting)).toBeInTheDocument();
+		expect(page.getByRole('alert').elements()).toHaveLength(0);
+	});
+});
+
 describe('Conectar con Fisqua: reading and polling', () => {
 	it.each(['cancelled', 'ended'])('%s shows the form with no line', async (state) => {
 		const { screen } = mount(status({ state, unitName: 'Sala 2' }));

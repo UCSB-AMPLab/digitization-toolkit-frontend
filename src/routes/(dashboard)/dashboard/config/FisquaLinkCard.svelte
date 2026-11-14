@@ -61,12 +61,19 @@
   let name = $state('');
   let nameTouched = false;
   let acting = $state(false);
-  // The code of the last refused request ('generic' when it had none).
-  let refusal = $state<string | null>(null);
+  // The last refused action and its code ('generic' when it had none),
+  // shown beside that action's button only.
+  type Action = 'start' | 'renew' | 'cancel';
+  let refusal = $state<{ action: Action; code: string } | null>(null);
+  // Every answer, GET or action, carries the generation it was sent under;
+  // an action raises it when it starts and again when it answers, so an
+  // answer sent before or during an action never overwrites the action's.
+  let generation = 0;
   let power = $state<ReturnType<typeof PowerControl> | undefined>(undefined);
   let powerError = $state<string | null>(null);
 
-  function accept(next: PairingStatus) {
+  function accept(next: PairingStatus, sentUnder: number) {
+    if (sentUnder < generation) return;
     readFailed = false;
     gap = false;
     const p = pairingPanel(next.state);
@@ -87,11 +94,12 @@
     const stop = pollPairing({
       intervalMs: pollMs,
       read: async (signal) => {
+        const sentUnder = generation;
         try {
           const next = await systemApi.getPairing(signal);
-          if (alive) accept(next);
+          if (alive) accept(next, sentUnder);
         } catch {
-          if (!alive) return;
+          if (!alive || sentUnder < generation) return;
           if (inRestart) gap = true;
           else readFailed = true;
         }
@@ -135,19 +143,23 @@
   function onName(e: Event) {
     nameTouched = true;
     name = (e.currentTarget as HTMLInputElement).value;
-    if (refusal === 'unit_name') refusal = null;
+    if (refusal?.code === 'unit_name') refusal = null;
   }
 
-  async function act(call: () => Promise<PairingStatus | null>) {
+  async function act(action: Action, call: () => Promise<PairingStatus | null>) {
+    const sentUnder = ++generation;
     acting = true;
     refusal = null;
     afterRestart = false;
     try {
       const next = await call();
-      if (next) accept(next);
+      if (sentUnder === generation) {
+        generation += 1;
+        if (next) accept(next, generation);
+      }
     } catch (err) {
       console.error('[FisquaLink] Request refused:', err);
-      refusal = pairingErrorCode(err) ?? 'generic';
+      if (sentUnder === generation) refusal = { action, code: pairingErrorCode(err) ?? 'generic' };
     } finally {
       acting = false;
     }
@@ -156,19 +168,26 @@
   function start(unitName = name) {
     const trimmed = unitName.trim();
     if (trimmed.length < 1 || trimmed.length > NAME_MAX) {
-      refusal = 'unit_name';
+      refusal = { action: 'start', code: 'unit_name' };
       return;
     }
-    act(() => systemApi.startPairing(trimmed));
+    act('start', () => systemApi.startPairing(trimmed));
   }
 
   // After `lapsed`, `lost_answer` or `unknown`: a new session with the same name.
   function newCode() {
-    act(() => systemApi.renewPairing());
+    act('renew', () => systemApi.renewPairing());
+  }
+
+  // A refused Cancel with a code this version knows shows that code's line;
+  // otherwise it says that the code could not be cancelled.
+  function cancelRefusalText(code: string): string {
+    const text = pairingRefusalText(code, $m);
+    return text === $m.fisqua_link_generic ? $m.fisqua_link_cancel_failed : text;
   }
 
   function cancel() {
-    act(() => systemApi.cancelPairing());
+    act('cancel', () => systemApi.cancelPairing());
   }
 </script>
 
@@ -252,8 +271,8 @@
     {/if}
 
     {#if panel === 'renew'}
-      {#if refusal}
-        <p class="link-error" role="alert">{pairingRefusalText(refusal, $m)}</p>
+      {#if refusal?.action === 'renew'}
+        <p class="link-error" role="alert">{pairingRefusalText(refusal.code, $m)}</p>
       {/if}
       <div class="link-actions">
         <button type="button" class="link-btn-save" onclick={newCode} disabled={acting || mustRestart}>{$m.fisqua_link_new_code}</button>
@@ -261,6 +280,9 @@
     {/if}
 
     {#if canCancel}
+      {#if refusal?.action === 'cancel'}
+        <p class="link-error" role="alert">{cancelRefusalText(refusal.code)}</p>
+      {/if}
       <div class="link-actions">
         <button type="button" class="link-btn-ghost" onclick={cancel} disabled={acting}>{$m.common_cancel}</button>
       </div>
@@ -291,8 +313,8 @@
       {#if ineligible}
         <p class="link-error">{pairingRefusalText(status.eligible.reason, $m)}</p>
       {/if}
-      {#if refusal}
-        <p class="link-error" role="alert">{pairingRefusalText(refusal, $m)}</p>
+      {#if refusal?.action === 'start'}
+        <p class="link-error" role="alert">{pairingRefusalText(refusal.code, $m)}</p>
       {/if}
       <div class="link-actions">
         <button type="button" class="link-btn-save" onclick={() => start()} disabled={acting || ineligible || mustRestart || !!status.deviceIdError}>
