@@ -1,10 +1,11 @@
 <script lang="ts">
   // Settings page (/dashboard/config), admin only: the role guard in
   // `(dashboard)/+layout.svelte` redirects every other role. Sections: the
-  // unit's mode and projects setting (NEH-311, NEH-313, UnitModeCard),
-  // language, storage (usage, primary path, external drive), the catalogue's
-  // off-site copy, diagnostics, maintenance, and power. Everything except the
-  // language choice acts on the appliance through the backend.
+  // unit's mode and projects setting (NEH-311, NEH-313, UnitModeCard), the
+  // link to a Fisqua workspace (NEH-345, FisquaLinkCard), language, storage
+  // (usage, primary path, external drive), the catalogue's off-site copy,
+  // diagnostics, maintenance, and power. Everything except the language
+  // choice acts on the appliance through the backend.
   //
   // Version: 0.3.3
 
@@ -12,6 +13,7 @@
   import { m, locale, setLanguage, type Locale } from '$lib/i18n';
   import CatalogueBackupCard from './CatalogueBackupCard.svelte';
   import UnitModeCard from './UnitModeCard.svelte';
+  import FisquaLinkCard from './FisquaLinkCard.svelte';
   // Available languages. The catalogue lives in `$lib/i18n`; this list only
   // names them for the selector.
   const LANGUAGES: { code: Locale; label: string }[] = [
@@ -261,6 +263,13 @@
   <div class="config-section" id="unit-mode">
     <h2 class="section-title">{$m.unit_section_title}</h2>
     <UnitModeCard />
+  </div>
+
+  <!-- Linking the unit to a Fisqua workspace by a code (NEH-345); after the
+       mode, whose switch to Fisqua mode needs the link. -->
+  <div class="config-section" id="fisqua-link">
+    <h2 class="section-title">{$m.fisqua_link_title}</h2>
+    <FisquaLinkCard />
   </div>
 
   <!-- Language is the only personal preference on this page; the rest are
