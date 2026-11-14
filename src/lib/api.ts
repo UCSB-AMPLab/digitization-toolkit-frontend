@@ -5,6 +5,7 @@ import { goto } from '$app/navigation';
 import { env } from '$env/dynamic/public';
 import { get } from 'svelte/store';
 import { resolveApiBase } from './api-base';
+import { readPairingStatus, type PairingStatus } from './fisqua-pairing';
 import { m } from './i18n';
 import { authStore } from './stores/auth';
 
@@ -2490,6 +2491,35 @@ export const systemApi = {
     keptVolumes?: KeptVolumesDecision;
   }): Promise<UnitSettings> {
     return apiRequest<UnitSettings>('/system/unit', { method: 'PUT', body: JSON.stringify(body) });
+  },
+
+  /**
+   * Linking the unit to a Fisqua workspace by a code (NEH-345), admin only.
+   * GET is also the card's heartbeat: the backend ends a session nobody has
+   * read for 30 s. Every answer goes through readPairingStatus, which keeps
+   * only the fields of the contract. A refusal is a 422 (`unit_name`) or a
+   * 409 whose detail carries the code; pairingErrorCode reads it.
+   */
+  async getPairing(signal?: AbortSignal): Promise<PairingStatus> {
+    const status = readPairingStatus(await apiRequest<unknown>('/system/pairing', { signal }));
+    if (!status) throw new ApiError(get(m).api_request_failed);
+    return status;
+  },
+
+  /** Ask for a code; with a session already running, the backend answers with its state. */
+  async startPairing(unitName: string): Promise<PairingStatus | null> {
+    return readPairingStatus(
+      await apiRequest<unknown>('/system/pairing', { method: 'POST', body: JSON.stringify({ unitName }) })
+    );
+  },
+
+  /** A new code after `lapsed`, within the renewal window. */
+  async renewPairing(): Promise<PairingStatus | null> {
+    return readPairingStatus(await apiRequest<unknown>('/system/pairing/renew', { method: 'POST' }));
+  },
+
+  async cancelPairing(): Promise<PairingStatus | null> {
+    return readPairingStatus(await apiRequest<unknown>('/system/pairing', { method: 'DELETE' }));
   },
 
   async getLogs(params?: { limit?: number; category?: string; level?: string }): Promise<SystemLogEntry[]> {
