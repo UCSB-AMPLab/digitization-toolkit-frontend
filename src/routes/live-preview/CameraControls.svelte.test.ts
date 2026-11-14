@@ -89,7 +89,8 @@ const dslrCapabilities: CameraCapabilities = {
   live_controls: false,
   zoom: false,
   autofocus_calibration: false,
-  dslr_settings: true
+  dslr_settings: true,
+  image_formats: ['JPEG', 'RAW+JPEG']
 };
 
 describe('CameraControls — capabilities request fails', () => {
@@ -227,4 +228,121 @@ describe('CameraControls — device list after a boot (NEH-300)', () => {
       })
       .toBe(270);
   });
+});
+
+// The capture format selector. It is shown for any camera whose capabilities
+// list image_formats, and offers exactly those. A T7 (dslr_settings) and a
+// CHDK compact (zoom_steps) both offer JPEG and RAW+JPEG; the line under the
+// selector says what each format saves on that camera type. A CHDK camera
+// takes the format alone, so it gets no shutter or ISO picker.
+describe('CameraControls — capture format', () => {
+  const formats = ['JPEG', 'RAW+JPEG'];
+  const t7Capabilities: CameraCapabilities = dslrCapabilities;
+  const chdkCapabilities: CameraCapabilities = {
+    backend: 'chdk',
+    live_preview: true,
+    continuous_preview: false,
+    focus_control: false,
+    live_controls: false,
+    zoom: false,
+    zoom_steps: true,
+    autofocus_calibration: false,
+    dslr_settings: false,
+    image_formats: formats
+  };
+
+  async function openPanel(caps: CameraCapabilities, reported: string | undefined) {
+    vi.spyOn(camerasApi, 'getCapabilities').mockResolvedValue(caps);
+    const getSettings = vi
+      .spyOn(camerasApi, 'getDSLRSettings')
+      .mockResolvedValue(reported === undefined ? {} : { image_format: reported });
+    const apply = vi.spyOn(camerasApi, 'applyDSLRSettings').mockResolvedValue({});
+    const screen = render(CameraControls, baseProps());
+    await screen.getByRole('button', { name: 'Camera controls', exact: true }).click();
+    return { screen, getSettings, apply };
+  }
+
+  function formatButton(): HTMLElement | null {
+    const label = [...document.body.querySelectorAll('.control-label')].find(
+      (el) => el.textContent === en.cam_format
+    );
+    return label?.parentElement?.querySelector<HTMLElement>('.control-btn') ?? null;
+  }
+
+  function dropdownOptions(): string[] {
+    return [...document.body.querySelectorAll('.global-dropdown button')].map((b) => b.textContent ?? '');
+  }
+
+  it('a CHDK camera shows the selector, reads its stored format, and has no shutter or ISO', async () => {
+    const { screen, getSettings } = await openPanel(chdkCapabilities, 'RAW+JPEG');
+    await expect.element(screen.getByText(en.cam_format, { exact: true })).toBeVisible();
+    await expect.poll(() => formatButton()?.textContent?.trim()).toBe('RAW+JPEG');
+    expect(getSettings).toHaveBeenCalledWith(0);
+    await expect.element(screen.getByText(en.cam_format_note_raw_chdk)).toBeVisible();
+    expect(screen.getByText(en.cam_shutter, { exact: true }).elements()).toHaveLength(0);
+    expect(screen.getByText('ISO', { exact: true }).elements()).toHaveLength(0);
+  });
+
+  it('a CHDK camera offers exactly the reported formats and saves the one picked', async () => {
+    const { screen, apply } = await openPanel(chdkCapabilities, 'RAW+JPEG');
+    await expect.poll(() => formatButton()?.textContent?.trim()).toBe('RAW+JPEG');
+    formatButton()!.click();
+    await expect.poll(dropdownOptions).toEqual(['JPEG', 'RAW+JPEG']);
+    const jpeg = [...document.body.querySelectorAll<HTMLElement>('.global-dropdown button')].find(
+      (b) => b.textContent === 'JPEG'
+    )!;
+    jpeg.click();
+    await expect.poll(() => apply.mock.calls.length).toBe(1);
+    expect(apply).toHaveBeenCalledWith(0, { image_format: 'JPEG' });
+    await expect.element(screen.getByText(en.cam_format_note_jpeg)).toBeVisible();
+    expect(screen.getByText(en.cam_format_note_raw_chdk).elements()).toHaveLength(0);
+  });
+
+  for (const [reported, shown] of [
+    ['RAW + L', 'RAW+JPEG'],
+    ['RAW', 'RAW+JPEG'],
+    ['RAW+JPEG', 'RAW+JPEG'],
+    ['L', 'JPEG'],
+    ['JPEG', 'JPEG']
+  ] as const) {
+    it(`a T7 reporting ${reported} shows ${shown}`, async () => {
+      const { screen } = await openPanel(t7Capabilities, reported);
+      await expect.poll(() => formatButton()?.textContent?.trim()).toBe(shown);
+      const note = shown === 'JPEG' ? en.cam_format_note_jpeg : en.cam_format_note_raw_dslr;
+      await expect.element(screen.getByText(note)).toBeVisible();
+      await expect.element(screen.getByText(en.cam_shutter, { exact: true })).toBeVisible();
+    });
+  }
+
+  it('a T7 offers JPEG and RAW+JPEG only and sends RAW+JPEG', async () => {
+    const { apply } = await openPanel(t7Capabilities, 'L');
+    await expect.poll(() => formatButton()?.textContent?.trim()).toBe('JPEG');
+    formatButton()!.click();
+    await expect.poll(dropdownOptions).toEqual(['JPEG', 'RAW+JPEG']);
+    [...document.body.querySelectorAll<HTMLElement>('.global-dropdown button')]
+      .find((b) => b.textContent === 'RAW+JPEG')!
+      .click();
+    await expect.poll(() => apply.mock.calls.length).toBe(1);
+    expect(apply).toHaveBeenCalledWith(0, { image_format: 'RAW+JPEG' });
+  });
+
+  it('offers only what the backend lists', async () => {
+    await openPanel({ ...t7Capabilities, image_formats: ['JPEG'] }, 'L');
+    await expect.poll(() => formatButton()?.textContent?.trim()).toBe('JPEG');
+    formatButton()!.click();
+    await expect.poll(dropdownOptions).toEqual(['JPEG']);
+  });
+
+  for (const [name, listed] of [
+    ['an empty list', []],
+    ['no list', undefined]
+  ] as const) {
+    it(`a backend that reports ${name} shows no selector`, async () => {
+      const caps: CameraCapabilities = { ...dslrCapabilities, image_formats: listed ? [...listed] : undefined };
+      const { screen } = await openPanel(caps, 'L');
+      await expect.element(screen.getByText(en.cam_shutter, { exact: true })).toBeVisible();
+      expect(screen.getByText(en.cam_format, { exact: true }).elements()).toHaveLength(0);
+      expect(screen.getByText(en.cam_format_note_jpeg).elements()).toHaveLength(0);
+    });
+  }
 });

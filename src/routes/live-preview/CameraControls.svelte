@@ -93,6 +93,16 @@
   const isDSLR          = $derived(capabilities?.dslr_settings === true);
   const hasFocusControl = $derived(capabilities?.focus_control === true);
   const hasLiveControls = $derived(capabilities?.live_controls === true);
+  // A CHDK compact (the A2500) reports stepped zoom; CameraCheck uses the
+  // same flag. It sets the capture format and nothing else from this panel.
+  const isChdk          = $derived(capabilities?.zoom_steps === true);
+  // Shutter and ISO go to the DSLR through PTP, or to picamera2 as live
+  // controls. A camera with neither gets no picker.
+  const hasExposurePickers = $derived(isDSLR || hasLiveControls);
+  // The capture formats the backend offers, in its order. Empty means no
+  // selector.
+  const formatOptions   = $derived(capabilities?.image_formats ?? []);
+  const hasFormatChoice = $derived(formatOptions.length > 0);
 
   // DSLR-specific per-camera state
   let cameraDslrAperture = $state<Record<number, string>>({ 0: '5.6', 1: '5.6' });
@@ -166,8 +176,25 @@
   const dsrlIsoOptions = ['100','200','400','800','1600','3200','6400','12800'];
   // DSLR aperture options (common values — camera will reject unsupported ones)
   const dsrlApertureOptions = ['3.5','4.0','4.5','5.0','5.6','6.3','7.1','8','9','10','11','13','16','18','20','22'];
-  // DSLR image format options
-  const dsrlFormatOptions = ['JPEG','RAW','RAW+JPEG'];
+  // The selector's name for a format as a camera or backend reports it. A
+  // gphoto2 body reports its PTP widget value ("L", "RAW + L", "RAW"); a T7
+  // in RAW writes one CR2 holding the JPEG, which is RAW+JPEG here. "RAW" is
+  // also the backend's old name for RAW+JPEG.
+  function formatName(value: string): string {
+    if (value === 'L') return 'JPEG';
+    if (value === 'RAW' || value === 'RAW + L') return 'RAW+JPEG';
+    return value;
+  }
+
+  // The line under the selector: what the selected format saves on this
+  // camera type.
+  function formatNote(value: string): string | null {
+    if (value === 'JPEG') return $m.cam_format_note_jpeg;
+    if (value !== 'RAW+JPEG') return null;
+    if (isDSLR) return $m.cam_format_note_raw_dslr;
+    if (isChdk) return $m.cam_format_note_raw_chdk;
+    return null;
+  }
 
   // The Basic dropdowns sit outside the panel with `position: fixed`, so the
   // scrolling panel does not clip them; each opens below its trigger button.
@@ -531,8 +558,10 @@
     }
   }
 
+  // The settings route serves a DSLR and any camera that offers a format
+  // choice; a CHDK camera answers with its stored format alone.
   $effect(() => {
-    if (!isDSLR) return;
+    if (!isDSLR && !hasFormatChoice) return;
     const idx = selectedCameraIndex;
     const seq = ++dslrSettingsSeq;
     camerasApi.getDSLRSettings(idx)
@@ -544,9 +573,7 @@
         if (s.iso)           cameraIso     = { ...cameraIso,     [idx]: s.iso };
         if (s.aperture)      cameraDslrAperture = { ...cameraDslrAperture, [idx]: s.aperture };
         if (s.image_format) {
-          // Map PTP internal names → user-facing names
-          const fmtMap: Record<string, string> = { 'L': 'JPEG', 'RAW': 'RAW', 'RAW + L': 'RAW+JPEG' };
-          cameraDslrFormat = { ...cameraDslrFormat, [idx]: fmtMap[s.image_format] ?? s.image_format };
+          cameraDslrFormat = { ...cameraDslrFormat, [idx]: formatName(s.image_format) };
         }
         // Store it even when undefined: a reconnection that loses the value
         // must clear the warning, not keep the last one read (NEH-76).
@@ -735,6 +762,7 @@
           {#if capabilitiesFailed}
           <p class="controls-unavailable" role="alert">{$m.cam_capabilities_failed}</p>
           {:else if capabilities}
+          {#if hasExposurePickers}
           <div class="control-row">
             <span class="control-label">{$m.cam_shutter}</span>
             <!-- `bind:this` gives `openBasicDropdown` the button's position -->
@@ -768,6 +796,8 @@
             </button>
           </div>
 
+          {/if}
+
           {#if selectedDevice?.has_aperture_control}
           <div class="control-row">
             <span class="control-label">{$m.cam_aperture}</span>
@@ -786,7 +816,9 @@
           </div>
           {/if}
 
-          {#if isDSLR}
+          {#if hasFormatChoice}
+          {@const selectedFormat = cameraDslrFormat[selectedCameraIndex] ?? 'JPEG'}
+          {@const note = formatNote(selectedFormat)}
           <div class="control-row">
             <span class="control-label">{$m.cam_format}</span>
             <button
@@ -795,13 +827,16 @@
               class:open={openDropdown === 'format'}
               onclick={() => openBasicDropdown('format')}
             >
-              <span>{cameraDslrFormat[selectedCameraIndex] ?? 'JPEG'}</span>
+              <span>{selectedFormat}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 style="transform: rotate({openDropdown === 'format' ? 180 : 0}deg); transition: transform 0.2s">
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
             </button>
           </div>
+          {#if note}
+          <p class="dslr-note">{note}</p>
+          {/if}
           {/if}
           {/if}
 
@@ -1174,7 +1209,7 @@
         >{opt}</button>
       {/each}
     {:else if openDropdown === 'format'}
-      {#each dsrlFormatOptions as opt}
+      {#each formatOptions as opt}
         <button
           class:selected={opt === (cameraDslrFormat[selectedCameraIndex] ?? 'JPEG')}
           onclick={() => {

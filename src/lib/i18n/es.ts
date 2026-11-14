@@ -906,6 +906,10 @@ export const es = {
 	cam_shutter: 'Velocidad de obturación',
 	cam_aperture: 'Apertura',
 	cam_format: 'Formato',
+	// The line under the format selector. RAW+JPEG differs by camera type.
+	cam_format_note_raw_dslr: 'La cámara guarda un archivo RAW (CR2) con un JPEG adentro. Captua extrae ese JPEG para mostrarlo.',
+	cam_format_note_raw_chdk: 'La cámara envía un archivo RAW (DNG) y un JPEG de la misma captura. Captua guarda los dos.',
+	cam_format_note_jpeg: 'La cámara guarda solo un JPEG.',
 	cam_focusing: 'Enfocando…',
 	cam_autofocus: 'Enfoque automático',
 	cam_manual_focus: 'Enfoque manual',

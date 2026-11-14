@@ -187,7 +187,8 @@ describe('live-preview buttons have accessible names (NEH-256)', () => {
 			live_controls: true,
 			zoom: true,
 			autofocus_calibration: false,
-			dslr_settings: true
+			dslr_settings: true,
+			image_formats: ['JPEG', 'RAW+JPEG']
 		});
 		const seen = { total: 0 };
 		render(CameraControls, {
