@@ -1783,6 +1783,69 @@ export const en: Messages = {
 	queue_fisqua_volumes_line: "Volumes come from Fisqua's queue. To add a volume, ask for it to be added to the queue in Fisqua.",
 	queue_import_err_volumes_from_fisqua: "In Fisqua mode only an administrator can import a list: volumes come from Fisqua's queue.",
 
+	// ── Connect to Fisqua: linking the unit to a workspace by a code (NEH-345) ──
+	fisqua_link_title: 'Connect to Fisqua',
+	fisqua_link_desc:
+		"Link this unit to a Fisqua workspace. An administrator of the workspace approves the code on Fisqua's Scanner page.",
+	fisqua_link_restart_warning: 'Linking restarts Captua, which takes about a minute. Do not start it during a capture.',
+	fisqua_link_name_label: 'Unit name',
+	fisqua_link_name_hint: 'For example the archive or the room, up to 64 characters.',
+	fisqua_link_name_invalid: 'Enter a name of 1 to 64 characters.',
+	fisqua_link_start: 'Get a code',
+	fisqua_link_requesting: 'Captua is asking Fisqua for a code…',
+	fisqua_link_code_label: 'Code',
+	fisqua_link_device_label: 'Device id',
+	fisqua_link_expires: (s: number) => `Expires in ${s} s`,
+	fisqua_link_waiting: 'Waiting for approval in Fisqua…',
+	fisqua_link_lapsed: 'The code has lapsed.',
+	fisqua_link_new_code: 'Get a new code',
+	fisqua_link_applying: 'Code approved. Captua is linking this unit…',
+	fisqua_link_restarting: 'Unit linked. Captua is restarting, which takes about a minute.',
+	fisqua_link_restart_manual: 'Unit linked. Restart the unit to finish.',
+	fisqua_link_restart_btn: 'Restart the unit',
+	fisqua_link_linked: (tenant: string, staging: boolean) =>
+		`Unit linked to ${tenant}${staging ? " (Fisqua's test service)" : ''}.`,
+	fisqua_link_current: (tenant: string) => `This unit is linked to ${tenant}.`,
+	fisqua_link_mode_hint: 'The unit is not in Fisqua mode. Captua sends volumes to Fisqua only in Fisqua mode.',
+	fisqua_link_switch_mode: 'Switch to Fisqua mode',
+	fisqua_link_busy: (s: number) => `Fisqua is busy. Captua tries again in ${s} s.`,
+	fisqua_link_retry: (s: number) => `Captua tries again in ${s} s.`,
+	fisqua_link_network: "Captua could not reach Fisqua. Check the unit's connection.",
+	fisqua_link_cannot_pair: 'This Fisqua cannot link units by code. Ask whoever installed the unit.',
+	fisqua_link_lost: 'Fisqua issued the link, but it did not reach this unit. Get a new code and approve it again.',
+	fisqua_link_unknown: 'Fisqua does not recognise this code. Get a new code.',
+	fisqua_link_wrong_env: 'Fisqua answered from a different environment. Captua changed nothing.',
+	fisqua_link_other_workspace: (tenant: string | null) =>
+		`${tenant ? `This unit is linked to ${tenant}.` : 'This unit is already linked to a workspace.'} A linked unit can only be linked again to the workspace it already has. To move it to another workspace, ask whoever installed the unit.`,
+	fisqua_link_bad_payload: "Captua could not read Fisqua's answer and changed nothing. Get a new code.",
+	fisqua_link_failed: 'Captua could not write the link settings and changed nothing.',
+	fisqua_link_unverified: 'Captua wrote the link settings but could not confirm them. Restart the unit, then check this section again.',
+	fisqua_link_overridden: "A setting in the unit's .env file overrides the link. Ask whoever installed the unit.",
+	fisqua_link_not_eligible: 'A unit can be linked when it is in "Fisqua" mode, or in "Scanner only" mode with no link yet.',
+	fisqua_link_held: 'The offsite copy is on hold on this unit. Link the unit once the hold is lifted.',
+	fisqua_link_rclone_missing: 'This unit lacks the program that uploads files to the offsite copy, so it cannot be linked by code. Ask whoever installed the unit.',
+	fisqua_link_busy_capturing: 'A capture is in progress. Link the unit once it is finished.',
+	fisqua_link_device_id_invalid: "This unit's device id is not valid. Ask whoever installed the unit.",
+	fisqua_link_script_too_old: "This unit's installation is too old to link by code. Update Captua, or ask whoever installed the unit.",
+	fisqua_link_script_missing: 'This unit lacks the script that writes the link settings. Update Captua, or ask whoever installed the unit.',
+	fisqua_link_finishing_uploads:
+		'Code approved. Captua is finishing an upload in progress before it links the unit. This can take a few minutes.',
+	fisqua_link_uploads_still_running:
+		'The upload in progress did not finish, and Captua changed nothing. Uploads stay paused until you restart the unit. After that, get a new code.',
+	fisqua_link_restart_required:
+		'Restart the unit before you get a new code. Captua may have written a link, and a link takes effect only after the unit restarts.',
+	fisqua_link_last_outcome: (text: string) => `Last attempt: ${text}`,
+	fisqua_link_offsite_job_running: 'Captua is freeing space on the SD card or restoring files to it. Link the unit once that has finished.',
+	fisqua_link_finishing_offsite_jobs:
+		'Code approved. Before it links the unit, Captua is finishing freeing space on the SD card or restoring files to it. This can take a few minutes.',
+	fisqua_link_offsite_jobs_still_running:
+		'Captua did not finish freeing space on the SD card or restoring files to it within ten minutes, so it changed nothing. Get a new code once that has finished.',
+	fisqua_link_prepare_failed: 'Captua could not prepare the link settings and changed nothing. Get a new code.',
+	fisqua_link_shutting_down: 'Captua was shutting down and changed nothing. Get a new code once it is running again.',
+	fisqua_link_cancel_failed: 'Captua could not cancel the code. Try again.',
+	fisqua_link_generic: 'Captua could not link the unit, for a reason it does not recognise.',
+	fisqua_link_err_read: 'Captua could not read the state of the link. It tries again every few seconds.',
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
 	api_request_failed: 'Request failed'

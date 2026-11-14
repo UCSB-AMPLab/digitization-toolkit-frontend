@@ -1866,6 +1866,69 @@ export const es = {
 	queue_import_err_volumes_from_fisqua:
 		'En modo Fisqua, solo un administrador puede importar una lista: los volúmenes vienen de la cola de Fisqua.',
 
+	// ── Connect to Fisqua: linking the unit to a workspace by a code (NEH-345) ──
+	fisqua_link_title: 'Vincular con Fisqua',
+	fisqua_link_desc: 'Vincula este equipo con un espacio de trabajo de Fisqua. Un administrador de ese espacio de trabajo aprueba el código en la página "Escáner" de Fisqua.',
+	fisqua_link_restart_warning: 'Al vincular el equipo, Captua se reinicia, y eso tarda alrededor de un minuto. No lo vincules durante una captura.',
+	fisqua_link_name_label: 'Nombre del equipo',
+	fisqua_link_name_hint: 'Por ejemplo, el del archivo o el de la sala. Hasta 64 caracteres.',
+	fisqua_link_name_invalid: 'Escribe un nombre de 1 a 64 caracteres.',
+	fisqua_link_start: 'Obtener un código',
+	fisqua_link_requesting: 'Captua le está pidiendo un código a Fisqua…',
+	fisqua_link_code_label: 'Código',
+	fisqua_link_device_label: 'Identificador del dispositivo',
+	fisqua_link_expires: (s: number) => `Vence en ${s} s`,
+	fisqua_link_waiting: 'Esperando la aprobación en Fisqua…',
+	fisqua_link_lapsed: 'El código venció.',
+	fisqua_link_new_code: 'Obtener un código nuevo',
+	fisqua_link_applying: 'Código aprobado. Captua está vinculando este equipo…',
+	fisqua_link_restarting: 'Equipo vinculado. Captua se está reiniciando, y eso tarda alrededor de un minuto.',
+	fisqua_link_restart_manual: 'Equipo vinculado. Reinicia el equipo para terminar.',
+	fisqua_link_restart_btn: 'Reiniciar el equipo',
+	fisqua_link_linked: (tenant: string, staging: boolean) =>
+		`Equipo vinculado con ${tenant}${staging ? ' (servicio de pruebas de Fisqua)' : ''}.`,
+	fisqua_link_current: (tenant: string) => `Este equipo está vinculado con ${tenant}.`,
+	fisqua_link_mode_hint: 'El equipo no está en el modo "Fisqua". Captua solo envía volúmenes a Fisqua en ese modo.',
+	fisqua_link_switch_mode: 'Cambiar al modo Fisqua',
+	fisqua_link_busy: (s: number) => `Fisqua está ocupado. Captua lo vuelve a intentar en ${s} s.`,
+	fisqua_link_retry: (s: number) => `Captua lo vuelve a intentar en ${s} s.`,
+	fisqua_link_network: 'Captua no pudo comunicarse con Fisqua. Revisa la conexión del equipo.',
+	fisqua_link_cannot_pair: 'Esta instalación de Fisqua no permite vincular equipos con un código. Pregúntale a quien instaló el equipo.',
+	fisqua_link_lost: 'Fisqua envió los datos de la vinculación, pero no llegaron a este equipo. Obtén un código nuevo y vuelve a aprobarlo.',
+	fisqua_link_unknown: 'Fisqua no reconoce este código. Obtén un código nuevo.',
+	fisqua_link_wrong_env: 'La respuesta llegó de otro servicio de Fisqua. Captua no cambió nada.',
+	fisqua_link_other_workspace: (tenant: string | null) =>
+		tenant
+			? `Este equipo ya está vinculado con ${tenant} y solo se puede volver a vincular con ese espacio de trabajo. Para pasarlo a otro, pregúntale a quien instaló el equipo.`
+			: 'Este equipo ya está vinculado con un espacio de trabajo y solo se puede volver a vincular con ese mismo. Para pasarlo a otro, pregúntale a quien instaló el equipo.',
+	fisqua_link_bad_payload: 'Captua no pudo leer la respuesta de Fisqua y no cambió nada. Obtén un código nuevo.',
+	fisqua_link_failed: 'Captua no pudo guardar los datos de la vinculación y no cambió nada.',
+	fisqua_link_unverified: 'Captua guardó los datos de la vinculación, pero no pudo comprobarlos. Reinicia el equipo y vuelve a revisar esta sección.',
+	fisqua_link_overridden: 'Un ajuste del archivo .env del equipo tiene prioridad sobre la vinculación. Pregúntale a quien instaló el equipo.',
+	fisqua_link_not_eligible:
+		'Se puede vincular un equipo que esté en el modo "Fisqua", o en el modo "Solo en el escáner" si todavía no está vinculado.',
+	fisqua_link_held: 'La copia externa está en pausa en este equipo. Vincúlalo cuando se reanude.',
+	fisqua_link_rclone_missing: 'A este equipo le falta el programa que sube los archivos a la copia externa, así que no se puede vincular con un código. Pregúntale a quien instaló el equipo.',
+	fisqua_link_busy_capturing: 'Hay una captura en curso. Vincula el equipo cuando termine.',
+	fisqua_link_device_id_invalid: 'El identificador de este dispositivo no es válido. Pregúntale a quien instaló el equipo.',
+	fisqua_link_script_too_old: 'La instalación de este equipo es demasiado antigua para vincularlo con un código. Actualiza Captua o pregúntale a quien instaló el equipo.',
+	fisqua_link_script_missing: 'A este equipo le falta el programa que guarda los datos de la vinculación. Actualiza Captua o pregúntale a quien instaló el equipo.',
+	fisqua_link_finishing_uploads: 'Código aprobado. Antes de vincular el equipo, Captua está terminando una subida. Puede tardar unos minutos.',
+	fisqua_link_uploads_still_running:
+		'La subida en curso no terminó y Captua no cambió nada. Las subidas quedan en pausa hasta que reinicies el equipo. Después, obtén un código nuevo.',
+	fisqua_link_restart_required: 'Reinicia el equipo antes de obtener un código nuevo. Puede que Captua haya guardado los datos de la vinculación, que solo tienen efecto después de reiniciar el equipo.',
+	fisqua_link_last_outcome: (text: string) => `Último intento: ${text}`,
+	fisqua_link_offsite_job_running:
+		'Captua está liberando espacio en la tarjeta o restaurando archivos en ella. Vincula el equipo cuando termine.',
+	fisqua_link_finishing_offsite_jobs: 'Código aprobado. Antes de vincular el equipo, Captua está terminando de liberar espacio en la tarjeta o de restaurar archivos en ella. Puede tardar unos minutos.',
+	fisqua_link_offsite_jobs_still_running: 'Después de diez minutos, Captua todavía estaba liberando espacio en la tarjeta o restaurando archivos en ella, así que no cambió nada. Obtén un código nuevo cuando termine.',
+	fisqua_link_prepare_failed: 'Captua no pudo preparar los datos de la vinculación y no cambió nada. Obtén un código nuevo.',
+	fisqua_link_shutting_down:
+		'Captua no cambió nada: la aprobación llegó durante el apagado. Obtén un código nuevo cuando Captua vuelva a estar en marcha.',
+	fisqua_link_cancel_failed: 'Captua no pudo cancelar el código. Intenta de nuevo.',
+	fisqua_link_generic: 'Captua no pudo vincular el equipo por un motivo que no reconoce.',
+	fisqua_link_err_read: 'Captua no pudo comprobar si el equipo está vinculado. Lo vuelve a intentar cada pocos segundos.',
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',
 	api_request_failed: 'Error en la solicitud'
