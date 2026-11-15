@@ -1569,6 +1569,10 @@ export interface CameraCapabilities {
   // NEH-339: true only for CHDK cameras, whose zoom is set in steps
   // (camerasApi.setZoomStep). Unrelated to `zoom`, the digital crop.
   zoom_steps?: boolean;
+  // The capture formats the settings route accepts ("JPEG", "RAW+JPEG"), on
+  // a DSLR and on a CHDK camera alike. Empty or absent when the backend
+  // offers no choice, and then the panel shows no format selector.
+  image_formats?: string[];
 }
 
 // The answer to camerasApi.setZoomStep(): the step the camera confirmed.
@@ -1770,7 +1774,8 @@ export const camerasApi = {
 
   /**
    * Read current DSLR settings from the active PTP session.
-   * Only available when the active backend is gphoto2 (dslr_settings=true).
+   * Available when the backend reports dslr_settings or image_formats; a CHDK
+   * camera answers with its stored image_format and the other fields null.
    */
   async getDSLRSettings(cameraIndex: number): Promise<DSLRSettings> {
     return apiRequest<DSLRSettings>(`/cameras/dslr/${cameraIndex}/settings`);
@@ -1779,7 +1784,8 @@ export const camerasApi = {
   /**
    * Apply DSLR settings (ISO, shutter speed, aperture, image format).
    * Only fields provided are applied; others are left at their current camera value.
-   * Only available when the active backend is gphoto2 (dslr_settings=true).
+   * Available when the backend reports dslr_settings or image_formats. A CHDK
+   * camera takes image_format alone and answers 422 to any other field.
    */
   async applyDSLRSettings(cameraIndex: number, settings: DSLRSettingsUpdate): Promise<DSLRSettings> {
     return apiRequest<DSLRSettings>(`/cameras/dslr/${cameraIndex}/settings`, {

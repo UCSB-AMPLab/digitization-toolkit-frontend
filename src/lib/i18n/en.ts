@@ -876,6 +876,10 @@ export const en: Messages = {
 	cam_shutter: 'Shutter Speed',
 	cam_aperture: 'Aperture',
 	cam_format: 'Format',
+	// The line under the format selector. RAW+JPEG differs by camera type.
+	cam_format_note_raw_dslr: 'The camera saves a RAW file (CR2). The JPEG is inside it, and Captua copies it out for viewing.',
+	cam_format_note_raw_chdk: 'The camera sends a RAW file (DNG) and a JPEG of the same picture. Captua keeps both.',
+	cam_format_note_jpeg: 'The camera saves a JPEG only.',
 	cam_focusing: 'Focusing…',
 	cam_autofocus: 'Autofocus',
 	cam_manual_focus: 'Manual focus',
