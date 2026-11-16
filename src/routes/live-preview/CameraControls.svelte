@@ -933,7 +933,7 @@
               <span>4×</span>
             </div>
           </div>
-          {:else}
+          {:else if isDSLR}
           <p class="dslr-note">
             {$m.cam_dslr_note_p1}<strong>MF</strong>{$m.cam_dslr_note_p2}
             {$m.cam_dslr_note_p3}

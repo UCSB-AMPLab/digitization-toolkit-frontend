@@ -283,6 +283,19 @@ describe('CameraControls — capture format', () => {
     expect(screen.getByText('ISO', { exact: true }).elements()).toHaveLength(0);
   });
 
+  // The lens-switch note is a DSLR instruction: a CHDK compact has no lens switch.
+  it('a CHDK camera gets no lens-switch note; a T7 does', async () => {
+    const chdk = await openPanel(chdkCapabilities, 'RAW+JPEG');
+    await expect.element(chdk.screen.getByText(en.cam_format_note_raw_chdk)).toBeVisible();
+    expect(chdk.screen.getByText(en.cam_dslr_note_p3).elements()).toHaveLength(0);
+    chdk.screen.unmount();
+    vi.restoreAllMocks();
+
+    const t7 = await openPanel(t7Capabilities, 'RAW+JPEG');
+    await expect.element(t7.screen.getByText(en.cam_format_note_raw_dslr)).toBeVisible();
+    await expect.element(t7.screen.getByText(en.cam_dslr_note_p3)).toBeVisible();
+  });
+
   it('a CHDK camera offers exactly the reported formats and saves the one picked', async () => {
     const { screen, apply } = await openPanel(chdkCapabilities, 'RAW+JPEG');
     await expect.poll(() => formatButton()?.textContent?.trim()).toBe('RAW+JPEG');
