@@ -441,6 +441,8 @@ function pollLine(run: FisquaRunResult | null | undefined, msgs: Messages): stri
 			return msgs.fisqua_unit_poll_config_error;
 		case 'error':
 			return msgs.fisqua_unit_poll_error;
+		case 'cooling_down':
+			return msgs.fisqua_unit_poll_cooling;
 		default:
 			return msgs.fisqua_unit_poll_other;
 	}

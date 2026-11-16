@@ -1317,6 +1317,7 @@ export const en: Messages = {
 		`Last status check: Captua asked about ${asked === 1 ? '1 volume' : `${formatCount(asked, 'en')} volumes`}, and Fisqua answered for ${formatCount(answered, 'en')}.`,
 	fisqua_unit_poll_config_error: 'Last status check: stopped by the configuration error below.',
 	fisqua_unit_poll_error: 'Captua could not finish the last status check. It asks again later.',
+	fisqua_unit_poll_cooling: 'Last status check: Fisqua asked Captua to wait. Captua asks again later.',
 	fisqua_unit_poll_other: 'On its last check, Captua asked Fisqua about no volumes.',
 
 	// ── Freeing space on the card and restoring (NEH-248, offsite-free.ts) ──
