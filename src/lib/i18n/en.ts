@@ -926,6 +926,8 @@ export const en: Messages = {
 	lv_camera_missing: 'Camera not detected. Half-press its shutter button or reseat the USB cable, then press "Reconnect cameras".',
 	lv_rotate_ccw: 'Rotate left',
 	lv_rotate_cw: 'Rotate right',
+	lv_orientation_save_failed: (camera: string): string =>
+		`Captua could not save the orientation of ${camera}. It uses this orientation for captures while this screen stays open, but if you reload or reopen the screen you will see the previous one. Press "Retry" to save this orientation.`,
 	lv_controls_collapse: 'Hide controls',
 	lv_controls_expand: 'Show controls',
 	lv_grid_settings: 'Grid settings',
