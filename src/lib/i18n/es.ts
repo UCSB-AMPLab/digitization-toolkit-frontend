@@ -957,6 +957,8 @@ export const es = {
 	lv_camera_missing: 'Cámara no detectada. Presiona el disparador hasta la mitad o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".',
 	lv_rotate_ccw: 'Girar a la izquierda',
 	lv_rotate_cw: 'Girar a la derecha',
+	lv_orientation_save_failed: (camera: string): string =>
+		`Captua no pudo guardar la orientación de ${camera}. Usará esta orientación en las capturas mientras esta pantalla siga abierta, pero si la recargas o vuelves a abrirla verás la anterior. Presiona "Reintentar" para guardar esta orientación.`,
 	lv_controls_collapse: 'Ocultar controles',
 	lv_controls_expand: 'Mostrar controles',
 	lv_grid_settings: 'Ajustes de cuadrícula',

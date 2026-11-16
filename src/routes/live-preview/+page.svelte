@@ -202,17 +202,59 @@
     Object.fromEntries(Object.entries(orientationPuts).map(([cam, n]) => [cam, n > 0])) as Record<number, boolean>
   );
 
+  // Bodies whose last orientation save failed, by camera index: the
+  // hardware_id the failed PUT was sent for. The screen keeps the new
+  // orientation, and captures send it, but the stored one is the previous
+  // one, so a notice under the viewer says so and offers "Retry". The notice
+  // shows only while that body is the one at the index, and the next save
+  // for that body that succeeds removes it.
+  let orientationFailed = $state<Record<number, string>>({});
+  let orientationFailedCams = $derived(
+    Object.entries(orientationFailed)
+      .map(([cam, hw]) => [Number(cam), hw] as const)
+      .filter(([cam, hw]) => devices.find(d => d.index === cam)?.hardware_id === hw)
+      .map(([cam]) => cam)
+      .sort((a, b) => a - b)
+  );
+
   // Persists a rotation change to the backend, coalescing quick repeat taps
   // on the same camera into a single in-flight PUT.
   const saveOrientation = createOrientationSaver(
     (i, hw, deg) => {
       orientationPuts = { ...orientationPuts, [i]: (orientationPuts[i] ?? 0) + 1 };
-      return camerasApi.setOrientation(i, hw, deg).finally(() => {
-        orientationPuts = { ...orientationPuts, [i]: (orientationPuts[i] ?? 1) - 1 };
-      });
+      return camerasApi.setOrientation(i, hw, deg)
+        .then(
+          () => {
+            if (orientationFailed[i] === hw) {
+              const { [i]: _cleared, ...rest } = orientationFailed;
+              orientationFailed = rest;
+            }
+          },
+          (e) => {
+            orientationFailed = { ...orientationFailed, [i]: hw };
+            throw e;
+          }
+        )
+        .finally(() => {
+          orientationPuts = { ...orientationPuts, [i]: (orientationPuts[i] ?? 1) - 1 };
+        });
     },
     (i, e) => console.error('[LivePreview] Error saving orientation:', i, e)
   );
+
+  // "Retry" in the notice: sends the orientation on screen again, for the
+  // body whose save failed, through the same writer. Nothing turns.
+  function retryOrientation(cam: number) {
+    const device = devices.find(d => d.index === cam);
+    if (!canSaveRotation(device) || device.hardware_id !== orientationFailed[cam]) return;
+    saveOrientation(cam, device.hardware_id, rotateDeg[cam] ?? 0);
+  }
+
+  // The name the viewer's label gives the camera (LiveViewport's cameraLabel).
+  function orientationCameraName(cam: number): string {
+    const dev = devices.find(d => d.index === cam);
+    return `${dev?.label || dev?.model || $m.cam_fallback_name} [${cam}]`;
+  }
 
   let projectName = $state<string>('');
 
@@ -1137,6 +1179,13 @@
           bind:capturing={viewportCapturing}
         />
 
+        {#each orientationFailedCams as cam (cam)}
+          <div class="lv-orientation-failed" role="alert">
+            <p class="ph-error">{$m.lv_orientation_save_failed(orientationCameraName(cam))}</p>
+            <button class="btn btn-secondary" disabled={savingOrientation[cam]} onclick={() => retryOrientation(cam)}>{$m.common_retry}</button>
+          </div>
+        {/each}
+
         <div class="thumbnail-area">
           <ThumbnailStrip
             {records}
@@ -1430,6 +1479,17 @@
   .ph-after-q { margin: 0; font-size: var(--text-lead); font-weight: var(--fw-bold); color: var(--color-light); }
   .ph-actions { display: flex; flex-wrap: wrap; gap: 12px; }
   .ph-error { margin: 0; font-size: var(--text-sm); color: var(--color-error); }
+  /* A failed orientation save, under the viewer. */
+  .lv-orientation-failed {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-left: 3px solid var(--color-error);
+    background-color: var(--color-surface-alt);
+  }
+  .lv-orientation-failed .ph-error { flex: 1; line-height: 1.4; }
   .ph-order { margin: 0; font-size: var(--text-sm); line-height: 1.5; color: var(--color-light-grey); }
   .ph-nothing {
     align-self: flex-start;
