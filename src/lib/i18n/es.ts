@@ -1369,6 +1369,7 @@ export const es = {
 		`Última consulta de estado: Captua preguntó por ${asked === 1 ? '1 volumen' : `${formatCount(asked, 'es')} volúmenes`} y Fisqua informó el estado de ${formatCount(answered, 'es')}.`,
 	fisqua_unit_poll_config_error: 'Última consulta de estado: detenida por el error de configuración que se indica abajo.',
 	fisqua_unit_poll_error: 'Captua no pudo terminar la última consulta de estado. Volverá a consultar más tarde.',
+	fisqua_unit_poll_cooling: 'Última consulta de estado: Fisqua pidió esperar. Captua volverá a consultar más tarde.',
 	fisqua_unit_poll_other: 'En la última consulta, Captua no le preguntó a Fisqua por ningún volumen.',
 
 	// ── Freeing space on the card and restoring (NEH-248, offsite-free.ts) ──

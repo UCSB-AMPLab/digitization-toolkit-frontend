@@ -382,6 +382,13 @@ describe('unitFisquaView', () => {
 		expect(view.lines[2]).toBe(en[pollKey]);
 	});
 
+	it('says Fisqua asked Captua to wait when a poll ends cooling down', () => {
+		const view = unitFisquaView(summary({ last_poll: { status: 'cooling_down' } }), en)!;
+		expect(view.lines[2]).toBe(en.fisqua_unit_poll_cooling);
+		expect(unitFisquaView(summary({ last_poll: { status: 'cooling_down' } }), es)!.lines[2]).toBe(es.fisqua_unit_poll_cooling);
+		expect(en.fisqua_unit_poll_cooling).not.toBe(en.fisqua_unit_poll_other);
+	});
+
 	it('words one delivered and one refused in the singular in Spanish', () => {
 		expect(es.fisqua_unit_send_done(1, 1, 0, 0)).toContain('1 entregado, 1 rechazado,');
 		expect(es.fisqua_unit_send_done(2, 0, 0, 0)).toContain('2 entregados, 0 rechazados,');
