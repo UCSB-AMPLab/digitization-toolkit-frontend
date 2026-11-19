@@ -6,6 +6,7 @@
 // Version: 0.3.3
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import { readable } from 'svelte/store';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
@@ -56,9 +57,12 @@ describe('volume page: recapture band', () => {
 		await expect.element(band).toBeVisible();
 		const link = band.getByRole('link', { name: 'Recapturar ahora' });
 		await expect.element(link).toHaveAttribute('href', '/live-preview?projectId=1&collectionId=7&recordId=6');
-		const style = getComputedStyle(link.element());
-		expect(style.backgroundColor).toBe('rgb(225, 183, 120)');
-		expect(style.color).toBe('rgb(19, 17, 16)');
+		// The pointer is a real one and stays where the last test left it. Over
+		// the link it would give the hover colour, so it is put on the band's
+		// title first, and the resting colour is read once the transition ends.
+		await userEvent.hover(band.getByRole('heading', { name: '2 pares de páginas por recapturar' }));
+		await expect.poll(() => getComputedStyle(link.element()).backgroundColor).toBe('rgb(225, 183, 120)');
+		expect(getComputedStyle(link.element()).color).toBe('rgb(19, 17, 16)');
 	});
 
 	it('counts the records prepared for retake as the summary does, and opens its first pending record', async () => {
