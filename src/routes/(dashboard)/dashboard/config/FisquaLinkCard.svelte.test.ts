@@ -9,7 +9,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
+import type { Writable } from 'svelte/store';
 
+const pageStore = vi.hoisted(() => ({ value: null as unknown }));
+vi.mock('$app/stores', async () => {
+	const { writable } = await import('svelte/store');
+	const store = writable({ url: new URL('http://localhost/dashboard/config') });
+	pageStore.value = store;
+	return { page: store };
+});
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
@@ -396,7 +404,7 @@ describe('Conectar con Fisqua: after approval', () => {
 		await backFromRestart('offline');
 		await expect.element(page.getByText(es.fisqua_link_mode_hint)).toBeInTheDocument();
 		const link = page.getByRole('link', { name: es.fisqua_link_switch_mode });
-		await expect.element(link).toHaveAttribute('href', '#unit-mode');
+		await expect.element(link).toHaveAttribute('href', '?section=unit-mode');
 	});
 
 	it('linked, in Fisqua mode, does not point to the mode switch', async () => {
@@ -625,11 +633,14 @@ describe('Conectar con Fisqua: reading and polling', () => {
 		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
 		vi.spyOn(systemApi, 'getPairing').mockResolvedValue(status());
 		vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
+		(pageStore.value as Writable<{ url: URL }>).set({ url: new URL('http://localhost/dashboard/config?section=fisqua-link') });
 		const screen = render(ConfigPage);
 		await expect.element(getCode()).toBeInTheDocument();
+		const ids = [...screen.container.querySelectorAll('[data-settings-section]')].map((b) => b.getAttribute('data-settings-section'));
+		expect(ids.indexOf('fisqua-link')).toBe(ids.indexOf('unit-mode') + 1);
 		const sections = [...screen.container.querySelectorAll('.config-section')];
-		expect(sections[0].id).toBe('unit-mode');
-		expect(sections[1].id).toBe('fisqua-link');
-		expect(sections[1].querySelector('.section-title')?.textContent?.trim()).toBe(es.fisqua_link_title);
+		expect(sections).toHaveLength(1);
+		expect(sections[0].id).toBe('fisqua-link');
+		expect(sections[0].querySelector('.section-title')?.textContent?.trim()).toBe(es.fisqua_link_title);
 	});
 });

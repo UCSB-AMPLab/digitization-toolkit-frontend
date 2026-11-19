@@ -178,6 +178,7 @@ export const es = {
 	dash_storage_alert_p1: 'El almacenamiento está al ',
 	dash_storage_alert_p2: (used: string, total: string) => ` (${used} / ${total}). Revisa la `,
 	dash_storage_alert_p3: ' para liberar espacio.',
+	dash_storage_alert_ask_admin: (used: string, total: string) => ` (${used} / ${total}). Avisa al administrador para que libere espacio.`,
 	dash_kpi_active_projects: 'Proyectos activos',
 	dash_kpi_collections: 'Volúmenes',
 	dash_kpi_total_records: 'Total registros',
@@ -1935,6 +1936,194 @@ export const es = {
 	fisqua_link_cancel_failed: 'Captua no pudo cancelar el código. Intenta de nuevo.',
 	fisqua_link_generic: 'Captua no pudo vincular el equipo por un motivo que no reconoce.',
 	fisqua_link_err_read: 'Captua no pudo comprobar si el equipo está vinculado. Lo vuelve a intentar cada pocos segundos.',
+	// ── Settings sections and Network (NEH-253) ─────────────────────────────
+	// Provisional Spanish, to be reviewed.
+	config_section_network: 'Red',
+	config_sections_label: 'Secciones de la configuración',
+	config_group_unit: 'Equipo',
+	config_subtitle_personal: 'Tu configuración y la red del equipo',
+	network_connections_title: 'Conexiones',
+	network_wifi_title: 'Wi-Fi',
+	network_card_ethernet: 'Ethernet',
+	network_card_wifi: 'Wi-Fi',
+	network_card_named: (kind: string, device: string) => `${kind} (${device})`,
+	network_badge_connected: 'Conectado',
+	network_badge_attention: 'Requiere atención',
+	network_badge_connecting: 'Conectando',
+	network_badge_no_cable: 'Sin cable',
+	network_badge_not_connected: 'Sin conexión',
+	network_badge_not_available: 'No disponible',
+	network_eth_empty:
+		'Para usar una conexión por cable, conecta un cable de red al equipo. Si hay un cable disponible, es la mejor opción: la conexión por cable es más estable que el Wi-Fi y no necesita contraseña.',
+	network_wifi_empty_can: 'Elige una red de la lista de abajo para conectar el equipo.',
+	network_wifi_empty_ro: 'El equipo no está conectado a ninguna red Wi-Fi.',
+	network_fact_network: 'Red',
+	network_fact_wired: 'Por cable',
+	network_fact_signal: 'Señal',
+	network_fact_ip: 'Dirección IP',
+	network_fact_gateway: 'Puerta de enlace',
+	network_fact_dns: 'DNS',
+	network_fact_mac: 'Dirección MAC',
+	network_fact_none: 'No hay',
+	network_signal_value: (percent: number, word: string) => `${percent}% (${word})`,
+	network_signal_strong: 'fuerte',
+	network_signal_good: 'buena',
+	network_signal_fair: 'regular',
+	network_signal_weak: 'débil',
+	network_signal_label: (percent: number) => `Señal ${percent}%`,
+	network_warn_try: (text: string) => `Qué puedes hacer: ${text}`,
+	network_warn_no_connection_title: 'Sin conexión de red.',
+	network_warn_no_connection_body:
+		'El equipo no está conectado ni por cable ni por Wi-Fi. Puedes seguir capturando y revisando.',
+	network_warn_no_connection_try: 'Conecta un cable de red o elige una de las redes Wi-Fi de abajo.',
+	network_warn_no_address_title: 'Conectado, pero sin dirección IP.',
+	network_warn_no_address_body:
+		'La red aceptó el equipo, pero no le asignó una dirección. Sin ella, el equipo no se puede comunicar con ningún otro dispositivo, ni ningún dispositivo con él.',
+	network_warn_no_address_try: (wifi: boolean): string =>
+		wifi
+			? 'Olvida la red y vuelve a conectar el equipo a ella. Si eso no funciona, pregúntale a quien administra la red si la red limita qué dispositivos se pueden conectar o exige registrarlos, y dale la dirección MAC que aparece en este recuadro.'
+			: 'Desconecta el cable y vuelve a conectarlo. Si eso no funciona, pregúntale a quien administra la red si la red limita qué dispositivos se pueden conectar o exige registrarlos, y dale la dirección MAC que aparece en este recuadro.',
+	network_warn_link_local_only_title: 'El equipo solo tiene una dirección local.',
+	network_warn_link_local_only_body:
+		'Ningún dispositivo de esta red le asignó una dirección, así que el equipo generó una por su cuenta (169.254…). Solo un computador conectado a la misma red local puede comunicarse con el equipo.',
+	network_warn_link_local_only_try: (wifi: boolean): string =>
+		wifi
+			? 'Olvida la red y vuelve a conectar el equipo a ella. Si eso no funciona, pregúntale a quien administra la red.'
+			: 'Revisa que el cable esté conectado a un punto de red o a un router encendido. Si es así, pregúntale a quien administra la red.',
+	network_warn_no_gateway_title: 'Sin puerta de enlace.',
+	network_warn_no_gateway_body:
+		'El equipo tiene una dirección, pero no tiene cómo salir de esta red. Desde un dispositivo de la misma red se puede abrir Captua, pero el equipo no tiene acceso a internet.',
+	network_warn_no_gateway_try: (wifi: boolean): string =>
+		wifi
+			? 'Olvida la red y vuelve a conectar el equipo a ella. Si sigue sin puerta de enlace, pregúntale a quien administra la red.'
+			: 'Desconecta el cable y vuelve a conectarlo. Si sigue sin puerta de enlace, pregúntale a quien administra la red.',
+	network_warn_no_dns_title: 'Sin servidor DNS.',
+	network_warn_no_dns_body:
+		'El equipo está conectado a la red, pero no puede ubicar sitios por su nombre (por ejemplo, github.com), así que la copia externa y el envío a Fisqua no funcionan.',
+	network_warn_no_dns_try: (wifi: boolean): string =>
+		wifi
+			? 'Olvida la red y vuelve a conectar el equipo a ella. Si eso no funciona, pregúntale a quien administra la red.'
+			: 'Desconecta el cable y vuelve a conectarlo. Si eso no funciona, pregúntale a quien administra la red.',
+	network_warn_other_title: 'Hay un problema con la conexión.',
+	network_readonly: 'Puedes ver el estado de la red. Los administradores y los operarios pueden conectar el equipo a una red y olvidar redes.',
+	network_not_permitted_notice:
+		'El sistema de este equipo no le permite a Captua cambiar la red, así que desde aquí no puedes conectar el equipo a una red ni olvidar redes. Para corregirlo, actualiza Captua o pregúntale a quien instaló el equipo.',
+	network_not_available:
+		'La configuración de red no está disponible en este dispositivo. Solo funciona en un equipo Captua, no en una máquina de desarrollo.',
+	network_service_unavailable: 'El servicio de red del equipo no responde. Intenta de nuevo en un momento.',
+	network_err_read: 'Captua no pudo leer el estado de la red.',
+	network_err_wifi: 'Captua no pudo leer la lista de redes Wi-Fi.',
+	network_no_wifi_device: 'Este equipo no tiene Wi-Fi.',
+	network_wifi_list_title: 'Redes Wi-Fi',
+	network_wifi_list_desc: 'Redes al alcance del equipo. Elige una para conectarlo.',
+	network_wifi_list_desc_ro: 'Redes al alcance del equipo.',
+	network_refreshing: 'Actualizando…',
+	network_not_rescanned:
+		'El sistema de este equipo no le permite a Captua volver a buscar redes, así que la lista muestra las redes que Captua encontró en la última búsqueda.',
+	network_wifi_none: 'No hay redes Wi-Fi al alcance.',
+	network_kind_open: 'Abierta',
+	network_kind_password: 'Con contraseña',
+	network_kind_enterprise: 'Con cuenta institucional',
+	network_saved_mark: 'Guardada',
+	network_connected_mark: '✓ Conectada',
+	network_join: 'Conectar',
+	network_join_aria: (ssid: string) => `Conectar a ${ssid}`,
+	network_saved_title: 'Redes guardadas',
+	network_saved_desc: 'El equipo se conecta automáticamente a estas redes cuando están al alcance.',
+	network_saved_desc_forget:
+		'El equipo se conecta automáticamente a estas redes cuando están al alcance. Al presionar "Olvidar", se borra del equipo la contraseña de esa red.',
+	network_saved_none: 'No hay redes guardadas.',
+	network_saved_active: 'Conectada ahora',
+	network_saved_in_range: 'Al alcance',
+	network_saved_out_of_range: 'Fuera de alcance',
+	network_saved_meta: (kind: string, where: string) => `${kind} · ${where}`,
+	network_forget: 'Olvidar',
+	network_forget_aria: (ssid: string) => `Olvidar ${ssid}`,
+	network_forgetting: 'Olvidando…',
+	network_forget_active_title: (ssid: string) => `¿Olvidar ${ssid}?`,
+	network_forget_active_body:
+		'El equipo está conectado a esta red en este momento. Si la olvidas, se desconecta de ella y borra la contraseña guardada.',
+	network_forget_active_confirm: 'Olvidar y desconectar',
+	network_forget_not_permitted: 'El sistema de este equipo no le permitió a Captua olvidar la red.',
+	network_forget_gone: 'Esta red ya no estaba guardada.',
+	network_forget_failed: 'Captua no pudo olvidar la red. Intenta de nuevo.',
+	network_join_title: (ssid: string) => `Conectar a ${ssid}`,
+	network_join_open_body: 'Esta red es abierta: no necesita contraseña.',
+	network_join_password_body: 'Esta red necesita contraseña.',
+	network_join_enterprise_body:
+		'Esta red pide iniciar sesión con tu cuenta institucional. Los datos que necesitas están en las instrucciones de tu institución para esta red.',
+	network_password_placeholder: 'Contraseña de la red',
+	network_enterprise_password_placeholder: 'Tu contraseña institucional',
+	network_password_note:
+		'La contraseña queda guardada en este equipo. Cualquier persona con acceso de administrador al equipo puede leerla.',
+	network_username_hint: 'Por lo general, tu correo institucional completo.',
+	network_server_label: 'Nombre del servidor de autenticación',
+	network_server_hint:
+		'Antes de enviar tu contraseña, el equipo verifica que el servidor con el que se comunica tenga este nombre.',
+	network_more_options: 'Más opciones',
+	network_outer_identity: 'Identidad anónima',
+	network_outer_identity_hint: 'Déjala en blanco, a menos que tu institución te pida una.',
+	network_method: 'Método',
+	network_method_peap: 'PEAP con MSCHAPv2 (el más común)',
+	network_method_ttls_pap: 'TTLS con PAP',
+	network_method_ttls_mschapv2: 'TTLS con MSCHAPv2',
+	network_joining_title: (ssid: string) => `Conectando a ${ssid}`,
+	network_joining_body:
+		'El equipo se está conectando y le pide una dirección a la red. Puede tardar unos minutos.',
+	network_joining_no_answer: 'El equipo todavía no responde. Puede estar cambiando de red.',
+	network_joined_title: (ssid: string) => `Conectado a ${ssid}`,
+	network_joined_body: 'El equipo está conectado.',
+	network_joined_address: (address: string) => `El equipo está conectado y tiene la dirección ${address}.`,
+	network_joined_saved: 'La red quedó guardada: el equipo se conectará automáticamente a ella cuando esté al alcance.',
+	network_failed_title: (ssid: string) => `No se pudo conectar a ${ssid}`,
+	network_fail_wrong_password: 'La red no aceptó la contraseña. Revísala (fíjate en las mayúsculas y minúsculas) y vuelve a intentarlo.',
+	network_fail_wrong_credentials:
+		'La red no aceptó el usuario o la contraseña. Revisa los dos; muchas instituciones piden el correo completo, como nombre@ejemplo.edu.',
+	network_fail_server_name_mismatch:
+		'El servidor de autenticación de esta red tiene un nombre distinto del que escribiste. Revisa el nombre del servidor en las instrucciones de tu institución para esta red.',
+	network_fail_server_names: (names: string) => `El servidor se identificó con estos nombres: ${names}.`,
+	network_fail_server_not_trusted:
+		'Este equipo no confía en el certificado del servidor de autenticación. Revisa el nombre del servidor; si es correcto, pregúntale al área de sistemas de tu institución qué certificado usa la red.',
+	network_fail_timeout: 'La red no respondió a tiempo. Acerca el equipo al punto de acceso o vuelve a intentarlo en un minuto.',
+	network_fail_not_permitted:
+		'El sistema del equipo no permitió el cambio. Reinicia el equipo y vuelve a intentarlo; si pasa otra vez, presiona "Reportar un problema". Para enviar el reporte se necesita conexión a internet.',
+	network_fail_failed:
+		'El equipo no pudo conectarse a la red. Vuelve a intentarlo; si pasa otra vez, presiona "Reportar un problema". Para enviar el reporte se necesita conexión a internet.',
+	network_restored_true: 'El equipo volvió a conectarse a la red Wi-Fi que tenía antes.',
+	network_restored_false: 'El equipo no pudo volver a conectarse a la red Wi-Fi que tenía antes.',
+	network_lost_title: 'Captua no puede comunicarse con el equipo',
+	network_lost_body:
+		'El equipo dejó de responder. Puede que ahora esté en otra red. Para ver a qué red está conectado, ve a Configuración › Red en la pantalla del propio equipo.',
+	network_refusal_ssid_invalid:
+		'No se puede usar el nombre de esta red: debe tener entre 1 y 32 caracteres, sin saltos de línea.',
+	network_refusal_password_required: 'Escribe la contraseña.',
+	network_refusal_password_invalid: 'La contraseña no puede tener saltos de línea.',
+	network_refusal_password_length: 'Una contraseña de Wi-Fi tiene entre 8 y 63 caracteres.',
+	network_refusal_identity_required: 'Escribe tu usuario.',
+	network_refusal_identity_invalid: 'El usuario no puede tener saltos de línea.',
+	network_refusal_anonymous_identity_invalid: 'La identidad anónima no puede tener saltos de línea.',
+	network_refusal_method_required: 'Elige un método.',
+	network_refusal_server_name_required: 'Escribe el nombre del servidor de autenticación.',
+	network_refusal_server_name_invalid: 'Escribe un nombre de servidor como radius.ejemplo.edu, no una dirección IP.',
+	network_refusal_inner_method_invalid: 'PEAP solo funciona con MSCHAPv2. Elige otro método.',
+	network_refusal_not_permitted: 'El sistema de este equipo no le permite a Captua cambiar la red.',
+	network_refusal_join_in_progress: 'El equipo ya se está conectando a una red. Espera a que termine y vuelve a intentarlo.',
+	network_refusal_other: 'El equipo no aceptó la solicitud. Revisa los campos y vuelve a intentarlo.',
+	network_err_request: 'Captua no pudo comunicarse con el equipo. Revisa la conexión y vuelve a intentarlo.',
+	network_ind_connected: 'Conectado',
+	network_ind_problem: 'Problema de red',
+	network_ind_offline: 'Sin conexión de red',
+	network_ind_label: (state: string, name: string | null, signal: number | null) =>
+		name === null ? state : signal === null ? `${state} · ${name}` : `${state} · ${name} · señal ${signal}%`,
+	network_ind_unknown: 'Estado de la red desconocido',
+	network_ind_connecting: 'Conectando',
+	network_stale: (time: string) =>
+		`No se pudo actualizar el estado de la red. Lo que ves es de la última actualización: ${time}.`,
+	network_unknown_title: 'Captua no pudo saber si el equipo se conectó',
+	network_unknown_body: 'Revisa el estado de la red en esta página para ver a qué red está conectado el equipo.',
+	network_not_received_title: 'El equipo no recibió la solicitud',
+	network_not_received_body: 'Presiona "Reintentar" para enviarla de nuevo.',
+
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',

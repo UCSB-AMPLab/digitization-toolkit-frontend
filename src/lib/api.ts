@@ -2847,3 +2847,190 @@ export const projectMembersApi = {
     await apiRequest(`/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
   },
 };
+
+// ============================================================================
+// NETWORK (NEH-253)
+// ============================================================================
+//
+// The routes of app/api/network.py. Every route answers 501 on a machine
+// without NetworkManager (a development machine) and 503 with the problem
+// `network_manager_unavailable` when NetworkManager does not answer. A
+// refused join or forget is a 409 whose detail is {message, problems:
+// [{code, message}]}; the interface translates the codes and never shows the
+// backend's English. No password or user name is ever put in a URL: they
+// travel only in the body of POST /network/wifi/join.
+
+export type NetworkInterfaceState = 'connected' | 'connecting' | 'disconnected' | 'unavailable' | 'unmanaged';
+
+export interface NetworkInterface {
+  device:     string;
+  type:       'ethernet' | 'wifi';
+  state:      NetworkInterfaceState;
+  connection: string | null;
+  mac:        string | null;
+  /** Addresses with their prefix, as "192.168.10.42/24". */
+  ipv4:       string[];
+  ipv6:       string[];
+  /** The IPv4 gateway. */
+  gateway:    string | null;
+  /** IPv4 servers first, then IPv6. */
+  dns:        string[];
+  /** Only for a connected Wi-Fi interface. */
+  ssid:       string | null;
+  signal:     number | null;
+}
+
+/** no_connection has no device; the others name the interface they concern. */
+export interface NetworkStatusProblem {
+  code:   string;
+  device: string | null;
+}
+
+export interface NetworkPermissions {
+  scan:    boolean;
+  control: boolean;
+  modify:  boolean;
+}
+
+export interface NetworkStatus {
+  hostname:    string;
+  wifiDevice:  string | null;
+  permissions: NetworkPermissions;
+  interfaces:  NetworkInterface[];
+  problems:    NetworkStatusProblem[];
+}
+
+export type WifiSecurity = 'open' | 'password' | 'enterprise';
+
+export interface WifiNetwork {
+  ssid:     string;
+  signal:   number;
+  security: WifiSecurity;
+  inUse:    boolean;
+  saved:    boolean;
+}
+
+export interface SavedWifiNetwork {
+  uuid:     string;
+  name:     string;
+  ssid:     string;
+  security: WifiSecurity;
+  active:   boolean;
+}
+
+export interface WifiScan {
+  networks:  WifiNetwork[];
+  saved:     SavedWifiNetwork[];
+  /** Whether a fresh scan was made for this answer. */
+  rescanned: boolean;
+}
+
+/** The server certificate a sign-in server presented, when one was read. */
+export interface WifiJoinServer {
+  subject: string;
+  names:   string[];
+  hash:    string;
+}
+
+export interface WifiJoinProblem {
+  code:   string;
+  detail: string | null;
+  server: WifiJoinServer | null;
+}
+
+export interface WifiJoinState {
+  state:      'idle' | 'joining' | 'joined' | 'failed';
+  ssid:       string | null;
+  startedAt:  string | null;
+  finishedAt: string | null;
+  problem:    WifiJoinProblem | null;
+  /** Whether the Wi-Fi connection active before the join came back; null when there was none. */
+  restored:   boolean | null;
+}
+
+export type WifiJoinRequest =
+  | { ssid: string; security: 'open' }
+  | { ssid: string; security: 'password'; password: string }
+  | {
+      ssid:               string;
+      security:           'enterprise';
+      identity:           string;
+      password:           string;
+      serverName:         string;
+      method:             'peap' | 'ttls';
+      innerMethod:        'mschapv2' | 'pap';
+      anonymousIdentity?: string;
+    };
+
+/**
+ * The longest each network request waits for an answer, in ms. A request
+ * past its limit is aborted and rejects without a `status`, as a request
+ * that never reached the unit does. The backend bounds each nmcli call
+ * (app/core/network.py): a read by _READ_TIMEOUT (15 s), a fresh scan by
+ * _SCAN_TIMEOUT (20 s), a delete by _WRITE_TIMEOUT (15 s).
+ *
+ * - status: 5 s. It is polled; a slow read is better given up and made
+ *   again (stores/network).
+ * - wifi: 20 s, one nmcli read with a margin; the cached list answers at once.
+ * - rescan: 35 s, the fresh scan and the reads of the saved networks.
+ * - join: 10 s; the join runs on the unit after the 202 and is polled.
+ * - joinState: 5 s, polled about once a second.
+ * - forget: 20 s. A forget usually answers within a second or two; the 204
+ *   of a forget of the network in use is often lost with the link, and a
+ *   forget given up is treated as of unknown outcome and the state read
+ *   again, so a shorter wait costs nothing.
+ */
+export const NETWORK_LIMITS_MS = {
+  status:    5_000,
+  wifi:      20_000,
+  rescan:    35_000,
+  join:      10_000,
+  joinState: 5_000,
+  forget:    20_000,
+} as const;
+
+/** Run `request` with a signal that aborts after `ms`, or when `outer` aborts. */
+async function bounded<T>(ms: number, outer: AbortSignal | undefined, request: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  const timer = setTimeout(abort, ms);
+  if (outer?.aborted) controller.abort();
+  else outer?.addEventListener('abort', abort);
+  try {
+    return await request(controller.signal);
+  } finally {
+    clearTimeout(timer);
+    outer?.removeEventListener('abort', abort);
+  }
+}
+
+export const networkApi = {
+  /** GET /network/status: interfaces, problems and permissions, for every role. */
+  async status(signal?: AbortSignal): Promise<NetworkStatus> {
+    return bounded(NETWORK_LIMITS_MS.status, signal, (s) => apiRequest<NetworkStatus>('/network/status', { signal: s }));
+  },
+
+  /** GET /network/wifi; with `rescan` the unit scans again first (about 10 s). */
+  async wifi(rescan = false, signal?: AbortSignal): Promise<WifiScan> {
+    return bounded(rescan ? NETWORK_LIMITS_MS.rescan : NETWORK_LIMITS_MS.wifi, signal, (s) =>
+      apiRequest<WifiScan>(rescan ? '/network/wifi?rescan=true' : '/network/wifi', { signal: s }));
+  },
+
+  /** POST /network/wifi/join: 202 with the join state, which then has to be polled. */
+  async join(body: WifiJoinRequest, signal?: AbortSignal): Promise<WifiJoinState> {
+    return bounded(NETWORK_LIMITS_MS.join, signal, (s) =>
+      apiRequest<WifiJoinState>('/network/wifi/join', { method: 'POST', body: JSON.stringify(body), signal: s }));
+  },
+
+  /** GET /network/wifi/join: the last join's state. */
+  async joinState(signal?: AbortSignal): Promise<WifiJoinState> {
+    return bounded(NETWORK_LIMITS_MS.joinState, signal, (s) => apiRequest<WifiJoinState>('/network/wifi/join', { signal: s }));
+  },
+
+  /** DELETE /network/wifi/saved/{uuid} (204); `force` forgets the network the unit is on. */
+  async forget(uuid: string, force = false, signal?: AbortSignal): Promise<void> {
+    const path = `/network/wifi/saved/${encodeURIComponent(uuid)}`;
+    await bounded(NETWORK_LIMITS_MS.forget, signal, (s) =>
+      apiRequest<void>(force ? `${path}?force=true` : path, { method: 'DELETE', signal: s }));
+  },
+};
