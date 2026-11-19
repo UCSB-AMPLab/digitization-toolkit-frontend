@@ -1,20 +1,34 @@
 // Configuración → Energía after the move to PowerControl (NEH-189): the
 // buttons open the shared confirmation, and a failure is still shown inside
-// the Power card rather than in a dialog.
+// the Power card rather than in a dialog. Since NEH-253 the Power section is
+// one of the administrator's sections, opened with ?section=power.
 //
 // Version: 0.1.0-beta
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+const pageStore = vi.hoisted(() => ({ value: null as null | { set: (v: { url: URL }) => void } }));
+vi.mock('$app/stores', async () => {
+	const { writable } = await import('svelte/store');
+	const store = writable({ url: new URL('http://localhost/dashboard/config') });
+	pageStore.value = store;
+	return { page: store };
+});
 
 import { systemApi, PowerControlError } from '$lib/api';
+import { authStore } from '$lib/stores/auth';
 import ConfigPage from './+page.svelte';
 
+beforeEach(() => {
+	authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
+	pageStore.value!.set({ url: new URL('http://localhost/dashboard/config?section=power') });
+});
 afterEach(() => {
 	vi.restoreAllMocks();
+	authStore.clearSession();
 });
 
 describe('Configuración power section', () => {

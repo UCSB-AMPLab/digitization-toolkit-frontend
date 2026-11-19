@@ -4,7 +4,9 @@
 	// protected content, and `NAV_ITEMS` decides both which sidebar links each
 	// role sees and which routes it may open: admin sees Overview, Projects,
 	// Queue, To retake, Users and Settings; operator and reviewer see all but
-	// Users and Settings. To retake carries a badge with the number of records
+	// Users. Settings is every role's (NEH-253); which of its sections a role
+	// may open is decided inside it (dashboard/config/settings-sections.ts).
+	// To retake carries a badge with the number of records
 	// waiting (GET /records/to-retake/count), reloaded on every navigation so
 	// that it follows a retake; badge and label are in the recapture sand
 	// while any is waiting (0.2.0).
@@ -14,6 +16,8 @@
 	// read Proyectos is shown, as before.
 	// A new section needs its route under `src/routes/(dashboard)/` and an
 	// entry in `NAV_ITEMS` listing the roles allowed to open it.
+	// The network status above the user button (NetworkIndicator, NEH-253)
+	// is every role's and links to Settings > Network.
 	//
 	// Version: 0.3.4
 
@@ -29,6 +33,7 @@
 	import BugReportButton from '$lib/bug-report/BugReportButton.svelte';
 	import CatalogueBackupIndicator from '$lib/components/CatalogueBackupIndicator.svelte';
 	import AccountMenu from '$lib/components/AccountMenu.svelte';
+	import NetworkIndicator from './dashboard/config/NetworkIndicator.svelte';
 	import { ensureUnit, projectsShownIn, unitState } from '$lib/unit-mode';
 
 	let { children } = $props();
@@ -179,7 +184,7 @@
 					labelKey: 'nav_settings',
 					icon: 'settings',
 					path: '/dashboard/config',
-					roles: ['admin']
+					roles: ['admin', 'operator', 'reviewer']
 				}
 			]
 		}
@@ -226,8 +231,8 @@
 	);
 
 	// Route role guard (NEH-65). Hiding the nav links is not enough: any
-	// signed-in user can reach /dashboard/users or /dashboard/config by typing
-	// the URL. `NAV_ITEMS` already declares which roles may see each route, so
+	// signed-in user can reach /dashboard/users by typing the URL. `NAV_ITEMS`
+	// already declares which roles may see each route, so
 	// it is the single source of truth for access control rather than a
 	// separate list of admin-only routes.
 
@@ -239,8 +244,7 @@
 	}
 
 	// true if the route has no role restriction or the current user's role is
-	// among the allowed ones. Both the guard and the off-site copy indicator's
-	// link use it, so they cannot give different answers.
+	// among the allowed ones.
 	function canAccess(path: string): boolean {
 		const item = findNavItem(path);
 		if (!item) return true;
@@ -249,9 +253,10 @@
 
 	let hasRoleAccess = $derived(canAccess(currentPath));
 
-	// Whether the current role may open Settings decides whether the off-site
-	// copy indicator links there.
-	let canOpenConfig = $derived(canAccess('/dashboard/config'));
+	// The off-site copy indicator links to its section of Settings, which is
+	// one of the administrator's sections (settings-sections.ts), so only an
+	// administrator gets the link.
+	let canOpenOffsite = $derived(currentUser?.role === 'admin');
 
 	// Redirects away from restricted routes as soon as the user's role is known
 	// (on mount, or on client-side navigation to another restricted route).
@@ -443,16 +448,27 @@
 		     role; it links to Settings only for roles that may open it. -->
 		<CatalogueBackupIndicator
 			{expanded}
-			href={canOpenConfig ? '/dashboard/config#offsite-copy' : null}
+			href={canOpenOffsite ? '/dashboard/config?section=offsite-copy' : null}
 		/>
 
 		<div class="s-footer">
-			<BugReportButton {expanded} />
+			<!-- On a tall screen the footer has three rows: Report a problem, the
+			     network status (NEH-253) and the account menu, which holds Help,
+			     shut down, restart and sign out (NEH-189) and opens upward over
+			     the content area. On a short screen (max-height 520px, as on the
+			     unit's 800x480 screen) the expanded sidebar puts the network
+			     status and Report a problem in one row: the status takes the
+			     width, its line cut with an ellipsis, and Report a problem shrinks
+			     to its icon, keeping its accessible name and tooltip. Collapsed,
+			     the two 44 px icons do not fit side by side in the 72 px sidebar,
+			     so they stay stacked. The navigation between header and footer
+			     takes what is left and scrolls, so every item stays reachable
+			     (measured in nav-settings.svelte.test.ts). -->
+			<div class="s-footer-row">
+				<div class="f-bug"><BugReportButton {expanded} /></div>
+				<div class="f-net"><NetworkIndicator {expanded} /></div>
+			</div>
 
-			<!-- The account menu holds Help, shut down, restart and sign out, so
-			     the footer stays two rows tall: at 800x480 anything taller would
-			     push the navigation out of its scroll area (NEH-189). It opens
-			     upward over the content area. -->
 			<AccountMenu placement="above-start" fill>
 				{#snippet trigger({ open, toggle })}
 					{#if expanded}
@@ -779,6 +795,31 @@
 		gap: 8px;
 		flex-shrink: 0;
 		align-items: center;
+	}
+
+	/* Report a problem and the network status: two rows of the footer, or
+	   one row on a short screen with the sidebar expanded. */
+	.s-footer-row {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+	}
+	.f-bug,
+	.f-net { display: flex; width: 100%; min-width: 0; }
+
+	@media (max-height: 520px) {
+		.s-footer-row :global(.bug-btn) { min-height: var(--touch-target-min); }
+		.sidebar.expanded .s-footer-row { flex-direction: row; gap: 6px; }
+		.sidebar.expanded .f-net { order: -1; flex: 1 1 auto; }
+		.sidebar.expanded .f-bug { flex: 0 0 auto; width: auto; }
+		.sidebar.expanded .f-bug :global(.bug-btn) {
+			width: var(--touch-target-min);
+			min-width: var(--touch-target-min);
+			padding: 0;
+		}
+		.sidebar.expanded .f-bug :global(.bug-btn-label) { display: none; }
 	}
 
 	/* The user row and the collapsed avatar tile are the account menu's
