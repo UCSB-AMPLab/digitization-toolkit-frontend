@@ -14,7 +14,7 @@ import {
 } from './camera-orientation';
 import type { CameraDevice } from './api';
 
-type Dev = Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation'>;
+type Dev = Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation' | 'orientation_saved'>;
 
 function device(overrides: Partial<Dev> = {}): Dev {
   return { index: 0, hardware_id: 'hw-a', orientation: 90, ...overrides };
@@ -264,6 +264,29 @@ describe('settlePendingRotations (NEH-300)', () => {
     ]);
     expect(result.apply).toEqual([]);
     expect(result.remaining.size).toBe(0);
+  });
+
+  it('applies it when the body reports an effective orientation but none saved', () => {
+    const result = settlePendingRotations(new Map([[0, 180]]), [
+      device({ index: 0, hardware_id: 'hw-a', orientation: 270, orientation_saved: false })
+    ]);
+    expect(result.apply).toEqual([[0, 180]]);
+    expect(result.remaining.size).toBe(0);
+  });
+
+  it('drops it when the body reports a saved orientation', () => {
+    const result = settlePendingRotations(new Map([[0, 180]]), [
+      device({ index: 0, hardware_id: 'hw-a', orientation: 270, orientation_saved: true })
+    ]);
+    expect(result.apply).toEqual([]);
+    expect(result.remaining.size).toBe(0);
+  });
+
+  it('a saved orientation of 0 counts as saved', () => {
+    const result = settlePendingRotations(new Map([[0, 180]]), [
+      device({ index: 0, hardware_id: 'hw-a', orientation: 0, orientation_saved: true })
+    ]);
+    expect(result.apply).toEqual([]);
   });
 
   it('never mutates the pending map it is given', () => {
