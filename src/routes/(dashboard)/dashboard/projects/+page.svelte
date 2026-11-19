@@ -373,9 +373,7 @@
 </div>
 
 {#if showCreateModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal(); }}>
+  <div class="modal-backdrop" use:dismissible={{ onDismiss: closeModal, escape: false }}>
     <!-- No Escape: it would throw away what was typed. -->
     <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
 
