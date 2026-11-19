@@ -22,6 +22,7 @@
 	import { tick } from 'svelte';
 	import { collectionsApi, type FreePlan, type OffsiteJobResult, type VolumeOffsiteState } from '$lib/api';
 	import { m } from '$lib/i18n';
+	import { dismissible } from '$lib/dialog';
 	import {
 		offsiteActionErrorText,
 		offsiteOffer,
@@ -137,10 +138,6 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (!step) return;
-		if (e.key === 'Escape') {
-			close();
-			return;
-		}
 		// Keep Tab inside the dialog, as HandoverControls does.
 		if (e.key === 'Tab' && cardEl) {
 			const items = [...cardEl.querySelectorAll<HTMLElement>('button:not(:disabled)')];
@@ -187,14 +184,7 @@
 {/if}
 
 {#if step}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="offsite-dialog-backdrop"
-		onclick={(e) => {
-			if (e.target === e.currentTarget) close();
-		}}
-	>
+	<div class="offsite-dialog-backdrop" use:dismissible={{ onDismiss: close }}>
 		<div
 			class="offsite-dialog-card"
 			role="dialog"

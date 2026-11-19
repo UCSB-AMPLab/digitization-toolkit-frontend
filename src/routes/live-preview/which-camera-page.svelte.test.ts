@@ -49,7 +49,7 @@ async function settle() {
 	}
 }
 
-type Row = { index: number; hardware_id: string; role?: string | null; role_confirmed?: boolean; orientation?: number | null };
+type Row = { index: number; hardware_id: string; role?: string | null; role_confirmed?: boolean; orientation?: number | null; orientation_saved?: boolean };
 const NOT_NEEDED = { needs_setup: false, reasons: [], confirmed_pair: { left: 'a', right: 'b' } };
 const needed = (code: string) => ({ needs_setup: true, reasons: [{ code, message: 'English', hardware_ids: ['b'] }], confirmed_pair: null });
 
@@ -62,6 +62,11 @@ let deviceLists: Row[][];
 // rows are chosen when the listing starts.
 let deviceCalls: number;
 let holdListing: ((call: number) => Promise<void> | null) | null;
+// What the appliance lists once a roles save has been answered, when a test
+// sets it (a listing requested after the save sees the saved state); the
+// listings requested after the save are counted.
+let listAfterSave: Row[][] | null;
+let listingsAfterSave: number;
 let captures: string[];
 let captureBodies: Record<string, unknown>[];
 
@@ -95,7 +100,10 @@ function serve() {
 		if (path.includes('/cameras/preview/')) return new Response(null, { status: 404 });
 		if (path.endsWith('/cameras/devices') || path.endsWith('/cameras/rescan')) {
 			deviceCalls += 1;
-			const list = deviceLists.length > 1 ? deviceLists.shift()! : deviceLists[0];
+			const afterSave = rolePuts.length > 0 && listAfterSave !== null;
+			if (afterSave) listingsAfterSave += 1;
+			const pool = afterSave ? listAfterSave! : deviceLists;
+			const list = pool.length > 1 ? pool.shift()! : pool[0];
 			const hold = holdListing?.(deviceCalls);
 			if (hold) await hold;
 			return json(list);
@@ -144,6 +152,8 @@ beforeEach(() => {
 	setupCalls = 0;
 	deviceCalls = 0;
 	holdListing = null;
+	listAfterSave = null;
+	listingsAfterSave = 0;
 	roleAnswers = [];
 	rolePuts = [];
 	captures = [];
@@ -784,4 +794,250 @@ describe('capture screen: capture waits for the first set-up answer', () => {
 		expect(captures.length).toBe(0);
 	});
 
+});
+
+describe('capture screen: the rotation follows the role once the roles are saved', () => {
+	const viewportDegrees = () => [...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
+	const B_LEFT = { needs_setup: false, reasons: [], confirmed_pair: { left: 'b', right: 'a' } };
+
+	async function answerWhichCamera() {
+		await expect.poll(() => card(1)).not.toBeNull();
+		(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+		await settle();
+		buttonIn(step(), en.camwhich_confirm)!.click();
+		await expect.poll(() => step()).toBeNull();
+	}
+
+	it('a body with no saved orientation takes the default of its new role, on screen and in the captures', async () => {
+		deviceLists = [[row(0, 'a', { orientation: 90, orientation_saved: false }), row(1, 'b', { orientation: 90, orientation_saved: false })]];
+		listAfterSave = [[row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false })]];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [
+			() =>
+				json({
+					devices: [
+						row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false }),
+						row(1, 'b', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false })
+					],
+					setup: B_LEFT
+				})
+		];
+		render(LivePreview);
+		await answerWhichCamera();
+		await expect.poll(() => viewportDegrees()).toEqual(['270°', '90°']);
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(1);
+		expect(captureBodies[0].rotate_deg_cam1).toBe(270);
+		expect(captureBodies[0].rotate_deg_cam0).toBe(90);
+	});
+
+	it('a body with a saved orientation keeps it when it gets a role', async () => {
+		deviceLists = [[row(0, 'a', { orientation: 90, orientation_saved: true }), row(1, 'b', { orientation: 180, orientation_saved: true })]];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [
+			() =>
+				json({
+					devices: [
+						row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: true }),
+						row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180, orientation_saved: true })
+					],
+					setup: B_LEFT
+				})
+		];
+		render(LivePreview);
+		await answerWhichCamera();
+		await expect.poll(() => viewportDegrees()).toEqual(['180°', '90°']);
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(1);
+		expect(captureBodies[0].rotate_deg_cam1).toBe(180);
+	});
+
+	it('a camera the operator turned by hand in this session keeps that rotation', async () => {
+		deviceLists = [[row(0, 'a', { orientation: 90, orientation_saved: false }), row(1, 'b', { orientation: 90, orientation_saved: false })]];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [
+			() =>
+				json({
+					devices: [
+						row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false }),
+						row(1, 'b', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false })
+					],
+					setup: B_LEFT
+				})
+		];
+		render(LivePreview);
+		await expect.poll(() => card(1)).not.toBeNull();
+		// Camera 2 (body "b") is turned by hand from 90 to 180 before the answer.
+		(card(1)!.querySelector('button[data-turn]') as HTMLButtonElement).click();
+		await settle();
+		await answerWhichCamera();
+		await expect.poll(() => viewportDegrees()).toEqual(['180°', '90°']);
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(1);
+		expect(captureBodies[0].rotate_deg_cam1).toBe(180);
+		expect(captureBodies[0].rotate_deg_cam0).toBe(90);
+	});
+
+	it('an answer without device rows changes no rotation', async () => {
+		deviceLists = [[row(0, 'a', { orientation: 90, orientation_saved: false }), row(1, 'b', { orientation: 180, orientation_saved: false })]];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [() => json({ devices: [], setup: B_LEFT })];
+		render(LivePreview);
+		await answerWhichCamera();
+		await expect.poll(() => viewportDegrees()).toEqual(['180°', '90°']);
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(1);
+		expect(captureBodies[0].rotate_deg_cam1).toBe(180);
+		expect(captureBodies[0].rotate_deg_cam0).toBe(90);
+	});
+
+	// A listing requested before the roles were saved can answer after it,
+	// with the rows from before; the first listing (the panel's mount read) is
+	// held until after the save to make that happen.
+	const UNSET = (a: number, b: number) => [
+		row(0, 'a', { role: 'right', role_confirmed: true, orientation: a, orientation_saved: false }),
+		row(1, 'b', { role: 'left', role_confirmed: true, orientation: b, orientation_saved: false })
+	];
+	const PRE = () => [row(0, 'a', { orientation: 90, orientation_saved: false }), row(1, 'b', { orientation: 90, orientation_saved: false })];
+
+	it('a listing requested before the save that answers after it does not put the old rotation back', async () => {
+		let release!: () => void;
+		const held = new Promise<void>((r) => (release = r));
+		holdListing = (call) => (call === 1 ? held : null);
+		deviceLists = [PRE()];
+		listAfterSave = [UNSET(90, 270)];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [() => json({ devices: UNSET(90, 270), setup: B_LEFT })];
+		render(LivePreview);
+		await answerWhichCamera();
+		await expect.poll(() => viewportDegrees()).toEqual(['270°', '90°']);
+		release();
+		await settle();
+		await settle();
+		expect(viewportDegrees()).toEqual(['270°', '90°']);
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(1);
+		expect(captureBodies[0].rotate_deg_cam1).toBe(270);
+		expect(captureBodies[0].rotate_deg_cam0).toBe(90);
+	});
+
+	it('a reconnect listing requested before the save that answers after it is dropped', async () => {
+		let release!: () => void;
+		const held = new Promise<void>((r) => (release = r));
+		let releaseRefresh!: () => void;
+		const refreshHeld = new Promise<void>((r) => (releaseRefresh = r));
+		deviceLists = [PRE()];
+		listAfterSave = [UNSET(90, 270)];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [() => json({ devices: UNSET(90, 270), setup: B_LEFT })];
+		render(LivePreview);
+		await expect.poll(() => card(1)).not.toBeNull();
+		await settle();
+		// The reconnect from the panel starts now and answers after the save;
+		// the listing the save asks for is held too, so only the reconnect's
+		// rows can change what is on screen.
+		(document.querySelector(`button[aria-label="${en.cam_panel_expand_aria}"]`) as HTMLButtonElement).click();
+		await expect.poll(() => document.querySelector('.btn-reconnect')).not.toBeNull();
+		const reconnectCall = deviceCalls + 1;
+		holdListing = (call) => (call === reconnectCall ? held : rolePuts.length > 0 ? refreshHeld : null);
+		(document.querySelector('.btn-reconnect') as HTMLButtonElement).click();
+		await expect.poll(() => deviceCalls).toBe(reconnectCall);
+		await answerWhichCamera();
+		await expect.poll(() => viewportDegrees()).toEqual(['270°', '90°']);
+		release();
+		await settle();
+		await settle();
+		expect(viewportDegrees()).toEqual(['270°', '90°']);
+		releaseRefresh();
+	});
+
+	it('a listing requested after the save is applied', async () => {
+		deviceLists = [PRE()];
+		// The save's own rows say 90 for camera 1; the listing after it, 180.
+		listAfterSave = [UNSET(90, 180)];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [() => json({ devices: UNSET(90, 270), setup: B_LEFT })];
+		render(LivePreview);
+		await answerWhichCamera();
+		await expect.poll(() => viewportDegrees()).toEqual(['180°', '90°']);
+	});
+
+	it('a camera turned by hand keeps its rotation through the stale listing', async () => {
+		let release!: () => void;
+		const held = new Promise<void>((r) => (release = r));
+		holdListing = (call) => (call === 1 ? held : null);
+		deviceLists = [PRE()];
+		listAfterSave = [UNSET(90, 270)];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [() => json({ devices: UNSET(90, 270), setup: B_LEFT })];
+		render(LivePreview);
+		await expect.poll(() => card(1)).not.toBeNull();
+		(card(1)!.querySelector('button[data-turn]') as HTMLButtonElement).click();
+		await settle();
+		await answerWhichCamera();
+		release();
+		await settle();
+		await settle();
+		expect(viewportDegrees()).toEqual(['180°', '90°']);
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(1);
+		expect(captureBodies[0].rotate_deg_cam1).toBe(180);
+	});
+
+	it('the cameras read again after a save: one more listing', async () => {
+		deviceLists = [PRE()];
+		listAfterSave = [UNSET(90, 270)];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [() => json({ devices: UNSET(90, 270), setup: B_LEFT })];
+		render(LivePreview);
+		await answerWhichCamera();
+		await expect.poll(() => listingsAfterSave).toBe(1);
+		await settle();
+		await settle();
+		expect(listingsAfterSave).toBe(1);
+	});
+
+	it('roles swapped in a second save swap the defaults of two bodies never set', async () => {
+		let release!: () => void;
+		const held = new Promise<void>((r) => (release = r));
+		holdListing = (call) => (call === 1 ? held : null);
+		deviceLists = [PRE()];
+		listAfterSave = [UNSET(90, 270), [row(0, 'a', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false }), row(1, 'b', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false })]];
+		setupAnswers = [() => json(needed('role_unconfirmed'))];
+		roleAnswers = [
+			() => json({ devices: UNSET(90, 270), setup: B_LEFT }),
+			() =>
+				json({
+					devices: [row(0, 'a', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false }), row(1, 'b', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false })],
+					setup: NOT_NEEDED
+				})
+		];
+		render(LivePreview);
+		await answerWhichCamera();
+		await expect.poll(() => viewportDegrees()).toEqual(['270°', '90°']);
+		openCheck()!.click();
+		await expect.poll(() => check()).not.toBeNull();
+		(check()!.querySelector('[data-chip="left"]') as HTMLButtonElement).click();
+		await settle();
+		buttonIn(document.querySelector('[role="dialog"][aria-labelledby="cd-title"]'), en.camwhich_open)!.click();
+		await expect.poll(() => step()).not.toBeNull();
+		await expect.poll(() => card(0)).not.toBeNull();
+		(card(0)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+		await settle();
+		buttonIn(step(), en.camwhich_confirm)!.click();
+		await expect.poll(() => step()).toBeNull();
+		release();
+		await settle();
+		await settle();
+		await settle();
+		await settle();
+		press('Escape');
+		await settle();
+		press(' ', 'Space');
+		await expect.poll(() => captureBodies.length).toBe(1);
+		expect(captureBodies[0].rotate_deg_cam0).toBe(270);
+		expect(captureBodies[0].rotate_deg_cam1).toBe(90);
+	});
 });

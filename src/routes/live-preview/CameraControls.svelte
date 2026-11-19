@@ -28,6 +28,7 @@
     onIsoChange,
     onApertureChange,
     onDevicesChange,
+    savesSeen,
     onRotateDegChange,
     rotateDeg = {},
     onRescan,
@@ -40,7 +41,11 @@
     onShutterSpeedChange: (value: string) => void;
     onIsoChange: (value: string) => void;
     onApertureChange: (value: string) => void;
-    onDevicesChange?: (devices: CameraDevice[]) => void;
+    onDevicesChange?: (devices: CameraDevice[], requestedAt: number) => void;
+    // How many roles saves the page has taken in. Read when a listing is
+    // requested and handed back with it, so the page can tell a listing from
+    // before a save from one after it.
+    savesSeen?: () => number;
     onRotateDegChange?: (cam: number, deg: number) => void;
     rotateDeg?: Record<number, number>;
     // Called after "Reconnect cameras" has rescanned and the devices are
@@ -56,11 +61,24 @@
   // rescanCameras.
   // All list results go through cameraRefresh, which publishes local and
   // parent state together. Calibration reloads wait for an active reconnect.
-  function publishDevices(list: CameraDevice[]) {
+  type Listing = { list: CameraDevice[]; requestedAt: number };
+  function publishDevices({ list, requestedAt }: Listing) {
     devices = list;
-    onDevicesChange?.(list);
+    onDevicesChange?.(list, requestedAt);
   }
-  const cameraRefresh = createCameraRefresh<CameraDevice[]>(publishDevices);
+  const cameraRefresh = createCameraRefresh<Listing>(publishDevices);
+  // Every listing this panel requests carries the page's save count from the
+  // moment of the request.
+  async function stamped(request: () => Promise<CameraDevice[]>): Promise<Listing> {
+    const requestedAt = savesSeen?.() ?? 0;
+    return { list: await request(), requestedAt };
+  }
+  const listDevices = () => stamped(() => camerasApi.listDevices());
+
+  // The page asks for a fresh listing after it saves the roles.
+  export function refreshDevices(): Promise<void> {
+    return cameraRefresh.read(listDevices);
+  }
 
   // Collapsed by default, for the 7" screen.
   let sidebarOpen = $state(false);
@@ -270,7 +288,7 @@
       const result = await camerasApi.calibrateWhiteBalance({ camera_index: idx });
       if (result.success) {
         // Refresh device list so selectedDevice.awb_gains picks up new values
-        await cameraRefresh.read(() => camerasApi.listDevices());
+        await cameraRefresh.read(listDevices);
         // Reset sliders to neutral; the new baseGains already encodes the calibrated WB
         temperature = 0;
         tint = 0;
@@ -346,7 +364,7 @@
       // Persist to registry
       const result = await camerasApi.commitWhiteBalance(idx, gains);
       if (result.success) {
-        await cameraRefresh.read(() => camerasApi.listDevices());
+        await cameraRefresh.read(listDevices);
         temperature = 0;
         tint = 0;
         cameraStatus.reportSuccess();
@@ -507,7 +525,7 @@
     for (let attempt = 0; ; attempt++) {
       let sessionEnded = false;
       await cameraRefresh.read(
-        () => camerasApi.listDevices(),
+        listDevices,
         (err) => {
           // A dead session already sends the operator to the login screen.
           if (err instanceof AuthError && err.status === 401) sessionEnded = true;
@@ -544,7 +562,7 @@
     if (rescanInFlight) return;
     rescanInFlight = true;
     try {
-      await cameraRefresh.reconnect(() => camerasApi.rescan());
+      await cameraRefresh.reconnect(() => stamped(() => camerasApi.rescan()));
       rescanError = null;
       onRescan?.();
       // Reconnecting is the remedy the failure message offers, so the

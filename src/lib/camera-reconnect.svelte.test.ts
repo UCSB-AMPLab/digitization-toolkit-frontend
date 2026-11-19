@@ -193,7 +193,7 @@ describe('reconnect screen wiring', () => {
     rescan.resolve(devices);
     await expect.poll(() => onDevicesChange.mock.calls.length).toBe(1);
     if (order === 'reconnect-first') { initial.resolve([]); await initial.promise; await tick(); }
-    expect(onDevicesChange.mock.calls).toEqual([[devices]]);
+    expect(onDevicesChange.mock.calls).toEqual([[devices, 0]]);
     await expect.element(screen.getByText('Recovered left [0]', { exact: true })).toBeVisible();
   });
 });

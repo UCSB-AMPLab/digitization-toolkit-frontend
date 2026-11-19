@@ -11,14 +11,20 @@
   // clears figures read earlier: the banner never states a fill level the
   // unit did not just report.
   //
+  // "Settings" links to Settings > Storage for administrators, the only role
+  // that may open that section (NEH-253); other roles are told to ask the
+  // administrator and the sentence does not mention Settings.
+  //
   // Version: 0.1.0-beta
 
   import { onMount } from 'svelte';
   import { systemApi } from '$lib/api';
   import { m } from '$lib/i18n';
+  import { authStore } from '$lib/stores/auth';
   import { formatStorage, storageUsage, type StorageUsage } from '$lib/storage-usage';
 
   let usage = $state<StorageUsage | null>(null);
+  let canOpenStorage = $derived($authStore.user?.role === 'admin');
 
   onMount(() => {
     let alive = true;
@@ -60,7 +66,7 @@
       <line x1="12" y1="17" x2="12.01" y2="17"/>
     </svg>
     <span>
-      {$m.dash_storage_alert_p1}<strong>{usage.percent}%</strong>{$m.dash_storage_alert_p2(formatStorage(usage.usedGB), formatStorage(usage.totalGB))}<a href="/dashboard/config" class="alert-link">{$m.nav_settings}</a>{$m.dash_storage_alert_p3}
+      {$m.dash_storage_alert_p1}<strong>{usage.percent}%</strong>{#if canOpenStorage}{$m.dash_storage_alert_p2(formatStorage(usage.usedGB), formatStorage(usage.totalGB))}<a href="/dashboard/config?section=storage" class="alert-link">{$m.nav_settings}</a>{$m.dash_storage_alert_p3}{:else}{$m.dash_storage_alert_ask_admin(formatStorage(usage.usedGB), formatStorage(usage.totalGB))}{/if}
     </span>
   </div>
 {/if}

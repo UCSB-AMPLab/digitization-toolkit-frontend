@@ -11,6 +11,13 @@ import { page, userEvent } from 'vitest/browser';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+const pageStore = vi.hoisted(() => ({ value: null as null | { set: (v: { url: URL }) => void } }));
+vi.mock('$app/stores', async () => {
+	const { writable } = await import('svelte/store');
+	const store = writable({ url: new URL('http://localhost/dashboard/config') });
+	pageStore.value = store;
+	return { page: store };
+});
 
 import { ApiError, systemApi } from '$lib/api';
 import { authStore } from '$lib/stores/auth';
@@ -193,13 +200,16 @@ describe('Modo del equipo', () => {
 		expect(screen.container.textContent).not.toContain('Internal');
 	});
 
-	it('is the first section of Configuración', async () => {
+	it('is the first of the administrator\'s sections of Configuración (NEH-253)', async () => {
 		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
 		vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
+		pageStore.value!.set({ url: new URL('http://localhost/dashboard/config?section=unit-mode') });
 		const screen = render(ConfigPage);
 		await expect.element(radio('Solo copia externa')).toBeChecked();
-		const first = screen.container.querySelector('.config-section .section-title');
-		expect(first?.textContent?.trim()).toBe(es.unit_section_title);
+		const shown = screen.container.querySelector('.config-section .section-title');
+		expect(shown?.textContent?.trim()).toBe(es.unit_section_title);
+		const unitGroup = [...screen.container.querySelectorAll('[data-settings-section]')].slice(2);
+		expect(unitGroup[0]?.textContent?.trim()).toBe(es.unit_section_title);
 	});
 
 	describe('leaving "Solo en el escáner" with volumes Captua keeps on the unit (NEH-320)', () => {

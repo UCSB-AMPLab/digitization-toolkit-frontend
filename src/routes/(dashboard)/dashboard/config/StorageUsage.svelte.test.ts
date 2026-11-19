@@ -1,15 +1,24 @@
 // Configuración → Almacenamiento: the usage row and bar show only figures
 // GET /system/storage reported (NEH-290). Fixtures are shaped as
 // get_storage_info in app/api/system.py; every other request the page makes
-// fails, which the page already tolerates.
+// fails, which the page already tolerates. Since NEH-253 Storage is one of
+// the administrator's sections, opened with ?section=storage.
 //
 // Version: 0.1.0-beta
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+const pageStore = vi.hoisted(() => ({ value: null as null | { set: (v: { url: URL }) => void } }));
+vi.mock('$app/stores', async () => {
+	const { writable } = await import('svelte/store');
+	const store = writable({ url: new URL('http://localhost/dashboard/config') });
+	pageStore.value = store;
+	return { page: store };
+});
 
+import { authStore } from '$lib/stores/auth';
 import ConfigPage from './+page.svelte';
 
 const GIB = 1024 ** 3;
@@ -47,8 +56,13 @@ async function usageRow(container: HTMLElement) {
 	return container.querySelector('[data-storage-used]') as HTMLElement;
 }
 
+beforeEach(() => {
+	authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
+	pageStore.value!.set({ url: new URL('http://localhost/dashboard/config?section=storage') });
+});
 afterEach(() => {
 	vi.restoreAllMocks();
+	authStore.clearSession();
 });
 
 describe('Configuración storage usage', () => {

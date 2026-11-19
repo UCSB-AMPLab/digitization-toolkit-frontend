@@ -3,6 +3,7 @@
 
   import { onMount } from 'svelte';
   import { m } from '$lib/i18n';
+  import { dismissible } from '$lib/dialog';
   import { captureContext } from './context';
   import { getRecentErrors } from './error-capture';
   import { buildIssueBody, type BugReportForm, type AttachOptions } from './build-issue-body';
@@ -47,22 +48,10 @@
     return () => previouslyFocused?.focus();
   });
 
-  // Escape is the keyboard equivalent of clicking the backdrop.
-  function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') onClose();
-  }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<!-- A click on the backdrop closes the panel; the keyboard equivalent is
-     Escape, above. -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-  class="bug-backdrop"
-  onclick={(e) => { if ((e.target as HTMLElement).classList.contains('bug-backdrop')) onClose(); }}
->
+<!-- Escape and a click on the backdrop close the panel (dismissible). -->
+<div class="bug-backdrop" use:dismissible={{ onDismiss: onClose }}>
   <div
     class="bug-card"
     bind:this={dialogEl}

@@ -245,7 +245,7 @@
       {#if outsideFisquaMode}
         <p class="link-muted">{$m.fisqua_link_mode_hint}</p>
         <div class="link-actions">
-          <a class="link-btn-ghost" href="#unit-mode">{$m.fisqua_link_switch_mode}</a>
+          <a class="link-btn-ghost" href="?section=unit-mode">{$m.fisqua_link_switch_mode}</a>
         </div>
       {/if}
     {:else if panel === 'final'}
