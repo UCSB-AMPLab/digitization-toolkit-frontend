@@ -278,7 +278,14 @@ describe('live-preview ImageViewerModal — an opening with a page never photogr
         expect(missingFrame.getAttribute('data-missing-side'), view).toBe(side);
         expect(missingFrame.querySelector('img'), view).toBeNull();
         expect(imageFrame.querySelector('img'), view).not.toBeNull();
-        expect(imageFrame.textContent).toContain(side === 'left' ? es.badge_right : es.badge_left);
+        // The page present: role right (the left camera's odd/recto page) when the left page is missing.
+        const badge = imageFrame.querySelector('.img-viewer-badge') as HTMLElement;
+        expect(badge.querySelector('.badge-letter')?.textContent?.trim(), view).toBe(side === 'left' ? es.badge_cam_left : es.badge_cam_right);
+        expect(badge.querySelector('.material-symbols-outlined')?.textContent?.trim(), view).toBe('photo_camera');
+        expect(badge.querySelector('.page-term')?.textContent?.trim(), view).toBe(side === 'left' ? es.page_term_odd : es.page_term_even);
+        expect(badge.getAttribute('title'), view).toBe(side === 'left' ? es.cam_page_odd : es.cam_page_even);
+        expect(badge.getAttribute('aria-hidden'), view).toBe('true');
+        expect(imageFrame.querySelector('img')?.getAttribute('alt'), view).toBe(`Folio 9 · ${side === 'left' ? es.cam_page_odd : es.cam_page_even}`);
         if (view === 'thumbnails') await screen.getByRole('button', { name: es.lvm_full_size }).click();
       }
     });

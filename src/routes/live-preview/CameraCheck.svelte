@@ -69,6 +69,7 @@
   import { PairPanZoom } from '$lib/pair-pan-zoom.svelte';
   import RefocusModal from './RefocusModal.svelte';
   import CameraCheckViewer from './CameraCheckViewer.svelte';
+  import PageCameraLabel from '$lib/components/PageCameraLabel.svelte';
 
   let {
     leftIndex = 0,
@@ -404,6 +405,15 @@
     revokeShots();
   });
 
+  // The chips are a tight place: the camera symbol, its letter and the page
+  // term; the full label rides in the title and the accessible name.
+  function chipCamera(side: Side): string {
+    return side === 'left' ? $m.badge_cam_right : $m.badge_cam_left;
+  }
+  function chipTerm(side: Side): string {
+    return side === 'left' ? $m.page_term_even : $m.page_term_odd;
+  }
+
   function sideLabel(side: Side): string {
     return side === 'left' ? $m.camcheck_left_page : $m.camcheck_right_page;
   }
@@ -465,14 +475,14 @@
     <div class="ck-status" role="group" aria-label={$m.camcheck_details_title}>
       {#each SIDES as side (side)}
         {@const conn = reach(side)}
-        <button class="cs-btn" data-chip={side} aria-label={$m.camcheck_chip_aria(side)} onclick={() => (detailsOpen = true)}>
+        <button class="cs-btn" data-chip={side} aria-label={$m.camcheck_chip_aria(side)} title={sideLabel(side)} onclick={() => (detailsOpen = true)}>
           <span class="cam-badge" class:ok={conn === 'ok'} class:err={conn === 'down'}>
             {#if conn === 'ok'}
               <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
             {:else if conn === 'down'}
               <span class="material-symbols-outlined" aria-hidden="true">error</span>
             {/if}
-            <span>{sideLabel(side)}</span>
+            <span><span class="material-symbols-outlined cs-cam" aria-hidden="true">photo_camera</span>{chipCamera(side)} · {chipTerm(side)}</span>
             {#if conn === 'ok' && deviceOf(side)?.model}
               <span class="cs-model">· {deviceOf(side)?.model}</span>
             {:else if conn === 'down'}
@@ -528,7 +538,7 @@
             {:else}
               <p class="empty-msg">{$m.camcheck_no_capture}</p>
             {/if}
-            <div class="feed-label" class:right={side === 'right'}>{sideLabel(side)}</div>
+            <PageCameraLabel role={side} width={panes.frameW[i]} class={side === 'right' ? 'feed-label right' : 'feed-label'} />
             <button
               class="float-btn ck-turn"
               data-turn
@@ -790,6 +800,7 @@
   .cam-badge.err { background-color: var(--color-error-bg); color: var(--color-error); border-color: var(--color-error); }
   .cam-badge .material-symbols-outlined { font-size: 15px; }
   .cam-badge .cs-more { font-size: 16px; opacity: 0.8; }
+  .cam-badge .cs-cam { font-size: 14px; vertical-align: -2px; margin-right: 1px; }
   .cs-model { font-weight: var(--fw-semibold); }
 
   @media (max-width: 900px) {
@@ -845,8 +856,9 @@
   .empty-msg.is-error { color: var(--color-light); }
   .empty-msg.is-error .material-symbols-outlined { color: var(--color-error); }
 
-  /* LiveViewport.svelte's .feed-label, at the frame's size */
-  .feed-label {
+  /* LiveViewport.svelte's .feed-label, at the frame's size. Global because
+     the label is PageCameraLabel's element. */
+  .sf-frame :global(.feed-label) {
     position: absolute;
     top: 6px;
     left: 6px;
@@ -861,7 +873,7 @@
     z-index: 5;
     white-space: nowrap;
   }
-  .feed-label.right { left: auto; right: 6px; }
+  .sf-frame :global(.feed-label.right) { left: auto; right: 6px; }
 
   /* LiveViewport.svelte's .float-btn, in the Refocus dialog's 1:1 look */
   .float-btn {

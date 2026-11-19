@@ -325,7 +325,15 @@ describe('ImageViewerModal — an opening with a page never photographed (0.3.2)
       expect(first.getAttribute('data-missing-side')).toBe(side);
       expect(first.querySelector('img')).toBeNull();
       expect(second.querySelector('img.img-viewer-img')).not.toBeNull();
-      expect(second.textContent).toContain(present === 'left' ? es.badge_left : es.badge_right);
+      // Role left is the right camera's even/verso page; role right the left camera's odd/recto page.
+      const badge = second.querySelector('.img-viewer-badge') as HTMLElement;
+      expect(badge.querySelector('.badge-letter')?.textContent?.trim()).toBe(present === 'left' ? es.badge_cam_right : es.badge_cam_left);
+      expect(badge.querySelector('.material-symbols-outlined')?.textContent?.trim()).toBe('photo_camera');
+      expect(badge.querySelector('.page-term')?.textContent?.trim()).toBe(present === 'left' ? es.page_term_even : es.page_term_odd);
+      expect(badge.getAttribute('title')).toBe(present === 'left' ? es.cam_page_even : es.cam_page_odd);
+      // The picture's accessible name carries both facts; the badge is hidden from assistive technology.
+      expect(badge.getAttribute('aria-hidden')).toBe('true');
+      expect(second.querySelector('img.img-viewer-img')?.getAttribute('alt')).toBe(`${record.title} · ${present === 'left' ? es.cam_page_even : es.cam_page_odd}`);
     });
   }
 

@@ -250,10 +250,15 @@
     saveOrientation(cam, device.hardware_id, rotateDeg[cam] ?? 0);
   }
 
-  // The name the viewer's label gives the camera (LiveViewport's cameraLabel).
+  // The camera's name inside the notice's sentence, from the same facts as
+  // the label under its picture (LiveViewport's paneLabel): with the roles
+  // confirmed in double mode, the side its page puts it on (the camera at
+  // `rolesLeft` photographs the even/verso page, on the right); with them
+  // unconfirmed, its number; in single mode, plainly "the camera".
   function orientationCameraName(cam: number): string {
-    const dev = devices.find(d => d.index === cam);
-    return `${dev?.label || dev?.model || $m.cam_fallback_name} [${cam}]`;
+    if (cameraMode === 'single') return $m.lv_camera_in_sentence({ single: true });
+    if (rolesLeft !== null) return $m.lv_camera_in_sentence({ role: cam === rolesLeft ? 'left' : 'right' });
+    return $m.lv_camera_in_sentence({ number: cam + 1 });
   }
 
   let projectName = $state<string>('');

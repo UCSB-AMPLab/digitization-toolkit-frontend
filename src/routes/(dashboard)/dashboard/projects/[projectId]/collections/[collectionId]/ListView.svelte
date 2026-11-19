@@ -1,7 +1,7 @@
 <script lang="ts">
   // List view of a volume's records: one row per record, with up to two
-  // thumbnails (L/R badge on a two-camera capture), title, status, image
-  // count and date. Rows can be dragged into a new order in reorder mode.
+  // thumbnails (on a two-camera capture, a badge naming each picture's
+  // camera and its page term), title, status, image count and date. Rows can be dragged into a new order in reorder mode.
   //
   // A row click opens the record in book view (onRecordClick, handled by
   // the page), not in a modal.
@@ -81,11 +81,26 @@
     });
   }
 
-  function roleLabel(img: RecordImage): 'L' | 'R' | null {
-    if (img.role === 'left')  return 'L';
-    if (img.role === 'right') return 'R';
+  function imageRole(img: RecordImage): 'left' | 'right' | null {
+    if (img.role === 'left' || img.role === 'right') return img.role;
     return null;
   }
+
+  // A picture of a page names its camera and its page. Role `right` is the
+  // odd/recto page, photographed by the left camera; role `left` the
+  // even/verso page, photographed by the right camera.
+  function cameraLetter(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.badge_cam_left : $m.badge_cam_right;
+  }
+
+  function pageTerm(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.page_term_odd : $m.page_term_even;
+  }
+
+  function pageLabel(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.cam_page_odd : $m.cam_page_even;
+  }
+
 
   function formatDate(dateStr: string | undefined): string {
     if (!dateStr) return '—';
@@ -158,15 +173,21 @@
 
         <div class="col-thumb thumb-group">
           {#each imgs.slice(0, 2) as img}
+            {@const role = imageRole(img)}
             <div class="thumb-wrap">
               <img
                 src={recordsApi.getImageThumbnailUrl(img.id)}
-                alt={record.title}
+                alt={role ? `${record.title} · ${pageLabel(role)}` : record.title}
                 class="row-thumb"
                 onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
-              {#if roleLabel(img)}
-                <span class="role-badge" class:right={roleLabel(img) === 'R'}>{roleLabel(img)}</span>
+              {#if role}
+                <!-- The picture's alt carries both facts; the badge and the
+                     term repeat them for the eye. -->
+                <span class="role-badge" class:right={role === 'right'} title={pageLabel(role)} aria-hidden="true">
+                  <span class="material-symbols-outlined badge-cam" aria-hidden="true">photo_camera</span><span class="badge-letter">{cameraLetter(role)}</span>
+                </span>
+                <span class="page-term" class:right={role === 'right'} aria-hidden="true">{pageTerm(role)}</span>
               {/if}
             </div>
           {/each}
@@ -318,6 +339,27 @@
     line-height: 1.4;
   }
   .role-badge.right { left: auto; right: 3px; }
+
+  .badge-cam {
+    font-size: 10px;
+    vertical-align: -1px;
+    margin-right: 1px;
+  }
+
+  .page-term {
+    position: absolute;
+    top: 2px; left: 3px;
+    background: rgba(19,17,16,0.8);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 8px;
+    color: var(--color-light);
+    line-height: 1.4;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .page-term.right { left: auto; right: 3px; }
 
   .thumb-placeholder {
     width: 64px;

@@ -8,7 +8,10 @@
   // grouped by proximity, as in the gallery and the grid, and the selection
   // frame surrounds the whole folio rather than each half. In `single` mode
   // each record shows its first image; in `double` mode both images of the
-  // folio sit together with an L/R badge.
+  // folio sit together, each with a badge naming its camera (a camera symbol
+  // and the camera letter) and the page term. Role `right` is the odd/recto
+  // page, photographed by the left camera; role `left` the even/verso page,
+  // photographed by the right camera.
   //
   // Version: 0.1.0-beta
 
@@ -32,15 +35,26 @@
   interface ThumbItem {
     record: Record;
     image: RecordImage | null;
-    role: 'L' | 'R' | null;
+    role: 'left' | 'right' | null;
     thumbnailUrl: string | null;
   }
 
-  function imageRole(img: RecordImage | null): 'L' | 'R' | null {
+  function imageRole(img: RecordImage | null): 'left' | 'right' | null {
     if (!img) return null;
-    if (img.role === 'left')  return 'L';
-    if (img.role === 'right') return 'R';
+    if (img.role === 'left' || img.role === 'right') return img.role;
     return null;
+  }
+
+  function cameraLetter(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.badge_cam_left : $m.badge_cam_right;
+  }
+
+  function pageTerm(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.page_term_odd : $m.page_term_even;
+  }
+
+  function pageLabel(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.cam_page_odd : $m.cam_page_even;
   }
 
   function thumbnailUrl(img: RecordImage | null): string | null {
@@ -128,7 +142,7 @@
                 {#if item.thumbnailUrl}
                   <img
                     src={item.thumbnailUrl}
-                    alt={item.record.title}
+                    alt={cameraMode === 'double' && item.role ? `${item.record.title} · ${pageLabel(item.role)}` : item.record.title}
                     class="thumb-img"
                     onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
@@ -141,9 +155,12 @@
                 {/if}
 
                 {#if cameraMode === 'double' && item.role}
-                  <div class="thumb-badge" class:right={item.role === 'R'}>
-                    {item.role}
+                  <!-- The picture's alt carries both facts; the badge and the
+                       term repeat them for the eye. -->
+                  <div class="thumb-badge" class:right={item.role === 'right'} title={pageLabel(item.role)} aria-hidden="true">
+                    <span class="material-symbols-outlined badge-cam" aria-hidden="true">photo_camera</span><span class="badge-letter">{cameraLetter(item.role)}</span>
                   </div>
+                  <span class="page-term" class:right={item.role === 'right'} aria-hidden="true">{pageTerm(item.role)}</span>
                 {/if}
               </div>
             {/each}
@@ -295,6 +312,30 @@
   }
 
   .thumb-badge.right {
+    left: auto;
+    right: 4px;
+  }
+
+  .badge-cam {
+    font-size: 10px;
+    vertical-align: -1px;
+    margin-right: 1px;
+  }
+
+  .page-term {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    background-color: rgba(19,17,16,0.8);
+    border-radius: 4px;
+    padding: 0 4px;
+    font-size: 9px;
+    color: var(--color-light);
+    line-height: 1.4;
+    pointer-events: none;
+  }
+
+  .page-term.right {
     left: auto;
     right: 4px;
   }

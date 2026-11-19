@@ -166,7 +166,7 @@
   interface GridItem {
     record: Record;
     image: RecordImage | null;
-    role: 'L' | 'R' | null;
+    role: 'left' | 'right' | null;
     thumbnailUrl: string | null;
     // The page never photographed, for the half that stands in for it.
     missing?: 'left' | 'right';
@@ -177,19 +177,34 @@
     items: GridItem[];
   }
 
-  function imageRole(img: RecordImage | null): 'L' | 'R' | null {
+  function imageRole(img: RecordImage | null): 'left' | 'right' | null {
     if (!img) return null;
-    if (img.role === 'left')  return 'L';
-    if (img.role === 'right') return 'R';
+    if (img.role === 'left' || img.role === 'right') return img.role;
     return null;
   }
+
+  // A picture of a page names its camera and its page. Role `right` is the
+  // odd/recto page, photographed by the left camera; role `left` the
+  // even/verso page, photographed by the right camera.
+  function cameraLetter(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.badge_cam_left : $m.badge_cam_right;
+  }
+
+  function pageTerm(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.page_term_odd : $m.page_term_even;
+  }
+
+  function pageLabel(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.cam_page_odd : $m.cam_page_even;
+  }
+
 
   function gridItemsForRecord(record: Record): GridItem[] {
     // A placeholder for a whole opening: both pages are empty frames.
     if (record.missing_side === 'both') {
       return [
-        { record, image: null, role: 'L', thumbnailUrl: null, missing: 'left' },
-        { record, image: null, role: 'R', thumbnailUrl: null, missing: 'right' },
+        { record, image: null, role: 'left', thumbnailUrl: null, missing: 'left' },
+        { record, image: null, role: 'right', thumbnailUrl: null, missing: 'right' },
       ];
     }
     if (!record.images || record.images.length === 0) {
@@ -208,10 +223,10 @@
     }));
     // The missing page takes its side of the pair: left before right.
     if (record.missing_side === 'left') {
-      return [{ record, image: null, role: 'L', thumbnailUrl: null, missing: 'left' }, ...items];
+      return [{ record, image: null, role: 'left', thumbnailUrl: null, missing: 'left' }, ...items];
     }
     if (record.missing_side === 'right') {
-      return [...items, { record, image: null, role: 'R', thumbnailUrl: null, missing: 'right' }];
+      return [...items, { record, image: null, role: 'right', thumbnailUrl: null, missing: 'right' }];
     }
     return items;
   }
@@ -546,7 +561,7 @@
   {#if item.missing}
     <MissingPage side={item.missing} />
   {:else if item.thumbnailUrl}
-    <img src={item.thumbnailUrl} alt="{record.title}{item.role ? ' ' + item.role : ''}" class="card-image" draggable="false" />
+    <img src={item.thumbnailUrl} alt={item.role ? `${record.title} · ${pageLabel(item.role)}` : record.title} class="card-image" draggable="false" />
   {:else}
     <div class="card-placeholder">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -558,7 +573,12 @@
   {/if}
 
   {#if item.role}
-    <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
+    <!-- The picture's alt carries both facts; the badge and the term repeat
+         them for the eye. -->
+    <div class="role-badge" class:right={item.role === 'right'} title={pageLabel(item.role)} aria-hidden="true">
+      <span class="material-symbols-outlined badge-cam" aria-hidden="true">photo_camera</span><span class="badge-letter">{cameraLetter(item.role)}</span>
+    </div>
+    <span class="page-term" class:right={item.role === 'right'} aria-hidden="true">{pageTerm(item.role)}</span>
   {/if}
 {/snippet}
 
@@ -830,7 +850,7 @@
   .pair-meta { text-align: center; }
   .pair-name { text-align: center; }
 
-  /* L/R badge — same background and border as in ThumbnailStrip.svelte;
+  /* Camera badge — same background and border as in ThumbnailStrip.svelte;
      position and size differ. */
   .role-badge {
     position: absolute;
@@ -846,6 +866,28 @@
     z-index: 2;
   }
   .role-badge.right { left: auto; right: 6px; }
+
+  .badge-cam {
+    font-size: 10px;
+    vertical-align: -1px;
+    margin-right: 1px;
+  }
+
+  /* Above the camera badge, at the bottom: the reorder handle holds the top-left corner. */
+  .page-term {
+    position: absolute;
+    bottom: 26px; left: 6px;
+    background: rgba(19,17,16,0.8);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 9px;
+    color: var(--color-light);
+    line-height: 1.4;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .page-term.right { left: auto; right: 6px; }
 
 
   .card-meta { padding: 7px 2px 2px; }

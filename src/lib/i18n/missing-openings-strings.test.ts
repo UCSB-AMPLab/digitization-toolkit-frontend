@@ -71,10 +71,10 @@ describe('placeholder openings, Spanish (approved)', () => {
 		expect(es.retakes_no_page).toBe('Aquí no hay ninguna página');
 		expect(es.retakes_capture).toBe('Capturar');
 		expect(es.retakes_page_missing_row('left')).toBe(
-			'Nunca se fotografió la página izquierda. Vuelve a capturar el par completo con las dos cámaras: la captura nueva reemplaza la anterior.'
+			'Nunca se fotografió la página par/verso. Vuelve a capturar el par de páginas completo con las dos cámaras: Captua reemplaza la captura anterior por la nueva.'
 		);
 		expect(es.retakes_page_missing_row('right')).toBe(
-			'Nunca se fotografió la página derecha. Vuelve a capturar el par completo con las dos cámaras: la captura nueva reemplaza la anterior.'
+			'Nunca se fotografió la página impar/recto. Vuelve a capturar el par de páginas completo con las dos cámaras: Captua reemplaza la captura anterior por la nueva.'
 		);
 	});
 });
@@ -117,7 +117,7 @@ describe('placeholder openings, without a folio or a capture number (new, not ye
 			'The empty opening after folio 90r is closed and stays in the volume with your reason, so reviewers can see what was checked.'
 		);
 		expect(en.retakes_page_missing_row('left')).toBe(
-			'The left page was never photographed. A capture with both cameras replaces the opening.'
+			'The even/verso page was never photographed. A capture with both cameras replaces the opening.'
 		);
 		expect(en.retakes_volume_pending(1)).toBe('1 pending');
 	});
