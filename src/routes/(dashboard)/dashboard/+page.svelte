@@ -13,7 +13,7 @@
 
   import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores/auth';
-  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, sessionRequestInit, getApiBase,
+  import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, sessionRequestInit, getApiBase, isPreviewFrameFailedResponse,
            type Collection, type Project, type RetakeSummary } from '$lib/api';
   import { readRetakeSummary } from '$lib/recapture-turn';
   import { projectsShownIn, unitState } from '$lib/unit-mode';
@@ -120,6 +120,25 @@
 
   const PREVIEW_INTERVAL_MS = 2500;
 
+  // A connected camera that sent no frame answers 503 preview_frame_failed
+  // (NEH-349): the box keeps the last frame, polling goes on and no issue
+  // shows. After this many such answers in a row the panel says the camera
+  // is connected but sends no image, with polling still running so that a
+  // good frame clears it: 12 polls at PREVIEW_INTERVAL_MS (2.5 s) = 30 s,
+  // longer when answers are slower than the interval, since a side has one
+  // request in flight at a time.
+  const NO_FRAME_RUN_LIMIT = 12;
+  // Per side, those answers since the side's last other answer.
+  let noFrameRun: Record<string, number> = {};
+  // Sides whose run reached the limit. The badge is left as it is: the
+  // backend says the camera is connected, and the badge has no state for
+  // "connected, no image".
+  let noImage = $state<Record<'left' | 'right', boolean>>({ left: false, right: false });
+  function resetNoFrameRuns() {
+    noFrameRun = {};
+    noImage = { left: false, right: false };
+  }
+
   // Null until it arrives, and when it cannot be loaded: then no band.
   let retakeSummary = $state<RetakeSummary | null>(null);
 
@@ -189,8 +208,10 @@
   async function rescanCameras() {
     if (rescanInFlight) return;
     rescanInFlight = true;
+    resetNoFrameRuns();
     try {
       await cameraRefresh.reconnect(async () => sidesFromDevices(await camerasApi.rescan()));
+      resetNoFrameRuns();
       rescanError = null;
     } catch (err) {
       // A 401 means a dead session, not a failed reconnect — `apiRequest`
@@ -208,6 +229,9 @@
       expandedCamera = null;
       if (streamActive[side]) stopStream(side);
     } else {
+      // Only the expanded side streams: the one being left stops.
+      const previous = expandedCamera;
+      if (previous && streamActive[previous]) stopStream(previous);
       expandedCamera = side;
     }
   }
@@ -225,9 +249,55 @@
 
   function stopStream(side: 'left' | 'right') {
     streamActive = { ...streamActive, [side]: false };
+    noFrameRun[side] = 0;
+    noImage = { ...noImage, [side]: false };
     if (cameraIssue[side]?.kind === 'preview') setIssue(side, null);
     if (previewIntervals[side]) { clearInterval(previewIntervals[side]); delete previewIntervals[side]; }
     if (previewUrls[side]) { URL.revokeObjectURL(previewUrls[side]); previewUrls = { ...previewUrls, [side]: '' }; }
+  }
+
+  type PreviewAnswer = 'ok' | 'missing' | 'no-frame' | 'error';
+
+  // Every preview answer for a side puts that side in exactly one state, and
+  // entering a state clears the marks of the others: the badge, the
+  // no-image text and a preview-kind issue line. This is the only code that
+  // writes them, apart from stopStream and resetNoFrameRuns. An issue of
+  // another kind (a focus failure) belongs to another event and stays.
+  // A failure from before or during a reconnect says nothing about the
+  // camera now, so it changes nothing; the check is read-only, because
+  // acceptPreview would count it as a status observation.
+  function recordPreviewAnswer(side: 'left' | 'right', answer: PreviewAnswer, token: number | null) {
+    const current = streamActive[side] && token !== null && cameraRefresh.previewToken() === token;
+    if (answer !== 'no-frame') noFrameRun[side] = 0;
+    switch (answer) {
+      case 'ok':
+        // A good frame is evidence the body is there, whether the badge said
+        // not-found or was still unknown while the device list loaded.
+        if (cameraStatus[side] !== 'ok') applyPreviewStatus(token, side, 'ok');
+        if (cameraIssue[side]?.kind === 'preview') setIssue(side, null);
+        if (noImage[side]) noImage = { ...noImage, [side]: false };
+        return;
+      case 'no-frame':
+        // The backend says the camera is connected: an earlier 404's
+        // not-found goes at once, and so does an earlier preview failure.
+        if (cameraStatus[side] !== 'ok') applyPreviewStatus(token, side, 'ok');
+        if (!streamActive[side]) return;
+        noFrameRun[side] = (noFrameRun[side] ?? 0) + 1;
+        if (current && cameraIssue[side]?.kind === 'preview') setIssue(side, null);
+        if (noFrameRun[side] >= NO_FRAME_RUN_LIMIT && current) noImage = { ...noImage, [side]: true };
+        return;
+      case 'missing':
+        // A preview from before/during reconnect cannot undo its result or
+        // stop the stream. An accepted failure changes only this camera;
+        // stopStream clears its text and issue line.
+        if (applyPreviewStatus(token, side, 'not-found')) stopStream(side);
+        return;
+      case 'error':
+        if (!current) return;
+        if (noImage[side]) noImage = { ...noImage, [side]: false };
+        setIssue(side, { kind: 'preview', text: $m.dash_camera_preview_error });
+        return;
+    }
   }
 
   // Polls still frames. TODO: if the backend gains a streaming endpoint
@@ -237,50 +307,31 @@
     if (isFetchingPreview[side]) return;
     isFetchingPreview[side] = true;
     const token = cameraRefresh.previewToken();
-    // A failure from before or during a reconnect says nothing about the
-    // camera now. Read-only check: acceptPreview would count it as a
-    // status observation.
-    const failureCounts = () =>
-      streamActive[side as 'left' | 'right'] && token !== null && cameraRefresh.previewToken() === token;
+    const cam = side as 'left' | 'right';
     try {
       const res = await fetch(`${getApiBase()}/cameras/preview/${index}`, sessionRequestInit());
       if (res.status === 404) {
-        // A preview from before/during reconnect cannot undo its result or
-        // stop the stream. An accepted failure changes only this camera.
-        if (applyPreviewStatus(token, side, 'not-found')) {
-          stopStream(side as 'left' | 'right');
-        }
+        recordPreviewAnswer(cam, 'missing', token);
         return;
       }
       if (!res.ok) {
-        if (failureCounts()) {
-          setIssue(side as 'left' | 'right', { kind: 'preview', text: $m.dash_camera_preview_error });
-        }
+        recordPreviewAnswer(cam, (await isPreviewFrameFailedResponse(res)) ? 'no-frame' : 'error', token);
         return;
       }
-      if (res.ok) {
-        // A good frame is evidence the body is there, whether the badge said
-        // not-found or was still unknown while the device list loaded.
-        if (cameraStatus[side] !== 'ok') {
-          applyPreviewStatus(token, side, 'ok');
-        }
-        if (cameraIssue[side as 'left' | 'right']?.kind === 'preview') setIssue(side as 'left' | 'right', null);
-        const blob = await res.blob();
-        // If the operator stopped the stream while this request was in
-        // flight, the frame is late: it is not shown, because no polling is
-        // left to replace it and the box would keep a stale image next to
-        // "Test". A test capture is shown with the stream stopped (NEH-166),
-        // but that goes through `handleCapture`.
-        if (!streamActive[side as 'left' | 'right']) return;
-        const url = URL.createObjectURL(blob);
-        if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
-        previewUrls = { ...previewUrls, [side]: url };
-      }
+      recordPreviewAnswer(cam, 'ok', token);
+      const blob = await res.blob();
+      // If the operator stopped the stream while this request was in
+      // flight, the frame is late: it is not shown, because no polling is
+      // left to replace it and the box would keep a stale image next to
+      // "Test". A test capture is shown with the stream stopped (NEH-166),
+      // but that goes through `handleCapture`.
+      if (!streamActive[cam]) return;
+      const url = URL.createObjectURL(blob);
+      if (previewUrls[side]) URL.revokeObjectURL(previewUrls[side]);
+      previewUrls = { ...previewUrls, [side]: url };
     } catch (e) {
       console.error('[Dashboard] Preview request failed:', e);
-      if (failureCounts()) {
-        setIssue(side as 'left' | 'right', { kind: 'preview', text: $m.dash_camera_preview_error });
-      }
+      recordPreviewAnswer(cam, 'error', token);
     }
     finally { isFetchingPreview[side] = false; }
   }
@@ -481,6 +532,9 @@
                 </div>
                 {#if !captureStatus[side] && cameraIssue[side]}
                   <p class="capture-status is-error" role="status">{cameraIssue[side].text}</p>
+                {/if}
+                {#if noImage[side]}
+                  <p class="cam-hint">{$m.lv_camera_no_image}</p>
                 {/if}
                 {#if captureStatus[side]}
                   <p

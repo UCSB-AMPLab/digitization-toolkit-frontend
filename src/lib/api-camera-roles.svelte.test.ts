@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { ApiError, camerasApi } from './api';
+import { ApiError, camerasApi, isPreviewFrameFailed, isPreviewFrameFailedResponse } from './api';
 
 function json(body: unknown, status = 200) {
 	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -79,5 +79,39 @@ describe('camerasApi.previewFrame', () => {
 		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ detail: 'Camera 1 not found' }, 404));
 		const err = await camerasApi.previewFrame(1).catch((e) => e);
 		expect(err.status).toBe(404);
+		expect(isPreviewFrameFailed(err)).toBe(false);
+	});
+
+	// NEH-349: a connected camera that sent no frame answers 503 with
+	// detail.code preview_frame_failed; the next request may get one.
+	const FAILED = { code: 'preview_frame_failed', message: 'The camera is connected but did not send a preview frame.' };
+
+	it('the 503 preview_frame_failed throws an ApiError that isPreviewFrameFailed recognises', async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ detail: FAILED }, 503));
+		const err = await camerasApi.previewFrame(0).catch((e) => e);
+		expect(err).toBeInstanceOf(ApiError);
+		expect(err.status).toBe(503);
+		expect(err.detail).toEqual(FAILED);
+		expect(err.message).toBe(FAILED.message);
+		expect(isPreviewFrameFailed(err)).toBe(true);
+	});
+
+	it('a 503 without the code, or another status with it, is not that answer', async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ detail: 'Capture system not available: x' }, 503));
+		const busy = await camerasApi.previewFrame(0).catch((e) => e);
+		expect(busy.status).toBe(503);
+		expect(busy.message).toBe('Capture system not available: x');
+		expect(isPreviewFrameFailed(busy)).toBe(false);
+		expect(isPreviewFrameFailed(new ApiError('x', FAILED, 500))).toBe(false);
+		expect(isPreviewFrameFailed(new Error('x'))).toBe(false);
+	});
+
+	it('isPreviewFrameFailedResponse reads a raw response without using up its body', async () => {
+		const failed = json({ detail: FAILED }, 503);
+		expect(await isPreviewFrameFailedResponse(failed)).toBe(true);
+		expect(await failed.json()).toEqual({ detail: FAILED });
+		expect(await isPreviewFrameFailedResponse(json({ detail: 'Capture system not available: x' }, 503))).toBe(false);
+		expect(await isPreviewFrameFailedResponse(new Response('', { status: 503 }))).toBe(false);
+		expect(await isPreviewFrameFailedResponse(json({ detail: FAILED }, 404))).toBe(false);
 	});
 });

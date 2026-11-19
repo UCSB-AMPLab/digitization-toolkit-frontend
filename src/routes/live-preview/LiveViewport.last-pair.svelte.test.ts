@@ -79,6 +79,9 @@ function stubFetch(opts: {
   thumbHold?: { promise: Promise<void> } | null;
   previewStatus?: Partial<Record<number, number>>;
   thumbStatus?: Partial<Record<number, number>>;
+  // A camera set to true answers 503 with the preview_frame_failed code.
+  // Read at each request, so a test can change it.
+  previewNoFrame?: Partial<Record<number, boolean>>;
 }) {
   const previewCalls: number[] = [];
   const thumbCalls: number[] = [];
@@ -89,6 +92,12 @@ function stubFetch(opts: {
       const idx = Number(preview[1]);
       previewCalls.push(idx);
       if (opts.hold) await opts.hold.promise;
+      if (opts.previewNoFrame?.[idx]) {
+        return new Response(JSON.stringify({ detail: { code: 'preview_frame_failed', message: 'No frame.' } }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
       const status = opts.previewStatus?.[idx];
       if (status) return new Response(null, { status });
       const size = opts.preview?.[idx];
@@ -1033,5 +1042,56 @@ describe('LiveViewport — a page capture in flight (NEH-334)', () => {
     expect(paneSource(screen.container, 0)).toBe(en.lv_preview_unsaved);
     expect(previewCalls).toEqual([0, 0]);
     await expect.element(refreshButton()).toBeEnabled();
+  });
+});
+
+// One state per answer: a capture that fills a pane ends that camera's
+// no-image notice, which nothing else clears in this mode.
+describe('LiveViewport last-pair mode — a capture ends the no-image notice (NEH-349)', () => {
+  const paneNotice = (c: HTMLElement, pane: number) =>
+    c.querySelectorAll('.camera-feed')[pane]?.querySelector('.camera-missing')?.textContent ?? null;
+
+  it('after 3 no-frame refreshes a successful capture shows the pair with no notice over it', async () => {
+    capsWith(false);
+    const previewNoFrame: Partial<Record<number, boolean>> = {};
+    stubFetch({ preview: { 0: { w: 400, h: 300 } }, thumbs: { 11: { w: 222, h: 300 } }, previewNoFrame });
+    vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true, record_id: 5, image_ids: [11] });
+    const screen = renderViewport(baseProps());
+    const c = screen.container;
+    await waitForPane(c, 0, 400);
+    previewNoFrame[0] = true;
+    for (let i = 0; i < 3; i++) {
+      await refreshButton().click();
+      await settle();
+    }
+    await expect.poll(() => paneNotice(c, 0)).toBe(en.lv_camera_no_image);
+
+    await userEvent.click(page.getByRole('button', { name: en.lv_capture_btn, exact: true }));
+    await waitForPane(c, 0, 222);
+    await settle();
+    expect(paneSource(c, 0)).toBe(en.lv_last_capture);
+    expect(paneNotice(c, 0)).toBeNull();
+  });
+
+  it('the count starts again after the capture: two more no-frame refreshes show no notice', async () => {
+    capsWith(false);
+    const previewNoFrame: Partial<Record<number, boolean>> = {};
+    stubFetch({ preview: { 0: { w: 400, h: 300 } }, thumbs: { 11: { w: 222, h: 300 } }, previewNoFrame });
+    vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true, record_id: 5, image_ids: [11] });
+    const screen = renderViewport(baseProps());
+    const c = screen.container;
+    await waitForPane(c, 0, 400);
+    previewNoFrame[0] = true;
+    for (let i = 0; i < 2; i++) {
+      await refreshButton().click();
+      await settle();
+    }
+    await userEvent.click(page.getByRole('button', { name: en.lv_capture_btn, exact: true }));
+    await waitForPane(c, 0, 222);
+    for (let i = 0; i < 2; i++) {
+      await refreshButton().click();
+      await settle();
+    }
+    expect(paneNotice(c, 0)).toBeNull();
   });
 });

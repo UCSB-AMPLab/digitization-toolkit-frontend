@@ -955,6 +955,7 @@ export const es = {
 	lv_no_signal_right: 'Sin señal — Derecha',
 	lv_check_hw: 'Verifica la conexión de la cámara',
 	lv_camera_missing: 'Cámara no detectada. Presiona el disparador hasta la mitad o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".',
+	lv_camera_no_image: 'La cámara está conectada, pero no envía ninguna imagen. Apágala y vuelve a encenderla. Si sigue igual, desconecta el cable USB de la cámara y vuelve a conectarlo.',
 	lv_rotate_ccw: 'Girar a la izquierda',
 	lv_rotate_cw: 'Girar a la derecha',
 	lv_orientation_save_failed: (camera: string): string =>
