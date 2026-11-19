@@ -27,6 +27,10 @@ import { en } from '$lib/i18n/en';
 import { FOCUS_CHECK_AFTER_MS, clearFocusActivity, readFocusActivity, recordFocusActivity } from '$lib/focus-check';
 import { clearChord, readChords, DEFAULT_CHORDS } from '$lib/capture-key';
 import '../../app.css';
+import GuidedTour from '$lib/components/GuidedTour.svelte';
+import { tour } from '$lib/tour';
+import { dialogOpen, openDialogCount } from '$lib/dialog';
+import { get } from 'svelte/store';
 import LivePreview from './+page.svelte';
 
 const USER = 3;
@@ -130,6 +134,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	tour.stop();
 	vi.restoreAllMocks();
 	authStore.clearSession();
 	localStorage.clear();
@@ -465,5 +470,22 @@ describe('the check waits for any open dialog (NEH-339)', () => {
 		await expect.poll(() => refocusDialog()).toBeNull();
 		document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', bubbles: true, cancelable: true }));
 		await expect.poll(() => readChords()[0]?.key).toBe('x');
+	});
+
+	// The guided tour is not a dialog: it stays out of the registry, so the
+	// capture key captures while its box is shown.
+	it('the capture key captures while the guided tour is shown, and the tour is not counted as a dialog', async () => {
+		recordFocusActivity(USER, Date.now());
+		const captures = serve(true);
+		tour.start();
+		render(GuidedTour);
+		render(LivePreview);
+		await expect.poll(() => captureButton()?.disabled).toBe(false);
+		await expect.poll(() => document.querySelector('.tour-box')).not.toBeNull();
+		expect(openDialogCount()).toBe(0);
+		expect(get(dialogOpen)).toBe(false);
+
+		pressCaptureKey();
+		await expect.poll(() => captures.length).toBe(1);
 	});
 });

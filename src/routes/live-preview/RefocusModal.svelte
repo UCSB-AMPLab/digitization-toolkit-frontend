@@ -455,7 +455,10 @@
                 onpointercancel={(e) => pz.endDrag(e)}
                 onlostpointercapture={(e) => pz.endDrag(e)}
               >
-                <span class="img-viewer-badge rf-badge">{side === 'left' ? $m.badge_left : $m.badge_right}</span>
+                <!-- `side` is the role: `left` is the right camera's even/verso page. -->
+                <span class="img-viewer-badge rf-badge" aria-hidden="true" title={side === 'left' ? $m.cam_page_even : $m.cam_page_odd}>
+                  <span class="material-symbols-outlined badge-cam" aria-hidden="true">photo_camera</span><span class="badge-letter">{side === 'left' ? $m.badge_cam_right : $m.badge_cam_left}</span><span class="page-term badge-term">{side === 'left' ? $m.page_term_even : $m.page_term_odd}</span>
+                </span>
                 {#if shot.status === 'ok' && shot.url}
                   <img
                     src={shot.url}
@@ -596,4 +599,16 @@
   .rf-no-focus ul { margin: 0; padding-left: 1.25rem; }
   .rf-pane-empty { margin: 0; padding: 0 0.75rem; font-size: var(--text-sm); color: var(--color-light-grey); text-align: center; }
   .rf-spacer { flex: 1; }
+
+  /* The camera symbol and the page term inside a picture's badge. */
+  .badge-cam {
+    font-size: 1.1em;
+    vertical-align: -0.15em;
+    margin-right: 2px;
+  }
+
+  .badge-term {
+    font-weight: normal;
+    margin-left: 4px;
+  }
 </style>

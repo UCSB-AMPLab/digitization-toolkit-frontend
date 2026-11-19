@@ -7,6 +7,9 @@
   import { locale } from '$lib/i18n';
   import { onMount } from 'svelte';
   import { initErrorCapture } from '$lib/bug-report/error-capture';
+  import { authApi } from '$lib/api';
+  import { authStore } from '$lib/stores/auth';
+  import { startSessionKeepalive } from '$lib/session-keepalive';
 
   let { children, data } = $props();
 
@@ -15,6 +18,17 @@
   // setting it once per load is enough.
   locale.set(data.locale);
   onMount(() => { initErrorCapture(); });
+
+  // Renews the session while someone uses the interface (NEH-355). Here
+  // rather than in the dashboard layout so that every signed-in page has it,
+  // the capture screen (/live-preview) included, which is outside that layout.
+  onMount(() =>
+    startSessionKeepalive({
+      target: window,
+      renew: () => authApi.refreshSession(),
+      isSignedIn: () => authStore.isAuthenticated()
+    })
+  );
 </script>
 
 <svelte:head>

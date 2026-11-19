@@ -52,8 +52,8 @@ describe('camera check strings', () => {
 		expect(en.camcheck_back).toBe('Back to capturing');
 		expect(en.camcheck_take).toBe('Take test captures');
 		expect(en.camcheck_discarded).toBe('Captua does not save test captures to the volume.');
-		expect(en.camcheck_left_page).toBe('Left page');
-		expect(en.camcheck_right_page).toBe('Right page');
+		expect(en.camcheck_left_page).toBe('Right camera · even/verso');
+		expect(en.camcheck_right_page).toBe('Left camera · odd/recto');
 		expect(en.camcheck_no_capture).toBe('No test capture yet');
 		expect(en.camcheck_zoom_both).toBe('Zoom · both cameras');
 		expect(en.camcheck_zoom_each).toBe('Zoom · each camera');
@@ -62,11 +62,12 @@ describe('camera check strings', () => {
 		expect(en.camcheck_match).toBe('Match');
 		expect(en.camcheck_focus_hint).toBe('Press 1:1 on a capture to see it at full size. The text must be sharp.');
 		expect(en.camcheck_focal_differ_title).toBe('The two cameras are at different focal lengths.');
-		expect(en.camcheck_unreachable_title('right')).toBe('Captua could not reach the right page camera.');
+		expect(en.camcheck_unreachable_title('right')).toBe('Captua could not reach the left camera.');
+		expect(en.camcheck_unreachable_title('left')).toBe('Captua could not reach the right camera.');
 		expect(en.camcheck_frame_unreachable).toBe('Captua could not reach this camera.');
 		expect(en.camcheck_viewer_title).toBe('Test captures at full size');
-		expect(en.camcheck_chip_aria('left')).toBe('Left page camera: show details');
-		expect(en.camcheck_turn_aria('right')).toBe('Turn the right page capture 90° clockwise');
+		expect(en.camcheck_chip_aria('left')).toBe('Right camera · even/verso: show details');
+		expect(en.camcheck_turn_aria('right')).toBe('Turn the capture of the odd/recto page 90° clockwise');
 		expect(en.camcheck_turn_title).toBe('Turn 90° clockwise');
 	});
 
@@ -98,6 +99,32 @@ describe('camera check strings', () => {
 	});
 });
 
+describe('camera and page names (NEH-379)', () => {
+	it('a camera is named left or right, a page odd/recto or even/verso; role `left` is the right camera', () => {
+		expect(en.cam_page_odd).toBe('Left camera · odd/recto');
+		expect(en.cam_page_even).toBe('Right camera · even/verso');
+		expect(es.cam_page_odd).toBe('Cámara izquierda · impar/recto');
+		expect(es.cam_page_even).toBe('Cámara derecha · par/verso');
+		expect([en.badge_cam_left, en.badge_cam_right]).toEqual(['L', 'R']);
+		expect([es.badge_cam_left, es.badge_cam_right]).toEqual(['I', 'D']);
+		expect([en.page_term_odd, en.page_term_even]).toEqual(['odd/recto', 'even/verso']);
+		expect([es.page_term_odd, es.page_term_even]).toEqual(['impar/recto', 'par/verso']);
+		expect(en.camcheck_right_page).toBe(en.cam_page_odd);
+		expect(es.camcheck_left_page).toBe(es.cam_page_even);
+		expect(en.focus_mf_warning('left')).toBe('The right camera still reads AF. Set its lens to MF before you continue.');
+		expect(en.focus_focal_mismatch(27, 35)).toContain('(left 35 mm, right 27 mm)');
+		expect(es.focus_focal_mismatch(27, 35.5)).toContain('(izquierda 35,5 mm, derecha 27 mm)');
+		expect(en.lv_orientation_swapped).toBe('Swap the pages of the two cameras (camera 2 now photographs the even/verso page)');
+		expect(es.lv_orientation_normal).toBe('Intercambiar las páginas de las dos cámaras (ahora la cámara 1 fotografía la página par/verso)');
+		expect([en.dash_camera_left, en.dash_camera_right, en.dash_camera_n(1)]).toEqual(['Right camera', 'Left camera', 'Camera 1']);
+		expect([es.dash_camera_left, es.dash_camera_right, es.dash_camera_n(2)]).toEqual(['Cámara derecha', 'Cámara izquierda', 'Cámara 2']);
+		for (const key of ['badge_left', 'badge_right']) {
+			expect(key in en, key).toBe(false);
+			expect(key in es, key).toBe(false);
+		}
+	});
+});
+
 describe('"Which camera is this?" strings (NEH-343)', () => {
 	const W = 'camwhich_';
 
@@ -122,10 +149,11 @@ describe('"Which camera is this?" strings (NEH-343)', () => {
 			expect(text, key).not.toMatch(/picture/i);
 			expect(text, key).not.toMatch(/identification failed/i);
 		}
-		expect(en.camwhich_ask_title).toBe('Which camera sees the left page?');
-		expect(en.camwhich_port_title).toBe('Have the cameras been swapped?');
-		expect(en.camwhich_port_no).toBe('No, they are where they were');
-		expect(en.camwhich_port_yes).toBe('Yes, they were swapped');
+		expect(en.camwhich_ask_title).toBe('Which image is the odd/recto page?');
+		for (const key of ['camwhich_port_title', 'camwhich_port_no', 'camwhich_port_yes']) {
+			expect(key in en, key).toBe(false);
+			expect(key in es, key).toBe(false);
+		}
 		expect(en.camwhich_confirm).toBe('Confirm');
 		expect(en.camwhich_refresh).toBe('Refresh');
 		expect(en.camwhich_open).toBe('Change the page of each camera');
@@ -134,14 +162,17 @@ describe('"Which camera is this?" strings (NEH-343)', () => {
 		expect(en.camwhich_rescan_failed).toBe('Captua could not reconnect the cameras.');
 		expect(es.camwhich_rescan_failed).toBe('Captua no pudo reconectar las cámaras.');
 		expect(en.camwhich_check_again).toBe('Reconnect cameras');
-		expect(en.camwhich_how).toBe('Press the image that shows the left page. Turn an image that is sideways or upside down.');
+		expect(en.camwhich_how).toBe('Press the image of the odd/recto page. Turn an image that is sideways or upside down.');
+		expect(es.camwhich_how).toBe('Presiona la imagen de la página impar/recto. Si una imagen está de lado o al revés, gírala.');
+		expect(es.camwhich_ask_title).toBe('¿Cuál de las dos imágenes es la página impar/recto?');
+		expect(en.camwhich_pick_aria(2)).toBe('Camera 2 photographs the odd/recto page');
+		expect(en.camwhich_guess('left')).toBe("Captua's guess: even/verso page");
+		expect(es.camwhich_guess('right')).toBe('Captua cree que es la página impar/recto');
 		expect(en.camwhich_err_failed).toBe('Captua could not save which page each camera photographs.');
 		expect(es.camwhich_open).toBe('Cambiar la página de cada cámara');
-		expect(es.camwhich_port_title).toBe('¿Alguien cambió las cámaras de lado?');
-		expect(es.camwhich_port_yes).toBe('Sí, las cambiaron de lado');
 		expect(es.camwhich_check_again).toBe('Reconectar cámaras');
-		expect(es.camwhich_err_not_connected).toBe('Captua no pudo guardar la respuesta porque una cámara ya no estaba conectada. Revisa que las dos cámaras estén conectadas y vuelve a elegir la imagen de la página izquierda.');
-		expect(es.camwhich_err_unavailable).toBe('Captua no pudo guardar qué página fotografía cada cámara. Intenta de nuevo en un momento.');
+		expect(es.camwhich_err_not_connected).toBe('Captua no pudo guardar la respuesta porque una cámara ya no estaba conectada. Revisa que las dos cámaras estén conectadas y vuelve a presionar la imagen de la página impar/recto.');
+		expect(es.camwhich_err_unavailable).toBe('Captua no pudo guardar qué página fotografía cada cámara. Vuelve a intentarlo en un momento.');
 	});
 
 	it('Spanish: the house terms', () => {

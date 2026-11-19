@@ -8,6 +8,9 @@ import { render } from 'vitest-browser-svelte';
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
+import { authStore } from '$lib/stores/auth';
+import { locale } from '$lib/i18n';
+import { en } from '$lib/i18n/en';
 import StorageAlert from './StorageAlert.svelte';
 
 const GIB = 1024 ** 3;
@@ -39,6 +42,7 @@ const banner = (container: HTMLElement) => container.querySelector('.storage-ale
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	authStore.clearSession();
 });
 
 describe('dashboard storage banner', () => {
@@ -85,4 +89,32 @@ describe('dashboard storage banner', () => {
 		await expect.poll(() => fetchSpy.mock.calls.length).toBe(2);
 		await expect.poll(() => banner(container)).toBeNull();
 	});
+});
+
+describe('dashboard storage banner: the Settings link (NEH-253)', () => {
+	it('links an administrator to Settings > Storage', async () => {
+		locale.set('en');
+		authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
+		respond({ status: 200, body: storage(51, 60) });
+		const { container } = render(StorageAlert);
+		await expect.poll(() => banner(container)).not.toBeNull();
+		const link = banner(container)!.querySelector('a');
+		expect(link?.getAttribute('href')).toBe('/dashboard/config?section=storage');
+		expect(link?.textContent).toBe(en.nav_settings);
+	});
+
+	for (const role of ['operator', 'reviewer'] as const) {
+		it(`tells the ${role} to ask the administrator, with no Settings text or link`, async () => {
+			locale.set('en');
+			authStore.setSession({ id: 2, username: role, email: null, role, is_active: true });
+			respond({ status: 200, body: storage(51, 60) });
+			const { container } = render(StorageAlert);
+			await expect.poll(() => banner(container)).not.toBeNull();
+			expect(banner(container)!.querySelector('a')).toBeNull();
+			expect(banner(container)!.textContent).not.toContain(en.nav_settings);
+			expect(banner(container)!.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+				`${en.dash_storage_alert_p1}85%${en.dash_storage_alert_ask_admin('51 GB', '60 GB')}`
+			);
+		});
+	}
 });

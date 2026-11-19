@@ -1,6 +1,6 @@
 <script lang="ts">
   // The camera check's test captures at full size (NEH-339): both captures
-  // side by side, left page and right page, under one zoom and one pan
+  // side by side, the even/verso page (role `left`) and the odd/recto page (role `right`), under one zoom and one pan
   // (src/lib/pair-pan-zoom.svelte.ts, as in the Refocus dialog's
   // test-pictures stage). It opens at 1:1 on the centre once both captures
   // are measured; Fit, 1:1 and the zoom steps sit in the header. Each

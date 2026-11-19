@@ -38,6 +38,7 @@
   import { stemProblem } from '$lib/volume-stem';
   import { fisquaRefusalText, fisquaVolumeRefusal, volumeSaveErrorText, type FisquaVolumeRefusal } from '$lib/volume-errors';
   import { reloadUnit, unitState, volumeCodesReadOnly } from '$lib/unit-mode';
+  import { dismissible } from '$lib/dialog';
   import VolumeStemField from './VolumeStemField.svelte';
 
   let {
@@ -198,9 +199,7 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={(e) => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) onClose(); }}>
+<div class="modal-backdrop" use:dismissible={{ onDismiss: onClose, escape: false }}>
   <!-- No Escape: it would throw away what was typed. -->
   <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
 

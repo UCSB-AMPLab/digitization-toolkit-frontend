@@ -873,7 +873,7 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 		const pairs = [...row.querySelectorAll('.q-pair')].map((p) => p.textContent?.replace(/\s+/g, ' ').trim());
 		// The record title, the same on every row of a volume, is not repeated (NEH-312);
 		// the side is shown when Fisqua names one page.
-		expect(pairs).toEqual(['Sequence 12 · Right page', 'Sequence 14', 'Record #999 · Left page']);
+		expect(pairs).toEqual(['Sequence 12 · Odd/recto page', 'Sequence 14', 'Record #999 · Even/verso page']);
 		expect(row.textContent).not.toContain('f. 12');
 		// Only the spot recapture has the block.
 		expect(screen.container.querySelectorAll('.q-pairs')).toHaveLength(1);

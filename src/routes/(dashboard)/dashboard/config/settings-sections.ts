@@ -1,0 +1,46 @@
+// The sections of Settings (/dashboard/config, NEH-253) and the roles that
+// may open each. Network and Language are every role's; the Unit group is
+// the administrator's. The page shows only the sections of the signed-in
+// role, and a section asked for that the role may not open (by URL or by
+// state) resolves to Network, so a non-admin never renders an admin section.
+// The backend enforces the same roles on every route these sections use.
+//
+// Version: 0.3.3
+
+import type { StringMessageKey } from '$lib/i18n';
+
+export interface SettingsSection {
+	id: string;
+	labelKey: StringMessageKey;
+	/** True for the administrator's sections, under the Unit group. */
+	unit: boolean;
+}
+
+export const SETTINGS_SECTIONS: SettingsSection[] = [
+	{ id: 'network', labelKey: 'config_section_network', unit: false },
+	{ id: 'language', labelKey: 'config_section_language', unit: false },
+	{ id: 'unit-mode', labelKey: 'unit_section_title', unit: true },
+	{ id: 'fisqua-link', labelKey: 'fisqua_link_title', unit: true },
+	{ id: 'storage', labelKey: 'config_section_storage', unit: true },
+	{ id: 'offsite-copy', labelKey: 'backup_section_title', unit: true },
+	{ id: 'diagnostics', labelKey: 'config_section_diagnostics', unit: true },
+	{ id: 'maintenance', labelKey: 'config_section_maintenance', unit: true },
+	{ id: 'power', labelKey: 'config_section_power', unit: true }
+];
+
+export const DEFAULT_SECTION = 'network';
+
+export function sectionsFor(role: string | null | undefined): SettingsSection[] {
+	return SETTINGS_SECTIONS.filter((s) => !s.unit || role === 'admin');
+}
+
+/** The section to show for `requested`: itself when the role may open it, else Network. */
+export function resolveSection(requested: string | null | undefined, role: string | null | undefined): SettingsSection {
+	const allowed = sectionsFor(role);
+	return allowed.find((s) => s.id === requested) ?? allowed.find((s) => s.id === DEFAULT_SECTION)!;
+}
+
+/** The section a Settings URL names: ?section=, or the hash of older links (#offsite-copy). */
+export function sectionInUrl(url: URL): string | null {
+	return url.searchParams.get('section') || (url.hash ? url.hash.slice(1) : null) || null;
+}

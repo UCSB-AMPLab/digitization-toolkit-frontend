@@ -245,6 +245,26 @@ describe('RefocusModal: test pictures', () => {
 		await expect.poll(() => paneImg('right')?.naturalWidth ?? 0).toBe(400);
 	});
 
+	it('each pane names its camera and page: a camera symbol and letter from the role, the page term, both facts as title and alt', async () => {
+		captureSpy.mockImplementation(async () => shot(400, 300));
+		await toTestStage();
+		await click(en.focus_take);
+		await expect.poll(() => paneImg('left')).not.toBeNull();
+		await expect.poll(() => paneImg('right')).not.toBeNull();
+		for (const [side, letter, term, both] of [
+			['left', en.badge_cam_right, en.page_term_even, en.cam_page_even],
+			['right', en.badge_cam_left, en.page_term_odd, en.cam_page_odd]
+		] as const) {
+			const badge = pane(side)!.querySelector('.img-viewer-badge') as HTMLElement;
+			expect(badge.querySelector('.badge-letter')?.textContent?.trim(), side).toBe(letter);
+			expect(badge.querySelector('.material-symbols-outlined')?.textContent?.trim(), side).toBe('photo_camera');
+			expect(badge.querySelector('.page-term')?.textContent?.trim(), side).toBe(term);
+			expect(badge.getAttribute('title'), side).toBe(both);
+			expect(badge.getAttribute('aria-hidden'), side).toBe('true');
+			expect(paneImg(side)?.getAttribute('alt'), side).toBe(both);
+		}
+	});
+
 	it('shows the seconds elapsed; "Take again" and the primary "Next" wait for a picture to arrive', async () => {
 		const answers = [deferred<TestCaptureResult>(), deferred<TestCaptureResult>()];
 		captureSpy.mockImplementation((i: number) => answers[i].promise);

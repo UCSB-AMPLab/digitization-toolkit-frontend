@@ -20,7 +20,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import '../../app.css';
 
 import LiveViewport from './LiveViewport.svelte';
-import { ApiError, camerasApi, type CaptureResponse } from '$lib/api';
+import { ApiError, camerasApi, type CameraDevice, type CaptureResponse } from '$lib/api';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
@@ -795,5 +795,85 @@ describe('LiveViewport — the swap orders a pair only', () => {
     window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
     await expect.poll(() => dualSpy.mock.calls.length).toBe(1);
     expect(dualSpy.mock.calls[0][0].left_camera_index).toBe(1);
+  });
+});
+
+// NEH-379: once the roles are confirmed (`swapLocked`), the left pane shows
+// the even/verso page and names the right camera, the right pane the
+// odd/recto page and the left camera. Before that, capture is blocked by the
+// camera step and the panes name their camera by number only; in
+// single-camera mode they name neither a side nor a page.
+describe('LiveViewport — pane names', () => {
+  const alts = () => [...document.querySelectorAll<HTMLImageElement>('img.feed-img')].map((i) => i.getAttribute('alt'));
+  const noSignal = () => [...document.querySelectorAll('.no-stream > span')].map((s) => s.textContent?.trim());
+  // Frames that never arrive: the panes show "No signal".
+  const hangPreviews = () => vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+
+  beforeEach(() => locale.set('en'));
+
+  it('roles confirmed: both facts on each picture, the camera on "No signal"', async () => {
+    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+    renderViewport(baseProps({ cameraMode: 'double', swapLocked: true, swapped: true }));
+    await expect.poll(() => alts()).toEqual([en.lv_camera_left_alt, en.lv_camera_right_alt]);
+    expect(alts()).toEqual(['Right camera · even/verso', 'Left camera · odd/recto']);
+  });
+
+  it('roles confirmed, no frame yet: "No signal" names the camera', async () => {
+    hangPreviews();
+    renderViewport(baseProps({ cameraMode: 'double', swapLocked: true }));
+    await expect.poll(() => noSignal()).toEqual([en.lv_no_signal_left, en.lv_no_signal_right]);
+  });
+
+  it('roles not confirmed: the plain camera name and number of the camera in each pane', async () => {
+    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+    renderViewport(baseProps({ cameraMode: 'double', swapLocked: false, swapped: true }));
+    await expect.poll(() => alts()).toEqual([`${en.cam_fallback_name} 2`, `${en.cam_fallback_name} 1`]);
+  });
+
+  it('roles not confirmed, no frame yet: "No signal" alone', async () => {
+    hangPreviews();
+    renderViewport(baseProps({ cameraMode: 'double', swapLocked: false }));
+    await expect.poll(() => noSignal()).toEqual([en.lv_no_signal, en.lv_no_signal]);
+  });
+
+  const feedLabels = () => [...document.querySelectorAll<HTMLElement>('.feed-label')].map((l) => [l.textContent?.trim(), l.getAttribute('title')]);
+  const cams = [
+    { index: 0, label: 'Cam A', model: 'ModelA' },
+    { index: 1, label: '', model: 'ModelB' }
+  ] as unknown as CameraDevice[];
+
+  it('roles confirmed: the visible label under each picture is the both-facts label, the words and then the camera as its title', async () => {
+    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+    renderViewport(baseProps({ cameraMode: 'double', swapLocked: true, devices: cams }));
+    await expect.poll(() => feedLabels()).toEqual([[en.lv_camera_left_alt, `${en.lv_camera_left_alt} · Cam A`], [en.lv_camera_right_alt, `${en.lv_camera_right_alt} · ModelB`]]);
+  });
+
+  it('roles not confirmed: the visible label is the camera name and number, as the alt, the camera as its title', async () => {
+    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+    renderViewport(baseProps({ cameraMode: 'double', swapLocked: false, devices: cams }));
+    await expect.poll(() => feedLabels()).toEqual([[`${en.cam_fallback_name} 1`, 'Cam A'], [`${en.cam_fallback_name} 2`, 'ModelB']]);
+  });
+
+  it('single-camera mode: the camera label, no number and no brackets', async () => {
+    stubPreviewFetch({ 0: { w: 40, h: 30 } });
+    renderViewport(baseProps({ cameraMode: 'single', swapLocked: true, devices: cams }));
+    await expect.poll(() => feedLabels()).toEqual([['Cam A', null]]);
+  });
+
+  it('single-camera mode without a device: the fallback name alone', async () => {
+    stubPreviewFetch({ 0: { w: 40, h: 30 } });
+    renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
+    await expect.poll(() => feedLabels()).toEqual([[en.cam_fallback_name, null]]);
+  });
+
+  it('single-camera mode: neither a side nor a page, in Spanish too', async () => {
+    locale.set('es');
+    stubPreviewFetch({ 0: { w: 40, h: 30 } });
+    const screen = renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
+    await expect.poll(() => alts()).toEqual([es.cam_fallback_name]);
+    screen.unmount();
+    hangPreviews();
+    renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
+    await expect.poll(() => noSignal()).toEqual([es.lv_no_signal]);
   });
 });

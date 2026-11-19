@@ -122,7 +122,7 @@ describe('floating controls fit the viewport (NEH-323)', () => {
 			const { panel, buttons } = boxes(screen);
 			const labels = buttons.map((b) => b.label);
 			expect(labels.slice(0, 6)).toEqual(['Hide controls', 'Zoom in', 'Zoom out', 'Fit to screen', 'Grid settings', 'Capture pedal and key']);
-			if (mode === 'double') expect(labels[6]).toBe('Swap left and right');
+			if (mode === 'double') expect(labels[6]).toBe('Swap the pages of the two cameras');
 			expect(panel.querySelector('.float-divider')).toBeNull();
 			// The toggle stays on the panel's right edge, which stays at the viewport's.
 			const toggle = buttons[0].r;

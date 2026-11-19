@@ -64,25 +64,25 @@ describe('reconnect screen wiring', () => {
     const screen = render(Dashboard);
     await expect.element(screen.getByText('Recovered left', { exact: true })).toBeVisible();
     await screen.getByRole('button', { name: 'Reconnect cameras' }).click();
-    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: /Camera 1/ }).click();
     await screen.getByRole('button', { name: 'Test', exact: true }).click();
     expect(fetch).toHaveBeenCalled();
     if (order === 'preview-first') { preview.resolve(new Response('', { status: 404 })); await tick(); }
     rescan.resolve(devices);
     await expect.element(screen.getByRole('button', { name: 'Reconnect cameras' })).toBeEnabled();
     if (order === 'reconnect-first') { preview.resolve(new Response('', { status: 404 })); await preview.promise; await tick(); }
-    await expect.element(screen.getByRole('button', { name: /Left Scanner Camera/ })).toHaveTextContent('OK');
+    await expect.element(screen.getByRole('button', { name: /Camera 1/ })).toHaveTextContent('OK');
   });
 
   it('a one-side 404 leaves the other side unknown', async () => {
     vi.spyOn(camerasApi, 'listDevices').mockReturnValue(new Promise(() => {}));
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 404 })));
     const screen = render(Dashboard);
-    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: /Camera 1/ }).click();
     await screen.getByRole('button', { name: 'Test', exact: true }).click();
     expect(fetch).toHaveBeenCalled();
-    await expect.element(screen.getByRole('button', { name: /Left Scanner Camera/ })).toHaveTextContent('Not detected');
-    await expect.element(screen.getByRole('button', { name: /Right Scanner Camera/ })).not.toHaveTextContent('Not detected');
+    await expect.element(screen.getByRole('button', { name: /Camera 1/ })).toHaveTextContent('Not detected');
+    await expect.element(screen.getByRole('button', { name: /Camera 2/ })).not.toHaveTextContent('Not detected');
   });
 
   it('an accepted preview 404 survives the initial list; a fresh list fills the other side', async () => {
@@ -92,7 +92,7 @@ describe('reconnect screen wiring', () => {
       .mockReturnValueOnce(initial.promise).mockReturnValueOnce(fresh.promise);
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 404 })));
     const screen = render(Dashboard);
-    const left = screen.getByRole('button', { name: /Left Scanner Camera/ });
+    const left = screen.getByRole('button', { name: /Camera 1/ });
     await left.click();
     await screen.getByRole('button', { name: 'Test', exact: true }).click();
     await expect.element(left).toHaveTextContent('Not detected');
@@ -124,7 +124,7 @@ describe('reconnect screen wiring', () => {
     vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
     vi.spyOn(camerasApi, 'calibrate').mockRejectedValue(new Error('Capture system not available'));
     const screen = render(Dashboard);
-    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: /Camera 1/ }).click();
     await screen.getByRole('button', { name: 'Focus', exact: true }).click();
     await expect.element(screen.getByRole('status')).toHaveTextContent('Could not focus');
   });
@@ -138,7 +138,7 @@ describe('reconnect screen wiring', () => {
     const screen = render(Dashboard);
     await expect.element(screen.getByText('Recovered left', { exact: true })).toBeVisible();
     await screen.getByRole('button', { name: 'Reconnect cameras' }).click();
-    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: /Camera 1/ }).click();
     await screen.getByRole('button', { name: 'Test', exact: true }).click();
     rescan.resolve(devices);
     await expect.element(screen.getByRole('button', { name: 'Reconnect cameras' })).toBeEnabled();
@@ -155,7 +155,7 @@ describe('reconnect screen wiring', () => {
     vi.spyOn(camerasApi, 'testCapture').mockRejectedValue(new Error('boom'));
     vi.spyOn(camerasApi, 'calibrate').mockRejectedValue(new Error('Capture system not available'));
     const screen = render(Dashboard);
-    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: /Camera 1/ }).click();
     await screen.getByRole('button', { name: 'Capture', exact: true }).click();
     await expect.element(screen.getByRole('status')).toHaveTextContent('Test capture failed');
     await screen.getByRole('button', { name: 'Focus', exact: true }).click();
@@ -167,7 +167,7 @@ describe('reconnect screen wiring', () => {
     const fetchMock = vi.fn(async () => new Response('', { status: 503 }));
     vi.stubGlobal('fetch', fetchMock);
     const screen = render(Dashboard);
-    await screen.getByRole('button', { name: /Left Scanner Camera/ }).click();
+    await screen.getByRole('button', { name: /Camera 1/ }).click();
     await screen.getByRole('button', { name: 'Test', exact: true }).click();
     await expect.element(screen.getByRole('status')).toHaveTextContent('Could not show the live preview');
     await screen.getByRole('button', { name: 'Stop', exact: true }).click();
@@ -193,7 +193,7 @@ describe('reconnect screen wiring', () => {
     rescan.resolve(devices);
     await expect.poll(() => onDevicesChange.mock.calls.length).toBe(1);
     if (order === 'reconnect-first') { initial.resolve([]); await initial.promise; await tick(); }
-    expect(onDevicesChange.mock.calls).toEqual([[devices]]);
+    expect(onDevicesChange.mock.calls).toEqual([[devices, 0]]);
     await expect.element(screen.getByText('Recovered left [0]', { exact: true })).toBeVisible();
   });
 });

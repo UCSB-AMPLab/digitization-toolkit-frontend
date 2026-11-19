@@ -165,6 +165,11 @@
 
   let cameraMode = $state<'single' | 'double'>('double');
 
+  // How many roles saves the page has taken in (see applyDevices). Not
+  // reactive: nothing renders from it.
+  let rolesSaves = 0;
+  let controls: CameraControls | undefined = $state();
+
   // Detected camera devices, reported by `CameraControls` through
   // `onDevicesChange` on mount and after every device-list refresh.
   let devices = $state<CameraDevice[]>([]);
@@ -250,10 +255,15 @@
     saveOrientation(cam, device.hardware_id, rotateDeg[cam] ?? 0);
   }
 
-  // The name the viewer's label gives the camera (LiveViewport's cameraLabel).
+  // The camera's name inside the notice's sentence, from the same facts as
+  // the label under its picture (LiveViewport's paneLabel): with the roles
+  // confirmed in double mode, the side its page puts it on (the camera at
+  // `rolesLeft` photographs the even/verso page, on the right); with them
+  // unconfirmed, its number; in single mode, plainly "the camera".
   function orientationCameraName(cam: number): string {
-    const dev = devices.find(d => d.index === cam);
-    return `${dev?.label || dev?.model || $m.cam_fallback_name} [${cam}]`;
+    if (cameraMode === 'single') return $m.lv_camera_in_sentence({ single: true });
+    if (rolesLeft !== null) return $m.lv_camera_in_sentence({ role: cam === rolesLeft ? 'left' : 'right' });
+    return $m.lv_camera_in_sentence({ number: cam + 1 });
   }
 
   let projectName = $state<string>('');
@@ -570,9 +580,15 @@
 
   // The roles were saved: back to where the operator was. The save's
   // set-up supersedes every read started before it, so a read still pending
-  // cannot put the set-up from before the save back on screen.
+  // cannot put the set-up from before the save back on screen. The answer's
+  // device rows go through applyDevices like a listing: a body with no saved
+  // orientation takes the default of its new role, and a rotation turned by
+  // hand in this session stays.
   function rolesSaved(answer: CameraRolesResponse) {
     readSetup.supersede();
+    rolesSaves += 1;
+    void controls?.refreshDevices();
+    if (Array.isArray(answer?.devices) && answer.devices.length > 0) applyDevices(answer.devices);
     cameraSetup = answer.setup;
     setupAnswered = true;
     whichByHand = false;
@@ -1015,10 +1031,27 @@
   // disconnected, the mode is single and the right camera is selected, or the
   // body is reported under a placeholder id), only the local state changes,
   // and the change waits in `rotatePending` until a body is identified there.
-  // Every device listing, from CameraControls: reseeds the rotations, and
-  // asks for the camera set-up on the first listing and whenever the bodies
-  // listed change (NEH-343).
-  function applyDevices(d: CameraDevice[]) {
+  // Every device listing: reseeds the rotations, and asks for the camera
+  // set-up on the first listing and whenever the bodies listed change
+  // (NEH-343).
+  //
+  // A listing requested before the most recent roles save is never applied:
+  // it can answer after the save with the rows from before it, and would put
+  // a body's default rotation back to the one of its old role. The rule is
+  // here, once, for every source of listings, each of which passes the value
+  // of `rolesSaves` read when it requested the listing:
+  //   - CameraControls: the read on mount and its retry loop, the reread
+  //     after a white-balance calibration or a picked white balance, and the
+  //     reconnect (all through `onDevicesChange`, stamped by `savesSeen`);
+  //   - WhichCamera (`onDevices`): its listings are applied only while it is
+  //     open and are never stamped, so they count as requested now; it closes
+  //     on the save and ignores answers after that;
+  //   - the answer of the roles save itself (`rolesSaved`): requested now.
+  // CameraCheck lists devices for its own view and does not call this.
+  // `rolesSaved` also asks CameraControls to list again, so the listings
+  // dropped here are replaced by a current one.
+  function applyDevices(d: CameraDevice[], requestedAt: number = rolesSaves) {
+    if (requestedAt < rolesSaves) return;
     devices = d;
     const seeded = seedRotation(rotateDeg, d, rotateTouched);
     const settled = settlePendingRotations(rotatePending, d);
@@ -1145,7 +1178,9 @@
         onShutterSpeedChange={(v) => shutterSpeed = v}
         onIsoChange={(v) => iso = v}
         onApertureChange={(v) => aperture = v}
+        bind:this={controls}
         onDevicesChange={applyDevices}
+        savesSeen={() => rolesSaves}
         onRotateDegChange={handleRotateDegChange}
         {rotateDeg}
         onRescan={() => void checkSetup()}

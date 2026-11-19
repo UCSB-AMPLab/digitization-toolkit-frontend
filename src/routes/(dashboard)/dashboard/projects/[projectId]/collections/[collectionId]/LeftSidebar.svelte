@@ -436,10 +436,19 @@
     })
   );
 
-  function roleLabel(img: RecordImage): string {
-    if (img.role === 'left')  return 'L';
-    if (img.role === 'right') return 'R';
-    return '·';
+  // The camera letter of a picture of a page: role `right`, the odd/recto
+  // page, is the left camera's; role `left`, the even/verso page, the right
+  // camera's.
+  function cameraLetter(img: RecordImage): string | null {
+    if (img.role === 'left')  return $m.badge_cam_right;
+    if (img.role === 'right') return $m.badge_cam_left;
+    return null;
+  }
+
+  function pageLabel(img: RecordImage): string | undefined {
+    if (img.role === 'left')  return $m.cam_page_even;
+    if (img.role === 'right') return $m.cam_page_odd;
+    return undefined;
   }
 
   function roleName(img: RecordImage, i: number): string {
@@ -512,13 +521,14 @@
 
               {:else}
                 {#each sortedImages as img, i}
+                  {@const letter = cameraLetter(img)}
                   <div class="img-section" class:first={i === 0}>
 
                     <div class="img-section-header">
-                      <span class="role-pill" class:role-right={img.role === 'right'} class:role-single={img.role !== 'left' && img.role !== 'right'}>
-                        {roleLabel(img)}
+                      <span class="role-pill" class:role-right={img.role === 'right'} class:role-single={letter === null} title={pageLabel(img)} role={letter ? 'img' : undefined} aria-label={letter ? pageLabel(img) : undefined}>
+                        {#if letter}<span class="material-symbols-outlined badge-cam" aria-hidden="true">photo_camera</span><span class="badge-letter" aria-hidden="true">{letter}</span>{:else}·{/if}
                       </span>
-                      <span class="img-section-title">{roleName(img, i)}</span>
+                      <span class="img-section-title" aria-hidden={letter ? 'true' : undefined}>{roleName(img, i)}</span>
                     </div>
 
                     <div class="info-rows">
@@ -1054,8 +1064,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
+    min-width: 18px;
     height: 18px;
+    padding: 0 3px;
     border-radius: 4px;
     font-size: 9px;
     font-weight: var(--fw-bold);
@@ -1063,6 +1074,11 @@
     background: rgba(90, 140, 98, 0.2);
     color: var(--color-primary);
     border: 1px solid rgba(90, 140, 98, 0.35);
+  }
+
+  .badge-cam {
+    font-size: 11px;
+    margin-right: 1px;
   }
 
   .role-pill.role-right {

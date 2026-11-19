@@ -144,14 +144,15 @@ describe('GridView L/R pair grouping (NEH-211: pairs read as a single block)', (
 		expect(thumbs.length).toBe(2);
 	});
 
-	it('keeps the L and R badges inside the pair container', async () => {
+	it('keeps the camera badges inside the pair container: the right camera (role left), then the left camera', async () => {
+		locale.set('es');
 		const screen = render(GridView, baseProps({ records: [makePairRecord()] }));
 
 		const pair = screen.container.querySelector('.grid-pair') as HTMLElement;
 		expect(pair).not.toBeNull();
 
-		const badges = Array.from(pair.querySelectorAll('.role-badge')).map((el) => el.textContent);
-		expect(badges).toEqual(['L', 'R']);
+		const badges = Array.from(pair.querySelectorAll('.role-badge .badge-letter')).map((el) => el.textContent?.trim());
+		expect(badges).toEqual([es.badge_cam_right, es.badge_cam_left]);
 	});
 
 	it('renders the document name exactly once per pair, not once per thumbnail', async () => {
@@ -279,7 +280,8 @@ describe('GridView click-to-Book-view (same pattern as ListView row click)', () 
 });
 
 describe('GridView — an opening with a page never photographed (0.3.2)', () => {
-  for (const [side, present, role] of [['left', 'right', 'R'], ['right', 'left', 'L']] as const) {
+  // The letter of the camera that photographed the page present.
+  for (const [side, present, letter] of [['left', 'right', es.badge_cam_left], ['right', 'left', es.badge_cam_right]] as const) {
     it(`missing the ${side} page: the tile is a pair with an empty ${side} half that says so`, async () => {
       locale.set('es');
       const record = makePairRecord({
@@ -294,7 +296,7 @@ describe('GridView — an opening with a page never photographed (0.3.2)', () =>
       expect(missingHalf.querySelector(`[data-missing-side="${side}"]`)).not.toBeNull();
       expect(missingHalf.querySelector('img')).toBeNull();
       expect(imageHalf.querySelector('img.card-image')).not.toBeNull();
-      expect(imageHalf.querySelector('.role-badge')?.textContent).toBe(role);
+      expect(imageHalf.querySelector('.role-badge .badge-letter')?.textContent?.trim()).toBe(letter);
     });
   }
 });

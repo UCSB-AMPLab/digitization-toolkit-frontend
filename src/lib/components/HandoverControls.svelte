@@ -27,6 +27,7 @@
   import { tick } from 'svelte';
   import { collectionsApi, type Record } from '$lib/api';
   import { m } from '$lib/i18n';
+  import { dismissible } from '$lib/dialog';
   import { handoverCounts, handoverLock, handoverOffer, missingSideCount, promoteBlockers } from '$lib/handover';
   import { recapturesPendingCount } from '$lib/recapture-turn';
 
@@ -158,7 +159,6 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (!dialog) return;
-    if (e.key === 'Escape') { closeDialog(); return; }
     // Keep Tab inside the dialog: aria-modal tells assistive technology the
     // rest of the page is inert, but it does not stop the focus leaving.
     if (e.key === 'Tab' && cardEl) {
@@ -200,9 +200,7 @@
 </span>
 
 {#if dialog}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="handover-backdrop" onclick={(e) => { if (e.target === e.currentTarget) closeDialog(); }}>
+  <div class="handover-backdrop" use:dismissible={{ onDismiss: closeDialog, escape: !busy, backdrop: !busy }}>
     <div
       class="handover-card dialog-fit"
       role="dialog"

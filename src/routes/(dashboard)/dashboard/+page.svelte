@@ -63,6 +63,8 @@
   let streamActive   = $state<Record<string, boolean>>({ left: false, right: false });
   let cameraStatus   = $state<Record<string, 'ok' | 'not-found' | 'unknown'>>({ left: 'unknown', right: 'unknown' });
   let cameraModel    = $state<Record<string, string | null>>({ left: null, right: null });
+  // Each panel's camera role from the last listing (see sidesFromDevices).
+  let cameraRole     = $state<Record<string, 'left' | 'right' | null>>({ left: null, right: null });
   type CameraSides = { left: SideInfo; right: SideInfo };
   // Writers: initial enumeration, reconnect, and per-side preview results.
   // List writers use cameraRefresh; previews check its recovery token and
@@ -73,7 +75,18 @@
       if (!info) continue;
       cameraStatus = { ...cameraStatus, [side]: info.status };
       cameraModel = { ...cameraModel, [side]: info.model };
+      if (info.role !== undefined) cameraRole = { ...cameraRole, [side]: info.role };
     }
+  }
+
+  // A panel names its camera from the confirmed set-up: role `right` (the
+  // odd/recto page) is the left camera, role `left` the right camera.
+  // Without one, by number: panel `left` is camera index 0.
+  function cameraName(side: 'left' | 'right'): string {
+    const role = cameraRole[side];
+    if (role === 'right') return $m.dash_camera_right;
+    if (role === 'left') return $m.dash_camera_left;
+    return $m.dash_camera_n(side === 'left' ? 1 : 2);
   }
   const cameraRefresh = createCameraRefresh<CameraSides>(applyCameraSides);
 
@@ -192,8 +205,8 @@
         // A dead login is not a hardware failure; apiRequest redirects (NEH-64).
         if (err instanceof AuthError && err.status === 401) return;
         applyCameraSides({
-          left: { status: 'not-found', model: null },
-          right: { status: 'not-found', model: null }
+          left: { status: 'not-found', model: null, role: null },
+          right: { status: 'not-found', model: null, role: null }
         });
       }
     );
@@ -453,7 +466,7 @@
       <div class="cameras-layout">
         {#each (['left', 'right'] as const) as side}
           {@const isExpanded = expandedCamera === side}
-          {@const label = side === 'left' ? $m.dash_camera_left : $m.dash_camera_right}
+          {@const label = cameraName(side)}
           {@const status = cameraStatus[side]}
           {@const active = streamActive[side]}
 
@@ -489,7 +502,7 @@
               <div class="cam-expanded">
                 <div class="preview-area">
                   {#if previewUrls[side]}
-                    <img src={previewUrls[side]} alt={side === 'left' ? $m.dash_camera_left : $m.dash_camera_right} class="preview-img" />
+                    <img src={previewUrls[side]} alt={label} class="preview-img" />
                   {:else}
                     <div class="no-signal">
                       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -563,7 +576,7 @@
         {#if cameraStatus.left === 'not-found' || cameraStatus.right === 'not-found'}
           {@const missingLabels = (['left', 'right'] as const)
             .filter(side => cameraStatus[side] === 'not-found')
-            .map(side => (side === 'left' ? $m.dash_camera_left : $m.dash_camera_right))
+            .map(side => cameraName(side))
             .join(' / ')}
           <p class="cam-hint">{$m.dash_camera_missing_hint(missingLabels)}</p>
         {/if}

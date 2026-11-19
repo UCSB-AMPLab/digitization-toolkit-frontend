@@ -1,8 +1,9 @@
 <script lang="ts">
   // Inspection modal for one record in the gallery: shows all of the record's
-  // images (with an L/R badge on a two-camera capture) under one shared
-  // pan and zoom, and offers retake and delete within the record's lock. On a
-  // record Fisqua excluded (contract 1.6) it says what the exclusion means.
+  // images (on a two-camera capture, a badge naming each one's camera and
+  // page) under one shared pan and zoom, and offers retake and delete within
+  // the record's lock. On a record Fisqua excluded (contract 1.6) it says
+  // what the exclusion means.
   // A dual record that misses a side (0.3.2) shows that page as an empty
   // frame that says so (MissingPage), on its side.
   //
@@ -49,6 +50,14 @@
   // captured nor rejected (409, RETAKE_STATUS_DETAIL in app/core/volume_stem.py).
   // A record Fisqua excluded is locked the same way (LOCKED_STATUSES in
   // app/api/records.py); its notice says why, in place of the lock message.
+  // The accessible name of a page picture: the title, then the camera and page it shows.
+  function imageAlt(img: { id: number; role?: string | null }): string {
+    const base = record.title || $m.col_image_alt(img.id);
+    if (img.role === 'left') return `${base} · ${$m.cam_page_even}`;
+    if (img.role === 'right') return `${base} · ${$m.cam_page_odd}`;
+    return base;
+  }
+
   let isLocked = $derived(record.status === 'in_review' || record.status === 'approved' || record.status === 'excluded');
 
   let confirmAction = $state<null | 'retake' | 'delete'>(null);
@@ -231,8 +240,10 @@
           onlostpointercapture={endDrag}
         >
           {#if isDouble() && (img.role === 'left' || img.role === 'right')}
-            <span class="img-viewer-badge">
-              {img.role === 'left' ? $m.badge_left : $m.badge_right}
+            <!-- Role `left` is the even/verso page, photographed by the right
+                 camera; role `right` the odd/recto page, by the left camera. -->
+            <span class="img-viewer-badge" aria-hidden="true" title={img.role === 'left' ? $m.cam_page_even : $m.cam_page_odd}>
+              <span class="material-symbols-outlined badge-cam" aria-hidden="true">photo_camera</span><span class="badge-letter">{img.role === 'left' ? $m.badge_cam_right : $m.badge_cam_left}</span><span class="page-term badge-term">{img.role === 'left' ? $m.page_term_even : $m.page_term_odd}</span>
             </span>
           {/if}
 
@@ -243,7 +254,7 @@
               <img
                 {src}
                 {onerror}
-                alt={record.title || $m.col_image_alt(img.id)}
+                alt={imageAlt(img)}
                 class="img-viewer-img"
                 draggable="false"
                 bind:naturalWidth={naturalW[i]}
@@ -441,4 +452,16 @@
     transition: background-color var(--transition-fast);
   }
   .btn-warning:hover { background-color: rgba(217, 119, 6, 0.12); }
+
+  /* The camera symbol and the page term inside a picture's badge. */
+  .badge-cam {
+    font-size: 1.1em;
+    vertical-align: -0.15em;
+    margin-right: 2px;
+  }
+
+  .badge-term {
+    font-weight: normal;
+    margin-left: 4px;
+  }
 </style>

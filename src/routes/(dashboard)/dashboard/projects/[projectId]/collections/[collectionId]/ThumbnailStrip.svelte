@@ -30,16 +30,31 @@
   interface ThumbItem {
     record: Record;
     image: RecordImage | null;
-    role: 'L' | 'R' | null;
+    role: 'left' | 'right' | null;
     thumbnailUrl: string | null;
   }
 
-  function imageRole(img: RecordImage | null): 'L' | 'R' | null {
+  function imageRole(img: RecordImage | null): 'left' | 'right' | null {
     if (!img) return null;
-    if (img.role === 'left')  return 'L';
-    if (img.role === 'right') return 'R';
+    if (img.role === 'left' || img.role === 'right') return img.role;
     return null;
   }
+
+  // A picture of a page names its camera and its page. Role `right` is the
+  // odd/recto page, photographed by the left camera; role `left` the
+  // even/verso page, photographed by the right camera.
+  function cameraLetter(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.badge_cam_left : $m.badge_cam_right;
+  }
+
+  function pageTerm(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.page_term_odd : $m.page_term_even;
+  }
+
+  function pageLabel(role: 'left' | 'right'): string {
+    return role === 'right' ? $m.cam_page_odd : $m.cam_page_even;
+  }
+
 
   function imageThumbnailUrl(img: RecordImage | null): string | null {
     if (!img) return null;
@@ -103,7 +118,7 @@
             {#each group.items as item, j}
               <div class="thumb-img-wrapper" class:alt={j % 2 !== 0}>
                 {#if item.thumbnailUrl}
-                  <img src={item.thumbnailUrl} alt={item.record.title} class="thumb-img" />
+                  <img src={item.thumbnailUrl} alt={item.role ? `${item.record.title} · ${pageLabel(item.role)}` : item.record.title} class="thumb-img" />
                 {:else}
                   <div class="thumb-placeholder">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -114,7 +129,12 @@
                 {/if}
 
                 {#if item.role}
-                  <div class="role-badge" class:right={item.role === 'R'}>{item.role}</div>
+                  <!-- The picture's alt carries both facts; the badge and the
+                       term repeat them for the eye. -->
+                  <div class="role-badge" class:right={item.role === 'right'} title={pageLabel(item.role)} aria-hidden="true">
+                    <span class="material-symbols-outlined badge-cam" aria-hidden="true">photo_camera</span><span class="badge-letter">{cameraLetter(item.role)}</span>
+                  </div>
+                  <span class="page-term" class:right={item.role === 'right'} aria-hidden="true">{pageTerm(item.role)}</span>
                 {/if}
               </div>
             {/each}
@@ -248,6 +268,27 @@
   }
 
   .role-badge.right { left: auto; right: 4px; }
+
+  .badge-cam {
+    font-size: 10px;
+    vertical-align: -1px;
+    margin-right: 1px;
+  }
+
+  .page-term {
+    position: absolute;
+    bottom: 4px; left: 4px;
+    background: rgba(19,17,16,0.8);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 9px;
+    color: var(--color-light);
+    line-height: 1.4;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .page-term.right { left: auto; right: 4px; }
 
   .thumb-info {
     flex-shrink: 0;
