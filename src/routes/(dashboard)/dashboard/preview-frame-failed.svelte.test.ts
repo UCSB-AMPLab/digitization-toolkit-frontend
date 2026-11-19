@@ -81,12 +81,12 @@ async function poll(n: number) {
   }
 }
 
-// The left camera's panel open and its preview running.
+// Panel `left` (camera 1 when no set-up is confirmed) open and its preview running.
 async function testing(answers: Record<number, Answer>) {
   const calls = stubCameras(answers);
   const screen = render(Dashboard);
-  const left = screen.getByRole('button', { name: /Left Scanner Camera/ });
-  const right = screen.getByRole('button', { name: /Right Scanner Camera/ });
+  const left = screen.getByRole('button', { name: /Camera 1/ });
+  const right = screen.getByRole('button', { name: /Camera 2/ });
   await expect.element(left).toHaveTextContent('OK');
   await left.click();
   await screen.getByRole('button', { name: en.dash_camera_test, exact: true }).click();
@@ -178,7 +178,7 @@ describe('overview camera panel — a connected camera that sent no frame (NEH-3
     answers[0] = 'missing';
     await poll(1);
     await expect.element(left).toHaveTextContent(en.camera_not_detected);
-    expect(hint(screen.container)).toBe(en.dash_camera_missing_hint(en.dash_camera_left));
+    expect(hint(screen.container)).toBe(en.dash_camera_missing_hint(en.dash_camera_n(1)));
     answers[0] = 'no-frame';
     await screen.getByRole('button', { name: en.dash_camera_test, exact: true }).click();
     await expect.element(left).not.toHaveTextContent(en.camera_not_detected);
