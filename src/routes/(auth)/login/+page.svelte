@@ -12,6 +12,7 @@
 	import { classifyLoginError, lockoutMinutes, retryAfterOf } from '$lib/login-error';
 	import { authStore, isUserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
+	import { dismissible } from '$lib/dialog';
 	// The logo's descriptor follows the locale inside CaptuaLogo.
 	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 
@@ -131,19 +132,7 @@
 		showForgotPopup = false;
 	}
 
-	function handleBackdropClick(event: MouseEvent) {
-		// Clicks inside the modal content bubble up to the backdrop too; only a
-		// click on the backdrop itself closes the popup.
-		if ((event.target as HTMLElement).classList.contains('popup-backdrop')) {
-			closeForgotPopup();
-		}
-	}
-
 	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && showForgotPopup) {
-			closeForgotPopup();
-			return;
-		}
 		// The fields are not in a <form>, so Enter submits here, while the popup is closed.
 		if (event.key === 'Enter' && !isLoading && !showForgotPopup) {
 			handleLogin();
@@ -332,11 +321,9 @@
 
 <!-- The popup closes on its Close button, Escape, or a click outside the modal. -->
 {#if showForgotPopup}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="popup-backdrop"
-		onclick={handleBackdropClick}
+		use:dismissible={{ onDismiss: closeForgotPopup }}
 		role="dialog"
 		aria-modal="true"
 		aria-label={$m.login_forgot_dialog_aria}
