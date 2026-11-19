@@ -1416,6 +1416,11 @@ export interface CameraDevice {
   // Capture rotation (clockwise degrees) the appliance remembers for this
   // body: 0 | 90 | 180 | 270, or null/absent if it has never been set.
   orientation?: number | null;
+  // Whether `orientation` is a value saved for this body (true) or the
+  // default the backend reports for a body with none saved, which follows
+  // its role (false). Absent from a backend that predates it, whose
+  // `orientation` is null for a body with nothing saved.
+  orientation_saved?: boolean;
   // Capabilities
   has_aperture_control?: boolean;
   supports_zoom?: boolean;
