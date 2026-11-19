@@ -23,6 +23,8 @@ vi.mock('$lib/session-check', async (importOriginal) => {
 
 import { authStore, type AuthUser } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
+import { authApi } from '$lib/api';
+import { sessionRenewals } from '$lib/session-keepalive';
 import Layout from './+layout.svelte';
 
 const user: AuthUser = {
@@ -57,9 +59,12 @@ beforeEach(() => {
 	authStore.setSession(user);
 });
 
-afterEach(() => {
+afterEach(async () => {
 	vi.restoreAllMocks();
 	authStore.clearSession();
+	// Each test starts with renewals allowed and none in flight.
+	await sessionRenewals.stop();
+	sessionRenewals.resume();
 });
 
 describe('(dashboard) layout with a saved session and a backend that is not answering', () => {
@@ -111,6 +116,60 @@ describe('(dashboard) layout with a saved session and a backend that is not answ
 		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
 		expect(gotoMock).toHaveBeenCalledWith('/login');
 		expect(authStore.getUser()).toBeNull();
+	});
+});
+
+// The failed validation that clears the session is a sign-out: the logout
+// follows the renewal in flight, and no renewal starts after it.
+describe('(dashboard) layout and the session renewal', () => {
+	function routed(meAnswer: () => Response | Promise<Response>) {
+		let finishRefresh!: () => void;
+		const refreshDone = new Promise<Response>((resolve) => {
+			finishRefresh = () =>
+				resolve(json(200, { access_token: null, token_type: 'cookie' }));
+		});
+		const order: string[] = [];
+		vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+			const path = new URL(String(input), 'http://localhost').pathname.replace(/^\/api/, '');
+			order.push(path);
+			if (path === '/auth/refresh') return refreshDone;
+			if (path === '/auth/logout') return new Response(null, { status: 204 });
+			return meAnswer();
+		});
+		return { order, finishRefresh };
+	}
+
+	it('sends the logout only after the renewal in flight settles when /users/me answers 403', async () => {
+		const { order, finishRefresh } = routed(() => json(403, { detail: 'Operation not permitted' }));
+		sessionRenewals.start(() => authApi.refreshSession());
+
+		render(Layout, { children });
+
+		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
+		expect(authStore.getUser()).toBeNull();
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(order).not.toContain('/auth/logout');
+		expect(sessionRenewals.canStart()).toBe(false);
+
+		finishRefresh();
+		await expect.poll(() => order.includes('/auth/logout')).toBe(true);
+		expect(order.indexOf('/auth/logout')).toBeGreaterThan(order.indexOf('/auth/refresh'));
+		expect(order.filter((p) => p === '/auth/logout')).toHaveLength(1);
+		expect(sessionRenewals.canStart()).toBe(false);
+	});
+
+	it('leaves renewals running when /users/me cannot be reached and the session is kept', async () => {
+		const { order, finishRefresh } = routed(() => new Response('bad gateway', { status: 502 }));
+		sessionRenewals.start(() => authApi.refreshSession());
+
+		render(Layout, { children });
+
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		finishRefresh();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(authStore.getUser()).toEqual(user);
+		expect(order).not.toContain('/auth/logout');
+		expect(sessionRenewals.canStart()).toBe(true);
 	});
 });
 

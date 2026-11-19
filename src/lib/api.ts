@@ -8,6 +8,7 @@ import { resolveApiBase } from './api-base';
 import { readPairingStatus, type PairingStatus } from './fisqua-pairing';
 import { m } from './i18n';
 import { authStore } from './stores/auth';
+import { sessionRenewals } from './session-keepalive';
 
 /**
  * Centralized API client for Digitization Toolkit
@@ -132,10 +133,178 @@ function isDeadSession(status: number, endpoint: string): boolean {
   return authStore.isAuthenticated();
 }
 
+// Time limits for requests made through apiRequest() and apiRequestBlob()
+// (NEH-356). A request with no complete answer by then is aborted and
+// rejects with a TimeoutError whose message is the existing "request failed"
+// text, so a caller's handling of a failed fetch applies to it. A call passes
+// `timeoutMs` to use another limit; a caller's own `signal` still cancels the
+// request, with its own reason.
+//
+// On the appliance every request goes through nginx, whose
+// proxy_read_timeout is 120 s: a backend still silent by then has been
+// answered with a 504, which the caller sees as an ApiError with status 504.
+// A limit above 120 s ends only a request that nothing answers at all (nginx
+// down, a dropped link), or one made straight to the backend in development.
+// A limit below 120 s (REQUEST_TIMEOUT_MS, HEALTH_REQUEST_TIMEOUT_MS,
+// SESSION_REFRESH_TIMEOUT_MS, POWER_REQUEST_TIMEOUT_MS) can end a request the
+// backend is still working on: the caller sees the TimeoutError, and the
+// backend may still complete the work, so a change can be made although the
+// page reported a failure.
+//
+// REQUEST_TIMEOUT_MS: requests that only read or write the catalogue.
+export const REQUEST_TIMEOUT_MS = 60_000;
+// Requests that wait on Fisqua (a code check: 10 s to connect, 60 s to read;
+// a change of unit mode: up to two such calls), on the offsite bucket, on a
+// system command, on files moved on disk, on one transaction over a whole
+// volume, or on an upload.
+export const SLOW_REQUEST_TIMEOUT_MS = 150_000;
+// Every /cameras request. On the backend a capture can take about 225 s per
+// camera before any wait for the camera's lock, and any other camera request
+// waits for that lock while a capture holds it; behind nginx such a request
+// is answered with a 504 at 120 s. This limit exists only to free the screen
+// when nothing answers at all.
+export const CAMERA_REQUEST_TIMEOUT_MS = 300_000;
+// GET /health answers at once; the login page and the wait after a reboot
+// ask it again when it fails.
+export const HEALTH_REQUEST_TIMEOUT_MS = 15_000;
+// POST /auth/refresh answers at once. Short because a sign-out waits for a
+// renewal in flight before it sends its logout (see signOut below): a
+// renewal nobody answers holds a sign-out back by at most this.
+export const SESSION_REFRESH_TIMEOUT_MS = 10_000;
+// POST /system/power answers once the order is logged; the helper that
+// carries it out (bounded at 30 s) runs after the answer.
+export const POWER_REQUEST_TIMEOUT_MS = 60_000;
+
+// `timeoutMs`: the limit in milliseconds. A value that is not a positive
+// finite number (Infinity, NaN, 0, a negative number, null) means
+// REQUEST_TIMEOUT_MS.
+export type ApiRequestOptions = RequestInit & { timeoutMs?: number };
+
+function timeLimit(timeoutMs: unknown): number {
+  return typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
+    ? timeoutMs
+    : REQUEST_TIMEOUT_MS;
+}
+
+// Runs `send` with a signal that aborts after the limit or when the caller's
+// signal aborts, and settles at either even if `send` is still reading a
+// body. The timer is cleared however `send` ends. Exported for the requests
+// that call fetch directly and for tests.
+export async function withTimeLimit<T>(
+  options: ApiRequestOptions,
+  send: (init: RequestInit) => Promise<T>
+): Promise<T> {
+  const { timeoutMs, signal: callerSignal, ...init } = options;
+  const controller = new AbortController();
+  const timedOut = new DOMException(get(m).api_request_failed, 'TimeoutError');
+  const onCallerAbort = () => controller.abort(callerSignal?.reason);
+  if (callerSignal?.aborted) onCallerAbort();
+  else callerSignal?.addEventListener('abort', onCallerAbort, { once: true });
+  const timer = setTimeout(() => controller.abort(timedOut), timeLimit(timeoutMs));
+  const aborted = new Promise<never>((_resolve, reject) => {
+    if (controller.signal.aborted) reject(controller.signal.reason);
+    controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true });
+  });
+  try {
+    return await Promise.race([send({ ...init, signal: controller.signal }), aborted]);
+  } catch (error) {
+    // An older fetch rejects an aborted request with its own AbortError
+    // rather than the signal's reason.
+    if (controller.signal.aborted) throw controller.signal.reason;
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    callerSignal?.removeEventListener('abort', onCallerAbort);
+  }
+}
+
+// Sign-out is the last auth request this tab sends (NEH-355).
+//
+// Three requests change the session cookie, all sent from authApi: POST
+// /auth/login and POST /auth/refresh set it, POST /auth/logout deletes it
+// (app/api/auth.py: login, refresh_token, logout; no other endpoint sets or
+// deletes it). A refresh processed after the logout would leave a valid
+// eight-hour cookie in a tab that shows nobody signed in, so each sign-out
+// sends its logout only once no refresh of this tab is in flight or can
+// start, and no login of this tab is sent before that logout has ended:
+//
+// - Refresh is sent only by the keepalive, through sessionRenewals, which
+//   starts no renewal once stop() has been called, until resume(); the
+//   only caller of authApi.refreshSession() is that keepalive
+//   (routes/+layout.svelte). Every sign-out calls stop() before it sends any
+//   request and waits for the renewal in flight at that moment to settle. It
+//   settles when its answer has been read, or when SESSION_REFRESH_TIMEOUT_MS
+//   aborts it. The browser stores a
+//   Set-Cookie when the response headers arrive and reads no response of an
+//   aborted request, so whatever cookie that refresh brings is stored before
+//   the logout is sent.
+// - Login (authApi.login) first waits for every sign-out begun before it
+//   (pendingSignOut), so its cookie comes after their logouts; only then does
+//   it resume renewals.
+// - The sign-outs are authApi.logout() (Salir in AccountMenu; the login page
+//   closing a session whose role it does not know) and endRejectedSession(),
+//   the sign-out for a session the backend has rejected: apiRequest() and
+//   apiRequestBlob() call it on a 401 (through endDeadSession(), which also
+//   goes to /login), and the dashboard layout calls it when /users/me answers
+//   401 or 403 and the record is still set. It clears this tab's record at
+//   once and sends a logout only when a renewal was in flight: the backend
+//   has just refused the cookie, so without a renewal there is no valid
+//   cookie to delete; a renewal sent before the refusal may still bring a
+//   new one, and the logout follows it. No other code clears the record of
+//   the session.
+//
+// This orders the requests of one tab only. The backend revokes no token, so
+// another tab, or a request replayed with an earlier cookie, can still
+// refresh after this tab has signed out. The cookie is shared by the tabs of
+// one browser, so a logout this tab sends late also deletes the cookie of a
+// sign-in made meanwhile in another tab.
+let pendingSignOut: Promise<void> = Promise.resolve();
+
+// A sign-out that fails still counts as ended: a rejection kept in
+// pendingSignOut would make every later sign-in of this page fail.
+function signOut(work: Promise<void>): Promise<void> {
+  const ended = work.catch(() => undefined);
+  pendingSignOut = Promise.all([pendingSignOut, ended]).then(() => undefined);
+  return work;
+}
+
+// POST /auth/logout, ended after LOGOUT_TIMEOUT_MS. Never rejects: with the
+// backend unreachable or too slow, nothing more can be done from the page.
+async function sendLogoutRequest(): Promise<void> {
+  try {
+    await withTimeLimit({ timeoutMs: LOGOUT_TIMEOUT_MS }, (init) =>
+      fetch(`${getApiBase()}/auth/logout`, sessionRequestInit({ ...init, method: 'POST' }))
+    );
+  } catch {
+    // The cookie then stays until it expires.
+  }
+}
+
+// The sign-out for a session the backend has rejected (see the comment above).
+export function endRejectedSession(): void {
+  authStore.clearSession();
+  signOut(sessionRenewals.stop().then((wasInFlight) => (wasInFlight ? sendLogoutRequest() : undefined)));
+}
+
+// The sign-out on a 401 that means this tab's session is dead (isDeadSession).
+function endDeadSession(): void {
+  endRejectedSession();
+  if (!window.location.pathname.startsWith('/login')) {
+    goto('/login');
+  }
+}
+
 // API request helper with authentication
-async function apiRequest<T>(
+function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiRequestOptions = {}
+): Promise<T> {
+  return withTimeLimit(options, (init) => sendApiRequest<T>(endpoint, init));
+}
+
+async function sendApiRequest<T>(
+  endpoint: string,
+  options: RequestInit
 ): Promise<T> {
   const base = getApiBase();
 
@@ -191,10 +360,7 @@ async function apiRequest<T>(
     // routes to /login so the UI never keeps rendering as a broken
     // "logged-in" shell against a session the backend has already rejected.
     if (isDeadSession(response.status, endpoint) && browser) {
-      authStore.clearSession();
-      if (!window.location.pathname.startsWith('/login')) {
-        goto('/login');
-      }
+      endDeadSession();
     }
 
     if (response.status === 401 || response.status === 403) {
@@ -224,10 +390,17 @@ async function apiRequest<T>(
 // caller that needs the raw blob (and its response headers) needs its own
 // helper rather than a special case inside apiRequest(). Same credentials,
 // same 401/403 handling, same error-body parsing into the thrown Error's
-// message as apiRequest().
-async function apiRequestBlob(
+// message and the same time limits as apiRequest().
+function apiRequestBlob(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiRequestOptions = {}
+): Promise<{ blob: Blob; headers: Headers }> {
+  return withTimeLimit(options, (init) => sendApiRequestBlob(endpoint, init));
+}
+
+async function sendApiRequestBlob(
+  endpoint: string,
+  options: RequestInit
 ): Promise<{ blob: Blob; headers: Headers }> {
   const base = getApiBase();
 
@@ -242,10 +415,7 @@ async function apiRequestBlob(
       : String(detail);
 
     if (isDeadSession(response.status, endpoint) && browser) {
-      authStore.clearSession();
-      if (!window.location.pathname.startsWith('/login')) {
-        goto('/login');
-      }
+      endDeadSession();
     }
 
     if (response.status === 401 || response.status === 403) {
@@ -326,10 +496,13 @@ export const authApi = {
    * cookie; nothing from the response body is kept.
    */
   async login(data: LoginData): Promise<void> {
+    // After any sign-out of this tab has sent its logout (see signOut).
+    await pendingSignOut;
     await apiRequest<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data)
     });
+    sessionRenewals.resume();
   },
 
   /**
@@ -337,30 +510,26 @@ export const authApi = {
    * new cookie and no token in the body.
    */
   async refreshSession(): Promise<void> {
-    await apiRequest<AuthResponse>('/auth/refresh', { method: 'POST' });
+    await apiRequest<AuthResponse>('/auth/refresh', { method: 'POST', timeoutMs: SESSION_REFRESH_TIMEOUT_MS });
   },
 
   /**
    * Log out. The cookie is httpOnly, so only the backend can remove it:
-   * POST /auth/logout clears it (204). The local user is cleared afterwards
-   * whatever the answer, and also when the backend cannot be reached or does
-   * not answer within LOGOUT_TIMEOUT_MS; the cookie then stays until it
-   * expires.
+   * POST /auth/logout clears it (204), sent once the session renewal in
+   * flight, if any, has settled (see signOut). The local user is cleared
+   * afterwards whatever the answer, and also when the backend cannot be
+   * reached or does not answer within LOGOUT_TIMEOUT_MS; the cookie then
+   * stays until it expires. At most SESSION_REFRESH_TIMEOUT_MS plus
+   * LOGOUT_TIMEOUT_MS in all.
    */
   async logout(): Promise<void> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), LOGOUT_TIMEOUT_MS);
-    try {
-      await fetch(
-        `${getApiBase()}/auth/logout`,
-        sessionRequestInit({ method: 'POST', signal: controller.signal })
-      );
-    } catch {
-      // Backend unreachable or too slow: nothing more can be done from the page.
-    } finally {
-      clearTimeout(timer);
-      authStore.clearSession();
-    }
+    return signOut(
+      (async () => {
+        await sessionRenewals.stop();
+        await sendLogoutRequest();
+        authStore.clearSession();
+      })()
+    );
   },
 
   /**
@@ -518,6 +687,7 @@ export const projectsApi = {
    */
   async delete(id: number): Promise<void> {
     await apiRequest(`/projects/${id}`, {
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
       method: 'DELETE'
     });
   },
@@ -527,6 +697,7 @@ export const projectsApi = {
    */
   async moveCollections(fromId: number, toId: number): Promise<{ moved: number; target_project_id: number }> {
     return apiRequest(`/projects/${fromId}/move-collections`, {
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify({ target_project_id: toId })
     });
@@ -704,6 +875,7 @@ export const collectionsApi = {
    */
   async create(data: CreateCollectionData): Promise<Collection> {
     return apiRequest<Collection>('/collections', {
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -714,6 +886,7 @@ export const collectionsApi = {
    */
   async update(id: number, data: UpdateCollectionData): Promise<Collection> {
     return apiRequest<Collection>(`/collections/${id}`, {
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
       method: 'PATCH',
       body: JSON.stringify(data)
     });
@@ -725,6 +898,7 @@ export const collectionsApi = {
    */
   async moveRecords(fromId: number, toId: number): Promise<{ moved: number; target_collection_id: number }> {
     return apiRequest(`/collections/${fromId}/move-records?target_collection_id=${toId}`, {
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
       method: 'POST'
     });
   },
@@ -746,6 +920,7 @@ export const collectionsApi = {
    */
   async reorderRecords(collectionId: number, ordered_ids: number[]): Promise<{ reordered: number }> {
     return apiRequest(`/collections/${collectionId}/records/reorder`, {
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
       method: 'PATCH',
       body: JSON.stringify({ ordered_ids })
     });
@@ -760,6 +935,7 @@ export const collectionsApi = {
    */
   async markMissingOpenings(collectionId: number, data: MissingOpeningsCreate): Promise<Record[]> {
     return apiRequest<Record[]>(`/collections/${collectionId}/records/missing-opening`, {
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -772,7 +948,7 @@ export const collectionsApi = {
    * (500), every sequence stays as it was.
    */
   async renumberImages(collectionId: number): Promise<{ renumbered: number }> {
-    return apiRequest(`/collections/${collectionId}/images/renumber`, { method: 'POST' });
+    return apiRequest(`/collections/${collectionId}/images/renumber`, { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   /** The volume's offsite state (NEH-227). `signal` lets the caller abort it. */
@@ -786,17 +962,17 @@ export const collectionsApi = {
    * GET /collections/{id}/offsite/free (plan_free in app/core/offsite_free.py).
    */
   async planFree(collectionId: number): Promise<FreePlan> {
-    return apiRequest<FreePlan>(`/collections/${collectionId}/offsite/free`);
+    return apiRequest<FreePlan>(`/collections/${collectionId}/offsite/free`, { timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   /** Start freeing the volume from the card; 202 with a job to poll. Admin only. */
   async startFree(collectionId: number): Promise<OffsiteJobStart> {
-    return apiRequest<OffsiteJobStart>(`/collections/${collectionId}/offsite/free`, { method: 'POST' });
+    return apiRequest<OffsiteJobStart>(`/collections/${collectionId}/offsite/free`, { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   /** Start copying the volume's freed files back to the card; 202 with a job to poll. Admin only. */
   async startRestore(collectionId: number): Promise<OffsiteJobStart> {
-    return apiRequest<OffsiteJobStart>(`/collections/${collectionId}/offsite/restore`, { method: 'POST' });
+    return apiRequest<OffsiteJobStart>(`/collections/${collectionId}/offsite/restore`, { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   /**
@@ -810,7 +986,7 @@ export const collectionsApi = {
    * on create (`unknown_reference_code`, `fisqua_unreachable`, `fisqua_no_lookup`).
    */
   async releaseFromUnit(collectionId: number): Promise<VolumeOffsiteState> {
-    return apiRequest<VolumeOffsiteState>(`/collections/${collectionId}/release-from-unit`, { method: 'POST' });
+    return apiRequest<VolumeOffsiteState>(`/collections/${collectionId}/release-from-unit`, { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   /**
@@ -822,7 +998,7 @@ export const collectionsApi = {
    * request (try again).
    */
   async keepOnUnit(collectionId: number): Promise<VolumeOffsiteState> {
-    return apiRequest<VolumeOffsiteState>(`/collections/${collectionId}/keep-on-unit`, { method: 'POST' });
+    return apiRequest<VolumeOffsiteState>(`/collections/${collectionId}/keep-on-unit`, { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   /** The state of a free or restore job, with its result once done. Admin only. */
@@ -838,7 +1014,9 @@ export const collectionsApi = {
    * (export_capture_manifest in app/api/collections.py).
    */
   async downloadCaptureManifest(collectionId: number): Promise<{ blob: Blob; contentDisposition: string | null }> {
-    const { blob, headers } = await apiRequestBlob(`/collections/${collectionId}/capture-manifest`);
+    const { blob, headers } = await apiRequestBlob(`/collections/${collectionId}/capture-manifest`, {
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS
+    });
     return { blob, contentDisposition: headers.get('Content-Disposition') };
   },
 
@@ -851,7 +1029,7 @@ export const collectionsApi = {
   async promote(collectionId: number): Promise<{ collection_id: number; promoted: number }> {
     return apiRequest<{ collection_id: number; promoted: number }>(
       `/collections/${collectionId}/promote`,
-      { method: 'POST' }
+      { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS }
     );
   },
 
@@ -872,7 +1050,7 @@ export const collectionsApi = {
   async takeBack(collectionId: number): Promise<{ collection_id: number; taken_back: number }> {
     return apiRequest<{ collection_id: number; taken_back: number }>(
       `/collections/${collectionId}/take-back`,
-      { method: 'POST' }
+      { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS }
     );
   },
 
@@ -885,7 +1063,7 @@ export const collectionsApi = {
     state: string;
     status_url: string;
   }> {
-    return apiRequest(`/collections/${collectionId}/export`, { method: 'POST' });
+    return apiRequest(`/collections/${collectionId}/export`, { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   /**
@@ -1614,7 +1792,7 @@ export const camerasApi = {
    * List available camera devices
    */
   async listDevices(): Promise<CameraDevice[]> {
-    return apiRequest<CameraDevice[]>('/cameras/devices');
+    return apiRequest<CameraDevice[]>('/cameras/devices', { timeoutMs: CAMERA_REQUEST_TIMEOUT_MS });
   },
 
   /**
@@ -1630,6 +1808,7 @@ export const camerasApi = {
    */
   async rescan(): Promise<CameraDevice[]> {
     return apiRequest<CameraDevice[]>('/cameras/rescan', {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST'
     });
   },
@@ -1639,6 +1818,7 @@ export const camerasApi = {
    */
   async capture(data: CaptureRequest): Promise<CaptureResponse> {
     return apiRequest<CaptureResponse>('/cameras/capture', {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -1660,6 +1840,7 @@ export const camerasApi = {
     // on AF that cannot find focus does not fire). The dashboard does not.
     const query = options.focusCheck ? '?focus_check=true' : '';
     const { blob, headers } = await apiRequestBlob(`/cameras/test-capture/${cameraIndex}${query}`, {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST'
     });
     const parseNumericHeader = (value: string | null): number | null => {
@@ -1681,6 +1862,7 @@ export const camerasApi = {
    */
   async captureDual(data: DualCaptureRequest): Promise<CaptureResponse> {
     return apiRequest<CaptureResponse>('/cameras/capture/dual', {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -1691,6 +1873,7 @@ export const camerasApi = {
    */
   async calibrate(data: CalibrationRequest = {}): Promise<CalibrationResponse> {
     return apiRequest<CalibrationResponse>('/cameras/calibrate', {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -1701,6 +1884,7 @@ export const camerasApi = {
    */
   async calibrateWhiteBalance(data: WhiteBalanceCalibrationRequest = {}): Promise<WhiteBalanceCalibrationResponse> {
     return apiRequest<WhiteBalanceCalibrationResponse>('/cameras/calibrate/white-balance', {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -1712,6 +1896,7 @@ export const camerasApi = {
    */
   async commitWhiteBalance(cameraIndex: number, awbGains: [number, number]): Promise<WhiteBalanceCalibrationResponse> {
     return apiRequest<WhiteBalanceCalibrationResponse>('/cameras/calibrate/white-balance/manual', {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify({ camera_index: cameraIndex, awb_gains: awbGains })
     });
@@ -1721,7 +1906,7 @@ export const camerasApi = {
    * Get current focus (lens position in dioptres)
    */
   async getFocus(cameraIndex: number): Promise<{ camera_index: number; lens_position: number }> {
-    return apiRequest<{ camera_index: number; lens_position: number }>(`/cameras/focus/${cameraIndex}`);
+    return apiRequest<{ camera_index: number; lens_position: number }>(`/cameras/focus/${cameraIndex}`, { timeoutMs: CAMERA_REQUEST_TIMEOUT_MS });
   },
 
   /**
@@ -1729,6 +1914,7 @@ export const camerasApi = {
    */
   async setFocus(cameraIndex: number, lensPosition: number): Promise<{ camera_index: number; lens_position: number }> {
     return apiRequest<{ camera_index: number; lens_position: number }>(`/cameras/focus/${cameraIndex}`, {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify({ lens_position: lensPosition })
     });
@@ -1739,6 +1925,7 @@ export const camerasApi = {
    */
   async setCameraControls(cameraIndex: number, controls: CameraControlsRequest): Promise<void> {
     await apiRequest(`/cameras/settings/${cameraIndex}`, {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify(controls)
     });
@@ -1755,6 +1942,7 @@ export const camerasApi = {
    */
   async setZoomStep(cameraIndex: number, step: number): Promise<ZoomStepResponse> {
     return apiRequest<ZoomStepResponse>(`/cameras/settings/${cameraIndex}`, {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify({ zoom_step: step })
     });
@@ -1766,6 +1954,7 @@ export const camerasApi = {
    */
   async flushPreviewTmp(): Promise<{ deleted: number; detail: string }> {
     return apiRequest<{ deleted: number; detail: string }>('/cameras/preview/tmp', {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'DELETE'
     });
   },
@@ -1774,7 +1963,7 @@ export const camerasApi = {
    * Get current backend capabilities (live_preview, focus_control, etc.)
    */
   async getCapabilities(): Promise<CameraCapabilities> {
-    return apiRequest<CameraCapabilities>('/cameras/capabilities');
+    return apiRequest<CameraCapabilities>('/cameras/capabilities', { timeoutMs: CAMERA_REQUEST_TIMEOUT_MS });
   },
 
   /**
@@ -1783,7 +1972,7 @@ export const camerasApi = {
    * camera answers with its stored image_format and the other fields null.
    */
   async getDSLRSettings(cameraIndex: number): Promise<DSLRSettings> {
-    return apiRequest<DSLRSettings>(`/cameras/dslr/${cameraIndex}/settings`);
+    return apiRequest<DSLRSettings>(`/cameras/dslr/${cameraIndex}/settings`, { timeoutMs: CAMERA_REQUEST_TIMEOUT_MS });
   },
 
   /**
@@ -1794,6 +1983,7 @@ export const camerasApi = {
    */
   async applyDSLRSettings(cameraIndex: number, settings: DSLRSettingsUpdate): Promise<DSLRSettings> {
     return apiRequest<DSLRSettings>(`/cameras/dslr/${cameraIndex}/settings`, {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'PUT',
       body: JSON.stringify(settings),
     });
@@ -1811,6 +2001,7 @@ export const camerasApi = {
    */
   async setOrientation(cameraIndex: number, hardwareId: string, orientation: number): Promise<void> {
     await apiRequest<CameraDevice>(`/cameras/${cameraIndex}/orientation`, {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'PUT',
       body: JSON.stringify({ orientation, hardware_id: hardwareId }),
     });
@@ -1824,7 +2015,7 @@ export const camerasApi = {
    */
   async getSetup(): Promise<CameraSetup> {
     try {
-      return await apiRequest<CameraSetup>('/cameras/setup');
+      return await apiRequest<CameraSetup>('/cameras/setup', { timeoutMs: CAMERA_REQUEST_TIMEOUT_MS });
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         return { needs_setup: false, reasons: [], confirmed_pair: null };
@@ -1842,6 +2033,7 @@ export const camerasApi = {
    */
   async setRoles(leftHardwareId: string, rightHardwareId: string): Promise<CameraRolesResponse> {
     return apiRequest<CameraRolesResponse>('/cameras/roles', {
+      timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
       method: 'PUT',
       body: JSON.stringify({ left: { hardware_id: leftHardwareId }, right: { hardware_id: rightHardwareId } }),
     });
@@ -1853,7 +2045,7 @@ export const camerasApi = {
    * non-ok answer; a 404 means the camera is not connected or gave no frame.
    */
   async previewFrame(cameraIndex: number): Promise<Blob> {
-    const { blob } = await apiRequestBlob(`/cameras/preview/${cameraIndex}`);
+    const { blob } = await apiRequestBlob(`/cameras/preview/${cameraIndex}`, { timeoutMs: CAMERA_REQUEST_TIMEOUT_MS });
     return blob;
   },
 };
@@ -2122,7 +2314,7 @@ export const importsApi = {
   async importList(file: File): Promise<ImportReport> {
     const body = new FormData();
     body.append('file', file);
-    return apiRequest<ImportReport>('/imports/digitisation-list', { method: 'POST', body });
+    return apiRequest<ImportReport>('/imports/digitisation-list', { method: 'POST', body, timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   /**
@@ -2155,7 +2347,7 @@ export const importsApi = {
 
 export const healthApi = {
   async check(): Promise<{ status: string }> {
-    return apiRequest<{ status: string }>('/health');
+    return apiRequest<{ status: string }>('/health', { timeoutMs: HEALTH_REQUEST_TIMEOUT_MS });
   }
 };
 
@@ -2501,7 +2693,7 @@ export const systemApi = {
     projectsEnabled?: boolean;
     keptVolumes?: KeptVolumesDecision;
   }): Promise<UnitSettings> {
-    return apiRequest<UnitSettings>('/system/unit', { method: 'PUT', body: JSON.stringify(body) });
+    return apiRequest<UnitSettings>('/system/unit', { method: 'PUT', body: JSON.stringify(body), timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   /**
@@ -2520,17 +2712,17 @@ export const systemApi = {
   /** Ask for a code; with a session already running, the backend answers with its state. */
   async startPairing(unitName: string): Promise<PairingStatus | null> {
     return readPairingStatus(
-      await apiRequest<unknown>('/system/pairing', { method: 'POST', body: JSON.stringify({ unitName }) })
+      await apiRequest<unknown>('/system/pairing', { method: 'POST', body: JSON.stringify({ unitName }), timeoutMs: SLOW_REQUEST_TIMEOUT_MS })
     );
   },
 
   /** A new code after `lapsed`, within the renewal window. */
   async renewPairing(): Promise<PairingStatus | null> {
-    return readPairingStatus(await apiRequest<unknown>('/system/pairing/renew', { method: 'POST' }));
+    return readPairingStatus(await apiRequest<unknown>('/system/pairing/renew', { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS }));
   },
 
   async cancelPairing(): Promise<PairingStatus | null> {
-    return readPairingStatus(await apiRequest<unknown>('/system/pairing', { method: 'DELETE' }));
+    return readPairingStatus(await apiRequest<unknown>('/system/pairing', { method: 'DELETE', timeoutMs: SLOW_REQUEST_TIMEOUT_MS }));
   },
 
   async getLogs(params?: { limit?: number; category?: string; level?: string }): Promise<SystemLogEntry[]> {
@@ -2572,7 +2764,7 @@ export const systemApi = {
   },
 
   async resetStorage(): Promise<{ projects_path: string; message: string }> {
-    return apiRequest('/system/storage/activate', { method: 'DELETE' });
+    return apiRequest('/system/storage/activate', { method: 'DELETE', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
   async unmountDevice(mountpoint: string): Promise<{ message: string; override_cleared: boolean }> {
@@ -2589,19 +2781,24 @@ export const systemApi = {
    *   501 → power control unavailable (e.g. a development environment)
    *   401 → session expired
    * Throws PowerControlError with the status so the UI can show the right
-   * message. Calls fetch directly, not through apiRequest().
+   * message. Calls fetch directly, not through apiRequest(), with
+   * POWER_REQUEST_TIMEOUT_MS: no answer by then rejects with the
+   * TimeoutError of withTimeLimit.
    */
   async powerControl(action: PowerAction): Promise<{ message: string }> {
-    const response = await fetch(`${getApiBase()}/system/power`, sessionRequestInit({
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ action }),
-    }));
-
-    // The body may be empty or not JSON (e.g. from a proxy); that must not
-    // break the declared return type.
-    const data: { message?: string; detail?: string } =
-      await response.json().catch(() => ({}));
+    const { response, data } = await withTimeLimit({ timeoutMs: POWER_REQUEST_TIMEOUT_MS }, async (init) => {
+      const response = await fetch(`${getApiBase()}/system/power`, sessionRequestInit({
+        ...init,
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action }),
+      }));
+      // The body may be empty or not JSON (e.g. from a proxy); that must not
+      // break the declared return type.
+      const data: { message?: string; detail?: string } =
+        await response.json().catch(() => ({}));
+      return { response, data };
+    });
     if (!response.ok) {
       throw new PowerControlError(response.status, data.detail || data.message || `HTTP ${response.status}`);
     }
