@@ -1,9 +1,9 @@
 // NEH-343: "Which camera is this?". A current frame from each camera (GET
 // /cameras/preview/{n}, one request per camera, never a continuous
 // preview), each turned by its camera's saved orientation, with "Turn".
-// The operator presses the image that shows the left page; the other camera
-// takes the right page; "Confirm" saves both roles in one request (PUT
-// /cameras/roles). The wording follows the most specific reason the
+// The operator presses the image of the odd/recto page: that camera takes
+// role `right`, the other role `left`; "Confirm" saves both roles in one
+// request (PUT /cameras/roles). The wording follows the most specific reason the
 // backend reports, never its English. While set-up is needed nothing
 // dismisses the screen; opened by hand, "Cancel" and Escape do.
 //
@@ -102,7 +102,9 @@ const view = () => document.querySelector('[data-which-camera]') as HTMLElement 
 const text = () => view()?.textContent ?? '';
 const card = (index: number) => document.querySelector(`[data-card="${index}"]`) as HTMLElement | null;
 const pick = (index: number) => card(index)?.querySelector('button[data-pick]') as HTMLButtonElement | null;
-const labelOf = (index: number) => card(index)?.querySelector('.feed-label')?.textContent?.trim() ?? null;
+// A label's words: its accessible name in the badge form, its text otherwise.
+const wordsOf = (el: Element | null | undefined) => (el ? (el.getAttribute('aria-label') ?? el.textContent?.trim() ?? null) : null);
+const labelOf = (index: number) => wordsOf(card(index)?.querySelector('.feed-label'));
 const turnOf = (index: number) => card(index)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
 const imgOf = (index: number) => card(index)?.querySelector('img') as HTMLImageElement | null;
 
@@ -148,7 +150,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-describe('WhichCamera: asking which camera sees the left page', () => {
+describe('WhichCamera: asking which image is the odd/recto page', () => {
 	it('a role not confirmed: the question, a frame from each camera, nothing chosen and no Confirm until a press', async () => {
 		renderWhich();
 		await settle();
@@ -173,26 +175,39 @@ describe('WhichCamera: asking which camera sees the left page', () => {
 		expect(text()).not.toMatch(/usb/i);
 	});
 
-	it('pressing an image makes it the left page and the other the right page; Confirm saves both ids', async () => {
+	it('pressing an image makes it the odd/recto page (role right) and the other the even/verso page (role left); Confirm saves both ids', async () => {
 		const { onSaved } = renderWhich();
 		await settle();
 		pick(1)!.click();
 		await settle();
-		expect(labelOf(1)).toBe(en.camcheck_left_page);
-		expect(labelOf(0)).toBe(en.camcheck_right_page);
+		// The pressed camera photographs the odd/recto page: the left camera.
+		expect(labelOf(1)).toBe(en.camcheck_right_page);
+		expect(labelOf(0)).toBe(en.camcheck_left_page);
 		expect(pick(1)?.getAttribute('aria-pressed')).toBe('true');
+		expect(pick(0)?.getAttribute('aria-pressed')).toBe('false');
 		expect(rolesSpy).not.toHaveBeenCalled();
 
 		// Another press changes the choice.
 		pick(0)!.click();
 		await settle();
-		expect(labelOf(0)).toBe(en.camcheck_left_page);
-		expect(labelOf(1)).toBe(en.camcheck_right_page);
+		expect(labelOf(0)).toBe(en.camcheck_right_page);
+		expect(labelOf(1)).toBe(en.camcheck_left_page);
+		expect(pick(0)?.getAttribute('aria-pressed')).toBe('true');
 
 		await click(en.camwhich_confirm);
 		expect(rolesSpy).toHaveBeenCalledTimes(1);
-		expect(rolesSpy).toHaveBeenCalledWith('hw0', 'hw1');
+		// setRoles(left, right): the pressed camera is sent as `right`.
+		expect(rolesSpy).toHaveBeenCalledWith('hw1', 'hw0');
 		expect(onSaved).toHaveBeenCalledWith(saved);
+	});
+
+	it('the pressed camera is sent as role right, the other as role left', async () => {
+		renderWhich();
+		await settle();
+		pick(1)!.click();
+		await settle();
+		await click(en.camwhich_confirm);
+		expect(rolesSpy).toHaveBeenCalledWith('hw0', 'hw1');
 	});
 
 	it('Confirm is held while the save is in flight', async () => {
@@ -230,7 +245,7 @@ describe('WhichCamera: asking which camera sees the left page', () => {
 		await settle();
 		expect(text()).toContain(en.camwhich_ask_title);
 		expect(text()).toContain(en.camwhich_lead_pair_changed);
-		expect(button(en.camwhich_port_no)).toBeNull();
+		expect(button('No, they are where they were')).toBeNull();
 	});
 
 	it('Captua\'s guess is shown faintly, and chooses nothing', async () => {
@@ -248,37 +263,60 @@ describe('WhichCamera: asking which camera sees the left page', () => {
 
 describe('WhichCamera: a known camera on another USB socket', () => {
 	beforeEach(() => {
-		// Camera 1 has the left page on record.
+		// Camera 1 has role `right` (the odd/recto page) on record; camera 2 has role `left` (the even/verso page).
 		devices = [device(0, { role: 'right', role_confirmed: true }), device(1, { role: 'left', role_confirmed: true })];
 	});
 
-	it('asks whether the cameras changed sides, with the images under their current roles', async () => {
+	it('asks the ask screen\'s question, with the images under their current labels, nothing pressed and no yes/no', async () => {
 		renderWhich({ setup: setup(['port_changed']) });
 		await settle();
-		expect(text()).toContain(en.camwhich_port_title);
+		expect(text()).toContain(en.camwhich_ask_title);
 		expect(text()).toContain(en.camwhich_lead_port);
+		expect(text()).toContain(en.camwhich_how);
 		expect(text()).not.toMatch(/usb:/i);
+		// The current assignment shows as the labels.
 		expect(labelOf(1)).toBe(en.camcheck_left_page);
 		expect(labelOf(0)).toBe(en.camcheck_right_page);
-		// The left page first.
+		// Each picture button keeps its own name and is described by the label shown on its card.
+		for (const i of [0, 1]) {
+			const describedBy = pick(i)?.getAttribute('aria-describedby');
+			expect(describedBy, `card ${i}`).toBeTruthy();
+			expect(wordsOf(document.getElementById(describedBy!)), `card ${i}`).toBe(labelOf(i));
+			expect(pick(i)?.getAttribute('aria-label'), `card ${i}`).toBe(en.camwhich_pick_aria(i + 1));
+		}
+		// The even/verso picture (role left) first, on the left.
 		const order = [...document.querySelectorAll('[data-card]')].map((c) => c.getAttribute('data-card'));
 		expect(order).toEqual(['1', '0']);
-		expect(button(en.camwhich_confirm)).toBeNull();
-		expect(document.querySelector('button[data-pick]')).toBeNull();
+		// Nothing pressed: the operator has to press.
+		expect(pick(0)?.getAttribute('aria-pressed')).toBe('false');
+		expect(pick(1)?.getAttribute('aria-pressed')).toBe('false');
+		expect(button(en.camwhich_confirm)?.disabled).toBe(true);
+		expect(button('No, they are where they were')).toBeNull();
+		expect(button('Yes, they were swapped')).toBeNull();
+		expect(text()).not.toContain('Have the cameras been swapped?');
 	});
 
-	it('"No, they are where they were" confirms the same roles', async () => {
+	it('pressing the image already labelled odd/recto and confirming saves the same roles', async () => {
 		const { onSaved } = renderWhich({ setup: setup(['port_changed']) });
 		await settle();
-		await click(en.camwhich_port_no);
+		pick(0)!.click();
+		await settle();
+		expect(pick(0)?.getAttribute('aria-pressed')).toBe('true');
+		expect(labelOf(0)).toBe(en.camcheck_right_page);
+		expect(labelOf(1)).toBe(en.camcheck_left_page);
+		await click(en.camwhich_confirm);
 		expect(rolesSpy).toHaveBeenCalledWith('hw1', 'hw0');
 		expect(onSaved).toHaveBeenCalled();
 	});
 
-	it('"Yes, they changed sides" exchanges them', async () => {
+	it('pressing the other image exchanges the roles', async () => {
 		renderWhich({ setup: setup(['port_changed']) });
 		await settle();
-		await click(en.camwhich_port_yes);
+		pick(1)!.click();
+		await settle();
+		expect(labelOf(1)).toBe(en.camcheck_right_page);
+		expect(labelOf(0)).toBe(en.camcheck_left_page);
+		await click(en.camwhich_confirm);
 		expect(rolesSpy).toHaveBeenCalledWith('hw0', 'hw1');
 	});
 });

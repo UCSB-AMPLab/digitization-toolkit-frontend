@@ -1,7 +1,8 @@
 <script lang="ts">
   // Shows one captured record's images at full size and lets the operator
-  // retake the record. Images are ordered left before right, with an L/R badge
-  // in `double` mode. Retake asks for confirmation, and the modal cannot be
+  // retake the record. Images are ordered role `left` (the even/verso page)
+  // before role `right` (the odd/recto page), each with a badge naming its
+  // camera and page in `double` mode. Retake asks for confirmation, and the modal cannot be
   // closed while the replacement capture runs. A rejected record also shows
   // its newest rejection (reason, note, who and when), so the operator
   // retaking it does not need the Por recapturar page open beside it. In the
@@ -146,6 +147,14 @@
 
   // Nothing closes the modal while a capture runs.
   let locked = $derived(retaking || busy);
+
+  // The accessible name of a page picture: the title, then the camera and page it shows.
+  function imageAlt(img: { id: number; role?: string | null }): string {
+    const base = record.title || $m.col_image_alt(img.id);
+    if (img.role === 'left') return `${base} · ${$m.cam_page_even}`;
+    if (img.role === 'right') return `${base} · ${$m.cam_page_odd}`;
+    return base;
+  }
 
   function handleClose() {
     if (locked) return;
@@ -354,8 +363,10 @@
           onlostpointercapture={endDrag}
         >
           {#if cameraMode === 'double' && img.role && img.role !== 'single'}
-            <span class="img-viewer-badge">
-              {img.role === 'left' ? $m.badge_left : $m.badge_right}
+            <!-- Role `left` is the even/verso page, photographed by the right
+                 camera; role `right` the odd/recto page, by the left camera. -->
+            <span class="img-viewer-badge" aria-hidden="true" title={img.role === 'left' ? $m.cam_page_even : $m.cam_page_odd}>
+              <span class="material-symbols-outlined badge-cam" aria-hidden="true">photo_camera</span><span class="badge-letter">{img.role === 'left' ? $m.badge_cam_right : $m.badge_cam_left}</span><span class="page-term badge-term">{img.role === 'left' ? $m.page_term_even : $m.page_term_odd}</span>
             </span>
           {/if}
 
@@ -368,7 +379,7 @@
                 <img
                   {src}
                   {onerror}
-                  alt={record.title || $m.col_image_alt(img.id)}
+                  alt={imageAlt(img)}
                   class="img-viewer-img"
                   draggable="false"
                   bind:naturalWidth={naturalW[i]}
@@ -401,7 +412,7 @@
             <img
               src={recordsApi.getImageThumbnailUrl(img.id)}
               onerror={() => (thumbFailed[img.id] = true)}
-              alt={record.title || $m.col_image_alt(img.id)}
+              alt={imageAlt(img)}
               class="img-viewer-img lv-thumb-img"
               draggable="false"
             />
@@ -528,4 +539,16 @@
     overflow-wrap: anywhere;
   }
   .lv-rejection-when { font-size: var(--text-xs); color: var(--color-light-grey); }
+
+  /* The camera symbol and the page term inside a picture's badge. */
+  .badge-cam {
+    font-size: 1.1em;
+    vertical-align: -0.15em;
+    margin-right: 2px;
+  }
+
+  .badge-term {
+    font-weight: normal;
+    margin-left: 4px;
+  }
 </style>

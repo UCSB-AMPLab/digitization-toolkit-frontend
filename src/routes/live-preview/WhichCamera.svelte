@@ -24,13 +24,16 @@
   // - two cameras on the same page, a role not confirmed, another pair: the
   //   question, a current frame from each camera (GET /cameras/preview/{n},
   //   once per camera, "Refresh" for new ones), each turned by its camera's
-  //   saved orientation, with "Turn". Pressing an image makes that camera the
-  //   left page and the other the right page; "Confirm" saves both in one
+  //   saved orientation, with "Turn". The operator presses the image of the
+  //   odd/recto page: that camera, the left camera, takes role `right`, and
+  //   the other, the right camera, role `left`; "Confirm" saves both in one
   //   request (PUT /cameras/roles). Nothing is chosen beforehand: a guess of
   //   the backend's (role_guess) shows only as a faint note;
-  // - a known camera on another USB socket: the two frames under their
-  //   current roles, and whether the cameras changed sides: "No" saves the
-  //   same roles again, "Yes" exchanges them.
+  // - a known camera on another USB socket: the same question and the same
+  //   press, with the two frames labelled by their current roles and no
+  //   image pressed until the operator presses one. Pressing the image
+  //   already labelled odd/recto saves the same roles again; pressing the
+  //   other exchanges them.
   // No socket name or USB path is shown. A save refused because a camera
   // went away reads everything again and asks to choose again.
   //
@@ -42,6 +45,7 @@
   import { whichScreen } from '$lib/camera-roles';
   import { dismissible, toBody, trapFocus } from '$lib/dialog';
   import { PairPanZoom } from '$lib/pair-pan-zoom.svelte';
+  import PageCameraLabel from '$lib/components/PageCameraLabel.svelte';
 
   let {
     setup,
@@ -94,8 +98,10 @@
 
   let screen = $derived(devices === null ? null : whichScreen(setup, devices));
   let asking = $derived(screen?.kind === 'ask');
-  // The two cameras on screen: by index while asking; the left page first
-  // when asking whether they changed sides.
+  // Both the ask screen and the USB-socket screen take a press and a Confirm.
+  let picking = $derived(screen?.kind === 'ask' || screen?.kind === 'port');
+  // The two cameras on screen: by index while asking; on another USB socket,
+  // the even/verso page (role left) first, so it stands on the left.
   let cameras = $derived.by((): CameraDevice[] => {
     if (!screen || !devices) return [];
     if (screen.kind === 'port') return [screen.left, screen.right];
@@ -136,7 +142,7 @@
       if (!destroyed) reading = false;
     }
     if (destroyed) return;
-    if (leftPick && !cameras.some((d) => d.hardware_id === leftPick)) leftPick = null;
+    if (oddPick && !cameras.some((d) => d.hardware_id === oddPick)) oddPick = null;
     void fetchFrames();
   }
 
@@ -165,7 +171,7 @@
       if (!destroyed) rescanning = false;
     }
     if (destroyed) return;
-    if (leftPick && !cameras.some((d) => d.hardware_id === leftPick)) leftPick = null;
+    if (oddPick && !cameras.some((d) => d.hardware_id === oddPick)) oddPick = null;
     void fetchFrames();
   }
 
@@ -232,20 +238,23 @@
   // ---------------------------------------------------------------------------
   // The answer
   // ---------------------------------------------------------------------------
-  // The body pressed as the left page; the other camera is the right page.
-  let leftPick = $state<string | null>(null);
+  // The body pressed as the odd/recto page (role `right`); the other camera
+  // takes the even/verso page (role `left`).
+  let oddPick = $state<string | null>(null);
   let saving = $state(false);
   let saveError = $state<string | null>(null);
 
+  // The role a card is labelled with: the press when there is one; before
+  // it, the current role on the USB-socket screen, none on the ask screen.
   function roleOf(device: CameraDevice): 'left' | 'right' | null {
+    if (oddPick !== null) return device.hardware_id === oddPick ? 'right' : 'left';
     if (screen?.kind === 'port') return device.role === 'left' ? 'left' : 'right';
-    if (leftPick === null) return null;
-    return device.hardware_id === leftPick ? 'left' : 'right';
+    return null;
   }
 
   function choose(device: CameraDevice) {
     if (saving) return;
-    leftPick = device.hardware_id;
+    oddPick = device.hardware_id;
     saveError = null;
   }
 
@@ -263,7 +272,7 @@
       const answer = await camerasApi.setRoles(left.hardware_id, right.hardware_id);
       if (destroyed) return;
       if (Array.isArray(answer?.devices) && answer.devices.length > 0) devices = answer.devices;
-      leftPick = null;
+      oddPick = null;
       onSaved(answer);
     } catch (err) {
       if (destroyed) return;
@@ -273,11 +282,11 @@
       const code = errorCode(err);
       if (status === 409 && code === 'camera_not_connected') {
         saveError = $m.camwhich_err_not_connected;
-        leftPick = null;
+        oddPick = null;
         await readAgain();
       } else if (status === 409 && code === 'camera_identity_unusable') {
         saveError = $m.camwhich_err_identity;
-        leftPick = null;
+        oddPick = null;
         await readAgain();
       } else if (status === 503) {
         saveError = $m.camwhich_err_unavailable;
@@ -290,18 +299,10 @@
   }
 
   function confirm() {
-    if (!asking || leftPick === null) return;
-    const left = cameras.find((d) => d.hardware_id === leftPick);
-    const right = cameras.find((d) => d.hardware_id !== leftPick);
+    if (!picking || oddPick === null) return;
+    const right = cameras.find((d) => d.hardware_id === oddPick);
+    const left = cameras.find((d) => d.hardware_id !== oddPick);
     if (left && right) void save(left, right);
-  }
-
-  function sameSides() {
-    if (screen?.kind === 'port') void save(screen.left, screen.right);
-  }
-
-  function changedSides() {
-    if (screen?.kind === 'port') void save(screen.right, screen.left);
   }
 
   function cancel() {
@@ -331,10 +332,6 @@
     destroyed = true;
     for (const frame of Object.values(frames)) if (frame.url) URL.revokeObjectURL(frame.url);
   });
-
-  function roleLabel(role: 'left' | 'right'): string {
-    return role === 'left' ? $m.camcheck_left_page : $m.camcheck_right_page;
-  }
 </script>
 
 {#snippet rescanState()}
@@ -428,8 +425,8 @@
         {@render rescanState()}
       {:else}
         <div class="id-head">
-          <h2 class="id-q" id="id-title">{screen.kind === 'port' ? $m.camwhich_port_title : $m.camwhich_ask_title}</h2>
-          <p class="sf-small">{lead}{lead && asking ? ' ' : ''}{asking ? $m.camwhich_how : ''}</p>
+          <h2 class="id-q" id="id-title">{$m.camwhich_ask_title}</h2>
+          <p class="sf-small">{lead}{lead ? ' ' : ''}{$m.camwhich_how}</p>
         </div>
         {#if saveError}
           <div class="action-notice is-error" role="alert">
@@ -440,28 +437,27 @@
         <div class="id-cards">
           {#each cameras as device, i (device.hardware_id)}
             {@const role = roleOf(device)}
+            {@const pressed = oddPick === device.hardware_id}
             {@const n = device.index + 1}
             <div class="id-card" data-card={device.index}>
               <div class="id-stage">
-              {#if asking}
                 <button
                   class="id-pick"
-                  class:selected={role === 'left'}
+                  class:selected={pressed}
                   data-pick
                   aria-label={$m.camwhich_pick_aria(n)}
-                  aria-pressed={role === 'left'}
+                  aria-describedby={role ? `id-label-${device.index}` : undefined}
+                  aria-pressed={pressed}
                   disabled={saving}
                   onclick={() => choose(device)}
                 >
                   {@render picture(device, i)}
-                  <span class="feed-label" class:is-role={role !== null}>{role ? roleLabel(role) : $m.camwhich_camera(n)}</span>
+                  {#if role}
+                    <PageCameraLabel {role} width={panes.frameW[i]} id="id-label-{device.index}" class="feed-label is-role" />
+                  {:else}
+                    <span class="feed-label" id="id-label-{device.index}">{$m.camwhich_camera(n)}</span>
+                  {/if}
                 </button>
-              {:else}
-                <div class="id-pick is-static">
-                  {@render picture(device, i)}
-                  <span class="feed-label is-role">{role ? roleLabel(role) : $m.camwhich_camera(n)}</span>
-                </div>
-              {/if}
               <button
                 class="float-btn id-turn"
                 data-turn
@@ -506,14 +502,8 @@
           <span>{$m.camwhich_check_again}</span>
         </button>
       {/if}
-      {#if screen?.kind === 'ask'}
-        <button class="btn btn-primary" onclick={confirm} disabled={leftPick === null || saving}>{$m.camwhich_confirm}</button>
-      {:else if screen?.kind === 'port'}
-        <button class="btn btn-secondary" onclick={sameSides} disabled={saving}>{$m.camwhich_port_no}</button>
-        <button class="btn btn-primary" onclick={changedSides} disabled={saving}>
-          <span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span>
-          <span>{$m.camwhich_port_yes}</span>
-        </button>
+      {#if picking}
+        <button class="btn btn-primary" onclick={confirm} disabled={oddPick === null || saving}>{$m.camwhich_confirm}</button>
       {/if}
     </div>
   </div>
@@ -603,7 +593,6 @@
     cursor: pointer;
     font-family: var(--font-family);
   }
-  .id-pick.is-static { cursor: default; }
   .id-pick:disabled { cursor: not-allowed; }
   .id-pick.selected { border-color: var(--color-selected); box-shadow: var(--selected-ring); }
   .id-frame { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 3px; background: #0a0a0a; display: flex; align-items: center; justify-content: center; }
@@ -615,8 +604,9 @@
   .empty-msg .material-symbols-outlined { display: block; margin: 0 auto 6px; font-size: 28px; color: var(--color-error); }
   .empty-msg.is-error { color: var(--color-light); }
 
-  /* LiveViewport.svelte's .feed-label; the role, once known, in light */
-  .feed-label {
+  /* LiveViewport.svelte's .feed-label; the role, once known, in light.
+     Global because the role's label is PageCameraLabel's element. */
+  .id-pick :global(.feed-label) {
     position: absolute;
     top: 8px;
     left: 8px;
@@ -631,7 +621,7 @@
     z-index: 5;
     white-space: nowrap;
   }
-  .feed-label.is-role { background: var(--color-light); color: var(--color-bg); border-color: var(--color-light); }
+  .id-pick :global(.feed-label.is-role) { background: var(--color-light); color: var(--color-bg); border-color: var(--color-light); }
 
   /* The camera check's turn button, in the bottom left corner of the image */
   .float-btn {

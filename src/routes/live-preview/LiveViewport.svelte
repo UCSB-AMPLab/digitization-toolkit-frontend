@@ -45,6 +45,7 @@
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
   import { dismissible, openDialogsOutside } from '$lib/dialog';
   import { powerControlOpen } from '$lib/stores/power';
+  import PageCameraLabel from '$lib/components/PageCameraLabel.svelte';
 
   let {
     cameraMode,
@@ -1064,9 +1065,46 @@
     cancelLearningChord();
   }
 
-  function cameraLabel(idx: number): string {
+  // What a pane's picture and its "No signal" call the camera. Once the
+  // roles are confirmed (`swapLocked`) the left pane is the even/verso page,
+  // photographed by the right camera, and the right pane the odd/recto page,
+  // by the left camera. Before that the camera step blocks capture, so a
+  // pane names only its camera's number; in single-camera mode no side.
+  function paneAlt(pane: 'left' | 'right', idx: number): string {
+    if (cameraMode !== 'double') return $m.cam_fallback_name;
+    if (!swapLocked) return `${$m.cam_fallback_name} ${idx + 1}`;
+    return pane === 'left' ? $m.lv_camera_left_alt : $m.lv_camera_right_alt;
+  }
+
+  function paneNoSignal(pane: 'left' | 'right'): string {
+    if (cameraMode !== 'double' || !swapLocked) return $m.lv_no_signal;
+    return pane === 'left' ? $m.lv_no_signal_left : $m.lv_no_signal_right;
+  }
+
+  // The visible label on a pane's picture. Once the roles are confirmed in
+  // double mode it names the camera and the page, as the picture's alt does,
+  // in words or in the badge form by the pane's width (PageCameraLabel);
+  // before that, the camera's number. In single mode it is the camera's own
+  // label or model. The camera's label or model is the element's title.
+  function cameraName(idx: number): string | undefined {
     const dev = devices.find(d => d.index === idx);
-    return `${dev?.label || dev?.model || $m.cam_fallback_name} [${idx}]`;
+    return dev?.label || dev?.model || undefined;
+  }
+
+  // A confirmed pair in double mode: the left pane shows the role-left
+  // camera, the right pane the role-right one.
+  let paneRoles = $derived(cameraMode === 'double' && swapLocked);
+
+  function paneLabel(pane: 'left' | 'right', idx: number): string {
+    if (cameraMode === 'double') return paneAlt(pane, idx);
+    return cameraName(idx) ?? $m.cam_fallback_name;
+  }
+
+  // Before the roles are confirmed, the title is the camera's own label or
+  // model; once they are, PageCameraLabel puts the words before it.
+  function paneLabelTitle(idx: number): string | undefined {
+    if (cameraMode !== 'double') return undefined;
+    return cameraName(idx);
   }
 </script>
 
@@ -1133,7 +1171,7 @@
               bind:naturalWidth={naturalW0}
               bind:naturalHeight={naturalH0}
               src={shownUrl(leftIdx)}
-              alt={$m.lv_camera_left_alt}
+              alt={paneAlt('left', leftIdx)}
               class="feed-img"
               style={feedRotateStyle(paneRotation(leftIdx), feedW0, feedH0)}
               onload={() => { if (imgEl0) histogramStore.update(s => ({ ...s, [leftIdx]: computeHistogram(imgEl0!) })); }}
@@ -1158,7 +1196,7 @@
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
-              <span>{$m.lv_no_signal_left}</span>
+              <span>{paneNoSignal('left')}</span>
               <small>{$m.lv_check_hw}</small>
             </div>
           {/if}
@@ -1166,7 +1204,11 @@
           {#if cameraMissing[leftIdx]}
             <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
           {/if}
-          <div class="feed-label">{cameraLabel(leftIdx)}</div>
+          {#if paneRoles}
+            <PageCameraLabel role="left" width={feedW0} title={cameraName(leftIdx)} class="feed-label" />
+          {:else}
+            <div class="feed-label" title={paneLabelTitle(leftIdx)}>{paneLabel('left', leftIdx)}</div>
+          {/if}
           <!-- Last-pair mode (NEH-334): whether the pane shows the last capture
                or a frame fetched on request, which is not saved. -->
           {#if lastPair && shownUrl(leftIdx)}
@@ -1198,7 +1240,7 @@
                 bind:naturalWidth={naturalW1}
                 bind:naturalHeight={naturalH1}
                 src={shownUrl(rightIdx)}
-                alt={$m.lv_camera_right_alt}
+                alt={paneAlt('right', rightIdx)}
                 class="feed-img"
                 style={feedRotateStyle(paneRotation(rightIdx), feedW1, feedH1)}
                 onload={() => { if (imgEl1) histogramStore.update(s => ({ ...s, [rightIdx]: computeHistogram(imgEl1!) })); }}
@@ -1222,7 +1264,7 @@
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
-                <span>{$m.lv_no_signal_right}</span>
+                <span>{paneNoSignal('right')}</span>
                 <small>{$m.lv_check_hw}</small>
               </div>
             {/if}
@@ -1230,7 +1272,11 @@
             {#if cameraMissing[rightIdx]}
               <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
             {/if}
-            <div class="feed-label right">{cameraLabel(rightIdx)}</div>
+            {#if paneRoles}
+              <PageCameraLabel role="right" width={feedW1} title={cameraName(rightIdx)} class="feed-label right" />
+            {:else}
+              <div class="feed-label right" title={paneLabelTitle(rightIdx)}>{paneLabel('right', rightIdx)}</div>
+            {/if}
             {#if lastPair && shownUrl(rightIdx)}
               <div class="feed-source right">{showsCapture(rightIdx) ? $m.lv_last_capture : $m.lv_preview_unsaved}</div>
             {/if}
@@ -1680,7 +1726,8 @@
     display: block;
   }
 
-  .feed-label {
+  /* Global because a confirmed pair's label is PageCameraLabel's element. */
+  .camera-feed :global(.feed-label) {
     position: absolute;
     top: 8px;
     left: 8px;
@@ -1694,9 +1741,10 @@
     color: var(--color-light);
     pointer-events: none;
     z-index: 5;
+    white-space: nowrap;
   }
 
-  .feed-label.right { left: auto; right: 8px; }
+  .camera-feed :global(.feed-label.right) { left: auto; right: 8px; }
 
   /* What a pane shows in last-pair mode (NEH-334), under the camera's
      label and in its style, lighter. */

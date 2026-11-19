@@ -33,8 +33,14 @@ import '../../app.css';
 import LivePreview from './+page.svelte';
 
 const USER = 3;
-const NAME0 = 'Canon PowerShot A2500 [0]';
-const NAME1 = 'Canon PowerShot A2500 [1]';
+// The label under each live picture while the roles are not confirmed (the
+// set-up answers nothing here): the camera's number. The notice names the
+// camera the same way, inside its sentence.
+const LAB0 = `${en.cam_fallback_name} 1`;
+const LAB1 = `${en.cam_fallback_name} 2`;
+const FAILED0 = en.lv_orientation_save_failed('camera 1');
+const FAILED1 = en.lv_orientation_save_failed('camera 2');
+const FAILED_ES0 = es.lv_orientation_save_failed('la cámara 1');
 
 function json(body: unknown, status = 200) {
 	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -58,6 +64,9 @@ type Put = { path: string; body: unknown; answer: ReturnType<typeof deferredResp
 let puts: Put[] = [];
 
 const body = (index: number, hardware_id: string) => ({ index, model: 'Canon PowerShot A2500', hardware_id, calibrated: false });
+// The set-up the next /cameras/setup request answers; null answers nothing
+// usable, so the roles stay unconfirmed.
+let setupAnswer: unknown = null;
 // The bodies the next device listing reports.
 let deviceList: ReturnType<typeof body>[] = [];
 let listings = 0;
@@ -74,6 +83,7 @@ function serve() {
 			puts.push({ path, body: JSON.parse(String((init as RequestInit | undefined)?.body)), answer });
 			return answer.promise;
 		}
+		if (path.endsWith('/cameras/setup') && setupAnswer !== null) return json(setupAnswer);
 		if (path.endsWith('/cameras/devices') || path.endsWith('/cameras/rescan')) {
 			listings += 1;
 			return json(deviceList);
@@ -92,9 +102,13 @@ const fail = (put: Put) => put.answer.resolve(json({ detail: 'nope' }, 500));
 const succeed = (put: Put, orientation: number) =>
 	put.answer.resolve(json({ index: 0, hardware_id: 'a', orientation }));
 
-// The feed whose label names that camera.
+// The feed whose label names that camera, by its text or, where the label
+// is the badge form, by its accessible name.
 const feed = (name: string) =>
-	[...document.querySelectorAll('.camera-feed')].find((f) => f.querySelector('.feed-label')?.textContent?.trim() === name) ?? null;
+	[...document.querySelectorAll('.camera-feed')].find((f) => {
+		const label = f.querySelector('.feed-label');
+		return label?.textContent?.trim() === name || label?.getAttribute('aria-label') === name;
+	}) ?? null;
 const rotateCw = (name: string) => feed(name)?.querySelector(`button[aria-label="${en.lv_rotate_cw}"]`) as HTMLButtonElement | null;
 const degreesOf = (name: string) => feed(name)?.querySelector('.feed-rotate-deg')?.textContent?.trim();
 
@@ -114,10 +128,7 @@ async function reconnect() {
 }
 const alerts = () => [...document.querySelectorAll('[role="alert"]')];
 const notice = (text: string) => alerts().find((a) => a.textContent?.includes(text)) ?? null;
-const notices = () =>
-	alerts().filter((a) =>
-		[NAME0, NAME1].some((n) => a.textContent?.includes(en.lv_orientation_save_failed(n)) || a.textContent?.includes(es.lv_orientation_save_failed(n)))
-	);
+const notices = () => alerts().filter((a) => [FAILED0, FAILED1].some((t) => a.textContent?.includes(t)));
 const retryIn = (el: Element | null, label = en.common_retry) =>
 	(el ? [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === label) : null) ?? null;
 
@@ -125,6 +136,7 @@ beforeEach(() => {
 	puts = [];
 	deviceList = [body(0, 'a'), body(1, 'b')];
 	listings = 0;
+	setupAnswer = null;
 	localStorage.clear();
 	clearChord();
 	locale.set('en');
@@ -143,110 +155,110 @@ afterEach(() => {
 
 async function ready() {
 	render(LivePreview);
-	await expect.poll(() => degreesOf(NAME0)).toBe('90°');
-	await expect.poll(() => degreesOf(NAME1)).toBe('90°');
+	await expect.poll(() => degreesOf(LAB0)).toBe('90°');
+	await expect.poll(() => degreesOf(LAB1)).toBe('90°');
 }
 
 describe('capture screen: an orientation that could not be saved', () => {
 	it('keeps the new orientation, logs the error and shows a notice naming the camera with Retry', async () => {
 		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
 		await ready();
-		rotateCw(NAME0)!.click();
+		rotateCw(LAB0)!.click();
 		await expect.poll(() => puts.length).toBe(1);
-		expect(notice(en.lv_orientation_save_failed(NAME0))).toBeNull();
+		expect(notice(FAILED0)).toBeNull();
 		fail(puts[0]);
-		await expect.poll(() => notice(en.lv_orientation_save_failed(NAME0))).not.toBeNull();
+		await expect.poll(() => notice(FAILED0)).not.toBeNull();
 		expect(errors.mock.calls.some((c) => String(c[0]).includes('Error saving orientation'))).toBe(true);
-		expect(degreesOf(NAME0)).toBe('180°');
-		expect(retryIn(notice(en.lv_orientation_save_failed(NAME0)))).not.toBeNull();
+		expect(degreesOf(LAB0)).toBe('180°');
+		expect(retryIn(notice(FAILED0))).not.toBeNull();
 		expect(notices().length).toBe(1);
 	});
 
 	it('Retry sends the same orientation and hardware id again and turns nothing', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		await ready();
-		rotateCw(NAME0)!.click();
+		rotateCw(LAB0)!.click();
 		await expect.poll(() => puts.length).toBe(1);
 		fail(puts[0]);
-		await expect.poll(() => notice(en.lv_orientation_save_failed(NAME0))).not.toBeNull();
-		await expect.poll(() => retryIn(notice(en.lv_orientation_save_failed(NAME0)))?.disabled).toBe(false);
+		await expect.poll(() => notice(FAILED0)).not.toBeNull();
+		await expect.poll(() => retryIn(notice(FAILED0))?.disabled).toBe(false);
 
-		retryIn(notice(en.lv_orientation_save_failed(NAME0)))!.click();
+		retryIn(notice(FAILED0))!.click();
 		await expect.poll(() => puts.length).toBe(2);
 		expect(puts[1].path.endsWith('/cameras/0/orientation')).toBe(true);
 		expect(puts[1].body).toEqual({ orientation: 180, hardware_id: 'a' });
-		expect(degreesOf(NAME0)).toBe('180°');
-		expect(degreesOf(NAME1)).toBe('90°');
+		expect(degreesOf(LAB0)).toBe('180°');
+		expect(degreesOf(LAB1)).toBe('90°');
 	});
 
 	it('a successful Retry removes the notice', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		await ready();
-		rotateCw(NAME0)!.click();
+		rotateCw(LAB0)!.click();
 		await expect.poll(() => puts.length).toBe(1);
 		fail(puts[0]);
-		await expect.poll(() => retryIn(notice(en.lv_orientation_save_failed(NAME0)))?.disabled).toBe(false);
-		retryIn(notice(en.lv_orientation_save_failed(NAME0)))!.click();
+		await expect.poll(() => retryIn(notice(FAILED0))?.disabled).toBe(false);
+		retryIn(notice(FAILED0))!.click();
 		await expect.poll(() => puts.length).toBe(2);
 		succeed(puts[1], 180);
-		await expect.poll(() => notice(en.lv_orientation_save_failed(NAME0))).toBeNull();
-		expect(degreesOf(NAME0)).toBe('180°');
+		await expect.poll(() => notice(FAILED0)).toBeNull();
+		expect(degreesOf(LAB0)).toBe('180°');
 	});
 
 	it('a later turn that saves removes the notice too', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		await ready();
-		rotateCw(NAME0)!.click();
+		rotateCw(LAB0)!.click();
 		await expect.poll(() => puts.length).toBe(1);
 		fail(puts[0]);
-		await expect.poll(() => notice(en.lv_orientation_save_failed(NAME0))).not.toBeNull();
-		rotateCw(NAME0)!.click();
+		await expect.poll(() => notice(FAILED0)).not.toBeNull();
+		rotateCw(LAB0)!.click();
 		await expect.poll(() => puts.length).toBe(2);
 		expect(puts[1].body).toEqual({ orientation: 270, hardware_id: 'a' });
 		succeed(puts[1], 270);
-		await expect.poll(() => notice(en.lv_orientation_save_failed(NAME0))).toBeNull();
+		await expect.poll(() => notice(FAILED0)).toBeNull();
 	});
 
 	it('each camera has its own notice', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		await ready();
-		rotateCw(NAME0)!.click();
+		rotateCw(LAB0)!.click();
 		await expect.poll(() => puts.length).toBe(1);
 		fail(puts[0]);
-		await expect.poll(() => notice(en.lv_orientation_save_failed(NAME0))).not.toBeNull();
-		expect(notice(en.lv_orientation_save_failed(NAME1))).toBeNull();
+		await expect.poll(() => notice(FAILED0)).not.toBeNull();
+		expect(notice(FAILED1)).toBeNull();
 
-		rotateCw(NAME1)!.click();
+		rotateCw(LAB1)!.click();
 		await expect.poll(() => puts.length).toBe(2);
 		expect(puts[1].path.endsWith('/cameras/1/orientation')).toBe(true);
 		fail(puts[1]);
 		await expect.poll(() => notices().length).toBe(2);
-		expect(notice(en.lv_orientation_save_failed(NAME1))).not.toBeNull();
+		expect(notice(FAILED1)).not.toBeNull();
 
 		// Camera 1's retry saves; camera 0's notice stays.
-		await expect.poll(() => retryIn(notice(en.lv_orientation_save_failed(NAME1)))?.disabled).toBe(false);
-		retryIn(notice(en.lv_orientation_save_failed(NAME1)))!.click();
+		await expect.poll(() => retryIn(notice(FAILED1))?.disabled).toBe(false);
+		retryIn(notice(FAILED1))!.click();
 		await expect.poll(() => puts.length).toBe(3);
 		expect(puts[2].body).toEqual({ orientation: 180, hardware_id: 'b' });
 		puts[2].answer.resolve(json({ index: 1, hardware_id: 'b', orientation: 180 }));
-		await expect.poll(() => notice(en.lv_orientation_save_failed(NAME1))).toBeNull();
+		await expect.poll(() => notice(FAILED1)).toBeNull();
 		await settle();
-		expect(notice(en.lv_orientation_save_failed(NAME0))).not.toBeNull();
+		expect(notice(FAILED0)).not.toBeNull();
 		expect(notices().length).toBe(1);
 	});
 
 	it('belongs to the body whose save failed: another body at that index has no notice and no Retry', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		await ready();
-		rotateCw(NAME0)!.click();
+		rotateCw(LAB0)!.click();
 		await expect.poll(() => puts.length).toBe(1);
 		fail(puts[0]);
-		await expect.poll(() => notice(en.lv_orientation_save_failed(NAME0))).not.toBeNull();
+		await expect.poll(() => notice(FAILED0)).not.toBeNull();
 
 		// Another body is connected at index 0 and the cameras are listed again.
 		deviceList = [body(0, 'c'), body(1, 'b')];
 		await reconnect();
-		await expect.poll(() => notice(en.lv_orientation_save_failed(NAME0))).toBeNull();
+		await expect.poll(() => notice(FAILED0)).toBeNull();
 		await settle();
 		expect(notices().length).toBe(0);
 		expect(retryIn(document.querySelector('.center-column'))).toBeNull();
@@ -255,7 +267,7 @@ describe('capture screen: an orientation that could not be saved', () => {
 	it('a save for the previous body that fails after another body is connected puts no notice on the new one', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		await ready();
-		rotateCw(NAME0)!.click();
+		rotateCw(LAB0)!.click();
 		await expect.poll(() => puts.length).toBe(1);
 		expect(puts[0].body).toEqual({ orientation: 180, hardware_id: 'a' });
 
@@ -265,7 +277,7 @@ describe('capture screen: an orientation that could not be saved', () => {
 		await settle();
 		fail(puts[0]);
 		await settle();
-		expect(notice(en.lv_orientation_save_failed(NAME0))).toBeNull();
+		expect(notice(FAILED0)).toBeNull();
 		expect(notices().length).toBe(0);
 	});
 
@@ -273,11 +285,64 @@ describe('capture screen: an orientation that could not be saved', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		locale.set('es');
 		render(LivePreview);
-		await expect.poll(() => degreesOf(NAME0)).toBe('90°');
-		feed(NAME0)!.querySelector<HTMLButtonElement>(`button[aria-label="${es.lv_rotate_cw}"]`)!.click();
+		const lab0 = `${es.cam_fallback_name} 1`;
+		await expect.poll(() => degreesOf(lab0)).toBe('90°');
+		feed(lab0)!.querySelector<HTMLButtonElement>(`button[aria-label="${es.lv_rotate_cw}"]`)!.click();
 		await expect.poll(() => puts.length).toBe(1);
 		fail(puts[0]);
-		await expect.poll(() => notice(es.lv_orientation_save_failed(NAME0))).not.toBeNull();
-		expect(retryIn(notice(es.lv_orientation_save_failed(NAME0)), es.common_retry)).not.toBeNull();
+		await expect.poll(() => notice(FAILED_ES0)).not.toBeNull();
+		expect(retryIn(notice(FAILED_ES0), es.common_retry)).not.toBeNull();
+	});
+
+	it('roles confirmed: the notice names the camera by its side, from the page its role gives it', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		setupAnswer = { needs_setup: false, reasons: [], confirmed_pair: { left: 'a', right: 'b' } };
+		render(LivePreview);
+		// Camera 0 has the role left (even/verso page): it is the right camera.
+		await expect.poll(() => degreesOf(en.lv_camera_left_alt)).toBe('90°');
+		await expect.poll(() => degreesOf(en.lv_camera_right_alt)).toBe('90°');
+		rotateCw(en.lv_camera_left_alt)!.click();
+		await expect.poll(() => puts.length).toBe(1);
+		expect(puts[0].path.endsWith('/cameras/0/orientation')).toBe(true);
+		fail(puts[0]);
+		const text = en.lv_orientation_save_failed('the right camera');
+		await expect.poll(() => notice(text)).not.toBeNull();
+
+		rotateCw(en.lv_camera_right_alt)!.click();
+		await expect.poll(() => puts.length).toBe(2);
+		expect(puts[1].path.endsWith('/cameras/1/orientation')).toBe(true);
+		fail(puts[1]);
+		await expect.poll(() => notice(en.lv_orientation_save_failed('the left camera'))).not.toBeNull();
+	});
+
+	it('roles confirmed, in Spanish: the notice names the camera by its side', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		locale.set('es');
+		setupAnswer = { needs_setup: false, reasons: [], confirmed_pair: { left: 'a', right: 'b' } };
+		render(LivePreview);
+		await expect.poll(() => degreesOf(es.lv_camera_left_alt)).toBe('90°');
+		feed(es.lv_camera_left_alt)!.querySelector<HTMLButtonElement>(`button[aria-label="${es.lv_rotate_cw}"]`)!.click();
+		await expect.poll(() => puts.length).toBe(1);
+		fail(puts[0]);
+		await expect.poll(() => notice(es.lv_orientation_save_failed('la cámara derecha'))).not.toBeNull();
+	});
+
+	it('single-camera mode: the notice says "the camera"', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		await ready();
+		const expand = document.querySelector<HTMLButtonElement>(`button[aria-label="${en.cam_panel_expand_aria}"]`);
+		if (expand) {
+			expand.click();
+			await settle();
+		}
+		const single = [...document.querySelectorAll<HTMLElement>('label.radio-label')].find((l) => l.textContent?.trim() === en.cam_mode_single);
+		single!.click();
+		await settle();
+		const model = 'Canon PowerShot A2500';
+		await expect.poll(() => degreesOf(model)).toBe('90°');
+		rotateCw(model)!.click();
+		await expect.poll(() => puts.length).toBe(1);
+		fail(puts[0]);
+		await expect.poll(() => notice(en.lv_orientation_save_failed('the camera'))).not.toBeNull();
 	});
 });

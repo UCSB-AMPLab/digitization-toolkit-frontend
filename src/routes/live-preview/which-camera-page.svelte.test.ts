@@ -228,7 +228,7 @@ describe('capture screen: set-up needed', () => {
 		roleAnswers = [() => json({ devices: [row(0, 'a', { role: 'right' }), row(1, 'b', { role: 'left' })], setup: NOT_NEEDED })];
 		render(LivePreview);
 		await expect.poll(() => card(1)).not.toBeNull();
-		(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+		(card(0)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
 		await settle();
 		buttonIn(step(), en.camwhich_confirm)!.click();
 		await expect.poll(() => step()).toBeNull();
@@ -258,7 +258,7 @@ describe('capture screen: set-up needed', () => {
 		// The tab comes back: a read that is still pending when the save answers.
 		document.dispatchEvent(new Event('visibilitychange'));
 		await expect.poll(() => setupCalls).toBe(3);
-		(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+		(card(0)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
 		await settle();
 		buttonIn(step(), en.camwhich_confirm)!.click();
 		await expect.poll(() => step()).toBeNull();
@@ -405,7 +405,7 @@ describe('the camera check: "Change which camera is which"', () => {
 	it('a save goes back to the check', async () => {
 		await openByHand();
 		await expect.poll(() => card(0)).not.toBeNull();
-		(card(0)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+		(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
 		await settle();
 		buttonIn(step(), en.camwhich_confirm)!.click();
 		await expect.poll(() => step()).toBeNull();
@@ -470,7 +470,7 @@ describe('capture screen: the saved roles decide left and right', () => {
 		render(LivePreview);
 		await expect.poll(() => card(1)).not.toBeNull();
 		expect(viewportDegrees()).toEqual(['90°', '180°']);
-		(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+		(card(0)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
 		await settle();
 		buttonIn(step(), en.camwhich_confirm)!.click();
 		await expect.poll(() => step()).toBeNull();
@@ -642,7 +642,7 @@ describe('capture screen: answers that started before a newer one', () => {
 		roleAnswers = [() => json({ devices: savedRows(), setup: SAVED_B_LEFT })];
 		render(LivePreview);
 		await expect.poll(() => card(1)).not.toBeNull();
-		(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+		(card(0)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
 		await settle();
 		buttonIn(step(), en.camwhich_confirm)!.click();
 		await expect.poll(() => step()).toBeNull();
@@ -687,7 +687,7 @@ describe('capture screen: answers that started before a newer one', () => {
 			await expect.poll(() => setupCalls).toBe(2);
 			document.dispatchEvent(new Event('visibilitychange'));
 			await expect.poll(() => setupCalls).toBe(3);
-			(card(1)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
+			(card(0)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
 			await settle();
 			buttonIn(step(), en.camwhich_confirm)!.click();
 			await expect.poll(() => step()).toBeNull();

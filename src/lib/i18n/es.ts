@@ -203,8 +203,11 @@ export const es = {
 	dash_stage_approved_desc: 'Volúmenes con todos los registros aprobados, listos para exportar.',
 	dash_progress_load_error: 'No se pudo cargar el avance de los volúmenes',
 	dash_test_cameras: 'Probar cámaras',
-	dash_camera_left: 'Cámara izquierda',
-	dash_camera_right: 'Cámara derecha',
+	// The camera by its confirmed role (`left` is the right camera), and by
+	// its number when no role is confirmed.
+	dash_camera_left: 'Cámara derecha',
+	dash_camera_right: 'Cámara izquierda',
+	dash_camera_n: (n: number) => `Cámara ${n}`,
 	dash_camera_not_active: 'No activa',
 	dash_camera_stop: 'Detener',
 	dash_camera_test: 'Probar',
@@ -661,10 +664,10 @@ export const es = {
 	col_delete_record_retry: 'Intenta de nuevo en un momento.',
 	col_prev: 'Anterior',
 	col_next: 'Siguiente',
-	col_left_page_short: 'Página izq.',
-	col_right_page_short: 'Página der.',
-	col_left_page: 'Página izquierda',
-	col_right_page: 'Página derecha',
+	col_left_page_short: 'Cámara derecha · par/verso',
+	col_right_page_short: 'Cámara izquierda · impar/recto',
+	col_left_page: 'Página par/verso',
+	col_right_page: 'Página impar/recto',
 	col_image_alt: (id: number | string) => `Imagen ${id}`,
 	col_record_locked: (statusLabel: string) => `Registro bloqueado (${statusLabel})`,
 	col_status_in_review_lc: 'en revisión',
@@ -672,8 +675,15 @@ export const es = {
 	col_retake: 'Volver a capturar',
 	col_retake_confirm: '¿Volver a capturar este registro desde la pantalla de captura? Captua guardará las imágenes actuales como versiones anteriores.',
 	col_delete_record_confirm: '¿Eliminar permanentemente este registro y todas sus imágenes?',
-	badge_left: 'Izq',
-	badge_right: 'Der',
+	// A picture of a page names the camera and the page. Role `right` is the
+	// odd/recto page, photographed by the left camera; role `left` is the
+	// even/verso page, photographed by the right camera.
+	cam_page_odd: 'Cámara izquierda · impar/recto',
+	cam_page_even: 'Cámara derecha · par/verso',
+	page_term_odd: 'impar/recto',
+	page_term_even: 'par/verso',
+	badge_cam_left: 'I',
+	badge_cam_right: 'D',
 	col_err_blurry: 'Imagen movida',
 	col_err_glare: 'Reflejo/Brillo',
 	col_err_shadows: 'Sombras',
@@ -716,8 +726,8 @@ export const es = {
 	col_annotation_load_error: 'No se pudieron cargar las anotaciones. Intenta de nuevo.',
 	col_annotation_save_error: 'No se pudo guardar la anotación. Intenta de nuevo.',
 	col_annotation_delete_error: 'No se pudo eliminar la anotación. Intenta de nuevo.',
-	col_role_left: 'Imagen izquierda',
-	col_role_right: 'Imagen derecha',
+	col_role_left: 'Imagen de la página par/verso',
+	col_role_right: 'Imagen de la página impar/recto',
 	col_role_overview: 'Vista general',
 	col_empty_collection: 'Sin imágenes en este volumen',
 	col_col_title: 'Título',
@@ -808,7 +818,7 @@ export const es = {
 	col_manifest_rule_sequence_missing: 'Algunos registros no tienen número de secuencia. Renumera el volumen.',
 	col_manifest_rule_sequence_repeated: 'Algunos registros tienen el mismo número de secuencia. Renumera el volumen.',
 	col_manifest_rule_roles_invalid:
-		'Algunos registros no tienen una imagen única, ni tampoco una imagen izquierda, una derecha o las dos. Vuelve a capturarlos para que cada uno tenga una imagen única o un par de imágenes izquierda y derecha.',
+		'Algunos registros no tienen una imagen única, ni tampoco una imagen de la página par/verso, una de la impar/recto o las dos. Vuelve a capturarlos para que cada uno tenga una imagen única o dos imágenes: una de la página par/verso y otra de la impar/recto.',
 	col_manifest_rule_capture_id_missing:
 		'Algunas imágenes no tienen identificador de captura, así que el manifiesto de captura no tiene el checksum de esas imágenes. Vuelve a capturar esos registros.',
 	col_manifest_rule_not_uploaded:
@@ -949,23 +959,29 @@ export const es = {
 
 	// ── Live view ────────────────────────────────────────────────────────────
 	lv_reconnecting: 'Reconectando con la cámara…',
-	lv_camera_left_alt: 'Cámara izquierda',
-	lv_camera_right_alt: 'Cámara derecha',
+	lv_camera_left_alt: 'Cámara derecha · par/verso',
+	lv_camera_right_alt: 'Cámara izquierda · impar/recto',
 	lv_wb_click_hint: 'Selecciona un área blanca o gris neutro en la previsualización',
-	lv_no_signal_left: 'Sin señal — Izquierda',
-	lv_no_signal_right: 'Sin señal — Derecha',
+	lv_no_signal_left: 'Sin señal — Cámara derecha',
+	lv_no_signal_right: 'Sin señal — Cámara izquierda',
+	lv_no_signal: 'Sin señal',
 	lv_check_hw: 'Verifica la conexión de la cámara',
 	lv_camera_missing: 'Cámara no detectada. Presiona el disparador hasta la mitad o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".',
 	lv_rotate_ccw: 'Girar a la izquierda',
 	lv_rotate_cw: 'Girar a la derecha',
+	// A camera named inside a sentence: by the page its role gives it (the
+	// camera with role left photographs the even/verso page, on the right),
+	// by its number, or, with one camera, plainly.
+	lv_camera_in_sentence: (which: { role: 'left' | 'right' } | { number: number } | { single: true }): string =>
+		'role' in which ? `la cámara ${which.role === 'left' ? 'derecha' : 'izquierda'}` : 'number' in which ? `la cámara ${which.number}` : 'la cámara',
 	lv_orientation_save_failed: (camera: string): string =>
 		`Captua no pudo guardar la orientación de ${camera}. Usará esta orientación en las capturas mientras esta pantalla siga abierta, pero si la recargas o vuelves a abrirla verás la anterior. Presiona "Reintentar" para guardar esta orientación.`,
 	lv_controls_collapse: 'Ocultar controles',
 	lv_controls_expand: 'Mostrar controles',
 	lv_grid_settings: 'Ajustes de cuadrícula',
-	lv_swap_orientation: 'Intercambiar izquierda y derecha',
-	lv_orientation_swapped: 'Intercambiar izquierda y derecha (ahora la cámara [1] está a la izquierda)',
-	lv_orientation_normal: 'Intercambiar izquierda y derecha (ahora la cámara [0] está a la izquierda)',
+	lv_swap_orientation: 'Intercambiar las páginas de las dos cámaras',
+	lv_orientation_swapped: 'Intercambiar las páginas de las dos cámaras (ahora la cámara 2 fotografía la página par/verso)',
+	lv_orientation_normal: 'Intercambiar las páginas de las dos cámaras (ahora la cámara 1 fotografía la página par/verso)',
 	lv_grid_modal_title: 'Cuadrícula y guías',
 	lv_grid_modal_subtitle: 'Activa las ayudas visuales de encuadre.',
 	lv_grid: 'Cuadrícula',
@@ -1021,8 +1037,8 @@ export const es = {
 	focus_title: 'Revisar el enfoque',
 	focus_step: (n: number, total: number) => `Paso ${n} de ${total}`,
 	focus_af_title: 'Pon los lentes en AF',
-	focus_camera_left: 'Cámara izquierda',
-	focus_camera_right: 'Cámara derecha',
+	focus_camera_left: 'Cámara derecha · par/verso',
+	focus_camera_right: 'Cámara izquierda · impar/recto',
 	focus_mode_auto: 'AF',
 	focus_mode_manual: 'MF',
 	focus_mode_unknown: 'Sin lectura',
@@ -1038,7 +1054,7 @@ export const es = {
 	focus_mf_warning: (side: 'left' | 'right' | 'both') =>
 		side === 'both'
 			? 'Las dos cámaras todavía marcan AF. Pon los dos lentes en MF antes de continuar.'
-			: `La cámara ${side === 'left' ? 'izquierda' : 'derecha'} todavía marca AF. Pon su lente en MF antes de continuar.`,
+			: `La cámara ${side === 'left' ? 'derecha' : 'izquierda'} todavía marca AF. Pon su lente en MF antes de continuar.`,
 	focus_mf_required: 'Para continuar, las dos cámaras tienen que marcar MF.',
 	focus_next: 'Siguiente',
 	focus_back: 'Atrás',
@@ -1063,7 +1079,7 @@ export const es = {
 	focus_no_focus_again: 'Luego repite las capturas.',
 	focus_focal: (mm: number) => `${String(mm).replace('.', ',')} mm`,
 	focus_focal_mismatch: (left: number, right: number) =>
-		`Las dos cámaras tienen distinto zoom (izquierda ${String(left).replace('.', ',')} mm, derecha ${String(right).replace('.', ',')} mm). Gira el anillo de zoom de uno de los lentes hasta que las dos cifras coincidan y repite las capturas.`,
+		`Las dos cámaras tienen distinto zoom (izquierda ${String(right).replace('.', ',')} mm, derecha ${String(left).replace('.', ',')} mm). Gira el anillo de zoom de uno de los lentes hasta que las dos cifras coincidan y repite las capturas.`,
 	focus_steps_show: 'Ver los pasos',
 	focus_steps_hide: 'Ocultar los pasos',
 	focus_mf_step_switch: 'Vuelve a correr el interruptor de cada lente a MF.',
@@ -1075,10 +1091,10 @@ export const es = {
 	camcheck_open: 'Revisar cámaras',
 	camcheck_title: 'Revisión de cámaras',
 	camcheck_back: 'Volver a la pantalla de captura',
-	camcheck_left_page: 'Página izquierda',
-	camcheck_right_page: 'Página derecha',
+	camcheck_left_page: 'Cámara derecha · par/verso',
+	camcheck_right_page: 'Cámara izquierda · impar/recto',
 	camcheck_chip_aria: (side: 'left' | 'right') =>
-		`Cámara de la página ${side === 'left' ? 'izquierda' : 'derecha'}: ver detalles`,
+		`${side === 'left' ? 'Cámara derecha · par/verso' : 'Cámara izquierda · impar/recto'}: ver detalles`,
 	camcheck_not_reachable: 'sin conexión',
 	camcheck_no_capture: 'Todavía no hay captura de prueba',
 	camcheck_taking: 'Haciendo la captura de prueba…',
@@ -1087,7 +1103,7 @@ export const es = {
 		detail ? `Captua no pudo hacer la captura de prueba: ${detail}` : 'Captua no pudo hacer la captura de prueba',
 	camcheck_frame_unreachable: 'Captua no pudo comunicarse con esta cámara.',
 	camcheck_unreachable_title: (side: 'left' | 'right') =>
-		`Captua no pudo comunicarse con la cámara de la página ${side === 'left' ? 'izquierda' : 'derecha'}.`,
+		`Captua no pudo comunicarse con la cámara ${side === 'left' ? 'derecha' : 'izquierda'}.`,
 	camcheck_unreachable_body: 'Revisa que la cámara esté encendida y que el cable USB esté conectado. Luego repite las capturas de prueba.',
 	camcheck_devices_failed: 'Captua no pudo leer la lista de cámaras.',
 	camcheck_idle: 'Haz capturas de prueba para revisar el zoom y el enfoque.',
@@ -1095,9 +1111,9 @@ export const es = {
 	camcheck_zoom_both: 'Zoom · las dos cámaras',
 	camcheck_zoom_each: 'Zoom · cada cámara',
 	camcheck_zoom_in: (who: 'both' | 'left' | 'right') =>
-		who === 'both' ? 'Acercar' : `Acercar, cámara de la página ${who === 'left' ? 'izquierda' : 'derecha'}`,
+		who === 'both' ? 'Acercar' : `Acercar, cámara ${who === 'left' ? 'derecha' : 'izquierda'}`,
 	camcheck_zoom_out: (who: 'both' | 'left' | 'right') =>
-		who === 'both' ? 'Alejar' : `Alejar, cámara de la página ${who === 'left' ? 'izquierda' : 'derecha'}`,
+		who === 'both' ? 'Alejar' : `Alejar, cámara ${who === 'left' ? 'derecha' : 'izquierda'}`,
 	// After the step shown: the last step, from the cameras' zoom_steps.
 	camcheck_zoom_of: (last: number) => `de ${last}`,
 	camcheck_adjust_separately: 'Ajustar por separado',
@@ -1106,7 +1122,7 @@ export const es = {
 	camcheck_zoom_first: 'Primero haz capturas de prueba: Captua puede ajustar el zoom cuando cada cámara haya hecho una.',
 	// The detail is the backend's, in English.
 	camcheck_zoom_failed: (side: 'left' | 'right', detail?: string) => {
-		const camera = `la cámara de la página ${side === 'left' ? 'izquierda' : 'derecha'}`;
+		const camera = `la cámara ${side === 'left' ? 'derecha' : 'izquierda'}`;
 		return detail ? `Captua no pudo ajustar el zoom de ${camera}: ${detail}` : `Captua no pudo ajustar el zoom de ${camera}.`;
 	},
 	camcheck_stale: 'Se cambió el zoom después de estas capturas. Repite las capturas de prueba.',
@@ -1119,24 +1135,23 @@ export const es = {
 	camcheck_focus: 'Enfoque',
 	camcheck_focus_hint: 'Presiona "1:1" en una captura para verla en tamaño real. El texto debe verse nítido.',
 	camcheck_full_size_aria: (side: 'left' | 'right') =>
-		`Página ${side === 'left' ? 'izquierda' : 'derecha'}: tamaño real (1:1)`,
+		`${side === 'left' ? 'Cámara derecha · par/verso' : 'Cámara izquierda · impar/recto'}: tamaño real (1:1)`,
 	camcheck_discarded: 'Captua no guarda las capturas de prueba en el volumen.',
 	camcheck_take: 'Hacer capturas de prueba',
 	camcheck_viewer_title: 'Capturas de prueba en tamaño real',
 	camcheck_viewer_hint: 'Arrastra una captura para mover las dos. Revisa que el texto se vea nítido en las dos páginas.',
 	camcheck_details_title: 'Cámaras',
-	camcheck_details_camera: (side: 'left' | 'right') => `Cámara de la página ${side === 'left' ? 'izquierda' : 'derecha'}`,
+	camcheck_details_camera: (side: 'left' | 'right'): string => (side === 'left' ? 'Cámara derecha · par/verso' : 'Cámara izquierda · impar/recto'),
 	camcheck_connection: 'Conexión',
 	camcheck_connected: 'Conectada',
 	camcheck_cannot_reach: 'Captua no puede comunicarse con la cámara',
 	camcheck_model: 'Modelo',
 	camcheck_turn_aria: (side: 'left' | 'right') =>
-		`Girar 90° a la derecha la captura de la página ${side === 'left' ? 'izquierda' : 'derecha'}`,
-	camcheck_turn_title: 'Girar 90° a la derecha',
+		`Girar la captura de la página ${side === 'left' ? 'par/verso' : 'impar/recto'} 90° en el sentido de las manecillas del reloj`,
+	camcheck_turn_title: 'Girar 90° en el sentido de las manecillas del reloj',
 	// ── "¿Qué cámara es cuál?" (NEH-343) ──────────────────────────────────────
 	camwhich_open: 'Cambiar la página de cada cámara',
-	camwhich_ask_title: '¿Qué cámara ve la página izquierda?',
-	camwhich_port_title: '¿Alguien cambió las cámaras de lado?',
+	camwhich_ask_title: '¿Cuál de las dos imágenes es la página impar/recto?',
 	camwhich_identity_title: 'Captua no puede identificar una de las cámaras',
 	camwhich_identity_body: 'Avisa al administrador: tiene que configurar esta cámara para que Captua la pueda identificar. Mientras tanto, nadie puede capturar en este equipo.',
 	camwhich_one_title: 'Captua necesita las dos cámaras conectadas',
@@ -1148,23 +1163,21 @@ export const es = {
 	camwhich_loading: 'Captua está leyendo la lista de cámaras…',
 	camwhich_lead_unconfirmed: 'Captua no sabe qué página fotografía cada cámara.',
 	camwhich_lead_conflict: 'Captua tiene las dos cámaras registradas para la misma página.',
-	camwhich_lead_pair_changed: 'Estas cámaras no son el par que se confirmó la última vez en este equipo.',
-	camwhich_lead_port: 'Una cámara está conectada a un puerto USB distinto del que usaba cuando se confirmó su página. Revisa que cada imagen muestre la página que indica su etiqueta.',
-	camwhich_how: 'Presiona la imagen que muestra la página izquierda. Si una imagen está de lado o al revés, gírala.',
+	camwhich_lead_pair_changed: 'Estas no son las dos cámaras que se confirmaron la última vez en este equipo.',
+	camwhich_lead_port: 'Una cámara está conectada a un puerto USB distinto del que usaba cuando se confirmó su página. Revisa que cada imagen corresponda a la página que indica su etiqueta.',
+	camwhich_how: 'Presiona la imagen de la página impar/recto. Si una imagen está de lado o al revés, gírala.',
 	camwhich_needed: 'Captua necesita esta respuesta antes de que puedas capturar.',
 	camwhich_camera: (n: number) => `Cámara ${n}`,
-	camwhich_pick_aria: (n: number) => `La cámara ${n} ve la página izquierda`,
-	camwhich_turn_aria: (n: number) => `Girar 90° a la derecha la imagen de la cámara ${n}`,
-	camwhich_guess: (side: 'left' | 'right') => `Captua cree que es la página ${side === 'left' ? 'izquierda' : 'derecha'}`,
+	camwhich_pick_aria: (n: number) => `La cámara ${n} fotografía la página impar/recto`,
+	camwhich_turn_aria: (n: number) => `Girar la imagen de la cámara ${n} 90° en el sentido de las manecillas del reloj`,
+	camwhich_guess: (side: 'left' | 'right') => `Captua cree que es la página ${side === 'left' ? 'par/verso' : 'impar/recto'}`,
 	camwhich_frame_busy: 'Pidiéndole una imagen a la cámara…',
 	camwhich_frame_failed: 'Captua no pudo obtener una imagen de esta cámara.',
 	camwhich_refresh: 'Actualizar',
 	camwhich_confirm: 'Confirmar',
-	camwhich_port_no: 'No, siguen donde estaban',
-	camwhich_port_yes: 'Sí, las cambiaron de lado',
-	camwhich_err_not_connected: 'Captua no pudo guardar la respuesta porque una cámara ya no estaba conectada. Revisa que las dos cámaras estén conectadas y vuelve a elegir la imagen de la página izquierda.',
+	camwhich_err_not_connected: 'Captua no pudo guardar la respuesta porque una cámara ya no estaba conectada. Revisa que las dos cámaras estén conectadas y vuelve a presionar la imagen de la página impar/recto.',
 	camwhich_err_identity: 'Captua no pudo guardar la respuesta porque no puede identificar una de las cámaras. Avisa al administrador.',
-	camwhich_err_unavailable: 'Captua no pudo guardar qué página fotografía cada cámara. Intenta de nuevo en un momento.',
+	camwhich_err_unavailable: 'Captua no pudo guardar qué página fotografía cada cámara. Vuelve a intentarlo en un momento.',
 	camwhich_err_failed: 'Captua no pudo guardar qué página fotografía cada cámara.',
 	tb_go_to_review: 'Revisar',
 	tb_go_to_review_title: 'Volver a la revisión de este volumen',
@@ -1702,7 +1715,7 @@ export const es = {
 	retakes_no_page: 'Aquí no hay ninguna página',
 	retakes_capture: 'Capturar',
 	retakes_page_missing_row: (side: 'left' | 'right') =>
-		`Nunca se fotografió la página ${side === 'left' ? 'izquierda' : 'derecha'}. Vuelve a capturar el par completo con las dos cámaras: la captura nueva reemplaza la anterior.`,
+		`Nunca se fotografió la página ${side === 'left' ? 'par/verso' : 'impar/recto'}. Vuelve a capturar el par de páginas completo con las dos cámaras: Captua reemplaza la captura anterior por la nueva.`,
 	// A volume's count under its heading in Por recapturar.
 	retakes_volume_pending: (n: number) => (n === 1 ? '1 pendiente' : `${formatCount(n, 'es')} pendientes`),
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────

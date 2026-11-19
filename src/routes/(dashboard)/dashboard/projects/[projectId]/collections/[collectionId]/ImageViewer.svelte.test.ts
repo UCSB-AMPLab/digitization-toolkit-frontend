@@ -186,6 +186,34 @@ describe('ImageViewer — drag-to-pan and out-of-frame caption (NEH-230)', () =>
   });
 });
 
+describe('ImageViewer — the spread names each camera and page (NEH-379)', () => {
+  let previewSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    locale.set('es');
+    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(make1200x800DataUrl());
+  });
+  afterEach(() => previewSpy.mockRestore());
+
+  it('the even/verso picture on the left with the right camera, the odd/recto picture on the right with the left camera', async () => {
+    const screen = render(ImageViewer, baseProps({ zoom: 1 }));
+    await expect.poll(() => screen.container.querySelector('img.spread-image.right')).not.toBeNull();
+    // The words: the accessible name in the badge form, the text otherwise.
+    const sides = [...screen.container.querySelectorAll('.spread-side')].map((s) => s.getAttribute('aria-label') ?? s.textContent?.trim());
+    expect(sides).toEqual([es.col_left_page_short, es.col_right_page_short]);
+    expect(sides).toEqual(['Cámara derecha · par/verso', 'Cámara izquierda · impar/recto']);
+    expect(screen.container.querySelector('img.spread-image.left')?.getAttribute('alt')).toBe(es.col_left_page_short);
+    expect(screen.container.querySelector('img.spread-image.right')?.getAttribute('alt')).toBe(es.col_right_page_short);
+  });
+
+  it('a single-camera image names neither a camera nor a page', async () => {
+    const record = makeRecord({ capture_mode: 'single', images: [makeImage({ id: 5, role: 'single', filename: 'one.jpg' })] });
+    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+    await expect.poll(() => screen.container.querySelector('img.spread-image.left')).not.toBeNull();
+    expect(screen.container.querySelector('.spread-side')).toBeNull();
+    expect(screen.container.querySelector('img.spread-image.left')?.getAttribute('alt')).toBe(es.col_image_alt(5));
+  });
+});
+
 // NEH-139: the spread view is the main review viewer; a page whose /preview
 // cannot be loaded (a RAW master without a sidecar) shows its thumbnail,
 // labelled, instead of a broken image.

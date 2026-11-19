@@ -123,6 +123,11 @@ function renderCheck(props: Partial<Props> = {}) {
 
 const view = () => document.querySelector('[data-camera-check]') as HTMLElement | null;
 const frame = (side: 'left' | 'right') => document.querySelector(`[data-frame="${side}"]`) as HTMLElement | null;
+// A picture's label in words: its accessible name in the badge form, its text otherwise.
+const labelWords = (side: 'left' | 'right') => {
+	const el = frame(side)?.querySelector('.feed-label');
+	return el ? (el.getAttribute('aria-label') ?? el.textContent?.trim()) : null;
+};
 const frameImg = (side: 'left' | 'right') => frame(side)?.querySelector('img') as HTMLImageElement | null;
 const zoomControl = (which: 'both' | 'left' | 'right') => document.querySelector(`[data-zoom="${which}"]`) as HTMLElement | null;
 const zoomValue = (which: 'both' | 'left' | 'right') => zoomControl(which)?.querySelector('.zc-val')?.textContent?.trim() ?? null;
@@ -184,8 +189,8 @@ describe('CameraCheck: at rest and closing', () => {
 		expect(view()).not.toBeNull();
 		expect(view()?.getAttribute('role')).toBe('dialog');
 		expect(text()).toContain(en.camcheck_title);
-		expect(frame('left')?.textContent).toContain(en.camcheck_left_page);
-		expect(frame('right')?.textContent).toContain(en.camcheck_right_page);
+		expect(labelWords('left')).toBe(en.camcheck_left_page);
+		expect(labelWords('right')).toBe(en.camcheck_right_page);
 		expect(frame('left')?.textContent).toContain(en.camcheck_no_capture);
 		expect(frame('right')?.textContent).toContain(en.camcheck_no_capture);
 		expect(text()).toContain(en.camcheck_discarded);
@@ -574,7 +579,8 @@ describe('CameraCheck: are my cameras OK', () => {
 		renderCheck({ leftIndex: 1 });
 		await settle();
 		expect(chip('left')?.getAttribute('aria-label')).toBe(en.camcheck_chip_aria('left'));
-		expect(chip('left')?.textContent).toContain(en.camcheck_left_page);
+		expect(chip('left')?.textContent).toContain(`${en.badge_cam_right} · ${en.page_term_even}`);
+		expect(chip('left')?.getAttribute('title')).toBe(en.camcheck_left_page);
 		expect(chip('left')?.textContent).toContain(A2500);
 		expect(chip('left')?.querySelector('.cam-badge.ok')).not.toBeNull();
 		expect(chip('right')?.querySelector('.cam-badge.ok')).not.toBeNull();

@@ -18,6 +18,7 @@
   import RecordImageDisplay from '$lib/components/RecordImageDisplay.svelte';
   import MissingPage from '$lib/components/MissingPage.svelte';
   import MissingPill from '$lib/components/MissingPill.svelte';
+  import PageCameraLabel from '$lib/components/PageCameraLabel.svelte';
   import {
     fittedSize,
     screenExtent,
@@ -77,6 +78,21 @@
   let spreadRightImage = $derived(
     selectedRecord?.images?.find(img => img.role === 'right') ?? null
   );
+
+  // A picture of a page names its camera and its page: role `left` is the
+  // even/verso page, photographed by the right camera; role `right` the
+  // odd/recto page, by the left camera. Any other image names neither.
+  function sideLabel(img: RecordImage | null): string | null {
+    if (img?.role === 'left') return $m.col_left_page_short;
+    if (img?.role === 'right') return $m.col_right_page_short;
+    return null;
+  }
+
+  // The caption under the picture says the same, in words or in the badge
+  // form by the picture's width (PageCameraLabel).
+  function pageRole(img: RecordImage | null): 'left' | 'right' | null {
+    return img?.role === 'left' || img?.role === 'right' ? img.role : null;
+  }
 
   // NEH-201: the image's exact file name, not the record's derived title — the
   // file name is what survives in the BagIt export.
@@ -272,7 +288,7 @@
                 <img
                   {src}
                   {onerror}
-                  alt={$m.col_left_page}
+                  alt={sideLabel(spreadLeftImage) ?? $m.col_image_alt(spreadLeftImage?.id ?? '')}
                   class="spread-image left"
                   draggable="false"
                   bind:naturalWidth={leftNaturalW}
@@ -303,7 +319,7 @@
         {#if spreadLeftImage}
           <div class="spread-label">
             <span class="spread-name">{getImageName(spreadLeftImage)}</span>
-            <span class="spread-side">{$m.col_left_page_short}</span>
+            {#if pageRole(spreadLeftImage)}<PageCameraLabel role={pageRole(spreadLeftImage)!} width={leftFrameW} class="spread-side" />{/if}
           </div>
         {/if}
       </div>
@@ -331,7 +347,7 @@
                 <img
                   {src}
                   {onerror}
-                  alt={$m.col_right_page}
+                  alt={sideLabel(spreadRightImage) ?? $m.col_image_alt(spreadRightImage?.id ?? '')}
                   class="spread-image right"
                   draggable="false"
                   bind:naturalWidth={rightNaturalW}
@@ -362,7 +378,7 @@
         {#if spreadRightImage}
           <div class="spread-label right">
             <span class="spread-name">{getImageName(spreadRightImage)}</span>
-            <span class="spread-side">{$m.col_right_page_short}</span>
+            {#if pageRole(spreadRightImage)}<PageCameraLabel role={pageRole(spreadRightImage)!} width={rightFrameW} class="spread-side" />{/if}
           </div>
         {/if}
       </div>
@@ -522,7 +538,8 @@
   .spread-label.right { align-self: flex-end; align-items: flex-end; }
 
   .spread-name { font-size: var(--text-sm); font-weight: var(--fw-bold); color: var(--color-light); }
-  .spread-side { font-size: var(--text-xs); color: var(--color-light-grey); }
+  /* Global because the label is PageCameraLabel's element. */
+  .spread-label :global(.spread-side) { font-size: var(--text-xs); color: var(--color-light-grey); }
 
   .spread-image {
     max-width: 100%;
