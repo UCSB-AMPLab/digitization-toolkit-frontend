@@ -23,7 +23,7 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import { m } from '$lib/i18n';
   import { browser } from '$app/environment';
-  import { camerasApi, recordsApi, hasContinuousPreview, sessionRequestInit, getApiBase, type CameraDevice } from '$lib/api';
+  import { camerasApi, recordsApi, hasContinuousPreview, sessionRequestInit, getApiBase, isPreviewFrameFailedResponse, type CameraDevice } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { wbSamplingStore } from '$lib/stores/wbSampling';
   import { histogramStore, computeHistogram } from '$lib/stores/histogram';
@@ -260,6 +260,18 @@
   // (e.g. 1000 = 1 s).
   const PREVIEW_INTERVAL_MS = 2000;
 
+  // A connected camera that sent no frame answers 503 preview_frame_failed
+  // (NEH-349): its pane keeps the last frame and polling goes on. After this
+  // many such answers in a row the pane shows "connected, no image" (not the
+  // missing-camera notice, since the camera is connected): 15 polls at
+  // PREVIEW_INTERVAL_MS (2 s) = 30 s, longer when answers are slower than the
+  // interval, since a camera has one request in flight at a time.
+  const NO_FRAME_RUN_LIMIT = 15;
+  // Last-pair mode asks only when the operator does (on entry, after a
+  // capture, "Refresh preview"), so a run of this many such answers, one per
+  // request, is enough to show the same notice.
+  const LAST_PAIR_NO_FRAME_LIMIT = 3;
+
   // Object URLs of the latest preview frame from each camera, keyed by camera
   // index. Which index shows on the left depends on `swapped`.
   let previewUrls = $state<Record<number, string>>({});
@@ -449,12 +461,20 @@
 
   // One fetch in flight per camera, so requests never overlap: a second
   // caller while one is in flight shares its answer.
-  type PreviewResult = 'ok' | 'missing' | 'error' | 'skipped';
+  type PreviewResult = 'ok' | 'missing' | 'no-frame' | 'error' | 'skipped';
   const previewInFlight: Record<number, Promise<PreviewResult> | undefined> = {};
 
-  // Consecutive preview errors — the reconnect banner shows after 3.
-  let previewErrorCount = $state(0);
-  let previewConnectError = $derived(previewErrorCount >= 3);
+  // Per camera, the 503 preview_frame_failed answers since that camera's
+  // last other answer (the limit depends on the preview mode).
+  const noFrameRun: Record<number, number> = {};
+
+  // Per camera, the preview errors since that camera's last other answer.
+  // The reconnect banner shows while any camera's run has reached the limit.
+  const ERROR_RUN_LIMIT = 3;
+  let previewErrorRun = $state<Record<number, number>>({});
+  let previewConnectError = $derived(
+    Object.values(previewErrorRun).some((n) => n >= ERROR_RUN_LIMIT)
+  );
 
   // A single missing camera (404 on its last preview fetch, NEH-229).
   // Separate from previewConnectError: 404 is deliberately left out of the
@@ -467,11 +487,42 @@
   // does not stop polling.
   let cameraMissing = $state<Record<number, boolean>>({});
 
+  // A camera that is connected (its last preview answer was the 503
+  // preview_frame_failed, NEH-349) but has sent no image for a whole run of
+  // answers. Never true together with cameraMissing for the same camera.
+  let cameraNoImage = $state<Record<number, boolean>>({});
+
+  // What one preview request for a camera answered: a frame, a 404, the 503
+  // preview_frame_failed, or any other failure.
+  type CameraAnswer = 'ok' | 'missing' | 'no-frame' | 'error';
+
+  // Every answer for a camera puts that camera in exactly one state, and
+  // entering a state clears the marks of the others: the missing overlay,
+  // the no-image notice and the reconnect banner's error count. This is the
+  // only code that writes them, apart from the resets of stopping the
+  // polling, switching the mode and starting the polling again. A 'no-frame'
+  // answer is the backend confirming the connection, so it ends the error
+  // run as a frame does. Each camera has its own error run: an answer ends
+  // that camera's run only. A no-image notice, once shown, stays through further
+  // 'no-frame' answers.
+  function recordAnswer(cam: number, answer: CameraAnswer) {
+    const run = answer === 'no-frame' ? (noFrameRun[cam] ?? 0) + 1 : 0;
+    noFrameRun[cam] = run;
+    const limit = lastPair ? LAST_PAIR_NO_FRAME_LIMIT : NO_FRAME_RUN_LIMIT;
+    const missing = answer === 'missing';
+    const noImage = answer === 'no-frame' && (run >= limit || !!cameraNoImage[cam]);
+    if (!!cameraMissing[cam] !== missing) cameraMissing = { ...cameraMissing, [cam]: missing };
+    if (!!cameraNoImage[cam] !== noImage) cameraNoImage = { ...cameraNoImage, [cam]: noImage };
+    const errors = answer === 'error' ? (previewErrorRun[cam] ?? 0) + 1 : 0;
+    if ((previewErrorRun[cam] ?? 0) !== errors) previewErrorRun = { ...previewErrorRun, [cam]: errors };
+  }
+
   // Calls GET /cameras/preview/{cameraIndex} (the endpoint is in the
   // backend's cameras.py). A 404 does not count toward the reconnect banner.
   // The previous object URL is revoked so frames do not leak memory.
-  // Resolves 'ok' when a new frame arrived, 'missing' on a 404, 'error' on
-  // any other failure and 'skipped' while the tab is hidden.
+  // Resolves 'ok' when a new frame arrived, 'missing' on a 404, 'no-frame' on
+  // the 503 preview_frame_failed, 'error' on any other failure and 'skipped'
+  // while the tab is hidden.
   function fetchPreview(cameraIndex: number): Promise<PreviewResult> {
     const inFlight = previewInFlight[cameraIndex];
     if (inFlight) return inFlight;
@@ -499,27 +550,30 @@
         }
 
         previewUrls = { ...previewUrls, [cameraIndex]: newUrl };
-        previewErrorCount = 0;  // reset on success
-        // In last-pair mode fetchFrames sets the overlay, and only for a
+        // In last-pair mode fetchFrames records the answer, and only for a
         // pane its operation still holds.
-        if (!lastPair && cameraMissing[cameraIndex]) {
-          cameraMissing = { ...cameraMissing, [cameraIndex]: false };
-        }
+        if (!lastPair) recordAnswer(cameraIndex, 'ok');
         return 'ok';
       } else if (response.status === 404) {
         // 404: the camera is not connected or its frame could not be
         // captured. It does not count as an error, but it shows in the
         // per-camera overlay (NEH-229).
-        if (!lastPair) cameraMissing = { ...cameraMissing, [cameraIndex]: true };
+        if (!lastPair) recordAnswer(cameraIndex, 'missing');
         return 'missing';
+      } else if (await isPreviewFrameFailedResponse(response)) {
+        // Connected, no frame this time: not an error, and the backend has
+        // just said the camera is there. The pane keeps its frame until the
+        // run reaches NO_FRAME_RUN_LIMIT.
+        if (!lastPair) recordAnswer(cameraIndex, 'no-frame');
+        return 'no-frame';
       } else {
         // Other errors (500, etc.) count toward the banner.
-        previewErrorCount += 1;
+        if (!lastPair) recordAnswer(cameraIndex, 'error');
         return 'error';
       }
     } catch {
       // A network error counts toward the reconnect banner.
-      previewErrorCount += 1;
+      if (!lastPair) recordAnswer(cameraIndex, 'error');
       return 'error';
     }
   }
@@ -541,7 +595,8 @@
   // Last-pair mode: fetches one frame for each of the given cameras and
   // shows the ones that arrived as a preview, on the panes no newer
   // operation has taken over. A 404 marks the camera missing; any other
-  // failure shows the refresh message; nothing asks again by itself.
+  // failure, the 503 preview_frame_failed included, shows the refresh
+  // message; nothing asks again by itself.
   async function fetchFrames(cams: number[]) {
     if (!framesAvailable || cams.length === 0) return;
     const ticket = takeTicket(cams);
@@ -556,20 +611,15 @@
       // with nothing polling to clear it.
       const held = results.map((result, i) => ({ cam: cams[i], result })).filter(({ cam }) => holdsTicket(cam, ticket));
       if (held.length === 0) return;
-      if (held.some(({ result }) => result === 'error')) previewFailed = true;
+      if (held.some(({ result }) => result === 'error' || result === 'no-frame')) previewFailed = true;
       else if (held.some(({ result }) => result === 'ok')) previewFailed = false;
       const nextKind = { ...paneKind };
-      const nextMissing = { ...cameraMissing };
       for (const { cam, result } of held) {
-        if (result === 'ok') {
-          nextKind[cam] = 'preview';
-          nextMissing[cam] = false;
-        } else if (result === 'missing') {
-          nextMissing[cam] = true;
-        }
+        if (result === 'skipped') continue;
+        if (result === 'ok') nextKind[cam] = 'preview';
+        recordAnswer(cam, result);
       }
       paneKind = nextKind;
-      cameraMissing = nextMissing;
     } finally {
       framesInFlight -= 1;
     }
@@ -645,7 +695,6 @@
     }
     const nextUrls = { ...captureUrls };
     const nextKind = { ...paneKind };
-    const nextMissing = { ...cameraMissing };
     for (const cam of [0, 1]) {
       const url = urls[cam] ?? null;
       if (!holdsTicket(cam, ticket)) {
@@ -669,7 +718,7 @@
         nextUrls[cam] = url;
         nextKind[cam] = 'capture';
         captureTicketOf[cam] = ticket;
-        nextMissing[cam] = false;
+        recordAnswer(cam, 'ok');
       } else if (cam < ids.length || nextKind[cam] === 'capture') {
         // In this capture without a thumbnail, or showing an older capture.
         delete nextKind[cam];
@@ -677,7 +726,6 @@
     }
     captureUrls = nextUrls;
     paneKind = nextKind;
-    cameraMissing = nextMissing;
     // The cameras whose thumbnail failed are empty now, so this covers them.
     fillEmptyPanes();
   }
@@ -737,8 +785,8 @@
     // banner, which last-pair mode does not show: they carry over as the
     // last-pair failure message, cleared as usual by the next good frame or
     // capture. The counter starts again, so it affects nothing later.
-    if (previewErrorCount > 0) previewFailed = true;
-    previewErrorCount = 0;
+    if (Object.values(previewErrorRun).some((n) => n > 0)) previewFailed = true;
+    previewErrorRun = {};
     const kinds: Record<number, 'capture' | 'preview'> = {};
     for (const cam of [0, 1]) if (previewUrls[cam]) kinds[cam] = 'preview';
     paneKind = kinds;
@@ -776,6 +824,13 @@
       clearInterval(previewInterval);
       previewInterval = null;
     }
+
+    // Every camera's run of no-frame answers and of errors starts again.
+    // A camera the new mode does not poll would otherwise keep its error
+    // run, and with it the reconnect banner, with no answer left to end it.
+    for (const cam of Object.keys(noFrameRun)) noFrameRun[Number(cam)] = 0;
+    cameraNoImage = {};
+    previewErrorRun = {};
 
     // Fetch at once rather than waiting for the first interval.
     fetchPreview(0);
@@ -1186,7 +1241,7 @@
                 title={$m.lv_wb_click_hint}
               ></div>
             {/if}
-          {:else if !cameraMissing[leftIdx]}
+          {:else if !cameraMissing[leftIdx] && !cameraNoImage[leftIdx]}
             <!-- No signal yet, or waiting for the first frame. Omitted when
                  the camera is marked missing: the NEH-229 notice says the same
                  with the concrete instruction, and both would sit in the
@@ -1203,6 +1258,8 @@
           <!-- The camera returned 404 on its last fetch (NEH-229). -->
           {#if cameraMissing[leftIdx]}
             <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
+          {:else if cameraNoImage[leftIdx]}
+            <div class="camera-missing" role="status">{$m.lv_camera_no_image}</div>
           {/if}
           {#if paneRoles}
             <PageCameraLabel role="left" width={feedW0} title={cameraName(leftIdx)} class="feed-label" />
@@ -1254,7 +1311,7 @@
                   title={$m.lv_wb_click_hint}
                 ></div>
               {/if}
-            {:else if !cameraMissing[rightIdx]}
+            {:else if !cameraMissing[rightIdx] && !cameraNoImage[rightIdx]}
               <!-- No signal yet, or waiting for the first frame. Omitted when
                    the camera is marked missing: the NEH-229 notice says the
                    same with the concrete instruction, and both would sit in
@@ -1271,6 +1328,8 @@
             <!-- The camera returned 404 on its last fetch (NEH-229). -->
             {#if cameraMissing[rightIdx]}
               <div class="camera-missing" role="status">{$m.lv_camera_missing}</div>
+            {:else if cameraNoImage[rightIdx]}
+              <div class="camera-missing" role="status">{$m.lv_camera_no_image}</div>
             {/if}
             {#if paneRoles}
               <PageCameraLabel role="right" width={feedW1} title={cameraName(rightIdx)} class="feed-label right" />

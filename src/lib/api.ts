@@ -2042,13 +2042,50 @@ export const camerasApi = {
   /**
    * One preview frame from a camera: GET /cameras/preview/{n}, the request
    * the capture screen polls (LiveViewport), asked for once. Throws on any
-   * non-ok answer; a 404 means the camera is not connected or gave no frame.
+   * non-ok answer; a 404 means the camera is not connected or gave no frame,
+   * and the 503 that isPreviewFrameFailed recognises means it is connected
+   * but sent no frame this time.
    */
   async previewFrame(cameraIndex: number): Promise<Blob> {
     const { blob } = await apiRequestBlob(`/cameras/preview/${cameraIndex}`, { timeoutMs: CAMERA_REQUEST_TIMEOUT_MS });
     return blob;
   },
 };
+
+// GET /cameras/preview/{n} answers 503 with detail
+// {code: "preview_frame_failed", message} when the camera is connected but
+// sent no frame (NEH-349); the next request may get one. It is per camera.
+// A backend without it never sends this code, and its other 503 (the
+// capture system not loaded) has a string detail.
+export const PREVIEW_FRAME_FAILED_CODE = 'preview_frame_failed';
+
+function isPreviewFrameFailedDetail(status: number | undefined, detail: unknown): boolean {
+  return (
+    status === 503 &&
+    typeof detail === 'object' &&
+    detail !== null &&
+    (detail as { code?: unknown }).code === PREVIEW_FRAME_FAILED_CODE
+  );
+}
+
+/** Whether an error thrown by camerasApi.previewFrame is that 503. */
+export function isPreviewFrameFailed(error: unknown): boolean {
+  return error instanceof ApiError && isPreviewFrameFailedDetail(error.status, error.detail);
+}
+
+/**
+ * The same test on a raw response, for the pollers that fetch the frame
+ * themselves. It reads a clone, so the response's body is left unread.
+ */
+export async function isPreviewFrameFailedResponse(response: Response): Promise<boolean> {
+  if (response.status !== 503) return false;
+  try {
+    const body = await response.clone().json();
+    return isPreviewFrameFailedDetail(response.status, body?.detail);
+  } catch {
+    return false;
+  }
+}
 
 // Camera controls request interface (all fields optional)
 export interface CameraControlsRequest {

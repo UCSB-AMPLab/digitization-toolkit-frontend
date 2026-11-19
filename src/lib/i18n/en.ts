@@ -936,6 +936,7 @@ export const en: Messages = {
 	lv_no_signal: 'No signal',
 	lv_check_hw: 'Check the camera connection',
 	lv_camera_missing: 'Camera not detected. Half-press its shutter button or reseat the USB cable, then press "Reconnect cameras".',
+	lv_camera_no_image: 'The camera is connected but is not sending an image. Turn the camera off and on again. If that does not help, unplug its USB cable and plug it back in.',
 	lv_rotate_ccw: 'Rotate left',
 	lv_rotate_cw: 'Rotate right',
 	// A camera named inside a sentence: by the page its role gives it (the
