@@ -55,6 +55,21 @@ export function canSaveRotation(
 }
 
 /**
+ * Whether the backend holds an orientation saved for this body. A current
+ * backend always reports a valid effective `orientation` (a body with none
+ * saved gets a default that follows its role), so only `orientation_saved`
+ * tells the two apart. A backend that predates the field reports no
+ * `orientation` for a body with nothing saved, so with the field absent a
+ * valid `orientation` is read as a saved one.
+ */
+function hasSavedOrientation(
+  device: Pick<CameraDevice, 'orientation' | 'orientation_saved'>
+): boolean {
+  if (typeof device.orientation_saved === 'boolean') return device.orientation_saved;
+  return isValidRotation(device.orientation);
+}
+
+/**
  * Decides what happens to rotations the operator set while an index had no
  * identified body. Each one belongs to the first identified body that appears
  * at its index: it is applied to it (and saved) when that body has no saved
@@ -64,7 +79,7 @@ export function canSaveRotation(
  */
 export function settlePendingRotations(
   pending: ReadonlyMap<number, number>,
-  devices: Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation'>[]
+  devices: Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation' | 'orientation_saved'>[]
 ): { apply: [number, number][]; remaining: Map<number, number> } {
   const apply: [number, number][] = [];
   const remaining = new Map<number, number>();
@@ -72,7 +87,7 @@ export function settlePendingRotations(
     const device = devices.find((d) => d.index === index);
     if (!canSaveRotation(device)) {
       remaining.set(index, degrees);
-    } else if (!isValidRotation(device.orientation)) {
+    } else if (!hasSavedOrientation(device)) {
       apply.push([index, degrees]);
     }
   }

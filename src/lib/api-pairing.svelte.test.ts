@@ -55,10 +55,21 @@ describe('systemApi pairing', () => {
 	});
 
 	it('getPairing passes the abort signal', async () => {
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(ANSWER));
+		// The request carries a signal of its own that also has the time limit
+		// (NEH-356); aborting the caller's signal aborts it.
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+			(_input, init) =>
+				new Promise<Response>((_resolve, reject) => {
+					init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true });
+				})
+		);
 		const ctrl = new AbortController();
-		await systemApi.getPairing(ctrl.signal);
-		expect(fetchSpy.mock.calls[0][1]?.signal).toBe(ctrl.signal);
+		const pending = systemApi.getPairing(ctrl.signal);
+		const sent = fetchSpy.mock.calls[0][1]?.signal as AbortSignal;
+		expect(sent.aborted).toBe(false);
+		ctrl.abort();
+		expect(sent.aborted).toBe(true);
+		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
 	});
 
 	it('getPairing throws for an answer without a state', async () => {

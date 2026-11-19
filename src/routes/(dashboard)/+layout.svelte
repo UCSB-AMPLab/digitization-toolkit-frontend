@@ -26,7 +26,7 @@
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
 	import { tour } from '$lib/tour';
-	import { usersApi, recordsApi } from '$lib/api';
+	import { usersApi, recordsApi, endRejectedSession } from '$lib/api';
 	import { waitForSession, sessionRetryDelay } from '$lib/session-check';
 	import { m, roleLabel, type StringMessageKey } from '$lib/i18n';
 	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
@@ -95,10 +95,11 @@
 				// backend since the last login) before rendering.
 				authStore.setSession(outcome.user);
 			} else {
-				// `apiRequest` clears the session on a 401 but not on a 403. If
+				// `apiRequest` ends the session on a 401 but not on a 403. If
 				// the session stayed set, /login would redirect back here and the
-				// loop would return, so it is cleared in both cases.
-				authStore.clearSession();
+				// loop would return, so it is ended in both cases, once: a
+				// renewal in flight is followed by a logout.
+				if (authStore.isAuthenticated()) endRejectedSession();
 				goto('/login');
 			}
 			isValidatingSession = false;
