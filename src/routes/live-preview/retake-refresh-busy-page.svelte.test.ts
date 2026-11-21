@@ -55,7 +55,7 @@ function serve(capture: () => Promise<Response>) {
 			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
-		if (path.endsWith('/records')) return json([record]);
+		if (path.endsWith('/records/')) return json([record]);
 		if (path.endsWith('/cameras/capture')) {
 			captures.push(1);
 			return capture();

@@ -663,7 +663,7 @@ export const projectsApi = {
    * Get all projects
    */
   async list(): Promise<Project[]> {
-    return apiRequest<Project[]>('/projects');
+    return apiRequest<Project[]>('/projects/');
   },
 
   /**
@@ -677,7 +677,7 @@ export const projectsApi = {
    * Create a new project
    */
   async create(data: CreateProjectData): Promise<Project> {
-    return apiRequest<Project>('/projects', {
+    return apiRequest<Project>('/projects/', {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -895,13 +895,13 @@ export const collectionsApi = {
     if (params?.limit !== undefined) queryParams.set('limit', params.limit.toString());
 
     const query = queryParams.toString();
-    return apiRequest<Collection[]>(`/collections${query ? '?' + query : ''}`);
+    return apiRequest<Collection[]>(`/collections/${query ? '?' + query : ''}`);
   },
 
   /**
    * Get the complete set of collections matching the given filters.
    *
-   * GET /collections is paginated (backend default limit=100, max 1000 per
+   * GET /collections/ is paginated (backend default limit=100, max 1000 per
    * page), so a bare list() call silently truncates any project past the
    * page size (NEH-121). Pages through skip/limit until a short page arrives.
    * Stable pagination relies on the backend's ORDER BY id.
@@ -937,7 +937,7 @@ export const collectionsApi = {
    * Create a new collection
    */
   async create(data: CreateCollectionData): Promise<Collection> {
-    return apiRequest<Collection>('/collections', {
+    return apiRequest<Collection>('/collections/', {
       timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
       method: 'POST',
       body: JSON.stringify(data)
@@ -1397,13 +1397,13 @@ export const recordsApi = {
     if (params?.limit !== undefined) queryParams.set('limit', params.limit.toString());
     
     const query = queryParams.toString();
-    return apiRequest<Record[]>(`/records${query ? '?' + query : ''}`);
+    return apiRequest<Record[]>(`/records/${query ? '?' + query : ''}`);
   },
 
   /**
    * Get the complete set of records matching the given filters.
    *
-   * GET /records is paginated (backend default limit=100, max 1000 per page),
+   * GET /records/ is paginated (backend default limit=100, max 1000 per page),
    * so a bare list() call silently truncates any collection past the page
    * size (NEH-163). Pages through skip/limit until a short page arrives.
    * Stable pagination relies on the backend's ORDER BY id.
@@ -1433,7 +1433,7 @@ export const recordsApi = {
    * Create a new record
    */
   async create(data: CreateRecordData): Promise<Record> {
-    return apiRequest<Record>('/records', {
+    return apiRequest<Record>('/records/', {
       method: 'POST',
       body: JSON.stringify(data)
     });

@@ -218,7 +218,7 @@ describe('sign-out and session renewal', () => {
 			'/auth/refresh': () => refresh.promise,
 			'/auth/logout': () => logout.promise,
 			'/auth/login': () => Promise.resolve(cookieAnswer()),
-			'/projects': () =>
+			'/projects/': () =>
 				Promise.resolve(
 					new Response(JSON.stringify({ detail: 'Not authenticated' }), {
 						status: 401,
@@ -278,7 +278,7 @@ describe('sign-out and session renewal', () => {
 
 	it('on a 401 with no renewal in flight, only the local session is cleared', async () => {
 		const { order } = routedFetch({
-			'/projects': () =>
+			'/projects/': () =>
 				Promise.resolve(
 					new Response(JSON.stringify({ detail: 'Not authenticated' }), {
 						status: 401,
@@ -291,7 +291,7 @@ describe('sign-out and session renewal', () => {
 		await expect(projectsApi.list()).rejects.toMatchObject({ status: 401 });
 		await vi.advanceTimersByTimeAsync(0);
 		expect(authStore.getUser()).toBeNull();
-		expect(order).toEqual(['/projects']);
+		expect(order).toEqual(['/projects/']);
 
 		authStore.setSession(user);
 		target.press();

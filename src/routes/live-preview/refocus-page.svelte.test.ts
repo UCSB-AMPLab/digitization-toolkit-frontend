@@ -83,7 +83,7 @@ function serve(dslr: boolean, served: Served = {}) {
 			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
-		if (path.endsWith('/records')) return json(served.records ?? [{ id: 41, title: 'Par 1', status: 'captured', sequence: 1, capture_mode: 'dual', collection_id: 9, images: [] }]);
+		if (path.endsWith('/records/')) return json(served.records ?? [{ id: 41, title: 'Par 1', status: 'captured', sequence: 1, capture_mode: 'dual', collection_id: 9, images: [] }]);
 		if (path.endsWith('/cameras/capture/dual') || path.endsWith('/cameras/capture')) {
 			captures.push(path);
 			await served.captureGate;
