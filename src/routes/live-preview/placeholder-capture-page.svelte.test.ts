@@ -110,7 +110,7 @@ function serve() {
 			return json({ id: 9, name: 'Tomo 17', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-not-t017', custom_attributes: null });
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
-		if (path.endsWith('/records')) {
+		if (path.endsWith('/records/')) {
 			served.recordReads++;
 			// Armed by a test: the next read of the records answers through it, once.
 			const once = served.recordsNext;
