@@ -11,7 +11,7 @@
   // unit's cameras offer both formats (GET /cameras/capabilities), and
   // otherwise nothing about the format is sent.
   //
-  // Version: 0.1.3
+  // Version: 0.1.4
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -22,7 +22,7 @@
   import TestingFormatChoice from './TestingFormatChoice.svelte';
   import { fileHoldText } from '$lib/volume-refusals';
   import { canCreateProjects, canDeleteProjects, inTestingSpace } from '$lib/unit-mode';
-  import { offersFormatChoice, testingProjectDeleteText, testingRefusalText } from '$lib/testing-space';
+  import { offersFormatChoice, projectDeleteRefusalText, testingProjectDeleteText, testingRefusalText } from '$lib/testing-space';
   import { dismissible } from '$lib/dialog';
 
   let projects     = $state<Project[]>([]);
@@ -235,7 +235,7 @@
       const msg = err instanceof Error ? err.message : String(err);
       const testingText = testingProjectDeleteText(err, $m, $authStore.user?.role);
       if (testingText) console.error('[Projects] Error deleting the project:', err);
-      deleteError = testingText ?? hold ?? $m.proj_err_delete(msg);
+      deleteError = testingText ?? hold ?? $m.proj_err_delete(projectDeleteRefusalText(err, $m) ?? msg);
       isDeleting = false;
     }
   }

@@ -4,7 +4,7 @@
 // administrator's and the operator's list stay as they were. The absence of a
 // Status column is checked in projects-no-status.svelte.test.ts.
 //
-// Version: 0.1.2
+// Version: 0.1.4
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -180,13 +180,18 @@ describe('deleting a project', () => {
 	});
 
 	const plain = (status: number, detail: string) => json({ detail }, status);
+	const notEmpty = json({ detail: { code: 'project_not_empty', message: 'Backend text that is never shown.', collections: 2, records: 9 } }, 409);
 	const refusals: [string, Response, keyof Messages][] = [
-		['a project that still has volumes', plain(409, 'Cannot delete a non-empty project: 2 collection(s) and 9 record(s) remain. Move or delete them first.'), 'testing_err_project_not_empty'],
-		['files still referenced', plain(409, 'Project directory still holds files referenced by other records. Move those records first.'), 'testing_err_project_files_held'],
-		['a manifest of another volume', plain(409, 'Project directory holds a capture manifest other than its own. Move it out first.'), 'testing_err_project_files_held'],
+		['a project that still has volumes', notEmpty, 'testing_err_project_not_empty'],
+		['files still referenced', refusal(409, 'project_files_held'), 'testing_err_project_files_held'],
+		['a manifest of another volume', refusal(409, 'project_manifest_foreign'), 'testing_err_project_files_held'],
+		['a manifest that could not be kept', refusal(500, 'project_manifest_keep_failed'), 'testing_err_other'],
+		['files that could not be removed', refusal(500, 'project_files_remove_failed'), 'testing_err_other'],
 		['a storage drive that cannot be read', plain(503, 'A storage drive that holds testing files cannot be read now. Reconnect it, then delete the project again.'), 'testing_err_project_storage'],
 		['a project that is gone', plain(404, 'Project not found'), 'testing_err_not_found'],
-		['anything else', plain(500, 'Failed to remove project files from disk'), 'testing_err_other']
+		['a code it does not know', refusal(409, 'something_new'), 'testing_err_other'],
+		['a refusal with no code', plain(500, 'Failed to remove project files from disk'), 'testing_err_other'],
+		['the old English sentence without a code', plain(409, 'Cannot delete a non-empty project: 2 collection(s) and 9 record(s) remain. Move or delete them first.'), 'testing_err_other']
 	];
 	for (const lang of ['en', 'es'] as const) {
 		for (const [label, answer, key] of refusals) {
@@ -199,13 +204,13 @@ describe('deleting a project', () => {
 				await openMenu(screen);
 				await confirmDelete(screen);
 				await expect.element(page.getByText(msgs[key] as string)).toBeVisible();
-				expect(screen.container.textContent).not.toMatch(/Cannot delete|Project directory|storage drive|Failed to|not found/);
+				expect(screen.container.textContent).not.toMatch(/Cannot delete|Project directory|storage drive|Failed to|not found|Backend text/);
 				expect(screen.container.textContent).not.toContain(msgs.proj_err_delete('x').slice(0, 20));
 			});
 		}
 	}
 
-	it('the administrator still gets the backend detail inside the existing error text', async () => {
+	it('the administrator still gets the backend detail inside the existing error text when there is no code', async () => {
 		signIn(ROLES[1][1]);
 		serve({ 'DELETE /projects/{project_id}': plain(503, 'A storage drive that holds testing files cannot be read now.') });
 		const screen = render(ProjectsPage);
@@ -214,4 +219,57 @@ describe('deleting a project', () => {
 		await expect.element(page.getByText(en.proj_err_delete('A storage drive that holds testing files cannot be read now.'))).toBeVisible();
 		expect(screen.container.textContent).not.toContain(en.testing_err_project_storage);
 	});
+
+	it('the administrator gets the backend message for a code it does not know', async () => {
+		signIn(ROLES[1][1]);
+		serve({ 'DELETE /projects/{project_id}': refusal(409, 'something_new', 'Something new happened.') });
+		const screen = render(ProjectsPage);
+		await openMenu(screen);
+		await confirmDelete(screen);
+		await expect.element(page.getByText(en.proj_err_delete('Something new happened.'))).toBeVisible();
+	});
+
+	const coded = (collections: number, records: number) =>
+		json({ detail: { code: 'project_not_empty', message: 'Cannot delete a non-empty project: backend text.', collections, records } }, 409);
+	const adminCases: [string, Response, string, string][] = [
+		['project_not_empty with volumes and records', coded(2, 9), 'it still has 2 volumes and 9 records. Move or delete them first.', 'todavía tiene 2 volúmenes y 9 registros. Muévelos o elimínalos primero.'],
+		['project_not_empty with one of each', coded(1, 1), 'it still has 1 volume and 1 record. Move or delete them first.', 'todavía tiene 1 volumen y 1 registro. Muévelos o elimínalos primero.'],
+		['project_not_empty with volumes only', coded(3, 0), 'it still has 3 volumes. Move or delete them first.', 'todavía tiene 3 volúmenes. Muévelos o elimínalos primero.'],
+		['project_not_empty with one volume only', coded(1, 0), 'it still has 1 volume. Move or delete it first.', 'todavía tiene 1 volumen. Muévelo o elimínalo primero.'],
+		['project_not_empty with records only', coded(0, 4), 'it still has 4 records. Move or delete them first.', 'todavía tiene 4 registros. Muévelos o elimínalos primero.'],
+		['project_not_empty with one record only', coded(0, 1), 'it still has 1 record. Move or delete it first.', 'todavía tiene 1 registro. Muévelo o elimínalo primero.'],
+		['project_files_held', refusal(409, 'project_files_held', 'Project directory still holds files referenced by other records.'), 'Captua still keeps files in this project that belong to other records. Move those records first.', 'Captua todavía guarda en este proyecto archivos que pertenecen a otros registros. Mueve primero esos registros.'],
+		['project_manifest_foreign', refusal(409, 'project_manifest_foreign', 'Project directory holds a capture manifest other than its own.'), 'its directory holds a capture manifest that does not belong to this project. Move it out of that directory first.', 'en su carpeta hay un manifiesto de captura que no es de este proyecto. Sácalo primero de esa carpeta.']
+	];
+	for (const lang of ['en', 'es'] as const) {
+		for (const [label, answer, enTail, esTail] of adminCases) {
+			it(`the administrator sees a translated sentence in ${lang} for ${label}, not the backend's English`, async () => {
+				locale.set(lang);
+				const msgs = (lang === 'en' ? en : es) as Messages;
+				signIn(ROLES[1][1]);
+				serve({ 'DELETE /projects/{project_id}': answer });
+				const screen = render(ProjectsPage);
+				await openMenu(screen);
+				await confirmDelete(screen);
+				await expect.element(page.getByText(msgs.proj_err_delete(lang === 'en' ? enTail : esTail))).toBeVisible();
+				expect(screen.container.textContent).not.toMatch(/Cannot delete|Project directory|Backend text/);
+			});
+		}
+	}
+
+	const backendText = 'Cannot delete a non-empty project: backend text.';
+	for (const [label, answer] of [
+		['both counts zero', coded(0, 0)],
+		['counts missing', json({ detail: { code: 'project_not_empty', message: backendText } }, 409)],
+		['counts that are not numbers', json({ detail: { code: 'project_not_empty', message: backendText, collections: '2', records: null } }, 409)]
+	] as [string, Response][]) {
+		it(`the administrator gets the backend message for project_not_empty with ${label}`, async () => {
+			signIn(ROLES[1][1]);
+			serve({ 'DELETE /projects/{project_id}': answer });
+			const screen = render(ProjectsPage);
+			await openMenu(screen);
+			await confirmDelete(screen);
+			await expect.element(page.getByText(en.proj_err_delete(backendText))).toBeVisible();
+		});
+	}
 });

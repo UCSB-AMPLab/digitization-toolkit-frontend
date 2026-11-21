@@ -1,6 +1,6 @@
 // The route matching of the testing account's request recorder (NEH-391).
 //
-// Version: 0.1.0
+// Version: 0.1.1
 import { describe, expect, it } from 'vitest';
 import { routeOf } from './testing-routes';
 
@@ -12,9 +12,14 @@ describe('routeOf', () => {
 		expect(routeOf('GET', '/collections/count')?.template).toBe('/collections/count');
 	});
 
-	it('matches with or without the trailing slash', () => {
-		expect(routeOf('GET', '/projects')?.template).toBe('/projects/');
-		expect(routeOf('POST', '/collections')?.admitted).toBe(true);
+	it('matches the path exactly as sent, trailing slash included', () => {
+		expect(routeOf('GET', '/projects/')?.template).toBe('/projects/');
+		expect(routeOf('GET', '/projects')).toBeNull();
+		expect(routeOf('POST', '/collections/')?.admitted).toBe(true);
+		expect(routeOf('POST', '/collections')).toBeNull();
+		expect(routeOf('GET', '/projects/3')?.template).toBe('/projects/{project_id}');
+		expect(routeOf('GET', '/projects/3/')).toBeNull();
+		expect(routeOf('GET', '/health/')).toBeNull();
 	});
 
 	it('refuses what the table refuses and what it does not list', () => {
