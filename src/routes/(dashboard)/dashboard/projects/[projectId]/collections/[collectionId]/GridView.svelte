@@ -34,11 +34,15 @@
   // offered while a filter hides records, since neighbours on screen are
   // then not neighbours in the volume.
   //
-  // Version: 0.3.3
+  // The testing account (NEH-391) gets no status filter and no legend line
+  // on review.
+  //
+  // Version: 0.3.4
 
   import { recordsApi, collectionsApi, type Record, type RecordImage, type ClosedReason } from '$lib/api';
   import { m } from '$lib/i18n';
   import { userRole } from '$lib/stores/auth';
+  import { canMarkMissing, takesPartInWorkflow } from '$lib/unit-mode';
   import MarkMissingDialog from './MarkMissingDialog.svelte';
   import MissingPill from '$lib/components/MissingPill.svelte';
   import { renumberErrorText, reorderErrorText } from '$lib/volume-refusals';
@@ -91,7 +95,10 @@
   let activeStatusFilter = $state<string | null>(null);
 
   // Marking an opening missing (NEH-317): the roles that capture.
-  let canOperate = $derived($userRole === 'admin' || $userRole === 'operator');
+  let canOperate = $derived(canMarkMissing($userRole));
+  // The status filter and the legend's line on review: not for the testing
+  // account (NEH-391), whose records are never reviewed.
+  let showsReview = $derived(takesPartInWorkflow($userRole));
   // The toolbar's mark waits for the click on the record the opening goes after.
   let picking = $state(false);
   // The record the mark dialog is open for, with its sequence as shown.
@@ -301,6 +308,7 @@
   <div class="grid-toolbar">
 
     <div class="toolbar-left">
+      {#if showsReview}
       <button
         class="toolbar-btn"
         disabled={isReorderMode}
@@ -314,6 +322,7 @@
       </button>
 
       <div class="toolbar-divider"></div>
+      {/if}
 
       <button class="toolbar-btn" onclick={() => showRenumberModal = true}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -381,7 +390,7 @@
 
   </div>
 
-  {#if showFilterPanel}
+  {#if showFilterPanel && showsReview}
     <div class="filter-panel">
       <span class="filter-title">{$m.col_filter_by_status}</span>
       <div class="filter-chips">
@@ -523,7 +532,7 @@
 
   <!-- What the colours of the grid say (NEH-317). -->
   <ul class="grid-legend" aria-label={$m.legend_title}>
-    <li><span class="legend-swatch legend-rejected" aria-hidden="true"></span>{$m.legend_rejected}</li>
+    {#if showsReview}<li><span class="legend-swatch legend-rejected" aria-hidden="true"></span>{$m.legend_rejected}</li>{/if}
     <li><span class="legend-swatch legend-never" aria-hidden="true"></span>{$m.legend_never}</li>
     <li><span class="legend-swatch legend-closed" aria-hidden="true"></span>{$m.legend_closed}</li>
   </ul>

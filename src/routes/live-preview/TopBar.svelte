@@ -6,12 +6,15 @@
   // projectName and collectionName are '' while they load. With
   // onCheckCameras, "Check cameras" opens the camera check (NEH-339), in the
   // review button's shape, outlined so that it reads as secondary to Review;
-  // below 600px wide it shows its icon only.
+  // below 600px wide it shows its icon only. Without onGoToReview (the
+  // testing account, NEH-391) there is no review button, and `testing`
+  // puts the Testing marker beside the breadcrumb.
   //
-  // Version: 0.3.3
+  // Version: 0.3.4
 
   import { m } from '$lib/i18n';
   import UserMenu from '$lib/components/UserMenu.svelte';
+  import TestingBadge from '$lib/components/TestingBadge.svelte';
 
   let {
     onBack,
@@ -20,9 +23,12 @@
     checkCamerasDisabled = false,
     projectName = '',
     collectionName = '',
+    testing = false,
   }: {
     onBack: () => void;
-    onGoToReview: () => void;
+    onGoToReview?: () => void;
+    // The signed-in account is the testing account.
+    testing?: boolean;
     onCheckCameras?: () => void;
     checkCamerasDisabled?: boolean;
     projectName?: string;
@@ -57,6 +63,9 @@
         {/if}
       </nav>
     {/if}
+    {#if testing}
+      <TestingBadge />
+    {/if}
   </div>
 
   <div class="topbar-right">
@@ -69,14 +78,16 @@
 
     <!-- Symmetric with the collection view's go-to-capture button: same
          corner, same style, opposite direction. -->
-    <button
-      class="btn-review"
-      onclick={onGoToReview}
-      title={$m.tb_go_to_review_title}
-    >
-      <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">rate_review</span>
-      <span>{$m.tb_go_to_review}</span>
-    </button>
+    {#if onGoToReview}
+      <button
+        class="btn-review"
+        onclick={onGoToReview}
+        title={$m.tb_go_to_review_title}
+      >
+        <span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true">rate_review</span>
+        <span>{$m.tb_go_to_review}</span>
+      </button>
+    {/if}
 
     <!-- Identity and sign-out. The avatar opens the menu (NEH-234). -->
     <UserMenu label={$m.tb_current_user} />

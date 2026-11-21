@@ -9,12 +9,16 @@
   // no hover and no keyboard, so a tap outside is the real way out; Escape is
   // for a desktop keyboard, and it returns focus to the trigger.
   //
-  // Version: 0.1.0-beta
+  // The testing account has no tour (NEH-391), so it gets no Help entry.
+  //
+  // Version: 0.1.2
 
   import type { Snippet } from 'svelte';
   import { goto } from '$app/navigation';
   import { m } from '$lib/i18n';
   import { tour } from '$lib/tour';
+  import { authStore } from '$lib/stores/auth';
+  import { inTestingSpace } from '$lib/unit-mode';
   import { authApi, type PowerAction } from '$lib/api';
   import PowerControl from './PowerControl.svelte';
 
@@ -104,6 +108,7 @@
 
       <!-- On the capture and volume screens, which have no sidebar, this is
            the only place to reopen the tour (NEH-95). -->
+      {#if !inTestingSpace($authStore.user?.role)}
       <button class="menu-item" role="menuitem" onclick={() => { open = false; tour.start(); }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
@@ -114,6 +119,7 @@
       </button>
 
       <div class="menu-sep"></div>
+      {/if}
 
       <!-- One entry per action: each goes straight to its own confirmation.
            Same icons as the buttons in Settings. -->

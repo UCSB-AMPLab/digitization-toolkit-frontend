@@ -24,11 +24,12 @@
 // as the wrong one. No import of api.ts, so the tests run in plain node:
 // errors are matched by shape (`status`, `message`), as volume-stem.ts does.
 //
-// Version: 0.2.0
+// Version: 0.2.1
 
 import type { Messages } from './i18n';
 import { isConflict, isVolumeRequired, isWrongRetakeVolume } from './volume-stem';
 import { isRecaptureTurnRefusal } from './recapture-turn';
+import { testingRefusalText } from './testing-space';
 
 // STEM_REQUIRED_DETAIL in app/core/volume_stem.py.
 const STEM_REQUIRED_DETAIL = 'This volume has no file name stem. Give it one before capturing into it.';
@@ -90,14 +91,19 @@ export function isStemRequired(error: unknown): boolean {
 	return isConflict(error) && error instanceof Error && error.message === STEM_REQUIRED_DETAIL;
 }
 
-/** The catalogue message for a failed capture or retake. */
-export function captureErrorText(error: unknown, msgs: Messages): string {
+/** The catalogue message for a failed capture or retake, for the signed-in `role`. */
+export function captureErrorText(error: unknown, msgs: Messages, role?: string | null): string {
 	if (error instanceof CaptureFailed) {
 		const camera = error.backendError?.match(CAMERA_NOT_CONNECTED);
 		if (camera) return msgs.lv_err_camera_not_connected(Number(camera[1]));
 		return msgs.lv_capture_error;
 	}
 	if (!(error instanceof Error)) return msgs.lv_capture_error;
+	// The testing account's refusals (NEH-391) carry a code: not enough space
+	// kept for real work, a volume outside the testing space. Other roles get
+	// the messages below.
+	const testing = testingRefusalText(error, msgs, role);
+	if (testing) return testing;
 	// The recapture turn's 409 (0.2.0) carries a code: matched on it, not on its text.
 	if (isRecaptureTurnRefusal(error)) return msgs.err_recapture_turn;
 	if (isVolumeRequired(error)) return msgs.lv_err_no_volume;

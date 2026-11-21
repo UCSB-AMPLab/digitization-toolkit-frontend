@@ -6,11 +6,12 @@
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`, `message`), as volume-stem.ts does.
 //
-// Version: 0.3.3
+// Version: 0.3.4
 
 import type { Messages } from './i18n';
 import { FILENAME_STEM_MAX_LENGTH, stemConflict, stemConflictText } from './volume-stem';
 import { fileHoldText, storedOffsiteCount } from './volume-refusals';
+import { testingRefusalText } from './testing-space';
 
 // Constraint names app/core/db_errors.py reports in a 409's `constraint`.
 function constraintOf(error: unknown): unknown {
@@ -79,8 +80,11 @@ export function fisquaRefusalText(refusal: FisquaVolumeRefusal, msgs: Messages):
 	}
 }
 
-/** The message for a failed create or update of a volume. */
-export function volumeSaveErrorText(error: unknown, msgs: Messages): string {
+/** The message for a failed create or update of a volume, for the signed-in `role`. */
+export function volumeSaveErrorText(error: unknown, msgs: Messages, role?: string | null): string {
+	// The testing account's refusals are its own; every other role gets the text below.
+	const testing = testingRefusalText(error, msgs, role);
+	if (testing) return testing;
 	const fisqua = fisquaVolumeRefusal(error);
 	if (fisqua) return fisquaRefusalText(fisqua, msgs);
 	const differs = referenceCodeDiffers(error);
@@ -159,8 +163,10 @@ export function moveBlockedCount(error: unknown): number | null {
 	return Array.isArray(ids) && ids.length > 0 ? ids.length : null;
 }
 
-/** The message for a failed delete (or the move of records before it). */
-export function volumeDeleteErrorText(error: unknown, msgs: Messages): string {
+/** The message for a failed delete (or the move of records before it), for the signed-in `role`. */
+export function volumeDeleteErrorText(error: unknown, msgs: Messages, role?: string | null): string {
+	const testing = testingRefusalText(error, msgs, role);
+	if (testing) return testing;
 	if (isKeptMoveRefusal(error)) return msgs.pd_err_move_kept_line;
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);

@@ -1,11 +1,11 @@
-// Version: 0.1.0-beta
+// Version: 0.1.1
 
 import type { LayoutLoad } from './$types';
 import { projectsApi, collectionsApi } from '$lib/api';
 
-// Loads the project and volume names for the layout breadcrumb. A failed fetch
-// yields '—' instead of an error, so the volume pages render even when a name
-// is unavailable.
+// Loads the project and volume names for the layout breadcrumb, and a testing
+// volume's removal date (NEH-391). A failed fetch yields '—' instead of an
+// error, so the volume pages render even when a name is unavailable.
 export const load: LayoutLoad = async ({ params }) => {
   const projectId    = Number(params.projectId);
   const collectionId = Number(params.collectionId);
@@ -20,5 +20,7 @@ export const load: LayoutLoad = async ({ params }) => {
     collectionId,
     projectName:    project?.name    ?? '—',
     collectionName: collection?.name ?? '—',
+    collectionTestingExpiresAt: collection?.testing_expires_at ?? null,
+    collectionTesting: collection?.testing === true,
   };
 };

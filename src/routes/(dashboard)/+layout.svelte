@@ -6,6 +6,11 @@
 	// Queue, To retake, Users and Settings; operator and reviewer see all but
 	// Users. Settings is every role's (NEH-253); which of its sections a role
 	// may open is decided inside it (dashboard/config/settings-sections.ts).
+	// The testing role (NEH-391) sees Overview, Projects and Settings only:
+	// the backend always shows it projects, so Volumes is not its, and a
+	// visit to /dashboard/volumes sends it to Overview. The Testing marker
+	// sits beside the account name, and in its place while the sidebar is
+	// collapsed.
 	// To retake carries a badge with the number of records
 	// waiting (GET /records/to-retake/count), reloaded on every navigation so
 	// that it follows a retake; badge and label are in the recapture sand
@@ -19,7 +24,7 @@
 	// The network status above the user button (NetworkIndicator, NEH-253)
 	// is every role's and links to Settings > Network.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.7
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -34,7 +39,8 @@
 	import CatalogueBackupIndicator from '$lib/components/CatalogueBackupIndicator.svelte';
 	import AccountMenu from '$lib/components/AccountMenu.svelte';
 	import NetworkIndicator from './dashboard/config/NetworkIndicator.svelte';
-	import { ensureUnit, projectsShownIn, unitState } from '$lib/unit-mode';
+	import { canManageOffsite, ensureUnit, inTestingSpace, projectsShownIn, takesPartInWorkflow, unitState } from '$lib/unit-mode';
+	import TestingBadge from '$lib/components/TestingBadge.svelte';
 
 	let { children } = $props();
 
@@ -63,7 +69,8 @@
 			// stored when the tour opens, not when it ends — someone who closes it
 			// straight away does not want it on every start, and the help button
 			// reopens it whenever they want.
-			if (s.user) tour.startIfFirstTime(s.user.id);
+			// The testing account is shared and has no tour (NEH-391).
+			if (s.user && !inTestingSpace(s.user.role)) tour.startIfFirstTime(s.user.id);
 		});
 
 		// Validation on mount: a user saved in localStorage does not guarantee
@@ -135,14 +142,14 @@
 					labelKey: 'nav_overview',
 					icon: 'grid',
 					path: '/dashboard',
-					roles: ['admin', 'operator', 'reviewer']
+					roles: ['admin', 'operator', 'reviewer', 'testing']
 				},
 				{
 					id: 'projects',
 					labelKey: 'nav_projects',
 					icon: 'folder',
 					path: '/dashboard/projects',
-					roles: ['admin', 'operator', 'reviewer'],
+					roles: ['admin', 'operator', 'reviewer', 'testing'],
 					// Always null, so no badge is shown.
 					// TODO: connect to a real count from the backend.
 					badge: null as number | null
@@ -185,7 +192,7 @@
 					labelKey: 'nav_settings',
 					icon: 'settings',
 					path: '/dashboard/config',
-					roles: ['admin', 'operator', 'reviewer']
+					roles: ['admin', 'operator', 'reviewer', 'testing']
 				}
 			]
 		}
@@ -198,6 +205,9 @@
 	$effect(() => {
 		currentPath;
 		if (isValidatingSession || !currentUser) return;
+		// The backend refuses the count to the testing role, which has no
+		// To retake entry.
+		if (!takesPartInWorkflow(currentUser.role)) return;
 		let cancelled = false;
 		recordsApi
 			.toRetakeCount()
@@ -257,7 +267,7 @@
 	// The off-site copy indicator links to its section of Settings, which is
 	// one of the administrator's sections (settings-sections.ts), so only an
 	// administrator gets the link.
-	let canOpenOffsite = $derived(currentUser?.role === 'admin');
+	let canOpenOffsite = $derived(canManageOffsite(currentUser?.role));
 
 	// Redirects away from restricted routes as soon as the user's role is known
 	// (on mount, or on client-side navigation to another restricted route).
@@ -446,11 +456,15 @@
 		</nav>
 
 		<!-- Status of the catalogue's off-site copy (NEH-266). Visible to every
-		     role; it links to Settings only for roles that may open it. -->
-		<CatalogueBackupIndicator
-			{expanded}
-			href={canOpenOffsite ? '/dashboard/config?section=offsite-copy' : null}
-		/>
+		     role but testing, whose backend refuses the status (NEH-391), so
+		     nothing polls for it; it links to Settings only for roles that may
+		     open it. -->
+		{#if takesPartInWorkflow(currentUser?.role)}
+			<CatalogueBackupIndicator
+				{expanded}
+				href={canOpenOffsite ? '/dashboard/config?section=offsite-copy' : null}
+			/>
+		{/if}
 
 		<div class="s-footer">
 			<!-- On a tall screen the footer has three rows: Report a problem, the
@@ -482,13 +496,20 @@
 							<div class="user-av">{userInitials}</div>
 							<div class="user-text">
 								<span class="user-name">{currentUser?.username ?? '—'}</span>
-								<span class="user-role">{$roleLabel(currentUser?.role)}</span>
+								{#if inTestingSpace(currentUser?.role)}
+									<span class="user-role"><TestingBadge /></span>
+								{:else}
+									<span class="user-role">{$roleLabel(currentUser?.role)}</span>
+								{/if}
 							</div>
 							<svg class="user-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
 								<polyline points="18 15 12 9 6 15" />
 							</svg>
 						</button>
 					{:else}
+						{#if inTestingSpace(currentUser?.role)}
+							<TestingBadge class="collapsed-testing-badge" />
+						{/if}
 						<button
 							class="user-av-sm"
 							aria-haspopup="menu"
@@ -894,6 +915,10 @@
 		font-size: 11px;
 		color: var(--color-light-grey);
 		text-transform: capitalize;
+	}
+	:global(.collapsed-testing-badge) {
+		align-self: center;
+		margin-bottom: 4px;
 	}
 
 	.content {

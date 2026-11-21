@@ -17,7 +17,7 @@
 // No static import of api.ts or the auth store, so the pure helpers can be
 // tested in plain node; the loader imports them when it first runs.
 //
-// Version: 0.3.3
+// Version: 0.3.4
 
 import { get, writable } from 'svelte/store';
 import type { Messages } from './i18n';
@@ -239,14 +239,148 @@ function fisquaOperator(role: string | null | undefined, state: UnitState | null
 	return role === 'operator' && state?.mode === 'fisqua';
 }
 
-/** New volume: admin and operator, but no operator in Fisqua mode. */
+/** New volume: admin and operator, but no operator in Fisqua mode; the testing account in every mode. */
 export function canCreateVolumes(role: string | null | undefined, state: UnitState | null): boolean {
+	if (inTestingSpace(role)) return true;
 	return (role === 'admin' || role === 'operator') && !fisquaOperator(role, state);
+}
+
+// ---------------------------------------------------------------------------
+// The testing account (NEH-391)
+//
+// The one place that decides what the testing role may do on every screen.
+// The backend admits the account to its own routes only (app/core/space_routes.py)
+// and answers every other one with a 403; these gates keep the screens from
+// offering, or sending, anything it would refuse.
+// ---------------------------------------------------------------------------
+
+/** The signed-in account is the testing account: its screens carry the testing marker. */
+export function inTestingSpace(role: string | null | undefined): boolean {
+	return role === 'testing';
+}
+
+/** New project: the administrator, and the testing account for its own projects. */
+export function canCreateProjects(role: string | null | undefined): boolean {
+	return role === 'admin' || inTestingSpace(role);
+}
+
+/** Edit a volume from its row (the volume form): admin and operator. */
+export function canEditVolumes(role: string | null | undefined): boolean {
+	return role === 'admin' || role === 'operator';
+}
+
+/** Delete a volume from its row: admin and operator, and the testing account in its own volumes. */
+export function canDeleteVolumes(role: string | null | undefined): boolean {
+	return canEditVolumes(role) || inTestingSpace(role);
+}
+
+/**
+ * The volume form's file name stem, reference code, "keep on this unit" and
+ * Fisqua lookup: every role but the testing account, whose volumes get their
+ * stem from the backend and never have a reference code.
+ */
+export function setsVolumeCodes(role: string | null | undefined): boolean {
+	return !inTestingSpace(role);
+}
+
+/** The capture screen and the volume page's Capture button: admin, operator and the testing account. */
+export function canCapture(role: string | null | undefined): boolean {
+	return role === 'admin' || role === 'operator' || inTestingSpace(role);
+}
+
+/**
+ * Controls that save the camera set-up on the unit: which camera is which,
+ * orientation, focus, zoom, camera settings, white balance, calibration,
+ * DSLR settings, rescan. Every role but the testing account; the capture
+ * screen admits only admin and operator besides it.
+ */
+export function canSaveCameraSetup(role: string | null | undefined): boolean {
+	return !inTestingSpace(role);
+}
+
+/**
+ * The role takes part in the workflow of real work: review and record
+ * status, the recapture turn and retake summaries, activity totals, Fisqua,
+ * the offsite copy, handover and promotion, the bag export and capture
+ * manifest, keep and release, project members, digitisation lists and the
+ * unit's storage. Every role but the testing account; its screens neither
+ * request nor show any of these.
+ */
+export function takesPartInWorkflow(role: string | null | undefined): boolean {
+	return !inTestingSpace(role);
 }
 
 /** List import in Cola: admin and operator, but no operator in Fisqua mode. */
 export function canImportList(role: string | null | undefined, state: UnitState | null): boolean {
 	return (role === 'admin' || role === 'operator') && !fisquaOperator(role, state);
+}
+
+// ---------------------------------------------------------------------------
+// The other roles' decisions on the screens of the testing slice, as those
+// screens made them inline.
+// ---------------------------------------------------------------------------
+
+/** Review a record (mark errors, add notes, approve, reject): reviewer and admin. */
+export function canReview(role: string | null | undefined): boolean {
+	return role === 'reviewer' || role === 'admin';
+}
+
+/** Mark an opening missing in the grid: admin and operator. */
+export function canMarkMissing(role: string | null | undefined): boolean {
+	return role === 'admin' || role === 'operator';
+}
+
+/** Add and remove a project's members: admin. */
+export function canManageMembers(role: string | null | undefined): boolean {
+	return role === 'admin';
+}
+
+/** Delete a project: admin, and the testing account for its own testing projects. */
+export function canDeleteProjects(role: string | null | undefined): boolean {
+	return role === 'admin' || inTestingSpace(role);
+}
+
+/** Hand a volume over for review and take it back: admin and operator. */
+export function canHandOver(role: string | null | undefined): boolean {
+	return role === 'admin' || role === 'operator';
+}
+
+/** Free or restore a volume's space, keep or release it, open the offsite copy's settings: admin. */
+export function canManageOffsite(role: string | null | undefined): boolean {
+	return role === 'admin';
+}
+
+/** Capture into an empty volume during the recapture turn anyway: admin. */
+export function canOverrideRecaptureTurn(role: string | null | undefined): boolean {
+	return role === 'admin';
+}
+
+/** The Overview's camera test panels: admin and operator. */
+export function canSeeCameraPanels(role: string | null | undefined): boolean {
+	return role === 'admin' || role === 'operator';
+}
+
+/** The new volume's "keep on this unit" box: admin. */
+/**
+ * Whether the role may copy a volume's pictures to a USB drive: the testing
+ * account and the administrator, and only for a testing volume.
+ */
+export function canCopyToUsb(role: string | null | undefined, testingVolume: boolean): boolean {
+	return testingVolume && (role === 'admin' || inTestingSpace(role));
+}
+
+export function canKeepOnUnit(role: string | null | undefined): boolean {
+	return role === 'admin';
+}
+
+/** In Fisqua mode, the volume form's Fisqua note, label and description search: admin. */
+export function checksStemWithFisqua(role: string | null | undefined): boolean {
+	return role === 'admin';
+}
+
+/** The Unit sections of Settings: admin (the testing account gets Power only, settings-sections.ts). */
+export function opensUnitSettings(role: string | null | undefined): boolean {
+	return role === 'admin';
 }
 
 /** The stem and reference code read-only in the volume form: an operator in Fisqua mode. */
@@ -282,6 +416,8 @@ export function stemFormTarget(
 	collectionId: number
 ): { href?: string; note?: true } {
 	if (!projectId || !collectionId) return {};
+	// The testing account gives no stem: the backend assigns it.
+	if (!setsVolumeCodes(role)) return {};
 	if (volumeCodesReadOnly(role, state)) return { note: true };
 	return projectsShownIn(state)
 		? { href: `/dashboard/projects/${projectId}?editVolume=${collectionId}` }

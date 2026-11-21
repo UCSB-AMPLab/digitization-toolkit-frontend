@@ -14,7 +14,15 @@
   // misses a side (0.3.2) is pending too, and the views draw its missing
   // page as an empty frame.
   //
-  // Version: 0.3.3
+  // The testing account (NEH-391) gets "Download pictures" in place of the
+  // export chooser, whose other entries (the bag export, the capture
+  // manifest) are not its; the page neither reads nor shows the recapture
+  // summary, the retake band or the hand-over controls for it.
+  //
+  // A testing volume also offers a copy of its pictures to a USB drive, to the
+  // testing account and the administrator (UsbCopyDialog.svelte).
+  //
+  // Version: 0.3.5
 
   import { onMount, untrack } from 'svelte';
   import { page } from '$app/stores';
@@ -23,6 +31,7 @@
   import { recordsApi, collectionsApi, ApiError, sessionRequestInit, type Record, type RetakeSummaryVolume } from '$lib/api';
   import { readRetakeSummary } from '$lib/recapture-turn';
   import { m, locale } from '$lib/i18n';
+  import { canCopyToUsb, canHandOver as handsOver, inTestingSpace, takesPartInWorkflow } from '$lib/unit-mode';
   import { formatCount } from '$lib/format-count';
   import JSZip from 'jszip';
 
@@ -32,6 +41,7 @@
   import ImageViewerModal from './ImageViewerModal.svelte';
   import GridView from './GridView.svelte';
   import RightToolbar from './RightToolbar.svelte';
+  import UsbCopyDialog from './UsbCopyDialog.svelte';
   import ThumbnailStrip from './ThumbnailStrip.svelte';
   import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
   import HandoverControls from '$lib/components/HandoverControls.svelte';
@@ -78,11 +88,20 @@
   // Record inspected in the modal (opened from the export blockers list)
   let inspectedRecord = $state<Record | null>(null);
 
+  // Mounted before the signed-in user is known (no stored user), the page
+  // loads nothing; the guard sends the browser to sign in, and if the user
+  // becomes known meanwhile the records load then, as on a mount with the
+  // user known.
+  let waitingForUser = $state(false);
   onMount(async () => {
     if (!authStore.requireSession()) {
+      waitingForUser = true;
       return;
     }
     await loadRecords();
+  });
+  $effect(() => {
+    if (waitingForUser && $userRole) untrack(() => { waitingForUser = false; loadRecords(); });
   });
 
   // Volume whose records are on screen. SvelteKit reuses this page when the
@@ -113,7 +132,17 @@
   let retakeEntry = $derived(retakeState.forId === collectionId ? retakeState.entry : undefined);
   let retakeSeq = 0;
 
+  // The recapture summary, the retake band, hand-over and the export chooser:
+  // not for the testing account.
+  // Nothing of it is requested while the signed-in role is not known.
+  // Copy to a USB drive: a testing volume, for the testing account and the administrator.
+  let offersUsbCopy = $derived(canCopyToUsb($userRole, ($page.data as any).collectionTesting === true));
+  let showUsbDialog = $state(false);
+
+  let followsWorkflow = $derived(!!$userRole && takesPartInWorkflow($userRole));
+
   async function loadRetakeEntry(forId: number) {
+    if (!followsWorkflow) return;
     const seq = ++retakeSeq;
     if (retakeState.forId !== forId) retakeState = { forId, entry: undefined };
     try {
@@ -351,6 +380,8 @@
   // A master freed from the card (410 from /file, NEH-248): it is in the
   // offsite copy, not on the appliance, so it cannot go in the ZIP.
   class FreedFromCard extends Error {}
+  // A 404 on a file for the testing account: the volume left the testing space or was removed.
+  class FileNotFound extends Error {}
 
   // Image ZIP built in the browser, without a backend endpoint. Very large
   // volumes would be better served by one.
@@ -366,6 +397,7 @@
       for (const { img, r } of items) {
         const res = await fetch(recordsApi.getImageFileUrl(img.id), sessionRequestInit());
         if (res.status === 410 && freedFromBody(410, await res.json().catch(() => null))) throw new FreedFromCard();
+        if (res.status === 404 && inTestingSpace($userRole)) throw new FileNotFound();
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
         const ext = (img.format || img.filename?.split('.').pop() || 'jpg').toLowerCase();
@@ -386,7 +418,9 @@
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      zipError = e instanceof FreedFromCard ? $m.col_zip_freed : (e?.message ?? $m.col_zip_error);
+      // No status code and no exception's text reaches the screen; they go to the console.
+      console.error('[Gallery] Error building the image ZIP:', e);
+      zipError = e instanceof FreedFromCard ? $m.col_zip_freed : e instanceof FileNotFound ? $m.testing_err_not_found : $m.col_zip_error;
     } finally {
       isZipping = false;
     }
@@ -425,7 +459,7 @@
   // the page puts them there because it holds the records. Operator and
   // admin only: the backend refuses promote and take-back to other roles.
   const topbar = getVolumeTopbar();
-  let canHandOver = $derived($userRole === 'admin' || $userRole === 'operator');
+  let canHandOver = $derived(followsWorkflow && handsOver($userRole));
 
   $effect(() => {
     if (!topbar) return;
@@ -451,7 +485,7 @@
 
 <div class="gallery-wrapper">
 
-  {#if pendingCount > 0 && firstPendingId !== null}
+  {#if followsWorkflow && pendingCount > 0 && firstPendingId !== null}
     <section class="retake-band" aria-labelledby="retake-band-title">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" class="retake-band-icon">
         <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" />
@@ -565,7 +599,9 @@
       {canExport}
       onViewModeChange={handleViewModeChange}
       onZoomChange={(z) => zoom = z}
-      onExport={() => showChooserModal = true}
+      onExport={followsWorkflow ? () => showChooserModal = true : undefined}
+      onDownloadPictures={followsWorkflow ? undefined : downloadImagesZip}
+      onCopyToUsb={offersUsbCopy ? () => showUsbDialog = true : undefined}
     />
 
   </div>
@@ -580,6 +616,10 @@
     onRetake={handleRetake}
     onDelete={handleDeleteRecord}
   />
+{/if}
+
+{#if showUsbDialog}
+  <UsbCopyDialog {collectionId} onClose={() => showUsbDialog = false} />
 {/if}
 
 {#if showExportModal}
@@ -700,7 +740,8 @@
       {:else if zipError}
         <span class="material-symbols-outlined icon-lg export-error-icon">error</span>
         <h3 class="export-modal-title">{$m.col_zip_error}</h3>
-        <p class="export-modal-subtitle">{zipError}</p>
+        <!-- The generic failure is the title alone. -->
+        {#if zipError !== $m.col_zip_error}<p class="export-modal-subtitle">{zipError}</p>{/if}
         <div class="export-modal-actions">
           <button class="btn-secondary" onclick={() => zipError = null}>{$m.common_close}</button>
         </div>

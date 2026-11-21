@@ -38,7 +38,7 @@ import { derived, get, writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { STORAGE_KEYS, readStoredStrict } from '$lib/storage-keys';
 import { canCreateVolumes, projectsShownIn, unitState, type UnitState } from '$lib/unit-mode';
-import { userRole } from '$lib/stores/auth';
+import { authStore, userRole } from '$lib/stores/auth';
 
 /**
  * What a step teaches, in the order of the work. Variants of one step share
@@ -221,6 +221,17 @@ function createTourStore() {
     if (!s.active) return;
     const index = reconcileTourIndex(before, steps, s.index);
     if (index !== s.index) set({ ...s, index });
+  });
+
+  // A tour ends with the session that opened it: clearSession, which logout
+  // and the sign-out of a session the backend rejected both call, stops it.
+  // auth.ts cannot import this module, which imports auth.ts, so the tour
+  // watches the auth store. A change of role with the session kept (the
+  // dashboard revalidating it) leaves the tour open.
+  let hadSession = false;
+  authStore.subscribe(({ user }) => {
+    if (hadSession && !user) set({ active: false, index: 0 });
+    hadSession = !!user;
   });
 
   return {

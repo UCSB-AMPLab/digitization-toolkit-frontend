@@ -6,7 +6,7 @@
   // dropdowns are rendered outside the scrolling panel with `position: fixed`,
   // at coordinates taken from their trigger button each time one opens.
   //
-  // Version: 0.1.0-beta
+  // Version: 0.1.1
 
   import { onMount } from 'svelte';
   import { createCameraRefresh } from '$lib/camera-refresh';
@@ -32,6 +32,7 @@
     onRotateDegChange,
     rotateDeg = {},
     onRescan,
+    setupControls = true,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -51,6 +52,11 @@
     // Called after "Reconnect cameras" has rescanned and the devices are
     // published (NEH-343: the page asks again which camera is which).
     onRescan?: () => void;
+    // Reconnect, Basic (orientation, exposure, format), Focus (focus and
+    // zoom) and Colour and exposure, which save on the unit: false for the
+    // testing account (NEH-391), which keeps the camera mode, the camera
+    // picker, the status and the histogram.
+    setupControls?: boolean;
   } = $props();
 
   // Index of the camera the panel controls: 0 = left, 1 = right.
@@ -726,6 +732,7 @@
       {/if}
     </div>
 
+    {#if setupControls}
     <!-- ── Reconnect cameras (NEH-229) ── -->
     <div class="reconnect-row">
       <button class="btn-reconnect" disabled={rescanInFlight} onclick={rescanCameras}>
@@ -1109,6 +1116,8 @@
         </div>
       {/if}
     </div>
+
+    {/if}
 
     <div class="accordion-block">
       <button class="accordion-trigger" onclick={() => toggleSection('histogram')}>

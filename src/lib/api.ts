@@ -452,7 +452,7 @@ export interface User {
   id: number;
   username: string;
   email: string | null;
-  role: 'admin' | 'operator' | 'reviewer';
+  role: 'admin' | 'operator' | 'reviewer' | 'testing';
   is_active: boolean;
   created_at?: string;
 }
@@ -628,7 +628,14 @@ export interface Project {
   signatura?: string;
   created_at: string;
   created_by?: string;
+  // Read-only. True for a project of the testing role's, kept apart from real work.
+  testing?: boolean;
+  // A testing project's capture format; null for a real project. Absent from an older backend.
+  capture_format?: CaptureFormat | null;
 }
+
+// What a testing project captures (NEH-391): JPEG only by default, or RAW and JPEG.
+export type CaptureFormat = 'JPEG' | 'RAW+JPEG';
 
 export interface CreateProjectData {
   name: string;
@@ -637,6 +644,8 @@ export interface CreateProjectData {
   serie?: string;
   signatura?: string;
   created_by?: string;
+  // The testing account's only; omitted means JPEG.
+  capture_format?: CaptureFormat;
 }
 
 export interface UpdateProjectData {
@@ -645,6 +654,8 @@ export interface UpdateProjectData {
   fondo?: string;
   serie?: string;
   signatura?: string;
+  // The testing account's only.
+  capture_format?: CaptureFormat;
 }
 
 export const projectsApi = {
@@ -759,6 +770,10 @@ export interface Collection {
   // copying none of its images offsite and sending none of its manifests.
   // Absent from an older backend.
   kept_on_unit?: boolean;
+  // Read-only. True for a collection or volume of the testing role's; when
+  // it is set, the instant after which the backend may remove it.
+  testing?: boolean;
+  testing_expires_at?: string | null;
 }
 
 export interface CollectionWithChildren extends Collection {
@@ -798,6 +813,54 @@ export interface UpdateCollectionData extends VolumeIdentityData {
   collection_type?: string;
   parent_collection_id?: number;
   archival_metadata?: { [key: string]: any };
+}
+
+// ============================================================================
+// USB COPY (testing volumes)
+// ============================================================================
+// The shapes of GET /system/testing/usb and of the copy job's status
+// (app/api/system.py, app/api/collections.py in the backend). A field the
+// backend names otherwise changes here only.
+
+/** One drive in the list GET /system/testing/usb gives (only drives that are not mounted). */
+export interface UsbDrive {
+  // The name the copy is started with (the `device` of the POST body).
+  name: string;
+  label: string | null;
+  // In bytes.
+  size: number;
+  fstype: 'vfat' | 'exfat';
+  free_bytes: number | null;
+}
+
+/** The GET /system/testing/usb body. */
+export interface UsbDriveList {
+  drives: UsbDrive[];
+  // The copy that is running, if any, whichever volume it is for.
+  active?: { collection_id: number; job_id: string } | null;
+}
+
+/**
+ * The status of a copy to a USB drive. `error` is a failure code (usb_full,
+ * usb_unmount, ...); `message` is the backend's English text and is never
+ * shown. `folder` is the folder the copy wrote on the drive. `unmounted` is
+ * true once the unit has released the drive.
+ */
+export interface UsbCopyStatus {
+  job_id: string;
+  collection_id: number;
+  state: 'queued' | 'running' | 'done' | 'failed';
+  done: number;
+  total: number;
+  bytes_done: number;
+  bytes_total: number;
+  error: string | null;
+  message: string | null;
+  folder: string;
+  drive: string;
+  // Pictures the copy left out.
+  skipped: { not_regular: number; outside: number; missing: number };
+  unmounted: boolean;
 }
 
 export const collectionsApi = {
@@ -1087,6 +1150,24 @@ export const collectionsApi = {
    */
   getExportDownloadUrl(collectionId: number): string {
     return `${getApiBase()}/collections/${collectionId}/export/download`;
+  },
+
+  /**
+   * Start copying a testing volume's pictures to a USB drive, named as the
+   * drive list gives it. 202 with the job's id; a refusal carries
+   * `detail.code` (usb_not_eligible 422, usb_copy_busy 409).
+   */
+  async startUsbCopy(collectionId: number, device: string): Promise<{ job_id: string }> {
+    return apiRequest(`/collections/${collectionId}/usb-copy`, {
+      method: 'POST',
+      body: JSON.stringify({ device }),
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS
+    });
+  },
+
+  /** Poll the state and progress of a copy to a USB drive. */
+  async getUsbCopyStatus(collectionId: number, jobId: string): Promise<UsbCopyStatus> {
+    return apiRequest(`/collections/${collectionId}/usb-copy/status/${jobId}`);
   }
 };
 
@@ -2712,7 +2793,59 @@ export const fisquaApi = {
   },
 };
 
+// GET and PUT /system/testing, PATCH /system/testing/account (NEH-391), admin only.
+export interface TestingSpace {
+  enabled: boolean;
+  /** Null until a testing account exists. */
+  username: string | null;
+  account_active: boolean;
+  /** Days without a capture after which a testing volume is removed. */
+  expiry_days: number;
+  projects: number;
+  volumes: number;
+  /** GB of free space kept for real work: below it the testing account's captures are refused. */
+  reserve_gb?: number;
+  /** Free space now, in GB; null when it cannot be read. */
+  free_gb?: number | null;
+}
+
+/** What POST /system/testing/clear removed, and the volumes it left because they were being captured into. */
+export interface TestingCleared {
+  projects: number;
+  volumes: number;
+  skipped: number;
+}
+
 export const systemApi = {
+  /** The USB drives the unit can copy a testing volume to (testing account and admin). */
+  async getTestingUsb(): Promise<UsbDriveList> {
+    return apiRequest<UsbDriveList>('/system/testing/usb');
+  },
+
+  /** The testing space: its state, account and counts (admin). */
+  async getTesting(): Promise<TestingSpace> {
+    return apiRequest<TestingSpace>('/system/testing');
+  },
+
+  /**
+   * Switch the testing space on or off, and set its term (admin). Switching
+   * on with no account needs `username` and `password`; switching off takes
+   * neither. A refusal carries `detail.code`.
+   */
+  async setTesting(body: { enabled: boolean; username?: string; password?: string; expiry_days?: number; reserve_gb?: number }): Promise<TestingSpace> {
+    return apiRequest<TestingSpace>('/system/testing', { method: 'PUT', body: JSON.stringify(body), timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
+  },
+
+  /** Remove every testing project and volume now, with their pictures (admin); the account and the settings stay. */
+  async clearTesting(): Promise<TestingCleared> {
+    return apiRequest<TestingCleared>('/system/testing/clear', { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
+  },
+
+  /** Rename the testing account or give it a new password (admin); a new password ends its open sessions. */
+  async updateTestingAccount(body: { username?: string; password?: string }): Promise<TestingSpace> {
+    return apiRequest<TestingSpace>('/system/testing/account', { method: 'PATCH', body: JSON.stringify(body), timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
+  },
+
   /** The unit's mode and projects setting, for every role. */
   async unit(): Promise<UnitSettings> {
     return apiRequest<UnitSettings>('/system/unit');
@@ -2854,7 +2987,7 @@ export const systemApi = {
 export interface ProjectMember {
   project_id:   number;
   user_id:      number;
-  role:         'operator' | 'reviewer' | 'admin';
+  role:         'operator' | 'reviewer' | 'admin' | 'testing';
   added_at:     string;
   added_by?:    string;
   username:     string;

@@ -5,16 +5,20 @@
   // (the project page's volumes, or every volume on Volúmenes), and its
   // records are moved there first; a
   // volume that reserves its stem cannot be deleted, and the dialog says why;
-  // sub-volumes block the delete. The backend's English goes to the console
+  // sub-volumes block the delete. The testing account's delete removes a
+  // testing volume whole, whatever it holds: one confirmation line, no stem
+  // refusal, no target, and no move. The backend's English goes to the console
   // only. `onChanged` reloads the page's list; `onClose` closes the dialog.
   //
-  // Version: 0.3.3
+  // Version: 0.3.5
   import { onMount, untrack } from 'svelte';
   import { m } from '$lib/i18n';
+  import { authStore } from '$lib/stores/auth';
   import { collectionsApi, recordsApi, type Collection } from '$lib/api';
   import { deleteRefused, stemConflict } from '$lib/volume-stem';
   import { isNotEmptyRefusal, notEmptyCounts, volumeDeleteErrorText } from '$lib/volume-errors';
   import { dismissible } from '$lib/dialog';
+  import { inTestingSpace } from '$lib/unit-mode';
 
   let {
     volume,
@@ -38,8 +42,16 @@
   // sub-volumes. This dialog cannot move those, so it offers no target, the
   // delete stays disabled, and records are never moved.
   let deleteBlockedBySubvolumes = $state(false);
+  // The testing account's delete removes the volume whole: the backend takes
+  // no move target, and a reserved stem does not refuse it.
+  const testing = $derived(inTestingSpace($authStore.user?.role));
+  const stemRefused = $derived(!testing && deleteRefused(deletingCol));
 
   onMount(async () => {
+    if (untrack(() => testing)) {
+      isLoadingDeleteColInfo = false;
+      return;
+    }
     try {
       deleteColRecordCount = await recordsApi.count({ collection_id: deletingCol.id });
     } catch (err) {
@@ -50,7 +62,7 @@
   });
 
   async function executeDeleteCol() {
-    if (deleteRefused(deletingCol) || deleteBlockedBySubvolumes) return;
+    if (stemRefused || deleteBlockedBySubvolumes) return;
     isDeletingCol = true;
     deleteColError = '';
     try {
@@ -72,8 +84,11 @@
       await onChanged();
       onClose();
     } catch (err) {
-      const conflict = stemConflict(err);
-      if (conflict === 'stem_reserved') {
+      const conflict = testing ? null : stemConflict(err);
+      if (testing) {
+        deleteColError = volumeDeleteErrorText(err, $m, $authStore.user?.role);
+        console.error('[VolumeDelete] Error deleting volume:', err);
+      } else if (conflict === 'stem_reserved') {
         // The backend refused: the modal switches to the reserved notice,
         // which says why, and the delete stays disabled.
         deletingCol = { ...deletingCol, stem_reserved: true };
@@ -97,14 +112,14 @@
           }
           if (deleteColRecordCount === 0) {
             // The count could not be read, or the records left meanwhile.
-            deleteColError = volumeDeleteErrorText(err, $m);
+            deleteColError = volumeDeleteErrorText(err, $m, $authStore.user?.role);
           }
         } else {
-          deleteColError = volumeDeleteErrorText(err, $m);
+          deleteColError = volumeDeleteErrorText(err, $m, $authStore.user?.role);
         }
       } else {
         // The backend's English text goes to the console only.
-        deleteColError = volumeDeleteErrorText(err, $m);
+        deleteColError = volumeDeleteErrorText(err, $m, $authStore.user?.role);
         console.error('[VolumeDelete] Error deleting volume:', err);
       }
       isDeletingCol = false;
@@ -127,7 +142,7 @@
       </button>
     </div>
 
-    {#if deleteRefused(deletingCol)}
+    {#if stemRefused}
       <!-- The backend refuses this delete (409); nothing is moved first. -->
       <div class="delete-warning" role="note">
         <div class="delete-warning-icon">
@@ -135,6 +150,8 @@
         </div>
         <p class="delete-warning-body">{$m.pd_delete_stem_reserved}</p>
       </div>
+    {:else if testing}
+      <p class="delete-confirm-text">{$m.testing_delete_volume_confirm}</p>
     {:else if deleteBlockedBySubvolumes}
       <!-- No target select: the error below says why the delete is refused. -->
     {:else if isLoadingDeleteColInfo}
@@ -192,9 +209,9 @@
       <button
         class="btn-danger"
         onclick={executeDeleteCol}
-        disabled={isDeletingCol || isLoadingDeleteColInfo || deleteRefused(deletingCol)
+        disabled={isDeletingCol || isLoadingDeleteColInfo || stemRefused
           || deleteBlockedBySubvolumes
-          || (deleteColRecordCount > 0 && deleteMoveColTarget === '')}
+          || (!testing && deleteColRecordCount > 0 && deleteMoveColTarget === '')}
       >
         <span class="material-symbols-outlined icon-sm">delete</span>
         {isDeletingCol ? $m.common_deleting : (deleteMoveColTarget !== '' ? $m.proj_move_and_delete : $m.pd_delete_collection_title)}
