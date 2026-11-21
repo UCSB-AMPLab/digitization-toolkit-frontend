@@ -3,10 +3,9 @@
   // and description; a row opens /dashboard/projects/{id}. One modal creates
   // and edits a project (name, description, fondo, serie, signatura); the
   // delete modal can move the project's volumes to another project first.
-  // The Status column shows placeholder values (see `mockStatuses`).
   //
-  // The testing account (NEH-391) creates and renames its own projects, and
-  // gets no Status column: its form has the name only, and every refusal it can get has its own
+  // The testing account (NEH-391) creates and renames its own projects; its
+  // form has the name only, and every refusal it can get has its own
   // message, never the backend's text. Its new project captures JPEG only
   // unless RAW and JPEG is chosen; the choice is offered only while the
   // unit's cameras offer both formats (GET /cameras/capabilities), and
@@ -240,29 +239,6 @@
       isDeleting = false;
     }
   }
-
-  let statusStyleMap = $derived<Record<string, string>>({
-    [$m.proj_status_in_progress]: 'color: var(--color-primary); background: rgba(90,140,98,0.15)',
-    [$m.proj_status_started]:     'color: var(--color-secondary); background: rgba(150,177,240,0.15)',
-    [$m.proj_status_review]:      'color: var(--color-warning); background: rgba(208,154,68,0.15)',
-    [$m.proj_status_paused]:      'color: var(--color-light-grey); background: rgba(171,183,183,0.12)',
-    [$m.proj_status_completed]:   'color: var(--color-success); background: rgba(111,191,115,0.15)',
-  });
-
-  function getStatusStyle(status: string): string {
-    return statusStyleMap[status] ?? 'color: var(--color-light-grey); background: rgba(0,0,0,0.2)';
-  }
-
-  // Placeholder statuses, not read from the backend: the Status column cycles
-  // through them by row index.
-  // TODO: connect to a real project status from the backend.
-  let mockStatuses = $derived([
-    $m.proj_status_in_progress,
-    $m.proj_status_started,
-    $m.proj_status_review,
-    $m.proj_status_paused,
-    $m.proj_status_completed,
-  ]);
 </script>
 
 <div class="page">
@@ -320,15 +296,12 @@
           <tr>
             <th>{$m.proj_col_project}</th>
             <th>{$m.proj_col_reference}</th>
-            {#if !nameOnly}<th>{$m.common_status}</th>{/if}
             <th>{$m.proj_col_start_date}</th>
             <th class="text-right">{$m.common_actions}</th>
           </tr>
         </thead>
         <tbody>
-          {#each filteredProjects as project, i}
-            {@const status = mockStatuses[i % mockStatuses.length]}
-
+          {#each filteredProjects as project}
             <tr onclick={() => handleProjectClick(project.id)} class="table-row">
               <td>
                 <div class="project-cell">
@@ -357,13 +330,6 @@
                   <span class="text-muted">—</span>
                 {/if}
               </td>
-
-              <!-- Placeholder statuses; not shown to the testing account. -->
-              {#if !nameOnly}
-                <td>
-                  <span class="status-badge" style={getStatusStyle(status)}>{status}</span>
-                </td>
-              {/if}
 
               <td>
                 <div class="date-cell">
@@ -841,15 +807,6 @@
   .breadcrumb-part { font-size: 12px; color: var(--color-light-grey); }
   .breadcrumb-sep { font-size: 12px; color: var(--color-light-grey); opacity: 0.4; }
   .text-muted { font-size: var(--text-sm); color: var(--color-light-grey); opacity: 0.4; }
-
-  .status-badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: var(--radius-full);
-    font-size: 12px;
-    font-weight: var(--fw-semibold);
-    white-space: nowrap;
-  }
 
   .date-cell { display: flex; align-items: center; gap: 7px; color: var(--color-light-grey); font-size: var(--text-sm); white-space: nowrap; }
 
