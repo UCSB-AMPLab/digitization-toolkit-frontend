@@ -1,9 +1,10 @@
 // The project list for the testing account (NEH-391): it creates its own
 // projects, sending only the name; each refusal it can get shows its own
 // message; it sends nothing the backend does not admit it to. The
-// administrator's and the operator's list stay as they were.
+// administrator's and the operator's list stay as they were. The absence of a
+// Status column is checked in projects-no-status.svelte.test.ts.
 //
-// Version: 0.1.1
+// Version: 0.1.2
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -92,15 +93,6 @@ describe('project list, testing account', () => {
 		});
 	}
 
-	it('has no Status column', async () => {
-		rec = recordRequests({ 'GET /projects/': projects });
-		const screen = render(ProjectsPage);
-		await expect.element(page.getByText('Practice')).toBeVisible();
-		const heads = [...screen.container.querySelectorAll('th')].map((t) => t.textContent?.trim());
-		expect(heads).not.toContain(en.common_status);
-		expect(screen.container.querySelector('.status-badge')).toBeNull();
-	});
-
 	it('renames with the name only, and shows the refusal translated', async () => {
 		rec = recordRequests({ 'GET /projects/': projects, 'PUT /projects/{project_id}': refusal(409, 'project_directory_taken') });
 		const screen = render(ProjectsPage);
@@ -127,15 +119,6 @@ describe('project list, other roles, unchanged', () => {
 		await page.getByRole('button', { name: en.proj_create_btn }).click();
 		await expect.element(page.getByText(en.proj_err_create('Project with this name already exists'))).toBeVisible();
 		expect(rec.to('POST /projects/').map((r) => r.body)).toEqual([{ name: 'Real', description: 'Desc', created_by: 'admin1' }]);
-	});
-
-	it('the administrator keeps the Status column', async () => {
-		signIn({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
-		rec = recordRequests({ 'GET /projects/': projects });
-		const screen = render(ProjectsPage);
-		await expect.element(page.getByText('Practice')).toBeVisible();
-		expect([...screen.container.querySelectorAll('th')].map((t) => t.textContent?.trim())).toContain(en.common_status);
-		expect(screen.container.querySelector('.status-badge')?.textContent?.trim()).toBe(en.proj_status_in_progress);
 	});
 
 	it('the operator has no New project', async () => {

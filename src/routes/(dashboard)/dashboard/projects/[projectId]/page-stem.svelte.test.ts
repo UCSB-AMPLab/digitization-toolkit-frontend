@@ -428,7 +428,7 @@ describe('project page: stage', () => {
 		render(ProjectPage);
 		await expect.element(page.getByRole('row').filter({ hasText: 'Tomo 55' }).getByText(es.dash_stage_capture)).toBeInTheDocument();
 		await expect.element(page.getByText(es.pd_status_completed)).not.toBeInTheDocument();
-		await expect.element(page.getByText(es.proj_status_paused)).not.toBeInTheDocument();
+		await expect.element(page.getByText('Pausado')).not.toBeInTheDocument();
 		await expect.element(page.getByText(es.pd_status_active)).not.toBeInTheDocument();
 	});
 
