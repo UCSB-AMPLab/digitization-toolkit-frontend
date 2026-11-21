@@ -28,6 +28,7 @@ import { clearChord, writeChord } from '$lib/capture-key';
 import { dismissible, trapFocus } from '$lib/dialog';
 import '../../app.css';
 import CameraCheck from './CameraCheck.svelte';
+import { createCaptureGate } from '$lib/capture-check';
 
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
 
@@ -1078,5 +1079,36 @@ describe('CameraCheck: one operation at a time', () => {
 		expect(takeBtn()?.disabled).toBe(false);
 		expect(zoomButton('both', 'in')?.disabled).toBe(false);
 		expect(text()).toContain(en.camcheck_devices_failed);
+	});
+});
+
+// NEH-381: the camera check's test captures take the capture screen's one
+// gate for their request, and send nothing while anything else holds it.
+describe('CameraCheck: the capture gate', () => {
+	it('with the gate held elsewhere, Take pictures and the capture key send no test capture', async () => {
+		const captureGate = createCaptureGate();
+		const hold = captureGate.acquire()!;
+		renderCheck({ captureGate } as Partial<Props>);
+		await settle();
+		await click(en.camcheck_take);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
+		await settle();
+		expect(captureSpy).not.toHaveBeenCalled();
+		hold();
+	});
+
+	it('holds the gate while its test captures run, and releases it when they end, failed or not', async () => {
+		const answers = [deferred<TestCaptureResult>(), deferred<TestCaptureResult>()];
+		captureSpy.mockImplementation((i: number) => answers[i].promise);
+		const captureGate = createCaptureGate();
+		renderCheck({ captureGate } as Partial<Props>);
+		await settle();
+		await click(en.camcheck_take);
+		expect(captureGate.isBusy()).toBe(true);
+		answers[0].resolve(await shot());
+		answers[1].reject(failure(504));
+		await settle();
+		expect(captureGate.isBusy()).toBe(false);
 	});
 });

@@ -120,9 +120,42 @@
   // derived from cameraSetup and `devices`, and `swapped` follows it in one
   // effect, only while it is not null.
   //
+  // A capture that ends in a timeout (NEH-381), from a retake, a
+  // placeholder's fill or "Capture another here", is not reported as failed:
+  // the backend may have stored it (src/lib/capture-check.ts). The modal
+  // says the capture may have been saved and stays locked, its capture still
+  // running, while the page reads the records again every 5 s
+  // (pageCapture). Found, the screen goes on as after a successful capture;
+  // not found by a read that succeeded 180 s or more after the check began,
+  // the modal shows that no capture was saved, as it shows a failure.
+  // LiveViewport checks its own captures the same way, with the page's
+  // baseline and read.
+  //
+  // The baseline is what the screen knows the server holds (`known`,
+  // createKnownRecords): the last successful read of the records plus every
+  // record and image a capture answer has confirmed since. One gate
+  // (`captureGate`, createCaptureGate) is held while any capture is in
+  // flight or being checked; every entry point asks it: LiveViewport's
+  // button and capture key take it, a capture made here takes it
+  // (pageCapture), and the image window's capture buttons, "Capture another
+  // here", the thumbnails, "Check cameras" and "Refocus" (the two dialogs
+  // with test captures of their own) are disabled while it is held
+  // (`captureBusy`). A request and a read belong to the volume they began in:
+  // an answer that arrives after the volume changed, or after the screen
+  // went, shows nothing and starts no check, and a read of the records is
+  // assigned only for the volume it was made for. Leaving the screen, or
+  // another volume, stops a check and the still-working timer. No capture
+  // starts until the volume's records have been read once (`known.ready`,
+  // which the gate itself requires; an empty list counts); the capture
+  // controls stay disabled until then, and a read that failed before any
+  // succeeded shows lv_records_unread with a retry. Another volume on the
+  // same screen clears every piece of state that names a record of the old
+  // one (leaveVolume) and reads the new one's records; a request that names a
+  // record the current volume's known records lack is not sent.
+  //
   // Version: 0.3.4
 
-  import { onMount, tick, untrack } from 'svelte';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { focusCheckNeeded, recordFocusActivity } from '$lib/focus-check';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -130,12 +163,14 @@
   import { canCapture, canOverrideRecaptureTurn, canSaveCameraSetup, ensureUnit, inTestingSpace, projectsShownIn, stemFormTarget,
            takesPartInWorkflow, unitState } from '$lib/unit-mode';
   import { camerasApi, recordsApi, projectsApi, collectionsApi, importsApi, type Record as ApiRecord, type CameraDevice,
-           type CameraRolesResponse, type CameraSetup, type QueueItem, type RetakeSummary, type RetakeSummaryVolume } from '$lib/api';
+           type CaptureResponse, type CameraRolesResponse, type CameraSetup, type QueueItem, type RetakeSummary, type RetakeSummaryVolume } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
   import { m } from '$lib/i18n';
   import { seedRotation, createOrientationSaver, canSaveRotation, settlePendingRotations } from '$lib/camera-orientation';
   import { isConflict, needsStem } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
+  import { createCaptureGate, createKnownRecords, runPageCapture } from '$lib/capture-check';
+  import type { CaptureNotice } from '$lib/stores/cameras';
   import { captureInstruction, instructionForVolume, retakeUrl, type CaptureInstruction as Instruction } from '$lib/queue';
   import { deferToBack, folioHint, guideNextId, guideOrder, preferredRetakeVolume, readRetakeSummary } from '$lib/recapture-turn';
   import { defaultRecordTitle } from '$lib/record-title';
@@ -524,6 +559,73 @@
   // True while one of the captures made here is in flight, so LiveViewport
   // asks the cameras for no preview frame meanwhile (NEH-334).
   let pageCapturing = $state(false);
+  // NEH-381: the one gate for starting a capture, held while any capture of
+  // the screen is in flight or being checked; `captureBusy` mirrors it for
+  // what the screen disables.
+  let captureBusy = $state(false);
+  // What the screen knows the server holds, for the volume on screen; the
+  // gate starts no capture until it holds a successful read (`baselineReady`
+  // mirrors that, for what the screen disables).
+  const known = createKnownRecords();
+  let baselineReady = $state(false);
+  // A read of the records failed before any had succeeded for this volume.
+  let recordsUnread = $state(false);
+  const captureGate = createCaptureGate((busy) => (captureBusy = busy), () => known.ready);
+  // Capture controls are usable only with the gate free and the baseline read.
+  let captureLocked = $derived(captureBusy || !baselineReady);
+  let pageCheckController: AbortController | null = null;
+  let cancelSlow: (() => void) | null = null;
+  // Whether the notice in the shared camera status is this page's.
+  let ownsNotice = false;
+  function notice(value: CaptureNotice | null) {
+    ownsNotice = value !== null;
+    cameraStatus.reportNotice(value);
+  }
+  let destroyed = false;
+  onDestroy(() => {
+    destroyed = true;
+    pageCheckController?.abort();
+    cancelSlow?.();
+    if (ownsNotice) cameraStatus.reportNotice(null);
+  });
+  let seenCollectionId = untrack(() => collectionId);
+  $effect(() => {
+    const id = collectionId;
+    if (id === seenCollectionId) return;
+    seenCollectionId = id;
+    untrack(() => {
+      pageCheckController?.abort();
+      cancelSlow?.();
+      if (ownsNotice) notice(null);
+      leaveVolume();
+    });
+  });
+
+  // Another volume on the same screen: every piece of state that names a
+  // record, an image or a capture target of the old volume is cleared before
+  // any control is usable again, and the new volume's records are read;
+  // until that read succeeds the gate starts no capture.
+  function leaveVolume() {
+    known.reset();
+    baselineReady = false;
+    recordsUnread = false;
+    records = [];
+    recordsLoaded = false;
+    selectedRecordId = null;
+    inspectedRecord = null;
+    cameFromRecapture = false;
+    guide = null;
+    guideEnd = null;
+    guidePaused = false;
+    guideNextFolios = null;
+    filled = null;
+    anotherError = null;
+    closingPlaceholder = false;
+    refreshFailed = false;
+    refreshing = false;
+    leaving = false;
+    if (collectionId) void loadRecords();
+  }
   let leftCameraIndex = $derived(swapped ? 1 : 0);
 
   // ---------------------------------------------------------------------------
@@ -617,7 +719,7 @@
   // until none shows.
   let focusCheckWaits = $derived(
     !screenSettled || $dialogOpen || blocked || guidePaused || guideEnd !== null ||
-      viewportCapturing || pageCapturing || cameraCheckOpen
+      viewportCapturing || pageCapturing || captureBusy || cameraCheckOpen
   );
 
   function askForFocusIfDue() {
@@ -742,7 +844,7 @@
   // right after the record just filled, which the next one follows in turn.
   async function captureAnother() {
     const start = filled;
-    if (!start || anotherBusy || leaving || refreshFailed || refreshing) return;
+    if (!start || anotherBusy || leaving || refreshFailed || refreshing || captureLocked) return;
     if (volumeNeedsStem) {
       anotherError = $m.lv_needs_stem;
       return;
@@ -755,27 +857,23 @@
     anotherError = null;
     try {
       // The same fields as LiveViewport's capture, inserted after the record filled last.
-      let result;
-      pageCapturing = true;
-      try {
-        result = await camerasApi.captureDual({
-          project_name: projectName,
-          collection_id: collectionId ?? undefined,
-          record_title: defaultRecordTitle(),
-          afterRecordId: start.lastId,
-          left_camera_index: leftCameraIndex,
-          rotate_deg_cam0: rotateDeg[0] ?? 0,
-          rotate_deg_cam1: rotateDeg[1] ?? 0,
-        });
-      } finally {
-        pageCapturing = false;
-      }
-      if (!result.success) throw new CaptureFailed(result.error);
+      const sent = await pageCapture(null, [start.lastId], () => camerasApi.captureDual({
+        project_name: projectName,
+        collection_id: collectionId ?? undefined,
+        record_title: defaultRecordTitle(),
+        afterRecordId: start.lastId,
+        left_camera_index: leftCameraIndex,
+        rotate_deg_cam0: rotateDeg[0] ?? 0,
+        rotate_deg_cam1: rotateDeg[1] ?? 0,
+      }));
+      if (sent === null) return;
+      if ('result' in sent && !sent.result.success) throw new CaptureFailed(sent.result.error);
+      const recordId = 'result' in sent ? sent.result.record_id : sent.found.id;
       pageCaptures += 1;
       noteFocusActivity();
       // Only if the screen is still where the capture started.
-      if (result.record_id != null && filled === start) {
-        filled = { holeId: start.holeId, lastId: result.record_id };
+      if (recordId != null && filled === start) {
+        filled = { holeId: start.holeId, lastId: recordId };
         await refreshAfterFill();
       }
     } catch (error) {
@@ -917,10 +1015,17 @@
   // an older answer is discarded whoever asked for it, so a slow read never
   // puts an older snapshot over a newer one.
   let loadsInFlight = 0;
+  // A read is assigned only while the screen is on the volume it was made for.
   const readRecords = newestOnly(
-    () => recordsApi.listAll({ collection_id: collectionId }),
-    (data) => {
+    () => {
+      const volume = collectionId;
+      return recordsApi.listAll({ collection_id: volume }).then((data) => ({ volume, data }));
+    },
+    ({ volume, data }) => {
+      if (volume !== collectionId) return false;
       records = data;
+      known.listed(data);
+      baselineReady = true;
       recordsLoaded = true;
       if (data.length > 0 && !selectedRecordId) {
         selectedRecordId = data[0].id;
@@ -933,10 +1038,60 @@
     loadsInFlight++;
     isLoading = true;
     try {
-      return (await readRecords()).ok;
+      const { ok } = await readRecords();
+      // NEH-381: until one read of the volume has succeeded, a failed read
+      // says why capture is unavailable, with a retry (recordsUnread).
+      if (ok) recordsUnread = false;
+      else if (!baselineReady) recordsUnread = true;
+      return ok;
     } finally {
       isLoading = --loadsInFlight > 0;
     }
+  }
+
+  // The read of the records a check makes (NEH-381): null when it failed.
+  async function readForCheck(): Promise<ApiRecord[] | null> {
+    return (await loadRecords()) ? records : null;
+  }
+  const viewportCheck = {
+    snapshot: () => known.snapshot(),
+    confirmed: (recordId: number | null | undefined, imageIds: readonly number[] | null | undefined) =>
+      known.confirmed(recordId, imageIds),
+    read: readForCheck,
+  };
+
+  // Sends a capture made here (a retake, a fill, "Capture another here")
+  // through runPageCapture (src/lib/capture-check.ts), which says what it
+  // resolves and when it sends nothing. `target` is the record it captures
+  // into, null for a new one; `names` are the records the request names
+  // (its record_id, its afterRecordId).
+  async function pageCapture(
+    target: number | null,
+    names: number[],
+    send: () => Promise<CaptureResponse>
+  ): Promise<{ result: CaptureResponse } | { found: ApiRecord } | null> {
+    const volume = collectionId;
+    return runPageCapture({
+      gate: captureGate,
+      known,
+      target,
+      names,
+      current: () => !destroyed && collectionId === volume,
+      send,
+      read: readForCheck,
+      notice,
+      onCapturing: (capturing) => (pageCapturing = capturing),
+      onCheck: (controller) => (pageCheckController = controller),
+      onSlowTimer: (cancel) => (cancelSlow = cancel),
+    });
+  }
+
+  // The line the modal shows about the capture in progress.
+  function noticeText(notice: 'still_working' | 'maybe_saved' | 'found' | null): string | null {
+    if (notice === 'still_working') return $m.lv_capture_still_working;
+    if (notice === 'maybe_saved') return $m.lv_capture_maybe_saved;
+    if (notice === 'found') return $m.lv_capture_found;
+    return null;
   }
 
   // Captures are reviewed in the volume view.
@@ -992,37 +1147,32 @@
   }
 
   async function retake(record: ApiRecord) {
-    let result;
     // A placeholder is a whole opening, closed or not: only a dual capture
     // fills it. An open one gets the after-panel.
     const hole = isOpenPlaceholder(record);
-    pageCapturing = true;
-    try {
-      if (cameraMode === 'double' || record.missing_side === 'both') {
-        result = await camerasApi.captureDual({
-          project_name: projectName,
-          collection_id: collectionId ?? undefined,
-          record_id: record.id,
-          // The roles of the new images: the same camera on the left as in the viewport.
-          left_camera_index: leftCameraIndex,
-          rotate_deg_cam0: rotateDeg[0] ?? 0,
-          rotate_deg_cam1: rotateDeg[1] ?? 0,
-        });
-      } else {
-        result = await camerasApi.capture({
-          project_name: projectName,
-          camera_index: 0,
-          collection_id: collectionId ?? undefined,
-          record_id: record.id,
-          rotate_deg: rotateDeg[0] ?? 0,
-        });
-      }
-    } finally {
-      pageCapturing = false;
-    }
+    const sent = await pageCapture(record.id, [record.id], () =>
+      cameraMode === 'double' || record.missing_side === 'both'
+        ? camerasApi.captureDual({
+            project_name: projectName,
+            collection_id: collectionId ?? undefined,
+            record_id: record.id,
+            // The roles of the new images: the same camera on the left as in the viewport.
+            left_camera_index: leftCameraIndex,
+            rotate_deg_cam0: rotateDeg[0] ?? 0,
+            rotate_deg_cam1: rotateDeg[1] ?? 0,
+          })
+        : camerasApi.capture({
+            project_name: projectName,
+            camera_index: 0,
+            collection_id: collectionId ?? undefined,
+            record_id: record.id,
+            rotate_deg: rotateDeg[0] ?? 0,
+          })
+    );
+    if (sent === null) return;
 
-    if (!result.success) {
-      throw new CaptureFailed(result.error);
+    if ('result' in sent && !sent.result.success) {
+      throw new CaptureFailed(sent.result.error);
     }
     pageCaptures += 1;
     noteFocusActivity();
@@ -1117,11 +1267,11 @@
     onBack={handleBack}
     onGoToReview={takesPartInWorkflow($userRole) ? handleGoToReview : undefined}
     onCheckCameras={() => {
-      if (viewportCapturing || pageCapturing) return;
+      if (viewportCapturing || pageCapturing || captureBusy) return;
       cameraCheckOpen = true;
       void checkSetup();
     }}
-    checkCamerasDisabled={pageCapturing || viewportCapturing}
+    checkCamerasDisabled={pageCapturing || viewportCapturing || captureBusy}
   />
 
   <CaptureInstruction {instruction} />
@@ -1247,7 +1397,10 @@
           onStemRefused={recheckStem}
           {pageCaptures}
           {pageCapturing}
-          onRefocus={dslrUnit ? () => { if (!viewportCapturing && !pageCapturing) refocusOpen = true; } : undefined}
+          {captureGate}
+          captureBusy={captureLocked}
+          captureCheck={viewportCheck}
+          onRefocus={dslrUnit ? () => { if (!viewportCapturing && !pageCapturing && !captureBusy) refocusOpen = true; } : undefined}
           bind:swapped
           bind:capturing={viewportCapturing}
         />
@@ -1259,12 +1412,20 @@
           </div>
         {/each}
 
+        {#if recordsUnread}
+          <div class="lv-orientation-failed lv-records-unread" role="alert">
+            <p class="ph-error">{$m.lv_records_unread}</p>
+            <button class="btn btn-secondary" disabled={isLoading} onclick={() => void loadRecords()}>{$m.common_retry}</button>
+          </div>
+        {/if}
+
         <div class="thumbnail-area">
           <ThumbnailStrip
             {records}
             {selectedRecordId}
             {cameraMode}
-            onSelect={(record) => { filled = null; refreshFailed = false; refreshing = false; selectedRecordId = record.id; inspectedRecord = record; }}
+            disabled={captureBusy}
+            onSelect={(record) => { if (captureBusy) return; filled = null; refreshFailed = false; refreshing = false; selectedRecordId = record.id; inspectedRecord = record; }}
           />
         </div>
 
@@ -1346,7 +1507,7 @@
             {#if refreshFailed}
               <button class="btn btn-secondary" disabled={refreshing || leaving} onclick={retryRefresh}>{$m.common_retry}</button>
             {/if}
-            <button class="btn btn-recapture" disabled={anotherBusy || leaving || refreshFailed || refreshing} onclick={captureAnother}>{$m.cap_another}</button>
+            <button class="btn btn-recapture" disabled={anotherBusy || leaving || refreshFailed || refreshing || captureLocked} onclick={captureAnother}>{$m.cap_another}</button>
             <button class="btn btn-secondary" disabled={anotherBusy || leaving} onclick={continueAfterCapture}>{$m.cap_last}</button>
           </div>
         </section>
@@ -1374,12 +1535,14 @@
       placeholder={placeholderPanel}
       offerCapture={filled === null && !leaving}
       busy={anotherBusy || leaving}
+      {captureLocked}
+      captureNote={noticeText($cameraStatus.notice)}
     />
   {/key}
 {/if}
 
 {#if refocusOpen}
-  <RefocusModal leftIndex={leftCameraIndex} onClose={closeRefocus} />
+  <RefocusModal leftIndex={leftCameraIndex} onClose={closeRefocus} {captureGate} />
 {/if}
 
 {#if cameraCheckOpen}
@@ -1394,6 +1557,7 @@
     onRefocusClosed={noteFocusActivity}
     onChangeRoles={canSetUp ? () => (whichByHand = true) : undefined}
     zoomControls={canSetUp}
+    {captureGate}
   />
 {/if}
 

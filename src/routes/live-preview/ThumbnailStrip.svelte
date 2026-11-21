@@ -13,6 +13,9 @@
   // page, photographed by the left camera; role `left` the even/verso page,
   // photographed by the right camera.
   //
+  // `disabled` (NEH-381): while a capture is in flight or being checked, no
+  // thumbnail can be activated, by pointer or keyboard.
+  //
   // Version: 0.1.0-beta
 
   import { recordsApi, type Record, type RecordImage } from '$lib/api';
@@ -23,11 +26,13 @@
     selectedRecordId,
     cameraMode,
     onSelect,
+    disabled = false,
   }: {
     records: Record[];
     selectedRecordId: number | null;
     cameraMode: 'single' | 'double';
     onSelect: (record: Record) => void;
+    disabled?: boolean;
   } = $props();
 
   // One image within a strip unit. In `single` mode a record has one item
@@ -131,6 +136,7 @@
         <button
           class="thumbnail-item"
           class:selected={isSelected}
+          {disabled}
           onclick={() => onSelect(group.record)}
         >
 
@@ -243,6 +249,8 @@
   }
 
   .thumbnail-item:hover { opacity: 1; }
+  .thumbnail-item:disabled { cursor: default; }
+  .thumbnail-item:disabled:hover { opacity: 0.7; }
   .thumbnail-item.selected { opacity: 1; }
 
   /* The selection frame surrounds the whole folio, not each half. */

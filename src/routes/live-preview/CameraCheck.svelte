@@ -56,9 +56,14 @@
   // Nothing closes the check while the cameras are working. The layout
   // section of the mock-up is not part of it.
   //
+  // The test captures take the capture screen's one gate (`captureGate`,
+  // src/lib/capture-check.ts) for their requests, and send nothing while
+  // anything else holds it (NEH-381); the Refocus dialog opened from here
+  // gets the same gate.
+  //
   // Version: 0.3.4
 
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { camerasApi, type CameraCapabilities, type CameraDevice } from '$lib/api';
   import { m } from '$lib/i18n';
   import { describeCaptureFailure } from '$lib/capture-outcome';
@@ -67,6 +72,7 @@
   import { clampStep, stepRange, zoomFailureDetail } from '$lib/zoom-steps';
   import { dialogsAbove, dismissible, toBody, trapFocus } from '$lib/dialog';
   import { PairPanZoom } from '$lib/pair-pan-zoom.svelte';
+  import { createCaptureGate, type CaptureGate } from '$lib/capture-check';
   import RefocusModal from './RefocusModal.svelte';
   import CameraCheckViewer from './CameraCheckViewer.svelte';
   import PageCameraLabel from '$lib/components/PageCameraLabel.svelte';
@@ -82,6 +88,7 @@
     onRefocusClosed,
     onChangeRoles,
     zoomControls = true,
+    captureGate,
   }: {
     // The camera that takes the left page: 1 when the viewport is swapped.
     leftIndex?: number;
@@ -99,7 +106,11 @@
     onChangeRoles?: () => void;
     // The zoom steps, which the unit saves: false for the testing account (NEH-391).
     zoomControls?: boolean;
+    // The capture screen's one gate; without it the check has one of its own.
+    captureGate?: CaptureGate;
   } = $props();
+
+  const gate: CaptureGate = untrack(() => captureGate) ?? createCaptureGate();
 
   type Side = 'left' | 'right';
   const SIDES: Side[] = ['left', 'right'];
@@ -197,6 +208,19 @@
   }
 
   async function captureAndList() {
+    const release = gate.acquire('test');
+    if (!release) return;
+    try {
+      await testCaptures();
+    } finally {
+      release();
+    }
+    if (destroyed) return;
+    // A capture puts a CHDK camera in shooting mode, which gives it a step.
+    await readDevices();
+  }
+
+  async function testCaptures() {
     revokeShots();
     shots = { 0: { status: 'busy' }, 1: { status: 'busy' } };
     stale = false;
@@ -216,9 +240,6 @@
         }
       })
     );
-    if (destroyed) return;
-    // A capture puts a CHDK camera in shooting mode, which gives it a step.
-    await readDevices();
   }
 
   // ---------------------------------------------------------------------------
@@ -726,7 +747,7 @@
 </div>
 
 {#if refocusOpen}
-  <RefocusModal {leftIndex} onClose={closeRefocus} />
+  <RefocusModal {leftIndex} onClose={closeRefocus} captureGate={gate} />
 {/if}
 
 <style>
