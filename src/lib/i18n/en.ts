@@ -402,6 +402,17 @@ export const en: Messages = {
 	proj_create_btn: 'Create project',
 	proj_err_create: (msg: string) => `Could not create the project: ${msg}`,
 	proj_err_delete: (msg: string) => `Could not delete the project: ${msg}`,
+	// The sentence after proj_err_delete's colon, for each coded refusal of a delete.
+	// A part whose count is 0 is left out; the caller never passes 0 for both.
+	proj_err_delete_not_empty: (collections: number, records: number) => {
+		const volumes = collections === 1 ? '1 volume' : `${formatCount(collections, 'en')} volumes`;
+		const recs = records === 1 ? '1 record' : `${formatCount(records, 'en')} records`;
+		if (collections > 0 && records > 0) return `it still has ${volumes} and ${recs}. Move or delete them first.`;
+		const count = collections > 0 ? collections : records;
+		return `it still has ${collections > 0 ? volumes : recs}. ${count === 1 ? 'Move or delete it first.' : 'Move or delete them first.'}`;
+	},
+	proj_err_delete_files_held: 'Captua still keeps files in this project that belong to other records. Move those records first.',
+	proj_err_delete_manifest_foreign: 'its directory holds a capture manifest that does not belong to this project. Move it out of that directory first.',
 	proj_delete_title: 'Delete project',
 	proj_checking_contents: 'Checking contents…',
 	proj_not_empty: 'This project is not empty',

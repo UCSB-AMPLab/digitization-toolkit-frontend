@@ -3,14 +3,16 @@
 // capture format, and when a testing volume is removed.
 //
 // The refusals carry a `{code, message}` detail (app/core/testing_space.py,
-// app/core/project_names.py); they are matched on the code and status, and
-// the backend's English text is never shown. Which role may do what is
+// app/core/project_names.py, and delete_project in app/api/projects.py); they
+// are matched on the code and status, and the backend's English text is never
+// shown. The one refusal of a project delete without a code, a storage drive
+// that cannot be read, is matched on its 503 status. Which role may do what is
 // decided in unit-mode.ts, not here.
 //
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`).
 //
-// Version: 0.1.3
+// Version: 0.1.5
 
 import type { Messages } from './i18n';
 import { parseApiDate } from './pipeline';
@@ -26,7 +28,13 @@ const REFUSALS: { [code: string]: { status: number[]; key: keyof Messages } } = 
 	capture_format_unavailable: { status: [422], key: 'testing_err_capture_format_unavailable' },
 	testing_volume_busy: { status: [409], key: 'testing_err_volume_busy' },
 	usb_not_eligible: { status: [422], key: 'testing_usb_err_not_eligible' },
-	usb_copy_busy: { status: [409], key: 'testing_usb_err_copy_busy' }
+	usb_copy_busy: { status: [409], key: 'testing_usb_err_copy_busy' },
+	// DELETE /projects/{id}: a capture manifest that is not the project's own is shown like files other records use.
+	project_not_empty: { status: [409], key: 'testing_err_project_not_empty' },
+	project_files_held: { status: [409], key: 'testing_err_project_files_held' },
+	project_manifest_foreign: { status: [409], key: 'testing_err_project_files_held' },
+	project_manifest_keep_failed: { status: [500], key: 'testing_err_other' },
+	project_files_remove_failed: { status: [500], key: 'testing_err_other' }
 };
 
 /** The code of a refusal with a `{code}` detail, or null. */
@@ -83,33 +91,44 @@ export function usbFailureText(code: string | null | undefined, msgs: Messages):
 	return key ? (msgs[key] as string) : null;
 }
 
-// The refusals of DELETE /projects/{id} carry no code: the backend sends
-// fixed English text, so they are matched on status and that text (its fixed
-// start for the first), as volume-refusals.ts does.
-const PROJECT_NOT_EMPTY = /^Cannot delete a non-empty project: /;
-const PROJECT_FILES_HELD = [
-	'Project directory still holds files referenced by other records. Move those records first.',
-	'Project directory holds a capture manifest other than its own. Move it out first.'
-];
-
 /**
  * The message for a refused delete of a testing project, for the testing
- * account: a project that still has volumes or records, files a volume
- * still holds, a storage drive that cannot be read (503), or one of the
- * coded refusals. Any other failure gets the generic testing line, so the
- * backend's English is never shown. Null for every other role.
+ * account: chosen by the refusal's code (a project that still has volumes or
+ * records, files a volume still holds, a capture manifest that is not its
+ * own, a failure of the disk), by the 503 for a storage drive that cannot be
+ * read (its detail is a plain string; the backend sends a 503 on this route
+ * only for that), or by the 404 for a project that is gone. Any other failure
+ * gets the generic testing line, so the backend's English is never shown.
+ * Null for every other role.
  */
 export function testingProjectDeleteText(error: unknown, msgs: Messages, role: string | null | undefined): string | null {
 	if (!inTestingSpace(role)) return null;
 	const coded = testingRefusalText(error, msgs, role);
 	if (coded) return coded;
-	const e = typeof error === 'object' && error !== null ? (error as { status?: unknown; message?: unknown }) : {};
-	const text = typeof e.message === 'string' ? e.message : '';
-	if (e.status === 503) return msgs.testing_err_project_storage;
-	if (e.status === 409 && PROJECT_NOT_EMPTY.test(text)) return msgs.testing_err_project_not_empty;
-	if (e.status === 409 && PROJECT_FILES_HELD.includes(text)) return msgs.testing_err_project_files_held;
-	if (e.status === 404) return msgs.testing_err_not_found;
+	const status = typeof error === 'object' && error !== null ? (error as { status?: unknown }).status : undefined;
+	if (status === 503) return msgs.testing_err_project_storage;
+	if (status === 404) return msgs.testing_err_not_found;
 	return msgs.testing_err_other;
+}
+
+/**
+ * The translated sentence for a coded refusal of a project delete, for the
+ * Projects list's error line, or null for a refusal with no code or a code
+ * not listed, or a not-empty refusal whose counts are missing, not numbers or both 0
+ * (the caller then shows the backend's message).
+ */
+export function projectDeleteRefusalText(error: unknown, msgs: Messages): string | null {
+	const found = refusalCode(error);
+	if (!found || found.status !== 409) return null;
+	const detail = (error as { detail: { collections?: unknown; records?: unknown } }).detail;
+	if (found.code === 'project_not_empty') {
+		if (typeof detail.collections !== 'number' || typeof detail.records !== 'number') return null;
+		if (detail.collections <= 0 && detail.records <= 0) return null;
+		return msgs.proj_err_delete_not_empty(detail.collections, detail.records);
+	}
+	if (found.code === 'project_files_held') return msgs.proj_err_delete_files_held;
+	if (found.code === 'project_manifest_foreign') return msgs.proj_err_delete_manifest_foreign;
+	return null;
 }
 
 /** Whether an error is the 507 for captures refused below the reserve kept for real work. */

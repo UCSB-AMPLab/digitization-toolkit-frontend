@@ -426,6 +426,17 @@ export const es = {
 	proj_create_btn: 'Crear proyecto',
 	proj_err_create: (msg: string) => `No se pudo crear el proyecto: ${msg}`,
 	proj_err_delete: (msg: string) => `No se pudo eliminar el proyecto: ${msg}`,
+	// The sentence after proj_err_delete's colon, for each coded refusal of a delete.
+	// A part whose count is 0 is left out; the caller never passes 0 for both.
+	proj_err_delete_not_empty: (collections: number, records: number) => {
+		const volumes = collections === 1 ? '1 volumen' : `${formatCount(collections, 'es')} volúmenes`;
+		const recs = records === 1 ? '1 registro' : `${formatCount(records, 'es')} registros`;
+		if (collections > 0 && records > 0) return `todavía tiene ${volumes} y ${recs}. Muévelos o elimínalos primero.`;
+		const count = collections > 0 ? collections : records;
+		return `todavía tiene ${collections > 0 ? volumes : recs}. ${count === 1 ? 'Muévelo o elimínalo primero.' : 'Muévelos o elimínalos primero.'}`;
+	},
+	proj_err_delete_files_held: 'Captua todavía guarda en este proyecto archivos que pertenecen a otros registros. Mueve primero esos registros.',
+	proj_err_delete_manifest_foreign: 'en su carpeta hay un manifiesto de captura que no es de este proyecto. Sácalo primero de esa carpeta.',
 	proj_delete_title: 'Eliminar proyecto',
 	proj_checking_contents: 'Verificando contenido…',
 	proj_not_empty: 'Este proyecto no está vacío',
