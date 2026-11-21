@@ -141,8 +141,9 @@ function isDeadSession(status: number, endpoint: string): boolean {
 // request, with its own reason.
 //
 // On the appliance every request goes through nginx, whose
-// proxy_read_timeout is 120 s: a backend still silent by then has been
-// answered with a 504, which the caller sees as an ApiError with status 504.
+// proxy_read_timeout is 120 s, and 300 s for POST /cameras/capture and
+// /cameras/capture/dual: a backend still silent by then has been answered
+// with a 504, which the caller sees as an ApiError with status 504.
 // A limit above 120 s ends only a request that nothing answers at all (nginx
 // down, a dropped link), or one made straight to the backend in development.
 // A limit below 120 s (REQUEST_TIMEOUT_MS, HEALTH_REQUEST_TIMEOUT_MS,
@@ -161,8 +162,11 @@ export const SLOW_REQUEST_TIMEOUT_MS = 150_000;
 // Every /cameras request. On the backend a capture can take about 225 s per
 // camera before any wait for the camera's lock, and any other camera request
 // waits for that lock while a capture holds it; behind nginx such a request
-// is answered with a 504 at 120 s. This limit exists only to free the screen
-// when nothing answers at all.
+// is answered with a 504 at 120 s, a capture at 300 s, the same moment as
+// this limit. Either timeout of a capture sends the capture screen into its
+// check of the records (src/lib/capture-check.ts). For the other camera
+// requests this limit exists only to free the screen when nothing answers
+// at all.
 export const CAMERA_REQUEST_TIMEOUT_MS = 300_000;
 // GET /health answers at once; the login page and the wait after a reboot
 // ask it again when it fails.

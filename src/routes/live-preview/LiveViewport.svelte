@@ -18,6 +18,25 @@
   // previewed and captured; the swap state orders the two cameras of a pair
   // only, and has no effect until dual mode again.
   //
+  // A capture still in flight after 10 s gets a line saying the unit is still
+  // working on it. A capture request that ends in a timeout (nginx's 504 or
+  // the request layer's TimeoutError) is not reported as failed: the capture
+  // may have been stored (src/lib/capture-check.ts). The viewport says so and
+  // checks: the button and the capture key stay locked, and the page's
+  // `captureCheck` reads the volume's records every 5 s, until a record that
+  // was not there before the request shows up (then everything happens as
+  // after a successful capture, and the line says it was saved), or until a
+  // read that succeeded 180 s or more after the check began has not found it
+  // (then the error banner says no capture was saved, and the controls are
+  // free). Unmounting, or another
+  // volume, stops the check. The page's `captureGate` is the one gate for
+  // starting any capture on the screen: this viewport takes it for its
+  // request and its check, and takes no capture while anything else holds it
+  // (`captureBusy`). A request belongs to the volume it began in: once the
+  // volume has changed, or the viewport is gone, its answer shows nothing and
+  // starts no check, the still-working timer is cancelled, and the last
+  // capture shown in last-pair mode goes.
+  //
   // Version: 0.3.4
 
   import { onMount, onDestroy, untrack } from 'svelte';
@@ -43,7 +62,17 @@
   import { createNoFrameRun, LAST_PAIR_NO_FRAME_ANSWERS, NO_FRAME_SECONDS, type NoFrameRun } from '$lib/no-frame-run';
   import { defaultRecordTitle } from '$lib/record-title';
   import { isConflict } from '$lib/volume-stem';
-  import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
+  import { CaptureFailed, CaptureNotSaved, captureErrorText } from '$lib/capture-errors';
+  import {
+    checkForCapture,
+    createCaptureGate,
+    isCaptureTimeout,
+    whenSlow,
+    type CaptureBefore,
+    type CaptureGate,
+    type RecordLike
+  } from '$lib/capture-check';
+  import type { CaptureNotice } from '$lib/stores/cameras';
   import { userRole } from '$lib/stores/auth';
   import { dismissible, openDialogsOutside } from '$lib/dialog';
   import { powerControlOpen } from '$lib/stores/power';
@@ -73,6 +102,9 @@
     capturing = $bindable(false),
     captureBlocked = false,
     swapLocked = false,
+    captureCheck,
+    captureGate,
+    captureBusy = false,
   }: {
     cameraMode: 'single' | 'double';
     shutterSpeed: string;
@@ -126,6 +158,22 @@
     // NEH-343: the saved camera roles decide left and right (the page sets
     // `swapped` from them), so the swap control is not shown.
     swapLocked?: boolean;
+    // NEH-381: what the page knows the server holds (`snapshot`, the
+    // baseline of a capture), where a capture answer is added to it
+    // (`confirmed`), and the page's read of the records, for the check after
+    // a capture that ended in a timeout. `read` resolves null when the read
+    // failed. Without it a timeout is reported as a failed capture.
+    captureCheck?: {
+      snapshot: () => CaptureBefore;
+      confirmed: (recordId: number | null | undefined, imageIds: readonly number[] | null | undefined) => void;
+      read: () => Promise<readonly RecordLike[] | null>;
+    };
+    // The page's one gate for starting a capture; without it the viewport
+    // has a gate of its own.
+    captureGate?: CaptureGate;
+    // True while the gate is held, by this viewport or by the page: the
+    // button and the capture key take no capture.
+    captureBusy?: boolean;
   } = $props();
 
   // The rotate buttons are shown only with onRotateDegChange: the testing
@@ -254,7 +302,7 @@
   const captureReady = $derived(projectId > 0 && collectionId > 0);
   // Ready, with a stem, and nothing blocking capture (NEH-343): the only
   // state that enables the capture button and the capture key.
-  const canCapture = $derived(captureReady && !needsStem && !captureBlocked);
+  const canCapture = $derived(captureReady && !needsStem && !captureBlocked && !captureBusy);
 
   // Its rect turns pointer positions into guide percentages.
   let viewportEl = $state<HTMLElement | null>(null);
@@ -896,6 +944,9 @@
 
   onDestroy(() => {
     destroyed = true;
+    checkController?.abort();
+    cancelSlow?.();
+    if (ownsNotice) cameraStatus.reportNotice(null);
     if (previewInterval) clearInterval(previewInterval);
     if (capabilitiesTimer) clearTimeout(capabilitiesTimer);
 
@@ -944,9 +995,102 @@
 
   function stopDrag() { dragging = null; }
 
+  const gate: CaptureGate = untrack(() => captureGate) ?? createCaptureGate();
+
+  // The check of a capture that ended in a timeout, and the still-working
+  // timer of the request in flight: both stop on unmount and when the volume
+  // changes.
+  let checkController: AbortController | null = null;
+  let cancelSlow: (() => void) | null = null;
+
+  let seenCollectionId = untrack(() => collectionId);
+  $effect(() => {
+    const id = collectionId;
+    if (id === seenCollectionId) return;
+    seenCollectionId = id;
+    untrack(() => {
+      checkController?.abort();
+      cancelSlow?.();
+      if (ownsNotice) notice(null);
+      // The last capture shown belongs to the old volume.
+      pageCaptured();
+    });
+  });
+
+  // Whether the notice in the shared camera status is this viewport's, so
+  // that leaving clears it and nothing else's.
+  let ownsNotice = false;
+  function notice(value: CaptureNotice | null) {
+    ownsNotice = value !== null;
+    cameraStatus.reportNotice(value);
+  }
+
+  // What follows a capture the backend stored: the flash, the cleared
+  // banner, the page's read of the records, and in last-pair mode the
+  // capture's images. `imageIds` are in camera order (camera 0, then 1).
+  function captureStored(imageIds: number[]) {
+    // The flash fires only once the backend has confirmed the capture: it
+    // is the only success signal the operator sees, and if it always fired,
+    // a failed capture would look identical to a good one and the page
+    // would be lost unnoticed until review or export (NEH-72).
+    captureFlash = true;
+    setTimeout(() => { captureFlash = false; }, 150);
+
+    cameraStatus.reportSuccess();
+    onCaptureDone();
+    // Not awaited: the thumbnails must not hold up the next capture.
+    lastCaptureIds = imageIds;
+    if (lastPair) showCapturedPair(imageIds);
+  }
+
+  // The image ids of a record found by the check, in camera order, as the
+  // capture's answer would have given them: in a pair, the camera that took
+  // the left page (`left`, from the request) has the image whose role is left.
+  function imageIdsInCameraOrder(record: RecordLike, dual: boolean, left: number): number[] {
+    const images = (record.images ?? []) as readonly { id: number; role?: string | null }[];
+    if (!dual) return images.slice(0, 1).map(img => img.id);
+    const byRole = (role: string) => images.find(img => img.role === role)?.id;
+    const leftId = byRole('left');
+    const rightId = byRole('right');
+    if (leftId === undefined || rightId === undefined) return images.map(img => img.id);
+    return left === 0 ? [leftId, rightId] : [rightId, leftId];
+  }
+
+  // A capture whose request ended in a timeout: the controls stay locked
+  // (isCapturing) while the records are read again.
+  async function checkTimedOut(before: CaptureBefore, dual: boolean, left: number) {
+    const check = captureCheck!;
+    const controller = new AbortController();
+    checkController = controller;
+    notice('maybe_saved');
+    const outcome = await checkForCapture({ before, read: check.read, signal: controller.signal });
+    if (checkController === controller) checkController = null;
+    if (outcome.kind === 'stopped') return;
+    if (outcome.kind === 'not-saved') {
+      notice(null);
+      cameraStatus.reportFailure(captureErrorText(new CaptureNotSaved(), $m, $userRole));
+      return;
+    }
+    const ids = imageIdsInCameraOrder(outcome.record, dual, left);
+    check.confirmed(outcome.record.id, ids);
+    captureStored(ids);
+    notice('found');
+  }
+
   async function handleCapture() {
     if (isCapturing || !canCapture) return;
+    const release = gate.acquire();
+    if (!release) return;
     isCapturing = true;
+    const volume = collectionId;
+    // Still on the volume the request began in, with the viewport mounted.
+    const current = () => !destroyed && collectionId === volume;
+    const before = captureCheck ? captureCheck.snapshot() : null;
+    const dual = cameraMode === 'double';
+    const left = leftIdx;
+    notice(null);
+    const stopSlow = whenSlow(() => { if (current()) notice('still_working'); });
+    cancelSlow = stopSlow;
 
     try {
       const payload = {
@@ -956,16 +1100,24 @@
       };
 
       let result;
-      if (cameraMode === 'double') {
-        result = await camerasApi.captureDual({
-          ...payload,
-          left_camera_index: leftIdx,
-          rotate_deg_cam0: rotateDeg[0] ?? 0,
-          rotate_deg_cam1: rotateDeg[1] ?? 0,
-        });
-      } else {
-        result = await camerasApi.capture({ ...payload, camera_index: 0, rotate_deg: rotateDeg[0] ?? 0 });
+      try {
+        if (dual) {
+          result = await camerasApi.captureDual({
+            ...payload,
+            left_camera_index: left,
+            rotate_deg_cam0: rotateDeg[0] ?? 0,
+            rotate_deg_cam1: rotateDeg[1] ?? 0,
+          });
+        } else {
+          result = await camerasApi.capture({ ...payload, camera_index: 0, rotate_deg: rotateDeg[0] ?? 0 });
+        }
+      } finally {
+        stopSlow();
+        if (cancelSlow === stopSlow) cancelSlow = null;
+        if (current()) notice(null);
       }
+      // The answer belongs to the volume the request began in.
+      if (!current()) return;
 
       if (!result.success) {
         // The backend's `error` is English; captureErrorText turns it into
@@ -973,21 +1125,16 @@
         throw new CaptureFailed(result.error);
       }
 
-      // The flash fires only once the backend has confirmed the capture: it
-      // is the only success signal the operator sees, and if it always fired,
-      // a failed capture would look identical to a good one and the page
-      // would be lost unnoticed until review or export (NEH-72).
-      captureFlash = true;
-      setTimeout(() => { captureFlash = false; }, 150);
-
-      cameraStatus.reportSuccess();
-      onCaptureDone();
-      // Not awaited: the thumbnails must not hold up the next capture.
-      lastCaptureIds = result.image_ids ?? [];
-      if (lastPair) showCapturedPair(result.image_ids);
+      captureCheck?.confirmed(result.record_id, result.image_ids);
+      captureStored(result.image_ids ?? []);
 
     } catch (error) {
       console.error('[LiveViewport] Capture error:', error);
+      if (!current()) return;
+      if (before && captureCheck && isCaptureTimeout(error)) {
+        await checkTimedOut(before, dual, left);
+        return;
+      }
       if (isConflict(error) && onStemRefused && (await onStemRefused())) {
         // The needs-stem banner says why, in the catalogue's words; the
         // backend's English text is not shown.
@@ -998,6 +1145,7 @@
       cameraStatus.reportFailure(captureErrorText(error, $m, $userRole));
     } finally {
       isCapturing = false;
+      release();
     }
   }
 
@@ -1197,6 +1345,21 @@
           {:else if stemFormHref}
             <a class="needs-stem-link" href={stemFormHref}>{$m.lv_needs_stem_link}</a>
           {/if}
+        </div>
+      {:else if $cameraStatus.notice}
+        <!-- NEH-381: a capture still in flight after 10 s, one that ended in
+             a timeout and is being checked, or one the check found. -->
+        <div class="capture-note-banner" role="status">
+          {#if $cameraStatus.notice === 'found'}
+            <span class="material-symbols-outlined icon-sm" aria-hidden="true">check_circle</span>
+          {:else}
+            <span class="material-symbols-outlined icon-sm" aria-hidden="true">sync</span>
+          {/if}
+          {$cameraStatus.notice === 'still_working'
+            ? $m.lv_capture_still_working
+            : $cameraStatus.notice === 'maybe_saved'
+              ? $m.lv_capture_maybe_saved
+              : $m.lv_capture_found}
         </div>
       {:else if $cameraStatus.captureError}
         <div class="capture-error-banner" role="alert">
@@ -1631,6 +1794,28 @@
      action, not a wait. z-index 60 puts it above everything drawn in the
      viewport (guides and overlays go up to 50), so it is not hidden while
      the operator has the framing guides on. */
+  /* Same place and shape as the error banner, in neutral colours. */
+  .capture-note-banner {
+    position: absolute;
+    top: 10px;
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    width: fit-content;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 80%;
+    padding: 8px 16px;
+    background: rgba(30, 30, 30, 0.92);
+    color: #fff;
+    font-size: 0.8rem;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+  }
+
   .capture-error-banner {
     position: absolute;
     top: 10px;

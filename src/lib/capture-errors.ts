@@ -18,6 +18,10 @@
 // - a request answered 200 with `success: false`, which the capture screen
 //   turns into a CaptureFailed carrying the backend's `error`: a camera that
 //   is not connected, or the text of whatever failed during the capture.
+// A request that ended in a timeout is not a failure the backend reported:
+// the capture screen checks whether the capture was saved (capture-check.ts),
+// and only a capture still missing after that check reaches this file, as a
+// CaptureNotSaved.
 //
 // The backend texts are matched exactly or by their fixed start, so a change
 // on the backend falls through to the generic message instead of being shown
@@ -82,6 +86,17 @@ export class CaptureFailed extends Error {
 	}
 }
 
+/**
+ * A capture whose request ended in a timeout and that did not appear in the
+ * volume's records within the check's window (capture-check.ts).
+ */
+export class CaptureNotSaved extends Error {
+	constructor() {
+		super('No capture was saved');
+		this.name = 'CaptureNotSaved';
+	}
+}
+
 function statusOf(error: unknown): unknown {
 	return typeof error === 'object' && error !== null ? (error as { status?: unknown }).status : undefined;
 }
@@ -93,6 +108,7 @@ export function isStemRequired(error: unknown): boolean {
 
 /** The catalogue message for a failed capture or retake, for the signed-in `role`. */
 export function captureErrorText(error: unknown, msgs: Messages, role?: string | null): string {
+	if (error instanceof CaptureNotSaved) return msgs.lv_capture_not_saved;
 	if (error instanceof CaptureFailed) {
 		const camera = error.backendError?.match(CAMERA_NOT_CONNECTED);
 		if (camera) return msgs.lv_err_camera_not_connected(Number(camera[1]));

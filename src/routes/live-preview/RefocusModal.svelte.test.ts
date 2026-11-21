@@ -20,6 +20,7 @@ import { REQUIRE_MF_READING } from '$lib/focus-check';
 import { dismissible, trapFocus } from '$lib/dialog';
 import '../../app.css';
 import RefocusModal from './RefocusModal.svelte';
+import { createCaptureGate } from '$lib/capture-check';
 
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
 
@@ -64,7 +65,7 @@ let modes: Record<number, string | undefined>;
 let settingsSpy: MockInstance<typeof camerasApi.getDSLRSettings>;
 let captureSpy: MockInstance<typeof camerasApi.testCapture>;
 
-function renderModal(props: Partial<{ leftIndex: number; requireMfReading: boolean }> = {}) {
+function renderModal(props: Partial<{ leftIndex: number; requireMfReading: boolean; captureGate: ReturnType<typeof createCaptureGate> }> = {}) {
 	const onClose = vi.fn();
 	const screen = render(RefocusModal, { leftIndex: 0, onClose, ...props });
 	return { screen, onClose };
@@ -120,7 +121,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-async function toTestStage(props: Partial<{ leftIndex: number }> = {}) {
+async function toTestStage(props: Partial<{ leftIndex: number; captureGate: ReturnType<typeof createCaptureGate> }> = {}) {
 	const r = renderModal(props);
 	await settle();
 	await click(en.focus_next);
@@ -815,5 +816,31 @@ describe('RefocusModal: Escape as the assigned capture key', () => {
 			expect(onClose).not.toHaveBeenCalled();
 			expect(captureSpy).not.toHaveBeenCalled();
 		});
+	});
+});
+
+// NEH-381: the focus check's test captures take the capture screen's one
+// gate for their request, and send nothing while anything else holds it.
+describe('RefocusModal: the capture gate', () => {
+	it('with the gate held elsewhere, Take pictures sends no test capture', async () => {
+		const captureGate = createCaptureGate();
+		const hold = captureGate.acquire()!;
+		await toTestStage({ captureGate });
+		await click(en.focus_take);
+		expect(captureSpy).not.toHaveBeenCalled();
+		hold();
+	});
+
+	it('holds the gate while its test captures run, and releases it when they end', async () => {
+		const answers = [deferred<TestCaptureResult>(), deferred<TestCaptureResult>()];
+		captureSpy.mockImplementation((i: number) => answers[i].promise);
+		const captureGate = createCaptureGate();
+		await toTestStage({ captureGate });
+		await click(en.focus_take);
+		expect(captureGate.isBusy()).toBe(true);
+		answers[0].resolve(await shot(400, 600));
+		answers[1].reject(failure(504));
+		await settle();
+		expect(captureGate.isBusy()).toBe(false);
 	});
 });

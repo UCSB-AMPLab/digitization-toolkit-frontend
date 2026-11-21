@@ -1038,6 +1038,13 @@ export const es = {
 	lv_capture_key_settings: 'Pedal y tecla de captura',
 	lv_capture_error: 'Error al capturar',
 	lv_capture_not_ready: 'Cargando el volumen…',
+	// A capture still in flight after 10 s, and one whose request ended in a
+	// timeout while the unit may still have saved it (capture-check.ts).
+	lv_capture_still_working: 'La cámara está tardando más de lo normal. Espera a que Captua termine esta captura.',
+	lv_capture_maybe_saved: 'La cámara no respondió a tiempo. Puede que la captura se haya guardado: espera mientras Captua lo comprueba.',
+	lv_capture_found: 'La captura se guardó.',
+	lv_capture_not_saved: 'No se guardó ninguna captura. Revisa la cámara y vuelve a capturar.',
+	lv_records_unread: 'Captua no pudo cargar los registros de este volumen, así que todavía no se puede capturar.',
 	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
 	lv_needs_stem_link: 'Asignar la raíz',
 	// Errors for a capture or retake the backend refused (capture-errors.ts).
