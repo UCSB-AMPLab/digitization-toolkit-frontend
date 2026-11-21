@@ -253,11 +253,13 @@ export async function withTimeLimit<T>(
 //   new one, and the logout follows it. No other code clears the record of
 //   the session.
 //
-// This orders the requests of one tab only. The backend revokes no token, so
-// another tab, or a request replayed with an earlier cookie, can still
-// refresh after this tab has signed out. The cookie is shared by the tabs of
-// one browser, so a logout this tab sends late also deletes the cookie of a
-// sign-in made meanwhile in another tab.
+// This orders the requests of one tab only. On sign-out the backend ends
+// every session of the user (the testing account excepted, which several
+// people share), so another tab, or a request replayed with an earlier
+// cookie, is refused afterwards. The cookie is shared by the tabs of one
+// browser, so a logout this tab sends late also deletes the cookie of a
+// sign-in made meanwhile in another tab, and ends that session too when it
+// is the same user's.
 let pendingSignOut: Promise<void> = Promise.resolve();
 
 // A sign-out that fails still counts as ended: a rejection kept in
