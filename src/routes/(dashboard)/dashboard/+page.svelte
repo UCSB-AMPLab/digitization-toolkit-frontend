@@ -31,6 +31,7 @@
   import ActivityCalendar from './ActivityCalendar.svelte';
   import StorageAlert from './StorageAlert.svelte';
   import RetakeBand from './RetakeBand.svelte';
+  import { createNoFrameRun, NO_FRAME_SECONDS, type NoFrameRun } from '$lib/no-frame-run';
 
   let currentUser = $state<any>(null);
   let userRole    = $state('');
@@ -144,14 +145,13 @@
 
   // A connected camera that sent no frame answers 503 preview_frame_failed
   // (NEH-349): the box keeps the last frame, polling goes on and no issue
-  // shows. After this many such answers in a row the panel says the camera
-  // is connected but sends no image, with polling still running so that a
-  // good frame clears it: 12 polls at PREVIEW_INTERVAL_MS (2.5 s) = 30 s,
-  // longer when answers are slower than the interval, since a side has one
-  // request in flight at a time.
-  const NO_FRAME_RUN_LIMIT = 12;
-  // Per side, those answers since the side's last other answer.
-  let noFrameRun: Record<string, number> = {};
+  // shows. Once such answers have lasted NO_FRAME_SECONDS
+  // (src/lib/no-frame-run.ts, the same on the capture screen) the panel says
+  // the camera is connected but sends no image, with polling still running
+  // so that a good frame clears it.
+  // Per side, the run of those answers since the side's last other answer.
+  let noFrameRun: Record<string, NoFrameRun> = {};
+  const noFrameRunOf = (side: string) => (noFrameRun[side] ??= createNoFrameRun());
   // Sides whose run reached the limit. The badge is left as it is: the
   // backend says the camera is connected, and the badge has no state for
   // "connected, no image".
@@ -288,7 +288,7 @@
 
   function stopStream(side: 'left' | 'right') {
     streamActive = { ...streamActive, [side]: false };
-    noFrameRun[side] = 0;
+    noFrameRunOf(side).reset();
     noImage = { ...noImage, [side]: false };
     if (cameraIssue[side]?.kind === 'preview') setIssue(side, null);
     if (previewIntervals[side]) { clearInterval(previewIntervals[side]); delete previewIntervals[side]; }
@@ -307,7 +307,7 @@
   // acceptPreview would count it as a status observation.
   function recordPreviewAnswer(side: 'left' | 'right', answer: PreviewAnswer, token: number | null) {
     const current = streamActive[side] && token !== null && cameraRefresh.previewToken() === token;
-    if (answer !== 'no-frame') noFrameRun[side] = 0;
+    if (answer !== 'no-frame') noFrameRunOf(side).frame();
     switch (answer) {
       case 'ok':
         // A good frame is evidence the body is there, whether the badge said
@@ -321,9 +321,9 @@
         // not-found goes at once, and so does an earlier preview failure.
         if (cameraStatus[side] !== 'ok') applyPreviewStatus(token, side, 'ok');
         if (!streamActive[side]) return;
-        noFrameRun[side] = (noFrameRun[side] ?? 0) + 1;
+        const limitReached = noFrameRunOf(side).noFrame({ seconds: NO_FRAME_SECONDS });
         if (current && cameraIssue[side]?.kind === 'preview') setIssue(side, null);
-        if (noFrameRun[side] >= NO_FRAME_RUN_LIMIT && current) noImage = { ...noImage, [side]: true };
+        if (limitReached && current) noImage = { ...noImage, [side]: true };
         return;
       case 'missing':
         // A preview from before/during reconnect cannot undo its result or

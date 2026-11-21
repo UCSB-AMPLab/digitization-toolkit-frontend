@@ -1,7 +1,7 @@
 // NEH-349: on the overview's camera test panel, a camera that is connected
 // but sent no preview frame answers 503 with detail.code
 // preview_frame_failed. The panel keeps the last frame and goes on polling;
-// only a run of such answers lasting about 30 s (12 polls at 2.5 s) shows the
+// only a run of such answers lasting 30 s (the same as on the capture screen) shows the
 // "connected, no image" text, with the badge still saying OK, and one good
 // frame clears it. A no-frame answer also clears "Not detected" left by an
 // earlier 404. A 404 and a 503 without the code behave as they did before.
@@ -28,9 +28,12 @@ import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 
-// The overview's PREVIEW_INTERVAL_MS and NO_FRAME_RUN_LIMIT.
+// The overview's PREVIEW_INTERVAL_MS and the shared NO_FRAME_SECONDS. The
+// run's first answer starts the clock, so the text shows with the answer
+// that arrives NO_FRAME_SECONDS later: the RUN_LIMIT-th.
 const INTERVAL_MS = 2500;
-const RUN_LIMIT = 12;
+const NO_FRAME_SECONDS = 30;
+const RUN_LIMIT = (NO_FRAME_SECONDS * 1000) / INTERVAL_MS + 1;
 const NO_IMAGE_EN =
   'The camera is connected but is not sending an image. Turn the camera off and on again. If that does not help, unplug its USB cable and plug it back in.';
 
@@ -109,7 +112,7 @@ beforeEach(() => {
   vi.spyOn(recordsApi, 'toRetakeSummary').mockRejectedValue(new Error('not needed'));
   vi.spyOn(camerasApi, 'getCapabilities').mockRejectedValue(new Error('not needed'));
   vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
 });
 afterEach(() => {
   vi.useRealTimers();

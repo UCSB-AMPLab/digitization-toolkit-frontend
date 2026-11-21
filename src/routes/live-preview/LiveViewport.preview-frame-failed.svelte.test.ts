@@ -1,8 +1,8 @@
 // NEH-349: a camera that is connected but sent no preview frame answers
 // 503 with detail.code preview_frame_failed, per camera. The continuous
 // preview keeps that camera's last frame and goes on polling at the same
-// pace; only a run of such answers lasting about 30 s (15 polls at 2 s)
-// shows that camera's "connected, no image" notice (not the missing-camera
+// pace; only a run of such answers lasting 30 s (NO_FRAME_SECONDS, the same
+// on the overview's camera panel) shows that camera's "connected, no image" notice (not the missing-camera
 // one), and one good frame clears it. A no-frame answer also clears a missing
 // notice left by an earlier 404. A 404, a 503 without the code and a network
 // error behave as they did before. Last-pair mode shows the notice after 3
@@ -25,9 +25,12 @@ import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import { clearChord } from '$lib/capture-key';
 
-// LiveViewport's PREVIEW_INTERVAL_MS and NO_FRAME_RUN_LIMIT.
+// LiveViewport's PREVIEW_INTERVAL_MS and the shared NO_FRAME_SECONDS. The
+// run's first answer starts the clock, so the notice shows with the answer
+// that arrives NO_FRAME_SECONDS later: the RUN_LIMIT-th.
 const INTERVAL_MS = 2000;
-const RUN_LIMIT = 15;
+const NO_FRAME_SECONDS = 30;
+const RUN_LIMIT = (NO_FRAME_SECONDS * 1000) / INTERVAL_MS + 1;
 // LiveViewport's LAST_PAIR_NO_FRAME_LIMIT.
 const LAST_PAIR_LIMIT = 3;
 const NO_IMAGE_EN =
@@ -162,7 +165,7 @@ async function polling(answers: Record<number, Answer>, cameraMode: 'single' | '
 
 beforeEach(() => {
   locale.set('en');
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
 });
 
 afterEach(() => {
@@ -214,6 +217,18 @@ describe('LiveViewport — a connected camera that sent no frame (NEH-349)', () 
     const before = count(calls, 0);
     await poll(2);
     expect(count(calls, 0) - before).toBe(2);
+  });
+
+  it(`shows the notice ${NO_FRAME_SECONDS} s after the first answer without a frame, not before`, async () => {
+    const answers: Record<number, Answer> = { 0: 'frame', 1: 'frame' };
+    const { c } = await polling(answers);
+    answers[0] = 'no-frame';
+    // The first answer starts the clock; the last poll before the duration
+    // is 2 s short of it, the next one is on it.
+    await poll(RUN_LIMIT - 1);
+    expect(paneText(c, 0)).toBeNull();
+    await poll(1);
+    await expect.poll(() => paneText(c, 0)).toBe(en.lv_camera_no_image);
   });
 
   it('the notice is in Spanish when the interface is', async () => {
