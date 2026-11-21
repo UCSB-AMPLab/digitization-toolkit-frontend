@@ -7,14 +7,15 @@
 // that needs no session, which the backend leaves to everyone); `false` is
 // every other entry, which the backend answers with a 403 for this account.
 // Routes the table does not list are refused too, as the backend refuses
-// them.
+// them. A path matches only with the slash the backend declares: `/projects`
+// does not reach `/projects/`.
 //
 // recordRequests() replaces fetch: a request to an admitted route is answered
 // by the test's handler for that route (or an empty 200 when the test gives
 // none); any other request is answered 403, as the backend answers it, and is
 // kept in `refused`, so a test asserts that list is empty.
 //
-// Version: 0.1.0
+// Version: 0.1.1
 
 import { vi } from 'vitest';
 
@@ -190,10 +191,6 @@ export const ROUTES: [Method, string, boolean][] = [
 
 const API_BASE = 'http://localhost:8000';
 
-function trim(path: string): string {
-	return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
-}
-
 interface CompiledRoute {
 	method: Method;
 	template: string;
@@ -207,7 +204,7 @@ const COMPILED: CompiledRoute[] = ROUTES.map(([method, template, admitted]) => (
 	template,
 	admitted,
 	pattern: new RegExp(
-		'^' + trim(template).replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\{[^}]+\}/g, '[^/]+') + '$'
+		'^' + template.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\{[^}]+\}/g, '[^/]+') + '$'
 	),
 	params: (template.match(/\{/g) ?? []).length
 }));
@@ -215,11 +212,12 @@ const COMPILED: CompiledRoute[] = ROUTES.map(([method, template, admitted]) => (
 /**
  * The route a request reaches: the template with the fewest parameters among
  * those that match, so a literal path (/records/to-retake) wins over a
- * parameter (/records/{rec_id}), as the backend's routing gives it.
+ * parameter (/records/{rec_id}), as the backend's routing gives it. The path
+ * is matched exactly as sent, trailing slash included, against the template
+ * as the backend declares it.
  */
 export function routeOf(method: string, path: string): CompiledRoute | null {
-	const p = trim(path);
-	const found = COMPILED.filter((r) => r.method === method.toUpperCase() && r.pattern.test(p));
+	const found = COMPILED.filter((r) => r.method === method.toUpperCase() && r.pattern.test(path));
 	found.sort((a, b) => a.params - b.params);
 	return found[0] ?? null;
 }
