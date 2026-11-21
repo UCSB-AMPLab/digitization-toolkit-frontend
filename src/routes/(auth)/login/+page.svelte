@@ -3,16 +3,21 @@
 	// `/users/me` returns (NEH-117), and it tells bad credentials, a login
 	// lockout and an unreachable backend apart so each gets its own message.
 	// The footer shows whether the backend answers and holds the language selector.
+	// After a person's own password change the app ends the session and opens
+	// this page with loginNotice set: the confirmation is shown above the form,
+	// as a status region, and the notice is cleared when the page is left, so
+	// it is shown for that one visit.
 	//
 	// Version: 0.1.0-beta
 
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authApi, healthApi, usersApi } from '$lib/api';
 	import { classifyLoginError, lockoutMinutes, retryAfterOf } from '$lib/login-error';
 	import { authStore, isUserRole } from '$lib/stores/auth';
 	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
 	import { dismissible } from '$lib/dialog';
+	import { loginNotice } from '$lib/stores/login-notice';
 	// The logo's descriptor follows the locale inside CaptuaLogo.
 	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 
@@ -32,6 +37,8 @@
 		{ code: 'es', label: 'ES' },
 		{ code: 'en', label: 'EN' }
 	];
+
+	onDestroy(() => loginNotice.set(null));
 
 	onMount(async () => {
 		// A signed-in user has no reason to see the login form.
@@ -152,6 +159,13 @@
 		<div class="card-logo-area">
 			<CaptuaLogo wordmark="descriptor" class="brand-logo" />
 		</div>
+
+		{#if $loginNotice === 'password_changed'}
+			<div class="notice" role="status">
+				<p class="notice-title">{$m.account_password_done_title}</p>
+				<p class="notice-text">{$m.account_password_done}</p>
+			</div>
+		{/if}
 
 		<div class="form-area">
 			<div class="field-group">
@@ -493,6 +507,19 @@
 		opacity: 0.4;
 		cursor: not-allowed;
 	}
+
+	.notice {
+		margin: 0 0 16px;
+		padding: 12px 14px;
+		border: 1px solid rgba(90, 140, 98, 0.4);
+		border-radius: var(--radius-md);
+		background-color: rgba(90, 140, 98, 0.08);
+		color: var(--color-light);
+		font-size: var(--text-sm);
+		line-height: 1.4;
+	}
+	.notice-title { margin: 0 0 4px; font-weight: var(--fw-bold); }
+	.notice-text { margin: 0; color: var(--color-light-grey); }
 
 	.alert {
 		display: flex;

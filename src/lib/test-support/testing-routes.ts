@@ -142,6 +142,7 @@ export const ROUTES: [Method, string, boolean][] = [
 	['GET', '/auth/users/{user_id}', false],
 	['PATCH', '/auth/users/{user_id}/role', false],
 	['PATCH', '/auth/users/{user_id}/active', false],
+	['PUT', '/auth/users/{user_id}/password', false],
 	['DELETE', '/auth/users/{user_id}', false],
 	['GET', '/users/me', true],
 

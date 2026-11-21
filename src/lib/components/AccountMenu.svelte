@@ -11,6 +11,11 @@
   //
   // The testing account has no tour (NEH-391), so it gets no Help entry.
   //
+  // Change password (NEH-395) opens ChangePasswordDialog, for every role but
+  // the testing account (changesOwnPassword), whose password an administrator
+  // sets in Settings. Like the power confirmation, the dialog is rendered
+  // outside the menu, since openChangePassword closes the menu.
+  //
   // Version: 0.1.2
 
   import type { Snippet } from 'svelte';
@@ -18,9 +23,10 @@
   import { m } from '$lib/i18n';
   import { tour } from '$lib/tour';
   import { authStore } from '$lib/stores/auth';
-  import { inTestingSpace } from '$lib/unit-mode';
+  import { changesOwnPassword, inTestingSpace } from '$lib/unit-mode';
   import { authApi, type PowerAction } from '$lib/api';
   import PowerControl from './PowerControl.svelte';
+  import ChangePasswordDialog from './ChangePasswordDialog.svelte';
 
   let {
     trigger,
@@ -54,6 +60,13 @@
   // Rendered outside the menu, which closes as soon as an entry is chosen,
   // so that the confirmation and the blocking state outlive it.
   let power = $state<ReturnType<typeof PowerControl> | undefined>(undefined);
+
+  let changingPassword = $state(false);
+
+  function openChangePassword() {
+    open = false;
+    changingPassword = true;
+  }
 
   function askPower(action: PowerAction) {
     open = false;
@@ -121,6 +134,18 @@
       <div class="menu-sep"></div>
       {/if}
 
+      {#if changesOwnPassword($authStore.user?.role)}
+      <button class="menu-item" role="menuitem" onclick={openChangePassword}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        <span>{$m.account_password_action}</span>
+      </button>
+
+      <div class="menu-sep"></div>
+      {/if}
+
       <!-- One entry per action: each goes straight to its own confirmation.
            Same icons as the buttons in Settings. -->
       <button class="menu-item" role="menuitem" onclick={() => askPower('poweroff')}>
@@ -154,6 +179,10 @@
 </div>
 
 <PowerControl bind:this={power} />
+
+{#if changingPassword && $authStore.user}
+  <ChangePasswordDialog username={$authStore.user.username} onCancel={() => (changingPassword = false)} />
+{/if}
 
 <style>
   .account-menu { position: relative; flex-shrink: 0; }

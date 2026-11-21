@@ -43,7 +43,7 @@ async function mount(role: UserRole) {
 	return screen;
 }
 
-const ENTRIES = ['Ayuda', 'Apagar el equipo', 'Reiniciar el equipo', 'Salir'];
+const ENTRIES = ['Ayuda', 'Cambiar contraseña', 'Apagar el equipo', 'Reiniciar el equipo', 'Salir'];
 
 beforeEach(() => locale.set('es'));
 afterEach(() => {
@@ -66,8 +66,8 @@ describe('dashboard sidebar account menu', () => {
 			for (const name of ENTRIES) {
 				await expect.element(menu.getByRole('menuitem', { name })).toBeVisible();
 			}
-			expect(menu.getByRole('menuitem').elements()).toHaveLength(4);
-			expect(menu.element().querySelectorAll('.menu-sep')).toHaveLength(2);
+			expect(menu.getByRole('menuitem').elements()).toHaveLength(5);
+			expect(menu.element().querySelectorAll('.menu-sep')).toHaveLength(3);
 			expect(menu.element().getBoundingClientRect().width).toBeGreaterThanOrEqual(204);
 			for (const item of menu.getByRole('menuitem').elements()) {
 				expect(item.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);

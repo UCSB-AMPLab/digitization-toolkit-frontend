@@ -14,6 +14,7 @@
 	import { m } from '$lib/i18n';
 	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 	import { normalizeEmail, emailFormatError } from '$lib/email-field';
+	import { PASSWORD_MIN_LENGTH, passwordTooShort, isPasswordTooShortRefusal } from '$lib/password-rule';
 
 	let username = $state('');
 	let email = $state('');
@@ -43,7 +44,7 @@
 		if (username.trim().length < 3) return $m.setup_val_username_short;
 		if (emailFormatError(email)) return $m.setup_val_email_format;
 		if (!password) return $m.setup_val_password_required;
-		if (password.length < 8) return $m.setup_val_password_short;
+		if (passwordTooShort(password)) return $m.common_password_too_short(PASSWORD_MIN_LENGTH);
 		if (password !== confirmPassword) return $m.setup_val_password_mismatch;
 		return '';
 	}
@@ -73,7 +74,9 @@
 		} catch (err: any) {
 			const status = err?.status;
 			const detail = (err?.message || '').toLowerCase();
-			if (detail.includes('already')) {
+			if (isPasswordTooShortRefusal(err)) {
+				errorMessage = $m.common_password_too_short(PASSWORD_MIN_LENGTH);
+			} else if (detail.includes('already')) {
 				errorMessage = $m.setup_err_exists;
 			} else if (detail.includes('no bootstrap token configured') || detail.includes('setup is unavailable')) {
 				errorMessage = $m.setup_err_unavailable;

@@ -3,6 +3,10 @@
   // `(dashboard)/+layout.svelte` redirects every other role. Search and
   // filters run client-side over the full list. Editing a user changes only
   // the role and the active flag; username and email are fixed at creation.
+  // Set password (SetPasswordDialog) gives another user a new password; it is
+  // offered on every row but the testing account's and the administrator's
+  // own, whose password changes from the account menu with the current one.
+  // On success a line on the page says so.
   //
   // Version: 0.1.0-beta
 
@@ -11,6 +15,10 @@
   import { m, locale, roleLabel } from '$lib/i18n';
   import { normalizeEmail, emailFormatError } from '$lib/email-field';
   import { dismissible } from '$lib/dialog';
+  import { authStore } from '$lib/stores/auth';
+  import { setsUserPasswords } from '$lib/unit-mode';
+  import { PASSWORD_MIN_LENGTH, passwordTooShort, isPasswordTooShortRefusal } from '$lib/password-rule';
+  import SetPasswordDialog from './SetPasswordDialog.svelte';
 
   type UserRole   = 'operator' | 'reviewer' | 'admin';
   type UserStatus = 'active'   | 'inactive';
@@ -63,6 +71,21 @@
   let showDeleteModal = $state(false);
   let deletingUser    = $state<UserRead | null>(null);
   let isDeleting      = $state(false);
+
+  // The user whose password the dialog sets, and the one whose was set last.
+  let passwordUser    = $state<UserRead | null>(null);
+  let passwordSetFor  = $state<string | null>(null);
+
+  function canSetPasswordOf(user: UserRead): boolean {
+    const me = $authStore.user;
+    return setsUserPasswords(me?.role) && user.role !== 'testing' && user.id !== me?.id;
+  }
+
+  function openPasswordDialog(user: UserRead) {
+    openMenuId     = null;
+    passwordSetFor = null;
+    passwordUser   = user;
+  }
 
   onMount(() => {
     document.addEventListener('click', handleOutsideClick);
@@ -137,6 +160,7 @@
       if (!formUsername.trim()) { formError = $m.users_val_username_required; return; }
       if (emailFormatError(formEmail)) { formError = $m.users_val_email_format; return; }
       if (!formPassword.trim()) { formError = $m.users_val_password_required; return; }
+      if (passwordTooShort(formPassword)) { formError = $m.common_password_too_short(PASSWORD_MIN_LENGTH); return; }
       if (formPassword !== formConfirm) { formError = $m.users_val_password_mismatch; return; }
 
       isSaving = true;
@@ -150,7 +174,9 @@
         await loadUsers();
         showUserModal = false;
       } catch (err) {
-        formError = err instanceof Error ? err.message : $m.users_err_create;
+        formError = isPasswordTooShortRefusal(err)
+          ? $m.common_password_too_short(PASSWORD_MIN_LENGTH)
+          : err instanceof Error ? err.message : $m.users_err_create;
       } finally {
         isSaving = false;
       }
@@ -228,6 +254,10 @@
       {$m.users_new}
     </button>
   </div>
+
+  {#if passwordSetFor}
+    <p class="page-notice" role="status">{$m.users_password_done(passwordSetFor)}</p>
+  {/if}
 
   <div class="toolbar">
     <div class="search-wrapper">
@@ -358,7 +388,7 @@
                         // it opens upwards.
                         const btn = (e.currentTarget as HTMLElement).getBoundingClientRect();
                         const viewportHeight = window.innerHeight;
-                        const dropdownHeight = 90; // estimated dropdown height (px)
+                        const dropdownHeight = canSetPasswordOf(user) ? 130 : 90; // estimated dropdown height (px)
                         const spaceBelow = viewportHeight - btn.bottom;
 
                         if (spaceBelow < dropdownHeight) {
@@ -388,6 +418,15 @@
                         </svg>
                         {$m.common_edit}
                       </button>
+                      {#if canSetPasswordOf(user)}
+                        <button class="dropdown-item" onclick={() => openPasswordDialog(user)}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                          </svg>
+                          {$m.users_password_action}
+                        </button>
+                      {/if}
                       <div class="dropdown-sep"></div>
                       <button class="dropdown-item danger" onclick={() => openDeleteModal(user)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -595,6 +634,14 @@
   </div>
 {/if}
 
+{#if passwordUser}
+  <SetPasswordDialog
+    user={passwordUser}
+    onCancel={() => (passwordUser = null)}
+    onDone={(updated) => { passwordSetFor = updated.username; passwordUser = null; }}
+  />
+{/if}
+
 {#if showDeleteModal && deletingUser}
   <div class="modal-backdrop" use:dismissible={{ onDismiss: () => showDeleteModal = false, escape: !isDeleting, backdrop: !isDeleting }}>
     <div class="modal-card modal-confirm dialog-fit" role="dialog" aria-modal="true" aria-labelledby="user-delete-title">
@@ -633,6 +680,16 @@
 
   .page-title    { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
   .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
+
+  .page-notice {
+    margin: 0 0 20px;
+    padding: 10px 14px;
+    border: 1px solid rgba(90,140,98,0.4);
+    border-radius: var(--radius-md);
+    background-color: rgba(90,140,98,0.08);
+    color: var(--color-light);
+    font-size: var(--text-sm);
+  }
 
   /* ── Buttons ── */
   .btn-primary {
