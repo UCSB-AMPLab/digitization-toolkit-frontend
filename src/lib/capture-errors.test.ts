@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
 import { en } from './i18n/en';
-import { CaptureFailed, captureErrorText, isStemRequired } from './capture-errors';
+import { CaptureFailed, CaptureNotSaved, captureErrorText, isStemRequired } from './capture-errors';
 
 // A stand-in for api.ts's ApiError, as in volume-stem.test.ts.
 class ApiError extends Error {
@@ -50,6 +50,11 @@ describe('captureErrorText', () => {
 			[new ApiError(RETAKE_STATUS, undefined, 409), es.lv_err_retake_status]
 		];
 		for (const [error, text] of cases) expect(captureErrorText(error, es)).toBe(text);
+	});
+
+	it('a capture the check after a timeout did not find: the not-saved message (NEH-381)', () => {
+		expect(captureErrorText(new CaptureNotSaved(), es)).toBe(es.lv_capture_not_saved);
+		expect(captureErrorText(new CaptureNotSaved(), en)).toBe(en.lv_capture_not_saved);
 	});
 
 	it('uses the catalogue of the language asked for', () => {

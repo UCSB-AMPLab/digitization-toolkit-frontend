@@ -31,6 +31,13 @@
   // placeholder has no panel: its two empty pages, the Closed pill, and the
   // usual retake with its confirmation.
   //
+  // NEH-381: `captureNote` is the page's line about the capture in progress
+  // (still in flight after 10 s, ended in a timeout and being checked, found
+  // by the check), shown under the header. `captureLocked` is true while the
+  // screen's capture gate is held, or its records have not been read: no
+  // retake or capture starts. The keyboard stays in the window (trapFocus, as
+  // in the screen's other dialogs), so nothing under it is reached by Tab.
+  //
   // Version: 0.3.3
 
   import type { Snippet } from 'svelte';
@@ -43,7 +50,7 @@
   import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
   import MissingPage from '$lib/components/MissingPage.svelte';
   import MissingPill from '$lib/components/MissingPill.svelte';
-  import { dismissible } from '$lib/dialog';
+  import { dismissible, trapFocus } from '$lib/dialog';
   import {
     fittedSize,
     screenExtent,
@@ -68,6 +75,8 @@
     placeholder,
     offerCapture = true,
     busy = false,
+    captureLocked = false,
+    captureNote = null,
   }: {
     record: ApiRecord;
     cameraMode: 'single' | 'double';
@@ -82,6 +91,8 @@
     offerCapture?: boolean;
     // A capture the page runs from the placeholder panel.
     busy?: boolean;
+    captureLocked?: boolean;
+    captureNote?: string | null;
   } = $props();
 
   let isPlaceholder = $derived(!!placeholder && record.missing_side === 'both' && !record.closed_reason);
@@ -129,7 +140,7 @@
 
   async function confirmAndRetake() {
     confirmRetake = false;
-    if (isExcluded) return;
+    if (isExcluded || captureLocked) return;
     retaking = true;
     retakeError = null;
     try {
@@ -290,7 +301,7 @@
   <!-- `stopPropagation` keeps a click inside the content from closing the modal -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="img-viewer-content" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="lv-img-viewer-title" onclick={(e) => e.stopPropagation()}>
+  <div class="img-viewer-content" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="lv-img-viewer-title" onclick={(e) => e.stopPropagation()} use:trapFocus>
 
     <div class="img-viewer-header">
       <span class="img-viewer-title" id="lv-img-viewer-title">
@@ -303,6 +314,13 @@
     </div>
 
     {#if guide}{@render guide(retaking)}{/if}
+
+    {#if captureNote}
+      <div class="img-viewer-capture-note" role="status">
+        <span class="material-symbols-outlined icon-sm" aria-hidden="true">sync</span>
+        <span>{captureNote}</span>
+      </div>
+    {/if}
 
     <!-- Retake error; the record keeps its original images -->
     {#if retakeError}
@@ -443,7 +461,7 @@
           {$m.common_close}
         </button>
         {#if offerCapture}
-          <button class="btn btn-recapture" onclick={confirmAndRetake}>
+          <button class="btn btn-recapture" onclick={confirmAndRetake} disabled={captureLocked}>
             <span class="material-symbols-outlined icon-sm" aria-hidden="true">photo_camera</span>
             {$m.retakes_capture}
           </button>
@@ -460,7 +478,7 @@
           </button>
         {/if}
         {#if !isExcluded}
-          <button class="btn btn-danger" onclick={() => confirmRetake = true}>
+          <button class="btn btn-danger" onclick={() => confirmRetake = true} disabled={captureLocked}>
             <span class="material-symbols-outlined icon-sm" aria-hidden="true">refresh</span>
             {$m.lvm_retake}
           </button>
@@ -473,7 +491,7 @@
           <button class="btn btn-secondary" onclick={() => confirmRetake = false}>
             {$m.common_cancel}
           </button>
-          <button class="btn btn-danger" onclick={confirmAndRetake}>
+          <button class="btn btn-danger" onclick={confirmAndRetake} disabled={captureLocked}>
             <span class="material-symbols-outlined icon-sm" aria-hidden="true">check</span>
             {$m.common_confirm}
           </button>
@@ -485,6 +503,18 @@
 </div>
 
 <style>
+  /* The line about the capture in progress: the retake error's shape, in neutral colours. */
+  .img-viewer-capture-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 1rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-light-grey);
+    font-size: var(--text-sm);
+  }
+
   .lv-pannable { touch-action: none; cursor: grab; }
   .lv-pannable.dragging { cursor: grabbing; }
   /* A thumbnail is 600 px at most: it fills its frame, contained. */

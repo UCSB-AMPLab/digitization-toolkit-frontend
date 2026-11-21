@@ -36,6 +36,10 @@
   // fold behind "Show steps" once a pair has answered
   // (RefocusModal.fit.svelte.test.ts).
   //
+  // The test captures take the capture screen's one gate (`captureGate`,
+  // src/lib/capture-check.ts) for their requests, and send nothing while
+  // anything else holds it (NEH-381).
+  //
   // Version: 0.3.3
 
   import { onDestroy, untrack } from 'svelte';
@@ -55,17 +59,23 @@
   } from '$lib/focus-check';
   import { dialogsAbove, dismissible, toBody, trapFocus } from '$lib/dialog';
   import { PairPanZoom } from '$lib/pair-pan-zoom.svelte';
+  import { createCaptureGate, type CaptureGate } from '$lib/capture-check';
 
   let {
     leftIndex = 0,
     onClose,
     requireMfReading = REQUIRE_MF_READING,
+    captureGate,
   }: {
     // The camera that takes the left page: 1 when the viewport is swapped.
     leftIndex?: number;
     onClose: (outcome: 'completed' | 'dismissed') => void;
     requireMfReading?: boolean;
+    // The capture screen's one gate; without it the dialog has one of its own.
+    captureGate?: CaptureGate;
   } = $props();
+
+  const gate: CaptureGate = untrack(() => captureGate) ?? createCaptureGate();
 
   type Side = 'left' | 'right';
   const SIDES: Side[] = ['left', 'right'];
@@ -209,6 +219,16 @@
 
   async function takePictures() {
     if (capturing) return;
+    const release = gate.acquire('test');
+    if (!release) return;
+    try {
+      await testCaptures();
+    } finally {
+      release();
+    }
+  }
+
+  async function testCaptures() {
     revokeShots();
     shots = { 0: { status: 'busy' }, 1: { status: 'busy' } };
     pz.reset();
