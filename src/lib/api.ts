@@ -1045,14 +1045,14 @@ export const collectionsApi = {
 
   /**
    * Dry run of freeing the volume from the card (NEH-248): what would be
-   * removed and what would stay, and why. Admin only. Changes nothing.
+   * removed and what would stay, and why. Admin and operator. Changes nothing.
    * GET /collections/{id}/offsite/free (plan_free in app/core/offsite_free.py).
    */
   async planFree(collectionId: number): Promise<FreePlan> {
     return apiRequest<FreePlan>(`/collections/${collectionId}/offsite/free`, { timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
-  /** Start freeing the volume from the card; 202 with a job to poll. Admin only. */
+  /** Start freeing the volume from the card; 202 with a job to poll. Admin and operator. */
   async startFree(collectionId: number): Promise<OffsiteJobStart> {
     return apiRequest<OffsiteJobStart>(`/collections/${collectionId}/offsite/free`, { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
@@ -1088,7 +1088,7 @@ export const collectionsApi = {
     return apiRequest<VolumeOffsiteState>(`/collections/${collectionId}/keep-on-unit`, { method: 'POST', timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   },
 
-  /** The state of a free or restore job, with its result once done. Admin only. */
+  /** The state of a free or restore job, with its result once done: a free job for admin and operator, a restore job for admin. */
   async getOffsiteJob(collectionId: number, jobId: string, signal?: AbortSignal): Promise<OffsiteJobStatus> {
     return apiRequest<OffsiteJobStatus>(`/collections/${collectionId}/offsite/jobs/${jobId}`, { signal });
   },
@@ -2516,6 +2516,38 @@ export interface StorageInfo {
   used_bytes:    number;
   free_bytes:    number;
   available:     boolean;
+  /** The space Captua keeps for its own work (CAPTUA_STORAGE_RESERVE_GB); absent from an older backend. */
+  reserve_bytes?: number;
+  /** free_bytes less the reserve, never below 0; absent from an older backend. */
+  usable_free_bytes?: number;
+}
+
+/** One volume of GET /system/storage/freeable (app/core/offsite_free.py, freeable_volumes). */
+export interface FreeableVolume {
+  collection_id: number;
+  project_id: number | null;
+  name: string;
+  filename_stem: string;
+  /** The files freeing would remove: masters and RAW previews still on the card. */
+  files: number;
+  /** Their bytes as the database holds them; a preview's size is not held, so it adds nothing. */
+  bytes: number;
+  unmeasured_files: number;
+}
+
+export interface FreeableVolumes {
+  volumes: FreeableVolume[];
+  total: { volumes: number; files: number; bytes: number; unmeasured_files: number };
+  /** False in offline mode, where freeing is refused (`off_in_this_mode`). */
+  mode_allows: boolean;
+  /** The free jobs queued or running on the unit; absent from an older backend. */
+  jobs?: { collection_id: number; job_id: string; state: 'queued' | 'running' }[];
+  /**
+   * Whether freed files can be brought back to this unit: false when it has
+   * no read access to the bucket (CAPTUA_OFFSITE_READ_REMOTE). Absent from an
+   * older backend, which says nothing either way.
+   */
+  restorable?: boolean;
 }
 
 export interface StorageDevice {
@@ -2590,6 +2622,8 @@ export interface OffsiteRefusal {
  * true when the volume has objects to upload and every one is verified.
  */
 export interface VolumeOffsiteState {
+  /** Whether this unit can restore freed files (NEH-380); absent from an older backend. */
+  restorable?:      boolean;
   collection_id:    number;
   filename_stem:    string | null;
   uploadable:       boolean;
@@ -2722,6 +2756,12 @@ export interface FreePlan {
   files:              OffsiteFileEntry[];
   refused:            OffsiteFileEntry[];
   local_sha1_checked: boolean;
+  /**
+   * Whether freed files can be brought back to this unit: false when it has
+   * no read access to the bucket (CAPTUA_OFFSITE_READ_REMOTE). Absent from an
+   * older backend, which says nothing either way.
+   */
+  restorable?: boolean;
 }
 
 /** The 202 of POST /offsite/free and /offsite/restore (_job_body in app/api/collections.py). */
@@ -2743,6 +2783,12 @@ export interface OffsiteJobResult {
   files:         OffsiteFileEntry[];
   refused:       OffsiteFileEntry[];
   manifest:      string | null;
+  /**
+   * Whether freed files can be brought back to this unit: false when it has
+   * no read access to the bucket (CAPTUA_OFFSITE_READ_REMOTE). Absent from an
+   * older backend, which says nothing either way.
+   */
+  restorable?: boolean;
 }
 
 /** GET /collections/{id}/offsite/jobs/{job_id}: OffsiteJob.to_dict in app/core/offsite_free.py. */
@@ -2930,6 +2976,11 @@ export const systemApi = {
 
   async getStorage(): Promise<StorageInfo> {
     return apiRequest<StorageInfo>('/system/storage');
+  },
+
+  /** The real volumes that can be freed, largest first (NEH-380). Admin and operator. */
+  async getFreeableVolumes(): Promise<FreeableVolumes> {
+    return apiRequest<FreeableVolumes>('/system/storage/freeable');
   },
 
   /** `signal` lets the caller abort it (the poll's 20 s timeout). */

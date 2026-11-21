@@ -102,6 +102,43 @@ describe('the recapture turn refusal (0.2.0)', () => {
 	});
 });
 
+describe('captureErrorText: the storage reserve (NEH-380)', () => {
+	const refusal = () =>
+		new ApiError('nearly full', { code: 'storage_reserve', message: 'nearly full', free_gb: 1.9, reserve_gb: 2 }, 507);
+
+	it('tells an administrator and an operator to free space in Settings > Storage', () => {
+		for (const msgs of [es, en]) {
+			expect(captureErrorText(refusal(), msgs, 'admin')).toBe(msgs.lv_err_storage_reserve_free);
+			expect(captureErrorText(refusal(), msgs, 'operator')).toBe(msgs.lv_err_storage_reserve_free);
+		}
+		expect(es.lv_err_storage_reserve_free).toContain('Configuración › Almacenamiento');
+		expect(en.lv_err_storage_reserve_free).toContain('Settings › Storage');
+	});
+
+	it('tells every other role to ask an administrator or an operator', () => {
+		for (const msgs of [es, en]) {
+			for (const role of ['reviewer', 'testing', null, undefined]) {
+				expect(captureErrorText(refusal(), msgs, role)).toBe(msgs.lv_err_storage_reserve);
+			}
+		}
+	});
+
+	it('is matched on the code and the 507, not on the text', () => {
+		const other = new ApiError('nearly full', { code: 'storage_reserve' }, 409);
+		expect(captureErrorText(other, es, 'admin')).toBe(es.lv_capture_error);
+		const testing = new ApiError('x', { code: 'testing_reserve' }, 507);
+		expect(captureErrorText(testing, es, 'admin')).toBe(es.lv_capture_error);
+		expect(captureErrorText(testing, es, 'testing')).toBe(es.testing_err_reserve);
+	});
+
+	it('ends without a full stop, as the other capture errors do', () => {
+		for (const msgs of [es, en]) {
+			expect(msgs.lv_err_storage_reserve_free.endsWith('.')).toBe(false);
+			expect(msgs.lv_err_storage_reserve.endsWith('.')).toBe(false);
+		}
+	});
+});
+
 describe('isStemRequired', () => {
 	it('recognises the no-stem 409 by its exact text', () => {
 		expect(isStemRequired(new ApiError(NO_STEM, undefined, 409))).toBe(true);

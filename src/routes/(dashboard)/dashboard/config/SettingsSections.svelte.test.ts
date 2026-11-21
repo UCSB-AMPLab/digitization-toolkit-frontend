@@ -96,20 +96,34 @@ describe('Settings sections', () => {
 		await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
 	});
 
-	for (const role of ['operator', 'reviewer'] as const) {
-		it(`the ${role} sees Network and Language only`, async () => {
-			serve();
-			signIn(role);
-			const { container } = render(ConfigPage);
-			await expect.poll(() => sectionNames(container)).toEqual([en.config_section_network, en.config_section_language]);
-			expect(container.querySelector('.settings-group')).toBeNull();
-			expect(container.textContent).toContain(en.config_subtitle_personal);
-		});
+	it('the reviewer sees Network and Language only', async () => {
+		serve();
+		signIn('reviewer');
+		const { container } = render(ConfigPage);
+		await expect.poll(() => sectionNames(container)).toEqual([en.config_section_network, en.config_section_language]);
+		expect(container.querySelector('.settings-group')).toBeNull();
+		expect(container.textContent).toContain(en.config_subtitle_personal);
+	});
 
+	it('the operator sees Network, Language and, in the Unit group, Storage only (NEH-380)', async () => {
+		serve();
+		signIn('operator');
+		const { container } = render(ConfigPage);
+		await expect
+			.poll(() => sectionNames(container))
+			.toEqual([en.config_section_network, en.config_section_language, en.config_section_storage]);
+		expect(container.querySelector('.settings-group')?.textContent?.trim()).toBe(en.config_group_unit);
+		expect(container.textContent).toContain(en.config_subtitle_personal);
+	});
+
+	for (const [role, refused] of [
+		['operator', ['power', 'unit-mode', 'fisqua-link', 'offsite-copy', 'diagnostics', 'maintenance']],
+		['reviewer', ['power', 'storage', 'unit-mode', 'fisqua-link', 'offsite-copy', 'diagnostics', 'maintenance']]
+	] as const) {
 		it(`the ${role} asking for an admin section by URL gets Network, with no admin content`, async () => {
 			serve();
 			signIn(role);
-			for (const id of ['power', 'storage', 'unit-mode', 'fisqua-link', 'offsite-copy', 'diagnostics', 'maintenance']) {
+			for (const id of refused) {
 				at(`?section=${id}`);
 				const { container, unmount } = render(ConfigPage);
 				await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
@@ -164,7 +178,7 @@ describe('Settings sections', () => {
 		expect(urls.filter((u) => u.endsWith('/system/storage') || u.endsWith('/cameras/capabilities'))).toEqual([]);
 	});
 
-	it('an administrator gets the storage figures on Storage and the capture system on Diagnostics, each requested once', async () => {
+	it('an administrator gets the storage figures each time Storage is shown, and the capture system once on Diagnostics', async () => {
 		const fetchSpy = serve();
 		signIn('admin');
 		at('?section=storage');
@@ -179,7 +193,9 @@ describe('Settings sections', () => {
 		expect(calls('/cameras/capabilities')).toBe(1);
 		at('?section=storage');
 		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40 GB / 100 GB');
-		expect(calls('/system/storage')).toBe(1);
+		// Read afresh on return (NEH-380): the section shows what the unit holds now.
+		await expect.poll(() => calls('/system/storage')).toBe(2);
+		expect(calls('/cameras/capabilities')).toBe(1);
 	});
 
 	it('an administrator opening Diagnostics first gets the capture system, and Storage then its figures', async () => {

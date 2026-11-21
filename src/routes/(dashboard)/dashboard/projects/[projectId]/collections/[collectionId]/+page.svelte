@@ -49,7 +49,7 @@
   import { retakeUrl } from '$lib/queue';
   import { dismissible } from '$lib/dialog';
   import { excludedRefusalText, fileHoldText } from '$lib/volume-refusals';
-  import { freedExportCount } from '$lib/offsite-free';
+  import { freedExportText, freedZipText } from '$lib/offsite-free';
   import { reconcileInspected, selectionAfterLoad } from '$lib/record-selection';
   import { freedFromBody } from '$lib/image-display';
   import {
@@ -320,9 +320,9 @@
           break;
         }
         if (st.state === 'failed') {
-          // A free that followed the request: the worker checks again (NEH-248).
-          const freed = freedExportCount(st.error);
-          exportError = freed !== null ? $m.col_export_freed(freed) : (st.error ?? $m.col_err_export);
+          // A free that followed the request: the worker checks again (NEH-248);
+          // its detail says whether this unit can restore (NEH-380).
+          exportError = freedExportText(st.error, $m, st.detail) ?? st.error ?? $m.col_err_export;
           break;
         }
       }
@@ -339,8 +339,7 @@
         showBlockersModal = true;
       } else {
         // Masters freed from the card are stored offsite, not here: a restore comes first (NEH-248).
-        const freed = freedExportCount(err);
-        exportError = freed !== null ? $m.col_export_freed(freed) : (fileHoldText(err, $m) ?? err?.message ?? $m.col_err_export);
+        exportError = freedExportText(err, $m) ?? fileHoldText(err, $m) ?? err?.message ?? $m.col_err_export;
       }
     } finally {
       isExporting = false;
@@ -379,7 +378,13 @@
 
   // A master freed from the card (410 from /file, NEH-248): it is in the
   // offsite copy, not on the appliance, so it cannot go in the ZIP.
-  class FreedFromCard extends Error {}
+  class FreedFromCard extends Error {
+    restorable?: boolean;
+    constructor(restorable?: boolean) {
+      super('freed');
+      this.restorable = restorable;
+    }
+  }
   // A 404 on a file for the testing account: the volume left the testing space or was removed.
   class FileNotFound extends Error {}
 
@@ -396,7 +401,10 @@
       let done = 0;
       for (const { img, r } of items) {
         const res = await fetch(recordsApi.getImageFileUrl(img.id), sessionRequestInit());
-        if (res.status === 410 && freedFromBody(410, await res.json().catch(() => null))) throw new FreedFromCard();
+        if (res.status === 410) {
+          const freed = freedFromBody(410, await res.json().catch(() => null));
+          if (freed) throw new FreedFromCard(freed.restorable);
+        }
         if (res.status === 404 && inTestingSpace($userRole)) throw new FileNotFound();
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
@@ -420,7 +428,7 @@
     } catch (e: any) {
       // No status code and no exception's text reaches the screen; they go to the console.
       console.error('[Gallery] Error building the image ZIP:', e);
-      zipError = e instanceof FreedFromCard ? $m.col_zip_freed : e instanceof FileNotFound ? $m.testing_err_not_found : $m.col_zip_error;
+      zipError = e instanceof FreedFromCard ? freedZipText({ restorable: volumeRestorable ?? e.restorable }, $m) : e instanceof FileNotFound ? $m.testing_err_not_found : $m.col_zip_error;
     } finally {
       isZipping = false;
     }
@@ -459,6 +467,11 @@
   // the page puts them there because it holds the records. Operator and
   // admin only: the backend refuses promote and take-back to other roles.
   const topbar = getVolumeTopbar();
+  // Whether this unit can restore freed files, from the volume's offsite state
+  // the layout reads (NEH-380); unset until read and from an older backend.
+  let volumeRestorable = $derived(
+    topbar?.offsite && topbar.offsite.collectionId === collectionId ? topbar.offsite.restorable : undefined
+  );
   let canHandOver = $derived(followsWorkflow && handsOver($userRole));
 
   $effect(() => {
@@ -579,6 +592,7 @@
           onPrev={handlePrev}
           onNext={handleNext}
           onOneToOneChange={(z) => oneToOne = z}
+          restorable={volumeRestorable}
         />
         <div class="thumbnail-area">
           <ThumbnailStrip
@@ -615,6 +629,7 @@
     onClose={() => inspectedRecord = null}
     onRetake={handleRetake}
     onDelete={handleDeleteRecord}
+    restorable={volumeRestorable}
   />
 {/if}
 

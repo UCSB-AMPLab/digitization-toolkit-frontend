@@ -18,6 +18,12 @@ export interface VolumeTopbarSlot {
 	 * Resolves false if the list could not be refreshed.
 	 */
 	reloadRecords: (() => Promise<boolean>) | null;
+	/**
+	 * What the layout last read of the volume's offsite state that the page's
+	 * image screens need: whether this unit can restore freed files (NEH-380).
+	 * Null until read; `restorable` unset from an older backend.
+	 */
+	offsite?: { collectionId: number; restorable: boolean | undefined } | null;
 }
 
 export function setVolumeTopbar(slot: VolumeTopbarSlot): void {

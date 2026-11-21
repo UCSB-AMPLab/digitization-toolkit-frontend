@@ -10,6 +10,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { collectionsApi, ApiError, type FreePlan, type OffsiteJobStatus, type VolumeOffsiteState } from '$lib/api';
 import VolumeOffsiteActions from './VolumeOffsiteActions.svelte';
+import { es } from '$lib/i18n/es';
 
 function state(over: Partial<VolumeOffsiteState> = {}): VolumeOffsiteState {
 	return {
@@ -69,7 +70,8 @@ describe('VolumeOffsiteActions', () => {
 		jobSpy.mockRestore();
 	});
 
-	const mount = (offsite: VolumeOffsiteState) => render(VolumeOffsiteActions, { collectionId: 7, offsite, onChanged });
+	const mount = (offsite: VolumeOffsiteState, canRestore = true) =>
+		render(VolumeOffsiteActions, { collectionId: 7, offsite, canRestore, onChanged });
 	const openMenu = async (screen: ReturnType<typeof mount>) =>
 		screen.getByRole('button', { name: 'Espacio en la tarjeta' }).click();
 
@@ -84,6 +86,97 @@ describe('VolumeOffsiteActions', () => {
 		const dialog = screen.getByRole('dialog');
 		await expect.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' })).toBeVisible();
 		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).not.toBeInTheDocument();
+	});
+
+	it('without restore (an operator): offers freeing only, and no button when only restoring is on offer', async () => {
+		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000 }), false);
+		await openMenu(screen);
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' })).toBeVisible();
+		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).not.toBeInTheDocument();
+		await dialog.getByRole('button', { name: 'Cerrar' }).click();
+		screen.unmount();
+
+		const freedOnly = mount(state({ freed_files: 10, freed_bytes: 300_000_000 }), false);
+		await expect.element(freedOnly.getByRole('button', { name: 'Espacio en la tarjeta' })).not.toBeInTheDocument();
+	});
+
+	it('on a unit that cannot restore (restorable false), no restore is offered even to an administrator (NEH-380)', async () => {
+		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000, restorable: false }), true);
+		await openMenu(screen);
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' })).toBeVisible();
+		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).not.toBeInTheDocument();
+		screen.unmount();
+		const freedOnly = mount(state({ freed_files: 10, freed_bytes: 300_000_000, restorable: false }), true);
+		await expect.element(freedOnly.getByRole('button', { name: 'Espacio en la tarjeta' })).not.toBeInTheDocument();
+	});
+
+	it('with restore (an administrator): offers both once files are freed', async () => {
+		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000 }), true);
+		await openMenu(screen);
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' })).toBeVisible();
+		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).toBeVisible();
+	});
+
+	it('opened for a volume with no button of its own (the Storage list): the same dialog, freeing only', async () => {
+		planSpy.mockResolvedValue(plan);
+		const onClosed = vi.fn();
+		const screen = render(VolumeOffsiteActions, {
+			collectionId: 7,
+			offsite: null,
+			canRestore: false,
+			showTrigger: false,
+			onChanged,
+			onClosed
+		});
+		await expect.element(screen.getByRole('button', { name: 'Espacio en la tarjeta' })).not.toBeInTheDocument();
+		screen.component.open();
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByRole('heading', { name: 'Espacio en la tarjeta' })).toBeVisible();
+		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).not.toBeInTheDocument();
+		await dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' }).click();
+		await expect.element(dialog.getByText('¿Liberar espacio en la tarjeta?')).toBeVisible();
+		expect(planSpy).toHaveBeenCalledWith(7);
+		await dialog.getByRole('button', { name: 'Cancelar' }).click();
+		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
+		expect(onClosed).toHaveBeenCalledTimes(1);
+	});
+
+	for (const [restorable, line] of [
+		[true, 'Más adelante, un administrador puede restaurar estos archivos en la tarjeta.'],
+		[false, 'desde aquí no será posible restaurarlos en la tarjeta ni exportar el volumen.']
+	] as const) {
+		it(`free: the dry run says whether the files can be restored (restorable ${restorable}), above the confirm button`, async () => {
+			planSpy.mockResolvedValue({ ...plan, restorable });
+			const screen = mount(state());
+			await openMenu(screen);
+			await screen.getByRole('button', { name: 'Liberar espacio en la tarjeta' }).click();
+			const dialog = screen.getByRole('dialog');
+			const shown = dialog.getByText(line, { exact: false });
+			await expect.element(shown).toBeVisible();
+			const other = restorable
+				? 'este equipo no puede leerla'
+				: 'Más adelante, un administrador puede restaurar estos archivos';
+			await expect.element(dialog.getByText(other, { exact: false })).not.toBeInTheDocument();
+			await expect.element(dialog.getByText('Un administrador puede restaurar el volumen más adelante', { exact: false })).not.toBeInTheDocument();
+			// The line comes before the confirm button.
+			const p = shown.element();
+			const confirm = dialog.getByRole('button', { name: 'Liberar espacio', exact: true }).element();
+			expect(p.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		});
+	}
+
+	it('free: an older backend that does not say whether the files can be restored gets the restore-later line, as before', async () => {
+		planSpy.mockResolvedValue(plan);
+		const screen = mount(state());
+		await openMenu(screen);
+		await screen.getByRole('button', { name: 'Liberar espacio en la tarjeta' }).click();
+		const dialog = screen.getByRole('dialog');
+		await expect.element(dialog.getByText('¿Liberar espacio en la tarjeta?')).toBeVisible();
+		await expect.element(dialog.getByText(es.offsite_free_restorable)).toBeVisible();
+		await expect.element(dialog.getByText('este equipo no puede leerla', { exact: false })).not.toBeInTheDocument();
 	});
 
 	it('free: shows the dry run first, frees nothing until confirmed, then polls and reports', async () => {

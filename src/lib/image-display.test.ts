@@ -8,12 +8,15 @@ import {
   formatOf,
   freedFromBody,
   freedFromMetadata,
+  freedHintText,
   isBrowserDisplayable,
   isRawImage,
   previewFreedByMetadata,
   probeFreed,
   type ImageUrlSource,
 } from './image-display';
+import { es } from './i18n/es';
+import { en } from './i18n/en';
 
 const api: ImageUrlSource = {
   getImagePreviewUrl: (id) => `/api/records/images/${id}/preview`,
@@ -157,6 +160,24 @@ function freed(kind: 'capture' | 'preview' = 'capture', status = 410): Response 
   };
   return new Response(JSON.stringify({ detail }), { status, headers: { 'Content-Type': 'application/json' } });
 }
+
+describe('freedFromBody and freedHintText: restorable (NEH-380)', () => {
+  it('reads restorable from the 410 detail, and leaves it unset for an older backend', () => {
+    expect(freedFromBody(410, { detail: { stored_offsite: true, restorable: false } })?.restorable).toBe(false);
+    expect(freedFromBody(410, { detail: { stored_offsite: true, restorable: true } })?.restorable).toBe(true);
+    expect(freedFromBody(410, { detail: { stored_offsite: true } })?.restorable).toBeUndefined();
+    expect(freedFromBody(410, { detail: { stored_offsite: true, restorable: 'no' } })?.restorable).toBeUndefined();
+  });
+
+  it('gives the restore hint unless the unit says it cannot restore', () => {
+    for (const msgs of [es, en]) {
+      expect(freedHintText({ kind: 'capture', freedAt: null, restorable: false }, msgs)).toBe(msgs.freed_no_restore_hint);
+      expect(freedHintText({ kind: 'capture', freedAt: null, restorable: true }, msgs)).toBe(msgs.freed_restore_hint);
+      expect(freedHintText({ kind: 'capture', freedAt: null }, msgs)).toBe(msgs.freed_restore_hint);
+      expect(freedHintText(null, msgs)).toBe(msgs.freed_restore_hint);
+    }
+  });
+});
 
 describe('freedFromBody', () => {
   it('reads the kind and the time of a 410 that says the file is stored offsite', () => {

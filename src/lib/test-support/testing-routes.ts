@@ -163,6 +163,7 @@ export const ROUTES: [Method, string, boolean][] = [
 	['POST', '/system/pairing/renew', false],
 	['DELETE', '/system/pairing', false],
 	['GET', '/system/storage', false],
+	['GET', '/system/storage/freeable', false],
 	['GET', '/system/storage/devices', false],
 	['POST', '/system/storage/mount', false],
 	['DELETE', '/system/storage/mount', false],

@@ -46,6 +46,7 @@
     onPrev,
     onNext,
     onOneToOneChange,
+    restorable,
   }: {
     viewMode: 'spread';
     records: Record[];
@@ -59,6 +60,8 @@
     onPrev: () => void;
     onNext: () => void;
     onOneToOneChange?: (z: number) => void;
+    /** Whether this unit can restore freed files, from the volume's offsite state (NEH-380). */
+    restorable?: boolean;
   } = $props();
 
   let selectedRecord = $derived(records.find(r => r.id === selectedRecordId) ?? null);
@@ -283,7 +286,7 @@
           {#if spreadLeftImage}
             <!-- NEH-139: a RAW shows as its JPEG preview or its thumbnail,
                  never as a broken image -->
-            <RecordImageDisplay image={spreadLeftImage}>
+            <RecordImageDisplay image={spreadLeftImage} {restorable}>
               {#snippet children(src, onerror)}
                 <img
                   {src}
@@ -342,7 +345,7 @@
           {#if spreadRightImage}
             <!-- NEH-139: a RAW shows as its JPEG preview or its thumbnail,
                  never as a broken image -->
-            <RecordImageDisplay image={spreadRightImage}>
+            <RecordImageDisplay image={spreadRightImage} {restorable}>
               {#snippet children(src, onerror)}
                 <img
                   {src}

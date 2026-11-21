@@ -182,7 +182,7 @@ export const es = {
 	dash_storage_alert_p1: 'El almacenamiento está al ',
 	dash_storage_alert_p2: (used: string, total: string) => ` (${used} / ${total}). Revisa la `,
 	dash_storage_alert_p3: ' para liberar espacio.',
-	dash_storage_alert_ask_admin: (used: string, total: string) => ` (${used} / ${total}). Avisa al administrador para que libere espacio.`,
+	dash_storage_alert_ask_admin: (used: string, total: string) => ` (${used} / ${total}). Pide a un administrador o a un operario que libere espacio.`,
 	dash_kpi_active_projects: 'Proyectos activos',
 	dash_kpi_collections: 'Volúmenes',
 	dash_kpi_total_records: 'Total registros',
@@ -297,6 +297,24 @@ export const es = {
 	config_unknown_location: 'directorio desconocido',
 	config_err_mount: 'Error al montar el dispositivo.',
 	config_storage_active: (path: string) => `Almacenamiento activo: ${path}`,
+	// NEH-380: the storage reserve (CAPTUA_STORAGE_RESERVE_GB) and the list of
+	// volumes that can be freed, in Settings > Almacenamiento.
+	config_storage_reserve: (gb: string) => `Captua deja siempre libres ${gb} GB para seguir funcionando.`,
+	config_freeable_title: 'Volúmenes con espacio por liberar',
+	config_freeable_intro:
+		'Todos los archivos de estos volúmenes ya están verificados en la copia externa, así que puedes quitarlos de la tarjeta sin perderlos. La lista va de mayor a menor espacio por liberar.',
+	config_freeable_space: (bytes: number): string => `${formatBytes(bytes, 'es')} por liberar`,
+	config_freeable_total: (volumes: number, bytes: number): string =>
+		volumes === 1
+			? `1 volumen, ${formatBytes(bytes, 'es')} por liberar en total`
+			: `${formatCount(volumes, 'es')} volúmenes, ${formatBytes(bytes, 'es')} por liberar en total`,
+	config_freeable_free: 'Liberar espacio',
+	config_freeable_free_aria: (name: string) => `Liberar espacio: ${name}`,
+	config_freeable_empty:
+		'Por ahora ningún volumen tiene espacio por liberar. Se puede liberar el espacio de un volumen cuando todos sus archivos están verificados en la copia externa.',
+	config_freeable_error: 'Captua no pudo revisar qué volúmenes tienen espacio por liberar. Intenta de nuevo en un momento.',
+	config_freeable_mode_off:
+		'En el modo actual, Captua guarda los archivos de imagen solo en este equipo, así que no se puede liberar espacio de ningún volumen.',
 	config_err_activate: 'Error al activar el almacenamiento.',
 	config_err_unmount: 'Error al desmontar el dispositivo.',
 	config_restored_default: 'Restaurado al almacenamiento predeterminado.',
@@ -814,6 +832,11 @@ export const es = {
 	freed_where: 'Este archivo está guardado fuera del equipo, en la copia externa, para liberar espacio en la tarjeta de memoria.',
 	freed_nothing_lost: 'No se perdió nada: Captua verificó la copia externa antes de quitar el archivo de la tarjeta.',
 	freed_restore_hint: 'Si necesitas verlo en tamaño completo, un administrador puede restaurar el volumen en la tarjeta.',
+	// NEH-380: instead of freed_restore_hint on a unit that cannot restore (`restorable` false).
+	freed_no_restore_hint: 'Este equipo no puede leer la copia externa, así que la imagen en tamaño completo no se puede ver aquí.',
+	// NEH-380: the export, or the image ZIP, of a volume with freed files on a unit that cannot restore.
+	export_freed_no_restore:
+		'Las imágenes de este volumen están solo en la copia externa, que este equipo no puede leer. Por eso, el volumen no se puede exportar desde aquí.',
 	freed_thumbnail_note: 'Lo que ves es la miniatura, que Captua conserva en el equipo.',
 	col_export_blocked_title: 'Aún no se puede exportar',
 	col_export_blocked_desc: 'Todos los registros deben estar aprobados antes de exportar. Los siguientes aún no lo están:',
@@ -1065,6 +1088,11 @@ export const es = {
 	lv_err_resolution_in_name: 'Captua no puede incluir la resolución en el nombre de archivo de las capturas',
 	lv_err_name_too_long: 'Captua no hizo la captura: el nombre de archivo tendría más de 36 caracteres',
 	lv_err_capture_limit: 'Captua no hizo la captura: este volumen llegó al límite de 9999 capturas; hace falta un volumen nuevo',
+	// NEH-380: the 507 `storage_reserve`, for whoever can free space and for everyone else.
+	lv_err_storage_reserve_free:
+		'Captua no hizo la captura: el almacenamiento está casi lleno y Captua necesita lo que queda para seguir funcionando; libera espacio en Configuración › Almacenamiento',
+	lv_err_storage_reserve:
+		'Captua no hizo la captura: el almacenamiento está casi lleno y Captua necesita lo que queda para seguir funcionando; pide a un administrador o a un operario que libere espacio',
 	lv_capture_btn: 'Capturar',
 	lv_zoom_in: 'Acercar',
 	lv_zoom_out: 'Alejar',
@@ -1447,7 +1475,10 @@ export const es = {
 		files === 1
 			? `Captua quitará 1 archivo (${formatBytes(bytes, 'es')}) de la tarjeta. Seguirá guardado en la copia externa.`
 			: `Captua quitará ${formatCount(files, 'es')} archivos (${formatBytes(bytes, 'es')}) de la tarjeta. Seguirán guardados en la copia externa.`,
-	offsite_plan_restore_later: 'Un administrador puede restaurar el volumen más adelante con "Restaurar en la tarjeta".',
+	// NEH-380: whether freed files can be brought back to this unit (`restorable`).
+	offsite_free_restorable: 'Más adelante, un administrador puede restaurar estos archivos en la tarjeta.',
+	offsite_free_not_restorable:
+		'Los archivos seguirán guardados en la copia externa, pero este equipo no puede leerla: desde aquí no será posible restaurarlos en la tarjeta ni exportar el volumen.',
 	offsite_free_check_note:
 		'Antes de quitar cada archivo, Captua vuelve a comparar su checksum con el de la copia externa. Puede tardar varios minutos.',
 	offsite_plan_nothing: 'Captua no encontró archivos que se puedan liberar en este volumen.',

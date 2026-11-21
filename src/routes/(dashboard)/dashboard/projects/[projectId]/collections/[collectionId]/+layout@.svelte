@@ -25,7 +25,7 @@
   import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
   import type { VolumeOffsiteState } from '$lib/api';
   import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
-  import { canCapture, canManageOffsite, ensureUnit, inTestingSpace, projectsShownIn, takesPartInWorkflow, unitState, volumeBackPath } from '$lib/unit-mode';
+  import { canCapture, canFreeVolumes, canManageOffsite, canRestoreVolumes, ensureUnit, inTestingSpace, projectsShownIn, takesPartInWorkflow, unitState, volumeBackPath } from '$lib/unit-mode';
   import { testingExpiry } from '$lib/testing-space';
   import { formatApiDate } from '$lib/format-date';
   import { locale } from '$lib/i18n';
@@ -57,12 +57,15 @@
   // Nothing is mounted for it while the signed-in role is not known.
   let showsOffsite = $derived(!!$authStore.user && takesPartInWorkflow($authStore.user.role));
 
-  // Space on the card (NEH-248): free and restore, admin only. The button
-  // sits next to the breadcrumb and the offsite copy line, which is what
-  // shows what is freed. The backend refuses these routes to other roles.
+  // Space on the card (NEH-248, NEH-380): free for the admin and the
+  // operator, restore for the admin only. The button sits next to the
+  // breadcrumb and the offsite copy line, which is what shows what is freed.
+  // The backend refuses these routes to other roles.
   // Beside it, keep the volume on the unit or release it (NEH-320), admin
-  // only too; a release only once the unit mode is known and is not Scanner only (keptActionOf).
+  // only; a release only once the unit mode is known and is not Scanner only (keptActionOf).
   let isAdmin = $derived(canManageOffsite(currentUser?.role));
+  let canFree = $derived(canFreeVolumes(currentUser?.role));
+  let canRestore = $derived(canRestoreVolumes(currentUser?.role));
   // The last state the line read: a poll that fails keeps it, so an open
   // dialog is not closed under the admin; it is matched to the volume shown.
   let offsiteState = $state<VolumeOffsiteState | null>(null);
@@ -75,6 +78,8 @@
   function offsiteRead(s: VolumeOffsiteState | null) {
     if (!s) return;
     offsiteState = s;
+    // The page's image screens read whether a restore is possible from here.
+    topbarSlot.offsite = { collectionId: s.collection_id, restorable: s.restorable };
     const next = freedCountsOf(s);
     // Advanced only once the records reloaded; a failed reload is tried
     // again on the next poll (freedAfterRead).
@@ -132,12 +137,14 @@
           </p>
         {/if}
       </div>
-      {#if isAdmin && offsiteState && offsiteState.collection_id === collectionId}
+      {#if canFree && offsiteState && offsiteState.collection_id === collectionId}
         {#key collectionId}
-          <VolumeOffsiteActions {collectionId} offsite={offsiteState} onChanged={offsiteChanged} />
-          <!-- Keep the volume on the unit, or release it (NEH-320). -->
-          <VolumeKeptActions {collectionId} offsite={offsiteState} {isAdmin} mode={$unitState?.mode ?? null}
-            onChanged={offsiteChanged} />
+          <VolumeOffsiteActions {collectionId} offsite={offsiteState} {canRestore} onChanged={offsiteChanged} />
+          {#if isAdmin}
+            <!-- Keep the volume on the unit, or release it (NEH-320). -->
+            <VolumeKeptActions {collectionId} offsite={offsiteState} {isAdmin} mode={$unitState?.mode ?? null}
+              onChanged={offsiteChanged} />
+          {/if}
         {/key}
       {/if}
     </div>

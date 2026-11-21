@@ -345,8 +345,21 @@ export function canHandOver(role: string | null | undefined): boolean {
 	return role === 'admin' || role === 'operator';
 }
 
-/** Free or restore a volume's space, keep or release it, open the offsite copy's settings: admin. */
+/** Keep a volume on the unit or release it, open the offsite copy's settings: admin. */
 export function canManageOffsite(role: string | null | undefined): boolean {
+	return role === 'admin';
+}
+
+/**
+ * Free a volume's space on the card, and open Settings > Storage with the
+ * list of volumes that can be freed: admin and operator (NEH-380).
+ */
+export function canFreeVolumes(role: string | null | undefined): boolean {
+	return role === 'admin' || role === 'operator';
+}
+
+/** Restore a freed volume to the card: admin. */
+export function canRestoreVolumes(role: string | null | undefined): boolean {
 	return role === 'admin';
 }
 

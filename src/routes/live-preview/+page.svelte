@@ -340,6 +340,25 @@
 
   // The record open in `ImageViewerModal`; null when the modal is closed.
   let inspectedRecord = $state<ApiRecord | null>(null);
+  // Whether this unit can restore freed files, from the volume's offsite state
+  // (NEH-380), for the inspected record's image screen. Read when a record is
+  // inspected, for the roles the backend gives that state to; unset otherwise.
+  let volumeRestorable = $state<{ collectionId: number; restorable: boolean | undefined } | null>(null);
+  $effect(() => {
+    const id = collectionId;
+    if (!inspectedRecord || !id || !takesPartInWorkflow($userRole)) return;
+    if (untrack(() => volumeRestorable?.collectionId) === id) return;
+    let alive = true;
+    collectionsApi
+      .getOffsiteState(id)
+      .then((s) => {
+        if (alive) volumeRestorable = { collectionId: id, restorable: s.restorable };
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  });
 
   let isLoading = $state(false);
   // The first load of the volume's records succeeded, so an empty list
@@ -1537,6 +1556,7 @@
       busy={anotherBusy || leaving}
       {captureLocked}
       captureNote={noticeText($cameraStatus.notice)}
+      restorable={volumeRestorable?.collectionId === collectionId ? volumeRestorable.restorable : undefined}
     />
   {/key}
 {/if}

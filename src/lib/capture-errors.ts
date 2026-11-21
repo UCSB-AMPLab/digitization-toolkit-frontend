@@ -14,7 +14,9 @@
 //   404s for an unknown volume or record, and the 422s for a retake in the
 //   wrong capture mode and for a resolution in the file name;
 //   (and, from 0.2.0, the 409 with code `recapture_turn` for a capture that
-//   would start an empty volume during the retake turn, in recapture-turn.ts);
+//   would start an empty volume during the retake turn, in recapture-turn.ts),
+//   and the 507 with code `storage_reserve` for a capture below the space
+//   Captua keeps for its own work (app/core/storage_override.py);
 // - a request answered 200 with `success: false`, which the capture screen
 //   turns into a CaptureFailed carrying the backend's `error`: a camera that
 //   is not connected, or the text of whatever failed during the capture.
@@ -34,6 +36,7 @@ import type { Messages } from './i18n';
 import { isConflict, isVolumeRequired, isWrongRetakeVolume } from './volume-stem';
 import { isRecaptureTurnRefusal } from './recapture-turn';
 import { testingRefusalText } from './testing-space';
+import { canFreeVolumes } from './unit-mode';
 
 // STEM_REQUIRED_DETAIL in app/core/volume_stem.py.
 const STEM_REQUIRED_DETAIL = 'This volume has no file name stem. Give it one before capturing into it.';
@@ -101,6 +104,17 @@ function statusOf(error: unknown): unknown {
 	return typeof error === 'object' && error !== null ? (error as { status?: unknown }).status : undefined;
 }
 
+/**
+ * Whether a capture was refused with the backend's 507 `storage_reserve`
+ * (app/core/storage_override.py): free space is below what Captua keeps for
+ * its own work. Matched on the status and the code, never on the text.
+ */
+function isStorageReserve(error: unknown): boolean {
+	if (statusOf(error) !== 507) return false;
+	const detail = (error as { detail?: unknown }).detail;
+	return typeof detail === 'object' && detail !== null && (detail as { code?: unknown }).code === 'storage_reserve';
+}
+
 /** Whether a capture was refused with the backend's 409 for a volume without a stem. */
 export function isStemRequired(error: unknown): boolean {
 	return isConflict(error) && error instanceof Error && error.message === STEM_REQUIRED_DETAIL;
@@ -120,6 +134,11 @@ export function captureErrorText(error: unknown, msgs: Messages, role?: string |
 	// the messages below.
 	const testing = testingRefusalText(error, msgs, role);
 	if (testing) return testing;
+	// Below the storage reserve (NEH-380): whoever can free space is sent to
+	// Settings > Storage; everyone else is told whom to ask.
+	if (isStorageReserve(error)) {
+		return canFreeVolumes(role) ? msgs.lv_err_storage_reserve_free : msgs.lv_err_storage_reserve;
+	}
 	// The recapture turn's 409 (0.2.0) carries a code: matched on it, not on its text.
 	if (isRecaptureTurnRefusal(error)) return msgs.err_recapture_turn;
 	if (isVolumeRequired(error)) return msgs.lv_err_no_volume;

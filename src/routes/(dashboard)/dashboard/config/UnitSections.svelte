@@ -5,20 +5,34 @@
   // FisquaLinkCard), the testing space (NEH-391, TestingSpaceCard), storage
   // (usage, primary path, external drive), the catalogue's off-site copy, diagnostics, maintenance, and power. They act
   // on the appliance through the backend. The page renders this component
-  // for administrators, and for the testing role, which opens Power only,
-  // with the section to show; the content of each
-  // section is as it was when they all shared one page.
+  // for administrators, for the testing role, which opens Power only, and
+  // for the operator, which opens Storage only (NEH-380), with the section
+  // to show; the content of each section is as it was when they all shared
+  // one page. In Storage, everyone who opens it sees the usage figure, the
+  // space Captua keeps for its own work and the list of volumes that can be
+  // freed (FreeableVolumes); the primary path and the drive controls (mount,
+  // activate, revert to internal storage) only with `canManageDrives`, the
+  // administrator.
   //
   // Version: 0.3.4
 
+  import { untrack } from 'svelte';
   import { m, locale } from '$lib/i18n';
   import CatalogueBackupCard from './CatalogueBackupCard.svelte';
   import UnitModeCard from './UnitModeCard.svelte';
   import FisquaLinkCard from './FisquaLinkCard.svelte';
   import TestingSpaceCard from './TestingSpaceCard.svelte';
+  import FreeableVolumes from './FreeableVolumes.svelte';
 
-  /** The section to show: one of the ids under the Unit group (settings-sections.ts). */
-  let { section }: { section: string } = $props();
+  let {
+    section,
+    canManageDrives
+  }: {
+    /** The section to show: one of the ids under the Unit group (settings-sections.ts). */
+    section: string;
+    /** The storage path and the drive controls: the administrator only. */
+    canManageDrives: boolean;
+  } = $props();
 
   import {
     systemApi,
@@ -28,7 +42,7 @@
     type StorageDevice
   } from '$lib/api';
   // The overview's banner reads the figures the same way and uses the same threshold.
-  import { formatStorage, storageUsage, STORAGE_ALERT_THRESHOLD } from '$lib/storage-usage';
+  import { formatStorage, reserveGB, storageUsage, STORAGE_ALERT_THRESHOLD } from '$lib/storage-usage';
   import PowerControl from '$lib/components/PowerControl.svelte';
 
   let storageInfo    = $state<StorageInfo | null>(null);
@@ -98,18 +112,25 @@
 
   // Each request is sent by the section that shows its result: storage by
   // Storage, the capture system by Diagnostics. The page keeps this component
-  // mounted when the section changes, so each is sent the first time its
-  // section is shown, and not again.
-  let storageRequested = false;
+  // mounted when the section changes. The storage figures are read each time
+  // Storage is shown, so it shows what the unit holds now (NEH-380); the
+  // capture system is read the first time Diagnostics is shown, and not again.
   let cameraRequested = false;
 
+  // Each read of the figures takes the next number; an answer that is not the
+  // latest request's is dropped, so an older answer that comes in last cannot
+  // replace the figures read after a free or a change of drive.
+  let storageLatest = 0;
+
   async function loadStorage() {
+    const seq = ++storageLatest;
     try {
-      storageInfo = await systemApi.getStorage();
+      const next = await systemApi.getStorage();
+      if (seq === storageLatest) storageInfo = next;
     } catch {
       // No figures: the row shows a dash and the bar is hidden.
     } finally {
-      storageLoading = false;
+      if (seq === storageLatest) storageLoading = false;
     }
   }
 
@@ -122,10 +143,7 @@
   }
 
   $effect(() => {
-    if (section === 'storage' && !storageRequested) {
-      storageRequested = true;
-      loadStorage();
-    }
+    if (section === 'storage') untrack(() => loadStorage());
     if (section === 'diagnostics' && !cameraRequested) {
       cameraRequested = true;
       loadCameraBackend();
@@ -139,15 +157,20 @@
     }
   }
 
+  // The same guard as the figures': only the latest request's answer is kept.
+  let devicesLatest = 0;
+
   async function refreshDevices() {
+    const seq = ++devicesLatest;
     devicesLoading = true;
     devicesError   = null;
     try {
-      devices = await systemApi.getStorageDevices();
+      const next = await systemApi.getStorageDevices();
+      if (seq === devicesLatest) devices = next;
     } catch {
-      devicesError = $m.config_err_read_devices;
+      if (seq === devicesLatest) devicesError = $m.config_err_read_devices;
     } finally {
-      devicesLoading = false;
+      if (seq === devicesLatest) devicesLoading = false;
     }
   }
 
@@ -173,7 +196,7 @@
     try {
       const result = await systemApi.activateStorage(mountpoint);
       storageOpSuccess = $m.config_storage_active(result.projects_path);
-      storageInfo = await systemApi.getStorage();
+      await loadStorage();
       setTimeout(() => { storageOpSuccess = null; }, 6000);
     } catch (e: unknown) {
       storageOpError = (e instanceof Error ? e.message : null) || $m.config_err_activate;
@@ -189,7 +212,7 @@
     try {
       const result = await systemApi.unmountDevice(mountpoint);
       storageOpSuccess = result.message;
-      storageInfo = await systemApi.getStorage();
+      await loadStorage();
       await refreshDevices();
       setTimeout(() => { storageOpSuccess = null; }, 6000);
     } catch (e: unknown) {
@@ -204,7 +227,7 @@
     storageOpSuccess = null;
     try {
       await systemApi.resetStorage();
-      storageInfo = await systemApi.getStorage();
+      await loadStorage();
       storageOpSuccess = $m.config_restored_default;
       setTimeout(() => { storageOpSuccess = null; }, 5000);
     } catch (e: unknown) {
@@ -334,8 +357,17 @@
             style="width: {usage.percent}%; background-color: {storageBarColor}"
           ></div>
         </div>
+        {#if usage.reserveBytes > 0}
+          <p class="storage-reserve">{$m.config_storage_reserve(reserveGB(usage.reserveBytes))}</p>
+        {/if}
       {/if}
 
+      <div class="section-divider"></div>
+
+      <!-- The volumes that can be freed (NEH-380); after a free, the usage figure is read again. -->
+      <FreeableVolumes onFreed={loadStorage} />
+
+      {#if canManageDrives}
       <div class="section-divider"></div>
 
       <div class="config-row">
@@ -482,6 +514,7 @@
           </button>
 
         </div>
+      {/if}
       {/if}
 
     </div>
@@ -701,6 +734,8 @@
   }
 
   .section-divider { height: 1px; background-color: var(--border-color); }
+
+  .storage-reserve { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; padding: 0 20px 14px; }
 
   .logs-expand-row {
     width: 100%; background: none; border: none; cursor: pointer;

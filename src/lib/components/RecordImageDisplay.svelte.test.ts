@@ -233,8 +233,9 @@ describe('gallery modal — download link', () => {
 
 // NEH-248: a file freed from the card is answered 410 with a body that says it
 // is stored offsite (_freed in app/api/records.py). It must never look missing.
-function freed410(kind: 'capture' | 'preview'): Response {
+function freed410(kind: 'capture' | 'preview', restorable?: boolean): Response {
   const detail = {
+    ...(restorable === undefined ? {} : { restorable }),
     message: 'This file is stored offsite and has been freed from the card to make room. An admin can restore the volume to bring it back.',
     stored_offsite: true,
     image_id: 1,
@@ -266,6 +267,22 @@ describe.each(modals)('%s — images freed from the card (NEH-248)', (_name, ren
     thumbSpy.mockRestore();
     fetchSpy.mockRestore();
   });
+
+  for (const [restorable, shown, hidden] of [
+    [false, 'Este equipo no puede leer la copia externa', 'un administrador puede restaurar'],
+    [true, 'un administrador puede restaurar', 'Este equipo no puede leer la copia externa'],
+  ] as const) {
+    it(`the panel's hint follows the 410's restorable (${restorable}) (NEH-380)`, async () => {
+      fetchSpy.mockImplementation((u: RequestInfo | URL) =>
+        Promise.resolve(String(u) === BROKEN ? freed410('preview', restorable) : freed410('capture', restorable)),
+      );
+      const screen = renderModal(makeRecord([makeImage()]));
+      await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+      await screen.getByRole('button', { name: 'Mostrar todo' }).click();
+      await expect.element(screen.getByText(shown, { exact: false })).toBeVisible();
+      expect(screen.container.textContent).not.toContain(hidden);
+    });
+  }
 
   it('a freed RAW preview: the thumbnail, with the calm panel instead of the thumbnail badge', async () => {
     const screen = renderModal(makeRecord([makeImage()]));
@@ -519,4 +536,56 @@ describe('gallery modal — download of a master the 410 says is freed (NEH-248)
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.container.querySelector('a.img-viewer-download')).not.toBeNull();
   });
+});
+
+
+// NEH-380: the hint takes `restorable` from the volume's offsite state, passed
+// down to RecordImageDisplay; a 410's value counts only where no state is given.
+describe('the freed hint follows the volume state (NEH-380)', () => {
+  const hintFalse = 'Este equipo no puede leer la copia externa';
+  const hintTrue = 'un administrador puede restaurar';
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let thumbSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+  });
+  afterEach(() => {
+    thumbSpy.mockRestore();
+    fetchSpy?.mockRestore();
+  });
+
+  const tiff = () => makeImage({ format: 'tif', filename: 'f.tif', master_freed_at: '2026-10-20T14:03:00+00:00' });
+  const open = async (screen: ReturnType<typeof render>) => {
+    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+    const toggle = screen.container.querySelector<HTMLButtonElement>('.freed-panel-toggle');
+    if (toggle) flushSync(() => toggle.click());
+  };
+
+  for (const [label, renderIt] of [
+    ['gallery modal', (restorable?: boolean) =>
+      render(GalleryModal, { record: makeRecord([tiff()]), restorable, onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() })],
+    ['live-preview modal', (restorable?: boolean) => {
+      const screen = render(LiveModal, { record: makeRecord([tiff()]), restorable, cameraMode: 'single', onClose: vi.fn(), onRetake: vi.fn() });
+      const fullSize = screen.container.querySelector<HTMLButtonElement>('.img-viewer-footer button[data-view-toggle]');
+      flushSync(() => fullSize?.click());
+      return screen;
+    }],
+  ] as const) {
+    it(`${label}: a TIFF freed by the record alone, on a unit that cannot restore, gets the cannot hint`, async () => {
+      const screen = renderIt(false);
+      await open(screen);
+      await expect.element(screen.getByText(hintFalse, { exact: false })).toBeVisible();
+      expect(screen.container.textContent).not.toContain(hintTrue);
+    });
+
+    it(`${label}: the volume state wins over a 410 that says otherwise`, async () => {
+      fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+        Promise.resolve(new Response(JSON.stringify({ detail: { stored_offsite: true, kind: 'capture', restorable: false } }), { status: 410 })),
+      );
+      const screen = renderIt(true);
+      await open(screen);
+      await expect.element(screen.getByText(hintTrue, { exact: false })).toBeVisible();
+      expect(screen.container.textContent).not.toContain(hintFalse);
+    });
+  }
 });

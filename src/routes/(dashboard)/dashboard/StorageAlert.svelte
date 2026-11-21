@@ -11,9 +11,11 @@
   // clears figures read earlier: the banner never states a fill level the
   // unit did not just report.
   //
-  // "Settings" links to Settings > Storage for administrators, the only role
-  // that may open that section (NEH-253); other roles are told to ask the
-  // administrator and the sentence does not mention Settings.
+  // "Settings" links to Settings > Storage for the administrator and the
+  // operator, the roles that may open that section and free space there
+  // (NEH-253, NEH-380); a reviewer is told to ask an administrator or an
+  // operator, and the sentence does not mention Settings. The percentage
+  // counts the space Captua keeps for its own work (storage-usage.ts).
   //
   // Version: 0.1.0-beta
 
@@ -22,9 +24,10 @@
   import { m } from '$lib/i18n';
   import { authStore } from '$lib/stores/auth';
   import { formatStorage, storageUsage, type StorageUsage } from '$lib/storage-usage';
+  import { canFreeVolumes } from '$lib/unit-mode';
 
   let usage = $state<StorageUsage | null>(null);
-  let canOpenStorage = $derived($authStore.user?.role === 'admin');
+  let canOpenStorage = $derived(canFreeVolumes($authStore.user?.role));
 
   onMount(() => {
     let alive = true;

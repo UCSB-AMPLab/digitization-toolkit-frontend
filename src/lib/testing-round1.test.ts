@@ -12,6 +12,8 @@ import {
 	canHandOver,
 	canManageMembers,
 	canManageOffsite,
+	canFreeVolumes,
+	canRestoreVolumes,
 	canMarkMissing,
 	canOverrideRecaptureTurn,
 	canReview,
@@ -77,6 +79,8 @@ describe('the role decisions of the slice', () => {
 		expect(table(canDeleteProjects)).toEqual([true, false, false, true, false]);
 		expect(table(canHandOver)).toEqual([true, true, false, false, false]);
 		expect(table(canManageOffsite)).toEqual([true, false, false, false, false]);
+		expect(table(canFreeVolumes)).toEqual([true, true, false, false, false]);
+		expect(table(canRestoreVolumes)).toEqual([true, false, false, false, false]);
 		expect(table(canOverrideRecaptureTurn)).toEqual([true, false, false, false, false]);
 		expect(table(canSeeCameraPanels)).toEqual([true, true, false, false, false]);
 		expect(table(canKeepOnUnit)).toEqual([true, false, false, false, false]);

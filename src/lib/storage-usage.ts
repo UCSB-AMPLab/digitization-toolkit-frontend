@@ -10,6 +10,12 @@
 // users, so the blocks a filesystem reserves for root are in neither; on such
 // a drive the percentage stays a few points below 100 when it is full.
 //
+// The percentage counts the storage reserve (`reserve_bytes`, the space
+// Captua keeps for its own work, CAPTUA_STORAGE_RESERVE_GB) as used, so it
+// reads 100 when only the reserve is left: below it the backend refuses
+// captures (507 `storage_reserve`). The "used / total" figures stay the
+// real ones. An older backend that sends no reserve is read as reserve 0.
+//
 // Version: 0.1.0-beta
 
 import type { StorageInfo } from './api';
@@ -22,6 +28,8 @@ export interface StorageUsage {
 	totalGB: number;
 	percent: number;
 	alert: boolean;
+	/** The space Captua keeps for its own work, in bytes; 0 when none is kept or the backend sends none. */
+	reserveBytes: number;
 }
 
 const GIB = 1024 ** 3;
@@ -37,13 +45,21 @@ export function storageUsage(info: StorageInfo | null | undefined): StorageUsage
 	const { used_bytes: used, total_bytes: total } = info;
 	if (typeof used !== 'number' || typeof total !== 'number') return null;
 	if (!Number.isFinite(used) || !Number.isFinite(total) || total <= 0 || used < 0) return null;
-	const percent = Math.min(100, Math.round((used / total) * 100));
+	const reserve = info.reserve_bytes;
+	const reserveBytes = typeof reserve === 'number' && Number.isFinite(reserve) && reserve > 0 ? reserve : 0;
+	const percent = Math.min(100, Math.round(((used + reserveBytes) / total) * 100));
 	return {
 		usedGB: used / GIB,
 		totalGB: total / GIB,
 		percent,
-		alert: percent >= STORAGE_ALERT_THRESHOLD
+		alert: percent >= STORAGE_ALERT_THRESHOLD,
+		reserveBytes
 	};
+}
+
+/** The reserve in whole GB of 10^9 bytes, as CAPTUA_STORAGE_RESERVE_GB states it. */
+export function reserveGB(bytes: number): string {
+	return String(Math.round(bytes / 10 ** 9));
 }
 
 /** A size in GB as the storage rows show it: "512 GB", or "1.2 TB" from 1000 GB. */

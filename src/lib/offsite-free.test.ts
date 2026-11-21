@@ -16,6 +16,8 @@ import {
 	freedCountsChanged,
 	freedCountsOf,
 	freedExportCount,
+	freedExportText,
+	freedZipText,
 	isJobLost,
 	offsiteActionErrorText,
 	offsiteJobErrorText,
@@ -175,6 +177,35 @@ describe('refusalLines', () => {
 
 	it('is empty when nothing was refused', () => {
 		expect(refusalLines([], es)).toEqual([]);
+	});
+});
+
+describe('freedExportText and freedZipText: restorable (NEH-380)', () => {
+	const freedText = (n: number) =>
+		`${n} file(s) of this volume are stored offsite and freed from the card. Restore the volume before exporting it.`;
+
+	it("the export's 409: the restore message unless the unit cannot restore", () => {
+		for (const msgs of [es, en]) {
+			const with_ = (restorable?: boolean) =>
+				new ApiError(freedText(3), { message: freedText(3), freed_image_ids: [1, 2, 3], ...(restorable === undefined ? {} : { restorable }) }, 409);
+			expect(freedExportText(with_(false), msgs)).toBe(msgs.export_freed_no_restore);
+			expect(freedExportText(with_(true), msgs)).toBe(msgs.col_export_freed(3));
+			expect(freedExportText(with_(), msgs)).toBe(msgs.col_export_freed(3));
+		}
+	});
+
+	it("the export job's failure: its error text and its detail", () => {
+		expect(freedExportText(freedText(2), es, { reason: 'freed_files', restorable: false })).toBe(es.export_freed_no_restore);
+		expect(freedExportText(freedText(2), es, { reason: 'freed_files', restorable: true })).toBe(es.col_export_freed(2));
+		expect(freedExportText(freedText(2), es, null)).toBe(es.col_export_freed(2));
+		expect(freedExportText('Something else failed', es, { restorable: false })).toBeNull();
+		expect(freedExportText(new ApiError('x', {}, 409), es)).toBeNull();
+	});
+
+	it('the image ZIP: the restore message unless the unit cannot restore', () => {
+		expect(freedZipText({ restorable: false }, es)).toBe(es.export_freed_no_restore);
+		expect(freedZipText({ restorable: true }, es)).toBe(es.col_zip_freed);
+		expect(freedZipText({}, es)).toBe(es.col_zip_freed);
 	});
 });
 
