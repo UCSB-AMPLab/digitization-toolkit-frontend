@@ -56,7 +56,7 @@
   // Nothing closes the check while the cameras are working. The layout
   // section of the mock-up is not part of it.
   //
-  // Version: 0.3.3
+  // Version: 0.3.4
 
   import { onDestroy, onMount } from 'svelte';
   import { camerasApi, type CameraCapabilities, type CameraDevice } from '$lib/api';
@@ -81,6 +81,7 @@
     onClose,
     onRefocusClosed,
     onChangeRoles,
+    zoomControls = true,
   }: {
     // The camera that takes the left page: 1 when the viewport is swapped.
     leftIndex?: number;
@@ -96,6 +97,8 @@
     onRefocusClosed?: () => void;
     // Opens "Which camera is this?" by hand (NEH-343).
     onChangeRoles?: () => void;
+    // The zoom steps, which the unit saves: false for the testing account (NEH-391).
+    zoomControls?: boolean;
   } = $props();
 
   type Side = 'left' | 'right';
@@ -539,6 +542,7 @@
               <p class="empty-msg">{$m.camcheck_no_capture}</p>
             {/if}
             <PageCameraLabel role={side} width={panes.frameW[i]} class={side === 'right' ? 'feed-label right' : 'feed-label'} />
+            {#if onRotateDegChange}
             <button
               class="float-btn ck-turn"
               data-turn
@@ -553,6 +557,7 @@
                 <path d="M4 4v4h4" />
               </svg>
             </button>
+            {/if}
             {#if shot.status === 'ok'}
               <button
                 class="float-btn ck-full"
@@ -585,7 +590,7 @@
           </div>
         {/if}
 
-        {#if stepped}
+        {#if stepped && zoomControls}
           <section class="ck-sec">
             <span class="ck-label">{linked ? $m.camcheck_zoom_both : $m.camcheck_zoom_each}</span>
             {#if linked}

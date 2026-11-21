@@ -17,10 +17,11 @@
   // Fisqua decision moves it, so Reject and Approve stay disabled and the
   // review section says what the exclusion means.
   //
-  // Version: 0.2.1
+  // Version: 0.2.2
 
   import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
   import { recordsApi, ApiError } from '$lib/api';
+  import { canCapture, canReview as reviews, takesPartInWorkflow } from '$lib/unit-mode';
   import { m, locale } from '$lib/i18n';
   import { formatApiDate } from '$lib/format-date';
   import { formatCount } from '$lib/format-count';
@@ -65,10 +66,14 @@
     onRecapture: (record: Record) => void;
   } = $props();
 
-  const canReview = $derived(userRole === 'reviewer' || userRole === 'admin');
+  const canReview = $derived(reviews(userRole));
   // A retake fires the camera, so only admin/operator may start one, as on
   // /live-preview itself (which redirects a reviewer, NEH-66).
-  const canOperate = $derived(userRole === 'admin' || userRole === 'operator');
+  // The Recapture button follows the capture screen's own rule.
+  const canRetake = $derived(canCapture(userRole));
+  // The Comments tab (annotations and review): not for the testing account
+  // (NEH-391), whose records are never reviewed.
+  const showsComments = $derived(takesPartInWorkflow(userRole));
 
   let activeTab = $state<'info' | 'edit' | 'comments'>('info');
 
@@ -135,7 +140,7 @@
     isNoteCardExpanded = false;
     reviewError = null;
     pendingAction = null;
-    if (recordId == null) return;
+    if (recordId == null || !showsComments) return;
 
     let cancelled = false;
     recordsApi.getAnnotations(recordId)
@@ -489,6 +494,7 @@
       </svg>
     </button>
 
+    {#if showsComments}
     <button
       class="strip-btn"
       class:active={activeTab === 'comments' && isExpanded}
@@ -500,6 +506,7 @@
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
       </svg>
     </button>
+    {/if}
   </div>
 
   {#if isExpanded}
@@ -836,7 +843,7 @@
                  operator does not approve or reject, but may capture again.
                  Each Reject/Approve click asks for confirmation
                  (`pendingAction`) first. -->
-            {#if canReview || (canOperate && currentRecord?.status === 'rejected') || isExcluded}
+            {#if canReview || (canRetake && currentRecord?.status === 'rejected') || isExcluded}
               <div class="review-section">
                 {#if isExcluded && currentRecord}
                   <div class="review-hint"><ExcludedNotice record={currentRecord} /></div>
@@ -856,7 +863,7 @@
                 {/if}
 
                 <div class="review-actions">
-                  {#if currentRecord?.status === 'rejected' && canOperate}
+                  {#if currentRecord?.status === 'rejected' && canRetake}
                     <button
                       class="btn-review recapture"
                       onclick={() => onRecapture(currentRecord!)}

@@ -9,14 +9,20 @@
   // While the unit hides projects (NEH-313) the "Proyectos activos" card is
   // left out.
   //
-  // Version: 0.3.3
+  // The testing account (NEH-391) gets its own Overview: what the testing
+  // space is, how many projects and volumes it holds (GET /projects and GET
+  // /collections/count) and the way to Projects. None of the rest is
+  // requested or shown for it: the storage alert, the retake summary, the
+  // volumes in progress, the activity calendar and the camera panels.
+  //
+  // Version: 0.3.4
 
   import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores/auth';
   import { camerasApi, projectsApi, collectionsApi, recordsApi, AuthError, sessionRequestInit, getApiBase, isPreviewFrameFailedResponse,
            type Collection, type Project, type RetakeSummary } from '$lib/api';
   import { readRetakeSummary } from '$lib/recapture-turn';
-  import { projectsShownIn, unitState } from '$lib/unit-mode';
+  import { canSeeCameraPanels, inTestingSpace, projectsShownIn, unitState } from '$lib/unit-mode';
   import { m } from '$lib/i18n';
   import { describeCaptureFailure, describeTestCapture, type CaptureOutcome } from '$lib/capture-outcome';
   import { sidesFromDevices, type SideInfo, type SideStatus } from '$lib/camera-sides';
@@ -40,7 +46,10 @@
   let isAdmin    = $derived(userRole === 'admin');
   let isOperator = $derived(userRole === 'operator');
   let isReviewer = $derived(userRole === 'reviewer');
-  let canSeeCameras = $derived(isAdmin || isOperator);
+  let canSeeCameras = $derived(canSeeCameraPanels(userRole));
+  // From the store, so nothing of the other roles' Overview mounts for the
+  // testing account before the subscription runs.
+  let testing = $derived(inTestingSpace($authStore.user?.role));
 
   let userName = $derived(
     currentUser?.username
@@ -165,6 +174,10 @@
   }
 
   onMount(async () => {
+    if (testing) {
+      await loadTestingCounts();
+      return;
+    }
     await Promise.all([
       loadStats(),
       loadRetakeSummary(),
@@ -177,6 +190,19 @@
     Object.values(previewUrls).forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
     Object.values(captureClearTimers).forEach(timer => { if (timer) clearTimeout(timer); });
   });
+
+  // The testing space's own counts; nothing else is read for it.
+  async function loadTestingCounts() {
+    try {
+      const [projects, volumes] = await Promise.all([projectsApi.list(), collectionsApi.count()]);
+      projectCount = projects.length;
+      collectionCount = volumes;
+    } catch (err) {
+      console.error('[Dashboard] Testing counts error:', err);
+    } finally {
+      isLoadingStats = false;
+    }
+  }
 
   async function loadStats() {
     try {
@@ -413,6 +439,18 @@
 
 </script>
 
+{#if testing}
+<div class="page">
+  <section class="testing-overview" aria-labelledby="testing-overview-title">
+    <h1 id="testing-overview-title" class="greeting">{$m.testing_overview_title}</h1>
+    <p class="subtitle">{$m.testing_overview_body}</p>
+    {#if !isLoadingStats}
+      <p class="testing-counts">{$m.testing_counts(projectCount, collectionCount)}</p>
+    {/if}
+    <a class="testing-go" href="/dashboard/projects">{$m.testing_overview_go}</a>
+  </section>
+</div>
+{:else}
 <div class="page">
 
   <div class="page-header">
@@ -604,6 +642,7 @@
   {/if}
 
 </div>
+{/if}
 
 <style>
   .page { padding: 32px 32px 80px; max-width: 1100px; position: relative; }
@@ -772,4 +811,17 @@
   }
 
   .cam-dot.ok { background-color: var(--color-success); box-shadow: 0 0 6px rgba(111,191,115,0.5); }
+  .testing-overview { display: flex; flex-direction: column; gap: 12px; max-width: 760px; }
+  .testing-counts { margin: 0; font-size: var(--text-base); color: var(--color-light); }
+  .testing-go {
+    align-self: flex-start;
+    display: inline-flex; align-items: center;
+    min-height: var(--touch-target-min);
+    padding: 0 22px;
+    border-radius: var(--radius-md);
+    background-color: var(--color-primary);
+    color: white;
+    font-weight: var(--fw-bold);
+    text-decoration: none;
+  }
 </style>

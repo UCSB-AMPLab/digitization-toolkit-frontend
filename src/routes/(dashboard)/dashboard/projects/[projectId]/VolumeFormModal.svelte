@@ -28,7 +28,13 @@
   // with its title when the name is still empty. Saving runs the 1.8 check
   // as before.
   //
-  // Version: 0.3.3
+  // The testing account (NEH-391) gives a volume its name and descriptive
+  // fields only: the backend assigns the stem, and a testing volume has no
+  // reference code, is always kept on the unit and is never looked up in
+  // Fisqua. Its form has no stem, reference code or "keep on this unit"
+  // field, and sends no filename_stem, external_id or kept_on_unit.
+  //
+  // Version: 0.3.4
 
   import { untrack } from 'svelte';
   import { m } from '$lib/i18n';
@@ -37,7 +43,7 @@
   import { NAME_MAX_LENGTH, nameFromTitle } from '$lib/description-search';
   import { stemProblem } from '$lib/volume-stem';
   import { fisquaRefusalText, fisquaVolumeRefusal, volumeSaveErrorText, type FisquaVolumeRefusal } from '$lib/volume-errors';
-  import { reloadUnit, unitState, volumeCodesReadOnly } from '$lib/unit-mode';
+  import { canKeepOnUnit, checksStemWithFisqua, reloadUnit, setsVolumeCodes, unitState, volumeCodesReadOnly } from '$lib/unit-mode';
   import { dismissible } from '$lib/dialog';
   import VolumeStemField from './VolumeStemField.svelte';
 
@@ -74,16 +80,18 @@
   let createError  = $state('');
 
   let role = $derived($authStore.user?.role);
-  let fisquaMode = $derived($unitState?.mode === 'fisqua');
+  // The stem, reference code, kept box and Fisqua lookup; off for the testing account.
+  let withCodes = $derived(setsVolumeCodes(role));
+  let fisquaMode = $derived(withCodes && $unitState?.mode === 'fisqua');
   // An operator in Fisqua mode: the stem comes from Fisqua.
   let codesReadOnly = $derived(!!editing && volumeCodesReadOnly(role, $unitState));
   // An admin in Fisqua mode: the override, with its note.
   // A new volume kept on the unit (NEH-320): the admin's choice, fixed in offline mode.
   let offlineMode = $derived($unitState?.mode === 'offline');
   let keptChoice = $state(false);
-  let showKept = $derived(!editing && role === 'admin');
+  let showKept = $derived(withCodes && !editing && canKeepOnUnit(role));
   let keptOnUnit = $derived(offlineMode || keptChoice);
-  let fisquaAdmin = $derived(fisquaMode && role === 'admin' && !(showKept && keptOnUnit));
+  let fisquaAdmin = $derived(fisquaMode && checksStemWithFisqua(role) && !(showKept && keptOnUnit));
   // The search of Fisqua's descriptions: a new volume only.
   let searchFisqua = $derived(!editing && fisquaAdmin);
 
@@ -131,7 +139,7 @@
   // be changed before the first capture, but never blanked. Only a volume
   // that has never had one may be saved without it.
   let stemRequired = $derived(!editing || !!editing.filename_stem);
-  let stemInvalid = $derived(!stemLocked && stemProblem(colStem, stemRequired) !== null);
+  let stemInvalid = $derived(withCodes && !stemLocked && stemProblem(colStem, stemRequired) !== null);
 
   let dateError = $derived(
     (colDateStart && !isValidISODate(colDateStart))
@@ -154,14 +162,14 @@
       if (colDateStart)        archMeta.date_start = colDateStart;
       if (colDateEnd)          archMeta.date_end   = colDateEnd;
       if (colCreator.trim())   archMeta.creator    = colCreator.trim();
-      if (colSignatura.trim()) archMeta.signatura  = colSignatura.trim();
+      if (withCodes && colSignatura.trim()) archMeta.signatura = colSignatura.trim();
       const archivalMetadata = Object.keys(archMeta).length > 0 ? archMeta : undefined;
 
       const stem = colStem.trim();
       if (editing) {
         // The stem is sent only when it changed to a non-empty value, and
         // never once it is locked; null is never sent.
-        const stemChanged = !stemLocked && stem !== '' && stem !== (editing.filename_stem ?? '');
+        const stemChanged = withCodes && !stemLocked && stem !== '' && stem !== (editing.filename_stem ?? '');
         await collectionsApi.update(editing.id, {
           name: colName.trim(),
           description: colDesc.trim() || undefined,
@@ -175,7 +183,7 @@
           ...(projectId !== undefined ? { project_id: projectId } : {}),
           created_by: $authStore.user?.username,
           archival_metadata: archivalMetadata,
-          filename_stem: stem,
+          ...(withCodes ? { filename_stem: stem } : {}),
           ...(showKept && keptOnUnit ? { kept_on_unit: true } : {}),
         });
       }
@@ -189,7 +197,7 @@
         refusedStem = colStem;
       } else {
         // Known cases have their own message, anything else a generic one.
-        createError = volumeSaveErrorText(err, $m);
+        createError = volumeSaveErrorText(err, $m, role);
         // The unit is in Fisqua mode after all: the screens follow it.
         if (fisqua) reloadUnit();
       }
@@ -234,6 +242,7 @@
         />
       </div>
 
+      {#if withCodes}
       <VolumeStemField
         bind:value={colStem}
         locked={stemLocked}
@@ -255,6 +264,7 @@
           bind:value={colSignatura}
         />
       </div>
+      {/if}
 
       <div class="form-field">
         <label class="field-label">{$m.pd_field_creator}</label>

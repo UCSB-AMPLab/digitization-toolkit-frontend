@@ -15,7 +15,7 @@
   // current section's tab is on screen, also when the URL names one at the
   // end of the row.
   //
-  // Version: 0.3.3
+  // Version: 0.3.4
 
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
@@ -24,6 +24,7 @@
   import NetworkSection from './NetworkSection.svelte';
   import UnitSections from './UnitSections.svelte';
   import { resolveSection, sectionInUrl, sectionsFor } from './settings-sections';
+  import { inTestingSpace, opensUnitSettings } from '$lib/unit-mode';
 
   // Available languages. The catalogue lives in `$lib/i18n`; this list only
   // names them for the selector.
@@ -33,7 +34,7 @@
   ];
 
   let role = $derived($authStore.user?.role ?? null);
-  let isAdmin = $derived(role === 'admin');
+  let isAdmin = $derived(opensUnitSettings(role));
   let sections = $derived(sectionsFor(role));
   let general = $derived(sections.filter((s) => !s.unit));
   let unitSections = $derived(sections.filter((s) => s.unit));
@@ -135,7 +136,7 @@
             </div>
           </div>
         </div>
-      {:else if isAdmin && current.unit}
+      {:else if (isAdmin || inTestingSpace(role)) && current.unit}
         <UnitSections section={current.id} />
       {/if}
     </div>

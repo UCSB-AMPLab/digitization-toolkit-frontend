@@ -183,6 +183,7 @@
       operator: 'color: var(--color-primary); background: rgba(90,140,98,0.15); border-color: rgba(90,140,98,0.3)',
       reviewer: 'color: var(--color-warning); background: rgba(208,154,68,0.15); border-color: rgba(208,154,68,0.3)',
       admin:    'color: var(--color-secondary); background: rgba(150,177,240,0.15); border-color: rgba(150,177,240,0.3)',
+      testing:  'color: var(--color-light-grey); background: rgba(171,183,183,0.12); border-color: rgba(171,183,183,0.3)',
     };
     return styles[role] ?? '';
   }
@@ -341,6 +342,9 @@
               <td class="meta-cell">{formatDate(user.created_at)}</td>
 
               <td class="col-actions">
+                <!-- The testing account is not edited, deactivated, deleted or
+                     given a new password from here: the backend refuses each. -->
+                {#if user.role !== 'testing'}
                 <div class="actions-menu-wrapper">
                   <button
                     class="btn-actions"
@@ -397,6 +401,7 @@
                     </div>
                   {/if}
                 </div>
+                {/if}
               </td>
 
             </tr>

@@ -62,7 +62,7 @@ export const m = derived(locale, (l) => catalogs[l]);
 /**
  * Translated label for a role: `{$roleLabel(member.role)}`.
  *
- * The backend sends the enum in English (admin/operator/reviewer, with a
+ * The backend sends the enum in English (admin/operator/reviewer/testing, with a
  * CHECK constraint in the database), and it must not be shown raw (NEH-183).
  * The mapping lives here rather than in each page so that copies cannot fall
  * out of sync when a role or a key changes.
@@ -79,7 +79,8 @@ export const roleLabel = derived(
 			const labels: Record<string, string> = {
 				admin: $m.role_admin,
 				operator: $m.role_operator,
-				reviewer: $m.role_reviewer
+				reviewer: $m.role_reviewer,
+				testing: $m.role_testing
 			};
 			return labels[role] ?? role;
 		}

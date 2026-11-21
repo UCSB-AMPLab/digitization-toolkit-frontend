@@ -3,8 +3,11 @@
   // &recordId=Z). The page holds the state its children share — camera mode,
   // exposure values, per-camera rotation, the volume's records — and passes it
   // down as props; `CameraControls`, `LiveViewport`, `ThumbnailStrip` and
-  // `ImageViewerModal` do the rendering. Only admin and operator may use it;
-  // a reviewer is redirected (role guard in `onMount`, NEH-66). When the
+  // `ImageViewerModal` do the rendering. Admin, operator and the testing
+  // account may use it; a reviewer is redirected (role guard in `onMount`,
+  // NEH-66). The testing account (NEH-391) reads neither the digitisation
+  // lists nor the recapture summary, and is shown no control that saves the
+  // camera set-up; when the cameras need set-up, a note blocks its screen. When the
   // volume is an item of a stored digitisation list, `CaptureInstruction`
   // shows that item's notes and action under the top bar: the item of the
   // newest list for this volume (GET /imports/digitisation-lists), or, when
@@ -117,14 +120,15 @@
   // derived from cameraSetup and `devices`, and `swapped` follows it in one
   // effect, only while it is not null.
   //
-  // Version: 0.3.3
+  // Version: 0.3.4
 
   import { onMount, tick, untrack } from 'svelte';
   import { focusCheckNeeded, recordFocusActivity } from '$lib/focus-check';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { ensureUnit, projectsShownIn, stemFormTarget, unitState } from '$lib/unit-mode';
+  import { canCapture, canOverrideRecaptureTurn, canSaveCameraSetup, ensureUnit, inTestingSpace, projectsShownIn, stemFormTarget,
+           takesPartInWorkflow, unitState } from '$lib/unit-mode';
   import { camerasApi, recordsApi, projectsApi, collectionsApi, importsApi, type Record as ApiRecord, type CameraDevice,
            type CameraRolesResponse, type CameraSetup, type QueueItem, type RetakeSummary, type RetakeSummaryVolume } from '$lib/api';
   import { cameraStatus } from '$lib/stores/cameras';
@@ -320,7 +324,7 @@
   let turnOverride = $state(false);
   let unlockDismissed = $state(false);
 
-  let isAdmin = $derived($userRole === 'admin');
+  let isAdmin = $derived(canOverrideRecaptureTurn($userRole));
   let isEmptyVolume = $derived(collectionId > 0 && recordsLoaded && records.length === 0);
   let turnState = $derived(retakeSummary && retakeSummary.pendingRecords > 0 ? retakeSummary.turn.state : 'free');
   let blocked = $derived(isEmptyVolume && turnState === 'recaptures' && !turnOverride);
@@ -341,7 +345,11 @@
     },
     (e) => console.error('[LivePreview] Error loading the recapture summary:', e)
   );
+  // The testing account (NEH-391) takes no part in the recapture turn: it
+  // never reads the summary, so the block panel, the unlock band and the
+  // guide never appear for it.
   async function loadRetakeSummary(): Promise<boolean> {
+    if (!takesPartInWorkflow($userRole)) return false;
     return (await readSummary()).ok;
   }
 
@@ -540,6 +548,11 @@
   // has, capture is held as while set-up is needed, with nothing on screen.
   let setupAnswered = $state(false);
   let captureHeld = $derived(setupNeeded || !setupAnswered);
+  // Saving which camera is which, orientation, focus, zoom and the camera
+  // settings: not for the testing account (NEH-391). When the cameras need
+  // set-up it cannot give, a note blocks the screen in place of the step.
+  let canSetUp = $derived(canSaveCameraSetup($userRole));
+  let setupBlocked = $derived(setupNeeded && !canSetUp);
   // "Change which camera is which", from the camera check.
   let whichByHand = $state(false);
   // The bodies of the last device listing, to ask again when they change.
@@ -767,7 +780,7 @@
       }
     } catch (error) {
       console.error('[LivePreview] Error capturing another opening:', error);
-      anotherError = captureErrorText(error, $m);
+      anotherError = captureErrorText(error, $m, $userRole);
     } finally {
       anotherBusy = false;
     }
@@ -818,8 +831,11 @@
     // The capture screen is for admin and operator only. A reviewer cannot
     // trigger captures or delete (the backend answers 403 in
     // cameras.py/records.py), and this route sits outside the (dashboard)
-    // group, so it checks the role itself (NEH-66).
-    if (!authStore.requireSession(['admin', 'operator'])) {
+    // group, so it checks the role itself (NEH-66). The testing account
+    // (NEH-391) captures into its own volumes.
+    if (!authStore.requireSession()) return;
+    if (!canCapture(authStore.getUser()?.role)) {
+      goto('/dashboard');
       return;
     }
 
@@ -853,7 +869,10 @@
       );
       // Not one of `tasks`: the band can arrive late, and the retake modal
       // below (NEH-209) must never wait for the lists.
-      importsApi.lists()
+      // The digitisation lists: not for the testing account, whose band
+      // reads the volume's own notes.
+      if (!takesPartInWorkflow($userRole)) listsSettled = true;
+      else importsApi.lists()
         .then(lists => {
           listInstruction = instructionForVolume(lists, collectionId);
           queueItems = lists.flatMap(l => l.items);
@@ -968,7 +987,7 @@
       console.error('[LivePreview] Error during retake:', error);
       if (isConflict(error) && (await recheckStem())) throw new Error($m.lv_needs_stem);
       // The backend's text is English; the modal shows the catalogue's.
-      throw new Error(captureErrorText(error, $m));
+      throw new Error(captureErrorText(error, $m, $userRole));
     }
   }
 
@@ -1069,6 +1088,11 @@
   }
 
   function handleRotateDegChange(cam: number, deg: number) {
+    // The testing account saves no orientation: the rotation stays on screen.
+    if (!canSaveCameraSetup($userRole)) {
+      rotateDeg = { ...rotateDeg, [cam]: deg };
+      return;
+    }
     const device = devices.find(d => d.index === cam);
     if (!canSaveRotation(device)) {
       rotateDeg = { ...rotateDeg, [cam]: deg };
@@ -1089,8 +1113,9 @@
   <TopBar
     projectName={projectsShownIn($unitState) ? projectName : ''}
     {collectionName}
+    testing={inTestingSpace($userRole)}
     onBack={handleBack}
-    onGoToReview={handleGoToReview}
+    onGoToReview={takesPartInWorkflow($userRole) ? handleGoToReview : undefined}
     onCheckCameras={() => {
       if (viewportCapturing || pageCapturing) return;
       cameraCheckOpen = true;
@@ -1114,7 +1139,19 @@
     </section>
   {/if}
 
-  {#if guidePaused}
+  {#if setupBlocked}
+    <div class="turn-stage">
+      <section class="turn-block setup-blocked" aria-labelledby="setup-blocked-title">
+        <div class="turn-block-head">
+          <span class="material-symbols-outlined turn-block-icon" aria-hidden="true">photo_camera</span>
+          <p id="setup-blocked-title" class="turn-block-body">{$m.testing_cameras_not_set_up}</p>
+        </div>
+        <div class="turn-block-actions">
+          <button class="btn btn-ghost" onclick={handleBack}>{$m.camwhich_leave}</button>
+        </div>
+      </section>
+    </div>
+  {:else if guidePaused}
     <div class="turn-stage">
       <section class="guide-end guide-paused" aria-labelledby="guide-paused-title">
         <span class="material-symbols-outlined guide-paused-icon" aria-hidden="true">error</span>
@@ -1181,9 +1218,10 @@
         bind:this={controls}
         onDevicesChange={applyDevices}
         savesSeen={() => rolesSaves}
-        onRotateDegChange={handleRotateDegChange}
+        onRotateDegChange={canSetUp ? handleRotateDegChange : undefined}
         {rotateDeg}
         onRescan={() => void checkSetup()}
+        setupControls={canSetUp}
       />
 
       <div class="center-column">
@@ -1199,7 +1237,7 @@
           {devices}
           {rotateDeg}
           onCaptureDone={handleCaptureDone}
-          onRotateDegChange={handleRotateDegChange}
+          onRotateDegChange={canSetUp ? handleRotateDegChange : undefined}
           otherModalOpen={inspectedRecord !== null || refocusOpen || cameraCheckOpen || setupNeeded || whichByHand}
           captureBlocked={captureHeld}
           swapLocked={rolesLeft !== null}
@@ -1350,15 +1388,16 @@
     projectName={projectsShownIn($unitState) ? projectName : ''}
     {collectionName}
     {rotateDeg}
-    onRotateDegChange={handleRotateDegChange}
+    onRotateDegChange={canSetUp ? handleRotateDegChange : undefined}
     {savingOrientation}
     onClose={() => (cameraCheckOpen = false)}
     onRefocusClosed={noteFocusActivity}
-    onChangeRoles={() => (whichByHand = true)}
+    onChangeRoles={canSetUp ? () => (whichByHand = true) : undefined}
+    zoomControls={canSetUp}
   />
 {/if}
 
-{#if setupNeeded || whichByHand}
+{#if canSetUp && (setupNeeded || whichByHand)}
   <WhichCamera
     setup={cameraSetup}
     cancellable={!setupNeeded}

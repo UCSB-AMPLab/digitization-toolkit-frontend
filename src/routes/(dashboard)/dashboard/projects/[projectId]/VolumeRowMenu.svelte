@@ -7,12 +7,12 @@
 
 <script lang="ts">
   // A volume row's action menu (Editar, Eliminar), for the project page and
-  // Volúmenes (NEH-313). The pages show it to admins and operators only, the
-  // roles the backend lets edit or delete a volume; what each action does is
-  // the page's (the volume form, the delete dialog). A click anywhere else
-  // closes it.
+  // Volúmenes (NEH-313). The pages show it to the roles the backend lets edit
+  // or delete a volume; without `onEdit` (the testing account, NEH-391) the
+  // menu has Eliminar only. What each action does is the page's (the volume
+  // form, the delete dialog). A click anywhere else closes it.
   //
-  // Version: 0.3.3
+  // Version: 0.3.4
   import { onDestroy } from 'svelte';
   import { m } from '$lib/i18n';
   import type { Collection } from '$lib/api';
@@ -23,7 +23,7 @@
     onDelete,
   }: {
     volume: Collection;
-    onEdit: (volume: Collection) => void;
+    onEdit?: (volume: Collection) => void;
     onDelete: (volume: Collection) => void;
   } = $props();
 
@@ -61,10 +61,13 @@
   </button>
   {#if open}
     <div class="action-menu">
-      <button class="action-item" onclick={(e) => act(e, onEdit)}>
-        <span class="material-symbols-outlined icon-sm">edit</span>
-        {$m.common_edit}
-      </button>
+      {#if onEdit}
+        {@const edit = onEdit}
+        <button class="action-item" onclick={(e) => act(e, edit)}>
+          <span class="material-symbols-outlined icon-sm">edit</span>
+          {$m.common_edit}
+        </button>
+      {/if}
       <button class="action-item action-item-danger" onclick={(e) => act(e, onDelete)}>
         <span class="material-symbols-outlined icon-sm">delete</span>
         {$m.common_delete}

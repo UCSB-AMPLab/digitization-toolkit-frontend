@@ -5,15 +5,25 @@
   // delete modal can move the project's volumes to another project first.
   // The Status column shows placeholder values (see `mockStatuses`).
   //
-  // Version: 0.1.0-beta
+  // The testing account (NEH-391) creates and renames its own projects, and
+  // gets no Status column: its form has the name only, and every refusal it can get has its own
+  // message, never the backend's text. Its new project captures JPEG only
+  // unless RAW and JPEG is chosen; the choice is offered only while the
+  // unit's cameras offer both formats (GET /cameras/capabilities), and
+  // otherwise nothing about the format is sent.
+  //
+  // Version: 0.1.3
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { m, locale } from '$lib/i18n';
   import { formatApiDate } from '$lib/format-date';
   import { authStore, userRole } from '$lib/stores/auth';
-  import { projectsApi, collectionsApi, recordsApi, type Project } from '$lib/api';
+  import { projectsApi, collectionsApi, recordsApi, camerasApi, type CaptureFormat, type Project } from '$lib/api';
+  import TestingFormatChoice from './TestingFormatChoice.svelte';
   import { fileHoldText } from '$lib/volume-refusals';
+  import { canCreateProjects, canDeleteProjects, inTestingSpace } from '$lib/unit-mode';
+  import { offersFormatChoice, testingProjectDeleteText, testingRefusalText } from '$lib/testing-space';
   import { dismissible } from '$lib/dialog';
 
   let projects     = $state<Project[]>([]);
@@ -29,10 +39,15 @@
       : projects
   );
 
-  // Only admin creates projects — the backend enforces it too (`allow_admin`
-  // in `create_project`, NEH-80); operator can create and delete volumes
-  // inside a project, but not projects.
-  let canCreate = $derived($authStore.user?.role === 'admin');
+  // The administrator creates projects, and the testing account its own —
+  // the backend enforces it too (`allow_admin` in `create_project`, NEH-80);
+  // operator can create and delete volumes inside a project, but not projects.
+  let canCreate = $derived(canCreateProjects($authStore.user?.role));
+  // The testing account's form has the name only.
+  let nameOnly = $derived(inTestingSpace($authStore.user?.role));
+  // The testing account's choice of capture format, when the cameras offer both.
+  let formatChoice = $state(false);
+  let formFormat = $state<CaptureFormat>('JPEG');
 
   let showCreateModal = $state(false);
 
@@ -69,8 +84,17 @@
   });
 
   onMount(async () => {
+    if (nameOnly) loadFormatChoice();
     await loadProjects();
   });
+
+  async function loadFormatChoice() {
+    try {
+      formatChoice = offersFormatChoice((await camerasApi.getCapabilities()).image_formats);
+    } catch (err) {
+      console.error('[Projects] Error reading the camera capabilities:', err);
+    }
+  }
 
   async function loadProjects() {
     try {
@@ -90,7 +114,10 @@
     createError = '';
 
     try {
-      if (editingProject) {
+      if (nameOnly) {
+        if (editingProject) await projectsApi.update(editingProject.id, { name: formName.trim() });
+        else await projectsApi.create({ name: formName.trim(), ...(formatChoice ? { capture_format: formFormat } : {}) });
+      } else if (editingProject) {
         await projectsApi.update(editingProject.id, {
           name: formName.trim(),
           description: formDesc.trim() || undefined,
@@ -116,7 +143,12 @@
       // project's files has its own message.
       const hold = fileHoldText(err, $m, 'project');
       const msg = err instanceof Error ? err.message : String(err);
-      createError = hold ?? $m.proj_err_create(msg);
+      if (nameOnly) {
+        console.error('[Projects] Error saving the project:', err);
+        createError = testingRefusalText(err, $m, $authStore.user?.role) ?? hold ?? $m.testing_err_other;
+      } else {
+        createError = hold ?? $m.proj_err_create(msg);
+      }
     } finally {
       isCreating = false;
     }
@@ -125,7 +157,7 @@
   function resetForm() {
     formName = ''; formDesc = '';
     formFondo = ''; formSerie = ''; formSignatura = '';
-    createError = ''; editingProject = null;
+    createError = ''; editingProject = null; formFormat = 'JPEG';
   }
 
   function closeModal() {
@@ -202,7 +234,9 @@
       // reads their files has its own message.
       const hold = fileHoldText(err, $m, 'project');
       const msg = err instanceof Error ? err.message : String(err);
-      deleteError = hold ?? $m.proj_err_delete(msg);
+      const testingText = testingProjectDeleteText(err, $m, $authStore.user?.role);
+      if (testingText) console.error('[Projects] Error deleting the project:', err);
+      deleteError = testingText ?? hold ?? $m.proj_err_delete(msg);
       isDeleting = false;
     }
   }
@@ -286,7 +320,7 @@
           <tr>
             <th>{$m.proj_col_project}</th>
             <th>{$m.proj_col_reference}</th>
-            <th>{$m.common_status}</th>
+            {#if !nameOnly}<th>{$m.common_status}</th>{/if}
             <th>{$m.proj_col_start_date}</th>
             <th class="text-right">{$m.common_actions}</th>
           </tr>
@@ -324,9 +358,12 @@
                 {/if}
               </td>
 
-              <td>
-                <span class="status-badge" style={getStatusStyle(status)}>{status}</span>
-              </td>
+              <!-- Placeholder statuses; not shown to the testing account. -->
+              {#if !nameOnly}
+                <td>
+                  <span class="status-badge" style={getStatusStyle(status)}>{status}</span>
+                </td>
+              {/if}
 
               <td>
                 <div class="date-cell">
@@ -353,7 +390,7 @@
                         <span class="material-symbols-outlined icon-sm">edit</span>
                         {$m.common_edit}
                       </button>
-                      {#if $userRole === 'admin'}
+                      {#if canDeleteProjects($userRole)}
                         <button class="action-item action-item-danger" onclick={(e) => openDeleteModal(e, project)}>
                           <span class="material-symbols-outlined icon-sm">delete</span>
                           {$m.common_delete}
@@ -401,6 +438,7 @@
           />
         </div>
 
+        {#if !nameOnly}
         <div class="form-field">
           <label class="field-label">{$m.proj_field_description}</label>
           <input
@@ -426,6 +464,11 @@
           <label class="field-label">{$m.proj_field_refcode}</label>
           <input class="field-input" type="text" placeholder={$m.proj_ph_refcode} bind:value={formSignatura} />
         </div>
+        {/if}
+
+        {#if nameOnly && formatChoice && !editingProject}
+          <TestingFormatChoice value={formFormat} onchange={(f) => (formFormat = f)} />
+        {/if}
 
       </div>
 

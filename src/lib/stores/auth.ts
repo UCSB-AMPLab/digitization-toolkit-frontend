@@ -16,7 +16,7 @@ import { clearFocusActivity } from '$lib/focus-check';
 // The array is the source and the type derives from it, not the other way
 // round: the list is needed at runtime to validate the backend's response
 // (isUserRole, below), and two written copies would drift apart.
-export const USER_ROLES = ['admin', 'operator', 'reviewer'] as const;
+export const USER_ROLES = ['admin', 'operator', 'reviewer', 'testing'] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
 

@@ -11,7 +11,14 @@
   // read-only. While the unit hides projects (NEH-313) the page goes to
   // Volúmenes, carrying ?editVolume=, so the form opens there.
   //
-  // Version: 0.3.3
+  // The testing account (NEH-391) gets New volume and the row's Delete, and
+  // each row says when Captua removes the volume. Its page neither requests
+  // nor shows the project's members or the volumes' stages (activity
+  // totals), which the backend refuses it. It sees the project's capture
+  // format and, while the unit's cameras offer both, changes it with one
+  // PUT; the change applies to the captures made after it.
+  //
+  // Version: 0.3.4
 
   import { onDestroy, onMount } from 'svelte';
   import { get } from 'svelte/store';
@@ -21,10 +28,14 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
+  import TestingFormatChoice from '../TestingFormatChoice.svelte';
+  import { camerasApi, type CaptureFormat } from '$lib/api';
   import { projectsApi, collectionsApi, recordsApi, projectMembersApi, activityApi,
            type Project, type Collection, type ProjectMember, type UserRead, type StatusCounts } from '$lib/api';
   import { needsStem } from '$lib/volume-stem';
-  import { canCreateVolumes, ensureUnit, hiddenProjectRedirect, unitState } from '$lib/unit-mode';
+  import { canCreateVolumes, canDeleteVolumes, canEditVolumes, canManageMembers as membersManaged, ensureUnit, hiddenProjectRedirect,
+           inTestingSpace, takesPartInWorkflow, unitState } from '$lib/unit-mode';
+  import { offersFormatChoice, testingExpiry, testingRefusalText } from '$lib/testing-space';
   import VolumeFormModal from './VolumeFormModal.svelte';
   import VolumeRowMenu from './VolumeRowMenu.svelte';
   import VolumeDeleteModal from './VolumeDeleteModal.svelte';
@@ -55,15 +66,52 @@
 
   // Editing: admin and operator. A new volume: the same, but no operator
   // in Fisqua mode (NEH-311).
-  let canCreate = $derived(
-    $authStore.user?.role === 'admin' || $authStore.user?.role === 'operator'
-  );
+  let canCreate = $derived(canEditVolumes($authStore.user?.role));
   let canCreateNew = $derived(canCreateVolumes($authStore.user?.role, $unitState));
+  // The row's Delete: the editors, and the testing account in its own volumes.
+  let canDelete = $derived(canDeleteVolumes($authStore.user?.role));
+  // Members and the volumes' stages: not for the testing account.
+  let showsWorkflow = $derived(takesPartInWorkflow($authStore.user?.role));
+  let showsExpiry = $derived(inTestingSpace($authStore.user?.role));
+
+  // A testing project's capture format, and whether the cameras offer a choice.
+  let formatChoice = $state(false);
+  let formatSaving = $state(false);
+  let formatError = $state('');
+
+  async function loadFormatChoice() {
+    try {
+      formatChoice = offersFormatChoice((await camerasApi.getCapabilities()).image_formats);
+    } catch (err) {
+      console.error('[ProjectDetail] Error reading the camera capabilities:', err);
+    }
+  }
+
+  async function changeFormat(format: CaptureFormat) {
+    if (!project || format === project.capture_format) return;
+    formatSaving = true;
+    formatError = '';
+    const before = project;
+    try {
+      project = await projectsApi.update(projectId, { capture_format: format });
+    } catch (err) {
+      console.error('[ProjectDetail] Error changing the capture format:', err);
+      // The radio shows the format the project still has.
+      project = { ...before };
+      formatError = testingRefusalText(err, $m, $authStore.user?.role) ?? $m.testing_err_other;
+    } finally {
+      formatSaving = false;
+    }
+  }
+
+  function formatLabel(format: CaptureFormat): string {
+    return format === 'RAW+JPEG' ? $m.testing_format_raw : $m.testing_format_jpeg;
+  }
   // Only admin adds or removes members — the backend enforces it too
   // (`allow_admin` in `add_project_member`/`remove_project_member`, NEH-80).
   // Operator and reviewer cannot even read the user list (GET /auth/users is
   // admin-only), so the picker must not try to load it for them.
-  let canManageMembers = $derived($authStore.user?.role === 'admin');
+  let canManageMembers = $derived(membersManaged($authStore.user?.role));
 
   let showCreateModal   = $state(false);
   let editingCollection = $state<Collection | null>(null);
@@ -93,7 +141,8 @@
     }
     if (left) return;
     routeReady = true;
-    await Promise.all([loadProject(), loadCollections(), loadRecordCount(), loadMembers()]);
+    await Promise.all([loadProject(), loadCollections(), loadRecordCount(), showsWorkflow ? loadMembers() : undefined,
+                       showsExpiry ? loadFormatChoice() : undefined]);
     // ?editVolume=<id> opens that volume's form: the capture screen links
     // here when the volume has no stem yet.
     const editId = Number($page.url.searchParams.get('editVolume')) || 0;
@@ -131,6 +180,7 @@
   let filteredUsers = $derived(
     allUsers.filter(u =>
       u.role !== 'admin' &&                          // admins are always implicit
+      u.role !== 'testing' &&                        // never a member of a real project
       !members.some(m => m.user_id === u.id) &&      // not already a member
       u.id !== $authStore.user?.id                   // not yourself
     )
@@ -187,7 +237,10 @@
       isLoading = true;
       // The stages are reloaded with the list, so a volume created, or one
       // that received records from a deleted volume, shows its current stage.
-      const [data] = await Promise.all([collectionsApi.listAll({ project_id: projectId }), loadStages()]);
+      const [data] = await Promise.all([
+        collectionsApi.listAll({ project_id: projectId }),
+        showsWorkflow ? loadStages() : undefined,
+      ]);
       collections = data;
     } catch (err) {
       console.error('[ProjectDetail] Error loading collections:', err);
@@ -268,6 +321,18 @@
     {$m.pd_back}
   </button>
 
+  {#if showsExpiry && project?.capture_format}
+    <div class="testing-format">
+      {#if formatChoice}
+        <TestingFormatChoice value={project.capture_format} onchange={changeFormat} disabled={formatSaving}
+          hint={$m.testing_format_applies} />
+      {:else}
+        <p class="testing-format-line">{$m.testing_format_current(formatLabel(project.capture_format))}</p>
+      {/if}
+      {#if formatError}<p class="testing-format-error" role="alert">{formatError}</p>{/if}
+    </div>
+  {/if}
+
   <div class="kpi-bar">
     <div class="kpi-row">
       <div class="kpi-card">
@@ -283,13 +348,15 @@
       </div>
     </div>
 
-    <button class="btn-collaborators" onclick={openMembersModal}>
-      <span class="material-symbols-outlined icon-sm">group</span>
-      <span>{$m.pd_members}</span>
-      {#if members.length > 0}
-        <span class="member-badge">{formatCount(members.length, $locale)}</span>
-      {/if}
-    </button>
+    {#if showsWorkflow}
+      <button class="btn-collaborators" onclick={openMembersModal}>
+        <span class="material-symbols-outlined icon-sm">group</span>
+        <span>{$m.pd_members}</span>
+        {#if members.length > 0}
+          <span class="member-badge">{formatCount(members.length, $locale)}</span>
+        {/if}
+      </button>
+    {/if}
   </div>
 
   <div class="toolbar">
@@ -361,6 +428,14 @@
                     {#if col.archival_metadata?.signatura}
                       <p class="col-code">{col.archival_metadata.signatura}</p>
                     {/if}
+                    {#if showsExpiry}
+                      {@const expiry = testingExpiry(col.testing_expires_at)}
+                      {#if expiry}
+                        <p class="testing-expiry" class:soon={expiry.soon}>
+                          {expiry.due ? $m.testing_expires_due : $m.testing_expires_on(formatApiDate(expiry.at.toISOString(), $locale, { day: 'numeric', month: 'long', year: 'numeric' }))}
+                        </p>
+                      {/if}
+                    {/if}
                   </div>
                 </div>
               </td>
@@ -394,6 +469,8 @@
               <td class="text-right">
                 {#if canCreate}
                   <VolumeRowMenu volume={col} onEdit={openEditCollection} onDelete={(v) => (deletingCol = v)} />
+                {:else if canDelete}
+                  <VolumeRowMenu volume={col} onDelete={(v) => (deletingCol = v)} />
                 {/if}
               </td>
             </tr>
@@ -1198,4 +1275,9 @@
   .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
 
+  .testing-format { margin: 0 0 16px; }
+  .testing-format-line { margin: 0; font-size: var(--text-sm); color: var(--color-light-grey); }
+  .testing-format-error { margin: 6px 0 0; font-size: var(--text-sm); color: var(--color-error); }
+  .testing-expiry { margin: 2px 0 0; font-size: var(--text-xs); color: var(--color-light-grey); }
+  .testing-expiry.soon { color: var(--color-warning); }
 </style>

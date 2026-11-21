@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 import { goto } from '$app/navigation';
-import { authStore, readInitialUser, type AuthUser } from './auth';
+import { authStore, readInitialUser, isUserRole, type AuthUser } from './auth';
 import { readFocusActivity, recordFocusActivity } from '$lib/focus-check';
 
 const user: AuthUser = {
@@ -114,5 +114,12 @@ describe('the focus check and the sign-in', () => {
 		recordFocusActivity(user.id, at);
 		authStore.setSession(user);
 		expect(readFocusActivity(user.id)).toBe(at);
+	});
+});
+
+describe('isUserRole', () => {
+	it('accepts the testing role (NEH-391) and the other three', () => {
+		for (const role of ['admin', 'operator', 'reviewer', 'testing']) expect(isUserRole(role)).toBe(true);
+		expect(isUserRole('guest')).toBe(false);
 	});
 });

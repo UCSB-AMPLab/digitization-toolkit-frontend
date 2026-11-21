@@ -375,6 +375,15 @@ describe('Network: who may change it', () => {
 		await expect.element(page.getByRole('button', { name: en.config_refresh_list })).toBeVisible();
 	});
 
+	it('the testing role sees the network as a reviewer does: no controls', async () => {
+		serve();
+		const { container } = mount('testing');
+		await expect.poll(() => wifiRows(container).length).toBe(4);
+		expect(container.querySelectorAll('[data-wifi-row] button, [data-saved-row] button')).toHaveLength(0);
+		expect(container.textContent).toContain(en.network_readonly);
+		expect(container.textContent).not.toContain(en.network_saved_desc_forget);
+	});
+
 	it('the operator gets the controls', async () => {
 		serve();
 		const { container } = mount('operator');

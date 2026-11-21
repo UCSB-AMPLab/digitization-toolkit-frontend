@@ -2,19 +2,20 @@
   // The administrator's sections of Settings (/dashboard/config), under the
   // Unit group: the unit's mode and projects setting (NEH-311, NEH-313,
   // UnitModeCard), the link to a Fisqua workspace (NEH-345,
-  // FisquaLinkCard), storage (usage, primary path, external drive), the
-  // catalogue's off-site copy, diagnostics, maintenance, and power. They act
+  // FisquaLinkCard), the testing space (NEH-391, TestingSpaceCard), storage
+  // (usage, primary path, external drive), the catalogue's off-site copy, diagnostics, maintenance, and power. They act
   // on the appliance through the backend. The page renders this component
-  // for administrators only, with the section to show; the content of each
+  // for administrators, and for the testing role, which opens Power only,
+  // with the section to show; the content of each
   // section is as it was when they all shared one page.
   //
-  // Version: 0.3.3
+  // Version: 0.3.4
 
-  import { onMount } from 'svelte';
   import { m, locale } from '$lib/i18n';
   import CatalogueBackupCard from './CatalogueBackupCard.svelte';
   import UnitModeCard from './UnitModeCard.svelte';
   import FisquaLinkCard from './FisquaLinkCard.svelte';
+  import TestingSpaceCard from './TestingSpaceCard.svelte';
 
   /** The section to show: one of the ids under the Unit group (settings-sections.ts). */
   let { section }: { section: string } = $props();
@@ -95,7 +96,14 @@
   // unit in the field needs. It is neither translated nor given a trade name.
   let cameraBackend = $state<string | null>(null);
 
-  onMount(async () => {
+  // Each request is sent by the section that shows its result: storage by
+  // Storage, the capture system by Diagnostics. The page keeps this component
+  // mounted when the section changes, so each is sent the first time its
+  // section is shown, and not again.
+  let storageRequested = false;
+  let cameraRequested = false;
+
+  async function loadStorage() {
     try {
       storageInfo = await systemApi.getStorage();
     } catch {
@@ -103,11 +111,24 @@
     } finally {
       storageLoading = false;
     }
+  }
 
+  async function loadCameraBackend() {
     try {
       cameraBackend = (await camerasApi.getCapabilities()).backend;
     } catch {
       // With no capture backend available the row shows "not available".
+    }
+  }
+
+  $effect(() => {
+    if (section === 'storage' && !storageRequested) {
+      storageRequested = true;
+      loadStorage();
+    }
+    if (section === 'diagnostics' && !cameraRequested) {
+      cameraRequested = true;
+      loadCameraBackend();
     }
   });
 
@@ -261,6 +282,15 @@
   <div class="config-section" id="fisqua-link">
     <h2 class="section-title">{$m.fisqua_link_title}</h2>
     <FisquaLinkCard />
+  </div>
+{/if}
+
+{#if section === 'testing'}
+  <!-- The testing space (NEH-391): the shared testing account and the term of
+       its volumes; after the Fisqua link, before storage. -->
+  <div class="config-section" id="testing">
+    <h2 class="section-title">{$m.config_section_testing}</h2>
+    <TestingSpaceCard />
   </div>
 {/if}
 

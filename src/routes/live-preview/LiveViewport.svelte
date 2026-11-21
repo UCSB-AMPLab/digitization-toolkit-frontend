@@ -18,7 +18,7 @@
   // previewed and captured; the swap state orders the two cameras of a pair
   // only, and has no effect until dual mode again.
   //
-  // Version: 0.3.3
+  // Version: 0.3.4
 
   import { onMount, onDestroy, untrack } from 'svelte';
   import { m } from '$lib/i18n';
@@ -43,6 +43,7 @@
   import { defaultRecordTitle } from '$lib/record-title';
   import { isConflict } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
+  import { userRole } from '$lib/stores/auth';
   import { dismissible, openDialogsOutside } from '$lib/dialog';
   import { powerControlOpen } from '$lib/stores/power';
   import PageCameraLabel from '$lib/components/PageCameraLabel.svelte';
@@ -126,6 +127,8 @@
     swapLocked?: boolean;
   } = $props();
 
+  // The rotate buttons are shown only with onRotateDegChange: the testing
+  // account (NEH-391) saves no orientation, and gets none.
   function stepRotation(camIdx: number, delta: number) {
     const current = (rotateDeg ?? {})[camIdx] ?? 0;
     const next = ((current + delta) % 360 + 360) % 360;
@@ -987,7 +990,7 @@
       }
       // Every backend error is English; the operator sees the catalogue's
       // message for it, and the console has the original.
-      cameraStatus.reportFailure(captureErrorText(error, $m));
+      cameraStatus.reportFailure(captureErrorText(error, $m, $userRole));
     } finally {
       isCapturing = false;
     }
@@ -1272,6 +1275,7 @@
             <div class="feed-source">{showsCapture(leftIdx) ? $m.lv_last_capture : $m.lv_preview_unsaved}</div>
           {/if}
           <!-- Floating rotation overlay -->
+          {#if onRotateDegChange}
           <div class="feed-rotate-overlay">
             <button class="feed-rotate-btn" onclick={() => stepRotation(leftIdx, -90)} aria-label={$m.lv_rotate_ccw} title={$m.lv_rotate_ccw}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -1287,6 +1291,7 @@
               </svg>
             </button>
           </div>
+          {/if}
         </div>
 
         {#if cameraMode === 'double'}
@@ -1340,6 +1345,7 @@
               <div class="feed-source right">{showsCapture(rightIdx) ? $m.lv_last_capture : $m.lv_preview_unsaved}</div>
             {/if}
             <!-- Floating rotation overlay -->
+            {#if onRotateDegChange}
             <div class="feed-rotate-overlay">
               <button class="feed-rotate-btn" onclick={() => stepRotation(rightIdx, -90)} aria-label={$m.lv_rotate_ccw} title={$m.lv_rotate_ccw}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -1355,6 +1361,7 @@
                 </svg>
               </button>
             </div>
+            {/if}
           </div>
         {/if}
 

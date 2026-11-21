@@ -45,6 +45,16 @@ function serve() {
 		if (url.includes('/network/')) {
 			return new Response(JSON.stringify({ detail: 'Network settings are not available on this device.' }), { status: 501 });
 		}
+		if (url.endsWith('/system/storage')) {
+			const GB = 1024 ** 3;
+			return new Response(
+				JSON.stringify({ projects_path: '/data/projects', is_override: false, total_bytes: 100 * GB, used_bytes: 40 * GB, free_bytes: 60 * GB, available: true }),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } }
+			);
+		}
+		if (url.endsWith('/cameras/capabilities')) {
+			return new Response(JSON.stringify({ backend: 'gphoto2' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+		}
 		return new Response('{}', { status: 500 });
 	});
 }
@@ -56,6 +66,7 @@ function sectionNames(container: HTMLElement) {
 const ADMIN_SECTIONS = [
 	en.unit_section_title,
 	en.fisqua_link_title,
+	en.config_section_testing,
 	en.config_section_storage,
 	en.backup_section_title,
 	en.config_section_diagnostics,
@@ -110,6 +121,81 @@ describe('Settings sections', () => {
 			}
 		});
 	}
+
+	it('the testing role (NEH-391) sees Network, Language and Power, and opens on Network', async () => {
+		serve();
+		signIn('testing');
+		const { container } = render(ConfigPage);
+		await expect.poll(() => sectionNames(container)).toEqual([en.config_section_network, en.config_section_language, en.config_section_power]);
+		await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
+		expect(container.textContent).toContain(en.config_subtitle_personal);
+	});
+
+	it('the testing role asking for an admin section by URL gets Network', async () => {
+		serve();
+		signIn('testing');
+		for (const id of ['storage', 'diagnostics', 'unit-mode', 'offsite-copy', 'maintenance']) {
+			at(`?section=${id}`);
+			const { container, unmount } = render(ConfigPage);
+			await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
+			expect(container.textContent).not.toContain(en.config_shutdown_label);
+			expect(container.textContent).not.toContain(en.config_storage_used);
+			unmount();
+		}
+	});
+
+	it('the testing role opening Power gets the shutdown button', async () => {
+		serve();
+		signIn('testing');
+		at('?section=power');
+		render(ConfigPage);
+		await expect.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 })).toBeVisible();
+		await expect.element(browserPage.getByRole('button', { name: en.config_shutdown_btn, exact: true })).toBeVisible();
+	});
+
+	it('a section requests only what it shows: the testing role on Power asks for neither storage nor capabilities', async () => {
+		const fetchSpy = serve();
+		signIn('testing');
+		at('?section=power');
+		render(ConfigPage);
+		await expect.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 })).toBeVisible();
+		await new Promise((r) => setTimeout(r, 100));
+		const urls = fetchSpy.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input));
+		expect(urls.filter((u) => u.endsWith('/system/storage') || u.endsWith('/cameras/capabilities'))).toEqual([]);
+	});
+
+	it('an administrator gets the storage figures on Storage and the capture system on Diagnostics, each requested once', async () => {
+		const fetchSpy = serve();
+		signIn('admin');
+		at('?section=storage');
+		const { container } = render(ConfigPage);
+		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40 GB / 100 GB');
+		const calls = (suffix: string) =>
+			fetchSpy.mock.calls.filter(([input]) => String(input instanceof Request ? input.url : input).endsWith(suffix)).length;
+		expect(calls('/cameras/capabilities')).toBe(0);
+		// The component stays mounted when the section changes.
+		at('?section=diagnostics');
+		await expect.poll(() => container.textContent).toContain('gphoto2');
+		expect(calls('/cameras/capabilities')).toBe(1);
+		at('?section=storage');
+		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40 GB / 100 GB');
+		expect(calls('/system/storage')).toBe(1);
+	});
+
+	it('an administrator opening Diagnostics first gets the capture system, and Storage then its figures', async () => {
+		const fetchSpy = serve();
+		signIn('admin');
+		at('?section=diagnostics');
+		const { container } = render(ConfigPage);
+		await expect.poll(() => container.textContent).toContain('gphoto2');
+		const calls = (suffix: string) =>
+			fetchSpy.mock.calls.filter(([input]) => String(input instanceof Request ? input.url : input).endsWith(suffix)).length;
+		expect(calls('/system/storage')).toBe(0);
+		at('?section=storage');
+		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40 GB / 100 GB');
+		expect(calls('/system/storage')).toBe(1);
+		expect(calls('/cameras/capabilities')).toBe(1);
+	});
 
 	it('opens the section named in the URL for an administrator', async () => {
 		serve();

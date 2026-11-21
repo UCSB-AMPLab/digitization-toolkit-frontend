@@ -1,11 +1,15 @@
 <script lang="ts">
-  // Version: 0.1.0-beta
+  // Version: 0.1.1
 
   import { m } from '$lib/i18n';
   // Toolbar on the right edge of the volume gallery, shown in every view mode.
   // It holds the view-mode switch (list, spread, grid); the zoom controls appear
   // only in spread view, and the BagIt export button only when the parent passes
-  // `onExport`.
+  // `onExport`. With `onDownloadPictures` (the testing account, NEH-391) a
+  // "Download pictures" button takes the place of the export button and
+  // downloads the volume's pictures as a ZIP at once. With `onCopyToUsb` (a
+  // testing volume, for the testing account and the administrator) a button
+  // opens the copy to a USB drive.
 
   import { stepZoom } from '$lib/pan-zoom';
 
@@ -17,6 +21,8 @@
     onViewModeChange,
     onZoomChange,
     onExport,
+    onDownloadPictures,
+    onCopyToUsb,
   }: {
     viewMode: 'list' | 'spread' | 'grid';
     zoom: number;
@@ -25,6 +31,8 @@
     onViewModeChange: (mode: 'list' | 'spread' | 'grid') => void;
     onZoomChange: (zoom: number) => void;
     onExport?: () => void;
+    onDownloadPictures?: () => void;
+    onCopyToUsb?: () => void;
   } = $props();
 
   function handleZoomIn()    { onZoomChange(stepZoom(zoom, 1, oneToOne)); }
@@ -129,6 +137,30 @@
       aria-label={$m.col_export}
     >
       <span class="material-symbols-outlined icon-md">archive</span>
+    </button>
+  {/if}
+
+  {#if onDownloadPictures}
+    <div class="divider"></div>
+    <button
+      class="tool-btn"
+      onclick={onDownloadPictures}
+      title={$m.testing_download_pictures}
+      aria-label={$m.testing_download_pictures}
+    >
+      <span class="material-symbols-outlined icon-md">download</span>
+    </button>
+  {/if}
+
+  {#if onCopyToUsb}
+    {#if !onDownloadPictures}<div class="divider"></div>{/if}
+    <button
+      class="tool-btn"
+      onclick={onCopyToUsb}
+      title={$m.testing_usb_copy}
+      aria-label={$m.testing_usb_copy}
+    >
+      <span class="material-symbols-outlined icon-md">drive_file_move</span>
     </button>
   {/if}
 

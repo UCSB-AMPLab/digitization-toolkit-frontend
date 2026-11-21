@@ -7,7 +7,11 @@
   // (NEH-313), the breadcrumb starts with "Volúmenes", a link to the list,
   // instead of the project's name, and the back button returns there.
   //
-  // Version: 0.3.3
+  // For the testing account (NEH-391) the bar has the Capture button and,
+  // under the breadcrumb, the date Captua removes the volume; it has no
+  // offsite copy line, which the backend refuses it, so nothing polls for it.
+  //
+  // Version: 0.3.4
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -21,7 +25,10 @@
   import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
   import type { VolumeOffsiteState } from '$lib/api';
   import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
-  import { ensureUnit, projectsShownIn, unitState, volumeBackPath } from '$lib/unit-mode';
+  import { canCapture, canManageOffsite, ensureUnit, inTestingSpace, projectsShownIn, takesPartInWorkflow, unitState, volumeBackPath } from '$lib/unit-mode';
+  import { testingExpiry } from '$lib/testing-space';
+  import { formatApiDate } from '$lib/format-date';
+  import { locale } from '$lib/i18n';
 
   let { children } = $props();
 
@@ -44,16 +51,18 @@
     return unsub;
   });
 
-  let canOpenCamera = $derived(
-    currentUser?.role === 'admin' || currentUser?.role === 'operator'
-  );
+  let canOpenCamera = $derived(canCapture(currentUser?.role));
+  // The offsite copy line: not for the testing account. Read from the store,
+  // so the line is never mounted for it before the subscription runs.
+  // Nothing is mounted for it while the signed-in role is not known.
+  let showsOffsite = $derived(!!$authStore.user && takesPartInWorkflow($authStore.user.role));
 
   // Space on the card (NEH-248): free and restore, admin only. The button
   // sits next to the breadcrumb and the offsite copy line, which is what
   // shows what is freed. The backend refuses these routes to other roles.
   // Beside it, keep the volume on the unit or release it (NEH-320), admin
   // only too; a release only once the unit mode is known and is not Scanner only (keptActionOf).
-  let isAdmin = $derived(currentUser?.role === 'admin');
+  let isAdmin = $derived(canManageOffsite(currentUser?.role));
   // The last state the line read: a poll that fails keeps it, so an open
   // dialog is not closed under the admin; it is matched to the volume shown.
   let offsiteState = $state<VolumeOffsiteState | null>(null);
@@ -84,6 +93,10 @@
   // Project and volume names come from the load in +layout.ts.
   let projectName    = $derived(($page.data as any).projectName    ?? '—');
   let collectionName = $derived(($page.data as any).collectionName ?? '—');
+  // When Captua removes a testing volume, for the testing account only.
+  let expiry = $derived(
+    inTestingSpace($authStore.user?.role) ? testingExpiry(($page.data as any).collectionTestingExpiresAt) : null
+  );
 </script>
 
 <div class="gallery-shell">
@@ -110,7 +123,14 @@
           <span class="bc-sep">/</span>
           <span class="bc-item bc-collection">{collectionName}</span>
         </nav>
-        <VolumeOffsiteIndicator {collectionId} refresh={offsiteRefresh} onState={offsiteRead} />
+        {#if showsOffsite}
+          <VolumeOffsiteIndicator {collectionId} refresh={offsiteRefresh} onState={offsiteRead} />
+        {/if}
+        {#if expiry}
+          <p class="testing-expiry" class:soon={expiry.soon}>
+            {expiry.due ? $m.testing_expires_due : $m.testing_expires_on(formatApiDate(expiry.at.toISOString(), $locale, { day: 'numeric', month: 'long', year: 'numeric' }))}
+          </p>
+        {/if}
       </div>
       {#if isAdmin && offsiteState && offsiteState.collection_id === collectionId}
         {#key collectionId}
@@ -122,7 +142,7 @@
       {/if}
     </div>
 
-    <!-- Camera button for operator and admin only -->
+    <!-- Camera button for operator, admin and the testing account -->
     <div class="topbar-right">
 
       {@render topbarSlot.actions?.()}
@@ -180,6 +200,9 @@
     gap: 12px;
     min-width: 0;
   }
+
+  .testing-expiry { margin: 2px 0 0; font-size: var(--text-xs); color: var(--color-light-grey); }
+  .testing-expiry.soon { color: var(--color-warning); }
 
   .topbar-right {
     display: flex;
