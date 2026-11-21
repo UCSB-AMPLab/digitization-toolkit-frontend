@@ -43,6 +43,8 @@ export const es = {
 	common_capture: 'Capturar',
 	common_email: 'Correo electrónico',
 	common_confirm_password: 'Confirmar contraseña',
+	// The rule every new password is held to (lib/password-rule.ts), shown by the three forms that set one.
+	common_password_too_short: (min: number) => `La contraseña debe tener al menos ${min} caracteres.`,
 	record_fallback_title: (id: number | string) => `Registro #${id}`,
 	common_filters: 'Filtros',
 	common_saving: 'Guardando…',
@@ -399,6 +401,33 @@ export const es = {
 	// when the account has an email address, and the "?" comes last.
 	users_delete_confirm_pre: '¿Estás seguro que quieres eliminar a ',
 	users_delete_btn: 'Sí, eliminar',
+	// Set password (NEH-395): an administrator gives another user a new password.
+	users_password_action: 'Asignar contraseña',
+	users_password_title: (name: string) => `Contraseña nueva para ${name}`,
+	users_password_new_label: 'Contraseña nueva',
+	users_password_repeat_label: 'Confirmar contraseña nueva',
+	users_password_signout_note: 'Al guardar, Captua cierra todas las sesiones de esta persona.',
+	users_password_done: (name: string) => `${name} ya tiene una contraseña nueva. Captua cerró todas las sesiones de esta persona.`,
+	users_password_err_user_not_found: 'Este usuario ya no existe. Vuelve a cargar la lista.',
+	users_password_err_testing_account: 'Esta es la cuenta de pruebas. Su contraseña se asigna en Configuración › Pruebas.',
+	users_password_err_own_account: 'Esta es tu cuenta. Para cambiar tu contraseña, abre el menú de tu cuenta y elige Cambiar contraseña. Vas a necesitar la contraseña actual.',
+	users_password_err_not_permitted: 'Solo un administrador puede asignarle una contraseña a otra persona.',
+	users_password_err_invalid: 'Captua no aceptó esta contraseña. Prueba con otra.',
+	users_password_err_generic: 'No se pudo guardar la contraseña. Intenta de nuevo.',
+	// Change password (NEH-395): the signed-in user changes their own, from the account menu.
+	account_password_action: 'Cambiar contraseña',
+	account_password_title: 'Cambiar tu contraseña',
+	account_password_current_label: 'Contraseña actual',
+	account_password_new_label: 'Contraseña nueva',
+	account_password_repeat_label: 'Confirmar contraseña nueva',
+	account_password_signout_note: 'Al guardar, Captua cierra todas tus sesiones, incluida la que estás usando.',
+	account_password_val_current_required: 'Escribe tu contraseña actual.',
+	account_password_done_title: 'Ya tienes una contraseña nueva',
+	account_password_done: 'Captua cerró todas tus sesiones. Vuelve a iniciar sesión con la contraseña nueva.',
+	account_password_err_wrong_current: 'La contraseña actual no es correcta.',
+	account_password_err_testing_account: 'La contraseña de la cuenta de pruebas la asigna un administrador, en Configuración › Pruebas.',
+	account_password_err_invalid: 'Captua no aceptó esta contraseña. Prueba con otra.',
+	account_password_err_generic: 'No se pudo cambiar tu contraseña. Intenta de nuevo.',
 
 	// ── Projects (list) ──────────────────────────────────────────────────────
 	proj_title: 'Gestión de Proyectos',
@@ -894,7 +923,6 @@ export const es = {
 	setup_val_username_short: 'El usuario debe tener al menos 3 caracteres',
 	setup_val_email_format: 'Formato de correo no válido',
 	setup_val_password_required: 'La contraseña es obligatoria',
-	setup_val_password_short: 'La contraseña debe tener al menos 8 caracteres',
 	setup_val_password_mismatch: 'Las contraseñas no coinciden',
 
 	// ── Welcome ──────────────────────────────────────────────────────────────

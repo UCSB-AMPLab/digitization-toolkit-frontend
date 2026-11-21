@@ -378,6 +378,16 @@ export function checksStemWithFisqua(role: string | null | undefined): boolean {
 	return role === 'admin';
 }
 
+/** Set password on the Users page, for another user: admin. */
+export function setsUserPasswords(role: string | null | undefined): boolean {
+	return role === 'admin';
+}
+
+/** Change password in the account menu: every role but the testing account, whose password an admin sets. */
+export function changesOwnPassword(role: string | null | undefined): boolean {
+	return role !== null && role !== undefined && !inTestingSpace(role);
+}
+
 /** The Unit sections of Settings: admin (the testing account gets Power only, settings-sections.ts). */
 export function opensUnitSettings(role: string | null | undefined): boolean {
 	return role === 'admin';

@@ -288,8 +288,10 @@ export function endRejectedSession(): void {
   signOut(sessionRenewals.stop().then((wasInFlight) => (wasInFlight ? sendLogoutRequest() : undefined)));
 }
 
-// The sign-out on a 401 that means this tab's session is dead (isDeadSession).
-function endDeadSession(): void {
+// The sign-out on a 401 that means this tab's session is dead (isDeadSession),
+// and after the user's own password change, which has ended every session of
+// the user, this one included.
+export function endDeadSession(): void {
   endRejectedSession();
   if (!window.location.pathname.startsWith('/login')) {
     goto('/login');
@@ -535,7 +537,11 @@ export const authApi = {
   },
 
   /**
-   * Change user password
+   * Change the signed-in user's own password, with the current one. On
+   * success the backend has ended every session of the user, this one
+   * included; the caller ends this tab's (endDeadSession). A wrong current
+   * password is a 401 with the detail "Old password incorrect", which this
+   * endpoint never treats as a dead session (SESSION_EXEMPT_ENDPOINTS).
    */
   async resetPassword(oldPassword: string, newPassword: string): Promise<void> {
     await apiRequest('/auth/password-reset', {
@@ -608,6 +614,18 @@ export const usersApi = {
   async setActive(id: number, isActive: boolean): Promise<UserRead> {
     return apiRequest<UserRead>(`/auth/users/${id}/active?is_active=${isActive}`, {
       method: 'PATCH',
+    });
+  },
+
+  /**
+   * Give another user a new password. Requires an admin session. The backend
+   * ends every session of that user; it refuses the testing account and the
+   * administrator's own account with a {code, message} detail.
+   */
+  async setPassword(id: number, newPassword: string): Promise<UserRead> {
+    return apiRequest<UserRead>(`/auth/users/${id}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ new_password: newPassword }),
     });
   },
 
