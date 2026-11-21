@@ -40,6 +40,7 @@
     type CaptureChord,
     type OwnsEventContext
   } from '$lib/capture-key';
+  import { createNoFrameRun, LAST_PAIR_NO_FRAME_ANSWERS, NO_FRAME_SECONDS, type NoFrameRun } from '$lib/no-frame-run';
   import { defaultRecordTitle } from '$lib/record-title';
   import { isConflict } from '$lib/volume-stem';
   import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
@@ -264,16 +265,13 @@
   const PREVIEW_INTERVAL_MS = 2000;
 
   // A connected camera that sent no frame answers 503 preview_frame_failed
-  // (NEH-349): its pane keeps the last frame and polling goes on. After this
-  // many such answers in a row the pane shows "connected, no image" (not the
-  // missing-camera notice, since the camera is connected): 15 polls at
-  // PREVIEW_INTERVAL_MS (2 s) = 30 s, longer when answers are slower than the
-  // interval, since a camera has one request in flight at a time.
-  const NO_FRAME_RUN_LIMIT = 15;
-  // Last-pair mode asks only when the operator does (on entry, after a
-  // capture, "Refresh preview"), so a run of this many such answers, one per
-  // request, is enough to show the same notice.
-  const LAST_PAIR_NO_FRAME_LIMIT = 3;
+  // (NEH-349): its pane keeps the last frame and polling goes on. Once such
+  // answers have lasted NO_FRAME_SECONDS (src/lib/no-frame-run.ts, the same
+  // on the overview) the pane shows "connected, no image" (not the
+  // missing-camera notice, since the camera is connected). Last-pair mode
+  // asks only when the operator does (on entry, after a capture, "Refresh
+  // preview"), so it has no pace to measure seconds by: it shows the same
+  // notice after LAST_PAIR_NO_FRAME_ANSWERS such answers in a row.
 
   // Object URLs of the latest preview frame from each camera, keyed by camera
   // index. Which index shows on the left depends on `swapped`.
@@ -469,7 +467,8 @@
 
   // Per camera, the 503 preview_frame_failed answers since that camera's
   // last other answer (the limit depends on the preview mode).
-  const noFrameRun: Record<number, number> = {};
+  const noFrameRun: Record<number, NoFrameRun> = {};
+  const noFrameRunOf = (cam: number) => (noFrameRun[cam] ??= createNoFrameRun());
 
   // Per camera, the preview errors since that camera's last other answer.
   // The reconnect banner shows while any camera's run has reached the limit.
@@ -509,11 +508,17 @@
   // that camera's run only. A no-image notice, once shown, stays through further
   // 'no-frame' answers.
   function recordAnswer(cam: number, answer: CameraAnswer) {
-    const run = answer === 'no-frame' ? (noFrameRun[cam] ?? 0) + 1 : 0;
-    noFrameRun[cam] = run;
-    const limit = lastPair ? LAST_PAIR_NO_FRAME_LIMIT : NO_FRAME_RUN_LIMIT;
+    const run = noFrameRunOf(cam);
+    let limitReached = false;
+    if (answer === 'no-frame') {
+      limitReached = run.noFrame(
+        lastPair ? { answers: LAST_PAIR_NO_FRAME_ANSWERS } : { seconds: NO_FRAME_SECONDS }
+      );
+    } else {
+      run.frame();
+    }
     const missing = answer === 'missing';
-    const noImage = answer === 'no-frame' && (run >= limit || !!cameraNoImage[cam]);
+    const noImage = answer === 'no-frame' && (limitReached || !!cameraNoImage[cam]);
     if (!!cameraMissing[cam] !== missing) cameraMissing = { ...cameraMissing, [cam]: missing };
     if (!!cameraNoImage[cam] !== noImage) cameraNoImage = { ...cameraNoImage, [cam]: noImage };
     const errors = answer === 'error' ? (previewErrorRun[cam] ?? 0) + 1 : 0;
@@ -566,7 +571,7 @@
       } else if (await isPreviewFrameFailedResponse(response)) {
         // Connected, no frame this time: not an error, and the backend has
         // just said the camera is there. The pane keeps its frame until the
-        // run reaches NO_FRAME_RUN_LIMIT.
+        // run reaches its limit.
         if (!lastPair) recordAnswer(cameraIndex, 'no-frame');
         return 'no-frame';
       } else {
@@ -831,7 +836,7 @@
     // Every camera's run of no-frame answers and of errors starts again.
     // A camera the new mode does not poll would otherwise keep its error
     // run, and with it the reconnect banner, with no answer left to end it.
-    for (const cam of Object.keys(noFrameRun)) noFrameRun[Number(cam)] = 0;
+    for (const cam of Object.keys(noFrameRun)) noFrameRun[Number(cam)].reset();
     cameraNoImage = {};
     previewErrorRun = {};
 
