@@ -1,7 +1,7 @@
 // What the testing account may do (NEH-391), decided in one place
 // (unit-mode.ts), and the helpers of its screens (testing-space.ts).
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import {
 	canCapture,

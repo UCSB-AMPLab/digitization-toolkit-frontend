@@ -4,7 +4,7 @@
 // read when it is still in the volume. With no records the selection is left
 // as it was, as the page has always done.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 export function selectionAfterLoad(
 	records: ReadonlyArray<{ id: number }>,

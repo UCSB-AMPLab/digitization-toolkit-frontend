@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 const DEFAULT_REPO = 'UCSB-AMPLab/digitization-toolkit-software';
 

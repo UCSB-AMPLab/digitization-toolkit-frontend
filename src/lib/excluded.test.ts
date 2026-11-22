@@ -1,7 +1,7 @@
 // The note shown on a record Fisqua excluded (contract 1.6): the note of the
 // latest change into "excluded", read off the volume's status history.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { exclusionNote } from './excluded';
 

@@ -1,4 +1,4 @@
-// Version: 0.3.3
+// Version: 0.3.0
 
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';

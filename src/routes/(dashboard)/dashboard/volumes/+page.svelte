@@ -25,7 +25,7 @@
 	// its project: the backend takes any target attached to a project, and a
 	// volume alone in an old project would otherwise have nowhere to go.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onDestroy, onMount } from 'svelte';
 	import { get } from 'svelte/store';

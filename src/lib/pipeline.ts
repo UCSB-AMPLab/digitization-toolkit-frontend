@@ -13,7 +13,7 @@
 // pages.
 // ============================================================================
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { CollectionActivity, StatusCounts } from '$lib/api';
 

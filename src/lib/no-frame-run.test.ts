@@ -1,7 +1,7 @@
 // The run of preview answers without a frame, counted in seconds for a
 // continuous preview and in answers for last-pair mode.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { createNoFrameRun, LAST_PAIR_NO_FRAME_ANSWERS, NO_FRAME_SECONDS } from './no-frame-run';
 

@@ -15,7 +15,7 @@
 // none); any other request is answered 403, as the backend answers it, and is
 // kept in `refused`, so a test asserts that list is empty.
 //
-// Version: 0.1.1
+// Version: 0.3.0
 
 import { vi } from 'vitest';
 

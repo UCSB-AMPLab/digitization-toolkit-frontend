@@ -15,7 +15,7 @@
 	// requested or shown for it: the storage alert, the retake summary, the
 	// volumes in progress, the activity calendar and the camera panels.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { onMount, onDestroy } from 'svelte';
 	import { authStore } from '$lib/stores/auth';

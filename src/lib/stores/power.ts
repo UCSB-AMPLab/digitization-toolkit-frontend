@@ -3,7 +3,7 @@
 // power confirmation: the account menu that opens it lives in the top bar, so
 // the capture view has no other way to know it is up.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { writable, derived } from 'svelte/store';
 

@@ -17,7 +17,7 @@
 // how many were opened over a given one, so that a screen's capture key acts
 // only while nothing covers it.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import { writable, type Readable } from 'svelte/store';
 

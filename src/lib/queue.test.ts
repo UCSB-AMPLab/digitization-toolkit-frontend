@@ -5,7 +5,7 @@
 // and Cola's three sections (0.3.1): in progress, recaptures and rescans,
 // new material, with Siguiente and the recapture turn's lock.
 //
-// Version: 0.3.2
+// Version: 0.3.0
 import { describe, it, expect } from 'vitest';
 import type { QueueItem, QueueList, ImportReject, RecordToRetake, StatusCounts } from './api';
 import {

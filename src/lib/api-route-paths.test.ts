@@ -3,7 +3,7 @@
 // with the backend declaration it comes from; a literal that names the same
 // prefix without the slash fails the second test.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import source from './api.ts?raw';
 

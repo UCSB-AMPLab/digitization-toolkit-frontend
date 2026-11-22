@@ -6,7 +6,7 @@
 // cleared after every request, and both languages. The /system/testing
 // routes are mocked and every request is recorded.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

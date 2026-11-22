@@ -2,7 +2,7 @@
 // <use>, picks the descriptor by locale, and takes its inks from the
 // --logo-* properties in app.css.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { locale } from '$lib/i18n';

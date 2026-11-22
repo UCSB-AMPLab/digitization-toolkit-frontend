@@ -8,7 +8,7 @@
 // stem must be a Fisqua reference code; Fisqua's refusals show under the
 // stem field or as the notice that points to the list import in Cola.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

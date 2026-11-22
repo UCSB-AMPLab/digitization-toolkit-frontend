@@ -14,7 +14,7 @@
 // single-session kiosk and the language is set at the start of each render.
 // A concurrent multi-user deployment would need Svelte context instead.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { derived, writable } from 'svelte/store';
 import { browser } from '$app/environment';

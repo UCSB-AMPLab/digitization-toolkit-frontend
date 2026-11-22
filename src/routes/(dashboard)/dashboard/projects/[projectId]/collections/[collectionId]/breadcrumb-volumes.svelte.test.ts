@@ -3,7 +3,7 @@
 // project's name, and the back button returns to Volúmenes. With projects
 // shown, or the unit's state not read, both stay as they were.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

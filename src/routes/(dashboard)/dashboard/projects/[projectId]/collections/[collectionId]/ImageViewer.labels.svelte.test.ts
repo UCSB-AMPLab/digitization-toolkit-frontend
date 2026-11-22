@@ -10,7 +10,7 @@
 // panel and the 80px toolbar) and 660px with it closed; on a 1920px screen,
 // 1520px.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';

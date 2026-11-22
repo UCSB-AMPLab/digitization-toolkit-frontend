@@ -2,7 +2,7 @@
 // it, the message for each failure code in both languages, and the
 // request recorder's route table.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { canCopyToUsb } from './unit-mode';
 import { testingRefusalText, usbFailureCode, usbFailureText } from './testing-space';

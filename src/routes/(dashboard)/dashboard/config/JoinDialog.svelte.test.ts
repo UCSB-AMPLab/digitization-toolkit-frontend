@@ -5,7 +5,7 @@
 // while the unit changes network, giving up at 240 s and polling quietly
 // after that. No password or user name goes into a URL or a console call.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

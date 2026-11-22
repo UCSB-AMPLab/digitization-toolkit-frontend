@@ -15,7 +15,7 @@
 	// the table drops its Proyecto column and the board its project line.
 	// ============================================================================
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';

@@ -3,7 +3,7 @@
 // own rotation, and in double mode the two panels sit side by side at a
 // common height, so their aspects add rather than average.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 export type Frame = { w: number; h: number; rotation: number };
 

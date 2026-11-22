@@ -4,7 +4,7 @@
 // when the sidebar is collapsed; "Network state unknown" when no read has
 // succeeded; nothing at all on a 501.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

@@ -2,7 +2,7 @@
 // with {"zoom_step": n} answers with the step the camera confirmed; a refusal
 // keeps the backend's detail, and pydantic's list form stays readable.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

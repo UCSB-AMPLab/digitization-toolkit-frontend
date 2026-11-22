@@ -18,7 +18,7 @@
 // aborted and counts as failed, so one request that never returns cannot
 // hold up the reads after it.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { writable } from 'svelte/store';
 import { networkApi, type NetworkInterface, type NetworkStatus } from '$lib/api';

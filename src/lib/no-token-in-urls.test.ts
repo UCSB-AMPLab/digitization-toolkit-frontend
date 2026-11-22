@@ -2,6 +2,8 @@
 // no source file outside the migration reads or writes the old localStorage
 // token key. The session is an httpOnly cookie; a token in a URL lands in
 // access logs, browser history and Referer headers.
+//
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 
 const sources = import.meta.glob('/src/**/*.{ts,svelte}', {

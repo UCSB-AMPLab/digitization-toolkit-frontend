@@ -5,7 +5,7 @@
 // empty. Run on Volúmenes at the unit's 800x480 screen, with app.css, as
 // page-fisqua.svelte.test.ts does.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

@@ -37,7 +37,7 @@
 	// No socket name or USB path is shown. A save refused because a camera
 	// went away reads everything again and asks to choose again.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onDestroy, onMount } from 'svelte';
 	import {

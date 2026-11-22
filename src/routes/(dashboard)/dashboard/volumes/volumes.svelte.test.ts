@@ -4,7 +4,7 @@
 // rows open the volume page, and Nuevo volumen opens the volume form without
 // a project. In Fisqua mode an operator has no Nuevo volumen (NEH-311).
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

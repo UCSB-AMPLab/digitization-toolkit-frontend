@@ -18,7 +18,7 @@
 	// the account menu are stacking contexts, and a fixed overlay inside one
 	// could be covered by the page underneath.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 	import { systemApi, healthApi, PowerControlError, type PowerAction } from '$lib/api';

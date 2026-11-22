@@ -2,7 +2,7 @@
 // email field is optional across setup and user forms. A value that is
 // given still has to look like an email.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

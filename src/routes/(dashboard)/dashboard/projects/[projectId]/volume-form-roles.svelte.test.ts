@@ -3,7 +3,7 @@
 // for an administrator who keeps the volume on the unit, kept_on_unit; an
 // operator in Fisqua mode still has no New volume.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

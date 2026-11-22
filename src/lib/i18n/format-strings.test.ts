@@ -3,7 +3,7 @@
 // type: a T7 writes one CR2 holding the JPEG, a CHDK compact sends a DNG and
 // a JPEG of the same capture.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';

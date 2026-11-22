@@ -2,7 +2,7 @@
 // there are, a read every 30 s while the tab is visible and none while it is
 // hidden, a 501 that drops the state, and the indicator's three states.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 

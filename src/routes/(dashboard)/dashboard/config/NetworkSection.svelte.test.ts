@@ -5,7 +5,7 @@
 // on), the controls only for administrators and operators on a unit that
 // lets Captua change the network, and the 501 and 503 answers.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

@@ -3,7 +3,7 @@
 // and retry, keeping the saved session, and must not navigate anywhere; only a
 // 401/403 from /users/me ends the session.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { createRawSnippet } from 'svelte';

@@ -9,6 +9,8 @@
 // says nothing was saved and frees the controls).
 // Every other failure behaves as before. Timers are faked; the records are
 // read through the `captureCheck` the page passes.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

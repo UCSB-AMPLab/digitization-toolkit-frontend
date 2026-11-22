@@ -4,7 +4,7 @@
 // fails, which the page already tolerates. Since NEH-253 Storage is one of
 // the administrator's sections, opened with ?section=storage.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

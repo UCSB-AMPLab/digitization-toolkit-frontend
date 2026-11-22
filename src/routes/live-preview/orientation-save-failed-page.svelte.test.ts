@@ -5,7 +5,7 @@
 // writer, without turning anything. A successful save of that camera's
 // orientation removes its notice; each camera has its own.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

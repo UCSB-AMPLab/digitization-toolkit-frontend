@@ -37,7 +37,7 @@
 	// The testing account (NEH-391) gets no status filter and no legend line
 	// on review.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import {
 		recordsApi,

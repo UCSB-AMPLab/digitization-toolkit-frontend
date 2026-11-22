@@ -4,7 +4,7 @@
 // (credentials: 'include') and the CSRF header the backend requires on
 // cookie-authenticated state changes.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const gotoMock = vi.hoisted(() => vi.fn());

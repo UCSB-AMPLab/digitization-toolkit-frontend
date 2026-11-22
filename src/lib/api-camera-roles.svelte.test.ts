@@ -4,7 +4,7 @@
 // backend without /cameras/setup (404) needs no answer, so the capture
 // screen behaves as before.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

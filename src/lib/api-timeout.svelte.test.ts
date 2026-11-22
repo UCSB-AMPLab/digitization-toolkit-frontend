@@ -5,7 +5,7 @@
 // far longer than a list), a caller's own signal still cancels the request,
 // and a timeout leaves the session alone.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 

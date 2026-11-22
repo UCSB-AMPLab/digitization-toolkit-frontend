@@ -19,7 +19,7 @@
 	// projects there are five, not six, and in Fisqua mode, for whoever cannot
 	// create volumes there, four (see $lib/tour.ts).
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { onDestroy, tick } from 'svelte';
 	import { page } from '$app/stores';

@@ -3,7 +3,7 @@
 // pop-up and reads the registry; Escape and the backdrop keep doing what they
 // did before the pop-up was registered.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

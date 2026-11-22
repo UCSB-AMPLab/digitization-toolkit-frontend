@@ -1,7 +1,7 @@
 // The connected network is read from the status, not from the cached list:
 // markConnected, connectedKey and listLacksConnected.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import type {
 	NetworkInterface,

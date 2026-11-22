@@ -3,7 +3,7 @@
 // /dashboard/volumes; with projects shown, or when the unit's state cannot
 // be read, Proyectos stays as it was.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { createRawSnippet } from 'svelte';

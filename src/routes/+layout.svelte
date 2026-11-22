@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import '../app.css';
 	import favicon from '$lib/assets/brand/captua-favicon.svg';

@@ -2,7 +2,7 @@
 // `Messages` in `index.ts`): a missing or extra key here is a type error in
 // `npm run check`.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { Messages } from './index';
 

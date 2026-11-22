@@ -7,7 +7,7 @@
 // in the target backend (E2E_USERNAME, E2E_PASSWORD), since the controls
 // are offered to operators and admins.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import {
 	test,
 	expect,

@@ -22,7 +22,7 @@
 //
 // No import of api.ts values, so the tests run in plain node.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { CameraDevice, CameraSetup } from './api';
 

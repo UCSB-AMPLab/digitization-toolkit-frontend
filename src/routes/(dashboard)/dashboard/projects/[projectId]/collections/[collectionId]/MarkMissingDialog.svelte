@@ -13,7 +13,7 @@
 	// The keyboard stays in the dialog (trapFocus): the focus moves in on
 	// open, Tab wraps inside, and the focus goes back on close.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { collectionsApi, type Record as ApiRecord } from '$lib/api';
 	import { m } from '$lib/i18n';

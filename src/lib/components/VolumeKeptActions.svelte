@@ -13,7 +13,7 @@
 	// kept_volumes.keep and release); the confirmation says so.
 	// ============================================================================
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { collectionsApi, type VolumeOffsiteState } from '$lib/api';
 	import { m } from '$lib/i18n';

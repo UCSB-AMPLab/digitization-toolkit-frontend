@@ -12,7 +12,7 @@
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`).
 //
-// Version: 0.1.5
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 import { parseApiDate } from './pipeline';

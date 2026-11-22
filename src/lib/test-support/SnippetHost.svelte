@@ -3,7 +3,7 @@
 	// can mount what a page puts in a slot without the layout that renders it
 	// (the volume top bar's actions). Used by tests only.
 	//
-	// Version: 0.2.0
+	// Version: 0.3.0
 
 	import type { Snippet } from 'svelte';
 

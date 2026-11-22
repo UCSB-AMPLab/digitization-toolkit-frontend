@@ -3,7 +3,7 @@
 // and no move request; every other role keeps the stem refusal and the move
 // select. The 409 `testing_volume_busy` has its own line.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

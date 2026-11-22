@@ -1,7 +1,7 @@
 // The book view's "position / total", with the thousands separator of each
 // language on both numbers.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

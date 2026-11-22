@@ -26,7 +26,7 @@
 	// Over a thumbnail the notice is one line, so the operator keeps the page to
 	// compare against the volume; a toggle opens the rest. On its own it is whole.
 	//
-	// Version: 0.2.0
+	// Version: 0.3.0
 
 	import { untrack, type Snippet } from 'svelte';
 	import { recordsApi, sessionRequestInit, type RecordImage } from '$lib/api';

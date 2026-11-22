@@ -3,7 +3,7 @@
 // accessible name of the badge form; the caller's class and id on the
 // element; never wrapping.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

@@ -7,7 +7,7 @@
 // setTimeout stays real, so the 5-minute poll never fires during a test and
 // the request timeout is tested in catalogue-backup.test.ts instead.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

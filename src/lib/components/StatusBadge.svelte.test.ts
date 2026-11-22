@@ -1,7 +1,7 @@
 // The status badge names every record status, Fisqua's "excluded" (contract
 // 1.6) included.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { afterEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { locale } from '$lib/i18n';

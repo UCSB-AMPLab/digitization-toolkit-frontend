@@ -25,7 +25,7 @@
 // recapture's retakes are named as Por recapturar names a record.
 // ============================================================================
 //
-// Version: 0.3.1
+// Version: 0.3.0
 
 import type {
 	ImportReject,

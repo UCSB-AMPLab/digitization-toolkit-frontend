@@ -4,7 +4,7 @@
 // camera), the page term, and both facts as the badge's title and in the
 // picture's alt. In single-camera mode it names neither.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

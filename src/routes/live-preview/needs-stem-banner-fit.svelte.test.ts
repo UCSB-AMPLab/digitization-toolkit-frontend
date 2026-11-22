@@ -2,7 +2,7 @@
 // must not shrink to a column of one word per line. Run on the real page with
 // app.css, in single and double mode, for a volume without a stem.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';

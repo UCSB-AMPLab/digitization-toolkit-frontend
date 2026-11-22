@@ -4,7 +4,7 @@
 	// it goes to `/setup` to create the administrator account, otherwise — or
 	// when the check fails — to `/login`.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { authApi } from '$lib/api';
 	import { setLanguage, type Locale } from '$lib/i18n';

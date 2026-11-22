@@ -5,7 +5,7 @@
 // a sign-out back by at most SESSION_REFRESH_TIMEOUT_MS. The sign-out on a
 // 401 follows the same order.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const gotoMock = vi.hoisted(() => vi.fn());

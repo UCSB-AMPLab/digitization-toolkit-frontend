@@ -6,7 +6,7 @@
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`, `message`), as volume-stem.ts does.
 //
-// Version: 0.3.4
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 import { FILENAME_STEM_MAX_LENGTH, stemConflict, stemConflictText } from './volume-stem';

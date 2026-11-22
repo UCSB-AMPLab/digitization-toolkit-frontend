@@ -56,7 +56,7 @@
 	// state: they are sent in the POST body and nowhere else, never logged,
 	// and cleared when the dialog closes (and the password once joined).
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onDestroy } from 'svelte';
 	import { m } from '$lib/i18n';

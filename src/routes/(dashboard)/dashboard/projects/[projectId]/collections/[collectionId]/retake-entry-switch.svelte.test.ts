@@ -5,7 +5,7 @@
 // from the last, its handover button is not disabled by it, and no link
 // pairs its id with the last volume's record.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

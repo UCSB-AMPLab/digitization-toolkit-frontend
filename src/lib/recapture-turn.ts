@@ -20,7 +20,7 @@
 // shape (`status`, `detail`), as capture-errors.ts does.
 // ============================================================================
 //
-// Version: 0.3.2
+// Version: 0.3.0
 
 import type { QueueItem, RetakeSummary, RetakeSummaryVolume } from './api';
 

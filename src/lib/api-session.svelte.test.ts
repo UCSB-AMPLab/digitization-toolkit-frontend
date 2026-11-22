@@ -4,7 +4,7 @@
 // request from a tab whose cookie another tab's logout cleared while this
 // tab's authStore still held the session.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const gotoMock = vi.hoisted(() => vi.fn());

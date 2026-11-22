@@ -22,7 +22,7 @@
 // the volume, so it counts as captured and not in missingSideCount.
 // ============================================================================
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { Record } from '$lib/api';
 

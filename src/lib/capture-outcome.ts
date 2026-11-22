@@ -4,7 +4,7 @@
 //
 // Kept free of api.ts (like login-error.ts) so this stays a plain node test.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 

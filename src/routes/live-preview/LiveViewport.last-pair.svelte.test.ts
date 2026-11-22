@@ -2,6 +2,8 @@
 // compact bodies), the capture screen shows the last captured pair and
 // fetches a live frame only when asked, through "Refresh preview". On a unit
 // that reports one, or says nothing, the preview is polled as before.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from '@vitest/browser/context';

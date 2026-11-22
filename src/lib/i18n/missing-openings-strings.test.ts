@@ -2,7 +2,7 @@
 // verbatim, and the variants used while the app has no folio for a record
 // or no next capture number for a volume.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';

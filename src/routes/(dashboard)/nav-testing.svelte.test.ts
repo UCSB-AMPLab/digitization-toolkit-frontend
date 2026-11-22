@@ -4,7 +4,7 @@
 // it, by link and by URL, and the layout does not ask for the retake count the
 // backend refuses it. The Testing marker sits beside the account name.
 //
-// Version: 0.1.1
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { createRawSnippet } from 'svelte';

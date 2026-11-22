@@ -1,7 +1,7 @@
 // The recapture turn's counted strings (0.2.0): each agrees in number with
 // its count, and writes the count with formatCount.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';

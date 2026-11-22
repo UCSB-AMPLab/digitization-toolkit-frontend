@@ -4,7 +4,7 @@
 // panes' height; the zoom buttons are 44px and lie over no picture; and no
 // text in the dialog is smaller than --text-sm (12px).
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';

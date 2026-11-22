@@ -20,7 +20,7 @@
 //
 // No import of api.ts, so the tests run in plain node.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 export interface LoadResult {
 	ok: boolean;

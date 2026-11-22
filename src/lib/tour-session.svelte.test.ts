@@ -2,7 +2,7 @@
 // user who signs out, or whose session the backend ends, is not active for
 // the next account that signs in in the same tab.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 

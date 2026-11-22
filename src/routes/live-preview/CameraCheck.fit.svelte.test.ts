@@ -6,7 +6,7 @@
 // steps apart, a DSLR pair whose focal lengths differ); every button is at
 // least 44px tall. At 1280x800 the same.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';

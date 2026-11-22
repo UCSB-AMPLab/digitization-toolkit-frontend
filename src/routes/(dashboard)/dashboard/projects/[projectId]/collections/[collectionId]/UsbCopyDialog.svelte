@@ -22,7 +22,7 @@
 	// route for it. The polling stops with the dialog, and a reopened dialog
 	// lists the drives again.
 	//
-	// Version: 0.2.0
+	// Version: 0.3.0
 
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { ApiError, collectionsApi, systemApi, type UsbCopyStatus, type UsbDrive } from '$lib/api';

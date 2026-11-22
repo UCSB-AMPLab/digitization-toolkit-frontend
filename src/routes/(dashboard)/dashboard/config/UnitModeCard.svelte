@@ -24,7 +24,7 @@
 	// GET /system/unit does not say who set the mode or when, so the board's
 	// "set by" line is left out.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onMount, tick } from 'svelte';
 	import { m } from '$lib/i18n';

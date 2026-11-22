@@ -1,6 +1,6 @@
 // The route matching of the testing account's request recorder (NEH-391).
 //
-// Version: 0.1.1
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { routeOf } from './testing-routes';
 

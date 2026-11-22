@@ -2,7 +2,7 @@
 // reads them: the GET /system/unit body checked for shape, the labels, the
 // translated 409 problems, and the gates each screen asks.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';

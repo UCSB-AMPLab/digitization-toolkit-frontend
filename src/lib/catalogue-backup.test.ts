@@ -5,7 +5,7 @@
 // local and not UTC ones. Node applies a TZ change made at runtime; nothing
 // here builds a Date before it.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 process.env.TZ = 'America/Bogota';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

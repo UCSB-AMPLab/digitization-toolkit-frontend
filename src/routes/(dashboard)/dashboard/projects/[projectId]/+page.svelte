@@ -18,7 +18,7 @@
 	// format and, while the unit's cameras offer both, changes it with one
 	// PUT; the change applies to the captures made after it.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { onDestroy, onMount } from 'svelte';
 	import { get } from 'svelte/store';

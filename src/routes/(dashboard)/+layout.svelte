@@ -24,7 +24,7 @@
 	// The network status above the user button (NetworkIndicator, NEH-253)
 	// is every role's and links to Settings > Network.
 	//
-	// Version: 0.3.7
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';

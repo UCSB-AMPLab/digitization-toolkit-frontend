@@ -40,6 +40,8 @@
 	// The dialog is moved to <body> (toBody): the account menu sits in top bars
 	// and the sidebar, which are stacking contexts. The keyboard stays in it
 	// (trapFocus).
+	//
+	// Version: 0.3.0
 
 	import { onDestroy, onMount } from 'svelte';
 	import { authStore } from '$lib/stores/auth';

@@ -17,7 +17,7 @@
 // No static import of api.ts or the auth store, so the pure helpers can be
 // tested in plain node; the loader imports them when it first runs.
 //
-// Version: 0.3.4
+// Version: 0.3.0
 
 import { get, writable } from 'svelte/store';
 import type { Messages } from './i18n';

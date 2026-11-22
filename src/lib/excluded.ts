@@ -4,7 +4,7 @@
 // change into "excluded" (GET /collections/{id}/status-changes), not on the
 // record. No import of api.ts, so the tests run in plain node.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 
 interface StatusChangeLike {
 	record_id: number | null;

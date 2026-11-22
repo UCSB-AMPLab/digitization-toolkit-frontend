@@ -2,7 +2,7 @@
 // that keeps its structured detail, and the store that reads the state once
 // per session and again after a change.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 

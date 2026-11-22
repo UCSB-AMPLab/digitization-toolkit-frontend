@@ -15,7 +15,7 @@
 // rather than being shown as the wrong one. No import of api.ts beyond types,
 // so the tests run in plain node.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 import { REQUEST_TIMEOUT_MS } from './catalogue-backup';

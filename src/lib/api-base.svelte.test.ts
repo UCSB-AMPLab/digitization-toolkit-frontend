@@ -1,7 +1,7 @@
 // With the appliance's relative base, every URL the browser is handed (fetch,
 // <img> src, links, downloads) stays on the page's own origin.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const env = vi.hoisted(() => ({ PUBLIC_API_BASE: '/api' }) as Record<string, string | undefined>);

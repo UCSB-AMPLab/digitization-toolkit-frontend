@@ -11,7 +11,7 @@
 	// that can open Configuración, and the others get the same pill without a
 	// link.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 	import { m, locale } from '$lib/i18n';
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
 	import {

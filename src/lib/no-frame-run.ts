@@ -16,7 +16,7 @@
 // The clock is injectable so tests need no real waiting. No import of
 // anything else, so the tests run in plain node.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 export const NO_FRAME_SECONDS = 30;
 export const LAST_PAIR_NO_FRAME_ANSWERS = 3;

@@ -4,7 +4,7 @@
 // without the slash, so these tests read the path it recorded, which is the
 // path as sent.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

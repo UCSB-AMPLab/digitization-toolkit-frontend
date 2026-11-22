@@ -2,6 +2,8 @@
 // debounce window, must all reach the camera. The sliders and the shutter
 // and ISO pickers each send a partial CameraControlsRequest; the panel merges
 // pending requests into one and sends the merged request once.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

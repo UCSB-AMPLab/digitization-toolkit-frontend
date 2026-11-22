@@ -1,7 +1,7 @@
 // activityApi.collections(): the request it sends for GET /activity/collections
 // and what it returns or throws.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

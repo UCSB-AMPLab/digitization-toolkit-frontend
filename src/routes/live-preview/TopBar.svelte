@@ -10,7 +10,7 @@
 	// testing account, NEH-391) there is no review button, and `testing`
 	// puts the Testing marker beside the breadcrumb.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 	import UserMenu from '$lib/components/UserMenu.svelte';

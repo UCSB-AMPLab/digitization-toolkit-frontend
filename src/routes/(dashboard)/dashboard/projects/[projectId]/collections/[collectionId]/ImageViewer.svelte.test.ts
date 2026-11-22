@@ -2,7 +2,7 @@
 // moved out of the image frame (below it, in static flow) so it never
 // covers foliation or marginalia at any zoom.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

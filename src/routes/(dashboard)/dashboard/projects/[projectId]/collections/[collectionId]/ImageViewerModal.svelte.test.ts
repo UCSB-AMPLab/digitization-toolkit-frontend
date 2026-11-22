@@ -2,7 +2,7 @@
 // none before — a plain <img> with no zoom at all), and drag-to-pan on the
 // image itself.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

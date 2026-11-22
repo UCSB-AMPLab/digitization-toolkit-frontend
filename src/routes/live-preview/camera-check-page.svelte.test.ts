@@ -5,7 +5,7 @@
 // camera's orientation through the capture screen's own writer: the same
 // PUT, one at a time per camera, optimistic and logged on failure.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

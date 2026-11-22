@@ -5,7 +5,7 @@
 // runs every interval while the page is visible and stops once the page has
 // been hidden for long.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	groupCode,

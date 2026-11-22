@@ -9,7 +9,7 @@
 // `e2e_neh210` account provisioned in this dev environment):
 //   E2E_USERNAME, E2E_PASSWORD
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import {
 	test,
 	expect,

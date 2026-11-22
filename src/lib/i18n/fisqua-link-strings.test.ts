@@ -2,7 +2,7 @@
 // catalogues, "workspace" and "unit" in English (never "tenant", never
 // "please"), "equipo" for the unit in Spanish, and no guillemets.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';

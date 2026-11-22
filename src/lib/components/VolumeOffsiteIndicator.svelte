@@ -19,7 +19,7 @@
 	// not for a volume Captua keeps on the unit (NEH-320), whose line,
 	// `kept`, has no icon either.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 	import { untrack } from 'svelte';
 	import { m, locale } from '$lib/i18n';
 	import { collectionsApi, AuthError } from '$lib/api';

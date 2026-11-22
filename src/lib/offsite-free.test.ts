@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { describe, expect, it, vi } from 'vitest';
 import { es } from './i18n/es';

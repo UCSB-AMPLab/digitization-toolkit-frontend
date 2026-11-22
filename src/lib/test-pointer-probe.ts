@@ -8,7 +8,7 @@
 // (1920x1080), which a headless run scales to cover the whole runner page, a
 // control at each corner and at the centre of the frame is not hovered either.
 //
-// Version: 0.3.7
+// Version: 0.3.0
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 

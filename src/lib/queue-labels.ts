@@ -3,7 +3,7 @@
 // from app/core/list_import.py's REASONS; a code the catalogue does not know
 // is shown as it comes rather than hidden.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { Messages } from '$lib/i18n';
 

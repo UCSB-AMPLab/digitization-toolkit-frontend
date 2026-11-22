@@ -4,7 +4,7 @@
 // and a refused switch shown as translated lines with the mode the unit
 // stays in. GET and PUT /system/unit are mocked.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

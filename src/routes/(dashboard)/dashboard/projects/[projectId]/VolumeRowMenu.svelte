@@ -12,7 +12,7 @@
 	// menu has Eliminar only. What each action does is the page's (the volume
 	// form, the delete dialog). A click anywhere else closes it.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 	import { onDestroy } from 'svelte';
 	import { m } from '$lib/i18n';
 	import type { Collection } from '$lib/api';

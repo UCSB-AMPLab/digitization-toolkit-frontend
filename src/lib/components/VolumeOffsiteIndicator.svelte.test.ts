@@ -2,7 +2,7 @@
 // backend with a request made after the job ended, also when the regular poll
 // has a request in flight at that moment.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { page } from 'vitest/browser';
 import { flushSync } from 'svelte';

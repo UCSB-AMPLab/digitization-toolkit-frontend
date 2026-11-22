@@ -29,6 +29,8 @@
 //
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `name`), as capture-errors.ts does.
+//
+// Version: 0.3.0
 
 import { CaptureNotSaved } from './capture-errors';
 

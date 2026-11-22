@@ -8,7 +8,7 @@
 // drifting apart: they all read the same two numbers and apply the same
 // pure functions below to their own measured geometry.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 export type Size = { w: number; h: number };
 export type Pan = { x: number; y: number };

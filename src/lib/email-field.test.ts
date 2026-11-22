@@ -2,7 +2,7 @@
 // so email became optional on setup/user forms. These are the two pure
 // helpers that back that behavior.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { describe, it, expect } from 'vitest';
 import { normalizeEmail, emailFormatError } from './email-field';
 

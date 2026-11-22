@@ -2,7 +2,7 @@
 // the camera check. Steps run from 0 to zoom_steps - 1; a failed request's
 // detail is the backend's, in either of the two forms it sends.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { clampStep, stepRange, zoomFailureDetail } from './zoom-steps';
 

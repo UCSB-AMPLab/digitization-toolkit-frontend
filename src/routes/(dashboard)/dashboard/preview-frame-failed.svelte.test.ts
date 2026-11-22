@@ -6,7 +6,7 @@
 // frame clears it. A no-frame answer also clears "Not detected" left by an
 // earlier 404. A 404 and a 503 without the code behave as they did before.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

@@ -4,7 +4,7 @@
 // DOM. KeyboardEvent-shaped plain objects stand in for real events; a fake
 // `localStorage` stands in for the browser's.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

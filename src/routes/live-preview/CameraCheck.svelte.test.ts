@@ -7,7 +7,7 @@
 // camera's saved orientation, as Captua saves it, and "Turn" turns that
 // camera by 90° through the capture screen's own orientation writer.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

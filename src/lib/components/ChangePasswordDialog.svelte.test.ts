@@ -4,6 +4,8 @@
 // user, this one included, so on success this tab's session is ended at
 // once, as any dead session is, and the login page shows the confirmation
 // (loginNotice). A wrong current password keeps the dialog open.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

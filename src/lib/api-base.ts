@@ -10,7 +10,7 @@
 // where a relative URL has no origin to resolve against, so it uses
 // PUBLIC_API_BASE_SSR, or PUBLIC_API_BASE only when that is absolute.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 export const DEFAULT_API_BASE = 'http://localhost:8000';
 
 export interface ApiBaseEnv {

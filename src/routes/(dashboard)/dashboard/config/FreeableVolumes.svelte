@@ -26,6 +26,8 @@
 	// In offline mode (`mode_allows` false) freeing is refused with
 	// off_in_this_mode, so no row is shown and a line says why. A list that
 	// cannot be read and an empty list each have their own line.
+	//
+	// Version: 0.3.0
 
 	import { onMount, tick } from 'svelte';
 	import { collectionsApi, systemApi, type FreeableVolumes } from '$lib/api';

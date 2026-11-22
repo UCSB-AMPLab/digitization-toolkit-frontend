@@ -6,7 +6,7 @@
 	// power confirmation are AccountMenu's, which the dashboard sidebar's user
 	// row opens too; this file adds the avatar trigger and the identity header.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { authStore } from '$lib/stores/auth';
 	import { roleLabel } from '$lib/i18n';

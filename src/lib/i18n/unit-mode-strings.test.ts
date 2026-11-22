@@ -1,6 +1,6 @@
 // The strings of the unit's mode (NEH-311) whose text was ruled on.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';

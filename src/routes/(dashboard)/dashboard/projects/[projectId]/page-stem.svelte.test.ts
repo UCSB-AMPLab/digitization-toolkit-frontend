@@ -5,7 +5,7 @@
 // Its Status column shows each volume's pipeline stage, from
 // GET /activity/collections.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

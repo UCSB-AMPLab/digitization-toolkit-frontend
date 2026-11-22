@@ -1,7 +1,7 @@
 // roleLabel translates the role the backend sends, the testing role (NEH-391)
 // included.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, describe, expect, it } from 'vitest';
 import { get } from 'svelte/store';
 import { locale, roleLabel } from './index';

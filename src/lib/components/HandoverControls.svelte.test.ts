@@ -2,7 +2,7 @@
 // buttons show for which mix of statuses, what each dialog says, and what is
 // reported after promote and take-back answer.
 //
-// Version: 0.3.2
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

@@ -16,7 +16,7 @@
 	// the caller styles with :global() because this element is not in its
 	// scope.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 

@@ -4,6 +4,8 @@
 // when the page is left, so it is shown for that one visit. The login page
 // reads it reactively, so a notice set while the page is already open, after
 // a background 401 took the screen there first, still appears.
+//
+// Version: 0.3.0
 
 import { writable } from 'svelte/store';
 

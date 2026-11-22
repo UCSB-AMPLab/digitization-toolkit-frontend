@@ -9,7 +9,7 @@
 	// are the check's object URLs, which the check revokes, not this viewer.
 	// Close and Escape close it.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 	import { dismissible, trapFocus } from '$lib/dialog';

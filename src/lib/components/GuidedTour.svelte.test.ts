@@ -2,7 +2,7 @@
 // unit's mode, so that dropping the project step leaves "1 / 5", not a
 // count of six with a step the operator cannot do.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

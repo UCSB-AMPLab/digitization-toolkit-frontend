@@ -2,7 +2,7 @@
 // signed-in page renews it, /live-preview included, which is outside the
 // dashboard layout. Signed out, input renews nothing.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';

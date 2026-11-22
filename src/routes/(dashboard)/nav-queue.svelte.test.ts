@@ -3,7 +3,7 @@
 // the records waiting, from GET /records/to-retake/count, read again on
 // every navigation: a count of 0, or a failed count, takes the badge away.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { createRawSnippet } from 'svelte';

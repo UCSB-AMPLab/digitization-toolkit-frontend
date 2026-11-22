@@ -7,7 +7,7 @@
 // the route guards send it to /login once, and the next load finds nothing to
 // migrate.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

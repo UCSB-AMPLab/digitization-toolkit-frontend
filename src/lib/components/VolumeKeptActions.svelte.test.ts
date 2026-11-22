@@ -2,7 +2,7 @@
 // the free and restore actions. POST /keep-on-unit and /release-from-unit
 // are mocked.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

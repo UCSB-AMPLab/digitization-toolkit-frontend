@@ -6,7 +6,7 @@
 // `rejectionReasonText` gives each reason's label and gloss from the
 // catalogue, for every screen that names a reason.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import type { PredefinedRejectionReason } from './api';
 import type { Messages } from './i18n';
 

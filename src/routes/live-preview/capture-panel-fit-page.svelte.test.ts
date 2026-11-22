@@ -4,7 +4,7 @@
 // strip leave the viewport about 268px) with app.css, and at 1280x800 where
 // they stay in one column with dividers.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';

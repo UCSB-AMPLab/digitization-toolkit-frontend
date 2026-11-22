@@ -3,6 +3,8 @@
 // the check that reads the records again every 5 s until the capture
 // appears, or until a read that succeeded at or after 180 s from the start
 // of the check has not found it.
+//
+// Version: 0.3.0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {

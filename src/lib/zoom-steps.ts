@@ -3,7 +3,7 @@
 // steps takes 0..zoom_steps - 1. No import of api.ts, so the tests run in
 // plain node.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 /**
  * The last step both cameras take: one less than the smaller count. Null
