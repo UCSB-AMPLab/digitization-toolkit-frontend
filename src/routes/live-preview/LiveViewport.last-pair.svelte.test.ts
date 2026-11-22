@@ -196,6 +196,41 @@ async function settle() {
 	}
 }
 
+// Waits until each pane given shows a frame of the width given, on real time
+// only. expect.poll and vi.waitFor advance the faked clock by their interval
+// at every retry, so a long wait with them fires the 2 s preview interval by
+// itself; this wait leaves the faked clock alone.
+async function framesShown(container: HTMLElement, widths: Record<number, number>, ms = 5000) {
+	const end = performance.now() + ms;
+	for (const [pane, w] of Object.entries(widths)) {
+		while ((paneImg(container, Number(pane))?.naturalWidth ?? 0) !== w) {
+			if (performance.now() > end) {
+				throw new Error(
+					`pane ${pane} shows ${paneImg(container, Number(pane))?.naturalWidth ?? 0} px, not ${w} px`
+				);
+			}
+			await new Promise((r) => realSetTimeout(r, 20));
+		}
+	}
+}
+
+// One turn of the continuous preview. A camera whose last request is still
+// in flight when the interval fires is not asked again, so the interval is
+// advanced only once every pane shows the frame of its last request; each
+// turn answers with a frame one pixel wider, which tells the two apart. The
+// request goes out as the interval fires, so a count read after this needs
+// no wait. Panes and cameras are the same here (not swapped).
+async function nextPoll(container: HTMLElement, sizes: Record<number, Size>) {
+	const widths: Record<number, number> = {};
+	for (const cam of Object.keys(sizes)) {
+		const size = sizes[Number(cam)];
+		sizes[Number(cam)] = { ...size, w: size.w + 1 };
+		widths[Number(cam)] = size.w + 1;
+	}
+	vi.advanceTimersByTime(2000);
+	await framesShown(container, widths);
+}
+
 beforeEach(() => {
 	locale.set('en');
 	// Only the interval is faked: the polling runs on setInterval, while
@@ -440,18 +475,16 @@ describe('LiveViewport — continuous preview stays as it was (NEH-334)', () => 
 	for (const continuous of [true, undefined] as const) {
 		it(`continuous_preview ${String(continuous)}: polls every 2 s and shows no refresh button or source label`, async () => {
 			capsWith(continuous);
-			const { previewCalls } = stubFetch({
-				preview: { 0: { w: 400, h: 300 }, 1: { w: 300, h: 400 } }
-			});
+			const sizes: Record<number, Size> = { 0: { w: 400, h: 300 }, 1: { w: 300, h: 400 } };
+			const { previewCalls } = stubFetch({ preview: sizes });
 			const screen = renderViewport(baseProps({ cameraMode: 'double' }));
-			await waitForPane(screen.container, 0, 400);
+			await framesShown(screen.container, { 0: 400, 1: 300 });
 			expect(previewCalls.length).toBe(2);
 
-			vi.advanceTimersByTime(2000);
-			await expect.poll(() => previewCalls.length).toBe(4);
-			await settle();
-			vi.advanceTimersByTime(2000);
-			await expect.poll(() => previewCalls.length).toBe(6);
+			await nextPoll(screen.container, sizes);
+			expect(previewCalls.length).toBe(4);
+			await nextPoll(screen.container, sizes);
+			expect(previewCalls.length).toBe(6);
 
 			expect(screen.container.querySelector('.refresh-preview-btn')).toBeNull();
 			expect(screen.container.querySelector('.feed-source')).toBeNull();
@@ -460,12 +493,13 @@ describe('LiveViewport — continuous preview stays as it was (NEH-334)', () => 
 
 	it('a failed capabilities request keeps the continuous preview', async () => {
 		vi.spyOn(camerasApi, 'getCapabilities').mockRejectedValue(new Error('503'));
-		const { previewCalls } = stubFetch({ preview: { 0: { w: 400, h: 300 } } });
+		const sizes: Record<number, Size> = { 0: { w: 400, h: 300 } };
+		const { previewCalls } = stubFetch({ preview: sizes });
 		const screen = renderViewport(baseProps());
-		await waitForPane(screen.container, 0, 400);
+		await framesShown(screen.container, { 0: 400 });
 
-		vi.advanceTimersByTime(2000);
-		await expect.poll(() => previewCalls.length).toBe(2);
+		await nextPoll(screen.container, sizes);
+		expect(previewCalls.length).toBe(2);
 		expect(screen.container.querySelector('.refresh-preview-btn')).toBeNull();
 	});
 
@@ -671,17 +705,18 @@ describe('LiveViewport — last pair, review round (NEH-334)', () => {
 		fakeTimeoutToo();
 		const caps = deferred<CameraCapabilities>();
 		vi.spyOn(camerasApi, 'getCapabilities').mockReturnValue(caps.promise);
-		const { previewCalls } = stubFetch({ preview: { 0: { w: 400, h: 300 } } });
+		const sizes: Record<number, Size> = { 0: { w: 400, h: 300 } };
+		const { previewCalls } = stubFetch({ preview: sizes });
 		const screen = renderViewport(baseProps());
 		await runCapabilitiesTimeout(previewCalls);
-		await waitForPane(screen.container, 0, 400);
+		await framesShown(screen.container, { 0: 400 });
 		expect(previewCalls).toEqual([0]);
 
 		caps.resolve({ ...CAPS, continuous_preview: true });
 		await settle();
 		expect(screen.container.querySelector('.refresh-preview-btn')).toBeNull();
-		vi.advanceTimersByTime(2000);
-		await expect.poll(() => previewCalls.length).toBe(2);
+		await nextPoll(screen.container, sizes);
+		expect(previewCalls.length).toBe(2);
 	});
 
 	it('item B: a late false after the timeout stops the polling and switches to last-pair mode', async () => {
@@ -861,9 +896,10 @@ describe('LiveViewport — last pair, review round (NEH-334)', () => {
 
 	it('item 9: continuous, hidden then visible: polling stops and resumes', async () => {
 		capsWith(true);
-		const { previewCalls } = stubFetch({ preview: { 0: { w: 400, h: 300 } } });
+		const sizes: Record<number, Size> = { 0: { w: 400, h: 300 } };
+		const { previewCalls } = stubFetch({ preview: sizes });
 		const screen = renderViewport(baseProps());
-		await waitForPane(screen.container, 0, 400);
+		await framesShown(screen.container, { 0: 400 });
 		expect(previewCalls).toEqual([0]);
 
 		setHidden(true);
@@ -871,11 +907,12 @@ describe('LiveViewport — last pair, review round (NEH-334)', () => {
 		await settle();
 		expect(previewCalls).toEqual([0]);
 
+		sizes[0] = { w: 401, h: 300 };
 		setHidden(false);
-		await expect.poll(() => previewCalls.length).toBe(2);
-		await settle();
-		vi.advanceTimersByTime(2000);
-		await expect.poll(() => previewCalls.length).toBe(3);
+		expect(previewCalls.length).toBe(2);
+		await framesShown(screen.container, { 0: 401 });
+		await nextPoll(screen.container, sizes);
+		expect(previewCalls.length).toBe(3);
 	});
 
 	it('item 8: the refresh button is disabled while the entry fetch is in flight', async () => {
@@ -1053,7 +1090,8 @@ describe('LiveViewport — a capture before last-pair mode is entered (NEH-334)'
 	it('capture while pending, then a continuous answer: nothing changes', async () => {
 		const caps = deferred<CameraCapabilities>();
 		vi.spyOn(camerasApi, 'getCapabilities').mockReturnValue(caps.promise);
-		const { previewCalls, thumbCalls } = stubFetch({ preview: pair, thumbs });
+		const sizes: Record<number, Size> = { ...pair };
+		const { previewCalls, thumbCalls } = stubFetch({ preview: sizes, thumbs });
 		const dual = vi
 			.spyOn(camerasApi, 'captureDual')
 			.mockResolvedValue({ success: true, record_id: 5, image_ids: [11, 12] });
@@ -1062,10 +1100,9 @@ describe('LiveViewport — a capture before last-pair mode is entered (NEH-334)'
 		await expect.poll(() => dual.mock.calls.length).toBe(1);
 
 		caps.resolve({ ...CAPS, continuous_preview: true });
-		await waitForPane(screen.container, 0, 400);
-		await waitForPane(screen.container, 1, 300);
-		vi.advanceTimersByTime(2000);
-		await expect.poll(() => previewCalls.length).toBe(4);
+		await framesShown(screen.container, { 0: 400, 1: 300 });
+		await nextPoll(screen.container, sizes);
+		expect(previewCalls.length).toBe(4);
 		expect(thumbCalls).toEqual([]);
 		expect(screen.container.querySelector('.feed-source')).toBeNull();
 	});
@@ -1083,16 +1120,17 @@ describe('LiveViewport — failing polls before a late switch (NEH-334)', () => 
 		const { previewCalls } = stubFetch(opts);
 		const screen = renderViewport(baseProps());
 		await runCapabilitiesTimeout(previewCalls);
-		await waitForPane(screen.container, 0, 400);
-		await settle();
+		await framesShown(screen.container, { 0: 400 });
 
 		// Two failed polls: below the reconnect banner's three, but failures.
+		// A 500 is answered within microtasks, so after settle() the camera is
+		// free to be asked again.
 		opts.previewStatus = { 0: 500 };
 		vi.advanceTimersByTime(2000);
-		await expect.poll(() => previewCalls.length).toBe(2);
+		expect(previewCalls.length).toBe(2);
 		await settle();
 		vi.advanceTimersByTime(2000);
-		await expect.poll(() => previewCalls.length).toBe(3);
+		expect(previewCalls.length).toBe(3);
 		await settle();
 
 		caps.resolve({ ...CAPS, continuous_preview: false });

@@ -183,6 +183,20 @@ async function press(b: HTMLButtonElement | null) {
 	await settle();
 }
 
+// The two test captures are answered separately, each camera filling its own
+// side, so one side's picture can be on screen while the other is still
+// being taken. A test that goes on to both sides waits for both 1:1 buttons,
+// which show with their pictures.
+async function bothTaken() {
+	await expect
+		.poll(() =>
+			(['left', 'right'] as const).filter(
+				(side) => button(en.camcheck_full_size_aria(side)) === null
+			)
+		)
+		.toEqual([]);
+}
+
 beforeEach(() => {
 	locale.set('en');
 	clearChord();
@@ -505,6 +519,7 @@ describe('CameraCheck: stepped zoom (CHDK)', () => {
 		await expect.poll(() => frameImg('left')?.naturalWidth ?? 0).toBe(400);
 		expect(text()).not.toContain(en.camcheck_stale);
 
+		await expect.poll(() => zoomButton('both', 'in')?.disabled).toBe(false);
 		await press(zoomButton('both', 'in'));
 		expect(text()).toContain(en.camcheck_stale);
 		expect(frame('left')?.hasAttribute('data-stale')).toBe(true);
@@ -531,6 +546,7 @@ describe('CameraCheck: zoom read from the pictures (DSLR)', () => {
 		expect(text()).toContain(en.camcheck_focal_hint);
 
 		await click(en.camcheck_take);
+		await bothTaken();
 		await expect
 			.poll(() => document.querySelector('[data-focal="left"]')?.textContent?.trim())
 			.toBe(`${en.camcheck_focal_value(27)}${en.camcheck_mm}`);
@@ -592,7 +608,7 @@ describe('CameraCheck: focus at full size', () => {
 		await settle();
 		expect(button(en.camcheck_full_size_aria('left'))).toBeNull();
 		await click(en.camcheck_take);
-		await expect.poll(() => button(en.camcheck_full_size_aria('left'))).not.toBeNull();
+		await bothTaken();
 
 		await click(en.camcheck_full_size_aria('right'));
 		const viewer = () => document.querySelector('[role="dialog"][aria-labelledby="fv-title"]');
@@ -685,6 +701,7 @@ describe('CameraCheck: orientation', () => {
 		await settle();
 		const before = frame('left')!.getBoundingClientRect();
 		await click(en.camcheck_take);
+		await bothTaken();
 		await expect.poll(() => frameImg('left')?.naturalWidth ?? 0).toBe(600);
 		expect(rotationOf(frameImg('left'))).toBe('90');
 		expect(rotationOf(frameImg('right'))).toBe('180');
@@ -711,6 +728,7 @@ describe('CameraCheck: orientation', () => {
 
 		captureSpy.mockImplementation(() => shot(600, 400));
 		await click(en.camcheck_take);
+		await bothTaken();
 		await expect.poll(() => rotationOf(frameImg('left'))).toBe('90');
 		await screen.rerender({ rotateDeg: { 0: 180, 1: 0 } });
 		await settle();
@@ -758,7 +776,7 @@ describe('CameraCheck: orientation', () => {
 		renderCheck({ rotateDeg: { 0: 90, 1: 270 } });
 		await settle();
 		await click(en.camcheck_take);
-		await expect.poll(() => button(en.camcheck_full_size_aria('left'))).not.toBeNull();
+		await bothTaken();
 		await click(en.camcheck_full_size_aria('left'));
 		const viewer = () => document.querySelector('[role="dialog"][aria-labelledby="fv-title"]')!;
 		const imgs = () => viewer().querySelectorAll('img');
@@ -789,6 +807,7 @@ describe('CameraCheck: EXIF orientation', () => {
 		renderCheck({ rotateDeg: { 0: 90, 1: 0 } });
 		await settle();
 		await click(en.camcheck_take);
+		await bothTaken();
 		await expect.poll(() => frameImg('left')?.naturalWidth ?? 0).toBe(400);
 		for (const side of ['left', 'right'] as const)
 			expect(getComputedStyle(frameImg(side)!).imageOrientation).toBe('none');
@@ -842,7 +861,7 @@ describe('CameraCheck: Escape as the assigned capture key', () => {
 		const { onClose } = renderCheck();
 		await settle();
 		await click(en.camcheck_take);
-		await expect.poll(() => button(en.camcheck_full_size_aria('left'))).not.toBeNull();
+		await bothTaken();
 		expect(captureSpy).toHaveBeenCalledTimes(2);
 		await click(en.camcheck_full_size_aria('left'));
 		const viewer = () => document.querySelector('[role="dialog"][aria-labelledby="fv-title"]');
