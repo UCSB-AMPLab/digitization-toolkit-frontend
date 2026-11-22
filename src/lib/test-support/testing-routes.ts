@@ -236,11 +236,18 @@ export interface RecordedRequest {
 export type Handler = (req: RecordedRequest) => Response | unknown | Promise<Response | unknown>;
 
 export function json(body: unknown, status = 200): Response {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 /** A refusal as the backend gives it: an HTTP status and a {code, message} detail. */
-export function refusal(status: number, code: string, message = 'Backend text that is never shown.'): Response {
+export function refusal(
+	status: number,
+	code: string,
+	message = 'Backend text that is never shown.'
+): Response {
 	return json({ detail: { code, message } }, status);
 }
 
@@ -266,11 +273,19 @@ export function recordRequests(handlers: { [route: string]: Handler | Response |
 	const refused: RecordedRequest[] = [];
 	const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-		const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+		const method = (
+			init?.method ?? (input instanceof Request ? input.method : 'GET')
+		).toUpperCase();
 		const url = new URL(raw, API_BASE);
 		const path = url.pathname;
 		const route = routeOf(method, path);
-		const req: RecordedRequest = { method, path, query: url.searchParams, template: route?.template ?? null, body: readBody(init) };
+		const req: RecordedRequest = {
+			method,
+			path,
+			query: url.searchParams,
+			template: route?.template ?? null,
+			body: readBody(init)
+		};
 		requests.push(req);
 		if (!route || !route.admitted) {
 			refused.push(req);
@@ -302,7 +317,13 @@ export function recordRequests(handlers: { [route: string]: Handler | Response |
 
 export type Recorder = ReturnType<typeof recordRequests>;
 
-export const TESTING_USER = { id: 77, username: 'unit-testing', email: null, role: 'testing' as const, is_active: true };
+export const TESTING_USER = {
+	id: 77,
+	username: 'unit-testing',
+	email: null,
+	role: 'testing' as const,
+	is_active: true
+};
 
 /** The GET /system/unit body the backend gives the testing account. */
 export const TESTING_UNIT = {

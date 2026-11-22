@@ -37,14 +37,30 @@ function json(code: number, body: unknown) {
 // browser's fake clock to it before sending.
 const STARTED = '2026-11-11T12:00:00+00:00';
 
-function joinState(state: WifiJoinState['state'], over: Partial<WifiJoinState> = {}): WifiJoinState {
-	return { state, ssid: 'Reading-Room-2', startedAt: STARTED, finishedAt: null, problem: null, restored: null, ...over };
+function joinState(
+	state: WifiJoinState['state'],
+	over: Partial<WifiJoinState> = {}
+): WifiJoinState {
+	return {
+		state,
+		ssid: 'Reading-Room-2',
+		startedAt: STARTED,
+		finishedAt: null,
+		problem: null,
+		restored: null,
+		...over
+	};
 }
 
 const IDLE = joinState('idle', { ssid: null, startedAt: null });
 
 function refused(...codes: string[]) {
-	return json(409, { detail: { message: 'English text', problems: codes.map((code) => ({ code, message: `English ${code}` })) } });
+	return json(409, {
+		detail: {
+			message: 'English text',
+			problems: codes.map((code) => ({ code, message: `English ${code}` }))
+		}
+	});
 }
 
 /**
@@ -66,14 +82,21 @@ function serve(
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const url = String(input instanceof Request ? input.url : input);
 		const method = (init?.method ?? 'GET').toUpperCase();
-		calls.push({ method, url, body: typeof init?.body === 'string' ? init.body : null, afterPost: posted });
+		calls.push({
+			method,
+			url,
+			body: typeof init?.body === 'string' ? init.body : null,
+			afterPost: posted
+		});
 		if (url.endsWith('/network/wifi/join') && method === 'POST') {
 			posted = true;
 			const answer = post();
 			if (answer === 'fail') throw new TypeError('Failed to fetch');
 			if (answer === 'hang') {
 				return new Promise<Response>((_, reject) => {
-					init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+					init?.signal?.addEventListener('abort', () =>
+						reject(new DOMException('Aborted', 'AbortError'))
+					);
 				});
 			}
 			return answer;
@@ -102,7 +125,10 @@ async function settle() {
 	for (let i = 0; i < 3; i++) await new Promise((r) => realSetTimeout(r, 10));
 }
 
-function open(security: WifiSecurity, ssid = security === 'enterprise' ? 'eduroam' : 'Reading-Room-2') {
+function open(
+	security: WifiSecurity,
+	ssid = security === 'enterprise' ? 'eduroam' : 'Reading-Room-2'
+) {
 	const onClose = vi.fn();
 	const onChanged = vi.fn();
 	const screen = render(JoinDialog, { network: { ssid, security }, onClose, onChanged });
@@ -114,7 +140,10 @@ const joinButton = () => dialog().getByRole('button', { name: en.network_join, e
 const passwordInput = () => dialog().getByLabelText(en.common_password_label, { exact: true });
 
 async function fillEnterprise(server = 'radius.example.edu') {
-	await userEvent.fill(dialog().getByLabelText(en.common_username_label, { exact: true }), USERNAME);
+	await userEvent.fill(
+		dialog().getByLabelText(en.common_username_label, { exact: true }),
+		USERNAME
+	);
 	await userEvent.fill(passwordInput(), PASSWORD);
 	await userEvent.fill(dialog().getByLabelText(en.network_server_label, { exact: true }), server);
 }
@@ -124,7 +153,9 @@ function posts(calls: Call[]) {
 }
 
 function polls(calls: Call[]) {
-	return calls.filter((c) => c.method === 'GET' && c.url.endsWith('/network/wifi/join') && c.afterPost);
+	return calls.filter(
+		(c) => c.method === 'GET' && c.url.endsWith('/network/wifi/join') && c.afterPost
+	);
 }
 
 function noSecretsLeaked(calls: Call[]) {
@@ -134,7 +165,9 @@ function noSecretsLeaked(calls: Call[]) {
 		expect(c.url).not.toContain(encodeURIComponent(USERNAME));
 	}
 	for (const args of consoleCalls) {
-		const text = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a) ?? String(a))).join(' ');
+		const text = args
+			.map((a) => (typeof a === 'string' ? a : (JSON.stringify(a) ?? String(a))))
+			.join(' ');
 		expect(text).not.toContain(PASSWORD);
 		expect(text).not.toContain(USERNAME);
 	}
@@ -178,7 +211,11 @@ describe('join dialog: the three forms', () => {
 		await joinButton().click();
 		await expect.poll(() => posts(calls).length).toBe(1);
 		expect(posts(calls)[0].url).toMatch(/\/network\/wifi\/join$/);
-		expect(JSON.parse(posts(calls)[0].body!)).toEqual({ ssid: 'Reading-Room-2', security: 'password', password: PASSWORD });
+		expect(JSON.parse(posts(calls)[0].body!)).toEqual({
+			ssid: 'Reading-Room-2',
+			security: 'password',
+			password: PASSWORD
+		});
 		await expect.poll(() => polls(calls).length).toBeGreaterThan(0);
 		noSecretsLeaked(calls);
 	});
@@ -208,23 +245,32 @@ describe('join dialog: the three forms', () => {
 		[en.network_method_ttls_pap, 'ttls', 'pap'],
 		[en.network_method_ttls_mschapv2, 'ttls', 'mschapv2'],
 		[en.network_method_peap, 'peap', 'mschapv2']
-	])('More options: "%s" and the outer identity go in the body', async (label, method, innerMethod) => {
-		const calls = serve(() => json(202, joinState('joining')));
-		open('enterprise');
-		await fillEnterprise();
-		const more = dialog().getByRole('button', { name: en.network_more_options });
-		await expect.element(more).toHaveAttribute('aria-expanded', 'false');
-		await more.click();
-		await expect.element(more).toHaveAttribute('aria-expanded', 'true');
-		await userEvent.fill(dialog().getByLabelText(en.network_outer_identity, { exact: true }), 'anonymous@example.edu');
-		await userEvent.selectOptions(dialog().getByLabelText(en.network_method, { exact: true }), label);
-		await joinButton().click();
-		await expect.poll(() => posts(calls).length).toBe(1);
-		const body = JSON.parse(posts(calls)[0].body!);
-		expect(body.method).toBe(method);
-		expect(body.innerMethod).toBe(innerMethod);
-		expect(body.anonymousIdentity).toBe('anonymous@example.edu');
-	});
+	])(
+		'More options: "%s" and the outer identity go in the body',
+		async (label, method, innerMethod) => {
+			const calls = serve(() => json(202, joinState('joining')));
+			open('enterprise');
+			await fillEnterprise();
+			const more = dialog().getByRole('button', { name: en.network_more_options });
+			await expect.element(more).toHaveAttribute('aria-expanded', 'false');
+			await more.click();
+			await expect.element(more).toHaveAttribute('aria-expanded', 'true');
+			await userEvent.fill(
+				dialog().getByLabelText(en.network_outer_identity, { exact: true }),
+				'anonymous@example.edu'
+			);
+			await userEvent.selectOptions(
+				dialog().getByLabelText(en.network_method, { exact: true }),
+				label
+			);
+			await joinButton().click();
+			await expect.poll(() => posts(calls).length).toBe(1);
+			const body = JSON.parse(posts(calls)[0].body!);
+			expect(body.method).toBe(method);
+			expect(body.innerMethod).toBe(innerMethod);
+			expect(body.anonymousIdentity).toBe('anonymous@example.edu');
+		}
+	);
 });
 
 describe('join dialog: checks before sending', () => {
@@ -261,7 +307,11 @@ describe('join dialog: refusals of POST /network/wifi/join (409)', () => {
 		['password_length', 'password', () => en.network_refusal_password_length],
 		['identity_required', 'identity', () => en.network_refusal_identity_required],
 		['identity_invalid', 'identity', () => en.network_refusal_identity_invalid],
-		['anonymous_identity_invalid', 'anonymousIdentity', () => en.network_refusal_anonymous_identity_invalid],
+		[
+			'anonymous_identity_invalid',
+			'anonymousIdentity',
+			() => en.network_refusal_anonymous_identity_invalid
+		],
 		['method_required', 'method', () => en.network_refusal_method_required],
 		['inner_method_invalid', 'method', () => en.network_refusal_inner_method_invalid],
 		['server_name_required', 'serverName', () => en.network_refusal_server_name_required],
@@ -273,7 +323,9 @@ describe('join dialog: refusals of POST /network/wifi/join (409)', () => {
 		const { screen } = open('enterprise');
 		await fillEnterprise();
 		await joinButton().click();
-		await expect.poll(() => document.querySelector(`[data-field-error="${field}"]`)?.textContent?.trim()).toBe(text());
+		await expect
+			.poll(() => document.querySelector(`[data-field-error="${field}"]`)?.textContent?.trim())
+			.toBe(text());
 		expect(document.body.textContent).not.toContain('English');
 		expect(screen.container).toBeTruthy();
 	});
@@ -291,7 +343,9 @@ describe('join dialog: refusals of POST /network/wifi/join (409)', () => {
 		open('password');
 		await userEvent.fill(passwordInput(), PASSWORD);
 		await joinButton().click();
-		await expect.poll(() => document.querySelector('[data-dialog-error]')?.textContent?.trim()).toBe(text());
+		await expect
+			.poll(() => document.querySelector('[data-dialog-error]')?.textContent?.trim())
+			.toBe(text());
 		expect(document.body.textContent).not.toContain('English');
 		// The form stays, with what was typed, so the person can correct it.
 		await expect.element(passwordInput()).toHaveValue(PASSWORD);
@@ -302,8 +356,12 @@ describe('join dialog: refusals of POST /network/wifi/join (409)', () => {
 		open('enterprise');
 		await fillEnterprise();
 		await joinButton().click();
-		await expect.poll(() => document.querySelector('[data-field-error="identity"]')?.textContent?.trim()).toBe(en.network_refusal_identity_required);
-		expect(document.querySelector('[data-field-error="serverName"]')?.textContent?.trim()).toBe(en.network_refusal_server_name_invalid);
+		await expect
+			.poll(() => document.querySelector('[data-field-error="identity"]')?.textContent?.trim())
+			.toBe(en.network_refusal_identity_required);
+		expect(document.querySelector('[data-field-error="serverName"]')?.textContent?.trim()).toBe(
+			en.network_refusal_server_name_invalid
+		);
 	});
 });
 
@@ -314,11 +372,16 @@ describe('join dialog: polling the join', () => {
 	});
 
 	async function startPasswordJoin(pollAnswers: (Response | 'fail')[]) {
-		const calls = serve(() => json(202, joinState('joining', { ssid: 'Reading-Room-2' })), pollAnswers);
+		const calls = serve(
+			() => json(202, joinState('joining', { ssid: 'Reading-Room-2' })),
+			pollAnswers
+		);
 		const opened = open('password');
 		await userEvent.fill(passwordInput(), PASSWORD);
 		await joinButton().click();
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		return { calls, ...opened };
 	}
 
@@ -336,7 +399,9 @@ describe('join dialog: polling the join', () => {
 		await settle();
 		expect(polls(calls)).toHaveLength(2);
 		await vi.advanceTimersByTimeAsync(1000);
-		await expect.element(dialog().getByText(en.network_joined_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joined_title('Reading-Room-2')))
+			.toBeVisible();
 		await expect.element(dialog().getByText(en.network_joined_saved)).toBeVisible();
 		expect(onChanged).toHaveBeenCalled();
 		await vi.advanceTimersByTimeAsync(5000);
@@ -354,9 +419,13 @@ describe('join dialog: polling the join', () => {
 		['not_permitted', () => en.network_fail_not_permitted],
 		['failed', () => en.network_fail_failed]
 	])('a failed join with %s says so in a sentence', async (code, text) => {
-		await startPasswordJoin([json(200, joinState('failed', { problem: { code, detail: 'English detail', server: null } }))]);
+		await startPasswordJoin([
+			json(200, joinState('failed', { problem: { code, detail: 'English detail', server: null } }))
+		]);
 		await vi.advanceTimersByTimeAsync(1000);
-		await expect.element(dialog().getByText(en.network_failed_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_failed_title('Reading-Room-2')))
+			.toBeVisible();
 		await expect.element(dialog().getByText(text())).toBeVisible();
 		expect(document.body.textContent).not.toContain('English detail');
 		await expect.element(dialog().getByRole('button', { name: en.common_retry })).toBeVisible();
@@ -364,44 +433,76 @@ describe('join dialog: polling the join', () => {
 
 	it("a server name mismatch lists the server's names", async () => {
 		await startPasswordJoin([
-			json(200, joinState('failed', {
-				problem: { code: 'server_name_mismatch', detail: null, server: { subject: 'CN=wifi.example.edu', names: ['wifi.example.edu', 'radius2.example.edu'], hash: 'ab' } }
-			}))
+			json(
+				200,
+				joinState('failed', {
+					problem: {
+						code: 'server_name_mismatch',
+						detail: null,
+						server: {
+							subject: 'CN=wifi.example.edu',
+							names: ['wifi.example.edu', 'radius2.example.edu'],
+							hash: 'ab'
+						}
+					}
+				})
+			)
 		]);
 		await vi.advanceTimersByTimeAsync(1000);
-		await expect.element(dialog().getByText(en.network_fail_server_names('wifi.example.edu, radius2.example.edu'))).toBeVisible();
+		await expect
+			.element(
+				dialog().getByText(en.network_fail_server_names('wifi.example.edu, radius2.example.edu'))
+			)
+			.toBeVisible();
 	});
 
 	it.each([
 		[true, () => en.network_restored_true],
 		[false, () => en.network_restored_false]
 	])('says whether the earlier Wi-Fi came back (restored %s)', async (restored, text) => {
-		await startPasswordJoin([json(200, joinState('failed', { problem: { code: 'timeout', detail: null, server: null }, restored }))]);
+		await startPasswordJoin([
+			json(
+				200,
+				joinState('failed', { problem: { code: 'timeout', detail: null, server: null }, restored })
+			)
+		]);
 		await vi.advanceTimersByTimeAsync(1000);
 		await expect.element(dialog().getByText(text())).toBeVisible();
 	});
 
 	it('"Retry" goes back to the form with what was typed', async () => {
-		await startPasswordJoin([json(200, joinState('failed', { problem: { code: 'wrong_password', detail: null, server: null } }))]);
+		await startPasswordJoin([
+			json(
+				200,
+				joinState('failed', { problem: { code: 'wrong_password', detail: null, server: null } })
+			)
+		]);
 		await vi.advanceTimersByTimeAsync(1000);
 		await dialog().getByRole('button', { name: en.common_retry }).click();
 		await expect.element(passwordInput()).toHaveValue(PASSWORD);
 	});
 
 	it('keeps polling through failed requests while the unit changes network', async () => {
-		const answers: (Response | 'fail')[] = [...Array(30).fill('fail'), json(200, joinState('joined'))];
+		const answers: (Response | 'fail')[] = [
+			...Array(30).fill('fail'),
+			json(200, joinState('joined'))
+		];
 		const { calls } = await startPasswordJoin(answers);
 		await vi.advanceTimersByTimeAsync(5000);
 		await expect.element(dialog().getByText(en.network_joining_no_answer)).toBeVisible();
 		await vi.advanceTimersByTimeAsync(27_000);
 		expect(polls(calls).length).toBeGreaterThanOrEqual(30);
-		await expect.element(dialog().getByText(en.network_joined_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joined_title('Reading-Room-2')))
+			.toBeVisible();
 	});
 
 	it('gives up after 240 s without an answer and says the unit may be on another network', async () => {
 		await startPasswordJoin(['fail']);
 		await vi.advanceTimersByTimeAsync(239_000);
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		await vi.advanceTimersByTimeAsync(2_000);
 		await expect.element(dialog().getByText(en.network_lost_title)).toBeVisible();
 		await expect.element(dialog().getByText(en.network_lost_body)).toBeVisible();
@@ -412,13 +513,21 @@ describe('join dialog: polling the join', () => {
 	it('after "cannot reach", an outcome for this join that arrives later replaces it', async () => {
 		const answers: (Response | 'fail')[] = [
 			...Array(250).fill('fail'),
-			json(200, joinState('failed', { problem: { code: 'timeout', detail: null, server: null }, restored: true }))
+			json(
+				200,
+				joinState('failed', {
+					problem: { code: 'timeout', detail: null, server: null },
+					restored: true
+				})
+			)
 		];
 		await startPasswordJoin(answers);
 		await run(242_000);
 		await expect.element(dialog().getByText(en.network_lost_title)).toBeVisible();
 		await run(20_000);
-		await expect.element(dialog().getByText(en.network_failed_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_failed_title('Reading-Room-2')))
+			.toBeVisible();
 		await expect.element(dialog().getByText(en.network_restored_true)).toBeVisible();
 	}, 60_000);
 
@@ -447,7 +556,10 @@ describe('join dialog: polling the join', () => {
 	}, 60_000);
 
 	it('after "cannot reach", an answer that this join is still running replaces it', async () => {
-		const { calls } = await startPasswordJoin([...Array(250).fill('fail'), json(200, joinState('joining'))]);
+		const { calls } = await startPasswordJoin([
+			...Array(250).fill('fail'),
+			json(200, joinState('joining'))
+		]);
 		await run(242_000);
 		await expect.element(dialog().getByText(en.network_lost_title)).toBeVisible();
 		await run(20_000);
@@ -482,10 +594,19 @@ describe('join dialog: closing', () => {
 		await dialog().getByRole('button', { name: en.common_cancel }).click();
 		expect(onClose).toHaveBeenCalledTimes(1);
 		await expect.element(passwordInput()).toHaveValue('');
-		await expect.element(dialog().getByLabelText(en.common_username_label, { exact: true })).toHaveValue('');
-		await expect.element(dialog().getByLabelText(en.network_server_label, { exact: true })).toHaveValue('');
+		await expect
+			.element(dialog().getByLabelText(en.common_username_label, { exact: true }))
+			.toHaveValue('');
+		await expect
+			.element(dialog().getByLabelText(en.network_server_label, { exact: true }))
+			.toHaveValue('');
 		await expect.element(outer).toHaveValue('');
-		const kept = [JSON.stringify(get(networkState)), JSON.stringify({ ...localStorage }), JSON.stringify({ ...sessionStorage }), document.cookie];
+		const kept = [
+			JSON.stringify(get(networkState)),
+			JSON.stringify({ ...localStorage }),
+			JSON.stringify({ ...sessionStorage }),
+			document.cookie
+		];
 		for (const text of kept) {
 			expect(text).not.toContain(PASSWORD);
 			expect(text).not.toContain(USERNAME);
@@ -513,13 +634,25 @@ describe('join dialog: the POST gets no HTTP answer (fix round)', () => {
 
 	it('a network error: polls, and a join of this SSID that started after the POST is this one: joined', async () => {
 		await send(() => 'fail', [json(200, joinState('joined'))]);
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		await vi.advanceTimersByTimeAsync(1000);
-		await expect.element(dialog().getByText(en.network_joined_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joined_title('Reading-Room-2')))
+			.toBeVisible();
 	});
 
 	it('a network error: polls, and a failed join of this SSID is this one: failed', async () => {
-		await send(() => 'fail', [json(200, joinState('failed', { problem: { code: 'wrong_password', detail: null, server: null } }))]);
+		await send(
+			() => 'fail',
+			[
+				json(
+					200,
+					joinState('failed', { problem: { code: 'wrong_password', detail: null, server: null } })
+				)
+			]
+		);
 		await vi.advanceTimersByTimeAsync(1000);
 		await expect.element(dialog().getByText(en.network_fail_wrong_password)).toBeVisible();
 	});
@@ -531,9 +664,13 @@ describe('join dialog: the POST gets no HTTP answer (fix round)', () => {
 		expect(polls(calls)).toHaveLength(0);
 		await expect.element(dialog().getByRole('button', { name: en.config_sending })).toBeDisabled();
 		await vi.advanceTimersByTimeAsync(1);
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		await vi.advanceTimersByTimeAsync(1000);
-		await expect.element(dialog().getByText(en.network_joined_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joined_title('Reading-Room-2')))
+			.toBeVisible();
 	});
 });
 
@@ -548,7 +685,9 @@ describe('join dialog: whose join a poll reports (fix round)', () => {
 		const opened = open('password');
 		await userEvent.fill(passwordInput(), PASSWORD);
 		await joinButton().click();
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		return { calls, ...opened };
 	}
 
@@ -568,17 +707,38 @@ describe('join dialog: whose join a poll reports (fix round)', () => {
 
 describe('join dialog: a POST answered with an error status (fix round)', () => {
 	it.each([
-		['422', () => json(422, { detail: [{ loc: ['body', 'ssid'], type: 'string_type', msg: 'x' }] }), () => en.network_refusal_other],
+		[
+			'422',
+			() => json(422, { detail: [{ loc: ['body', 'ssid'], type: 'string_type', msg: 'x' }] }),
+			() => en.network_refusal_other
+		],
 		['500', () => json(500, { detail: 'boom' }), () => en.network_refusal_other],
-		['501', () => json(501, { detail: 'Network settings are not available on this device.' }), () => en.network_not_available],
-		['503', () => json(503, { detail: { message: 'x', problems: [{ code: 'network_manager_unavailable' }] } }), () => en.network_service_unavailable],
-		['409 with no problems', () => json(409, { detail: { message: 'x', problems: [] } }), () => en.network_refusal_other]
+		[
+			'501',
+			() => json(501, { detail: 'Network settings are not available on this device.' }),
+			() => en.network_not_available
+		],
+		[
+			'503',
+			() =>
+				json(503, {
+					detail: { message: 'x', problems: [{ code: 'network_manager_unavailable' }] }
+				}),
+			() => en.network_service_unavailable
+		],
+		[
+			'409 with no problems',
+			() => json(409, { detail: { message: 'x', problems: [] } }),
+			() => en.network_refusal_other
+		]
 	])('%s: the form stays with a message, and nothing is polled', async (_name, answer, text) => {
 		const calls = serve(answer);
 		open('password');
 		await userEvent.fill(passwordInput(), PASSWORD);
 		await joinButton().click();
-		await expect.poll(() => document.querySelector('[data-dialog-error]')?.textContent?.trim()).toBe(text());
+		await expect
+			.poll(() => document.querySelector('[data-dialog-error]')?.textContent?.trim())
+			.toBe(text());
 		await expect.element(passwordInput()).toHaveValue(PASSWORD);
 		await new Promise((r) => setTimeout(r, 1200));
 		expect(polls(calls)).toHaveLength(0);
@@ -631,48 +791,80 @@ describe('join dialog: no 202, and whose join it is without the browser clock (l
 		vi.setSystemTime(Date.parse(STARTED));
 	});
 
-	async function send(pollAnswers: (Response | 'fail')[], before: Response | 'fail' = json(200, IDLE)) {
+	async function send(
+		pollAnswers: (Response | 'fail')[],
+		before: Response | 'fail' = json(200, IDLE)
+	) {
 		const calls = serve(() => 'fail', pollAnswers, before);
 		const opened = open('password');
 		await userEvent.fill(passwordInput(), PASSWORD);
 		await joinButton().click();
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		return { calls, ...opened };
 	}
 
 	it.each([
 		['one hour', HOUR],
 		['one year', YEAR]
-	])('the unit\'s clock %s behind: a joined join is shown as joined', async (_name, behind) => {
+	])("the unit's clock %s behind: a joined join is shown as joined", async (_name, behind) => {
 		await send([json(200, joinState('joined', { startedAt: unitTime(-behind) }))]);
 		await run(1000);
-		await expect.element(dialog().getByText(en.network_joined_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joined_title('Reading-Room-2')))
+			.toBeVisible();
 	});
 
 	it.each([
 		['one hour', HOUR],
 		['one year', YEAR]
-	])('the unit\'s clock %s behind: a wrong password is shown as such', async (_name, behind) => {
-		await send([json(200, joinState('failed', { startedAt: unitTime(-behind), problem: { code: 'wrong_password', detail: null, server: null } }))]);
+	])("the unit's clock %s behind: a wrong password is shown as such", async (_name, behind) => {
+		await send([
+			json(
+				200,
+				joinState('failed', {
+					startedAt: unitTime(-behind),
+					problem: { code: 'wrong_password', detail: null, server: null }
+				})
+			)
+		]);
 		await run(1000);
 		await expect.element(dialog().getByText(en.network_fail_wrong_password)).toBeVisible();
 	});
 
 	it('the read before the POST fails: the first finished answer for this SSID is taken', async () => {
 		const { calls } = await send(
-			[json(200, joinState('failed', { startedAt: unitTime(-YEAR), problem: { code: 'timeout', detail: null, server: null } }))],
+			[
+				json(
+					200,
+					joinState('failed', {
+						startedAt: unitTime(-YEAR),
+						problem: { code: 'timeout', detail: null, server: null }
+					})
+				)
+			],
 			'fail'
 		);
-		expect(calls.filter((c) => c.method === 'GET' && !c.afterPost && c.url.endsWith('/network/wifi/join'))).toHaveLength(1);
+		expect(
+			calls.filter(
+				(c) => c.method === 'GET' && !c.afterPost && c.url.endsWith('/network/wifi/join')
+			)
+		).toHaveLength(1);
 		await run(1000);
 		await expect.element(dialog().getByText(en.network_fail_timeout)).toBeVisible();
 	});
 
 	it('only the join from before the POST is reported: after 15 s, the unit did not receive the request', async () => {
-		const older = joinState('failed', { startedAt: unitTime(-60_000), problem: { code: 'wrong_password', detail: null, server: null } });
+		const older = joinState('failed', {
+			startedAt: unitTime(-60_000),
+			problem: { code: 'wrong_password', detail: null, server: null }
+		});
 		await send([json(200, older)], json(200, older));
 		await run(14_000);
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		expect(document.body.textContent).not.toContain(en.network_fail_wrong_password);
 		await run(2_000);
 		await expect.element(dialog().getByText(en.network_not_received_title)).toBeVisible();
@@ -683,7 +875,10 @@ describe('join dialog: no 202, and whose join it is without the browser clock (l
 	});
 
 	it('after "cannot reach", the join from before the POST: the unit did not receive the request, with Retry', async () => {
-		const older = joinState('failed', { startedAt: unitTime(-60_000), problem: { code: 'wrong_password', detail: null, server: null } });
+		const older = joinState('failed', {
+			startedAt: unitTime(-60_000),
+			problem: { code: 'wrong_password', detail: null, server: null }
+		});
 		await send([...Array(250).fill('fail'), json(200, older)], json(200, older));
 		await run(242_000);
 		await expect.element(dialog().getByText(en.network_lost_title)).toBeVisible();
@@ -702,24 +897,50 @@ describe('join dialog: no 202, and whose join it is without the browser clock (l
 	it('another SSID once failed polls recover: the unit did not receive the request', async () => {
 		await send(['fail', 'fail', 'fail', json(200, joinState('joined', { ssid: 'Library-Guest' }))]);
 		await run(3000);
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		await run(17_000);
 		await expect.element(dialog().getByText(en.network_not_received_title)).toBeVisible();
 	});
 
 	it('a newer join that appears within 15 s is this one', async () => {
-		const older = joinState('failed', { startedAt: unitTime(-60_000), problem: { code: 'wrong_password', detail: null, server: null } });
+		const older = joinState('failed', {
+			startedAt: unitTime(-60_000),
+			problem: { code: 'wrong_password', detail: null, server: null }
+		});
 		const newer = joinState('joined', { startedAt: unitTime(-YEAR) });
-		await send([json(200, older), json(200, older), json(200, older), json(200, newer)], json(200, older));
+		await send(
+			[json(200, older), json(200, older), json(200, older), json(200, newer)],
+			json(200, older)
+		);
 		await run(4000);
-		await expect.element(dialog().getByText(en.network_joined_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joined_title('Reading-Room-2')))
+			.toBeVisible();
 	});
 
 	it('Retry seconds after a failed attempt, with no 202: the earlier failure is not taken for the new one', async () => {
-		const first = joinState('failed', { startedAt: unitTime(-YEAR), problem: { code: 'wrong_password', detail: null, server: null } });
-		const second = joinState('failed', { startedAt: unitTime(-YEAR + 5000), problem: { code: 'timeout', detail: null, server: null } });
-		const gets = [json(200, IDLE), json(200, first), json(200, first), json(200, first), json(200, first), json(200, second)];
-		const posts = [() => json(202, joinState('joining', { startedAt: first.startedAt })), () => 'fail' as const];
+		const first = joinState('failed', {
+			startedAt: unitTime(-YEAR),
+			problem: { code: 'wrong_password', detail: null, server: null }
+		});
+		const second = joinState('failed', {
+			startedAt: unitTime(-YEAR + 5000),
+			problem: { code: 'timeout', detail: null, server: null }
+		});
+		const gets = [
+			json(200, IDLE),
+			json(200, first),
+			json(200, first),
+			json(200, first),
+			json(200, first),
+			json(200, second)
+		];
+		const posts = [
+			() => json(202, joinState('joining', { startedAt: first.startedAt })),
+			() => 'fail' as const
+		];
 		let g = 0;
 		let p = 0;
 		vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -741,10 +962,14 @@ describe('join dialog: no 202, and whose join it is without the browser clock (l
 
 		await dialog().getByRole('button', { name: en.common_retry }).click();
 		await joinButton().click();
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		await run(2000);
 		// Still the earlier failure: not shown as the outcome of this attempt.
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		await run(3000);
 		await expect.element(dialog().getByText(en.network_fail_timeout)).toBeVisible();
 		expect(document.body.textContent).not.toContain(en.network_fail_wrong_password);
@@ -762,21 +987,34 @@ describe('join dialog: the 240 s cap and the quiet polling after it (last round)
 		open('password');
 		await userEvent.fill(passwordInput(), PASSWORD);
 		await joinButton().click();
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		return calls;
 	}
 
 	it('stops after 240 s of "joining" answers: cannot tell, with the status read again', async () => {
 		const calls = await startWith([json(200, joinState('joining'))]);
 		await run(239_000);
-		await expect.element(dialog().getByText(en.network_joining_title('Reading-Room-2'))).toBeVisible();
+		await expect
+			.element(dialog().getByText(en.network_joining_title('Reading-Room-2')))
+			.toBeVisible();
 		await run(2_000);
 		await expect.element(dialog().getByText(en.network_unknown_title)).toBeVisible();
 		await expect.poll(() => statusReads(calls).length).toBeGreaterThan(0);
 	}, 60_000);
 
 	it('an outcome for this join that arrives within 120 s after "cannot tell" replaces it', async () => {
-		const answers = [...Array(255).fill(json(200, joinState('joining'))), json(200, joinState('failed', { problem: { code: 'timeout', detail: null, server: null }, restored: true }))];
+		const answers = [
+			...Array(255).fill(json(200, joinState('joining'))),
+			json(
+				200,
+				joinState('failed', {
+					problem: { code: 'timeout', detail: null, server: null },
+					restored: true
+				})
+			)
+		];
 		await startWith(answers);
 		await run(245_000);
 		await expect.element(dialog().getByText(en.network_unknown_title)).toBeVisible();

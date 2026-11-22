@@ -19,10 +19,20 @@ import { resetUnit } from '$lib/unit-mode';
 import '../../../../app.css';
 import Queue from './+page.svelte';
 
-const FREE: RetakeSummary = { pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } };
+const FREE: RetakeSummary = {
+	pendingRecords: 0,
+	volumes: [],
+	turn: { state: 'free', unlockedBy: null }
+};
 
 function unit(mode: string) {
-	return { mode, projectsEnabled: false, projectsShown: false, defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] } };
+	return {
+		mode,
+		projectsEnabled: false,
+		projectsShown: false,
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
 }
 
 function signIn(role: UserRole) {
@@ -98,8 +108,13 @@ describe('Cola and the unit mode', () => {
 	it('shows a 403 volumes_from_fisqua on an import translated', async () => {
 		signIn('operator');
 		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
-		const detail = { code: 'volumes_from_fisqua', message: "In Fisqua mode, volumes come from Fisqua's queue." };
-		vi.spyOn(importsApi, 'importList').mockRejectedValue(Object.assign(new AuthError(403, detail.message), { detail }));
+		const detail = {
+			code: 'volumes_from_fisqua',
+			message: "In Fisqua mode, volumes come from Fisqua's queue."
+		};
+		vi.spyOn(importsApi, 'importList').mockRejectedValue(
+			Object.assign(new AuthError(403, detail.message), { detail })
+		);
 		const screen = render(Queue);
 		await expect.element(importButton()).toBeVisible();
 		const input = screen.container.querySelector('input[type="file"]') as HTMLInputElement;

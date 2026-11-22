@@ -46,19 +46,35 @@ function vol(id: number, name: string, extra: Partial<Collection> = {}): Collect
 const tomo = vol(22, 'Tomo 097', { filename_stem: 'co-ahr-not-t097', stem_reserved: false });
 
 function unit(mode: string) {
-	return { mode, projectsEnabled: true, projectsShown: mode === 'offline', defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] } };
+	return {
+		mode,
+		projectsEnabled: true,
+		projectsShown: mode === 'offline',
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
 }
 
 function signIn(role: UserRole) {
 	authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
 }
 
-function match(code: string, title: string, level = 'file', display = '1790-1795'): DescriptionMatch {
+function match(
+	code: string,
+	title: string,
+	level = 'file',
+	display = '1790-1795'
+): DescriptionMatch {
 	return { referenceCode: code, title, level, dates: { display, start: null, end: null } };
 }
 
 const MATCHES = [
-	match('co-ahr-con-caj002-car001', 'Autos de la Real Audiencia sobre tierras', 'file', '1790-1795'),
+	match(
+		'co-ahr-con-caj002-car001',
+		'Autos de la Real Audiencia sobre tierras',
+		'file',
+		'1790-1795'
+	),
 	match('co-ahr-con-caj002-car002', 'Expediente de visita', 'item', ''),
 	match('co-ahr-con-caj002', 'Caja 2', 'volume', '1780')
 ];
@@ -85,7 +101,9 @@ beforeEach(async () => {
 	vi.spyOn(projectMembersApi, 'list').mockResolvedValue([]);
 	vi.spyOn(activityApi, 'collections').mockResolvedValue([]);
 	vi.spyOn(collectionsApi, 'listAll').mockResolvedValue([tomo]);
-	searchMock = vi.spyOn(fisquaApi, 'searchDescriptions').mockResolvedValue({ results: MATCHES }) as never;
+	searchMock = vi
+		.spyOn(fisquaApi, 'searchDescriptions')
+		.mockResolvedValue({ results: MATCHES }) as never;
 	signIn('admin');
 });
 afterEach(() => {
@@ -121,7 +139,12 @@ describe('the reference-code field searches Fisqua on a new volume', () => {
 		await new Promise((r) => setTimeout(r, 600));
 		expect(searchMock).not.toHaveBeenCalled();
 		expect(list().elements()).toHaveLength(0);
-		expect(page.getByRole('status').elements().filter((e) => e.textContent?.trim())).toHaveLength(0);
+		expect(
+			page
+				.getByRole('status')
+				.elements()
+				.filter((e) => e.textContent?.trim())
+		).toHaveLength(0);
 	});
 
 	it('choosing a match by tap fills the stem and the empty name, and closes the list', async () => {
@@ -152,7 +175,9 @@ describe('the reference-code field searches Fisqua on a new volume', () => {
 		await expect.element(list()).toBeInTheDocument();
 		await userEvent.keyboard('{ArrowDown}');
 		await expect.element(options().first()).toHaveAttribute('aria-selected', 'true');
-		await expect.element(stem()).toHaveAttribute('aria-activedescendant', options().first().element().id);
+		await expect
+			.element(stem())
+			.toHaveAttribute('aria-activedescendant', options().first().element().id);
 		await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
 		// It stops at the last.
 		await expect.element(options().nth(2)).toHaveAttribute('aria-selected', 'true');
@@ -218,9 +243,14 @@ describe('the reference-code field searches Fisqua on a new volume', () => {
 		await userEvent.fill(stem(), 'co-ahr-con');
 		await userEvent.click(options().nth(2));
 		await userEvent.click(page.getByRole('button', { name: es.pd_create_btn }));
-		await vi.waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({
-			name: 'Caja 2', filename_stem: 'co-ahr-con-caj002'
-		})));
+		await vi.waitFor(() =>
+			expect(create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					name: 'Caja 2',
+					filename_stem: 'co-ahr-con-caj002'
+				})
+			)
+		);
 	});
 
 	it('the admin can still type a full code by hand', async () => {
@@ -231,7 +261,11 @@ describe('the reference-code field searches Fisqua on a new volume', () => {
 		await userEvent.fill(stem(), 'co-ahr-not-t099');
 		await expect.element(page.getByText(es.pd_search_none)).toBeInTheDocument();
 		await userEvent.click(page.getByRole('button', { name: es.pd_create_btn }));
-		await vi.waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ filename_stem: 'co-ahr-not-t099' })));
+		await vi.waitFor(() =>
+			expect(create).toHaveBeenCalledWith(
+				expect.objectContaining({ filename_stem: 'co-ahr-not-t099' })
+			)
+		);
 	});
 });
 
@@ -344,9 +378,14 @@ describe('the lines under the field', () => {
 		expect(list().elements()).toHaveLength(0);
 	});
 
-	for (const [status, code] of [[429, 'rate_limited'], [503, 'fisqua_unreachable']] as const) {
+	for (const [status, code] of [
+		[429, 'rate_limited'],
+		[503, 'fisqua_unreachable']
+	] as const) {
 		it(`says Captua can't search Fisqua on a ${status}`, async () => {
-			searchMock.mockRejectedValue(new ApiError('English', { code, message: 'English' }, status, status === 429 ? '30' : null));
+			searchMock.mockRejectedValue(
+				new ApiError('English', { code, message: 'English' }, status, status === 429 ? '30' : null)
+			);
 			const screen = render(Volumes);
 			await userEvent.click(page.getByRole('button', { name: es.pd_new_collection }));
 			await userEvent.fill(stem(), 'co-ahr-con');
@@ -393,7 +432,9 @@ describe('the help under the field', () => {
 
 	it('is the stem help when editing a volume', async () => {
 		render(Volumes);
-		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		await userEvent.click(
+			page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions)
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_edit }));
 		await expect.element(page.getByText(es.pd_stem_help)).toBeInTheDocument();
 		expect(page.getByText(es.pd_stem_search_help).elements()).toHaveLength(0);
@@ -410,7 +451,9 @@ describe('the help under the field', () => {
 describe('the field stays a plain field', () => {
 	it('when editing a volume', async () => {
 		render(Volumes);
-		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		await userEvent.click(
+			page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions)
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_edit }));
 		const field = page.getByLabelText(es.pd_field_stem_fisqua);
 		await expect.element(field).toBeInTheDocument();
@@ -454,9 +497,13 @@ describe('the field stays a plain field', () => {
 describe('at 800x480', () => {
 	it('fits the list inside the card, with nothing cut off', async () => {
 		const long = Array.from({ length: 20 }, (_, i) =>
-			match(`co-ahr-jud-caj1000-car${String(i).padStart(3, '0')}`,
+			match(
+				`co-ahr-jud-caj1000-car${String(i).padStart(3, '0')}`,
 				'Expediente seguido por don Juan de la Cruz contra los herederos de doña María Josefa sobre la propiedad de unas tierras en el valle',
-				'file', '1790-1795'));
+				'file',
+				'1790-1795'
+			)
+		);
 		searchMock.mockResolvedValue({ results: long });
 		await openNew();
 		await userEvent.fill(stem(), 'co-ahr-jud');
@@ -478,7 +525,9 @@ describe('at 800x480', () => {
 		// Nothing in an option is clipped: every part fits its own box, and the option's width.
 		for (const option of options().elements() as HTMLElement[]) {
 			const box = option.getBoundingClientRect();
-			for (const part of option.querySelectorAll<HTMLElement>('.match-code, .match-meta, .match-title')) {
+			for (const part of option.querySelectorAll<HTMLElement>(
+				'.match-code, .match-meta, .match-title'
+			)) {
 				expect(part.scrollWidth).toBeLessThanOrEqual(part.clientWidth);
 				const partBox = part.getBoundingClientRect();
 				expect(partBox.left).toBeGreaterThanOrEqual(box.left - 0.5);
@@ -487,8 +536,14 @@ describe('at 800x480', () => {
 			expect(option.scrollWidth).toBeLessThanOrEqual(option.clientWidth);
 		}
 		const first = options().first().element() as HTMLElement;
-		expect(first.querySelector('.match-meta')?.textContent).toBe('1790-1795 · Unidad documental compuesta');
-		expect(first.querySelector('.match-title')?.textContent).toContain('sobre la propiedad de unas tierras en el valle');
-		expect(getComputedStyle(first.querySelector('.match-code') as HTMLElement).fontFamily).toContain('monospace');
+		expect(first.querySelector('.match-meta')?.textContent).toBe(
+			'1790-1795 · Unidad documental compuesta'
+		);
+		expect(first.querySelector('.match-title')?.textContent).toContain(
+			'sobre la propiedad de unas tierras en el valle'
+		);
+		expect(
+			getComputedStyle(first.querySelector('.match-code') as HTMLElement).fontFamily
+		).toContain('monospace');
 	});
 });

@@ -24,10 +24,30 @@ const SAND = 'rgb(208, 154, 68)';
 
 function pair(id: number, sequence: number, extra: Partial<ApiRecord> = {}): ApiRecord {
 	return {
-		id, title: `Registro ${sequence}`, status: 'in_review', capture_mode: 'dual', sequence,
+		id,
+		title: `Registro ${sequence}`,
+		status: 'in_review',
+		capture_mode: 'dual',
+		sequence,
 		images: [
-			{ id: id * 10, record_id: id, filename: 'l.jpg', file_path: '/l', format: 'jpg', role: 'left', is_current: true },
-			{ id: id * 10 + 1, record_id: id, filename: 'r.jpg', file_path: '/r', format: 'jpg', role: 'right', is_current: true }
+			{
+				id: id * 10,
+				record_id: id,
+				filename: 'l.jpg',
+				file_path: '/l',
+				format: 'jpg',
+				role: 'left',
+				is_current: true
+			},
+			{
+				id: id * 10 + 1,
+				record_id: id,
+				filename: 'r.jpg',
+				file_path: '/r',
+				format: 'jpg',
+				role: 'right',
+				is_current: true
+			}
 		],
 		...extra
 	} as ApiRecord;
@@ -35,9 +55,18 @@ function pair(id: number, sequence: number, extra: Partial<ApiRecord> = {}): Api
 
 function placeholder(id: number, sequence: number, extra: Partial<ApiRecord> = {}): ApiRecord {
 	return {
-		id, title: `Registro ${sequence}`, status: 'captured', capture_mode: 'dual', sequence, images: [],
-		missing_side: 'both', missing_expected: 'Folios 90v y 91r', missing_note: 'Marcado en Fisqua: parece faltar el folio 91.',
-		missing_request_id: null, closed_reason: null, closed_note: null,
+		id,
+		title: `Registro ${sequence}`,
+		status: 'captured',
+		capture_mode: 'dual',
+		sequence,
+		images: [],
+		missing_side: 'both',
+		missing_expected: 'Folios 90v y 91r',
+		missing_note: 'Marcado en Fisqua: parece faltar el folio 91.',
+		missing_request_id: null,
+		closed_reason: null,
+		closed_note: null,
 		...extra
 	} as ApiRecord;
 }
@@ -51,7 +80,9 @@ function mount(records: ApiRecord[], onRecordsUpdate = vi.fn(), onRecordClick = 
 }
 
 function cardOf(screen: ReturnType<typeof render>, title: string): HTMLElement {
-	const name = [...screen.container.querySelectorAll<HTMLElement>('.card-name')].find((n) => n.textContent?.trim() === title);
+	const name = [...screen.container.querySelectorAll<HTMLElement>('.card-name')].find(
+		(n) => n.textContent?.trim() === title
+	);
 	const card = name?.closest<HTMLElement>('.grid-pair, .grid-card');
 	if (!card) throw new Error(`no card for ${title}`);
 	return card;
@@ -89,7 +120,17 @@ describe('grid: placeholders and closed records (NEH-317)', () => {
 		const missing = pair(3, 99, {
 			status: 'captured',
 			missing_side: 'left',
-			images: [{ id: 31, record_id: 3, filename: 'r.jpg', file_path: '/r', format: 'jpg', role: 'right', is_current: true }]
+			images: [
+				{
+					id: 31,
+					record_id: 3,
+					filename: 'r.jpg',
+					file_path: '/r',
+					format: 'jpg',
+					role: 'right',
+					is_current: true
+				}
+			]
 		});
 		const screen = mount([missing]);
 		const card = cardOf(screen, 'Registro 99');
@@ -99,7 +140,10 @@ describe('grid: placeholders and closed records (NEH-317)', () => {
 	});
 
 	it('gives a closed placeholder a grey dashed border, the Closed pill and its reason, and no sand pill', async () => {
-		const closed = placeholder(4, 100, { closed_reason: 'foliation_skip', closed_note: 'Al 90 le sigue el 92.' });
+		const closed = placeholder(4, 100, {
+			closed_reason: 'foliation_skip',
+			closed_note: 'Al 90 le sigue el 92.'
+		});
 		const screen = mount([closed]);
 		const card = cardOf(screen, 'Registro 100');
 		await expect.element(screen.getByText(es.pill_closed, { exact: true })).toBeVisible();
@@ -114,8 +158,21 @@ describe('grid: placeholders and closed records (NEH-317)', () => {
 
 	it('closes a record missing one page the same way, whatever its side', async () => {
 		const closed = pair(5, 101, {
-			status: 'captured', missing_side: 'right', closed_reason: 'captured_elsewhere', closed_note: null,
-			images: [{ id: 51, record_id: 5, filename: 'l.jpg', file_path: '/l', format: 'jpg', role: 'left', is_current: true }]
+			status: 'captured',
+			missing_side: 'right',
+			closed_reason: 'captured_elsewhere',
+			closed_note: null,
+			images: [
+				{
+					id: 51,
+					record_id: 5,
+					filename: 'l.jpg',
+					file_path: '/l',
+					format: 'jpg',
+					role: 'left',
+					is_current: true
+				}
+			]
 		});
 		const screen = mount([closed]);
 		const card = cardOf(screen, 'Registro 101');
@@ -133,20 +190,30 @@ describe('grid: placeholders and closed records (NEH-317)', () => {
 		await expect.element(legend.getByText(es.legend_never)).toBeVisible();
 		await expect.element(legend.getByText(es.legend_closed)).toBeVisible();
 		const swatches = [...legend.element().querySelectorAll<HTMLElement>('.legend-swatch')];
-		expect(swatches.map((s) => getComputedStyle(s).borderTopColor)).toEqual(['rgb(214, 103, 74)', SAND, expect.stringMatching(/^rgba?\(171, 183, 183/)]);
+		expect(swatches.map((s) => getComputedStyle(s).borderTopColor)).toEqual([
+			'rgb(214, 103, 74)',
+			SAND,
+			expect.stringMatching(/^rgba?\(171, 183, 183/)
+		]);
 	});
 });
 
 describe('grid: marking an opening missing (NEH-317)', () => {
 	it('is offered to an operator in the toolbar, and not to a reviewer', async () => {
 		const screen = mount([pair(1, 95), pair(2, 96)]);
-		await expect.element(screen.getByRole('button', { name: es.toolbar_mark_missing })).toBeVisible();
+		await expect
+			.element(screen.getByRole('button', { name: es.toolbar_mark_missing }))
+			.toBeVisible();
 		screen.unmount();
 		signIn('reviewer');
 		const other = mount([pair(1, 95), pair(2, 96)]);
 		await expect.element(other.getByRole('button', { name: 'Filtros' })).toBeVisible();
-		await expect.element(other.getByRole('button', { name: es.toolbar_mark_missing })).not.toBeInTheDocument();
-		await expect.element(other.getByRole('button', { name: es.hover_missing_here, exact: true })).not.toBeInTheDocument();
+		await expect
+			.element(other.getByRole('button', { name: es.toolbar_mark_missing }))
+			.not.toBeInTheDocument();
+		await expect
+			.element(other.getByRole('button', { name: es.hover_missing_here, exact: true }))
+			.not.toBeInTheDocument();
 	});
 
 	it('from the toolbar, asks for the record the opening goes after, and opens the dialog for the one clicked', async () => {
@@ -179,15 +246,28 @@ describe('grid: marking an opening missing (NEH-317)', () => {
 	});
 
 	it('marks it and reloads the grid', async () => {
-		const spy = vi.spyOn(collectionsApi, 'markMissingOpenings').mockResolvedValue([placeholder(9, 96)]);
+		const spy = vi
+			.spyOn(collectionsApi, 'markMissingOpenings')
+			.mockResolvedValue([placeholder(9, 96)]);
 		const onRecordsUpdate = vi.fn();
 		const screen = mount([pair(1, 95), pair(2, 96)], onRecordsUpdate);
-		(screen.getByRole('button', { name: es.hover_missing_here, exact: true }).element() as HTMLElement).click();
+		(
+			screen
+				.getByRole('button', { name: es.hover_missing_here, exact: true })
+				.element() as HTMLElement
+		).click();
 		const dialog = screen.getByRole('dialog', { name: es.mark_title });
 		await dialog.getByRole('button', { name: es.mark_submit }).click();
 		await vi.waitFor(() => expect(onRecordsUpdate).toHaveBeenCalled());
-		expect(spy).toHaveBeenCalledWith(17, { afterRecordId: 1, count: null, expected: null, note: null });
-		await expect.element(screen.getByRole('dialog', { name: es.mark_title })).not.toBeInTheDocument();
+		expect(spy).toHaveBeenCalledWith(17, {
+			afterRecordId: 1,
+			count: null,
+			expected: null,
+			note: null
+		});
+		await expect
+			.element(screen.getByRole('dialog', { name: es.mark_title }))
+			.not.toBeInTheDocument();
 	});
 });
 
@@ -205,17 +285,28 @@ describe('grid: the hover button and the legend (NEH-317, round 2)', () => {
 		const screen = mount([pair(1, 95), pair(2, 96)]);
 		await screen.getByRole('button', { name: 'Filtros' }).click();
 		await screen.getByRole('button', { name: 'En revisión', exact: true }).click();
-		await expect.element(screen.getByRole('button', { name: es.hover_missing_here, exact: true })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: es.hover_missing_here, exact: true }))
+			.not.toBeInTheDocument();
 		await screen.getByRole('button', { name: es.col_clear_filter }).click();
-		await expect.element(screen.getByRole('button', { name: es.hover_missing_here, exact: true })).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: es.hover_missing_here, exact: true }))
+			.toBeInTheDocument();
 		await screen.getByRole('button', { name: 'Reordenar' }).click();
-		await expect.element(screen.getByRole('button', { name: es.hover_missing_here, exact: true })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: es.hover_missing_here, exact: true }))
+			.not.toBeInTheDocument();
 	});
 
 	it('lets the last row scroll clear of the legend', async () => {
 		const records = Array.from({ length: 9 }, (_, i) => pair(i + 1, 90 + i));
 		records.push(placeholder(20, 99, { closed_reason: 'foliation_skip' }));
-		const screen = render(GridView, { records, collectionId: 17, onRecordsUpdate: vi.fn(), onRecordClick: vi.fn() });
+		const screen = render(GridView, {
+			records,
+			collectionId: 17,
+			onRecordsUpdate: vi.fn(),
+			onRecordClick: vi.fn()
+		});
 		const view = screen.container.querySelector<HTMLElement>('.grid-view')!;
 		view.style.height = '500px';
 		await expect.element(screen.getByText(es.pill_closed, { exact: true })).toBeInTheDocument();
@@ -237,8 +328,12 @@ describe('grid: round 3 (NEH-317)', () => {
 		await expect.element(screen.getByText(es.mark_pick_hint)).not.toBeInTheDocument();
 	});
 
-	it('the dashed frame of a placeholder or a closed record does not change the tile\'s size (NEH-211)', async () => {
-		const screen = mount([pair(1, 95), placeholder(2, 96), placeholder(3, 97, { closed_reason: 'other', closed_note: 'x' })]);
+	it("the dashed frame of a placeholder or a closed record does not change the tile's size (NEH-211)", async () => {
+		const screen = mount([
+			pair(1, 95),
+			placeholder(2, 96),
+			placeholder(3, 97, { closed_reason: 'other', closed_note: 'x' })
+		]);
 		const slider = screen.getByRole('slider', { name: 'Número de columnas' });
 		for (const value of ['2', '4', '6']) {
 			await slider.fill(value);
@@ -285,7 +380,8 @@ describe('grid: focus on a placeholder or closed tile (round 4)', () => {
 			const screen = mount([placeholder(seq, seq, extra)]);
 			const card = cardOf(screen, title);
 			await userEvent.keyboard('{Tab}');
-			for (let i = 0; i < 10 && document.activeElement !== card; i++) await userEvent.keyboard('{Tab}');
+			for (let i = 0; i < 10 && document.activeElement !== card; i++)
+				await userEvent.keyboard('{Tab}');
 			expect(document.activeElement).toBe(card);
 			expect(card.matches(':focus-visible')).toBe(true);
 			const style = getComputedStyle(card);
@@ -302,7 +398,21 @@ describe('grid: focus on a placeholder or closed tile (round 4)', () => {
 describe('grid: pick mode from the keyboard (Copilot review of #159)', () => {
 	for (const key of ['{Enter}', ' ']) {
 		it(`${key === ' ' ? 'Space' : 'Enter'} on a pair tile or a single tile chooses it`, async () => {
-			const single = { ...pair(3, 97), capture_mode: 'single', images: [{ id: 30, record_id: 3, filename: 's.jpg', file_path: '/s', format: 'jpg', role: null, is_current: true }] } as unknown as ApiRecord;
+			const single = {
+				...pair(3, 97),
+				capture_mode: 'single',
+				images: [
+					{
+						id: 30,
+						record_id: 3,
+						filename: 's.jpg',
+						file_path: '/s',
+						format: 'jpg',
+						role: null,
+						is_current: true
+					}
+				]
+			} as unknown as ApiRecord;
 			for (const title of ['Registro 95', 'Registro 97']) {
 				const onRecordClick = vi.fn();
 				const screen = mount([pair(1, 95), pair(2, 96), single], vi.fn(), onRecordClick);
@@ -311,7 +421,9 @@ describe('grid: pick mode from the keyboard (Copilot review of #159)', () => {
 				card.focus();
 				await userEvent.keyboard(key);
 				const dialog = screen.getByRole('dialog', { name: es.mark_title });
-				await expect.element(dialog.getByText(es.mark_body(title === 'Registro 95' ? 95 : 97, null))).toBeVisible();
+				await expect
+					.element(dialog.getByText(es.mark_body(title === 'Registro 95' ? 95 : 97, null)))
+					.toBeVisible();
 				expect(onRecordClick).not.toHaveBeenCalled();
 				screen.unmount();
 			}

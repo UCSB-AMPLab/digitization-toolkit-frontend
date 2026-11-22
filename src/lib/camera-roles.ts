@@ -62,7 +62,10 @@ export function whichScreen(setup: CameraSetup | null, devices: CameraDevice[]):
 // bodies connected, each confirmed in its role); the listing only says at
 // which index each body is. A listing's own role fields are never read, so
 // a listing that started before a save cannot carry the roles from before it.
-export function leftIndexFromRoles(devices: CameraDevice[], setup: CameraSetup | null): number | null {
+export function leftIndexFromRoles(
+	devices: CameraDevice[],
+	setup: CameraSetup | null
+): number | null {
 	if (!setup || setup.needs_setup || !setup.confirmed_pair) return null;
 	const { left, right } = setup.confirmed_pair;
 	if (left === right) return null;

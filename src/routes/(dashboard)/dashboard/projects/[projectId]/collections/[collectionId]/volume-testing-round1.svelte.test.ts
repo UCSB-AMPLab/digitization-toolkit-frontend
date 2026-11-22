@@ -17,7 +17,9 @@ vi.mock('$app/stores', async () => {
 		page: readable({
 			params: { projectId: '1', collectionId: '7' },
 			url: new URL('http://localhost/dashboard/projects/1/collections/7'),
-			get data() { return nav.data; }
+			get data() {
+				return nav.data;
+			}
 		})
 	};
 });
@@ -28,13 +30,31 @@ import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { resetUnit } from '$lib/unit-mode';
 import { volumeTopbarContext, type VolumeTopbarSlot } from '$lib/volume-topbar';
-import { json, recordRequests, TESTING_UNIT, TESTING_USER, type Recorder } from '$lib/test-support/testing-routes';
+import {
+	json,
+	recordRequests,
+	TESTING_UNIT,
+	TESTING_USER,
+	type Recorder
+} from '$lib/test-support/testing-routes';
 import VolumePageHost from '$lib/test-support/VolumePageHost.svelte';
 import CollectionPage from './+page.svelte';
 
 const OPERATOR = { id: 5, username: 'op', email: null, role: 'operator' as const, is_active: true };
-const image = (id: number) => ({ id, filename: `p${id}.jpg`, format: 'jpg', is_current: true, role: 'single' });
-const records = [1, 2].map((id) => ({ id, title: `Folio ${id}`, status: 'captured', sequence: id, images: [image(id * 10)] }));
+const image = (id: number) => ({
+	id,
+	filename: `p${id}.jpg`,
+	format: 'jpg',
+	is_current: true,
+	role: 'single'
+});
+const records = [1, 2].map((id) => ({
+	id,
+	title: `Folio ${id}`,
+	status: 'captured',
+	sequence: id,
+	images: [image(id * 10)]
+}));
 
 let rec: Recorder;
 let fileAnswer: () => Response | Promise<Response>;
@@ -80,12 +100,27 @@ async function startZip(role: 'testing' | 'operator') {
 
 describe('ZIP download failures', () => {
 	const cases: [string, () => Response | Promise<Response>, 'testing' | 'operator', string][] = [
-		['a 404, testing', () => json({ detail: { code: 'not_found', message: 'Not found.' } }, 404), 'testing', en.testing_err_not_found],
+		[
+			'a 404, testing',
+			() => json({ detail: { code: 'not_found', message: 'Not found.' } }, 404),
+			'testing',
+			en.testing_err_not_found
+		],
 		['a 500, testing', () => json({ detail: 'boom' }, 500), 'testing', en.col_zip_error],
-		['a rejected fetch, testing', () => Promise.reject(new TypeError('Failed to fetch')), 'testing', en.col_zip_error],
+		[
+			'a rejected fetch, testing',
+			() => Promise.reject(new TypeError('Failed to fetch')),
+			'testing',
+			en.col_zip_error
+		],
 		['a 404, operator', () => json({ detail: 'Not found.' }, 404), 'operator', en.col_zip_error],
 		['a 500, operator', () => json({ detail: 'boom' }, 500), 'operator', en.col_zip_error],
-		['a rejected fetch, operator', () => Promise.reject(new TypeError('Failed to fetch')), 'operator', en.col_zip_error]
+		[
+			'a rejected fetch, operator',
+			() => Promise.reject(new TypeError('Failed to fetch')),
+			'operator',
+			en.col_zip_error
+		]
 	];
 	for (const [label, answer, role, message] of cases) {
 		it(`shows its own words for ${label}`, async () => {
@@ -94,11 +129,13 @@ describe('ZIP download failures', () => {
 			fileAnswer = answer;
 			const screen = renderPage();
 			await startZip(role);
-			const dialog = () => screen.container.ownerDocument.querySelector('[role="dialog"]')?.textContent ?? '';
+			const dialog = () =>
+				screen.container.ownerDocument.querySelector('[role="dialog"]')?.textContent ?? '';
 			await expect.poll(dialog).toContain(message);
 			if (message !== en.col_zip_error) expect(dialog()).toContain(en.col_zip_error);
 			const text = document.body.textContent ?? '';
-			for (const leak of ['HTTP', '404', '500', 'Failed to fetch']) expect(text).not.toContain(leak);
+			for (const leak of ['HTTP', '404', '500', 'Failed to fetch'])
+				expect(text).not.toContain(leak);
 		});
 	}
 });
@@ -138,7 +175,9 @@ describe('before the signed-in role is known', () => {
 		expect(rec.to('GET /records/to-retake/summary')).toHaveLength(0);
 		expect(screen.container.querySelector('.offsite-indicator')).toBeNull();
 		authStore.setSession(TESTING_USER);
-		await expect.element(page.getByRole('button', { name: en.testing_download_pictures })).toBeVisible();
+		await expect
+			.element(page.getByRole('button', { name: en.testing_download_pictures }))
+			.toBeVisible();
 		await new Promise((r) => setTimeout(r, 150));
 		expect(rec.refusedList()).toEqual([]);
 	});
@@ -149,7 +188,9 @@ describe('before the signed-in role is known', () => {
 		await new Promise((r) => setTimeout(r, 150));
 		expect(rec.to('GET /collections/{collection_id}/offsite')).toHaveLength(0);
 		authStore.setSession(OPERATOR);
-		await expect.poll(() => rec.to('GET /collections/{collection_id}/offsite').length).toBeGreaterThan(0);
+		await expect
+			.poll(() => rec.to('GET /collections/{collection_id}/offsite').length)
+			.toBeGreaterThan(0);
 		await expect.poll(() => rec.to('GET /records/to-retake/summary').length).toBeGreaterThan(0);
 		await expect.poll(() => screen.container.querySelector('.offsite-indicator')).not.toBeNull();
 	});

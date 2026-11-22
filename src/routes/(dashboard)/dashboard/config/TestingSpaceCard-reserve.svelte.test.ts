@@ -20,7 +20,8 @@ let calls: Call[];
 let state: { [k: string]: unknown };
 let answers: { [route: string]: () => Response };
 
-const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+const json = (data: unknown, status = 200) =>
+	new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
 function serve() {
 	calls = [];
@@ -43,7 +44,16 @@ function serve() {
 beforeEach(() => {
 	locale.set('en');
 	authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
-	state = { enabled: true, username: 'unit-testing', account_active: true, expiry_days: 30, projects: 2, volumes: 5, reserve_gb: 20, free_gb: 41.5 };
+	state = {
+		enabled: true,
+		username: 'unit-testing',
+		account_active: true,
+		expiry_days: 30,
+		projects: 2,
+		volumes: 5,
+		reserve_gb: 20,
+		free_gb: 41.5
+	};
 	answers = {};
 	serve();
 });
@@ -117,7 +127,9 @@ describe('clearing the testing space', () => {
 		await expect.element(page.getByText(en.testing_cleared(2, 4))).toBeVisible();
 		await expect.element(page.getByText(en.testing_cleared_skipped(1))).toBeVisible();
 		await expect.element(page.getByText(en.testing_counts(0, 1))).toBeVisible();
-		expect(calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual(['/system/testing/clear']);
+		expect(calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual([
+			'/system/testing/clear'
+		]);
 	});
 
 	it('says nothing of volumes left when none was skipped', async () => {
@@ -140,7 +152,8 @@ describe('clearing the testing space', () => {
 	});
 
 	it('shows its own line when the clearing is refused because a purge is running', async () => {
-		answers['POST /system/testing/clear'] = () => json({ detail: { code: 'testing_purge_running', message: 'BACKEND-TEXT' } }, 409);
+		answers['POST /system/testing/clear'] = () =>
+			json({ detail: { code: 'testing_purge_running', message: 'BACKEND-TEXT' } }, 409);
 		const screen = render(TestingSpaceCard);
 		await page.getByRole('button', { name: en.testing_clear }).click();
 		await page.getByRole('button', { name: en.testing_clear_confirm }).click();
@@ -150,7 +163,8 @@ describe('clearing the testing space', () => {
 	});
 
 	it('keeps the generic line for a 409 with another code', async () => {
-		answers['POST /system/testing/clear'] = () => json({ detail: { code: 'other', message: 'x' } }, 409);
+		answers['POST /system/testing/clear'] = () =>
+			json({ detail: { code: 'other', message: 'x' } }, 409);
 		render(TestingSpaceCard);
 		await page.getByRole('button', { name: en.testing_clear }).click();
 		await page.getByRole('button', { name: en.testing_clear_confirm }).click();

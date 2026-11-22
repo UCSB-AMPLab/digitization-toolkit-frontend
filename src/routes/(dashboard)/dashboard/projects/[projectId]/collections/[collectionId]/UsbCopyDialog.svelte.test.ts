@@ -13,18 +13,47 @@ import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
-import { recordRequests, refusal, TESTING_USER, type Recorder, type RecordedRequest } from '$lib/test-support/testing-routes';
+import {
+	recordRequests,
+	refusal,
+	TESTING_USER,
+	type Recorder,
+	type RecordedRequest
+} from '$lib/test-support/testing-routes';
 import { formatBytes } from '$lib/format-bytes';
 import type { UsbCopyStatus, UsbDrive } from '$lib/api';
 import UsbCopyDialog from './UsbCopyDialog.svelte';
 
-const STICK: UsbDrive = { name: '/dev/sda1', label: 'PRACTICE', size: 29_800_000_000, fstype: 'exfat', free_bytes: 1_000_000 };
-const OTHER: UsbDrive = { name: '/dev/sdb1', label: null, size: 14_900_000_000, fstype: 'vfat', free_bytes: null };
+const STICK: UsbDrive = {
+	name: '/dev/sda1',
+	label: 'PRACTICE',
+	size: 29_800_000_000,
+	fstype: 'exfat',
+	free_bytes: 1_000_000
+};
+const OTHER: UsbDrive = {
+	name: '/dev/sdb1',
+	label: null,
+	size: 14_900_000_000,
+	fstype: 'vfat',
+	free_bytes: null
+};
 
 const status = (over: Partial<UsbCopyStatus> = {}): UsbCopyStatus => ({
-	job_id: 'j1', collection_id: 7, state: 'running', done: 3, total: 10, bytes_done: 30_000_000, bytes_total: 100_000_000,
-	error: null, message: 'Backend English text that is never shown.', folder: 'tomo-practice', drive: '/dev/sda1',
-	skipped: { not_regular: 0, outside: 0, missing: 0 }, unmounted: true, ...over
+	job_id: 'j1',
+	collection_id: 7,
+	state: 'running',
+	done: 3,
+	total: 10,
+	bytes_done: 30_000_000,
+	bytes_total: 100_000_000,
+	error: null,
+	message: 'Backend English text that is never shown.',
+	folder: 'tomo-practice',
+	drive: '/dev/sda1',
+	skipped: { not_regular: 0, outside: 0, missing: 0 },
+	unmounted: true,
+	...over
 });
 
 const LIST = 'GET /system/testing/usb';
@@ -73,12 +102,20 @@ describe('the drive list', () => {
 		open({ [LIST]: { drives: [STICK] } });
 		const radio = page.getByRole('radio');
 		await expect.element(radio).toBeChecked();
-		await expect.element(page.getByText(en.testing_usb_drive('PRACTICE', formatBytes(STICK.size, 'en'), 'exfat'))).toBeVisible();
+		await expect
+			.element(
+				page.getByText(en.testing_usb_drive('PRACTICE', formatBytes(STICK.size, 'en'), 'exfat'))
+			)
+			.toBeVisible();
 	});
 
 	it('names a drive without a label by its device and preselects none of several', async () => {
 		open({ [LIST]: { drives: [STICK, OTHER] } });
-		await expect.element(page.getByText(en.testing_usb_drive('/dev/sdb1', formatBytes(OTHER.size, 'en'), 'vfat'))).toBeVisible();
+		await expect
+			.element(
+				page.getByText(en.testing_usb_drive('/dev/sdb1', formatBytes(OTHER.size, 'en'), 'vfat'))
+			)
+			.toBeVisible();
 		expect(page.getByRole('radio').elements()).toHaveLength(2);
 		await expect.element(page.getByRole('radio').first()).not.toBeChecked();
 		await expect.element(page.getByRole('button', { name: en.testing_usb_start })).toBeDisabled();
@@ -92,7 +129,11 @@ describe('the drive list', () => {
 
 describe('the copy', () => {
 	it('starts with the chosen device, then shows files and bytes, and the line about closing', async () => {
-		open({ [LIST]: { drives: [STICK, OTHER] }, [START]: () => ({ job_id: 'j1' }), [POLL]: status() });
+		open({
+			[LIST]: { drives: [STICK, OTHER] },
+			[START]: () => ({ job_id: 'j1' }),
+			[POLL]: status()
+		});
 		await page.getByRole('radio').nth(1).click();
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		await expect.element(page.getByText(en.testing_usb_files(3, 10))).toBeVisible();
@@ -107,28 +148,44 @@ describe('the copy', () => {
 	});
 
 	it('names the folder when done and says the drive can be removed only without an error', async () => {
-		open({ [LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' }, [POLL]: status({ state: 'done', done: 10, bytes_done: 100_000_000 }) });
+		open({
+			[LIST]: { drives: [STICK] },
+			[START]: { job_id: 'j1' },
+			[POLL]: status({ state: 'done', done: 10, bytes_done: 100_000_000 })
+		});
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		await expect.element(page.getByText(en.testing_usb_done('tomo-practice'))).toBeVisible();
 		await expect.element(page.getByText(en.testing_usb_safe)).toBeVisible();
 	});
 
-	it('shows no line of the backend\'s own message', async () => {
-		open({ [LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' }, [POLL]: status({ state: 'failed', error: 'usb_full' }) });
+	it("shows no line of the backend's own message", async () => {
+		open({
+			[LIST]: { drives: [STICK] },
+			[START]: { job_id: 'j1' },
+			[POLL]: status({ state: 'failed', error: 'usb_full' })
+		});
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		await expect.element(page.getByText(en.testing_usb_err_full)).toBeVisible();
 		expect(page.getByText('Backend English text').elements()).toHaveLength(0);
 	});
 
 	it('names the folder alone when done but the drive was not unmounted', async () => {
-		open({ [LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' }, [POLL]: status({ state: 'done', unmounted: false }) });
+		open({
+			[LIST]: { drives: [STICK] },
+			[START]: { job_id: 'j1' },
+			[POLL]: status({ state: 'done', unmounted: false })
+		});
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		await expect.element(page.getByText(en.testing_usb_done('tomo-practice'))).toBeVisible();
 		expect(page.getByText(en.testing_usb_safe).elements()).toHaveLength(0);
 	});
 
 	it('does not say the drive can be removed when done carries an error', async () => {
-		open({ [LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' }, [POLL]: status({ state: 'done', error: 'usb_unmount', unmounted: true }) });
+		open({
+			[LIST]: { drives: [STICK] },
+			[START]: { job_id: 'j1' },
+			[POLL]: status({ state: 'done', error: 'usb_unmount', unmounted: true })
+		});
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		await expect.element(page.getByText(en.testing_usb_done('tomo-practice'))).toBeVisible();
 		expect(page.getByText(en.testing_usb_safe).elements()).toHaveLength(0);
@@ -136,7 +193,8 @@ describe('the copy', () => {
 
 	it('counts the pictures skipped as missing, not regular or outside', async () => {
 		open({
-			[LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' },
+			[LIST]: { drives: [STICK] },
+			[START]: { job_id: 'j1' },
 			[POLL]: status({ state: 'done', skipped: { not_regular: 1, outside: 1, missing: 1 } })
 		});
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
@@ -144,25 +202,53 @@ describe('the copy', () => {
 	});
 
 	it('treats a status without a skipped object as none skipped', async () => {
-		open({ [LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' }, [POLL]: { ...status({ state: 'done' }), skipped: undefined } });
+		open({
+			[LIST]: { drives: [STICK] },
+			[START]: { job_id: 'j1' },
+			[POLL]: { ...status({ state: 'done' }), skipped: undefined }
+		});
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		await expect.element(page.getByText(en.testing_usb_safe)).toBeVisible();
 	});
 
 	it('says nothing of skipped pictures when none were skipped', async () => {
-		open({ [LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' }, [POLL]: status({ state: 'done' }) });
+		open({
+			[LIST]: { drives: [STICK] },
+			[START]: { job_id: 'j1' },
+			[POLL]: status({ state: 'done' })
+		});
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		await expect.element(page.getByText(en.testing_usb_safe)).toBeVisible();
 		expect(page.getByText(/could not be copied/).elements()).toHaveLength(0);
 	});
 
-	for (const code of ['usb_mount', 'usb_full', 'usb_write', 'usb_name', 'usb_unmount', 'usb_volume_empty', 'usb_read', 'usb_exists'] as const) {
-		for (const [tag, cat, loc] of [['English', en, 'en'], ['Spanish', es, 'es']] as const) {
+	for (const code of [
+		'usb_mount',
+		'usb_full',
+		'usb_write',
+		'usb_name',
+		'usb_unmount',
+		'usb_volume_empty',
+		'usb_read',
+		'usb_exists'
+	] as const) {
+		for (const [tag, cat, loc] of [
+			['English', en, 'en'],
+			['Spanish', es, 'es']
+		] as const) {
 			it(`shows the ${tag} message for ${code} from the status`, async () => {
 				locale.set(loc);
-				open({ [LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' }, [POLL]: status({ state: 'failed', error: code }) });
+				open({
+					[LIST]: { drives: [STICK] },
+					[START]: { job_id: 'j1' },
+					[POLL]: status({ state: 'failed', error: code })
+				});
 				await page.getByRole('button', { name: cat.testing_usb_start }).click();
-				await expect.element(page.getByText(cat[`testing_usb_err_${code.slice(4)}` as keyof typeof en] as string)).toBeVisible();
+				await expect
+					.element(
+						page.getByText(cat[`testing_usb_err_${code.slice(4)}` as keyof typeof en] as string)
+					)
+					.toBeVisible();
 			});
 		}
 	}
@@ -179,14 +265,17 @@ describe('the copy', () => {
 		['testing_volume_busy', 409, 'testing_usb_err_volume_busy'],
 		['not_found', 404, 'testing_err_not_found']
 	] as const) {
-		for (const [tag, cat, loc] of [['English', en, 'en'], ['Spanish', es, 'es']] as const) {
-		it(`shows the ${tag} message for ${code} refused on start`, async () => {
-			locale.set(loc);
-			open({ [LIST]: { drives: [STICK] }, [START]: refusal(status_, code) });
-			await page.getByRole('button', { name: cat.testing_usb_start }).click();
-			await expect.element(page.getByText(cat[key] as string)).toBeVisible();
-			expect(rec.to(POLL)).toHaveLength(0);
-		});
+		for (const [tag, cat, loc] of [
+			['English', en, 'en'],
+			['Spanish', es, 'es']
+		] as const) {
+			it(`shows the ${tag} message for ${code} refused on start`, async () => {
+				locale.set(loc);
+				open({ [LIST]: { drives: [STICK] }, [START]: refusal(status_, code) });
+				await page.getByRole('button', { name: cat.testing_usb_start }).click();
+				await expect.element(page.getByText(cat[key] as string)).toBeVisible();
+				expect(rec.to(POLL)).toHaveLength(0);
+			});
 		}
 	}
 });
@@ -198,7 +287,11 @@ describe('a status request that fails', () => {
 	};
 	async function started(poll: (r: RecordedRequest) => unknown) {
 		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-		const screen = open({ [LIST]: { drives: [STICK], active: null }, [START]: { job_id: 'j1' }, [POLL]: poll });
+		const screen = open({
+			[LIST]: { drives: [STICK], active: null },
+			[START]: { job_id: 'j1' },
+			[POLL]: poll
+		});
 		await vi.waitFor(() => expect(page.getByRole('radio').elements()).toHaveLength(1));
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		return screen;
@@ -208,28 +301,43 @@ describe('a status request that fails', () => {
 		await started(failing(1, () => status({ state: 'done' })));
 		await vi.advanceTimersByTimeAsync(700);
 		await vi.advanceTimersByTimeAsync(700);
-		await vi.waitFor(() => expect(page.getByText(en.testing_usb_done('tomo-practice')).elements()).toHaveLength(1));
+		await vi.waitFor(() =>
+			expect(page.getByText(en.testing_usb_done('tomo-practice')).elements()).toHaveLength(1)
+		);
 		expect(page.getByText(en.testing_usb_status_unreachable).elements()).toHaveLength(0);
 	});
 
 	it('shows the unreachable line after three in a row, and a later success removes it', async () => {
 		await started(failing(3, () => status()));
 		for (let i = 0; i < 3; i++) await vi.advanceTimersByTimeAsync(700);
-		await vi.waitFor(() => expect(page.getByText(en.testing_usb_status_unreachable).elements()).toHaveLength(1));
+		await vi.waitFor(() =>
+			expect(page.getByText(en.testing_usb_status_unreachable).elements()).toHaveLength(1)
+		);
 		await vi.advanceTimersByTimeAsync(700);
-		await vi.waitFor(() => expect(page.getByText(en.testing_usb_status_unreachable).elements()).toHaveLength(0));
+		await vi.waitFor(() =>
+			expect(page.getByText(en.testing_usb_status_unreachable).elements()).toHaveLength(0)
+		);
 		expect(page.getByText(en.testing_usb_files(3, 10)).elements()).toHaveLength(1);
 	});
 
-	for (const [tag, cat, loc] of [['English', en, 'en'], ['Spanish', es, 'es']] as const) {
+	for (const [tag, cat, loc] of [
+		['English', en, 'en'],
+		['Spanish', es, 'es']
+	] as const) {
 		it(`shows the ${tag} lost-track message on a 404 and polls no more`, async () => {
 			locale.set(loc);
 			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-			open({ [LIST]: { drives: [STICK], active: null }, [START]: { job_id: 'j1' }, [POLL]: refusal(404, 'not_found') });
+			open({
+				[LIST]: { drives: [STICK], active: null },
+				[START]: { job_id: 'j1' },
+				[POLL]: refusal(404, 'not_found')
+			});
 			await vi.waitFor(() => expect(page.getByRole('radio').elements()).toHaveLength(1));
 			await page.getByRole('button', { name: cat.testing_usb_start }).click();
 			await vi.advanceTimersByTimeAsync(700);
-			await vi.waitFor(() => expect(page.getByText(cat.testing_usb_err_lost).elements()).toHaveLength(1));
+			await vi.waitFor(() =>
+				expect(page.getByText(cat.testing_usb_err_lost).elements()).toHaveLength(1)
+			);
 			const n = rec.to(POLL).length;
 			await vi.advanceTimersByTimeAsync(5000);
 			expect(rec.to(POLL).length).toBe(n);
@@ -238,22 +346,34 @@ describe('a status request that fails', () => {
 });
 
 describe('a copy already running', () => {
-	it('is resumed at the progress when it is this volume\'s, with no POST', async () => {
+	it("is resumed at the progress when it is this volume's, with no POST", async () => {
 		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-		open({ [LIST]: { drives: [STICK], active: { collection_id: 7, job_id: 'jx' } }, [POLL]: status({ job_id: 'jx' }) });
+		open({
+			[LIST]: { drives: [STICK], active: { collection_id: 7, job_id: 'jx' } },
+			[POLL]: status({ job_id: 'jx' })
+		});
 		await vi.advanceTimersByTimeAsync(700);
-		await vi.waitFor(() => expect(page.getByText(en.testing_usb_files(3, 10)).elements()).toHaveLength(1));
+		await vi.waitFor(() =>
+			expect(page.getByText(en.testing_usb_files(3, 10)).elements()).toHaveLength(1)
+		);
 		expect(rec.to(START)).toHaveLength(0);
 		expect(rec.to(POLL)[0].path).toBe('/collections/7/usb-copy/status/jx');
 		expect(page.getByRole('radio').elements()).toHaveLength(0);
 	});
 
-	it('shows the busy text, no list and no Copy button when it is another volume\'s, and Refresh asks again', async () => {
+	it("shows the busy text, no list and no Copy button when it is another volume's, and Refresh asks again", async () => {
 		let n = 0;
-		open({ [LIST]: () => ({ drives: [STICK], active: n++ === 0 ? { collection_id: 99, job_id: 'jy' } : null }) });
+		open({
+			[LIST]: () => ({
+				drives: [STICK],
+				active: n++ === 0 ? { collection_id: 99, job_id: 'jy' } : null
+			})
+		});
 		await expect.element(page.getByText(en.testing_usb_err_copy_busy)).toBeVisible();
 		expect(page.getByRole('radio').elements()).toHaveLength(0);
-		expect(page.getByRole('button', { name: en.testing_usb_start, exact: true }).elements()).toHaveLength(0);
+		expect(
+			page.getByRole('button', { name: en.testing_usb_start, exact: true }).elements()
+		).toHaveLength(0);
 		await page.getByRole('button', { name: en.testing_usb_refresh }).click();
 		await expect.element(page.getByRole('radio')).toBeVisible();
 		expect(page.getByText(en.testing_usb_err_copy_busy).elements()).toHaveLength(0);
@@ -262,7 +382,11 @@ describe('a copy already running', () => {
 
 describe('the start', () => {
 	it('sends one POST on a double click', async () => {
-		open({ [LIST]: { drives: [STICK], active: null }, [START]: () => ({ job_id: 'j1' }), [POLL]: status() });
+		open({
+			[LIST]: { drives: [STICK], active: null },
+			[START]: () => ({ job_id: 'j1' }),
+			[POLL]: status()
+		});
 		await page.getByRole('button', { name: en.testing_usb_start }).dblClick();
 		await expect.element(page.getByText(en.testing_usb_files(3, 10))).toBeVisible();
 		expect(rec.to(START)).toHaveLength(1);
@@ -280,7 +404,11 @@ describe('the start', () => {
 describe('the volume changes under the dialog', () => {
 	it('closes it and stops polling', async () => {
 		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-		const screen = open({ [LIST]: { drives: [STICK], active: null }, [START]: { job_id: 'j1' }, [POLL]: status() });
+		const screen = open({
+			[LIST]: { drives: [STICK], active: null },
+			[START]: { job_id: 'j1' },
+			[POLL]: status()
+		});
 		await vi.waitFor(() => expect(page.getByRole('radio').elements()).toHaveLength(1));
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		await vi.advanceTimersByTimeAsync(700);
@@ -295,7 +423,11 @@ describe('the volume changes under the dialog', () => {
 describe('polling', () => {
 	it('polls at the export interval and stops when the dialog is destroyed', async () => {
 		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-		const screen = open({ [LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' }, [POLL]: status() });
+		const screen = open({
+			[LIST]: { drives: [STICK] },
+			[START]: { job_id: 'j1' },
+			[POLL]: status()
+		});
 		await vi.waitFor(() => expect(page.getByRole('radio').elements()).toHaveLength(1));
 		await page.getByRole('button', { name: en.testing_usb_start }).click();
 		await vi.advanceTimersByTimeAsync(700);
@@ -309,7 +441,11 @@ describe('polling', () => {
 
 	it('stops when the dialog is closed, and the close does not cancel anything', async () => {
 		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-		const screen = open({ [LIST]: { drives: [STICK] }, [START]: { job_id: 'j1' }, [POLL]: status() });
+		const screen = open({
+			[LIST]: { drives: [STICK] },
+			[START]: { job_id: 'j1' },
+			[POLL]: status()
+		});
 		// The page removes the dialog when it is closed.
 		onClose.mockImplementation(() => screen.unmount());
 		await vi.waitFor(() => expect(page.getByRole('radio').elements()).toHaveLength(1));

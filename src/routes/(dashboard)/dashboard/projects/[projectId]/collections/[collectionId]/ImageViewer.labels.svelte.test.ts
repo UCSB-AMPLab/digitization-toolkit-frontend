@@ -33,12 +33,27 @@ async function settle() {
 	}
 }
 
-const hit = (a: DOMRect, b: DOMRect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+const hit = (a: DOMRect, b: DOMRect) =>
+	a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 const text = (el: HTMLElement) => el.innerText.replace(/\s+/g, ' ').trim();
 
 const image = (id: number, role: 'left' | 'right'): RecordImage =>
-	({ id, record_id: 1, filename: `co-ahr-6-000${id}.jpg`, file_path: '/x', format: 'jpeg', is_current: true, role }) as RecordImage;
-const record = { id: 1, title: 'Folio 1', status: 'in_review', capture_mode: 'dual', images: [image(1, 'left'), image(2, 'right')] } as ApiRecord;
+	({
+		id,
+		record_id: 1,
+		filename: `co-ahr-6-000${id}.jpg`,
+		file_path: '/x',
+		format: 'jpeg',
+		is_current: true,
+		role
+	}) as RecordImage;
+const record = {
+	id: 1,
+	title: 'Folio 1',
+	status: 'in_review',
+	capture_mode: 'dual',
+	images: [image(1, 'left'), image(2, 'right')]
+} as ApiRecord;
 
 async function open(viewport: [number, number], width: number) {
 	await browserPage.viewport(...viewport);
@@ -51,13 +66,25 @@ async function open(viewport: [number, number], width: number) {
 	document.body.appendChild(host);
 	render(ImageViewer, {
 		target: host,
-		props: { viewMode: 'spread', records: [record], selectedRecordId: 1, zoom: 1, rotation: 0, onPrev: vi.fn(), onNext: vi.fn() }
+		props: {
+			viewMode: 'spread',
+			records: [record],
+			selectedRecordId: 1,
+			zoom: 1,
+			rotation: 0,
+			onPrev: vi.fn(),
+			onNext: vi.fn()
+		}
 	});
 	await settle();
 	const pages = [...host.querySelectorAll<HTMLElement>('.spread-page')];
 	return {
 		host,
-		sides: (['left', 'right'] as const).map((role, i) => ({ role, page: pages[i], label: pages[i].querySelector('.spread-side') as HTMLElement }))
+		sides: (['left', 'right'] as const).map((role, i) => ({
+			role,
+			page: pages[i],
+			label: pages[i].querySelector('.spread-side') as HTMLElement
+		}))
 	};
 }
 
@@ -67,11 +94,15 @@ function fits(sides: Awaited<ReturnType<typeof open>>['sides']) {
 	sides.forEach(({ role, page, label }, i) => {
 		const l = label.getBoundingClientRect();
 		const p = page.getBoundingClientRect();
-		console.log(`[spread labels] ${role}: page ${p.width.toFixed(0)}px, label ${l.width.toFixed(0)}x${l.height.toFixed(0)}px`);
+		console.log(
+			`[spread labels] ${role}: page ${p.width.toFixed(0)}px, label ${l.width.toFixed(0)}x${l.height.toFixed(0)}px`
+		);
 		expect(l.height, `${role} height`).toBeLessThan(20);
 		expect(l.left, `${role} left`).toBeGreaterThanOrEqual(p.left);
 		expect(l.right, `${role} right`).toBeLessThanOrEqual(p.right);
-		expect(hit(l, captions[1 - i].getBoundingClientRect()), `${role} over the other caption`).toBe(false);
+		expect(hit(l, captions[1 - i].getBoundingClientRect()), `${role} over the other caption`).toBe(
+			false
+		);
 	});
 }
 
@@ -99,7 +130,9 @@ for (const [lang, t] of [
 					const term = role === 'left' ? t.page_term_even : t.page_term_odd;
 					expect(text(label)).toContain(`${letter} · ${term}`);
 					expect(text(label)).not.toContain(words);
-					expect(label.querySelector('.material-symbols-outlined')?.getAttribute('aria-hidden')).toBe('true');
+					expect(
+						label.querySelector('.material-symbols-outlined')?.getAttribute('aria-hidden')
+					).toBe('true');
 					expect(label.getAttribute('role')).toBe('img');
 					expect(label.getAttribute('aria-label')).toBe(words);
 					expect(label.getAttribute('title')).toBe(words);

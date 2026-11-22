@@ -43,24 +43,39 @@ function serve() {
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const url = String(input instanceof Request ? input.url : input);
 		if (url.includes('/network/')) {
-			return new Response(JSON.stringify({ detail: 'Network settings are not available on this device.' }), { status: 501 });
+			return new Response(
+				JSON.stringify({ detail: 'Network settings are not available on this device.' }),
+				{ status: 501 }
+			);
 		}
 		if (url.endsWith('/system/storage')) {
 			const GB = 1024 ** 3;
 			return new Response(
-				JSON.stringify({ projects_path: '/data/projects', is_override: false, total_bytes: 100 * GB, used_bytes: 40 * GB, free_bytes: 60 * GB, available: true }),
+				JSON.stringify({
+					projects_path: '/data/projects',
+					is_override: false,
+					total_bytes: 100 * GB,
+					used_bytes: 40 * GB,
+					free_bytes: 60 * GB,
+					available: true
+				}),
 				{ status: 200, headers: { 'Content-Type': 'application/json' } }
 			);
 		}
 		if (url.endsWith('/cameras/capabilities')) {
-			return new Response(JSON.stringify({ backend: 'gphoto2' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+			return new Response(JSON.stringify({ backend: 'gphoto2' }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
 		}
 		return new Response('{}', { status: 500 });
 	});
 }
 
 function sectionNames(container: HTMLElement) {
-	return [...container.querySelectorAll('[data-settings-section]')].map((b) => b.textContent?.trim());
+	return [...container.querySelectorAll('[data-settings-section]')].map((b) =>
+		b.textContent?.trim()
+	);
 }
 
 const ADMIN_SECTIONS = [
@@ -91,16 +106,24 @@ describe('Settings sections', () => {
 		serve();
 		signIn('admin');
 		const { container } = render(ConfigPage);
-		await expect.poll(() => sectionNames(container)).toEqual([en.config_section_network, en.config_section_language, ...ADMIN_SECTIONS]);
-		expect(container.querySelector('.settings-group')?.textContent?.trim()).toBe(en.config_group_unit);
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
+		await expect
+			.poll(() => sectionNames(container))
+			.toEqual([en.config_section_network, en.config_section_language, ...ADMIN_SECTIONS]);
+		expect(container.querySelector('.settings-group')?.textContent?.trim()).toBe(
+			en.config_group_unit
+		);
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 }))
+			.toBeVisible();
 	});
 
 	it('the reviewer sees Network and Language only', async () => {
 		serve();
 		signIn('reviewer');
 		const { container } = render(ConfigPage);
-		await expect.poll(() => sectionNames(container)).toEqual([en.config_section_network, en.config_section_language]);
+		await expect
+			.poll(() => sectionNames(container))
+			.toEqual([en.config_section_network, en.config_section_language]);
 		expect(container.querySelector('.settings-group')).toBeNull();
 		expect(container.textContent).toContain(en.config_subtitle_personal);
 	});
@@ -112,13 +135,21 @@ describe('Settings sections', () => {
 		await expect
 			.poll(() => sectionNames(container))
 			.toEqual([en.config_section_network, en.config_section_language, en.config_section_storage]);
-		expect(container.querySelector('.settings-group')?.textContent?.trim()).toBe(en.config_group_unit);
+		expect(container.querySelector('.settings-group')?.textContent?.trim()).toBe(
+			en.config_group_unit
+		);
 		expect(container.textContent).toContain(en.config_subtitle_personal);
 	});
 
 	for (const [role, refused] of [
-		['operator', ['power', 'unit-mode', 'fisqua-link', 'offsite-copy', 'diagnostics', 'maintenance']],
-		['reviewer', ['power', 'storage', 'unit-mode', 'fisqua-link', 'offsite-copy', 'diagnostics', 'maintenance']]
+		[
+			'operator',
+			['power', 'unit-mode', 'fisqua-link', 'offsite-copy', 'diagnostics', 'maintenance']
+		],
+		[
+			'reviewer',
+			['power', 'storage', 'unit-mode', 'fisqua-link', 'offsite-copy', 'diagnostics', 'maintenance']
+		]
 	] as const) {
 		it(`the ${role} asking for an admin section by URL gets Network, with no admin content`, async () => {
 			serve();
@@ -126,7 +157,9 @@ describe('Settings sections', () => {
 			for (const id of refused) {
 				at(`?section=${id}`);
 				const { container, unmount } = render(ConfigPage);
-				await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
+				await expect
+					.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 }))
+					.toBeVisible();
 				expect(container.textContent).not.toContain(en.config_shutdown_label);
 				expect(container.textContent).not.toContain(en.config_storage_used);
 				expect(container.querySelector('.config-section#unit-mode')).toBeNull();
@@ -140,8 +173,12 @@ describe('Settings sections', () => {
 		serve();
 		signIn('testing');
 		const { container } = render(ConfigPage);
-		await expect.poll(() => sectionNames(container)).toEqual([en.config_section_network, en.config_section_language, en.config_section_power]);
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
+		await expect
+			.poll(() => sectionNames(container))
+			.toEqual([en.config_section_network, en.config_section_language, en.config_section_power]);
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 }))
+			.toBeVisible();
 		expect(container.textContent).toContain(en.config_subtitle_personal);
 	});
 
@@ -151,7 +188,9 @@ describe('Settings sections', () => {
 		for (const id of ['storage', 'diagnostics', 'unit-mode', 'offsite-copy', 'maintenance']) {
 			at(`?section=${id}`);
 			const { container, unmount } = render(ConfigPage);
-			await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
+			await expect
+				.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 }))
+				.toBeVisible();
 			expect(container.textContent).not.toContain(en.config_shutdown_label);
 			expect(container.textContent).not.toContain(en.config_storage_used);
 			unmount();
@@ -163,8 +202,12 @@ describe('Settings sections', () => {
 		signIn('testing');
 		at('?section=power');
 		render(ConfigPage);
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 })).toBeVisible();
-		await expect.element(browserPage.getByRole('button', { name: en.config_shutdown_btn, exact: true })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 }))
+			.toBeVisible();
+		await expect
+			.element(browserPage.getByRole('button', { name: en.config_shutdown_btn, exact: true }))
+			.toBeVisible();
 	});
 
 	it('a section requests only what it shows: the testing role on Power asks for neither storage nor capabilities', async () => {
@@ -172,10 +215,16 @@ describe('Settings sections', () => {
 		signIn('testing');
 		at('?section=power');
 		render(ConfigPage);
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 }))
+			.toBeVisible();
 		await new Promise((r) => setTimeout(r, 100));
-		const urls = fetchSpy.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input));
-		expect(urls.filter((u) => u.endsWith('/system/storage') || u.endsWith('/cameras/capabilities'))).toEqual([]);
+		const urls = fetchSpy.mock.calls.map(([input]) =>
+			String(input instanceof Request ? input.url : input)
+		);
+		expect(
+			urls.filter((u) => u.endsWith('/system/storage') || u.endsWith('/cameras/capabilities'))
+		).toEqual([]);
 	});
 
 	it('an administrator gets the storage figures each time Storage is shown, and the capture system once on Diagnostics', async () => {
@@ -183,16 +232,26 @@ describe('Settings sections', () => {
 		signIn('admin');
 		at('?section=storage');
 		const { container } = render(ConfigPage);
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40 GB / 100 GB');
+		await expect
+			.poll(() =>
+				container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()
+			)
+			.toBe('40 GB / 100 GB');
 		const calls = (suffix: string) =>
-			fetchSpy.mock.calls.filter(([input]) => String(input instanceof Request ? input.url : input).endsWith(suffix)).length;
+			fetchSpy.mock.calls.filter(([input]) =>
+				String(input instanceof Request ? input.url : input).endsWith(suffix)
+			).length;
 		expect(calls('/cameras/capabilities')).toBe(0);
 		// The component stays mounted when the section changes.
 		at('?section=diagnostics');
 		await expect.poll(() => container.textContent).toContain('gphoto2');
 		expect(calls('/cameras/capabilities')).toBe(1);
 		at('?section=storage');
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40 GB / 100 GB');
+		await expect
+			.poll(() =>
+				container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()
+			)
+			.toBe('40 GB / 100 GB');
 		// Read afresh on return (NEH-380): the section shows what the unit holds now.
 		await expect.poll(() => calls('/system/storage')).toBe(2);
 		expect(calls('/cameras/capabilities')).toBe(1);
@@ -205,10 +264,16 @@ describe('Settings sections', () => {
 		const { container } = render(ConfigPage);
 		await expect.poll(() => container.textContent).toContain('gphoto2');
 		const calls = (suffix: string) =>
-			fetchSpy.mock.calls.filter(([input]) => String(input instanceof Request ? input.url : input).endsWith(suffix)).length;
+			fetchSpy.mock.calls.filter(([input]) =>
+				String(input instanceof Request ? input.url : input).endsWith(suffix)
+			).length;
 		expect(calls('/system/storage')).toBe(0);
 		at('?section=storage');
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40 GB / 100 GB');
+		await expect
+			.poll(() =>
+				container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()
+			)
+			.toBe('40 GB / 100 GB');
 		expect(calls('/system/storage')).toBe(1);
 		expect(calls('/cameras/capabilities')).toBe(1);
 	});
@@ -218,8 +283,12 @@ describe('Settings sections', () => {
 		signIn('admin');
 		at('?section=power');
 		render(ConfigPage);
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 })).toBeVisible();
-		await expect.element(browserPage.getByRole('button', { name: en.config_shutdown_btn, exact: true })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 }))
+			.toBeVisible();
+		await expect
+			.element(browserPage.getByRole('button', { name: en.config_shutdown_btn, exact: true }))
+			.toBeVisible();
 	});
 
 	it('an admin opening ?section=power renders Power first: no network request is made', async () => {
@@ -227,9 +296,13 @@ describe('Settings sections', () => {
 		signIn('admin');
 		at('?section=power');
 		render(ConfigPage);
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_power, level: 2 }))
+			.toBeVisible();
 		await new Promise((r) => setTimeout(r, 50));
-		const urls = fetchSpy.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input));
+		const urls = fetchSpy.mock.calls.map(([input]) =>
+			String(input instanceof Request ? input.url : input)
+		);
 		expect(urls.filter((u) => u.includes('/network/'))).toEqual([]);
 	});
 
@@ -238,19 +311,31 @@ describe('Settings sections', () => {
 		signIn('admin');
 		store().set({ url: new URL('http://localhost/dashboard/config#offsite-copy') });
 		render(ConfigPage);
-		await expect.element(browserPage.getByRole('heading', { name: en.backup_section_title, level: 2 })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.backup_section_title, level: 2 }))
+			.toBeVisible();
 	});
 
 	it('choosing a section shows it and puts it in the URL', async () => {
 		serve();
 		signIn('admin');
 		const { container } = render(ConfigPage);
-		const storage = browserPage.getByRole('button', { name: en.config_section_storage, exact: true });
+		const storage = browserPage.getByRole('button', {
+			name: en.config_section_storage,
+			exact: true
+		});
 		await storage.click();
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_storage, level: 2 })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_storage, level: 2 }))
+			.toBeVisible();
 		await expect.element(storage).toHaveAttribute('aria-current', 'page');
-		expect(gotoMock).toHaveBeenCalledWith('?section=storage', expect.objectContaining({ replaceState: true }));
-		expect(container.querySelector('[data-settings-section][aria-current="page"]')?.textContent?.trim()).toBe(en.config_section_storage);
+		expect(gotoMock).toHaveBeenCalledWith(
+			'?section=storage',
+			expect.objectContaining({ replaceState: true })
+		);
+		expect(
+			container.querySelector('[data-settings-section][aria-current="page"]')?.textContent?.trim()
+		).toBe(en.config_section_storage);
 	});
 
 	it('the reviewer can change the language from the Language section', async () => {
@@ -258,8 +343,12 @@ describe('Settings sections', () => {
 		signIn('reviewer');
 		at('?section=language');
 		render(ConfigPage);
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_language, level: 2 })).toBeVisible();
-		await expect.element(browserPage.getByRole('group', { name: en.config_language_label })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_language, level: 2 }))
+			.toBeVisible();
+		await expect
+			.element(browserPage.getByRole('group', { name: en.config_language_label }))
+			.toBeVisible();
 		await expect.element(browserPage.getByRole('button', { name: 'Español' })).toBeVisible();
 	});
 
@@ -273,22 +362,27 @@ describe('Settings sections', () => {
 		expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(800);
 	});
 
-	it.each(['offsite-copy', 'power'])('on the unit screen, a section opened by URL (%s) has its tab scrolled into view', async (id) => {
-		await browserPage.viewport(800, 480);
-		serve();
-		signIn('admin');
-		at(`?section=${id}`);
-		const { container } = render(ConfigPage);
-		const list = container.querySelector('.settings-nav') as HTMLElement;
-		await expect.poll(() => getComputedStyle(list).flexDirection).toBe('row');
-		// The row is wider than the screen, so some tab starts off it.
-		expect(list.scrollWidth).toBeGreaterThan(list.clientWidth);
-		const tab = container.querySelector(`[data-settings-section="${id}"]`) as HTMLElement;
-		await expect.element(tab).toHaveAttribute('aria-current', 'page');
-		await expect.poll(() => {
-			const l = list.getBoundingClientRect();
-			const t = tab.getBoundingClientRect();
-			return t.left >= l.left - 1 && t.right <= l.right + 1;
-		}).toBe(true);
-	});
+	it.each(['offsite-copy', 'power'])(
+		'on the unit screen, a section opened by URL (%s) has its tab scrolled into view',
+		async (id) => {
+			await browserPage.viewport(800, 480);
+			serve();
+			signIn('admin');
+			at(`?section=${id}`);
+			const { container } = render(ConfigPage);
+			const list = container.querySelector('.settings-nav') as HTMLElement;
+			await expect.poll(() => getComputedStyle(list).flexDirection).toBe('row');
+			// The row is wider than the screen, so some tab starts off it.
+			expect(list.scrollWidth).toBeGreaterThan(list.clientWidth);
+			const tab = container.querySelector(`[data-settings-section="${id}"]`) as HTMLElement;
+			await expect.element(tab).toHaveAttribute('aria-current', 'page');
+			await expect
+				.poll(() => {
+					const l = list.getBoundingClientRect();
+					const t = tab.getBoundingClientRect();
+					return t.left >= l.left - 1 && t.right <= l.right + 1;
+				})
+				.toBe(true);
+		}
+	);
 });

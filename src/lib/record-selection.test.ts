@@ -26,7 +26,10 @@ describe('selectionAfterLoad', () => {
 });
 
 describe('reconcileInspected', () => {
-	const recs = [{ id: 1, v: 'new' }, { id: 5, v: 'new' }];
+	const recs = [
+		{ id: 1, v: 'new' },
+		{ id: 5, v: 'new' }
+	];
 
 	it('swaps the record being inspected for its reloaded copy, by id', () => {
 		expect(reconcileInspected({ id: 5, v: 'old' }, recs)).toBe(recs[1]);

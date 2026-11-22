@@ -19,10 +19,16 @@ import { testingExpiry, testingRefusalText } from './testing-space';
 import { en } from './i18n/en';
 import { es } from './i18n/es';
 
-const fisqua = { mode: 'fisqua', projectsEnabled: false, projectsShown: false, defaultProjectId: null,
-	prerequisites: { backup: [], fisqua: [] }, keptVolumes: [] } as UnitState;
+const fisqua = {
+	mode: 'fisqua',
+	projectsEnabled: false,
+	projectsShown: false,
+	defaultProjectId: null,
+	prerequisites: { backup: [], fisqua: [] },
+	keptVolumes: []
+} as UnitState;
 
-describe('the testing account\'s permissions', () => {
+describe("the testing account's permissions", () => {
 	it('creates projects, as the administrator does, and nobody else', () => {
 		expect(canCreateProjects('testing')).toBe(true);
 		expect(canCreateProjects('admin')).toBe(true);
@@ -61,23 +67,37 @@ describe('the testing account\'s permissions', () => {
 		expect(setsVolumeCodes('testing')).toBe(false);
 		expect(setsVolumeCodes('admin')).toBe(true);
 		expect(takesPartInWorkflow('testing')).toBe(false);
-		for (const role of ['admin', 'operator', 'reviewer']) expect(takesPartInWorkflow(role)).toBe(true);
+		for (const role of ['admin', 'operator', 'reviewer'])
+			expect(takesPartInWorkflow(role)).toBe(true);
 		expect(inTestingSpace('testing')).toBe(true);
 		expect(inTestingSpace('admin')).toBe(false);
 		expect(inTestingSpace(undefined)).toBe(false);
 	});
 });
 
-const err = (status: number, detail: unknown) => Object.assign(new Error('Backend text'), { status, detail });
+const err = (status: number, detail: unknown) =>
+	Object.assign(new Error('Backend text'), { status, detail });
 
 describe('testingRefusalText', () => {
 	it('gives each refusal its own message', () => {
-		expect(testingRefusalText(err(507, { code: 'testing_reserve', message: 'x' }), en, 'testing')).toBe(en.testing_err_reserve);
-		expect(testingRefusalText(err(409, { code: 'project_directory_taken', message: 'x' }), en, 'testing')).toBe(en.testing_err_project_directory_taken);
-		expect(testingRefusalText(err(422, { code: 'project_name_invalid', message: 'x' }), en, 'testing')).toBe(en.testing_err_project_name_invalid);
-		expect(testingRefusalText(err(409, { code: 'testing_volume_codes', message: 'x' }), en, 'testing')).toBe(en.testing_err_volume_codes);
-		expect(testingRefusalText(err(404, { code: 'not_found', message: 'x' }), en, 'testing')).toBe(en.testing_err_not_found);
-		expect(testingRefusalText(err(409, { code: 'testing_volume_busy', message: 'x' }), en, 'testing')).toBe(en.testing_err_volume_busy);
+		expect(
+			testingRefusalText(err(507, { code: 'testing_reserve', message: 'x' }), en, 'testing')
+		).toBe(en.testing_err_reserve);
+		expect(
+			testingRefusalText(err(409, { code: 'project_directory_taken', message: 'x' }), en, 'testing')
+		).toBe(en.testing_err_project_directory_taken);
+		expect(
+			testingRefusalText(err(422, { code: 'project_name_invalid', message: 'x' }), en, 'testing')
+		).toBe(en.testing_err_project_name_invalid);
+		expect(
+			testingRefusalText(err(409, { code: 'testing_volume_codes', message: 'x' }), en, 'testing')
+		).toBe(en.testing_err_volume_codes);
+		expect(testingRefusalText(err(404, { code: 'not_found', message: 'x' }), en, 'testing')).toBe(
+			en.testing_err_not_found
+		);
+		expect(
+			testingRefusalText(err(409, { code: 'testing_volume_busy', message: 'x' }), en, 'testing')
+		).toBe(en.testing_err_volume_busy);
 	});
 
 	it('is null for anything else', () => {
@@ -105,7 +125,9 @@ describe('testingExpiry', () => {
 
 describe('testing_cameras_not_set_up', () => {
 	it('sends the testing account to an administrator, and names no operator', () => {
-		expect(en.testing_cameras_not_set_up.endsWith('Ask an administrator to set them up.')).toBe(true);
+		expect(en.testing_cameras_not_set_up.endsWith('Ask an administrator to set them up.')).toBe(
+			true
+		);
 		expect(en.testing_cameras_not_set_up).not.toMatch(/operator/i);
 		expect(es.testing_cameras_not_set_up).not.toMatch(/operari/i);
 	});

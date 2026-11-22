@@ -21,16 +21,19 @@ class ApiError extends Error {
 const NO_VOLUME = 'Captures must go into a volume.';
 const NO_STEM = 'This volume has no file name stem. Give it one before capturing into it.';
 const RETAKE_VOLUME = "A retake must go into the record's own volume.";
-const MODE_DUAL = "Record 12 was captured in 'dual' mode; use the dual-capture endpoint to recapture it.";
+const MODE_DUAL =
+	"Record 12 was captured in 'dual' mode; use the dual-capture endpoint to recapture it.";
 const NAME_TOO_LONG =
 	"This capture's file name would be longer than the 36 characters a pair id holds. Nothing was captured.";
 const NUMBERS_TAKEN =
 	'The next capture numbers of this volume are already taken by files on disk. Nothing was captured.';
 const CAPTURE_LIMIT =
 	'This volume has reached the limit of 9999 captures. A new volume is needed. Nothing was captured.';
-const RESOLUTION = "A capture's file name cannot carry its resolution: the exchange contract fixes the name.";
+const RESOLUTION =
+	"A capture's file name cannot carry its resolution: the exchange contract fixes the name.";
 const RETAKE_STATUS = 'Only a captured or rejected record can be retaken.';
-const MODE_SINGLE = "Record 12 was captured in 'single' mode; use the single-capture endpoint to recapture it.";
+const MODE_SINGLE =
+	"Record 12 was captured in 'single' mode; use the single-capture endpoint to recapture it.";
 
 describe('captureErrorText', () => {
 	it('maps each capture refusal to its own message', () => {
@@ -66,17 +69,25 @@ describe('captureErrorText', () => {
 
 	it('matches a refusal only on its status as well as its text', () => {
 		expect(captureErrorText(new ApiError(NO_VOLUME, undefined, 422), es)).toBe(es.lv_capture_error);
-		expect(captureErrorText(new ApiError('Collection 7 not found', undefined, 409), es)).toBe(es.lv_capture_error);
+		expect(captureErrorText(new ApiError('Collection 7 not found', undefined, 409), es)).toBe(
+			es.lv_capture_error
+		);
 		expect(captureErrorText(new ApiError(MODE_DUAL, undefined, 409), es)).toBe(es.lv_capture_error);
-		expect(captureErrorText(new ApiError(CAPTURE_LIMIT, undefined, 422), es)).toBe(es.lv_capture_error);
+		expect(captureErrorText(new ApiError(CAPTURE_LIMIT, undefined, 422), es)).toBe(
+			es.lv_capture_error
+		);
 		expect(captureErrorText(new Error(RETAKE_VOLUME), es)).toBe(es.lv_capture_error);
-		expect(captureErrorText(new ApiError(NAME_TOO_LONG, undefined, 422), es)).toBe(es.lv_capture_error);
+		expect(captureErrorText(new ApiError(NAME_TOO_LONG, undefined, 422), es)).toBe(
+			es.lv_capture_error
+		);
 	});
 
 	it('gives anything else the generic message, never the backend text', () => {
 		for (const error of [
 			new CaptureFailed('Dual capture failed on camera(s) cam1: DSLR capture failed: timeout'),
-			new CaptureFailed('A file named co-x-img_0001_c0 already exists in /data/projects/co-x/captures'),
+			new CaptureFailed(
+				'A file named co-x-img_0001_c0 already exists in /data/projects/co-x/captures'
+			),
 			new CaptureFailed(undefined),
 			new CaptureFailed(null),
 			new ApiError('Collection 7 is not attached to a project', undefined, 422),
@@ -93,7 +104,11 @@ describe('captureErrorText', () => {
 
 describe('the recapture turn refusal (0.2.0)', () => {
 	it('is read by its code, whatever the English text says', () => {
-		const refusal = new ApiError('Anything at all.', { code: 'recapture_turn', message: 'Anything at all.' }, 409);
+		const refusal = new ApiError(
+			'Anything at all.',
+			{ code: 'recapture_turn', message: 'Anything at all.' },
+			409
+		);
 		expect(captureErrorText(refusal, es)).toBe(es.err_recapture_turn);
 		expect(captureErrorText(refusal, en)).toBe(en.err_recapture_turn);
 		expect(es.err_recapture_turn).toBe(
@@ -104,7 +119,11 @@ describe('the recapture turn refusal (0.2.0)', () => {
 
 describe('captureErrorText: the storage reserve (NEH-380)', () => {
 	const refusal = () =>
-		new ApiError('nearly full', { code: 'storage_reserve', message: 'nearly full', free_gb: 1.9, reserve_gb: 2 }, 507);
+		new ApiError(
+			'nearly full',
+			{ code: 'storage_reserve', message: 'nearly full', free_gb: 1.9, reserve_gb: 2 },
+			507
+		);
 
 	it('tells an administrator and an operator to free space in Settings > Storage', () => {
 		for (const msgs of [es, en]) {
@@ -172,7 +191,11 @@ describe('the capture error strings', () => {
 describe('lvm_retake_error', () => {
 	it('reads as sentences whether or not the message ends with a full stop', () => {
 		for (const msgs of [es, en]) {
-			for (const message of [msgs.lv_needs_stem, msgs.lv_capture_error, msgs.lv_err_retake_volume]) {
+			for (const message of [
+				msgs.lv_needs_stem,
+				msgs.lv_capture_error,
+				msgs.lv_err_retake_volume
+			]) {
 				const text = msgs.lvm_retake_error(message);
 				expect(text).not.toContain('..');
 				expect(text).toContain(message.endsWith('.') ? message : `${message}.`);

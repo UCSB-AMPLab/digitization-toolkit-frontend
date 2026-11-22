@@ -14,7 +14,10 @@ import { ApiError, systemApi } from './api';
 import { pairingErrorCode } from './fisqua-pairing';
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 const ANSWER = {
@@ -60,7 +63,9 @@ describe('systemApi pairing', () => {
 		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
 			(_input, init) =>
 				new Promise<Response>((_resolve, reject) => {
-					init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true });
+					init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), {
+						once: true
+					});
 				})
 		);
 		const ctrl = new AbortController();
@@ -78,7 +83,9 @@ describe('systemApi pairing', () => {
 	});
 
 	it('startPairing posts only the unit name', async () => {
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ ...ANSWER, state: 'requesting' }));
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(json({ ...ANSWER, state: 'requesting' }));
 		const s = await systemApi.startPairing('Sala 2');
 		const [input, init] = fetchSpy.mock.calls[0];
 		expect(path(input).endsWith('/system/pairing')).toBe(true);
@@ -97,7 +104,9 @@ describe('systemApi pairing', () => {
 	});
 
 	it('cancelPairing sends DELETE /system/pairing, and accepts an empty answer', async () => {
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(new Response(null, { status: 204 }));
 		const s = await systemApi.cancelPairing();
 		const [input, init] = fetchSpy.mock.calls[0];
 		expect(path(input).endsWith('/system/pairing')).toBe(true);
@@ -106,26 +115,39 @@ describe('systemApi pairing', () => {
 	});
 
 	it('renew and cancel answer with the same body as GET', async () => {
-		vi.spyOn(globalThis, 'fetch').mockImplementation(async () => json({ ...ANSWER, state: 'cancelled', code: null }));
+		vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+			json({ ...ANSWER, state: 'cancelled', code: null })
+		);
 		expect((await systemApi.renewPairing())?.state).toBe('cancelled');
 		expect((await systemApi.cancelPairing())?.state).toBe('cancelled');
 	});
 
 	it.each([
-		'mode_not_eligible', 'offsite_held', 'rclone_missing', 'busy_capturing', 'script_missing', 'script_too_old',
-		'not_renewable', 'restart_required', 'offsite_job_running', 'device_id_missing', 'device_id_invalid', 'device_id_unreadable'
-	])(
-		'a 409 %s keeps its code',
-		async (code) => {
-			vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ detail: { code, message: 'English' } }, 409));
-			const err = await systemApi.startPairing('Sala 2').catch((e) => e);
-			expect(err).toBeInstanceOf(ApiError);
-			expect(pairingErrorCode(err)).toBe(code);
-		}
-	);
+		'mode_not_eligible',
+		'offsite_held',
+		'rclone_missing',
+		'busy_capturing',
+		'script_missing',
+		'script_too_old',
+		'not_renewable',
+		'restart_required',
+		'offsite_job_running',
+		'device_id_missing',
+		'device_id_invalid',
+		'device_id_unreadable'
+	])('a 409 %s keeps its code', async (code) => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			json({ detail: { code, message: 'English' } }, 409)
+		);
+		const err = await systemApi.startPairing('Sala 2').catch((e) => e);
+		expect(err).toBeInstanceOf(ApiError);
+		expect(pairingErrorCode(err)).toBe(code);
+	});
 
 	it('a 422 unit_name keeps its code', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ detail: { code: 'unit_name', message: 'English' } }, 422));
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			json({ detail: { code: 'unit_name', message: 'English' } }, 422)
+		);
 		const err = await systemApi.startPairing('x'.repeat(65)).catch((e) => e);
 		expect(pairingErrorCode(err)).toBe('unit_name');
 	});

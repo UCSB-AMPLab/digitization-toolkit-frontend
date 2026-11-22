@@ -8,9 +8,17 @@ import { es } from './es';
 describe('col_takeback_confirm_kept', () => {
 	const kept = es.col_takeback_confirm_kept;
 	it.each([
-		[9, 4, 'Los 9 registros aprobados y los 4 rechazados se quedan como están, porque ya se revisaron.'],
+		[
+			9,
+			4,
+			'Los 9 registros aprobados y los 4 rechazados se quedan como están, porque ya se revisaron.'
+		],
 		[1, 4, 'El registro aprobado y los 4 rechazados se quedan como están, porque ya se revisaron.'],
-		[9, 1, 'Los 9 registros aprobados y el rechazado se quedan como están, porque ya se revisaron.'],
+		[
+			9,
+			1,
+			'Los 9 registros aprobados y el rechazado se quedan como están, porque ya se revisaron.'
+		],
 		[1, 1, 'El registro aprobado y el rechazado se quedan como están, porque ya se revisaron.'],
 		[9, 0, 'Los 9 registros aprobados se quedan como están, porque ya se revisaron.'],
 		[1, 0, 'El registro aprobado se queda como está, porque ya se revisó.'],

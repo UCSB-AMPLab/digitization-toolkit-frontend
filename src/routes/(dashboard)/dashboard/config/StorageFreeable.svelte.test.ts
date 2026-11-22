@@ -40,11 +40,35 @@ function storage(usedGB: number, totalGB: number) {
 	};
 }
 
-type Row = { collection_id: number; project_id: number; name: string; filename_stem: string; files: number; bytes: number; unmeasured_files: number };
+type Row = {
+	collection_id: number;
+	project_id: number;
+	name: string;
+	filename_stem: string;
+	files: number;
+	bytes: number;
+	unmeasured_files: number;
+};
 
 const ROWS: Row[] = [
-	{ collection_id: 11, project_id: 1, name: 'Tomo grande', filename_stem: 'co-big', files: 40, bytes: 3_000_000_000, unmeasured_files: 0 },
-	{ collection_id: 12, project_id: 1, name: 'Tomo chico', filename_stem: 'co-small', files: 3, bytes: 90_000_000, unmeasured_files: 0 }
+	{
+		collection_id: 11,
+		project_id: 1,
+		name: 'Tomo grande',
+		filename_stem: 'co-big',
+		files: 40,
+		bytes: 3_000_000_000,
+		unmeasured_files: 0
+	},
+	{
+		collection_id: 12,
+		project_id: 1,
+		name: 'Tomo chico',
+		filename_stem: 'co-small',
+		files: 3,
+		bytes: 90_000_000,
+		unmeasured_files: 0
+	}
 ];
 
 function freeable(rows: Row[], modeAllows = true, restorable?: boolean, jobs: unknown[] = []) {
@@ -63,7 +87,10 @@ function freeable(rows: Row[], modeAllows = true, restorable?: boolean, jobs: un
 }
 
 function json(status: number, body: unknown) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 type Answer = () => Response | Promise<Response>;
@@ -83,7 +110,13 @@ function serve(
 	storageAnswers: Answer[] = [() => json(200, storage(40, 100))],
 	jobStates: string[] = ['done']
 ): Served {
-	const served: Served = { calls: [], freeableAnswers, storageAnswers, jobStates, doneServed: false };
+	const served: Served = {
+		calls: [],
+		freeableAnswers,
+		storageAnswers,
+		jobStates,
+		doneServed: false
+	};
 	const next = (list: Answer[]) => (list.length > 1 ? list.shift()! : list[0])();
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const url = new URL(String(input instanceof Request ? input.url : input), 'http://localhost');
@@ -91,7 +124,8 @@ function serve(
 		const path = url.pathname.replace(/^\/api/, '');
 		served.calls.push(`${method} ${path}`);
 		if (method === 'GET' && path === '/system/storage') return next(served.storageAnswers);
-		if (method === 'GET' && path === '/system/storage/freeable') return next(served.freeableAnswers);
+		if (method === 'GET' && path === '/system/storage/freeable')
+			return next(served.freeableAnswers);
 		if (method === 'GET' && path === '/collections/11/offsite/free') {
 			return json(200, {
 				collection_id: 11,
@@ -103,7 +137,12 @@ function serve(
 			});
 		}
 		if (method === 'POST' && path === '/collections/11/offsite/free') {
-			return json(202, { job_id: 'j1', state: 'queued', action: 'free', status_url: '/collections/11/offsite/jobs/j1' });
+			return json(202, {
+				job_id: 'j1',
+				state: 'queued',
+				action: 'free',
+				status_url: '/collections/11/offsite/jobs/j1'
+			});
 		}
 		if (method === 'GET' && path === '/collections/11/offsite/jobs/j1') {
 			const state = served.jobStates.length > 1 ? served.jobStates.shift()! : served.jobStates[0];
@@ -114,7 +153,14 @@ function serve(
 				action: 'free',
 				state,
 				error: null,
-				result: { collection_id: 11, filename_stem: 'co-big', freed: { files: 40, bytes: 3_000_000_000 }, files: [], refused: [], manifest: null }
+				result: {
+					collection_id: 11,
+					filename_stem: 'co-big',
+					freed: { files: 40, bytes: 3_000_000_000 },
+					files: [],
+					refused: [],
+					manifest: null
+				}
 			});
 		}
 		return json(500, { detail: 'not in this test' });
@@ -127,7 +173,9 @@ function signIn(role: UserRole) {
 }
 
 const rows = (container: HTMLElement) =>
-	[...container.querySelectorAll('[data-freeable-row]')].map((r) => r.querySelector('[data-freeable-name]')?.textContent?.trim());
+	[...container.querySelectorAll('[data-freeable-row]')].map((r) =>
+		r.querySelector('[data-freeable-name]')?.textContent?.trim()
+	);
 
 beforeEach(() => {
 	locale.set('en');
@@ -144,10 +192,20 @@ describe('Settings > Storage per role (NEH-380)', () => {
 		serve([() => json(200, freeable(ROWS))]);
 		signIn('operator');
 		const { container } = render(ConfigPage);
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_storage, level: 2 })).toBeVisible();
-		const names = [...container.querySelectorAll('[data-settings-section]')].map((b) => b.textContent?.trim());
-		expect(names).toEqual([en.config_section_network, en.config_section_language, en.config_section_storage]);
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim()).toBe('40 GB / 100 GB');
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_storage, level: 2 }))
+			.toBeVisible();
+		const names = [...container.querySelectorAll('[data-settings-section]')].map((b) =>
+			b.textContent?.trim()
+		);
+		expect(names).toEqual([
+			en.config_section_network,
+			en.config_section_language,
+			en.config_section_storage
+		]);
+		await expect
+			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
+			.toBe('40 GB / 100 GB');
 		await expect.poll(() => rows(container)).toEqual(['Tomo grande', 'Tomo chico']);
 		expect(container.textContent).toContain(en.config_storage_reserve('2'));
 		expect(container.textContent).not.toContain(en.config_storage_primary);
@@ -169,7 +227,9 @@ describe('Settings > Storage per role (NEH-380)', () => {
 		const served = serve([() => json(200, freeable(ROWS))]);
 		signIn('reviewer');
 		const { container } = render(ConfigPage);
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 }))
+			.toBeVisible();
 		expect(container.textContent).not.toContain(en.config_storage_used);
 		expect(served.calls.filter((c) => c.includes('/system/storage'))).toEqual([]);
 	});
@@ -186,7 +246,9 @@ describe('the list of volumes that can be freed (NEH-380)', () => {
 		expect(first.textContent).toContain(en.config_freeable_space(3_000_000_000));
 		expect(container.textContent).toContain(en.config_freeable_total(2, 3_090_000_000));
 		await expect
-			.element(browserPage.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') }))
+			.element(
+				browserPage.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') })
+			)
 			.toBeVisible();
 	});
 
@@ -217,7 +279,11 @@ describe('the list of volumes that can be freed (NEH-380)', () => {
 	});
 
 	it('says in its intro that the files cannot be restored on a unit without a read remote, and nothing otherwise', async () => {
-		for (const [restorable, shown] of [[false, true], [true, false], [undefined, false]] as const) {
+		for (const [restorable, shown] of [
+			[false, true],
+			[true, false],
+			[undefined, false]
+		] as const) {
 			serve([() => json(200, freeable(ROWS, true, restorable))]);
 			signIn('operator');
 			const { container, unmount } = render(ConfigPage);
@@ -237,19 +303,29 @@ describe('the list of volumes that can be freed (NEH-380)', () => {
 		signIn('operator');
 		const { container } = render(ConfigPage);
 		await expect.poll(() => rows(container)).toEqual(['Tomo grande', 'Tomo chico']);
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim()).toBe('90 GB / 100 GB');
+		await expect
+			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
+			.toBe('90 GB / 100 GB');
 
-		await browserPage.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') }).click();
+		await browserPage
+			.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') })
+			.click();
 		const dialog = browserPage.getByRole('dialog');
 		await expect.element(dialog.getByText(en.offsite_manage_intro)).toBeVisible();
-		await expect.element(dialog.getByRole('button', { name: en.offsite_restore_action })).not.toBeInTheDocument();
+		await expect
+			.element(dialog.getByRole('button', { name: en.offsite_restore_action }))
+			.not.toBeInTheDocument();
 		await dialog.getByRole('button', { name: en.offsite_free_action }).click();
 		await expect.element(dialog.getByText(en.offsite_free_confirm_title)).toBeVisible();
 		await dialog.getByRole('button', { name: en.offsite_free_confirm, exact: true }).click();
-		await expect.element(dialog.getByText(en.offsite_free_done_title), { timeout: 6000 }).toBeVisible();
+		await expect
+			.element(dialog.getByText(en.offsite_free_done_title), { timeout: 6000 })
+			.toBeVisible();
 
 		await expect.poll(() => rows(container)).toEqual(['Tomo chico']);
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim()).toBe('87 GB / 100 GB');
+		await expect
+			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
+			.toBe('87 GB / 100 GB');
 		// The dialog with the job's result stays open while the list changes under it.
 		await expect.element(dialog.getByText(en.offsite_free_done_title)).toBeVisible();
 		expect(served.calls.filter((c) => c === 'GET /system/storage/freeable')).toHaveLength(2);
@@ -258,7 +334,6 @@ describe('the list of volumes that can be freed (NEH-380)', () => {
 		expect(served.calls.some((c) => c.includes('/offsite/restore'))).toBe(false);
 	});
 });
-
 
 describe('the section watches a free it started (NEH-380)', () => {
 	it('reads the list and the usage again when the job ends, though the dialog was closed while it ran', async () => {
@@ -274,7 +349,9 @@ describe('the section watches a free it started (NEH-380)', () => {
 		signIn('operator');
 		const { container } = render(ConfigPage);
 		await expect.poll(() => rows(container)).toEqual(['Tomo grande', 'Tomo chico']);
-		await browserPage.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') }).click();
+		await browserPage
+			.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') })
+			.click();
 		const dialog = browserPage.getByRole('dialog');
 		await dialog.getByRole('button', { name: en.offsite_free_action }).click();
 		await dialog.getByRole('button', { name: en.offsite_free_confirm, exact: true }).click();
@@ -284,7 +361,11 @@ describe('the section watches a free it started (NEH-380)', () => {
 		await expect.element(browserPage.getByRole('dialog')).not.toBeInTheDocument();
 
 		await expect.poll(() => rows(container), { timeout: 15000 }).toEqual(['Tomo chico']);
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim(), { timeout: 15000 }).toBe('87 GB / 100 GB');
+		await expect
+			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim(), {
+				timeout: 15000
+			})
+			.toBe('87 GB / 100 GB');
 		// The re-read came after the job's end was read.
 		const lastJob = served.calls.lastIndexOf('GET /collections/11/offsite/jobs/j1');
 		const lastList = served.calls.lastIndexOf('GET /system/storage/freeable');
@@ -301,17 +382,24 @@ describe('the section watches a free it started (NEH-380)', () => {
 		signIn('operator');
 		const { container } = render(ConfigPage);
 		await expect.poll(() => rows(container)).toEqual(['Tomo grande', 'Tomo chico']);
-		await browserPage.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') }).click();
+		await browserPage
+			.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') })
+			.click();
 		const dialog = browserPage.getByRole('dialog');
 		await dialog.getByRole('button', { name: en.offsite_free_action }).click();
 		await dialog.getByRole('button', { name: en.offsite_free_confirm, exact: true }).click();
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim(), { timeout: 15000 }).toBe('87 GB / 100 GB');
+		await expect
+			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim(), {
+				timeout: 15000
+			})
+			.toBe('87 GB / 100 GB');
 		releaseFirst(json(200, storage(90, 100)));
 		await new Promise((r) => setTimeout(r, 200));
-		expect(container.querySelector('[data-storage-used]')?.textContent?.trim()).toBe('87 GB / 100 GB');
+		expect(container.querySelector('[data-storage-used]')?.textContent?.trim()).toBe(
+			'87 GB / 100 GB'
+		);
 	}, 30000);
 });
-
 
 describe('the section knows the work in progress from the unit (NEH-380)', () => {
 	function at(section: string) {
@@ -323,7 +411,20 @@ describe('the section knows the work in progress from the unit (NEH-380)', () =>
 		const ended = () => holder.served?.doneServed === true;
 		const running = [{ collection_id: 11, job_id: 'j1', state: 'running' }];
 		const served = serve(
-			[() => json(200, ended() ? freeable(ROWS.slice(1)) : freeable(ROWS, true, undefined, holder.served?.calls.includes('POST /collections/11/offsite/free') ? running : []))],
+			[
+				() =>
+					json(
+						200,
+						ended()
+							? freeable(ROWS.slice(1))
+							: freeable(
+									ROWS,
+									true,
+									undefined,
+									holder.served?.calls.includes('POST /collections/11/offsite/free') ? running : []
+								)
+					)
+			],
 			[() => json(200, ended() ? storage(87, 100) : storage(90, 100))],
 			['running', 'running', 'running', 'running', 'running', 'done']
 		);
@@ -331,7 +432,9 @@ describe('the section knows the work in progress from the unit (NEH-380)', () =>
 		signIn('operator');
 		const { container } = render(ConfigPage);
 		await expect.poll(() => rows(container)).toEqual(['Tomo grande', 'Tomo chico']);
-		await browserPage.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') }).click();
+		await browserPage
+			.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') })
+			.click();
 		const dialog = browserPage.getByRole('dialog');
 		await dialog.getByRole('button', { name: en.offsite_free_action }).click();
 		await dialog.getByRole('button', { name: en.offsite_free_confirm, exact: true }).click();
@@ -340,16 +443,25 @@ describe('the section knows the work in progress from the unit (NEH-380)', () =>
 
 		// Away to Network, then back to Storage before the job ends.
 		at('network');
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 }))
+			.toBeVisible();
 		at('storage');
 		await expect.poll(() => rows(container)).toEqual(['Tomo grande', 'Tomo chico']);
 		// The row whose volume is being freed says so, and its button is off.
-		const row = () => [...container.querySelectorAll('[data-freeable-row]')].find((r) => r.textContent?.includes('Tomo grande'));
+		const row = () =>
+			[...container.querySelectorAll('[data-freeable-row]')].find((r) =>
+				r.textContent?.includes('Tomo grande')
+			);
 		await expect.poll(() => row()?.textContent).toContain(en.offsite_running_free);
 		expect(row()?.querySelector('button')?.hasAttribute('disabled')).toBe(true);
 
 		await expect.poll(() => rows(container), { timeout: 20000 }).toEqual(['Tomo chico']);
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim(), { timeout: 20000 }).toBe('87 GB / 100 GB');
+		await expect
+			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim(), {
+				timeout: 20000
+			})
+			.toBe('87 GB / 100 GB');
 	}, 40000);
 
 	it('coming back after the job ended: the list and usage are read fresh', async () => {
@@ -364,13 +476,19 @@ describe('the section knows the work in progress from the unit (NEH-380)', () =>
 		// An administrator moves between sections of the Unit group, which keeps the section's component mounted.
 		signIn('admin');
 		const { container } = render(ConfigPage);
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim()).toBe('90 GB / 100 GB');
+		await expect
+			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
+			.toBe('90 GB / 100 GB');
 		at('diagnostics');
-		await expect.element(browserPage.getByRole('heading', { name: en.config_section_diagnostics, level: 2 })).toBeVisible();
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_diagnostics, level: 2 }))
+			.toBeVisible();
 		// The job ended elsewhere while the section was not shown.
 		served.doneServed = true;
 		at('storage');
 		await expect.poll(() => rows(container)).toEqual(['Tomo chico']);
-		await expect.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim()).toBe('87 GB / 100 GB');
+		await expect
+			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
+			.toBe('87 GB / 100 GB');
 	}, 30000);
 });

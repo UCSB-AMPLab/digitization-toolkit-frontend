@@ -10,7 +10,12 @@ import { buildGrid, levelFor, moveFocus, parseLocalDate, WEEKS } from './activit
 import type { DailyActivity } from './api';
 
 /** `days` consecutive local dates ending on `end` (YYYY-MM-DD), counts from `count(i)`. */
-function series(end: string, days: number, count: (i: number) => number, reviews = (i: number) => 0): DailyActivity[] {
+function series(
+	end: string,
+	days: number,
+	count: (i: number) => number,
+	reviews = (i: number) => 0
+): DailyActivity[] {
 	const last = parseLocalDate(end);
 	return Array.from({ length: days }, (_, i) => {
 		const d = new Date(last.getFullYear(), last.getMonth(), last.getDate() - (days - 1 - i));
@@ -48,7 +53,10 @@ describe('levelFor', () => {
 });
 
 describe('buildGrid', () => {
-	const grid = buildGrid(series(END, 182, (i) => i), 'captured_images');
+	const grid = buildGrid(
+		series(END, 182, (i) => i),
+		'captured_images'
+	);
 
 	it('lays 182 days out as 26 Monday-first weeks of 7', () => {
 		expect(grid.weeks).toHaveLength(WEEKS);
@@ -67,7 +75,9 @@ describe('buildGrid', () => {
 
 	it('totals only the days shown', () => {
 		// Counts are the series index; the shown days are indexes 3..181.
-		expect(grid.total).toBe(Array.from({ length: 179 }, (_, i) => i + 3).reduce((a, b) => a + b, 0));
+		expect(grid.total).toBe(
+			Array.from({ length: 179 }, (_, i) => i + 3).reduce((a, b) => a + b, 0)
+		);
 		expect(grid.activeDays).toBe(179);
 	});
 
@@ -88,7 +98,10 @@ describe('buildGrid', () => {
 	});
 
 	it('buckets levels by the busiest day', () => {
-		const g = buildGrid(series(END, 182, (i) => (i === 100 ? 100 : i === 101 ? 30 : i === 102 ? 1 : 0)), 'captured_images');
+		const g = buildGrid(
+			series(END, 182, (i) => (i === 100 ? 100 : i === 101 ? 30 : i === 102 ? 1 : 0)),
+			'captured_images'
+		);
 		const byDate = Object.fromEntries(g.days.map((d) => [d.date, d.level]));
 		const s = series(END, 182, () => 0);
 		expect(byDate[s[100].date]).toBe(4);
@@ -98,21 +111,35 @@ describe('buildGrid', () => {
 	});
 
 	it('gives level 0 everywhere and zero figures for all-zero data', () => {
-		const g = buildGrid(series(END, 182, () => 0), 'captured_images');
+		const g = buildGrid(
+			series(END, 182, () => 0),
+			'captured_images'
+		);
 		expect(g.days.every((d) => d.level === 0)).toBe(true);
 		expect(g.activeDays).toBe(0);
 		expect(g.total).toBe(0);
 	});
 
 	it('reads the other series for the reviews metric', () => {
-		const g = buildGrid(series(END, 182, () => 5, (i) => (i === 181 ? 7 : 0)), 'reviewed_records');
+		const g = buildGrid(
+			series(
+				END,
+				182,
+				() => 5,
+				(i) => (i === 181 ? 7 : 0)
+			),
+			'reviewed_records'
+		);
 		expect(g.total).toBe(7);
 		expect(g.activeDays).toBe(1);
 		expect(g.days[g.days.length - 1].level).toBe(4);
 	});
 
 	it('handles a series shorter than the window, with leading empty slots', () => {
-		const g = buildGrid(series(END, 10, () => 1), 'captured_images'); // Tue 2026-10-13 .. Thu 10-22
+		const g = buildGrid(
+			series(END, 10, () => 1),
+			'captured_images'
+		); // Tue 2026-10-13 .. Thu 10-22
 		expect(g.days).toHaveLength(10);
 		expect(g.weeks).toHaveLength(2);
 		expect(g.weeks[0][0]).toBeNull();
@@ -126,7 +153,10 @@ describe('buildGrid', () => {
 
 describe('buildGrid across a DST change', () => {
 	// US clocks go back on 2026-11-01; 2026-11-03 is a Tuesday.
-	const grid = buildGrid(series('2026-11-03', 182, (i) => i), 'captured_images');
+	const grid = buildGrid(
+		series('2026-11-03', 182, (i) => i),
+		'captured_images'
+	);
 
 	it('keeps every day once, in order, with Mondays in the first row', () => {
 		// 2026-05-11 .. 2026-11-03

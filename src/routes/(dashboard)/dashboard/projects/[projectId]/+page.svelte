@@ -1,1283 +1,1697 @@
 <script lang="ts">
-  // Project detail (/dashboard/projects/[projectId]): the project's volumes,
-  // with KPIs, a name search, and the modals that create, edit and delete a
-  // volume and manage the project's members. The volume form owns the
-  // filename stem rules (see `VolumeStemField`); the delete modal moves a
-  // volume's records to another volume first when it has any. The Status
-  // column shows the volume's pipeline stage, as Cola labels it, from one
-  // GET /activity/collections for the project. The volume form lives in
-  // VolumeFormModal, which Volúmenes opens too. In Fisqua mode (NEH-311) an
-  // operator has no Nuevo volumen, and the form keeps their stem
-  // read-only. While the unit hides projects (NEH-313) the page goes to
-  // Volúmenes, carrying ?editVolume=, so the form opens there.
-  //
-  // The testing account (NEH-391) gets New volume and the row's Delete, and
-  // each row says when Captua removes the volume. Its page neither requests
-  // nor shows the project's members or the volumes' stages (activity
-  // totals), which the backend refuses it. It sees the project's capture
-  // format and, while the unit's cameras offer both, changes it with one
-  // PUT; the change applies to the captures made after it.
-  //
-  // Version: 0.3.4
+	// Project detail (/dashboard/projects/[projectId]): the project's volumes,
+	// with KPIs, a name search, and the modals that create, edit and delete a
+	// volume and manage the project's members. The volume form owns the
+	// filename stem rules (see `VolumeStemField`); the delete modal moves a
+	// volume's records to another volume first when it has any. The Status
+	// column shows the volume's pipeline stage, as Cola labels it, from one
+	// GET /activity/collections for the project. The volume form lives in
+	// VolumeFormModal, which Volúmenes opens too. In Fisqua mode (NEH-311) an
+	// operator has no Nuevo volumen, and the form keeps their stem
+	// read-only. While the unit hides projects (NEH-313) the page goes to
+	// Volúmenes, carrying ?editVolume=, so the form opens there.
+	//
+	// The testing account (NEH-391) gets New volume and the row's Delete, and
+	// each row says when Captua removes the volume. Its page neither requests
+	// nor shows the project's members or the volumes' stages (activity
+	// totals), which the backend refuses it. It sees the project's capture
+	// format and, while the unit's cameras offer both, changes it with one
+	// PUT; the change applies to the captures made after it.
+	//
+	// Version: 0.3.4
 
-  import { onDestroy, onMount } from 'svelte';
-  import { get } from 'svelte/store';
-  import { m, roleLabel, locale } from '$lib/i18n';
-  import { formatApiDate } from '$lib/format-date';
-  import { formatCount } from '$lib/format-count';
-  import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
-  import { authStore } from '$lib/stores/auth';
-  import TestingFormatChoice from '../TestingFormatChoice.svelte';
-  import { camerasApi, type CaptureFormat } from '$lib/api';
-  import { projectsApi, collectionsApi, recordsApi, projectMembersApi, activityApi,
-           type Project, type Collection, type ProjectMember, type UserRead, type StatusCounts } from '$lib/api';
-  import { needsStem } from '$lib/volume-stem';
-  import { canCreateVolumes, canDeleteVolumes, canEditVolumes, canManageMembers as membersManaged, ensureUnit, hiddenProjectRedirect,
-           inTestingSpace, takesPartInWorkflow, unitState } from '$lib/unit-mode';
-  import { offersFormatChoice, testingExpiry, testingRefusalText } from '$lib/testing-space';
-  import VolumeFormModal from './VolumeFormModal.svelte';
-  import VolumeRowMenu from './VolumeRowMenu.svelte';
-  import VolumeDeleteModal from './VolumeDeleteModal.svelte';
-  import { dismissible } from '$lib/dialog';
-  import { placeVolume, stageBadgeStyle, type PipelineStage } from '$lib/pipeline';
+	import { onDestroy, onMount } from 'svelte';
+	import { get } from 'svelte/store';
+	import { m, roleLabel, locale } from '$lib/i18n';
+	import { formatApiDate } from '$lib/format-date';
+	import { formatCount } from '$lib/format-count';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import { authStore } from '$lib/stores/auth';
+	import TestingFormatChoice from '../TestingFormatChoice.svelte';
+	import { camerasApi, type CaptureFormat } from '$lib/api';
+	import {
+		projectsApi,
+		collectionsApi,
+		recordsApi,
+		projectMembersApi,
+		activityApi,
+		type Project,
+		type Collection,
+		type ProjectMember,
+		type UserRead,
+		type StatusCounts
+	} from '$lib/api';
+	import { needsStem } from '$lib/volume-stem';
+	import {
+		canCreateVolumes,
+		canDeleteVolumes,
+		canEditVolumes,
+		canManageMembers as membersManaged,
+		ensureUnit,
+		hiddenProjectRedirect,
+		inTestingSpace,
+		takesPartInWorkflow,
+		unitState
+	} from '$lib/unit-mode';
+	import { offersFormatChoice, testingExpiry, testingRefusalText } from '$lib/testing-space';
+	import VolumeFormModal from './VolumeFormModal.svelte';
+	import VolumeRowMenu from './VolumeRowMenu.svelte';
+	import VolumeDeleteModal from './VolumeDeleteModal.svelte';
+	import { dismissible } from '$lib/dialog';
+	import { placeVolume, stageBadgeStyle, type PipelineStage } from '$lib/pipeline';
 
-  let projectId = $derived(Number($page.params.projectId) || 0);
+	let projectId = $derived(Number($page.params.projectId) || 0);
 
-  let project     = $state<Project | null>(null);
-  let collections = $state<Collection[]>([]);
-  let isLoading   = $state(true);
-  let searchQuery = $state('');
+	let project = $state<Project | null>(null);
+	let collections = $state<Collection[]>([]);
+	let isLoading = $state(true);
+	let searchQuery = $state('');
 
-  // Records living directly under the project (no collection) — the
-  // single-parent DB constraint means a record's project_id is NULL as
-  // soon as it's filed into a collection, so this alone undercounts.
-  let directRecordCount = $state<number | null>(null);
+	// Records living directly under the project (no collection) — the
+	// single-parent DB constraint means a record's project_id is NULL as
+	// soon as it's filed into a collection, so this alone undercounts.
+	let directRecordCount = $state<number | null>(null);
 
-  // Total = direct records + each collection's own record_count (populated
-  // by GET /collections/, NEH-179). The UI does not nest collections, so
-  // summing the flat, top-level list covers every record under the project
-  // without a recursive traversal.
-  let recordCount = $derived(
-    directRecordCount === null
-      ? null
-      : directRecordCount + collections.reduce((sum, c) => sum + (c.record_count ?? 0), 0)
-  );
+	// Total = direct records + each collection's own record_count (populated
+	// by GET /collections/, NEH-179). The UI does not nest collections, so
+	// summing the flat, top-level list covers every record under the project
+	// without a recursive traversal.
+	let recordCount = $derived(
+		directRecordCount === null
+			? null
+			: directRecordCount + collections.reduce((sum, c) => sum + (c.record_count ?? 0), 0)
+	);
 
-  // Editing: admin and operator. A new volume: the same, but no operator
-  // in Fisqua mode (NEH-311).
-  let canCreate = $derived(canEditVolumes($authStore.user?.role));
-  let canCreateNew = $derived(canCreateVolumes($authStore.user?.role, $unitState));
-  // The row's Delete: the editors, and the testing account in its own volumes.
-  let canDelete = $derived(canDeleteVolumes($authStore.user?.role));
-  // Members and the volumes' stages: not for the testing account.
-  let showsWorkflow = $derived(takesPartInWorkflow($authStore.user?.role));
-  let showsExpiry = $derived(inTestingSpace($authStore.user?.role));
+	// Editing: admin and operator. A new volume: the same, but no operator
+	// in Fisqua mode (NEH-311).
+	let canCreate = $derived(canEditVolumes($authStore.user?.role));
+	let canCreateNew = $derived(canCreateVolumes($authStore.user?.role, $unitState));
+	// The row's Delete: the editors, and the testing account in its own volumes.
+	let canDelete = $derived(canDeleteVolumes($authStore.user?.role));
+	// Members and the volumes' stages: not for the testing account.
+	let showsWorkflow = $derived(takesPartInWorkflow($authStore.user?.role));
+	let showsExpiry = $derived(inTestingSpace($authStore.user?.role));
 
-  // A testing project's capture format, and whether the cameras offer a choice.
-  let formatChoice = $state(false);
-  let formatSaving = $state(false);
-  let formatError = $state('');
+	// A testing project's capture format, and whether the cameras offer a choice.
+	let formatChoice = $state(false);
+	let formatSaving = $state(false);
+	let formatError = $state('');
 
-  async function loadFormatChoice() {
-    try {
-      formatChoice = offersFormatChoice((await camerasApi.getCapabilities()).image_formats);
-    } catch (err) {
-      console.error('[ProjectDetail] Error reading the camera capabilities:', err);
-    }
-  }
+	async function loadFormatChoice() {
+		try {
+			formatChoice = offersFormatChoice((await camerasApi.getCapabilities()).image_formats);
+		} catch (err) {
+			console.error('[ProjectDetail] Error reading the camera capabilities:', err);
+		}
+	}
 
-  async function changeFormat(format: CaptureFormat) {
-    if (!project || format === project.capture_format) return;
-    formatSaving = true;
-    formatError = '';
-    const before = project;
-    try {
-      project = await projectsApi.update(projectId, { capture_format: format });
-    } catch (err) {
-      console.error('[ProjectDetail] Error changing the capture format:', err);
-      // The radio shows the format the project still has.
-      project = { ...before };
-      formatError = testingRefusalText(err, $m, $authStore.user?.role) ?? $m.testing_err_other;
-    } finally {
-      formatSaving = false;
-    }
-  }
+	async function changeFormat(format: CaptureFormat) {
+		if (!project || format === project.capture_format) return;
+		formatSaving = true;
+		formatError = '';
+		const before = project;
+		try {
+			project = await projectsApi.update(projectId, { capture_format: format });
+		} catch (err) {
+			console.error('[ProjectDetail] Error changing the capture format:', err);
+			// The radio shows the format the project still has.
+			project = { ...before };
+			formatError = testingRefusalText(err, $m, $authStore.user?.role) ?? $m.testing_err_other;
+		} finally {
+			formatSaving = false;
+		}
+	}
 
-  function formatLabel(format: CaptureFormat): string {
-    return format === 'RAW+JPEG' ? $m.testing_format_raw : $m.testing_format_jpeg;
-  }
-  // Only admin adds or removes members — the backend enforces it too
-  // (`allow_admin` in `add_project_member`/`remove_project_member`, NEH-80).
-  // Operator and reviewer cannot even read the user list (GET /auth/users is
-  // admin-only), so the picker must not try to load it for them.
-  let canManageMembers = $derived(membersManaged($authStore.user?.role));
+	function formatLabel(format: CaptureFormat): string {
+		return format === 'RAW+JPEG' ? $m.testing_format_raw : $m.testing_format_jpeg;
+	}
+	// Only admin adds or removes members — the backend enforces it too
+	// (`allow_admin` in `add_project_member`/`remove_project_member`, NEH-80).
+	// Operator and reviewer cannot even read the user list (GET /auth/users is
+	// admin-only), so the picker must not try to load it for them.
+	let canManageMembers = $derived(membersManaged($authStore.user?.role));
 
-  let showCreateModal   = $state(false);
-  let editingCollection = $state<Collection | null>(null);
+	let showCreateModal = $state(false);
+	let editingCollection = $state<Collection | null>(null);
 
-  let filteredCollections = $derived(
-    searchQuery.trim()
-      ? collections.filter(c =>
-          c.name.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : collections
-  );
+	let filteredCollections = $derived(
+		searchQuery.trim()
+			? collections.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+			: collections
+	);
 
+	// False until the unit's state is read: while projects are hidden the
+	// page goes to Volúmenes without ever showing itself (NEH-313).
+	let routeReady = $state(false);
+	let left = false;
+	onDestroy(() => (left = true));
 
-  // False until the unit's state is read: while projects are hidden the
-  // page goes to Volúmenes without ever showing itself (NEH-313).
-  let routeReady = $state(false);
-  let left = false;
-  onDestroy(() => (left = true));
+	onMount(async () => {
+		const here = get(page).url.pathname;
+		const away = hiddenProjectRedirect(
+			await ensureUnit(),
+			get(page).url.searchParams.get('editVolume')
+		);
+		if (away) {
+			// Only while this page is still the one shown.
+			if (!left && get(page).url.pathname === here) goto(away, { replaceState: true });
+			return;
+		}
+		if (left) return;
+		routeReady = true;
+		await Promise.all([
+			loadProject(),
+			loadCollections(),
+			loadRecordCount(),
+			showsWorkflow ? loadMembers() : undefined,
+			showsExpiry ? loadFormatChoice() : undefined
+		]);
+		// ?editVolume=<id> opens that volume's form: the capture screen links
+		// here when the volume has no stem yet.
+		const editId = Number($page.url.searchParams.get('editVolume')) || 0;
+		if (editId && canCreate) {
+			const target = collections.find((c) => c.id === editId);
+			if (target) openEditCollection(target);
+		}
+	});
 
-  onMount(async () => {
-    const here = get(page).url.pathname;
-    const away = hiddenProjectRedirect(await ensureUnit(), get(page).url.searchParams.get('editVolume'));
-    if (away) {
-      // Only while this page is still the one shown.
-      if (!left && get(page).url.pathname === here) goto(away, { replaceState: true });
-      return;
-    }
-    if (left) return;
-    routeReady = true;
-    await Promise.all([loadProject(), loadCollections(), loadRecordCount(), showsWorkflow ? loadMembers() : undefined,
-                       showsExpiry ? loadFormatChoice() : undefined]);
-    // ?editVolume=<id> opens that volume's form: the capture screen links
-    // here when the volume has no stem yet.
-    const editId = Number($page.url.searchParams.get('editVolume')) || 0;
-    if (editId && canCreate) {
-      const target = collections.find(c => c.id === editId);
-      if (target) openEditCollection(target);
-    }
-  });
+	async function loadProject() {
+		try {
+			project = await projectsApi.get(projectId);
+		} catch (err) {
+			console.error('[ProjectDetail] Error loading project:', err);
+		}
+	}
 
-  async function loadProject() {
-    try {
-      project = await projectsApi.get(projectId);
-    } catch (err) {
-      console.error('[ProjectDetail] Error loading project:', err);
-    }
-  }
+	async function loadRecordCount() {
+		try {
+			directRecordCount = await recordsApi.count({ project_id: projectId });
+		} catch (err) {
+			console.error('[ProjectDetail] Error loading record count:', err);
+		}
+	}
 
-  async function loadRecordCount() {
-    try {
-      directRecordCount = await recordsApi.count({ project_id: projectId });
-    } catch (err) {
-      console.error('[ProjectDetail] Error loading record count:', err);
-    }
-  }
+	let members = $state<ProjectMember[]>([]);
+	let showMembersModal = $state(false);
+	let memberSearchQuery = $state('');
+	let allUsers = $state<UserRead[]>([]);
+	let addUserId = $state<number | null>(null);
+	let addRole = $state<'operator' | 'reviewer'>('reviewer');
+	let isAddingMember = $state(false);
+	let memberError = $state('');
 
-  let members            = $state<ProjectMember[]>([]);
-  let showMembersModal   = $state(false);
-  let memberSearchQuery  = $state('');
-  let allUsers           = $state<UserRead[]>([]);
-  let addUserId          = $state<number | null>(null);
-  let addRole            = $state<'operator' | 'reviewer'>('reviewer');
-  let isAddingMember     = $state(false);
-  let memberError        = $state('');
+	let filteredUsers = $derived(
+		allUsers.filter(
+			(u) =>
+				u.role !== 'admin' && // admins are always implicit
+				u.role !== 'testing' && // never a member of a real project
+				!members.some((m) => m.user_id === u.id) && // not already a member
+				u.id !== $authStore.user?.id // not yourself
+		)
+	);
 
-  let filteredUsers = $derived(
-    allUsers.filter(u =>
-      u.role !== 'admin' &&                          // admins are always implicit
-      u.role !== 'testing' &&                        // never a member of a real project
-      !members.some(m => m.user_id === u.id) &&      // not already a member
-      u.id !== $authStore.user?.id                   // not yourself
-    )
-  );
+	async function loadMembers() {
+		try {
+			members = await projectMembersApi.list(projectId);
+		} catch (err) {
+			console.error('[ProjectDetail] Error loading members:', err);
+		}
+	}
 
-  async function loadMembers() {
-    try {
-      members = await projectMembersApi.list(projectId);
-    } catch (err) {
-      console.error('[ProjectDetail] Error loading members:', err);
-    }
-  }
+	async function openMembersModal() {
+		showMembersModal = true;
+		memberError = '';
+		if (canManageMembers && allUsers.length === 0) {
+			try {
+				const { usersApi } = await import('$lib/api');
+				allUsers = await usersApi.list();
+			} catch (err) {
+				console.error('[ProjectDetail] Error loading users:', err);
+			}
+		}
+	}
 
-  async function openMembersModal() {
-    showMembersModal = true;
-    memberError = '';
-    if (canManageMembers && allUsers.length === 0) {
-      try {
-        const { usersApi } = await import('$lib/api');
-        allUsers = await usersApi.list();
-      } catch (err) {
-        console.error('[ProjectDetail] Error loading users:', err);
-      }
-    }
-  }
+	async function handleAddMember() {
+		if (!addUserId) return;
+		isAddingMember = true;
+		memberError = '';
+		try {
+			await projectMembersApi.add(projectId, { user_id: addUserId, role: addRole });
+			await loadMembers();
+			addUserId = null;
+			addRole = 'reviewer';
+		} catch (err) {
+			memberError = err instanceof Error ? err.message : $m.pd_err_member_add;
+		} finally {
+			isAddingMember = false;
+		}
+	}
 
-  async function handleAddMember() {
-    if (!addUserId) return;
-    isAddingMember = true;
-    memberError = '';
-    try {
-      await projectMembersApi.add(projectId, { user_id: addUserId, role: addRole });
-      await loadMembers();
-      addUserId = null;
-      addRole = 'reviewer';
-    } catch (err) {
-      memberError = err instanceof Error ? err.message : $m.pd_err_member_add;
-    } finally {
-      isAddingMember = false;
-    }
-  }
+	async function handleRemoveMember(userId: number) {
+		try {
+			await projectMembersApi.remove(projectId, userId);
+			await loadMembers();
+		} catch (err) {
+			memberError = err instanceof Error ? err.message : $m.pd_err_member_remove;
+		}
+	}
 
-  async function handleRemoveMember(userId: number) {
-    try {
-      await projectMembersApi.remove(projectId, userId);
-      await loadMembers();
-    } catch (err) {
-      memberError = err instanceof Error ? err.message : $m.pd_err_member_remove;
-    }
-  }
+	async function loadCollections() {
+		try {
+			isLoading = true;
+			// The stages are reloaded with the list, so a volume created, or one
+			// that received records from a deleted volume, shows its current stage.
+			const [data] = await Promise.all([
+				collectionsApi.listAll({ project_id: projectId }),
+				showsWorkflow ? loadStages() : undefined
+			]);
+			collections = data;
+		} catch (err) {
+			console.error('[ProjectDetail] Error loading collections:', err);
+		} finally {
+			isLoading = false;
+		}
+	}
 
-  async function loadCollections() {
-    try {
-      isLoading = true;
-      // The stages are reloaded with the list, so a volume created, or one
-      // that received records from a deleted volume, shows its current stage.
-      const [data] = await Promise.all([
-        collectionsApi.listAll({ project_id: projectId }),
-        showsWorkflow ? loadStages() : undefined,
-      ]);
-      collections = data;
-    } catch (err) {
-      console.error('[ProjectDetail] Error loading collections:', err);
-    } finally {
-      isLoading = false;
-    }
-  }
+	function closeModal() {
+		showCreateModal = false;
+		editingCollection = null;
+	}
 
+	function handleCollectionClick(collectionId: number) {
+		goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
+	}
 
-  function closeModal() {
-    showCreateModal = false;
-    editingCollection = null;
-  }
+	// The volume whose delete dialog is open (VolumeDeleteModal).
+	let deletingCol = $state<Collection | null>(null);
 
-  function handleCollectionClick(collectionId: number) {
-    goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
-  }
+	function startEditCollection(e: MouseEvent, col: Collection) {
+		e.stopPropagation();
+		openEditCollection(col);
+	}
 
-  // The volume whose delete dialog is open (VolumeDeleteModal).
-  let deletingCol = $state<Collection | null>(null);
+	function openEditCollection(col: Collection) {
+		editingCollection = col;
+		showCreateModal = true;
+	}
 
-  function startEditCollection(e: MouseEvent, col: Collection) {
-    e.stopPropagation();
-    openEditCollection(col);
-  }
+	// Each volume's status counts, by collection id, from one request for the
+	// project. A volume without an entry (the request failed) shows no stage.
+	let statusCounts = $state<Map<number, StatusCounts>>(new Map());
 
-  function openEditCollection(col: Collection) {
-    editingCollection = col;
-    showCreateModal = true;
-  }
+	async function loadStages() {
+		try {
+			const rows = await activityApi.collections({ project_id: projectId });
+			statusCounts = new Map(rows.map((r) => [r.collection_id, r.status_counts]));
+		} catch (err) {
+			console.error('[ProjectDetail] Error loading volume stages:', err);
+		}
+	}
 
-  // Each volume's status counts, by collection id, from one request for the
-  // project. A volume without an entry (the request failed) shows no stage.
-  let statusCounts = $state<Map<number, StatusCounts>>(new Map());
-
-  async function loadStages() {
-    try {
-      const rows = await activityApi.collections({ project_id: projectId });
-      statusCounts = new Map(rows.map(r => [r.collection_id, r.status_counts]));
-    } catch (err) {
-      console.error('[ProjectDetail] Error loading volume stages:', err);
-    }
-  }
-
-  let stageTitle = $derived<{ [K in PipelineStage]: string }>({
-    capture: $m.dash_stage_capture,
-    recapture: $m.dash_stage_recapture,
-    review: $m.dash_stage_review,
-    approved: $m.dash_stage_approved,
-  });
-
+	let stageTitle = $derived<{ [K in PipelineStage]: string }>({
+		capture: $m.dash_stage_capture,
+		recapture: $m.dash_stage_recapture,
+		review: $m.dash_stage_review,
+		approved: $m.dash_stage_approved
+	});
 </script>
 
 {#if routeReady}
-<div class="page">
+	<div class="page">
+		<!-- Header -->
+		<div class="page-header">
+			<div>
+				<h1 class="page-title">{project?.name ?? '—'}</h1>
+				<p class="page-subtitle">{$m.pd_subtitle}</p>
+			</div>
+			<!-- Only once volumes exist: the empty state has its own create button. -->
+			{#if canCreateNew && collections.length > 0}
+				<button
+					class="btn-primary"
+					data-tour="nuevo-volumen"
+					onclick={() => {
+						editingCollection = null;
+						showCreateModal = true;
+					}}
+				>
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.5"
+					>
+						<line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+					</svg>
+					{$m.pd_new_collection}
+				</button>
+			{/if}
+		</div>
 
-  <!-- Header -->
-  <div class="page-header">
-    <div>
-      <h1 class="page-title">{project?.name ?? '—'}</h1>
-      <p class="page-subtitle">{$m.pd_subtitle}</p>
-    </div>
-    <!-- Only once volumes exist: the empty state has its own create button. -->
-    {#if canCreateNew && collections.length > 0}
-      <button class="btn-primary" data-tour="nuevo-volumen" onclick={() => { editingCollection = null; showCreateModal = true; }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-        {$m.pd_new_collection}
-      </button>
-    {/if}
-  </div>
+		<button class="btn-back" onclick={() => goto('/dashboard/projects')}>
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<path d="M2.5 12H21M2.5 12l5-5M2.5 12l5 5" />
+			</svg>
+			{$m.pd_back}
+		</button>
 
-  <button class="btn-back" onclick={() => goto('/dashboard/projects')}>
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M2.5 12H21M2.5 12l5-5M2.5 12l5 5"/>
-    </svg>
-    {$m.pd_back}
-  </button>
+		{#if showsExpiry && project?.capture_format}
+			<div class="testing-format">
+				{#if formatChoice}
+					<TestingFormatChoice
+						value={project.capture_format}
+						onchange={changeFormat}
+						disabled={formatSaving}
+						hint={$m.testing_format_applies}
+					/>
+				{:else}
+					<p class="testing-format-line">
+						{$m.testing_format_current(formatLabel(project.capture_format))}
+					</p>
+				{/if}
+				{#if formatError}<p class="testing-format-error" role="alert">{formatError}</p>{/if}
+			</div>
+		{/if}
 
-  {#if showsExpiry && project?.capture_format}
-    <div class="testing-format">
-      {#if formatChoice}
-        <TestingFormatChoice value={project.capture_format} onchange={changeFormat} disabled={formatSaving}
-          hint={$m.testing_format_applies} />
-      {:else}
-        <p class="testing-format-line">{$m.testing_format_current(formatLabel(project.capture_format))}</p>
-      {/if}
-      {#if formatError}<p class="testing-format-error" role="alert">{formatError}</p>{/if}
-    </div>
-  {/if}
+		<div class="kpi-bar">
+			<div class="kpi-row">
+				<div class="kpi-card">
+					<div class="kpi-line" style="background: var(--color-primary)"></div>
+					<div class="kpi-num">{formatCount(collections.length, $locale)}</div>
+					<div class="kpi-lbl">{$m.dash_kpi_collections}</div>
+				</div>
 
-  <div class="kpi-bar">
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-line" style="background: var(--color-primary)"></div>
-        <div class="kpi-num">{formatCount(collections.length, $locale)}</div>
-        <div class="kpi-lbl">{$m.dash_kpi_collections}</div>
-      </div>
+				<div class="kpi-card">
+					<div class="kpi-line" style="background: var(--color-secondary)"></div>
+					<div class="kpi-num">{recordCount ?? '—'}</div>
+					<div class="kpi-lbl">{$m.pd_kpi_total_records}</div>
+				</div>
+			</div>
 
-      <div class="kpi-card">
-        <div class="kpi-line" style="background: var(--color-secondary)"></div>
-        <div class="kpi-num">{recordCount ?? '—'}</div>
-        <div class="kpi-lbl">{$m.pd_kpi_total_records}</div>
-      </div>
-    </div>
+			{#if showsWorkflow}
+				<button class="btn-collaborators" onclick={openMembersModal}>
+					<span class="material-symbols-outlined icon-sm">group</span>
+					<span>{$m.pd_members}</span>
+					{#if members.length > 0}
+						<span class="member-badge">{formatCount(members.length, $locale)}</span>
+					{/if}
+				</button>
+			{/if}
+		</div>
 
-    {#if showsWorkflow}
-      <button class="btn-collaborators" onclick={openMembersModal}>
-        <span class="material-symbols-outlined icon-sm">group</span>
-        <span>{$m.pd_members}</span>
-        {#if members.length > 0}
-          <span class="member-badge">{formatCount(members.length, $locale)}</span>
-        {/if}
-      </button>
-    {/if}
-  </div>
+		<div class="toolbar">
+			<div class="search-wrapper">
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					class="search-icon"
+				>
+					<circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+				</svg>
+				<input
+					type="text"
+					placeholder={$m.proj_search_placeholder}
+					bind:value={searchQuery}
+					class="search-input"
+				/>
+			</div>
+		</div>
 
-  <div class="toolbar">
-    <div class="search-wrapper">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input type="text" placeholder={$m.proj_search_placeholder} bind:value={searchQuery} class="search-input" />
-    </div>
-  </div>
+		{#if isLoading}
+			<div class="loading">
+				<div class="spinner"></div>
+				<span>{$m.pd_loading}</span>
+			</div>
+		{:else if filteredCollections.length === 0}
+			<div class="empty-state">
+				<svg
+					width="36"
+					height="36"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+				>
+					<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+				</svg>
+				<span>{searchQuery ? $m.pd_empty_search : $m.pd_empty}</span>
+				{#if canCreateNew && !searchQuery}
+					<button
+						class="btn-primary"
+						onclick={() => {
+							editingCollection = null;
+							showCreateModal = true;
+						}}>{$m.pd_create_first}</button
+					>
+				{/if}
+			</div>
+		{:else}
+			<div class="table-wrapper">
+				<table class="collections-table">
+					<thead>
+						<tr>
+							<th>{$m.pd_col_collection}</th>
+							<th>{$m.common_status}</th>
+							<th>{$m.pd_col_records}</th>
+							<th>{$m.pd_col_date}</th>
+							<th class="text-right">{$m.common_actions}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each filteredCollections as col}
+							{@const counts = statusCounts.get(col.id)}
+							{@const stage = counts ? placeVolume(counts) : null}
 
-  {#if isLoading}
-    <div class="loading">
-      <div class="spinner"></div>
-      <span>{$m.pd_loading}</span>
-    </div>
-  {:else if filteredCollections.length === 0}
-    <div class="empty-state">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-      </svg>
-      <span>{searchQuery ? $m.pd_empty_search : $m.pd_empty}</span>
-      {#if canCreateNew && !searchQuery}
-        <button class="btn-primary" onclick={() => { editingCollection = null; showCreateModal = true; }}>{$m.pd_create_first}</button>
-      {/if}
-    </div>
-  {:else}
-    <div class="table-wrapper">
-      <table class="collections-table">
-        <thead>
-          <tr>
-            <th>{$m.pd_col_collection}</th>
-            <th>{$m.common_status}</th>
-            <th>{$m.pd_col_records}</th>
-            <th>{$m.pd_col_date}</th>
-            <th class="text-right">{$m.common_actions}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each filteredCollections as col}
-            {@const counts = statusCounts.get(col.id)}
-            {@const stage  = counts ? placeVolume(counts) : null}
+							<tr class="table-row" onclick={() => handleCollectionClick(col.id)}>
+								<td>
+									<div class="col-cell">
+										<div class="col-icon">
+											<svg
+												width="16"
+												height="16"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="var(--color-primary)"
+												stroke-width="2"
+											>
+												<path
+													d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+												/>
+											</svg>
+										</div>
+										<div>
+											<p class="col-name">
+												{col.name}
+												{#if needsStem(col)}
+													{#if canCreate}
+														<button
+															type="button"
+															class="no-stem-badge"
+															title={$m.pd_no_stem_title}
+															onclick={(e) => startEditCollection(e, col)}
+															>{$m.pd_no_stem_badge}</button
+														>
+													{:else}
+														<span class="no-stem-badge" title={$m.pd_no_stem_title}
+															>{$m.pd_no_stem_badge}</span
+														>
+													{/if}
+												{/if}
+											</p>
+											<!-- Only a signatura the volume has: no code is built from the project's or the row number. -->
+											{#if col.archival_metadata?.signatura}
+												<p class="col-code">{col.archival_metadata.signatura}</p>
+											{/if}
+											{#if showsExpiry}
+												{@const expiry = testingExpiry(col.testing_expires_at)}
+												{#if expiry}
+													<p class="testing-expiry" class:soon={expiry.soon}>
+														{expiry.due
+															? $m.testing_expires_due
+															: $m.testing_expires_on(
+																	formatApiDate(expiry.at.toISOString(), $locale, {
+																		day: 'numeric',
+																		month: 'long',
+																		year: 'numeric'
+																	})
+																)}
+													</p>
+												{/if}
+											{/if}
+										</div>
+									</div>
+								</td>
 
-            <tr class="table-row" onclick={() => handleCollectionClick(col.id)}>
-              <td>
-                <div class="col-cell">
-                  <div class="col-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2">
-                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <p class="col-name">
-                      {col.name}
-                      {#if needsStem(col)}
-                        {#if canCreate}
-                          <button
-                            type="button"
-                            class="no-stem-badge"
-                            title={$m.pd_no_stem_title}
-                            onclick={(e) => startEditCollection(e, col)}
-                          >{$m.pd_no_stem_badge}</button>
-                        {:else}
-                          <span class="no-stem-badge" title={$m.pd_no_stem_title}>{$m.pd_no_stem_badge}</span>
-                        {/if}
-                      {/if}
-                    </p>
-                    <!-- Only a signatura the volume has: no code is built from the project's or the row number. -->
-                    {#if col.archival_metadata?.signatura}
-                      <p class="col-code">{col.archival_metadata.signatura}</p>
-                    {/if}
-                    {#if showsExpiry}
-                      {@const expiry = testingExpiry(col.testing_expires_at)}
-                      {#if expiry}
-                        <p class="testing-expiry" class:soon={expiry.soon}>
-                          {expiry.due ? $m.testing_expires_due : $m.testing_expires_on(formatApiDate(expiry.at.toISOString(), $locale, { day: 'numeric', month: 'long', year: 'numeric' }))}
-                        </p>
-                      {/if}
-                    {/if}
-                  </div>
-                </div>
-              </td>
+								<td>
+									{#if stage}
+										<span class="status-badge" style={stageBadgeStyle(stage)}
+											>{stageTitle[stage]}</span
+										>
+									{/if}
+								</td>
 
-              <td>
-                {#if stage}
-                  <span class="status-badge" style={stageBadgeStyle(stage)}>{stageTitle[stage]}</span>
-                {/if}
-              </td>
+								<td>
+									<div class="img-count">
+										<svg
+											width="13"
+											height="13"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<rect x="3" y="3" width="18" height="18" rx="2" /><circle
+												cx="8.5"
+												cy="8.5"
+												r="1.5"
+											/>
+											<polyline points="21 15 16 10 5 21" />
+										</svg>
+										{col.record_count ?? 0}
+									</div>
+								</td>
 
-              <td>
-                <div class="img-count">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21 15 16 10 5 21"/>
-                  </svg>
-                  {col.record_count ?? 0}
-                </div>
-              </td>
+								<td>
+									<div class="date-cell">
+										<svg
+											width="12"
+											height="12"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<rect x="3" y="4" width="18" height="18" rx="2" /><line
+												x1="16"
+												y1="2"
+												x2="16"
+												y2="6"
+											/>
+											<line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+										</svg>
+										{col.created_at
+											? formatApiDate(col.created_at, $locale, {
+													day: 'numeric',
+													month: 'short',
+													year: 'numeric'
+												})
+											: '—'}
+									</div>
+								</td>
 
-              <td>
-                <div class="date-cell">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
-                    <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                  </svg>
-                  {col.created_at ? formatApiDate(col.created_at, $locale, { day:'numeric', month:'short', year:'numeric' }) : '—'}
-                </div>
-              </td>
-
-              <td class="text-right">
-                {#if canCreate}
-                  <VolumeRowMenu volume={col} onEdit={openEditCollection} onDelete={(v) => (deletingCol = v)} />
-                {:else if canDelete}
-                  <VolumeRowMenu volume={col} onDelete={(v) => (deletingCol = v)} />
-                {/if}
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
-
-</div>
+								<td class="text-right">
+									{#if canCreate}
+										<VolumeRowMenu
+											volume={col}
+											onEdit={openEditCollection}
+											onDelete={(v) => (deletingCol = v)}
+										/>
+									{:else if canDelete}
+										<VolumeRowMenu volume={col} onDelete={(v) => (deletingCol = v)} />
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
+	</div>
 {/if}
 
 {#if showCreateModal}
-  <VolumeFormModal
-    editing={editingCollection}
-    {projectId}
-    projectName={project?.name ?? null}
-    onClose={closeModal}
-    onSaved={loadCollections}
-  />
+	<VolumeFormModal
+		editing={editingCollection}
+		{projectId}
+		projectName={project?.name ?? null}
+		onClose={closeModal}
+		onSaved={loadCollections}
+	/>
 {/if}
 
 {#if showMembersModal}
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: () => showMembersModal = false }}>
-    <div class="modal-card modal-card--wide dialog-fit" role="dialog" aria-modal="true">
+	<div class="modal-backdrop" use:dismissible={{ onDismiss: () => (showMembersModal = false) }}>
+		<div class="modal-card modal-card--wide dialog-fit" role="dialog" aria-modal="true">
+			<div class="modal-header">
+				<div>
+					<h3 class="modal-title">{$m.pd_members}</h3>
+					<p class="modal-subtitle">{$m.pd_modal_project(project?.name ?? '—')}</p>
+				</div>
+				<button
+					class="modal-close modal-close--circle"
+					onclick={() => (showMembersModal = false)}
+					aria-label={$m.common_close}
+				>
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+					</svg>
+				</button>
+			</div>
 
-      <div class="modal-header">
-        <div>
-          <h3 class="modal-title">{$m.pd_members}</h3>
-          <p class="modal-subtitle">{$m.pd_modal_project(project?.name ?? '—')}</p>
-        </div>
-        <button class="modal-close modal-close--circle" onclick={() => showMembersModal = false} aria-label={$m.common_close}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
+			<div class="modal-body">
+				<!-- Current members list -->
+				<ul class="members-list">
+					{#each members as member}
+						<li class="member-row" class:member-row--implicit={member.is_implicit}>
+							<div class="member-av">{member.username.slice(0, 2).toUpperCase()}</div>
+							<div class="member-info">
+								<span class="member-name">{member.username}</span>
+								{#if member.email}
+									<span class="member-email">{member.email}</span>
+								{/if}
+							</div>
+							<!-- The CSS class keeps the raw enum value; only the text is translated. -->
+							<span class="role-badge role-badge--{member.role}">{$roleLabel(member.role)}</span>
+							{#if member.is_implicit}
+								<span class="member-implicit-icon" title={$m.pd_member_implicit}>
+									<span class="material-symbols-outlined icon-sm">lock</span>
+								</span>
+							{:else if canManageMembers}
+								<button
+									class="btn-remove-member"
+									onclick={() => handleRemoveMember(member.user_id)}
+									title={$m.pd_member_remove}
+								>
+									<span class="material-symbols-outlined icon-sm">person_remove</span>
+								</button>
+							{/if}
+						</li>
+					{/each}
+				</ul>
 
-      <div class="modal-body">
+				{#if canManageMembers}
+					<div class="add-member-section">
+						<p class="add-member-title">{$m.pd_member_add}</p>
+						<div class="add-member-row">
+							<select class="field-input add-member-select" bind:value={addUserId}>
+								<option value={null}>{$m.pd_member_select}</option>
+								{#each filteredUsers as u}
+									<option value={u.id}>{u.email ? `${u.username} (${u.email})` : u.username}</option
+									>
+								{/each}
+							</select>
+							<select class="field-input add-role-select" bind:value={addRole}>
+								<option value="reviewer">{$m.role_reviewer}</option>
+								<option value="operator">{$m.role_operator}</option>
+							</select>
+							<button
+								class="btn-crear"
+								onclick={handleAddMember}
+								disabled={!addUserId || isAddingMember}
+							>
+								<span class="material-symbols-outlined icon-sm">person_add</span>
+								{isAddingMember ? $m.pd_member_adding : $m.pd_member_add_btn}
+							</button>
+						</div>
+					</div>
+				{/if}
 
-        <!-- Current members list -->
-        <ul class="members-list">
-          {#each members as member}
-            <li class="member-row" class:member-row--implicit={member.is_implicit}>
-              <div class="member-av">{member.username.slice(0,2).toUpperCase()}</div>
-              <div class="member-info">
-                <span class="member-name">{member.username}</span>
-                {#if member.email}
-                  <span class="member-email">{member.email}</span>
-                {/if}
-              </div>
-              <!-- The CSS class keeps the raw enum value; only the text is translated. -->
-              <span class="role-badge role-badge--{member.role}">{$roleLabel(member.role)}</span>
-              {#if member.is_implicit}
-                <span class="member-implicit-icon" title={$m.pd_member_implicit}>
-                  <span class="material-symbols-outlined icon-sm">lock</span>
-                </span>
-              {:else if canManageMembers}
-                <button class="btn-remove-member" onclick={() => handleRemoveMember(member.user_id)} title={$m.pd_member_remove}>
-                  <span class="material-symbols-outlined icon-sm">person_remove</span>
-                </button>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-
-        {#if canManageMembers}
-          <div class="add-member-section">
-            <p class="add-member-title">{$m.pd_member_add}</p>
-            <div class="add-member-row">
-              <select class="field-input add-member-select" bind:value={addUserId}>
-                <option value={null}>{$m.pd_member_select}</option>
-                {#each filteredUsers as u}
-                  <option value={u.id}>{u.email ? `${u.username} (${u.email})` : u.username}</option>
-                {/each}
-              </select>
-              <select class="field-input add-role-select" bind:value={addRole}>
-                <option value="reviewer">{$m.role_reviewer}</option>
-                <option value="operator">{$m.role_operator}</option>
-              </select>
-              <button
-                class="btn-crear"
-                onclick={handleAddMember}
-                disabled={!addUserId || isAddingMember}
-              >
-                <span class="material-symbols-outlined icon-sm">person_add</span>
-                {isAddingMember ? $m.pd_member_adding : $m.pd_member_add_btn}
-              </button>
-            </div>
-          </div>
-        {/if}
-
-        {#if memberError}
-          <div class="create-error">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
-              <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-            </svg>
-            {memberError}
-          </div>
-        {/if}
-
-      </div>
-
-    </div>
-  </div>
+				{#if memberError}
+					<div class="create-error">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							style="flex-shrink:0"
+						>
+							<circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+						</svg>
+						{memberError}
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
 {/if}
 
 {#if deletingCol}
-  <VolumeDeleteModal
-    volume={deletingCol}
-    moveTargets={collections}
-    onClose={() => (deletingCol = null)}
-    onChanged={loadCollections}
-  />
+	<VolumeDeleteModal
+		volume={deletingCol}
+		moveTargets={collections}
+		onClose={() => (deletingCol = null)}
+		onChanged={loadCollections}
+	/>
 {/if}
 
 <style>
-  .page { padding: 32px; max-width: 1100px; }
+	.page {
+		padding: 32px;
+		max-width: 1100px;
+	}
 
-  /* Header */
-  .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-  .page-title  { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
-  .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
+	/* Header */
+	.page-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		margin-bottom: 16px;
+	}
+	.page-title {
+		font-size: var(--text-h2);
+		font-weight: var(--fw-black);
+		color: var(--color-light);
+		margin: 0 0 4px;
+	}
+	.page-subtitle {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		margin: 0;
+	}
 
-  .btn-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: none;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    margin-bottom: 24px;
-    min-height: var(--touch-target-min);
-  }
+	.btn-back {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 16px;
+		background: none;
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		margin-bottom: 24px;
+		min-height: var(--touch-target-min);
+	}
 
-  .btn-back:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
+	.btn-back:hover {
+		color: var(--color-light);
+		border-color: rgba(255, 255, 255, 0.2);
+	}
 
-  /* KPI row */
-  .kpi-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 28px;
-  }
+	/* KPI row */
+	.kpi-row {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 16px;
+		margin-bottom: 28px;
+	}
 
-  .kpi-card {
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    padding: 12px 16px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
+	.kpi-card {
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-lg);
+		padding: 12px 16px 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
 
-  .kpi-line {
-    width: 24px;
-    height: 2px;
-    border-radius: var(--radius-full);
-    margin-bottom: 2px;
-  }
+	.kpi-line {
+		width: 24px;
+		height: 2px;
+		border-radius: var(--radius-full);
+		margin-bottom: 2px;
+	}
 
-  .kpi-num  { font-size: var(--text-h3); font-weight: var(--fw-extrabold); color: var(--color-light); margin: 0; line-height: 1; }
-  .kpi-lbl  { font-size: var(--text-xs); color: var(--color-light-grey); margin: 0; text-transform: uppercase; letter-spacing: 0.04em; }
+	.kpi-num {
+		font-size: var(--text-h3);
+		font-weight: var(--fw-extrabold);
+		color: var(--color-light);
+		margin: 0;
+		line-height: 1;
+	}
+	.kpi-lbl {
+		font-size: var(--text-xs);
+		color: var(--color-light-grey);
+		margin: 0;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
 
-  /* Toolbar */
-  .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
+	/* Toolbar */
+	.toolbar {
+		display: flex;
+		gap: 12px;
+		margin-bottom: 16px;
+	}
 
-  .search-wrapper { position: relative; flex: 1; max-width: 400px; }
+	.search-wrapper {
+		position: relative;
+		flex: 1;
+		max-width: 400px;
+	}
 
-  .search-icon {
-    position: absolute;
-    left: 12px; top: 50%;
-    transform: translateY(-50%);
-    color: var(--color-light-grey);
-    pointer-events: none;
-  }
+	.search-icon {
+		position: absolute;
+		left: 12px;
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--color-light-grey);
+		pointer-events: none;
+	}
 
-  .search-input {
-    width: 100%;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 9px 12px 9px 36px;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light);
-    outline: none;
-    transition: border-color var(--transition-base);
-    min-height: var(--touch-target-min);
-  }
+	.search-input {
+		width: 100%;
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 9px 12px 9px 36px;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light);
+		outline: none;
+		transition: border-color var(--transition-base);
+		min-height: var(--touch-target-min);
+	}
 
-  .search-input:focus { border-color: var(--color-primary); }
-  .search-input::placeholder { color: var(--color-light-grey); opacity: 0.5; }
+	.search-input:focus {
+		border-color: var(--color-primary);
+	}
+	.search-input::placeholder {
+		color: var(--color-light-grey);
+		opacity: 0.5;
+	}
 
-  /* Buttons */
-  .btn-primary {
-    display: inline-flex; align-items: center; gap: 7px;
-    background-color: var(--color-primary);
-    color: white;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
-    border: none;
-    border-radius: var(--radius-md);
-    padding: 9px 18px;
-    min-height: var(--touch-target-min);
-    cursor: pointer;
-    transition: background-color var(--transition-base);
-    white-space: nowrap;
-  }
+	/* Buttons */
+	.btn-primary {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		background-color: var(--color-primary);
+		color: white;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		border: none;
+		border-radius: var(--radius-md);
+		padding: 9px 18px;
+		min-height: var(--touch-target-min);
+		cursor: pointer;
+		transition: background-color var(--transition-base);
+		white-space: nowrap;
+	}
 
-  .btn-primary:hover { background-color: var(--color-primary-hover); }
+	.btn-primary:hover {
+		background-color: var(--color-primary-hover);
+	}
 
-  .btn-ghost {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: none;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 9px 14px;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    min-height: var(--touch-target-min);
-    white-space: nowrap;
-  }
+	.btn-ghost {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		background: none;
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 9px 14px;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		min-height: var(--touch-target-min);
+		white-space: nowrap;
+	}
 
-  .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
+	.btn-ghost:hover {
+		color: var(--color-light);
+		border-color: rgba(255, 255, 255, 0.2);
+	}
 
-  /* Loading / empty */
-  .loading, .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 60px 20px;
-    color: var(--color-light-grey);
-    font-size: var(--text-base);
-  }
+	/* Loading / empty */
+	.loading,
+	.empty-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		padding: 60px 20px;
+		color: var(--color-light-grey);
+		font-size: var(--text-base);
+	}
 
-  .spinner {
-    width: 30px; height: 30px;
-    border: 3px solid var(--border-color);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
+	.spinner {
+		width: 30px;
+		height: 30px;
+		border: 3px solid var(--border-color);
+		border-top-color: var(--color-primary);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
 
-  @keyframes spin { to { transform: rotate(360deg); } }
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
 
-  /* Table */
-  .table-wrapper {
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    overflow: visible;
-  }
+	/* Table */
+	.table-wrapper {
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-xl);
+		overflow: visible;
+	}
 
-  /* Round table corners without overflow:hidden */
-  .collections-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-xl); }
-  .collections-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-xl); }
-  .collections-table tbody tr:last-child td:first-child  { border-bottom-left-radius: var(--radius-xl); }
-  .collections-table tbody tr:last-child td:last-child   { border-bottom-right-radius: var(--radius-xl); }
+	/* Round table corners without overflow:hidden */
+	.collections-table thead tr:first-child th:first-child {
+		border-top-left-radius: var(--radius-xl);
+	}
+	.collections-table thead tr:first-child th:last-child {
+		border-top-right-radius: var(--radius-xl);
+	}
+	.collections-table tbody tr:last-child td:first-child {
+		border-bottom-left-radius: var(--radius-xl);
+	}
+	.collections-table tbody tr:last-child td:last-child {
+		border-bottom-right-radius: var(--radius-xl);
+	}
 
-  .collections-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--text-sm);
-    text-align: left;
-  }
+	.collections-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--text-sm);
+		text-align: left;
+	}
 
-  .collections-table thead tr {
-    background-color: var(--color-surface-alt);
-    border-bottom: 1px solid var(--border-color);
-  }
+	.collections-table thead tr {
+		background-color: var(--color-surface-alt);
+		border-bottom: 1px solid var(--border-color);
+	}
 
-  .collections-table th {
-    padding: 12px 20px;
-    font-size: 11px;
-    font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-  }
+	.collections-table th {
+		padding: 12px 20px;
+		font-size: 11px;
+		font-weight: var(--fw-bold);
+		color: var(--color-light-grey);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		white-space: nowrap;
+	}
 
-  .collections-table th.text-right { text-align: right; }
-  .collections-table td { padding: 14px 20px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
-  .collections-table tbody tr:last-child td { border-bottom: none; }
+	.collections-table th.text-right {
+		text-align: right;
+	}
+	.collections-table td {
+		padding: 14px 20px;
+		border-bottom: 1px solid var(--border-color);
+		vertical-align: middle;
+	}
+	.collections-table tbody tr:last-child td {
+		border-bottom: none;
+	}
 
-  .table-row { cursor: pointer; transition: background-color var(--transition-fast); }
-  .table-row:hover { background-color: rgba(255,255,255,0.02); }
-  .text-right { text-align: right; }
+	.table-row {
+		cursor: pointer;
+		transition: background-color var(--transition-fast);
+	}
+	.table-row:hover {
+		background-color: rgba(255, 255, 255, 0.02);
+	}
+	.text-right {
+		text-align: right;
+	}
 
-  /* Cells */
-  .col-cell { display: flex; align-items: center; gap: 12px; }
+	/* Cells */
+	.col-cell {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
 
-  .col-icon {
-    width: 34px; height: 34px;
-    border-radius: var(--radius-md);
-    background-color: rgba(90,140,98,0.15);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
+	.col-icon {
+		width: 34px;
+		height: 34px;
+		border-radius: var(--radius-md);
+		background-color: rgba(90, 140, 98, 0.15);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
 
-  .col-name { font-weight: var(--fw-semibold); color: var(--color-light); margin: 0 0 2px; }
-  .col-code { font-size: 11px; color: var(--color-light-grey); margin: 0; }
-  .no-stem-badge {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 8px;
-    font-family: var(--font-family);
-    font-size: 11px;
-    font-weight: var(--fw-bold);
-    color: var(--color-highlight);
-    background: rgba(225, 183, 120, 0.12);
-    border: 1px solid rgba(225, 183, 120, 0.4);
-    border-radius: var(--radius-md);
-    vertical-align: middle;
-  }
-  button.no-stem-badge { cursor: pointer; }
-  button.no-stem-badge:hover { background: rgba(225, 183, 120, 0.22); }
+	.col-name {
+		font-weight: var(--fw-semibold);
+		color: var(--color-light);
+		margin: 0 0 2px;
+	}
+	.col-code {
+		font-size: 11px;
+		color: var(--color-light-grey);
+		margin: 0;
+	}
+	.no-stem-badge {
+		display: inline-block;
+		margin-left: 6px;
+		padding: 1px 8px;
+		font-family: var(--font-family);
+		font-size: 11px;
+		font-weight: var(--fw-bold);
+		color: var(--color-highlight);
+		background: rgba(225, 183, 120, 0.12);
+		border: 1px solid rgba(225, 183, 120, 0.4);
+		border-radius: var(--radius-md);
+		vertical-align: middle;
+	}
+	button.no-stem-badge {
+		cursor: pointer;
+	}
+	button.no-stem-badge:hover {
+		background: rgba(225, 183, 120, 0.22);
+	}
 
-  .status-badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: var(--radius-full);
-    font-size: 12px;
-    font-weight: var(--fw-semibold);
-    white-space: nowrap;
-  }
+	.status-badge {
+		display: inline-block;
+		padding: 3px 10px;
+		border-radius: var(--radius-full);
+		font-size: 12px;
+		font-weight: var(--fw-semibold);
+		white-space: nowrap;
+	}
 
-  .img-count {
-    display: flex; align-items: center; gap: 7px;
-    color: var(--color-light-grey);
-    font-size: var(--text-sm);
-  }
+	.img-count {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		color: var(--color-light-grey);
+		font-size: var(--text-sm);
+	}
 
-  .manager-cell {
-    display: flex; align-items: center; gap: 8px;
-    font-size: var(--text-sm); color: var(--color-light-grey);
-  }
+	.manager-cell {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+	}
 
-  .manager-av {
-    width: 26px; height: 26px;
-    border-radius: 50%;
-    background-color: rgba(90,140,98,0.2);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: var(--fw-bold);
-    color: var(--color-primary);
-    flex-shrink: 0;
-  }
+	.manager-av {
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		background-color: rgba(90, 140, 98, 0.2);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 10px;
+		font-weight: var(--fw-bold);
+		color: var(--color-primary);
+		flex-shrink: 0;
+	}
 
-  .date-cell { display: flex; align-items: center; gap: 7px; color: var(--color-light-grey); white-space: nowrap; }
+	.date-cell {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		color: var(--color-light-grey);
+		white-space: nowrap;
+	}
 
-  .action-menu-wrap { position: relative; display: inline-flex; justify-content: flex-end; }
+	.action-menu-wrap {
+		position: relative;
+		display: inline-flex;
+		justify-content: flex-end;
+	}
 
-  .btn-menu {
-    width: 32px; height: 32px;
-    background: none; border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
+	.btn-menu {
+		width: 32px;
+		height: 32px;
+		background: none;
+		border: 1px solid transparent;
+		border-radius: var(--radius-sm);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--color-light-grey);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
 
-  .btn-menu:hover { background-color: var(--color-surface-alt); border-color: var(--border-color); color: var(--color-light); }
+	.btn-menu:hover {
+		background-color: var(--color-surface-alt);
+		border-color: var(--border-color);
+		color: var(--color-light);
+	}
 
-  .action-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    min-width: 140px;
-    z-index: 50;
-    overflow: hidden;
-  }
+	.action-menu {
+		position: absolute;
+		top: calc(100% + 4px);
+		right: 0;
+		background-color: var(--color-surface-alt);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-lg);
+		min-width: 140px;
+		z-index: 50;
+		overflow: hidden;
+	}
 
-  .action-item {
-    display: flex; align-items: center; gap: 8px;
-    width: 100%; padding: 9px 14px;
-    background: none; border: none;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    text-align: left;
-    transition: background-color var(--transition-fast);
-  }
+	.action-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 9px 14px;
+		background: none;
+		border: none;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		cursor: pointer;
+		text-align: left;
+		transition: background-color var(--transition-fast);
+	}
 
-  .action-item:hover { background-color: var(--color-surface); color: var(--color-light); }
-  .action-item-danger:hover { color: var(--color-error); }
+	.action-item:hover {
+		background-color: var(--color-surface);
+		color: var(--color-light);
+	}
+	.action-item-danger:hover {
+		color: var(--color-error);
+	}
 
-  /* ── Modal ── */
-  .modal-backdrop {
-    position: fixed; inset: 0;
-    background-color: rgba(0,0,0,0.65);
-    backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 100; padding: 24px;
-  }
+	/* ── Modal ── */
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background-color: rgba(0, 0, 0, 0.65);
+		backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 100;
+		padding: 24px;
+	}
 
-  .modal-card {
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 24px;
-    width: 100%;
-    max-width: 420px;
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
+	.modal-card {
+		background-color: var(--color-surface-alt);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-xl);
+		padding: 24px;
+		width: 100%;
+		max-width: 420px;
+		box-shadow: var(--shadow-lg);
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
 
-  .modal-header { display: flex; justify-content: space-between; align-items: flex-start; }
-  .modal-title  { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0 0 4px; }
-  .modal-subtitle { font-size: var(--text-sm); color: var(--color-secondary); margin: 0; }
+	.modal-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+	}
+	.modal-title {
+		font-size: var(--text-h3);
+		font-weight: var(--fw-bold);
+		color: var(--color-light);
+		margin: 0 0 4px;
+	}
+	.modal-subtitle {
+		font-size: var(--text-sm);
+		color: var(--color-secondary);
+		margin: 0;
+	}
 
-  .modal-close {
-    width: 28px; height: 28px;
-    background: none; border: none;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
-    flex-shrink: 0;
-  }
+	.modal-close {
+		width: 28px;
+		height: 28px;
+		background: none;
+		border: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--color-light-grey);
+		cursor: pointer;
+		border-radius: var(--radius-sm);
+		transition: all var(--transition-fast);
+		flex-shrink: 0;
+	}
 
-  .modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
+	.modal-close:hover {
+		background-color: var(--color-surface);
+		color: var(--color-light);
+	}
 
-  /* Close button of the members modal: a circle with a 44x44 touch target
+	/* Close button of the members modal: a circle with a 44x44 touch target
      (--touch-target-min) and visible hover/active feedback (same pattern as
      .btn-back in the volume view's +layout@.svelte and the global
      .btn:active). */
-  .modal-close--circle {
-    width: var(--touch-target-min);
-    height: var(--touch-target-min);
-    border-radius: var(--radius-full);
-  }
+	.modal-close--circle {
+		width: var(--touch-target-min);
+		height: var(--touch-target-min);
+		border-radius: var(--radius-full);
+	}
 
-  .modal-close--circle:hover { background-color: var(--border-color); }
+	.modal-close--circle:hover {
+		background-color: var(--border-color);
+	}
 
-  .modal-close--circle:active {
-    background-color: var(--border-color);
-    transform: scale(0.97);
-  }
+	.modal-close--circle:active {
+		background-color: var(--border-color);
+		transform: scale(0.97);
+	}
 
-  .modal-body { display: flex; flex-direction: column; gap: 14px; }
+	.modal-body {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
 
-  .form-field { display: flex; flex-direction: column; gap: 6px; }
+	.form-field {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
 
-  .field-label {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 11px; font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
+	.field-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 11px;
+		font-weight: var(--fw-bold);
+		color: var(--color-light-grey);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
 
-  .field-input, .field-textarea {
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light);
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 9px 12px;
-    outline: none;
-    transition: border-color var(--transition-base);
-    width: 100%;
-  }
+	.field-input,
+	.field-textarea {
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light);
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 9px 12px;
+		outline: none;
+		transition: border-color var(--transition-base);
+		width: 100%;
+	}
 
-  .field-input { min-height: var(--touch-target-min); }
-  .field-textarea { min-height: 80px; resize: vertical; }
-  .field-input:focus, .field-textarea:focus { border-color: var(--color-primary); }
-  .field-input::placeholder, .field-textarea::placeholder { color: var(--color-light-grey); opacity: 0.5; }
+	.field-input {
+		min-height: var(--touch-target-min);
+	}
+	.field-textarea {
+		min-height: 80px;
+		resize: vertical;
+	}
+	.field-input:focus,
+	.field-textarea:focus {
+		border-color: var(--color-primary);
+	}
+	.field-input::placeholder,
+	.field-textarea::placeholder {
+		color: var(--color-light-grey);
+		opacity: 0.5;
+	}
 
-  .create-error {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    background-color: var(--color-error-bg);
-    border: 1px solid var(--color-error);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-    color: var(--color-error);
-    line-height: 1.4;
-  }
+	.create-error {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 14px;
+		background-color: var(--color-error-bg);
+		border: 1px solid var(--color-error);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+		color: var(--color-error);
+		line-height: 1.4;
+	}
 
-  .modal-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    padding-top: 4px;
-    border-top: 1px solid var(--border-color);
-  }
+	.modal-actions {
+		display: flex;
+		gap: 12px;
+		justify-content: flex-end;
+		padding-top: 4px;
+		border-top: 1px solid var(--border-color);
+	}
 
-  .btn-crear {
-    display: inline-flex; align-items: center; gap: 8px;
-    background-color: var(--color-primary);
-    color: white;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
-    border: none;
-    border-radius: var(--radius-md);
-    padding: 9px 18px;
-    min-height: var(--touch-target-min);
-    cursor: pointer;
-    transition: background-color var(--transition-base);
-  }
+	.btn-crear {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		background-color: var(--color-primary);
+		color: white;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		border: none;
+		border-radius: var(--radius-md);
+		padding: 9px 18px;
+		min-height: var(--touch-target-min);
+		cursor: pointer;
+		transition: background-color var(--transition-base);
+	}
 
-  .btn-crear:hover { background-color: var(--color-primary-hover); }
-  .btn-crear:disabled { opacity: 0.5; cursor: not-allowed; }
+	.btn-crear:hover {
+		background-color: var(--color-primary-hover);
+	}
+	.btn-crear:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 
-  /* KPI bar — cards + collaborators button side by side */
-  .kpi-bar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 28px;
-    flex-wrap: wrap;
-  }
+	/* KPI bar — cards + collaborators button side by side */
+	.kpi-bar {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		margin-bottom: 28px;
+		flex-wrap: wrap;
+	}
 
-  .btn-collaborators {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: none;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    min-height: var(--touch-target-min);
-    white-space: nowrap;
-    margin-left: auto;
-  }
+	.btn-collaborators {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 16px;
+		background: none;
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		min-height: var(--touch-target-min);
+		white-space: nowrap;
+		margin-left: auto;
+	}
 
-  .btn-collaborators:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
+	.btn-collaborators:hover {
+		color: var(--color-light);
+		border-color: rgba(255, 255, 255, 0.2);
+	}
 
-  .member-badge {
-    background: var(--color-primary);
-    color: white;
-    font-size: 11px;
-    font-weight: var(--fw-bold);
-    border-radius: 99px;
-    padding: 1px 7px;
-    line-height: 1.6;
-  }
+	.member-badge {
+		background: var(--color-primary);
+		color: white;
+		font-size: 11px;
+		font-weight: var(--fw-bold);
+		border-radius: 99px;
+		padding: 1px 7px;
+		line-height: 1.6;
+	}
 
-  /* Wide modal variant */
-  .modal-card--wide { max-width: 540px; width: 100%; }
+	/* Wide modal variant */
+	.modal-card--wide {
+		max-width: 540px;
+		width: 100%;
+	}
 
-  /* Members list */
-  .members-list {
-    list-style: none;
-    margin: 0 0 20px;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
+	/* Members list */
+	.members-list {
+		list-style: none;
+		margin: 0 0 20px;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
 
-  .members-empty {
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    margin: 0 0 20px;
-  }
+	.members-empty {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		margin: 0 0 20px;
+	}
 
-  .member-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 10px;
-    border-radius: var(--radius-md);
-    background: var(--color-surface-alt);
-  }
+	.member-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 8px 10px;
+		border-radius: var(--radius-md);
+		background: var(--color-surface-alt);
+	}
 
-  .member-av {
-    width: 32px; height: 32px;
-    border-radius: 50%;
-    background: rgba(90,140,98,0.2);
-    color: var(--color-primary);
-    font-size: var(--text-xs);
-    font-weight: var(--fw-bold);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
+	.member-av {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		background: rgba(90, 140, 98, 0.2);
+		color: var(--color-primary);
+		font-size: var(--text-xs);
+		font-weight: var(--fw-bold);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
 
-  .member-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-  .member-name { font-size: var(--text-sm); color: var(--color-light); font-weight: var(--fw-semibold); }
-  .member-email { font-size: var(--text-xs); color: var(--color-light-grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.member-info {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-width: 0;
+	}
+	.member-name {
+		font-size: var(--text-sm);
+		color: var(--color-light);
+		font-weight: var(--fw-semibold);
+	}
+	.member-email {
+		font-size: var(--text-xs);
+		color: var(--color-light-grey);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 
-  .role-badge {
-    font-size: 11px;
-    font-weight: var(--fw-bold);
-    padding: 2px 8px;
-    border-radius: 99px;
-    text-transform: capitalize;
-    white-space: nowrap;
-  }
+	.role-badge {
+		font-size: 11px;
+		font-weight: var(--fw-bold);
+		padding: 2px 8px;
+		border-radius: 99px;
+		text-transform: capitalize;
+		white-space: nowrap;
+	}
 
-  .role-badge--operator { background: rgba(150,177,240,0.15); color: var(--color-secondary); }
-  .role-badge--reviewer  { background: rgba(171,183,183,0.12); color: var(--color-light-grey); }
-  .role-badge--admin     { background: rgba(225,183,120,0.15); color: var(--color-highlight); }
+	.role-badge--operator {
+		background: rgba(150, 177, 240, 0.15);
+		color: var(--color-secondary);
+	}
+	.role-badge--reviewer {
+		background: rgba(171, 183, 183, 0.12);
+		color: var(--color-light-grey);
+	}
+	.role-badge--admin {
+		background: rgba(225, 183, 120, 0.15);
+		color: var(--color-highlight);
+	}
 
-  /* Implicit (admin) members — slightly muted row */
-  .member-row--implicit { opacity: 0.75; }
+	/* Implicit (admin) members — slightly muted row */
+	.member-row--implicit {
+		opacity: 0.75;
+	}
 
-  .member-implicit-icon {
-    color: var(--color-light-grey);
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    padding: 4px;
-  }
+	.member-implicit-icon {
+		color: var(--color-light-grey);
+		display: flex;
+		align-items: center;
+		flex-shrink: 0;
+		padding: 4px;
+	}
 
-  .btn-remove-member {
-    background: none;
-    border: none;
-    color: var(--color-light-grey);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: var(--radius-sm);
-    display: flex; align-items: center;
-    transition: color var(--transition-fast);
-    flex-shrink: 0;
-  }
+	.btn-remove-member {
+		background: none;
+		border: none;
+		color: var(--color-light-grey);
+		cursor: pointer;
+		padding: 4px;
+		border-radius: var(--radius-sm);
+		display: flex;
+		align-items: center;
+		transition: color var(--transition-fast);
+		flex-shrink: 0;
+	}
 
-  .btn-remove-member:hover { color: var(--color-error); }
+	.btn-remove-member:hover {
+		color: var(--color-error);
+	}
 
-  /* Add member section */
-  .add-member-section {
-    border-top: 1px solid var(--border-color);
-    padding-top: 16px;
-  }
+	/* Add member section */
+	.add-member-section {
+		border-top: 1px solid var(--border-color);
+		padding-top: 16px;
+	}
 
-  .add-member-title {
-    font-size: var(--text-xs);
-    font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin: 0 0 10px;
-  }
+	.add-member-title {
+		font-size: var(--text-xs);
+		font-weight: var(--fw-bold);
+		color: var(--color-light-grey);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		margin: 0 0 10px;
+	}
 
-  .add-member-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
+	.add-member-row {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		flex-wrap: wrap;
+	}
 
-  .add-member-select { flex: 1; min-width: 160px; }
-  .add-role-select   { width: 120px; flex-shrink: 0; }
+	.add-member-select {
+		flex: 1;
+		min-width: 160px;
+	}
+	.add-role-select {
+		width: 120px;
+		flex-shrink: 0;
+	}
 
-  /* ── Archival date range ─────────────────────────────────── */
-  .date-range-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-  }
+	/* ── Archival date range ─────────────────────────────────── */
+	.date-range-row {
+		display: flex;
+		align-items: flex-end;
+		gap: 10px;
+	}
 
-  .date-field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex: 1;
-    min-width: 0;
-  }
+	.date-field {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		flex: 1;
+		min-width: 0;
+	}
 
-  .date-sub-label {
-    font-size: 10px;
-    font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
+	.date-sub-label {
+		font-size: 10px;
+		font-weight: var(--fw-bold);
+		color: var(--color-light-grey);
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+	}
 
-  .date-sep {
-    color: var(--color-light-grey);
-    padding-bottom: 10px;
-    flex-shrink: 0;
-    font-size: var(--text-base);
-  }
+	.date-sep {
+		color: var(--color-light-grey);
+		padding-bottom: 10px;
+		flex-shrink: 0;
+		font-size: var(--text-base);
+	}
 
-  .date-error {
-    font-size: 12px;
-    color: var(--color-error);
-    margin: 2px 0 0;
-    line-height: 1.4;
-  }
+	.date-error {
+		font-size: 12px;
+		color: var(--color-error);
+		margin: 2px 0 0;
+		line-height: 1.4;
+	}
 
-  .field-input--error {
-    border-color: var(--color-error) !important;
-  }
+	.field-input--error {
+		border-color: var(--color-error) !important;
+	}
 
-  .field-required { color: var(--color-error); margin-left: 2px; }
+	.field-required {
+		color: var(--color-error);
+		margin-left: 2px;
+	}
 
-  /* ── Delete collection modal ─────────────────────────────── */
-  .delete-modal-card { max-width: 460px; }
+	/* ── Delete collection modal ─────────────────────────────── */
+	.delete-modal-card {
+		max-width: 460px;
+	}
 
-  .delete-loading {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 0;
-    color: var(--color-light-grey);
-    font-size: var(--text-sm);
-  }
+	.delete-loading {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 12px 0;
+		color: var(--color-light-grey);
+		font-size: var(--text-sm);
+	}
 
-  .delete-warning {
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
-    background: rgba(220, 80, 60, 0.08);
-    border: 1px solid rgba(220, 80, 60, 0.25);
-    border-radius: var(--radius-md);
-    padding: 14px 16px;
-  }
+	.delete-warning {
+		display: flex;
+		gap: 14px;
+		align-items: flex-start;
+		background: rgba(220, 80, 60, 0.08);
+		border: 1px solid rgba(220, 80, 60, 0.25);
+		border-radius: var(--radius-md);
+		padding: 14px 16px;
+	}
 
-  .delete-warning-icon {
-    color: var(--color-error);
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    padding-top: 1px;
-  }
+	.delete-warning-icon {
+		color: var(--color-error);
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		padding-top: 1px;
+	}
 
-  .delete-warning-title {
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
-    color: var(--color-error);
-    margin: 0 0 4px;
-  }
+	.delete-warning-title {
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		color: var(--color-error);
+		margin: 0 0 4px;
+	}
 
-  .delete-warning-body {
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    margin: 0;
-    line-height: 1.5;
-  }
+	.delete-warning-body {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		margin: 0;
+		line-height: 1.5;
+	}
 
-  .delete-move-section {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
+	.delete-move-section {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
 
-  .delete-move-hint {
-    font-size: 12px;
-    color: var(--color-light-grey);
-    margin: 0;
-    line-height: 1.4;
-  }
+	.delete-move-hint {
+		font-size: 12px;
+		color: var(--color-light-grey);
+		margin: 0;
+		line-height: 1.4;
+	}
 
-  .delete-confirm-text {
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    margin: 0;
-    line-height: 1.5;
-  }
+	.delete-confirm-text {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		margin: 0;
+		line-height: 1.5;
+	}
 
-  .btn-danger {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    background-color: var(--color-error);
-    color: white;
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
-    border: none;
-    border-radius: var(--radius-md);
-    padding: 9px 18px;
-    min-height: var(--touch-target-min);
-    cursor: pointer;
-    transition: filter var(--transition-base);
-  }
+	.btn-danger {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		background-color: var(--color-error);
+		color: white;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		border: none;
+		border-radius: var(--radius-md);
+		padding: 9px 18px;
+		min-height: var(--touch-target-min);
+		cursor: pointer;
+		transition: filter var(--transition-base);
+	}
 
-  .btn-danger:hover:not(:disabled) { filter: brightness(1.15); }
-  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+	.btn-danger:hover:not(:disabled) {
+		filter: brightness(1.15);
+	}
+	.btn-danger:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 
-
-  .testing-format { margin: 0 0 16px; }
-  .testing-format-line { margin: 0; font-size: var(--text-sm); color: var(--color-light-grey); }
-  .testing-format-error { margin: 6px 0 0; font-size: var(--text-sm); color: var(--color-error); }
-  .testing-expiry { margin: 2px 0 0; font-size: var(--text-xs); color: var(--color-light-grey); }
-  .testing-expiry.soon { color: var(--color-warning); }
+	.testing-format {
+		margin: 0 0 16px;
+	}
+	.testing-format-line {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+	}
+	.testing-format-error {
+		margin: 6px 0 0;
+		font-size: var(--text-sm);
+		color: var(--color-error);
+	}
+	.testing-expiry {
+		margin: 2px 0 0;
+		font-size: var(--text-xs);
+		color: var(--color-light-grey);
+	}
+	.testing-expiry.soon {
+		color: var(--color-warning);
+	}
 </style>

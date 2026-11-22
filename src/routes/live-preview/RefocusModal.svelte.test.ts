@@ -51,7 +51,11 @@ async function jpeg(w: number, h: number): Promise<Blob> {
 	return new Promise((resolve) => c.toBlob((b) => resolve(b!), 'image/jpeg', 0.5));
 }
 
-async function shot(w: number, h: number, focalLength: number | null = null): Promise<TestCaptureResult> {
+async function shot(
+	w: number,
+	h: number,
+	focalLength: number | null = null
+): Promise<TestCaptureResult> {
 	return { blob: await jpeg(w, h), seconds: 1.2, bytes: 1000, focalLength };
 }
 
@@ -65,7 +69,13 @@ let modes: Record<number, string | undefined>;
 let settingsSpy: MockInstance<typeof camerasApi.getDSLRSettings>;
 let captureSpy: MockInstance<typeof camerasApi.testCapture>;
 
-function renderModal(props: Partial<{ leftIndex: number; requireMfReading: boolean; captureGate: ReturnType<typeof createCaptureGate> }> = {}) {
+function renderModal(
+	props: Partial<{
+		leftIndex: number;
+		requireMfReading: boolean;
+		captureGate: ReturnType<typeof createCaptureGate>;
+	}> = {}
+) {
 	const onClose = vi.fn();
 	const screen = render(RefocusModal, { leftIndex: 0, onClose, ...props });
 	return { screen, onClose };
@@ -73,15 +83,21 @@ function renderModal(props: Partial<{ leftIndex: number; requireMfReading: boole
 
 const reading = (side: 'left' | 'right') =>
 	document.querySelector(`[data-reading="${side}"] .rf-reading-value`)?.textContent?.trim() ?? '';
-const ticked = (side: 'left' | 'right') => document.querySelector(`[data-reading="${side}"] .rf-tick`) !== null;
-const pane = (side: 'left' | 'right') => document.querySelector(`[data-pane="${side}"]`) as HTMLElement | null;
-const paneImg = (side: 'left' | 'right') => pane(side)?.querySelector('img') as HTMLImageElement | null;
+const ticked = (side: 'left' | 'right') =>
+	document.querySelector(`[data-reading="${side}"] .rf-tick`) !== null;
+const pane = (side: 'left' | 'right') =>
+	document.querySelector(`[data-pane="${side}"]`) as HTMLElement | null;
+const paneImg = (side: 'left' | 'right') =>
+	pane(side)?.querySelector('img') as HTMLImageElement | null;
 const button = (name: string) =>
 	[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
 		(b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim() === name
 	) ?? null;
 const heading = () => document.querySelector('[role="dialog"] h2')?.textContent?.trim();
-const steps = () => [...document.querySelectorAll('[role="dialog"] ol.rf-steps li')].map((li) => li.textContent?.trim());
+const steps = () =>
+	[...document.querySelectorAll('[role="dialog"] ol.rf-steps li')].map((li) =>
+		li.textContent?.trim()
+	);
 const lens = () => document.querySelector('[role="dialog"] svg.rf-lens');
 const dialogText = () => document.querySelector('[role="dialog"]')?.textContent ?? '';
 
@@ -121,7 +137,9 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-async function toTestStage(props: Partial<{ leftIndex: number; captureGate: ReturnType<typeof createCaptureGate> }> = {}) {
+async function toTestStage(
+	props: Partial<{ leftIndex: number; captureGate: ReturnType<typeof createCaptureGate> }> = {}
+) {
 	const r = renderModal(props);
 	await settle();
 	await click(en.focus_next);
@@ -142,18 +160,31 @@ describe('RefocusModal: stages', () => {
 		renderModal();
 		await settle();
 		expect(heading()).toBe(en.focus_af_title);
-		expect(steps()).toEqual([en.focus_af_step_light, en.focus_af_step_switch, en.focus_af_step_tick]);
+		expect(steps()).toEqual([
+			en.focus_af_step_light,
+			en.focus_af_step_switch,
+			en.focus_af_step_tick
+		]);
 		expect(lens()).not.toBeNull();
 
 		await click(en.focus_next);
 		expect(heading()).toBe(en.focus_test_title);
-		expect(steps()).toEqual([en.focus_test_step_hold, en.focus_test_step_take, en.focus_test_step_zoom, en.focus_test_step_again]);
+		expect(steps()).toEqual([
+			en.focus_test_step_hold,
+			en.focus_test_step_take,
+			en.focus_test_step_zoom,
+			en.focus_test_step_again
+		]);
 		expect(dialogText()).toContain(en.focus_test_not_saved);
 		expect(lens()).toBeNull();
 
 		await click(en.focus_next);
 		expect(heading()).toBe(en.focus_mf_title);
-		expect(steps()).toEqual([en.focus_mf_step_switch, en.focus_mf_step_ring, en.focus_mf_step_tick]);
+		expect(steps()).toEqual([
+			en.focus_mf_step_switch,
+			en.focus_mf_step_ring,
+			en.focus_mf_step_tick
+		]);
 		expect(lens()).not.toBeNull();
 
 		await click(en.focus_back);
@@ -163,7 +194,7 @@ describe('RefocusModal: stages', () => {
 		expect(button(en.focus_back)).toBeNull();
 	});
 
-	it('the AF stage shows each camera\'s mode by side, with a tick for each camera on AF', async () => {
+	it("the AF stage shows each camera's mode by side, with a tick for each camera on AF", async () => {
 		renderModal({ leftIndex: 1 });
 		await settle();
 		// Camera 1 takes the left page here.
@@ -258,7 +289,9 @@ describe('RefocusModal: test pictures', () => {
 		] as const) {
 			const badge = pane(side)!.querySelector('.img-viewer-badge') as HTMLElement;
 			expect(badge.querySelector('.badge-letter')?.textContent?.trim(), side).toBe(letter);
-			expect(badge.querySelector('.material-symbols-outlined')?.textContent?.trim(), side).toBe('photo_camera');
+			expect(badge.querySelector('.material-symbols-outlined')?.textContent?.trim(), side).toBe(
+				'photo_camera'
+			);
 			expect(badge.querySelector('.page-term')?.textContent?.trim(), side).toBe(term);
 			expect(badge.getAttribute('title'), side).toBe(both);
 			expect(badge.getAttribute('aria-hidden'), side).toBe('true');
@@ -309,8 +342,15 @@ describe('RefocusModal: test pictures', () => {
 		await toTestStage();
 		await click(en.focus_take);
 		await expect.poll(() => pane('left')?.textContent ?? '').toContain(en.focus_no_focus_lead);
-		const items = [...pane('left')!.querySelectorAll('.rf-pane-error ul li')].map((li) => li.textContent?.trim());
-		expect(items).toEqual([en.focus_no_focus_cap, en.focus_no_focus_light, en.focus_no_focus_glass, en.focus_no_focus_page]);
+		const items = [...pane('left')!.querySelectorAll('.rf-pane-error ul li')].map((li) =>
+			li.textContent?.trim()
+		);
+		expect(items).toEqual([
+			en.focus_no_focus_cap,
+			en.focus_no_focus_light,
+			en.focus_no_focus_glass,
+			en.focus_no_focus_page
+		]);
 		expect(pane('left')?.textContent).toContain(en.focus_no_focus_again);
 		expect(pane('right')?.textContent).toContain(en.focus_test_failed(undefined));
 		expect(pane('right')?.textContent).not.toContain(en.focus_no_focus_lead);
@@ -326,7 +366,9 @@ describe('RefocusModal: test pictures', () => {
 		await click(en.focus_take);
 		await expect.poll(() => paneImg('left')?.naturalWidth ?? 0).toBe(400);
 		expect(paneImg('right')).toBeNull();
-		expect(pane('right')?.textContent).toContain(en.focus_test_failed(en.dash_camera_capture_not_connected));
+		expect(pane('right')?.textContent).toContain(
+			en.focus_test_failed(en.dash_camera_capture_not_connected)
+		);
 	});
 
 	it('"Take again" takes a new pair and revokes the URLs it replaces; closing revokes the rest', async () => {
@@ -417,10 +459,11 @@ describe('RefocusModal: test pictures', () => {
 });
 
 describe('RefocusModal: focal length', () => {
-	const focal = (side: 'left' | 'right') => pane(side)?.querySelector('.rf-focal')?.textContent?.trim() ?? null;
+	const focal = (side: 'left' | 'right') =>
+		pane(side)?.querySelector('.rf-focal')?.textContent?.trim() ?? null;
 	const mismatch = () => document.querySelector('.rf-focal-mismatch')?.textContent?.trim() ?? null;
 
-	it('shows each camera\'s focal length under its picture, and nothing more when they match', async () => {
+	it("shows each camera's focal length under its picture, and nothing more when they match", async () => {
 		captureSpy.mockImplementation(() => shot(400, 300, 27));
 		await toTestStage();
 		await click(en.focus_take);
@@ -781,7 +824,12 @@ describe('RefocusModal: Escape as the assigned capture key', () => {
 	// Ctrl+Escape, plain Escape is no capture key and closes the dialog.
 	describe('with the pedal on Ctrl+Escape', () => {
 		function pressCtrlEscape(): KeyboardEvent {
-			const event = new KeyboardEvent('keydown', { key: 'Escape', ctrlKey: true, bubbles: true, cancelable: true });
+			const event = new KeyboardEvent('keydown', {
+				key: 'Escape',
+				ctrlKey: true,
+				bubbles: true,
+				cancelable: true
+			});
 			document.body.dispatchEvent(event);
 			document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }));
 			return event;

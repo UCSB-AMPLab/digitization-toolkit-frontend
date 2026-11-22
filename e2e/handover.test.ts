@@ -8,7 +8,14 @@
 // are offered to operators and admins.
 //
 // Version: 0.1.0-beta
-import { test, expect, testStem, signInBrowser, type APIRequestContext, type Page } from './fixtures';
+import {
+	test,
+	expect,
+	testStem,
+	signInBrowser,
+	type APIRequestContext,
+	type Page
+} from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh209';
@@ -36,19 +43,32 @@ async function login(request: APIRequestContext): Promise<string> {
 		data: { username: E2E_USERNAME, password: E2E_PASSWORD }
 	});
 	if (!resp.ok()) {
-		throw new Error(`E2E login failed (${resp.status()}). Set E2E_USERNAME/E2E_PASSWORD to a valid admin account.`);
+		throw new Error(
+			`E2E login failed (${resp.status()}). Set E2E_USERNAME/E2E_PASSWORD to a valid admin account.`
+		);
 	}
 	return (await resp.json()).access_token as string;
 }
 
-async function post<T>(request: APIRequestContext, token: string, path: string, data: unknown): Promise<T> {
+async function post<T>(
+	request: APIRequestContext,
+	token: string,
+	path: string,
+	data: unknown
+): Promise<T> {
 	const resp = await request.post(`${API_BASE}${path}`, { headers: auth(token), data });
 	expect(resp.ok(), await resp.text()).toBeTruthy();
 	return (await resp.json()) as T;
 }
 
 // A captured record, left captured: nothing here promotes.
-async function createRecord(request: APIRequestContext, token: string, collectionId: number, title: string, withImage: boolean) {
+async function createRecord(
+	request: APIRequestContext,
+	token: string,
+	collectionId: number,
+	title: string,
+	withImage: boolean
+) {
 	const record = await post<{ id: number }>(request, token, '/records/', {
 		title,
 		collection_id: collectionId,
@@ -64,8 +84,14 @@ async function createRecord(request: APIRequestContext, token: string, collectio
 	return record.id;
 }
 
-async function statuses(request: APIRequestContext, token: string, collectionId: number): Promise<string[]> {
-	const resp = await request.get(`${API_BASE}/records/?collection_id=${collectionId}`, { headers: auth(token) });
+async function statuses(
+	request: APIRequestContext,
+	token: string,
+	collectionId: number
+): Promise<string[]> {
+	const resp = await request.get(`${API_BASE}/records/?collection_id=${collectionId}`, {
+		headers: auth(token)
+	});
 	expect(resp.ok()).toBeTruthy();
 	return ((await resp.json()) as { status: string }[]).map((r) => r.status);
 }
@@ -73,9 +99,19 @@ async function statuses(request: APIRequestContext, token: string, collectionId:
 async function setup(request: APIRequestContext): Promise<Ctx> {
 	const token = await login(request);
 	const suffix = Date.now();
-	const project = await post<{ id: number }>(request, token, '/projects/', { name: `NEH-260 handover e2e ${suffix}` });
-	const ready = await post<{ id: number }>(request, token, '/collections/', { name: `Ready ${suffix}`, project_id: project.id, filename_stem: testStem() });
-	const blocked = await post<{ id: number }>(request, token, '/collections/', { name: `Blocked ${suffix}`, project_id: project.id, filename_stem: testStem() });
+	const project = await post<{ id: number }>(request, token, '/projects/', {
+		name: `NEH-260 handover e2e ${suffix}`
+	});
+	const ready = await post<{ id: number }>(request, token, '/collections/', {
+		name: `Ready ${suffix}`,
+		project_id: project.id,
+		filename_stem: testStem()
+	});
+	const blocked = await post<{ id: number }>(request, token, '/collections/', {
+		name: `Blocked ${suffix}`,
+		project_id: project.id,
+		filename_stem: testStem()
+	});
 	const readyRecordIds = [
 		await createRecord(request, token, ready.id, 'Folio 1', true),
 		await createRecord(request, token, ready.id, 'Folio 2', true)
@@ -95,19 +131,33 @@ async function setup(request: APIRequestContext): Promise<Ctx> {
 async function teardown(request: APIRequestContext, token: string, projectId: number) {
 	// Nothing cascades: records, then collections, then the project. The
 	// account is an admin, so records in review can be deleted too.
-	const cols = await (await request.get(`${API_BASE}/collections/?project_id=${projectId}`, { headers: auth(token) })).json();
+	const cols = await (
+		await request.get(`${API_BASE}/collections/?project_id=${projectId}`, { headers: auth(token) })
+	).json();
 	for (const col of cols) {
-		const recs = await (await request.get(`${API_BASE}/records/?collection_id=${col.id}`, { headers: auth(token) })).json();
-		for (const r of recs) await request.delete(`${API_BASE}/records/${r.id}`, { headers: auth(token) });
+		const recs = await (
+			await request.get(`${API_BASE}/records/?collection_id=${col.id}`, { headers: auth(token) })
+		).json();
+		for (const r of recs)
+			await request.delete(`${API_BASE}/records/${r.id}`, { headers: auth(token) });
 		await request.delete(`${API_BASE}/collections/${col.id}`, { headers: auth(token) });
 	}
 	await request.delete(`${API_BASE}/projects/${projectId}`, { headers: auth(token) });
 }
 
 async function openVolume(page: Page, ctx: Ctx, collectionId: number) {
-	await signInBrowser(page, API_BASE, { username: E2E_USERNAME, password: E2E_PASSWORD }, {
-		id: 0, username: E2E_USERNAME, email: 'e2e@example.com', role: 'admin', is_active: true
-	});
+	await signInBrowser(
+		page,
+		API_BASE,
+		{ username: E2E_USERNAME, password: E2E_PASSWORD },
+		{
+			id: 0,
+			username: E2E_USERNAME,
+			email: 'e2e@example.com',
+			role: 'admin',
+			is_active: true
+		}
+	);
 	await page.goto(`/dashboard/projects/${ctx.projectId}/collections/${collectionId}`);
 }
 
@@ -129,24 +179,39 @@ test.describe('Volume top bar — send for review and take back (NEH-260)', () =
 		// the client, so a visible button is already hydrated.
 		await page.getByRole('button', { name: 'Enviar a revisión' }).click();
 		const confirm = page.getByRole('dialog');
-		await expect(confirm.getByText('Los 2 registros capturados quedarán en revisión.', { exact: false })).toBeVisible();
+		await expect(
+			confirm.getByText('Los 2 registros capturados quedarán en revisión.', { exact: false })
+		).toBeVisible();
 		await confirm.getByRole('button', { name: 'Enviar', exact: true }).click();
 
 		await expect(page.getByRole('status')).toHaveText('Se enviaron 2 registros a revisión.');
-		expect(await statuses(request, ctx.token, ctx.readyCollectionId)).toEqual(['in_review', 'in_review']);
+		expect(await statuses(request, ctx.token, ctx.readyCollectionId)).toEqual([
+			'in_review',
+			'in_review'
+		]);
 		await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toBeHidden();
 
 		await page.getByRole('button', { name: 'Retirar de revisión' }).click();
 		const takeBack = page.getByRole('dialog');
-		await expect(takeBack.getByText('Los 2 registros en revisión quedarán otra vez en estado Capturado', { exact: false })).toBeVisible();
+		await expect(
+			takeBack.getByText('Los 2 registros en revisión quedarán otra vez en estado Capturado', {
+				exact: false
+			})
+		).toBeVisible();
 		await takeBack.getByRole('button', { name: 'Retirar', exact: true }).click();
 
 		await expect(page.getByRole('status')).toHaveText('Se retiraron 2 registros de revisión.');
-		expect(await statuses(request, ctx.token, ctx.readyCollectionId)).toEqual(['captured', 'captured']);
+		expect(await statuses(request, ctx.token, ctx.readyCollectionId)).toEqual([
+			'captured',
+			'captured'
+		]);
 		await expect(page.getByRole('button', { name: 'Enviar a revisión' })).toBeVisible();
 	});
 
-	test('a record without an image blocks the send, and nothing changes', async ({ page, request }) => {
+	test('a record without an image blocks the send, and nothing changes', async ({
+		page,
+		request
+	}) => {
 		await openVolume(page, ctx, ctx.blockedCollectionId);
 
 		await page.getByRole('button', { name: 'Enviar a revisión' }).click();
@@ -154,9 +219,14 @@ test.describe('Volume top bar — send for review and take back (NEH-260)', () =
 
 		const refusal = page.getByRole('dialog');
 		await expect(refusal.getByText('No se pudo enviar el volumen')).toBeVisible();
-		await expect(refusal.getByText('Hay un registro que todavía no se puede enviar', { exact: false })).toBeVisible();
+		await expect(
+			refusal.getByText('Hay un registro que todavía no se puede enviar', { exact: false })
+		).toBeVisible();
 		await expect(refusal.getByText('Folio sin imagen')).toBeVisible();
 		await expect(refusal.getByText('Folio con imagen')).toBeHidden();
-		expect(await statuses(request, ctx.token, ctx.blockedCollectionId)).toEqual(['captured', 'captured']);
+		expect(await statuses(request, ctx.token, ctx.blockedCollectionId)).toEqual([
+			'captured',
+			'captured'
+		]);
 	});
 });

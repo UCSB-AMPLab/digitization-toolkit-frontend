@@ -16,8 +16,28 @@ import RetakeBand from './RetakeBand.svelte';
 const summary: RetakeSummary = {
 	pendingRecords: 33,
 	volumes: [
-		{ collectionId: 92, projectId: 24, name: 'Tomo 066', filenameStem: 'co-ahr-not-t066', pending: 31, total: 31, excluded: 0, firstPendingRecordId: 20946, pendingRecordIds: Array.from({ length: 31 }, (_, i) => 20946 + i) },
-		{ collectionId: 3, projectId: 24, name: 'Tomo 003', filenameStem: 'co-ahr-not-t003', pending: 2, total: 4, excluded: 0, firstPendingRecordId: 11, pendingRecordIds: [11, 12] }
+		{
+			collectionId: 92,
+			projectId: 24,
+			name: 'Tomo 066',
+			filenameStem: 'co-ahr-not-t066',
+			pending: 31,
+			total: 31,
+			excluded: 0,
+			firstPendingRecordId: 20946,
+			pendingRecordIds: Array.from({ length: 31 }, (_, i) => 20946 + i)
+		},
+		{
+			collectionId: 3,
+			projectId: 24,
+			name: 'Tomo 003',
+			filenameStem: 'co-ahr-not-t003',
+			pending: 2,
+			total: 4,
+			excluded: 0,
+			firstPendingRecordId: 11,
+			pendingRecordIds: [11, 12]
+		}
 	],
 	turn: { state: 'recaptures', unlockedBy: null }
 };
@@ -26,7 +46,10 @@ beforeEach(() => locale.set('es'));
 
 describe('RetakeBand', () => {
 	it('draws nothing while no record is pending, or without a summary', async () => {
-		const free = render(RetakeBand, { summary: { pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } }, canRetake: true });
+		const free = render(RetakeBand, {
+			summary: { pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } },
+			canRetake: true
+		});
 		expect(free.container.textContent?.trim()).toBe('');
 		const none = render(RetakeBand, { summary: null, canRetake: true });
 		expect(none.container.textContent?.trim()).toBe('');
@@ -34,9 +57,17 @@ describe('RetakeBand', () => {
 
 	it('shows the counts, the body, the volume with most pending, and a start link to it', async () => {
 		const screen = render(RetakeBand, { summary, canRetake: true });
-		const band = screen.getByRole('region', { name: '33 pares de páginas por recapturar en 2 volúmenes' });
+		const band = screen.getByRole('region', {
+			name: '33 pares de páginas por recapturar en 2 volúmenes'
+		});
 		await expect.element(band).toBeVisible();
-		await expect.element(band.getByText('Se rechazaron en la revisión o no se capturaron completos.', { exact: false })).toBeVisible();
+		await expect
+			.element(
+				band.getByText('Se rechazaron en la revisión o no se capturaron completos.', {
+					exact: false
+				})
+			)
+			.toBeVisible();
 		await expect.element(band.getByText('Con más pendientes: Tomo 066 (31).')).toBeVisible();
 		await expect
 			.element(band.getByRole('link', { name: 'Empezar recapturas' }))
@@ -78,11 +109,28 @@ describe('RetakeBand', () => {
 		// The backend counts a missing side in `pending` and not in `total`.
 		const missing: RetakeSummary = {
 			pendingRecords: 2,
-			volumes: [{ collectionId: 5, projectId: 24, name: 'Tomo 010', filenameStem: 'co-ahr-not-t010', pending: 2, total: 0, excluded: 0, firstPendingRecordId: 40, pendingRecordIds: [40, 41], missingSideRecordIds: [40, 41] }],
+			volumes: [
+				{
+					collectionId: 5,
+					projectId: 24,
+					name: 'Tomo 010',
+					filenameStem: 'co-ahr-not-t010',
+					pending: 2,
+					total: 0,
+					excluded: 0,
+					firstPendingRecordId: 40,
+					pendingRecordIds: [40, 41],
+					missingSideRecordIds: [40, 41]
+				}
+			],
 			turn: { state: 'recaptures', unlockedBy: null }
 		};
 		const screen = render(RetakeBand, { summary: missing, canRetake: true });
-		await expect.element(screen.getByRole('region', { name: '2 pares de páginas por recapturar en un volumen' })).toBeVisible();
+		await expect
+			.element(
+				screen.getByRole('region', { name: '2 pares de páginas por recapturar en un volumen' })
+			)
+			.toBeVisible();
 		await expect.element(screen.getByText('2 de 2 pendientes')).toBeVisible();
 		const fill = screen.container.querySelector<HTMLElement>('.rb-bar-fill');
 		expect(fill?.style.width).toBe('0%');

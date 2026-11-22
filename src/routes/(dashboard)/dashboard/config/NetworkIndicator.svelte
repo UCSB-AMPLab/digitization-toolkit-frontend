@@ -48,12 +48,26 @@
 						: $m.network_ind_offline
 	);
 
-	let tone = $derived(unknown ? 'off' : view?.state === 'connected' ? 'ok' : view?.state === 'problem' ? 'warn' : 'off');
+	let tone = $derived(
+		unknown
+			? 'off'
+			: view?.state === 'connected'
+				? 'ok'
+				: view?.state === 'problem'
+					? 'warn'
+					: 'off'
+	);
 	// A connected Wi-Fi whose signal was not read: empty bars, neutral.
 	let neutralIcon = $derived(unknown || (view?.via === 'wifi' && view.signal === null));
 	let name = $derived(unknown || view?.state === 'offline' ? null : (view?.name ?? null));
 
-	let label = $derived(unknown ? $m.network_ind_unknown : view ? $m.network_ind_label(stateLabel, name, view.signal) : '');
+	let label = $derived(
+		unknown
+			? $m.network_ind_unknown
+			: view
+				? $m.network_ind_label(stateLabel, name, view.signal)
+				: ''
+	);
 </script>
 
 {#if view || unknown}
@@ -70,7 +84,15 @@
 			{:else if view?.via === 'wifi'}
 				<SignalBars signal={view.signal} />
 			{:else if view?.via === 'ethernet'}
-				<svg class="cable" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					class="cable"
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<rect x="5" y="3" width="14" height="10" rx="1" />
 					<path d="M8 13v3h8v-3" />
 					<line x1="12" y1="16" x2="12" y2="21" />
@@ -83,7 +105,9 @@
 			{/if}
 		</span>
 		{#if expanded}
-			<span class="net-status-line"><b>{stateLabel}</b>{#if name !== null}{` · ${name}`}{/if}</span>
+			<span class="net-status-line"
+				><b>{stateLabel}</b>{#if name !== null}{` · ${name}`}{/if}</span
+			>
 		{/if}
 	</a>
 {/if}
@@ -100,16 +124,33 @@
 		color: var(--color-light-grey);
 		text-decoration: none;
 		font-family: var(--font-family);
-		transition: background-color var(--transition-fast), color var(--transition-fast);
+		transition:
+			background-color var(--transition-fast),
+			color var(--transition-fast);
 	}
-	.net-status:hover { background-color: rgba(255, 255, 255, 0.04); color: var(--color-light); }
-	.net-status.collapsed { justify-content: center; padding: 8px 0; }
+	.net-status:hover {
+		background-color: rgba(255, 255, 255, 0.04);
+		color: var(--color-light);
+	}
+	.net-status.collapsed {
+		justify-content: center;
+		padding: 8px 0;
+	}
 
-	.net-ico { display: flex; flex-shrink: 0; }
-	.tone-ok .net-ico { color: var(--color-success); }
-	.tone-warn .net-ico { color: var(--color-warning); }
+	.net-ico {
+		display: flex;
+		flex-shrink: 0;
+	}
+	.tone-ok .net-ico {
+		color: var(--color-success);
+	}
+	.tone-warn .net-ico {
+		color: var(--color-warning);
+	}
 	.tone-off .net-ico,
-	.net-ico.ico-neutral { color: var(--color-light-grey); }
+	.net-ico.ico-neutral {
+		color: var(--color-light-grey);
+	}
 
 	.net-status-line {
 		font-size: 13px;
@@ -119,5 +160,8 @@
 		text-overflow: ellipsis;
 		min-width: 0;
 	}
-	.net-status-line b { color: var(--color-light); font-weight: var(--fw-semibold); }
+	.net-status-line b {
+		color: var(--color-light);
+		font-weight: var(--fw-semibold);
+	}
 </style>

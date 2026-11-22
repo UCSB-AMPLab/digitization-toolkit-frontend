@@ -37,7 +37,9 @@ class ApiError extends Error {
 
 describe('keptActionOf', () => {
 	it('offers an admin the release of a kept volume', () => {
-		expect(keptActionOf(volume({ kept_on_unit: true, pending: 0 }), true, 'backup')).toBe('release');
+		expect(keptActionOf(volume({ kept_on_unit: true, pending: 0 }), true, 'backup')).toBe(
+			'release'
+		);
 	});
 
 	it('offers an admin to keep a volume nothing of which is offsite', () => {
@@ -57,8 +59,12 @@ describe('keptActionOf', () => {
 
 	it('offers no release in Scanner only mode, and the keep in every mode', () => {
 		expect(keptActionOf(volume({ kept_on_unit: true, pending: 0 }), true, 'offline')).toBeNull();
-		expect(keptActionOf(volume({ kept_on_unit: true, pending: 0 }), true, 'backup')).toBe('release');
-		expect(keptActionOf(volume({ kept_on_unit: true, pending: 0 }), true, 'fisqua')).toBe('release');
+		expect(keptActionOf(volume({ kept_on_unit: true, pending: 0 }), true, 'backup')).toBe(
+			'release'
+		);
+		expect(keptActionOf(volume({ kept_on_unit: true, pending: 0 }), true, 'fisqua')).toBe(
+			'release'
+		);
 		for (const mode of ['offline', 'backup', 'fisqua'] as const) {
 			expect(keptActionOf(volume(), true, mode)).toBe('keep');
 		}
@@ -84,9 +90,17 @@ describe('keptActionErrorText', () => {
 	});
 
 	it("shows Fisqua's refusal of a release in Fisqua mode", () => {
-		const unknown = new ApiError('x', { code: 'unknown_reference_code', message: 'English', referenceCode: 'co-x-1' }, 422);
+		const unknown = new ApiError(
+			'x',
+			{ code: 'unknown_reference_code', message: 'English', referenceCode: 'co-x-1' },
+			422
+		);
 		expect(keptActionErrorText(unknown, es)).toBe(es.pd_err_unknown_reference_code('co-x-1'));
-		const down = new ApiError('x', { code: 'fisqua_unreachable', message: 'English', referenceCode: 'co-x-1' }, 409);
+		const down = new ApiError(
+			'x',
+			{ code: 'fisqua_unreachable', message: 'English', referenceCode: 'co-x-1' },
+			409
+		);
 		expect(keptActionErrorText(down, es)).toBe(es.pd_fisqua_unreachable_title);
 	});
 

@@ -26,7 +26,10 @@ const body: CollectionActivity[] = [
 
 function respond(status: number, json: unknown) {
 	return vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-		new Response(JSON.stringify(json), { status, headers: { 'Content-Type': 'application/json' } })
+		new Response(JSON.stringify(json), {
+			status,
+			headers: { 'Content-Type': 'application/json' }
+		})
 	);
 }
 

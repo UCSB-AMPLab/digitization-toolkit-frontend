@@ -15,11 +15,15 @@ describe('localeFromCookies', () => {
 	});
 
 	it('prefers the current cookie when both are present', () => {
-		expect(localeFromCookies(jar({ [LOCALE_COOKIE]: 'es', [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe('es');
+		expect(localeFromCookies(jar({ [LOCALE_COOKIE]: 'es', [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe(
+			'es'
+		);
 	});
 
 	it('falls back to the old cookie when the current value is not a language', () => {
-		expect(localeFromCookies(jar({ [LOCALE_COOKIE]: 'fr', [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe('en');
+		expect(localeFromCookies(jar({ [LOCALE_COOKIE]: 'fr', [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe(
+			'en'
+		);
 	});
 
 	it('uses the default when neither is set', () => {

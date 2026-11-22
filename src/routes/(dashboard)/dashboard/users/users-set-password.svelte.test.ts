@@ -24,11 +24,46 @@ const FAKE_PASSWORD = 'fake-pw-for-tests-1';
 const ADMIN = { id: 3, username: 'jefa', email: null, role: 'admin' as const, is_active: true };
 
 const users = [
-	{ id: 1, username: 'ana', email: null, role: 'operator', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-	{ id: 2, username: 'unit-testing', email: null, role: 'testing', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-	{ id: 3, username: 'jefa', email: null, role: 'admin', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-	{ id: 4, username: 'luis', email: null, role: 'reviewer', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-	{ id: 5, username: 'otra-jefa', email: null, role: 'admin', is_active: true, created_at: '2026-01-01T00:00:00Z' }
+	{
+		id: 1,
+		username: 'ana',
+		email: null,
+		role: 'operator',
+		is_active: true,
+		created_at: '2026-01-01T00:00:00Z'
+	},
+	{
+		id: 2,
+		username: 'unit-testing',
+		email: null,
+		role: 'testing',
+		is_active: true,
+		created_at: '2026-01-01T00:00:00Z'
+	},
+	{
+		id: 3,
+		username: 'jefa',
+		email: null,
+		role: 'admin',
+		is_active: true,
+		created_at: '2026-01-01T00:00:00Z'
+	},
+	{
+		id: 4,
+		username: 'luis',
+		email: null,
+		role: 'reviewer',
+		is_active: true,
+		created_at: '2026-01-01T00:00:00Z'
+	},
+	{
+		id: 5,
+		username: 'otra-jefa',
+		email: null,
+		role: 'admin',
+		is_active: true,
+		created_at: '2026-01-01T00:00:00Z'
+	}
 ];
 
 interface Sent {
@@ -41,14 +76,20 @@ let sent: Sent[];
 let answer: () => Response;
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function serve() {
 	sent = [];
 	answer = () => json(users[0]);
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-		const url = new URL(typeof input === 'string' ? input : (input as Request).url, 'http://localhost:8000');
+		const url = new URL(
+			typeof input === 'string' ? input : (input as Request).url,
+			'http://localhost:8000'
+		);
 		const method = (init?.method ?? 'GET').toUpperCase();
 		const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
 		sent.push({ method, path: url.pathname, body });
@@ -59,7 +100,9 @@ function serve() {
 }
 
 function signIn(role: UserRole) {
-	authStore.setSession(role === 'admin' ? ADMIN : { id: 9, username: 'someone', email: null, role, is_active: true });
+	authStore.setSession(
+		role === 'admin' ? ADMIN : { id: 9, username: 'someone', email: null, role, is_active: true }
+	);
 }
 
 function rowOf(name: string) {
@@ -84,8 +127,14 @@ async function openDialogFor(name: string, msgs = en) {
 }
 
 async function fill(newPassword: string, repeat: string, msgs = en) {
-	await userEvent.fill(page.getByLabelText(msgs.users_password_new_label, { exact: true }), newPassword);
-	await userEvent.fill(page.getByLabelText(msgs.users_password_repeat_label, { exact: true }), repeat);
+	await userEvent.fill(
+		page.getByLabelText(msgs.users_password_new_label, { exact: true }),
+		newPassword
+	);
+	await userEvent.fill(
+		page.getByLabelText(msgs.users_password_repeat_label, { exact: true }),
+		repeat
+	);
 	await page.getByRole('button', { name: msgs.common_save, exact: true }).click();
 }
 
@@ -108,7 +157,9 @@ describe('who sees Set password', () => {
 		render(UsersPage);
 		for (const name of ['ana', 'luis', 'otra-jefa']) {
 			await openRowMenu(name);
-			await expect.element(page.getByRole('button', { name: en.users_password_action })).toBeVisible();
+			await expect
+				.element(page.getByRole('button', { name: en.users_password_action }))
+				.toBeVisible();
 			document.body.click();
 		}
 	});
@@ -135,7 +186,9 @@ describe('who sees Set password', () => {
 			render(UsersPage);
 			await openRowMenu('ana');
 			await expect.element(page.getByRole('button', { name: en.common_edit })).toBeVisible();
-			expect(page.getByRole('button', { name: en.users_password_action }).elements()).toHaveLength(0);
+			expect(page.getByRole('button', { name: en.users_password_action }).elements()).toHaveLength(
+				0
+			);
 		});
 	}
 
@@ -160,14 +213,18 @@ describe('the dialog', () => {
 		const passwords = [...form.querySelectorAll('input[type="password"]')] as HTMLInputElement[];
 		expect(passwords.map((i) => i.autocomplete)).toEqual(['new-password', 'new-password']);
 		expect(form.querySelectorAll('input[autocomplete="current-password"]')).toHaveLength(0);
-		expect(document.activeElement).toBe(page.getByLabelText(en.users_password_new_label, { exact: true }).element());
+		expect(document.activeElement).toBe(
+			page.getByLabelText(en.users_password_new_label, { exact: true }).element()
+		);
 	});
 
 	it('shows and hides each password', async () => {
 		signIn('admin');
 		render(UsersPage);
 		await openDialogFor('ana');
-		const input = page.getByLabelText(en.users_password_new_label, { exact: true }).element() as HTMLInputElement;
+		const input = page
+			.getByLabelText(en.users_password_new_label, { exact: true })
+			.element() as HTMLInputElement;
 		await page.getByRole('button', { name: en.common_show_password }).first().click();
 		expect(input.type).toBe('text');
 		await page.getByRole('button', { name: en.common_hide_password }).click();
@@ -198,7 +255,9 @@ describe('the dialog', () => {
 		render(UsersPage);
 		await openDialogFor('ana');
 		await fill('fake-pw', 'fake-pw');
-		await expect.element(page.getByRole('alert')).toHaveTextContent(en.common_password_too_short(8));
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent(en.common_password_too_short(8));
 		expect(puts()).toEqual([]);
 	});
 
@@ -212,7 +271,10 @@ describe('the dialog', () => {
 	});
 });
 
-const LOCALES: [Locale, typeof en][] = [['en', en], ['es', es]];
+const LOCALES: [Locale, typeof en][] = [
+	['en', en],
+	['es', es]
+];
 
 describe('success and refusals', () => {
 	for (const [lang, msgs] of LOCALES) {
@@ -223,17 +285,45 @@ describe('success and refusals', () => {
 			await openDialogFor('ana', msgs);
 			await fill(FAKE_PASSWORD, FAKE_PASSWORD, msgs);
 			await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
-			await expect.element(page.getByRole('status')).toHaveTextContent(msgs.users_password_done('ana'));
-			expect(puts()).toEqual([{ method: 'PUT', path: '/auth/users/1/password', body: { new_password: FAKE_PASSWORD } }]);
+			await expect
+				.element(page.getByRole('status'))
+				.toHaveTextContent(msgs.users_password_done('ana'));
+			expect(puts()).toEqual([
+				{ method: 'PUT', path: '/auth/users/1/password', body: { new_password: FAKE_PASSWORD } }
+			]);
 		});
 
 		const refusals: [string, () => Response, string][] = [
-			['user_not_found', () => json({ detail: { code: 'user_not_found', message: 'x' } }, 404), msgs.users_password_err_user_not_found],
-			['testing_account', () => json({ detail: { code: 'testing_account', message: 'x' } }, 409), msgs.users_password_err_testing_account],
-			['use_own_password_change', () => json({ detail: { code: 'use_own_password_change', message: 'x' } }, 409), msgs.users_password_err_own_account],
-			['a 403', () => json({ detail: 'Operation not permitted' }, 403), msgs.users_password_err_not_permitted],
-			['password_too_short', () => json({ detail: { code: 'password_too_short', message: 'x', min_length: 8 } }, 422), msgs.common_password_too_short(8)],
-			['a 422', () => json({ detail: [{ type: 'string_type', loc: ['body', 'new_password'] }] }, 422), msgs.users_password_err_invalid],
+			[
+				'user_not_found',
+				() => json({ detail: { code: 'user_not_found', message: 'x' } }, 404),
+				msgs.users_password_err_user_not_found
+			],
+			[
+				'testing_account',
+				() => json({ detail: { code: 'testing_account', message: 'x' } }, 409),
+				msgs.users_password_err_testing_account
+			],
+			[
+				'use_own_password_change',
+				() => json({ detail: { code: 'use_own_password_change', message: 'x' } }, 409),
+				msgs.users_password_err_own_account
+			],
+			[
+				'a 403',
+				() => json({ detail: 'Operation not permitted' }, 403),
+				msgs.users_password_err_not_permitted
+			],
+			[
+				'password_too_short',
+				() => json({ detail: { code: 'password_too_short', message: 'x', min_length: 8 } }, 422),
+				msgs.common_password_too_short(8)
+			],
+			[
+				'a 422',
+				() => json({ detail: [{ type: 'string_type', loc: ['body', 'new_password'] }] }, 422),
+				msgs.users_password_err_invalid
+			],
 			['a 500', () => json({ detail: 'boom' }, 500), msgs.users_password_err_generic]
 		];
 		for (const [name, response, text] of refusals) {
@@ -255,7 +345,9 @@ describe('success and refusals', () => {
 describe('the requests against the backend route table', () => {
 	it('lists the route as not admitted for the testing account', () => {
 		expect(ROUTES).toContainEqual(['PUT', '/auth/users/{user_id}/password', false]);
-		expect(routeOf('PUT', '/auth/users/1/password')?.template).toBe('/auth/users/{user_id}/password');
+		expect(routeOf('PUT', '/auth/users/1/password')?.template).toBe(
+			'/auth/users/{user_id}/password'
+		);
 	});
 
 	it('sends only routes the table lists', async () => {

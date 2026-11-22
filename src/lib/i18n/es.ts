@@ -44,7 +44,8 @@ export const es = {
 	common_email: 'Correo electrónico',
 	common_confirm_password: 'Confirmar contraseña',
 	// The rule every new password is held to (lib/password-rule.ts), shown by the three forms that set one.
-	common_password_too_short: (min: number) => `La contraseña debe tener al menos ${min} caracteres.`,
+	common_password_too_short: (min: number) =>
+		`La contraseña debe tener al menos ${min} caracteres.`,
 	record_fallback_title: (id: number | string) => `Registro #${id}`,
 	common_filters: 'Filtros',
 	common_saving: 'Guardando…',
@@ -67,18 +68,22 @@ export const es = {
 	login_offline: 'Sin conexión con el servidor',
 	login_error_fill_all_fields: 'Por favor completa todos los campos',
 	login_error_bad_credentials: 'Usuario o contraseña incorrectos',
-	login_error_unknown_role: 'Tu cuenta tiene un rol que la aplicación no reconoce. Avisa al administrador.',
-	login_error_backend_unavailable: 'No se pudo conectar con el servidor. Puede que todavía no esté listo: espera unos segundos e intenta de nuevo.',
+	login_error_unknown_role:
+		'Tu cuenta tiene un rol que la aplicación no reconoce. Avisa al administrador.',
+	login_error_backend_unavailable:
+		'No se pudo conectar con el servidor. Puede que todavía no esté listo: espera unos segundos e intenta de nuevo.',
 	login_error_locked_out: (minutes: number) =>
 		minutes === 1
 			? 'Demasiados intentos fallidos. Espera 1 minuto e intenta de nuevo.'
 			: `Demasiados intentos fallidos. Espera ${minutes} minutos e intenta de nuevo.`,
-	login_error_locked_out_unknown: 'Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.',
+	login_error_locked_out_unknown:
+		'Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.',
 
 	// ── Session ──────────────────────────────────────────────────────────────
 	session_validating: 'Verificando sesión…',
 	session_backend_waiting: 'Esperando respuesta del servidor…',
-	session_backend_waiting_detail: 'Si acabas de encender el equipo, el servidor puede tardar unos segundos en responder. Captua seguirá intentando conectarse y continuará en cuanto lo logre.',
+	session_backend_waiting_detail:
+		'Si acabas de encender el equipo, el servidor puede tardar unos segundos en responder. Captua seguirá intentando conectarse y continuará en cuanto lo logre.',
 
 	// ── Navigation (dashboard) ───────────────────────────────────────────────
 	nav_section_main: 'PRINCIPAL',
@@ -123,9 +128,9 @@ export const es = {
 	tour_s5_body:
 		'Aprueba las páginas que estén bien y rechaza, con el motivo, las que haya que repetir. Para aprobar, abre la vista libro (ícono del libro abierto, en la barra derecha) y luego Anotaciones (globo de diálogo, en la barra izquierda). Solo pueden aprobar los roles Revisor y Administrador.',
 	tour_s6_title: 'Exportar',
-	tour_s6_where: 'Ve a Proyectos › tu proyecto › tu volumen y presiona el ícono de la caja de archivo, el último de la barra derecha.',
-	tour_s6_body:
-		'Con todo aprobado, el volumen se empaqueta y queda disponible para descargarlo.',
+	tour_s6_where:
+		'Ve a Proyectos › tu proyecto › tu volumen y presiona el ícono de la caja de archivo, el último de la barra derecha.',
+	tour_s6_body: 'Con todo aprobado, el volumen se empaqueta y queda disponible para descargarlo.',
 	// Without projects (NEH-318): no project step, and every route from Volúmenes.
 	tour_s2_vol_title: 'Crear un volumen',
 	tour_s2_vol_where: 'Ve a Volúmenes › Nuevo volumen.',
@@ -144,7 +149,8 @@ export const es = {
 	tour_s3_where_vol: 'Ve a Volúmenes › tu volumen › Capturar.',
 	tour_s4_where_vol: 'Ve a Volúmenes › tu volumen › Enviar a revisión.',
 	tour_s5_where_vol: 'Ve a Volúmenes › tu volumen.',
-	tour_s6_where_vol: 'Ve a Volúmenes › tu volumen y presiona el ícono de la caja de archivo, el último de la barra derecha.',
+	tour_s6_where_vol:
+		'Ve a Volúmenes › tu volumen y presiona el ícono de la caja de archivo, el último de la barra derecha.',
 
 	nav_logout: 'Salir',
 
@@ -155,7 +161,8 @@ export const es = {
 	status_approved: 'Aprobado',
 	// Fisqua's third QC decision (contract 1.6).
 	status_excluded: 'Excluido',
-	status_excluded_hint: 'Fisqua excluyó este registro porque no es una página del volumen. No hay que volver a capturarlo.',
+	status_excluded_hint:
+		'Fisqua excluyó este registro porque no es una página del volumen. No hay que volver a capturarlo.',
 	excluded_note_label: 'Motivo:',
 
 	// ── Roles ────────────────────────────────────────────────────────────────
@@ -182,7 +189,8 @@ export const es = {
 	dash_storage_alert_p1: 'El almacenamiento está al ',
 	dash_storage_alert_p2: (used: string, total: string) => ` (${used} / ${total}). Revisa la `,
 	dash_storage_alert_p3: ' para liberar espacio.',
-	dash_storage_alert_ask_admin: (used: string, total: string) => ` (${used} / ${total}). Pide a un administrador o a un operario que libere espacio.`,
+	dash_storage_alert_ask_admin: (used: string, total: string) =>
+		` (${used} / ${total}). Pide a un administrador o a un operario que libere espacio.`,
 	dash_kpi_active_projects: 'Proyectos activos',
 	dash_kpi_collections: 'Volúmenes',
 	dash_kpi_total_records: 'Total registros',
@@ -245,9 +253,13 @@ export const es = {
 	dash_cal_less: 'Menos',
 	dash_cal_more: 'Más',
 	dash_cal_day_captures: (n: number, date: string) =>
-		n === 1 ? `1 imagen capturada el ${date}` : `${formatCount(n, 'es')} imágenes capturadas el ${date}`,
+		n === 1
+			? `1 imagen capturada el ${date}`
+			: `${formatCount(n, 'es')} imágenes capturadas el ${date}`,
 	dash_cal_day_reviews: (n: number, date: string) =>
-		n === 1 ? `1 registro revisado el ${date}` : `${formatCount(n, 'es')} registros revisados el ${date}`,
+		n === 1
+			? `1 registro revisado el ${date}`
+			: `${formatCount(n, 'es')} registros revisados el ${date}`,
 	dash_cal_days_captures: 'Días con capturas',
 	dash_cal_total_captures: 'Imágenes capturadas',
 	dash_cal_days_reviews: 'Días con revisiones',
@@ -258,7 +270,8 @@ export const es = {
 	config_subtitle: 'Parámetros del sistema de digitalización',
 	config_section_language: 'Idioma',
 	config_language_label: 'Idioma de la interfaz',
-	config_language_desc: 'Cambia el idioma de toda la aplicación. La página se recarga para aplicarlo; la sesión no se cierra.',
+	config_language_desc:
+		'Cambia el idioma de toda la aplicación. La página se recarga para aplicarlo; la sesión no se cierra.',
 	config_section_storage: 'Almacenamiento',
 	// Fragments around the <strong>{percentage}%</strong>
 	config_storage_alert_pre: 'El almacenamiento está al ',
@@ -270,9 +283,12 @@ export const es = {
 	config_badge_experimental: 'experimental',
 	config_badge_active: 'activo',
 	config_storage_device: 'Unidad de almacenamiento',
-	config_storage_device_desc: 'Conecta un disco USB o una tarjeta SD para guardar allí las imágenes',
-	config_external_active_pre: 'Almacenamiento externo activo. Captua guarda las imágenes nuevas en ',
-	config_storage_override_invalid: 'La configuración del almacenamiento externo no es válida y no se pudo leer. Captua usa el almacenamiento interno.',
+	config_storage_device_desc:
+		'Conecta un disco USB o una tarjeta SD para guardar allí las imágenes',
+	config_external_active_pre:
+		'Almacenamiento externo activo. Captua guarda las imágenes nuevas en ',
+	config_storage_override_invalid:
+		'La configuración del almacenamiento externo no es válida y no se pudo leer. Captua usa el almacenamiento interno.',
 	config_restore_progress: 'Restaurando…',
 	config_restore_default: 'Restaurar predeterminado',
 	config_experimental_lead: 'Función experimental.',
@@ -299,7 +315,8 @@ export const es = {
 	config_storage_active: (path: string) => `Almacenamiento activo: ${path}`,
 	// NEH-380: the storage reserve (CAPTUA_STORAGE_RESERVE_GB) and the list of
 	// volumes that can be freed, in Settings > Almacenamiento.
-	config_storage_reserve: (gb: string) => `Captua deja siempre libres ${gb} GB para seguir funcionando.`,
+	config_storage_reserve: (gb: string) =>
+		`Captua deja siempre libres ${gb} GB para seguir funcionando.`,
 	config_freeable_title: 'Volúmenes con espacio por liberar',
 	config_freeable_intro:
 		'Todos los archivos de estos volúmenes ya están verificados en la copia externa, así que puedes quitarlos de la tarjeta sin perderlos. La lista va de mayor a menor espacio por liberar.',
@@ -312,7 +329,8 @@ export const es = {
 	config_freeable_free_aria: (name: string) => `Liberar espacio: ${name}`,
 	config_freeable_empty:
 		'Por ahora ningún volumen tiene espacio por liberar. Se puede liberar el espacio de un volumen cuando todos sus archivos están verificados en la copia externa.',
-	config_freeable_error: 'Captua no pudo revisar qué volúmenes tienen espacio por liberar. Intenta de nuevo en un momento.',
+	config_freeable_error:
+		'Captua no pudo revisar qué volúmenes tienen espacio por liberar. Intenta de nuevo en un momento.',
 	config_freeable_mode_off:
 		'En el modo actual, Captua guarda los archivos de imagen solo en este equipo, así que no se puede liberar espacio de ningún volumen.',
 	config_err_activate: 'Error al activar el almacenamiento.',
@@ -353,7 +371,9 @@ export const es = {
 	config_clean_tmp: 'Limpiar /tmp',
 	config_tmp_none: 'No había archivos temporales pendientes.',
 	config_tmp_deleted: (n: number) =>
-		n === 1 ? '1 archivo eliminado correctamente.' : `${formatCount(n, 'es')} archivos eliminados correctamente.`,
+		n === 1
+			? '1 archivo eliminado correctamente.'
+			: `${formatCount(n, 'es')} archivos eliminados correctamente.`,
 	config_err_clean: 'Error al limpiar los archivos.',
 	config_section_power: 'Energía',
 	config_shutdown_label: 'Apagar el equipo',
@@ -425,11 +445,15 @@ export const es = {
 	users_password_new_label: 'Contraseña nueva',
 	users_password_repeat_label: 'Confirmar contraseña nueva',
 	users_password_signout_note: 'Al guardar, Captua cierra todas las sesiones de esta persona.',
-	users_password_done: (name: string) => `${name} ya tiene una contraseña nueva. Captua cerró todas las sesiones de esta persona.`,
+	users_password_done: (name: string) =>
+		`${name} ya tiene una contraseña nueva. Captua cerró todas las sesiones de esta persona.`,
 	users_password_err_user_not_found: 'Este usuario ya no existe. Vuelve a cargar la lista.',
-	users_password_err_testing_account: 'Esta es la cuenta de pruebas. Su contraseña se asigna en Configuración › Pruebas.',
-	users_password_err_own_account: 'Esta es tu cuenta. Para cambiar tu contraseña, abre el menú de tu cuenta y elige Cambiar contraseña. Vas a necesitar la contraseña actual.',
-	users_password_err_not_permitted: 'Solo un administrador puede asignarle una contraseña a otra persona.',
+	users_password_err_testing_account:
+		'Esta es la cuenta de pruebas. Su contraseña se asigna en Configuración › Pruebas.',
+	users_password_err_own_account:
+		'Esta es tu cuenta. Para cambiar tu contraseña, abre el menú de tu cuenta y elige Cambiar contraseña. Vas a necesitar la contraseña actual.',
+	users_password_err_not_permitted:
+		'Solo un administrador puede asignarle una contraseña a otra persona.',
 	users_password_err_invalid: 'Captua no aceptó esta contraseña. Prueba con otra.',
 	users_password_err_generic: 'No se pudo guardar la contraseña. Intenta de nuevo.',
 	// Change password (NEH-395): the signed-in user changes their own, from the account menu.
@@ -438,12 +462,15 @@ export const es = {
 	account_password_current_label: 'Contraseña actual',
 	account_password_new_label: 'Contraseña nueva',
 	account_password_repeat_label: 'Confirmar contraseña nueva',
-	account_password_signout_note: 'Al guardar, Captua cierra todas tus sesiones, incluida la que estás usando.',
+	account_password_signout_note:
+		'Al guardar, Captua cierra todas tus sesiones, incluida la que estás usando.',
 	account_password_val_current_required: 'Escribe tu contraseña actual.',
 	account_password_done_title: 'Ya tienes una contraseña nueva',
-	account_password_done: 'Captua cerró todas tus sesiones. Vuelve a iniciar sesión con la contraseña nueva.',
+	account_password_done:
+		'Captua cerró todas tus sesiones. Vuelve a iniciar sesión con la contraseña nueva.',
 	account_password_err_wrong_current: 'La contraseña actual no es correcta.',
-	account_password_err_testing_account: 'La contraseña de la cuenta de pruebas la asigna un administrador, en Configuración › Pruebas.',
+	account_password_err_testing_account:
+		'La contraseña de la cuenta de pruebas la asigna un administrador, en Configuración › Pruebas.',
 	account_password_err_invalid: 'Captua no aceptó esta contraseña. Prueba con otra.',
 	account_password_err_generic: 'No se pudo cambiar tu contraseña. Intenta de nuevo.',
 
@@ -478,17 +505,21 @@ export const es = {
 	proj_err_delete_not_empty: (collections: number, records: number) => {
 		const volumes = collections === 1 ? '1 volumen' : `${formatCount(collections, 'es')} volúmenes`;
 		const recs = records === 1 ? '1 registro' : `${formatCount(records, 'es')} registros`;
-		if (collections > 0 && records > 0) return `todavía tiene ${volumes} y ${recs}. Muévelos o elimínalos primero.`;
+		if (collections > 0 && records > 0)
+			return `todavía tiene ${volumes} y ${recs}. Muévelos o elimínalos primero.`;
 		const count = collections > 0 ? collections : records;
 		return `todavía tiene ${collections > 0 ? volumes : recs}. ${count === 1 ? 'Muévelo o elimínalo primero.' : 'Muévelos o elimínalos primero.'}`;
 	},
-	proj_err_delete_files_held: 'Captua todavía guarda en este proyecto archivos que pertenecen a otros registros. Mueve primero esos registros.',
-	proj_err_delete_manifest_foreign: 'en su carpeta hay un manifiesto de captura que no es de este proyecto. Sácalo primero de esa carpeta.',
+	proj_err_delete_files_held:
+		'Captua todavía guarda en este proyecto archivos que pertenecen a otros registros. Mueve primero esos registros.',
+	proj_err_delete_manifest_foreign:
+		'en su carpeta hay un manifiesto de captura que no es de este proyecto. Sácalo primero de esa carpeta.',
 	proj_delete_title: 'Eliminar proyecto',
 	proj_checking_contents: 'Verificando contenido…',
 	proj_not_empty: 'Este proyecto no está vacío',
 	proj_contains_pre: 'Contiene ',
-	proj_collections_count: (n: number) => (n === 1 ? '1 volumen' : `${formatCount(n, 'es')} volúmenes`),
+	proj_collections_count: (n: number) =>
+		n === 1 ? '1 volumen' : `${formatCount(n, 'es')} volúmenes`,
 	proj_contains_mid: ' con ',
 	proj_images_count: (n: number) => (n === 1 ? '1 imagen' : `${formatCount(n, 'es')} imágenes`),
 	proj_delete_warning:
@@ -543,12 +574,14 @@ export const es = {
 	pd_val_date_range: 'La fecha de fin no puede ser anterior a la fecha de inicio.',
 	pd_err_create_collection: 'No se pudo guardar el volumen. Intenta de nuevo.',
 	pd_err_delete_collection: 'No se pudo eliminar el volumen. Intenta de nuevo.',
-	pd_err_delete_has_subvolumes: 'Este volumen no se puede eliminar porque todavía contiene otros volúmenes.',
+	pd_err_delete_has_subvolumes:
+		'Este volumen no se puede eliminar porque todavía contiene otros volúmenes.',
 	pd_err_move_under_review: (n: number) =>
 		n === 1
 			? 'Un registro de este volumen está en revisión, así que no se puede mover. Primero retira el volumen con "Retirar de revisión".'
 			: `Hay ${formatCount(n, 'es')} registros de este volumen en revisión, así que no se pueden mover. Primero retira el volumen con "Retirar de revisión".`,
-	pd_err_delete_not_empty: 'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
+	pd_err_delete_not_empty:
+		'Este volumen todavía tiene registros. Muévelos a otro volumen antes de eliminarlo.',
 	// A records move between a volume Captua keeps on the unit and one it does not (NEH-320).
 	pd_err_move_kept_line:
 		'Captua guarda solo en este equipo uno de los dos volúmenes y el otro no, así que no puede mover los registros de uno al otro. Elige un volumen de destino que Captua guarde igual que este, o incluye primero en el modo actual el que Captua guarda solo en este equipo.',
@@ -588,7 +621,8 @@ export const es = {
 	pd_move_label: 'MOVER LOS REGISTROS A',
 	pd_move_none: '— Elige un volumen —',
 	pd_move_hint_none: 'Elige un volumen de destino para poder eliminar este.',
-	pd_move_hint_selected: 'Los registros se moverán al volumen seleccionado antes de eliminar este volumen.',
+	pd_move_hint_selected:
+		'Los registros se moverán al volumen seleccionado antes de eliminar este volumen.',
 	pd_delete_confirm_pre: '¿Estás seguro de que quieres eliminar el volumen ',
 	pd_field_stem: 'RAÍZ',
 	pd_ph_stem: 'Ej: co-ahrb-aht-003',
@@ -603,7 +637,8 @@ export const es = {
 	pd_err_stem_differs_from_reference_code: (externalId: string, stem: string): string =>
 		`La raíz tiene que coincidir con el código de referencia del volumen en Fisqua: usa "${externalId}" en lugar de "${stem}".`,
 	pd_err_stem_taken: 'Otro volumen ya usa esta raíz.',
-	pd_err_stem_fixed: 'Ya se capturaron imágenes de este volumen, así que ya no se puede cambiar la raíz.',
+	pd_err_stem_fixed:
+		'Ya se capturaron imágenes de este volumen, así que ya no se puede cambiar la raíz.',
 	pd_no_stem_badge: 'Sin raíz',
 	pd_no_stem_title: 'Este volumen no tiene raíz. Asígnale una antes de capturar.',
 	pd_delete_stem_reserved:
@@ -627,16 +662,19 @@ export const es = {
 	col_reason_done: 'Listo',
 	col_reject_error: 'No se pudo rechazar el registro. Intenta de nuevo.',
 	col_reject_needs_reason: 'Debes seleccionar al menos un error.',
-	col_reject_other_needs_note: 'Para rechazar por "Otro" hace falta una nota. Usa "Agregar nota" para describir el problema.',
+	col_reject_other_needs_note:
+		'Para rechazar por "Otro" hace falta una nota. Usa "Agregar nota" para describir el problema.',
 	col_reject_comment_too_long: (max: number): string =>
 		`No se pudo rechazar el registro: Fisqua guarda notas de hasta ${formatCount(max, 'es')} caracteres. Acorta la nota y vuelve a intentarlo.`,
 	col_annotation_note_count: (n: number, max: number): string =>
 		`${formatCount(n, 'es')} de ${formatCount(max, 'es')} caracteres`,
-	col_reject_other_note_error: 'No se pudo rechazar el registro: si eliges "Otro", debes agregar una nota que describa el problema.',
+	col_reject_other_note_error:
+		'No se pudo rechazar el registro: si eliges "Otro", debes agregar una nota que describa el problema.',
 	col_review_approve_error: 'No se pudo aprobar el registro. Intenta de nuevo.',
 	// ── Send for review (NEH-260) ───────────────────────────────────
 	col_handover_send: 'Enviar a revisión',
-	col_handover_send_new: (n: number) => (n === 1 ? 'Enviar 1 registro nuevo' : `Enviar ${formatCount(n, 'es')} registros nuevos`),
+	col_handover_send_new: (n: number) =>
+		n === 1 ? 'Enviar 1 registro nuevo' : `Enviar ${formatCount(n, 'es')} registros nuevos`,
 	col_handover_take_back: 'Retirar de revisión',
 	col_handover_confirm_title: '¿Enviar el volumen a revisión?',
 	col_handover_confirm_body: (n: number) =>
@@ -654,7 +692,10 @@ export const es = {
 			? 'Hay un registro que todavía no se puede enviar porque le falta la imagen o la que tiene fue rechazada. Vuelve a capturar su imagen y envía el volumen de nuevo.'
 			: `Hay ${formatCount(n, 'es')} registros que todavía no se pueden enviar porque les falta la imagen o la que tienen fue rechazada. Vuelve a capturar sus imágenes y envía el volumen de nuevo.`,
 	col_handover_refused_unchanged: 'No se cambió el estado de ningún registro.',
-	col_handover_sent: (n: number) => (n === 1 ? 'Se envió 1 registro a revisión.' : `Se enviaron ${formatCount(n, 'es')} registros a revisión.`),
+	col_handover_sent: (n: number) =>
+		n === 1
+			? 'Se envió 1 registro a revisión.'
+			: `Se enviaron ${formatCount(n, 'es')} registros a revisión.`,
 	col_handover_nothing_to_send: 'No había registros capturados para enviar.',
 	col_handover_send_error: 'No se pudo enviar el volumen a revisión. Intenta de nuevo.',
 	col_takeback_confirm_title: '¿Retirar el volumen de revisión?',
@@ -666,7 +707,8 @@ export const es = {
 	// alone. The component does not call this when a = r = 0.
 	col_takeback_confirm_kept: (a: number, r: number) => {
 		if (a > 0 && r > 0) {
-			const ap = a === 1 ? 'El registro aprobado' : `Los ${formatCount(a, 'es')} registros aprobados`;
+			const ap =
+				a === 1 ? 'El registro aprobado' : `Los ${formatCount(a, 'es')} registros aprobados`;
 			const rp = r === 1 ? 'el rechazado' : `los ${formatCount(r, 'es')} rechazados`;
 			return `${ap} y ${rp} se quedan como están, porque ya se revisaron.`;
 		}
@@ -677,12 +719,17 @@ export const es = {
 			: `Los ${formatCount(n, 'es')} registros ${word}s se quedan como están, porque ya se revisaron.`;
 	},
 	col_takeback_confirm_submit: 'Retirar',
-	col_takeback_done: (n: number) => (n === 1 ? 'Se retiró 1 registro de revisión.' : `Se retiraron ${formatCount(n, 'es')} registros de revisión.`),
+	col_takeback_done: (n: number) =>
+		n === 1
+			? 'Se retiró 1 registro de revisión.'
+			: `Se retiraron ${formatCount(n, 'es')} registros de revisión.`,
 	col_takeback_nothing: 'No había registros en revisión para retirar.',
 	col_takeback_error: 'No se pudo retirar el volumen de revisión. Intenta de nuevo.',
-	col_review_not_sent_hint: 'Este registro no está en revisión. Podrás aprobarlo o rechazarlo cuando se envíe a revisión.',
+	col_review_not_sent_hint:
+		'Este registro no está en revisión. Podrás aprobarlo o rechazarlo cuando se envíe a revisión.',
 	// Only after a send or take-back that succeeded.
-	col_records_reload_error: 'El cambio se guardó, pero no se pudo actualizar la lista de registros. Recarga la página para ver el estado actual de los registros.',
+	col_records_reload_error:
+		'El cambio se guardó, pero no se pudo actualizar la lista de registros. Recarga la página para ver el estado actual de los registros.',
 	col_recapture_btn: 'Recapturar imagen',
 	col_annotation_comment_placeholder: 'Agrega un comentario (opcional)…',
 	col_annotation_note_required_placeholder: 'Describe el problema (obligatorio para "Otro")…',
@@ -699,7 +746,8 @@ export const es = {
 	col_columns_aria: 'Número de columnas',
 	col_filter_by_status: 'Filtrar por estado:',
 	col_clear_filter: '× Limpiar',
-	col_filters_disabled_reorder: 'Los filtros se desactivan durante el reordenamiento para no alterar la secuencia',
+	col_filters_disabled_reorder:
+		'Los filtros se desactivan durante el reordenamiento para no alterar la secuencia',
 	col_image_n: (i: number) => `Imagen ${i}`,
 	col_renumber_modal_title: '¿Renumerar los registros?',
 	col_renumber_desc:
@@ -714,7 +762,8 @@ export const es = {
 				: `Se renumeraron ${formatCount(n, 'es')} registros.`,
 	col_reorder_stale:
 		'Mientras reordenabas, se agregaron o se quitaron registros en este volumen, así que Captua no guardó el orden nuevo. Captua volvió a cargar el orden guardado.',
-	col_reorder_error: 'Captua no pudo guardar el orden nuevo. Captua volvió a cargar el orden guardado.',
+	col_reorder_error:
+		'Captua no pudo guardar el orden nuevo. Captua volvió a cargar el orden guardado.',
 	col_delete_record_error_title: 'No se pudo eliminar el registro',
 	col_delete_record_retry: 'Intenta de nuevo en un momento.',
 	col_prev: 'Anterior',
@@ -728,7 +777,8 @@ export const es = {
 	col_status_in_review_lc: 'en revisión',
 	col_status_approved_lc: 'aprobado',
 	col_retake: 'Volver a capturar',
-	col_retake_confirm: '¿Volver a capturar este registro desde la pantalla de captura? Captua guardará las imágenes actuales como versiones anteriores.',
+	col_retake_confirm:
+		'¿Volver a capturar este registro desde la pantalla de captura? Captua guardará las imágenes actuales como versiones anteriores.',
 	col_delete_record_confirm: '¿Eliminar permanentemente este registro y todas sus imágenes?',
 	// A picture of a page names the camera and the page. Role `right` is the
 	// odd/recto page, photographed by the left camera; role `left` is the
@@ -749,13 +799,17 @@ export const es = {
 	col_err_obstruction: 'Obstrucción',
 	col_err_other: 'Otro',
 	// One line beneath each reason in "Mark error", saying what it covers.
-	col_err_blurry_gloss: 'La cámara o la página se movió durante la captura y los trazos se ven arrastrados.',
+	col_err_blurry_gloss:
+		'La cámara o la página se movió durante la captura y los trazos se ven arrastrados.',
 	col_err_glare_gloss: 'La luz rebota en la página o en el vidrio y no deja ver una parte.',
 	col_err_shadows_gloss: 'Una sombra cae sobre la página y oscurece o tapa una parte.',
-	col_err_focus_gloss: 'La cámara enfocó por delante o por detrás de la página y por eso el texto no se ve nítido.',
+	col_err_focus_gloss:
+		'La cámara enfocó por delante o por detrás de la página y por eso el texto no se ve nítido.',
 	col_err_exposure_gloss: 'Toda la imagen está tan oscura o tan clara que no se puede leer.',
-	col_err_debris_gloss: 'En la imagen se ve polvo, un pelo o suciedad que había en la página, el vidrio o el lente.',
-	col_err_framing_gloss: 'Una parte de la página está por fuera del cuadro o la página está mal ubicada dentro del cuadro.',
+	col_err_debris_gloss:
+		'En la imagen se ve polvo, un pelo o suciedad que había en la página, el vidrio o el lente.',
+	col_err_framing_gloss:
+		'Una parte de la página está por fuera del cuadro o la página está mal ubicada dentro del cuadro.',
 	col_err_obstruction_gloss: 'Un dedo, una pesa u otro objeto tapa parte de la página.',
 	col_err_other_gloss: 'Cualquier otro problema. Descríbelo en la nota.',
 	col_tab_info: 'Información de la imagen',
@@ -811,35 +865,44 @@ export const es = {
 	col_download_image: 'Descargar imagen',
 	// NEH-139: RAW images in the inspection viewers
 	raw_preview_badge: 'Vista previa (RAW)',
-	raw_preview_hint: 'El navegador no puede mostrar archivos RAW. Esta es la vista previa JPEG guardada junto al original.',
+	raw_preview_hint:
+		'El navegador no puede mostrar archivos RAW. Esta es la vista previa JPEG guardada junto al original.',
 	raw_thumbnail_badge: 'Miniatura (RAW)',
-	raw_thumbnail_hint: 'El navegador no puede mostrar archivos RAW, y este archivo no tiene vista previa en tamaño completo. Esta es su miniatura, en baja resolución.',
+	raw_thumbnail_hint:
+		'El navegador no puede mostrar archivos RAW, y este archivo no tiene vista previa en tamaño completo. Esta es su miniatura, en baja resolución.',
 	raw_unviewable_title: 'No se puede mostrar este formato',
-	raw_unviewable_body: 'El navegador no puede mostrar archivos RAW, y este archivo no tiene vista previa.',
+	raw_unviewable_body:
+		'El navegador no puede mostrar archivos RAW, y este archivo no tiene vista previa.',
 	image_original_stored: 'El archivo original está guardado en el equipo.',
 	image_file_missing: 'No se encontró el archivo de esta imagen.',
 	// NEH-139: non-RAW images the browser cannot display (TIFF) or that fail to load
 	image_thumbnail_badge: 'Miniatura',
 	image_thumbnail_hint_format: (ext: string) =>
 		`El navegador no puede mostrar archivos ${ext}. Esta es la miniatura de este archivo, en baja resolución.`,
-	image_thumbnail_hint: 'No se pudo mostrar este archivo en tamaño completo. Esta es su miniatura, en baja resolución.',
+	image_thumbnail_hint:
+		'No se pudo mostrar este archivo en tamaño completo. Esta es su miniatura, en baja resolución.',
 	image_unviewable_title: 'No se puede mostrar esta imagen',
 	image_unviewable_body_format: (ext: string) =>
 		`El navegador no puede mostrar archivos ${ext}, y la miniatura de este archivo tampoco se pudo mostrar.`,
 	image_unviewable_body: 'No se pudo mostrar este archivo ni su miniatura.',
 	// NEH-248: an image freed from the card (RecordImageDisplay.svelte)
 	freed_title: 'Imagen guardada en la copia externa',
-	freed_where: 'Este archivo está guardado fuera del equipo, en la copia externa, para liberar espacio en la tarjeta de memoria.',
-	freed_nothing_lost: 'No se perdió nada: Captua verificó la copia externa antes de quitar el archivo de la tarjeta.',
-	freed_restore_hint: 'Si necesitas verlo en tamaño completo, un administrador puede restaurar el volumen en la tarjeta.',
+	freed_where:
+		'Este archivo está guardado fuera del equipo, en la copia externa, para liberar espacio en la tarjeta de memoria.',
+	freed_nothing_lost:
+		'No se perdió nada: Captua verificó la copia externa antes de quitar el archivo de la tarjeta.',
+	freed_restore_hint:
+		'Si necesitas verlo en tamaño completo, un administrador puede restaurar el volumen en la tarjeta.',
 	// NEH-380: instead of freed_restore_hint on a unit that cannot restore (`restorable` false).
-	freed_no_restore_hint: 'Este equipo no puede leer la copia externa, así que la imagen en tamaño completo no se puede ver aquí.',
+	freed_no_restore_hint:
+		'Este equipo no puede leer la copia externa, así que la imagen en tamaño completo no se puede ver aquí.',
 	// NEH-380: the export, or the image ZIP, of a volume with freed files on a unit that cannot restore.
 	export_freed_no_restore:
 		'Las imágenes de este volumen están solo en la copia externa, que este equipo no puede leer. Por eso, el volumen no se puede exportar desde aquí.',
 	freed_thumbnail_note: 'Lo que ves es la miniatura, que Captua conserva en el equipo.',
 	col_export_blocked_title: 'Aún no se puede exportar',
-	col_export_blocked_desc: 'Todos los registros deben estar aprobados antes de exportar. Los siguientes aún no lo están:',
+	col_export_blocked_desc:
+		'Todos los registros deben estar aprobados antes de exportar. Los siguientes aún no lo están:',
 	col_download_choose_title: 'Exportar o descargar',
 	col_download_choose_desc: 'Elige qué quieres obtener de este volumen',
 	col_bagit_option_title: 'Paquete de archivo (BagIt)',
@@ -856,11 +919,13 @@ export const es = {
 		`${n === 1 ? 'Un archivo de este volumen está guardado en la copia externa y ya no está' : `${formatCount(n, 'es')} archivos de este volumen están guardados en la copia externa y ya no están`} en la tarjeta, así que Captua no puede armar el paquete. Para exportar el volumen, primero un administrador debe restaurarlo desde "Espacio en la tarjeta", junto a la línea de la copia externa.`,
 	// ── Capture manifest for Fisqua ─────────────────────────────────────────
 	col_manifest_option_title: 'Manifiesto de captura (Fisqua)',
-	col_manifest_option_desc: 'Un archivo JSON que le indica a Fisqua qué páginas de este volumen están en la copia externa.',
+	col_manifest_option_desc:
+		'Un archivo JSON que le indica a Fisqua qué páginas de este volumen están en la copia externa.',
 	col_manifest_requires: 'Requiere envío a revisión y copia externa completa',
 	col_manifest_preparing: 'Preparando el manifiesto de captura…',
 	col_manifest_refused_title: 'Todavía no se puede exportar el manifiesto de captura',
-	col_manifest_refused_body: 'Fisqua rechazaría este archivo. Corrige lo siguiente y vuelve a exportarlo.',
+	col_manifest_refused_body:
+		'Fisqua rechazaría este archivo. Corrige lo siguiente y vuelve a exportarlo.',
 	col_manifest_records: (ids: number[]): string => {
 		const shown = ids.slice(0, 20).join(', ');
 		const rest = ids.length - 20;
@@ -872,11 +937,14 @@ export const es = {
 		'La carpeta de la institución configurada en este equipo para la copia externa no es válida. Avisa al administrador: tiene que corregir CAPTUA_OFFSITE_TENANT y reiniciar Captua.',
 	col_manifest_rule_no_stem:
 		'El volumen no tiene raíz, así que sus imágenes no tienen nombres que Fisqua pueda leer. Asígnale una raíz al volumen: su código de referencia en Fisqua.',
-	col_manifest_rule_no_project: 'El volumen no pertenece a ningún proyecto, y el manifiesto tiene que indicar a cuál pertenece. Mueve el volumen a un proyecto.',
+	col_manifest_rule_no_project:
+		'El volumen no pertenece a ningún proyecto, y el manifiesto tiene que indicar a cuál pertenece. Mueve el volumen a un proyecto.',
 	col_manifest_rule_records_captured:
 		'Algunos registros siguen en estado Capturado, así que el volumen todavía no está en revisión. Envíalo a revisión cuando termines de capturarlo.',
-	col_manifest_rule_sequence_missing: 'Algunos registros no tienen número de secuencia. Renumera el volumen.',
-	col_manifest_rule_sequence_repeated: 'Algunos registros tienen el mismo número de secuencia. Renumera el volumen.',
+	col_manifest_rule_sequence_missing:
+		'Algunos registros no tienen número de secuencia. Renumera el volumen.',
+	col_manifest_rule_sequence_repeated:
+		'Algunos registros tienen el mismo número de secuencia. Renumera el volumen.',
 	col_manifest_rule_roles_invalid:
 		'Algunos registros no tienen una imagen única, ni tampoco una imagen de la página par/verso, una de la impar/recto o las dos. Vuelve a capturarlos para que cada uno tenga una imagen única o dos imágenes: una de la página par/verso y otra de la impar/recto.',
 	col_manifest_rule_capture_id_missing:
@@ -905,7 +973,8 @@ export const es = {
 		'El código de referencia del volumen en Fisqua no coincide con la raíz del volumen, así que Captua no lo envía a Fisqua. Desde aquí no se puede cambiar el código de referencia. Avisa al administrador: tiene que hacer coincidir el código de referencia con la raíz. Después, retira el volumen con "Retirar de revisión" y vuelve a enviarlo a revisión.',
 	col_manifest_rule_other: 'Fisqua rechazaría el archivo por otro motivo.',
 	col_manifest_err_title: 'No se pudo descargar el manifiesto de captura',
-	col_manifest_err_not_found: 'Captua no encontró este volumen. Vuelve al proyecto y ábrelo de nuevo.',
+	col_manifest_err_not_found:
+		'Captua no encontró este volumen. Vuelve al proyecto y ábrelo de nuevo.',
 	col_manifest_err: 'Captua no pudo preparar el manifiesto de captura. Intenta de nuevo.',
 	bug_report_button: 'Reportar un problema',
 	bug_report_title: 'Reportar un problema',
@@ -941,7 +1010,8 @@ export const es = {
 	setup_ph_token: 'Pega el token de arranque del dispositivo',
 	setup_token_hint: 'Requerido en un dispositivo aprovisionado; déjalo vacío en desarrollo.',
 	setup_err_token: 'Token de arranque inválido o faltante. Verifica el token en el dispositivo.',
-	setup_err_unavailable: 'La instalación no está disponible: esta unidad no tiene token de arranque configurado.',
+	setup_err_unavailable:
+		'La instalación no está disponible: esta unidad no tiene token de arranque configurado.',
 	setup_val_username_required: 'El nombre de usuario es obligatorio',
 	setup_val_username_short: 'El usuario debe tener al menos 3 caracteres',
 	setup_val_email_format: 'Formato de correo no válido',
@@ -963,13 +1033,17 @@ export const es = {
 	cam_reconnect: 'Reconectar cámaras',
 	cam_reconnect_error: 'No se pudo reconectar',
 	cam_section_basic: 'Ajustes básicos',
-	cam_section_basic_info: 'Cómo queda orientada la página, cuánta luz entra y en qué formato se guarda la imagen.',
+	cam_section_basic_info:
+		'Cómo queda orientada la página, cuánta luz entra y en qué formato se guarda la imagen.',
 	cam_section_focus: 'Enfoque',
 	cam_section_focus_info: 'Ajusta el enfoque para que la imagen salga nítida.',
 	cam_section_settings: 'Color y exposición',
-	cam_section_settings_info: 'Ajusta el color y la exposición para que el documento se vea con sus colores reales.',
-	cam_live_controls_unavailable: 'Estos controles se muestran cuando hay conectada una cámara que los admite.',
-	cam_capabilities_failed: 'El sistema de captura no está disponible, así que no se pueden mostrar estos controles. Presiona "Reconectar cámaras" y, si sigue igual, reinicia el equipo.',
+	cam_section_settings_info:
+		'Ajusta el color y la exposición para que el documento se vea con sus colores reales.',
+	cam_live_controls_unavailable:
+		'Estos controles se muestran cuando hay conectada una cámara que los admite.',
+	cam_capabilities_failed:
+		'El sistema de captura no está disponible, así que no se pueden mostrar estos controles. Presiona "Reconectar cámaras" y, si sigue igual, reinicia el equipo.',
 	cam_orientation: 'Orientación',
 	cam_rotate_ccw: 'Girar 90° a la izquierda',
 	cam_rotate_cw: 'Girar 90° a la derecha',
@@ -977,8 +1051,10 @@ export const es = {
 	cam_aperture: 'Apertura',
 	cam_format: 'Formato',
 	// The line under the format selector. RAW+JPEG differs by camera type.
-	cam_format_note_raw_dslr: 'La cámara guarda un archivo RAW (CR2) con un JPEG adentro. Captua extrae ese JPEG para mostrarlo.',
-	cam_format_note_raw_chdk: 'La cámara envía un archivo RAW (DNG) y un JPEG de la misma captura. Captua guarda los dos.',
+	cam_format_note_raw_dslr:
+		'La cámara guarda un archivo RAW (CR2) con un JPEG adentro. Captua extrae ese JPEG para mostrarlo.',
+	cam_format_note_raw_chdk:
+		'La cámara envía un archivo RAW (DNG) y un JPEG de la misma captura. Captua guarda los dos.',
 	cam_format_note_jpeg: 'La cámara guarda solo un JPEG.',
 	cam_focusing: 'Enfocando…',
 	cam_autofocus: 'Enfoque automático',
@@ -993,17 +1069,20 @@ export const es = {
 	cam_dslr_note_p1: 'Pon el interruptor del lente en ',
 	cam_dslr_note_p2: ' antes de capturar.',
 	cam_dslr_note_p3: 'El enfoque automático (AF) bloquea las DSLR de Canon unos 12 segundos.',
-	cam_dslr_af_warning: (mode: string) => `El lente está en ${mode}. La captura puede quedarse bloqueada hasta que el interruptor del lente esté en MF.`,
+	cam_dslr_af_warning: (mode: string) =>
+		`El lente está en ${mode}. La captura puede quedarse bloqueada hasta que el interruptor del lente esté en MF.`,
 	cam_wb: 'Balance de blancos',
 	cam_wb_calibrate_aria: 'Calibrar el balance de blancos automáticamente',
 	cam_wb_cancel_aria: 'Cancelar la muestra para el balance de blancos',
-	cam_wb_sample_aria: 'Tomar una muestra para el balance de blancos: toca un área blanca en la previsualización (experimental)',
+	cam_wb_sample_aria:
+		'Tomar una muestra para el balance de blancos: toca un área blanca en la previsualización (experimental)',
 	cam_wb_hint: 'Selecciona un área blanca o gris neutro en la previsualización.',
 	cam_temperature: 'Temperatura',
 	cam_tint: 'Tinte',
 	cam_exposure: 'Exposición',
 	cam_histogram: 'Histograma',
-	cam_histogram_info: 'Verifica que la imagen no pierda detalle en las zonas claras ni en las oscuras.',
+	cam_histogram_info:
+		'Verifica que la imagen no pierda detalle en las zonas claras ni en las oscuras.',
 	cam_histogram_empty: 'El histograma se muestra cuando hay imagen en la previsualización.',
 	cam_focus_result: (dpt: number) => `Foco: ${dpt.toFixed(2).replace('.', ',')} dioptrías`,
 	cam_af_failed: 'No se pudo enfocar automáticamente',
@@ -1012,7 +1091,8 @@ export const es = {
 	cam_wb_failed: 'No se pudo calibrar el balance de blancos',
 	cam_wb_error: 'Error al calibrar el balance de blancos',
 	cam_wb_invalid_pixel: 'Píxel inválido — elige un área con luz',
-	cam_wb_sampled: (r: string, b: string) => `Balance de blancos ajustado con la muestra (R=${r}, B=${b})`,
+	cam_wb_sampled: (r: string, b: string) =>
+		`Balance de blancos ajustado con la muestra (R=${r}, B=${b})`,
 	cam_wb_save_error: 'No se pudo guardar el balance de blancos',
 	cam_wb_apply_error: 'No se pudo aplicar el balance de blancos',
 
@@ -1025,23 +1105,33 @@ export const es = {
 	lv_no_signal_right: 'Sin señal — Cámara izquierda',
 	lv_no_signal: 'Sin señal',
 	lv_check_hw: 'Verifica la conexión de la cámara',
-	lv_camera_missing: 'Cámara no detectada. Presiona el disparador hasta la mitad o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".',
-	lv_camera_no_image: 'La cámara está conectada, pero no envía ninguna imagen. Apágala y vuelve a encenderla. Si sigue igual, desconecta el cable USB de la cámara y vuelve a conectarlo.',
+	lv_camera_missing:
+		'Cámara no detectada. Presiona el disparador hasta la mitad o vuelve a conectar el cable USB, y luego presiona "Reconectar cámaras".',
+	lv_camera_no_image:
+		'La cámara está conectada, pero no envía ninguna imagen. Apágala y vuelve a encenderla. Si sigue igual, desconecta el cable USB de la cámara y vuelve a conectarlo.',
 	lv_rotate_ccw: 'Girar a la izquierda',
 	lv_rotate_cw: 'Girar a la derecha',
 	// A camera named inside a sentence: by the page its role gives it (the
 	// camera with role left photographs the even/verso page, on the right),
 	// by its number, or, with one camera, plainly.
-	lv_camera_in_sentence: (which: { role: 'left' | 'right' } | { number: number } | { single: true }): string =>
-		'role' in which ? `la cámara ${which.role === 'left' ? 'derecha' : 'izquierda'}` : 'number' in which ? `la cámara ${which.number}` : 'la cámara',
+	lv_camera_in_sentence: (
+		which: { role: 'left' | 'right' } | { number: number } | { single: true }
+	): string =>
+		'role' in which
+			? `la cámara ${which.role === 'left' ? 'derecha' : 'izquierda'}`
+			: 'number' in which
+				? `la cámara ${which.number}`
+				: 'la cámara',
 	lv_orientation_save_failed: (camera: string): string =>
 		`Captua no pudo guardar la orientación de ${camera}. Usará esta orientación en las capturas mientras esta pantalla siga abierta, pero si la recargas o vuelves a abrirla verás la anterior. Presiona "Reintentar" para guardar esta orientación.`,
 	lv_controls_collapse: 'Ocultar controles',
 	lv_controls_expand: 'Mostrar controles',
 	lv_grid_settings: 'Ajustes de cuadrícula',
 	lv_swap_orientation: 'Intercambiar las páginas de las dos cámaras',
-	lv_orientation_swapped: 'Intercambiar las páginas de las dos cámaras (ahora la cámara 2 fotografía la página par/verso)',
-	lv_orientation_normal: 'Intercambiar las páginas de las dos cámaras (ahora la cámara 1 fotografía la página par/verso)',
+	lv_orientation_swapped:
+		'Intercambiar las páginas de las dos cámaras (ahora la cámara 2 fotografía la página par/verso)',
+	lv_orientation_normal:
+		'Intercambiar las páginas de las dos cámaras (ahora la cámara 1 fotografía la página par/verso)',
 	lv_grid_modal_title: 'Cuadrícula y guías',
 	lv_grid_modal_subtitle: 'Activa las ayudas visuales de encuadre.',
 	lv_grid: 'Cuadrícula',
@@ -1054,20 +1144,26 @@ export const es = {
 	lv_capture_key_learn: 'Asignar la tecla del pedal',
 	lv_capture_key_learning: 'Presiona el pedal o la tecla ahora…',
 	lv_capture_key_reset: 'Restaurar predeterminada',
-	lv_capture_key_note: 'Mientras esta tecla esté asignada a la captura, deja de activar el botón que esté seleccionado en esta pantalla. Verifica que el pedal esté en modo de tecla única, no en modo macro ni de repetición.',
-	lv_capture_key_modifier_only: (modifier: string) => `El dispositivo solo envió ${modifier}. Presiona la tecla del pedal, no solo un modificador.`,
-	lv_capture_key_unbindable: 'El dispositivo envió una tecla que no se puede asignar a la captura. Intenta de nuevo.',
+	lv_capture_key_note:
+		'Mientras esta tecla esté asignada a la captura, deja de activar el botón que esté seleccionado en esta pantalla. Verifica que el pedal esté en modo de tecla única, no en modo macro ni de repetición.',
+	lv_capture_key_modifier_only: (modifier: string) =>
+		`El dispositivo solo envió ${modifier}. Presiona la tecla del pedal, no solo un modificador.`,
+	lv_capture_key_unbindable:
+		'El dispositivo envió una tecla que no se puede asignar a la captura. Intenta de nuevo.',
 	lv_capture_key_space: 'Espacio',
 	lv_capture_key_settings: 'Pedal y tecla de captura',
 	lv_capture_error: 'Error al capturar',
 	lv_capture_not_ready: 'Cargando el volumen…',
 	// A capture still in flight after 10 s, and one whose request ended in a
 	// timeout while the unit may still have saved it (capture-check.ts).
-	lv_capture_still_working: 'La cámara está tardando más de lo normal. Espera a que Captua termine esta captura.',
-	lv_capture_maybe_saved: 'La cámara no respondió a tiempo. Puede que la captura se haya guardado: espera mientras Captua lo comprueba.',
+	lv_capture_still_working:
+		'La cámara está tardando más de lo normal. Espera a que Captua termine esta captura.',
+	lv_capture_maybe_saved:
+		'La cámara no respondió a tiempo. Puede que la captura se haya guardado: espera mientras Captua lo comprueba.',
 	lv_capture_found: 'La captura se guardó.',
 	lv_capture_not_saved: 'No se guardó ninguna captura. Revisa la cámara y vuelve a capturar.',
-	lv_records_unread: 'Captua no pudo cargar los registros de este volumen, así que todavía no se puede capturar.',
+	lv_records_unread:
+		'Captua no pudo cargar los registros de este volumen, así que todavía no se puede capturar.',
 	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
 	lv_needs_stem_link: 'Asignar la raíz',
 	// Errors for a capture or retake the backend refused (capture-errors.ts).
@@ -1076,7 +1172,8 @@ export const es = {
 	lv_err_no_volume: 'Elige un volumen antes de capturar',
 	lv_err_volume_not_found: 'Este volumen ya no está en el catálogo',
 	lv_err_record_not_found: 'Este registro ya no está en el catálogo',
-	lv_err_retake_volume: 'Un registro solo se puede volver a capturar desde el volumen al que pertenece',
+	lv_err_retake_volume:
+		'Un registro solo se puede volver a capturar desde el volumen al que pertenece',
 	lv_err_retake_mode: (mode: 'single' | 'dual'): string =>
 		mode === 'dual'
 			? 'Este registro se capturó con dos cámaras; para volver a capturarlo, elige "Dos cámaras"'
@@ -1084,10 +1181,14 @@ export const es = {
 	lv_err_camera_not_connected: (n: number) => `La cámara ${n} no está conectada`,
 	lv_err_numbers_taken:
 		'Captua no hizo la captura: ya hay archivos en el disco con los próximos números de captura de este volumen; avisa al administrador',
-	lv_err_retake_status: 'Solo se puede volver a capturar un registro en estado Capturado o Rechazado',
-	lv_err_resolution_in_name: 'Captua no puede incluir la resolución en el nombre de archivo de las capturas',
-	lv_err_name_too_long: 'Captua no hizo la captura: el nombre de archivo tendría más de 36 caracteres',
-	lv_err_capture_limit: 'Captua no hizo la captura: este volumen llegó al límite de 9999 capturas; hace falta un volumen nuevo',
+	lv_err_retake_status:
+		'Solo se puede volver a capturar un registro en estado Capturado o Rechazado',
+	lv_err_resolution_in_name:
+		'Captua no puede incluir la resolución en el nombre de archivo de las capturas',
+	lv_err_name_too_long:
+		'Captua no hizo la captura: el nombre de archivo tendría más de 36 caracteres',
+	lv_err_capture_limit:
+		'Captua no hizo la captura: este volumen llegó al límite de 9999 capturas; hace falta un volumen nuevo',
 	// NEH-380: the 507 `storage_reserve`, for whoever can free space and for everyone else.
 	lv_err_storage_reserve_free:
 		'Captua no hizo la captura: el almacenamiento está casi lleno y Captua necesita lo que queda para seguir funcionando; libera espacio en Configuración › Almacenamiento',
@@ -1101,7 +1202,8 @@ export const es = {
 	lv_refresh_preview: 'Actualizar previsualización',
 	lv_last_capture: 'Última captura',
 	lv_preview_unsaved: 'Previsualización (sin guardar)',
-	lv_preview_failed: 'No se pudo obtener la previsualización. Presiona "Actualizar previsualización" para intentar de nuevo.',
+	lv_preview_failed:
+		'No se pudo obtener la previsualización. Presiona "Actualizar previsualización" para intentar de nuevo.',
 	lv_thumb_empty: 'Sin capturas aún — usa el botón de captura',
 	// NEH-339: the focus check of a DSLR unit, opened with "Reenfocar" or
 	// by itself at the start of a session or after a break.
@@ -1120,7 +1222,9 @@ export const es = {
 	focus_taking: (s: number) => `Haciendo las capturas de prueba… ${s} s`,
 	// The detail is dash_camera_capture_not_connected, in lowercase; a 504 has the focus_no_focus_ list instead.
 	focus_test_failed: (detail?: string) =>
-		detail ? `No se pudo hacer la captura de prueba: ${detail}` : 'No se pudo hacer la captura de prueba',
+		detail
+			? `No se pudo hacer la captura de prueba: ${detail}`
+			: 'No se pudo hacer la captura de prueba',
 	focus_test_empty: 'Todavía no hay captura de prueba',
 	focus_mf_title: 'Pon los lentes en MF',
 	focus_mf_warning: (side: 'left' | 'right' | 'both') =>
@@ -1134,7 +1238,8 @@ export const es = {
 	focus_continue: 'Continuar',
 	focus_af_step_light:
 		'Enciende la luz del equipo, abre el libro en un par de páginas con texto y ponlo debajo de las cámaras. No uses una página en blanco: la cámara enfocaría el vidrio y no el libro.',
-	focus_af_step_switch: 'En un costado de cada lente hay un interruptor marcado AF / MF: córrelo a AF.',
+	focus_af_step_switch:
+		'En un costado de cada lente hay un interruptor marcado AF / MF: córrelo a AF.',
 	focus_af_step_tick: 'Cuando Captua lea AF en una cámara, lo indica aquí, junto a esa cámara.',
 	focus_test_step_hold: 'Pon la página contra el vidrio, como cuando capturas, y sostenla ahí.',
 	focus_test_step_take:
@@ -1155,7 +1260,8 @@ export const es = {
 	focus_steps_show: 'Ver los pasos',
 	focus_steps_hide: 'Ocultar los pasos',
 	focus_mf_step_switch: 'Vuelve a correr el interruptor de cada lente a MF.',
-	focus_mf_step_ring: 'No toques el anillo de enfoque: si lo giras, se pierde el enfoque que acabas de ajustar.',
+	focus_mf_step_ring:
+		'No toques el anillo de enfoque: si lo giras, se pierde el enfoque que acabas de ajustar.',
 	focus_mf_step_tick: 'Cuando Captua lea MF en una cámara, lo indica aquí, junto a esa cámara.',
 	focus_continue_anyway: 'Continuar de todos modos',
 	// NEH-339: the camera check, opened from the capture screen with
@@ -1172,11 +1278,14 @@ export const es = {
 	camcheck_taking: 'Haciendo la captura de prueba…',
 	// The detail is dash_camera_capture_not_connected or _timeout, in lowercase.
 	camcheck_test_failed: (detail?: string) =>
-		detail ? `Captua no pudo hacer la captura de prueba: ${detail}` : 'Captua no pudo hacer la captura de prueba',
+		detail
+			? `Captua no pudo hacer la captura de prueba: ${detail}`
+			: 'Captua no pudo hacer la captura de prueba',
 	camcheck_frame_unreachable: 'Captua no pudo comunicarse con esta cámara.',
 	camcheck_unreachable_title: (side: 'left' | 'right') =>
 		`Captua no pudo comunicarse con la cámara ${side === 'left' ? 'derecha' : 'izquierda'}.`,
-	camcheck_unreachable_body: 'Revisa que la cámara esté encendida y que el cable USB esté conectado. Luego repite las capturas de prueba.',
+	camcheck_unreachable_body:
+		'Revisa que la cámara esté encendida y que el cable USB esté conectado. Luego repite las capturas de prueba.',
 	camcheck_devices_failed: 'Captua no pudo leer la lista de cámaras.',
 	camcheck_idle: 'Haz capturas de prueba para revisar el zoom y el enfoque.',
 	camcheck_zoom: 'Zoom',
@@ -1191,29 +1300,37 @@ export const es = {
 	camcheck_adjust_separately: 'Ajustar por separado',
 	camcheck_adjust_together: 'Ajustar juntas',
 	camcheck_match: 'Igualar',
-	camcheck_zoom_first: 'Primero haz capturas de prueba: Captua puede ajustar el zoom cuando cada cámara haya hecho una.',
+	camcheck_zoom_first:
+		'Primero haz capturas de prueba: Captua puede ajustar el zoom cuando cada cámara haya hecho una.',
 	// The detail is the backend's, in English.
 	camcheck_zoom_failed: (side: 'left' | 'right', detail?: string) => {
 		const camera = `la cámara ${side === 'left' ? 'derecha' : 'izquierda'}`;
-		return detail ? `Captua no pudo ajustar el zoom de ${camera}: ${detail}` : `Captua no pudo ajustar el zoom de ${camera}.`;
+		return detail
+			? `Captua no pudo ajustar el zoom de ${camera}: ${detail}`
+			: `Captua no pudo ajustar el zoom de ${camera}.`;
 	},
 	camcheck_stale: 'Se cambió el zoom después de estas capturas. Repite las capturas de prueba.',
-	camcheck_focal_hint: 'Captua lee la distancia focal de cada cámara en las capturas de prueba. Para cambiarla, gira el anillo de zoom del lente.',
+	camcheck_focal_hint:
+		'Captua lee la distancia focal de cada cámara en las capturas de prueba. Para cambiarla, gira el anillo de zoom del lente.',
 	camcheck_focal_read: 'Captua leyó estas distancias en las capturas de prueba.',
 	camcheck_focal_value: (mm: number) => String(mm).replace('.', ','),
 	camcheck_mm: 'mm',
 	camcheck_focal_differ_title: 'Las dos cámaras tienen distinta distancia focal.',
-	camcheck_focal_differ_body: 'Gira el anillo de zoom de uno de los lentes hasta que las dos cifras coincidan. Luego repite las capturas de prueba.',
+	camcheck_focal_differ_body:
+		'Gira el anillo de zoom de uno de los lentes hasta que las dos cifras coincidan. Luego repite las capturas de prueba.',
 	camcheck_focus: 'Enfoque',
-	camcheck_focus_hint: 'Presiona "1:1" en una captura para verla en tamaño real. El texto debe verse nítido.',
+	camcheck_focus_hint:
+		'Presiona "1:1" en una captura para verla en tamaño real. El texto debe verse nítido.',
 	camcheck_full_size_aria: (side: 'left' | 'right') =>
 		`${side === 'left' ? 'Cámara derecha · par/verso' : 'Cámara izquierda · impar/recto'}: tamaño real (1:1)`,
 	camcheck_discarded: 'Captua no guarda las capturas de prueba en el volumen.',
 	camcheck_take: 'Hacer capturas de prueba',
 	camcheck_viewer_title: 'Capturas de prueba en tamaño real',
-	camcheck_viewer_hint: 'Arrastra una captura para mover las dos. Revisa que el texto se vea nítido en las dos páginas.',
+	camcheck_viewer_hint:
+		'Arrastra una captura para mover las dos. Revisa que el texto se vea nítido en las dos páginas.',
 	camcheck_details_title: 'Cámaras',
-	camcheck_details_camera: (side: 'left' | 'right'): string => (side === 'left' ? 'Cámara derecha · par/verso' : 'Cámara izquierda · impar/recto'),
+	camcheck_details_camera: (side: 'left' | 'right'): string =>
+		side === 'left' ? 'Cámara derecha · par/verso' : 'Cámara izquierda · impar/recto',
 	camcheck_connection: 'Conexión',
 	camcheck_connected: 'Conectada',
 	camcheck_cannot_reach: 'Captua no puede comunicarse con la cámara',
@@ -1225,9 +1342,11 @@ export const es = {
 	camwhich_open: 'Cambiar la página de cada cámara',
 	camwhich_ask_title: '¿Cuál de las dos imágenes es la página impar/recto?',
 	camwhich_identity_title: 'Captua no puede identificar una de las cámaras',
-	camwhich_identity_body: 'Avisa al administrador: tiene que configurar esta cámara para que Captua la pueda identificar. Mientras tanto, nadie puede capturar en este equipo.',
+	camwhich_identity_body:
+		'Avisa al administrador: tiene que configurar esta cámara para que Captua la pueda identificar. Mientras tanto, nadie puede capturar en este equipo.',
 	camwhich_one_title: 'Captua necesita las dos cámaras conectadas',
-	camwhich_one_body: 'Revisa que las dos cámaras estén encendidas y que los cables USB estén conectados. Luego presiona "Reconectar cámaras".',
+	camwhich_one_body:
+		'Revisa que las dos cámaras estén encendidas y que los cables USB estén conectados. Luego presiona "Reconectar cámaras".',
 	camwhich_check_again: 'Reconectar cámaras',
 	camwhich_rescanning: 'Captua está reconectando las cámaras…',
 	camwhich_rescan_failed: 'Captua no pudo reconectar las cámaras.',
@@ -1235,21 +1354,29 @@ export const es = {
 	camwhich_loading: 'Captua está leyendo la lista de cámaras…',
 	camwhich_lead_unconfirmed: 'Captua no sabe qué página fotografía cada cámara.',
 	camwhich_lead_conflict: 'Captua tiene las dos cámaras registradas para la misma página.',
-	camwhich_lead_pair_changed: 'Estas no son las dos cámaras que se confirmaron la última vez en este equipo.',
-	camwhich_lead_port: 'Una cámara está conectada a un puerto USB distinto del que usaba cuando se confirmó su página. Revisa que cada imagen corresponda a la página que indica su etiqueta.',
-	camwhich_how: 'Presiona la imagen de la página impar/recto. Si una imagen está de lado o al revés, gírala.',
+	camwhich_lead_pair_changed:
+		'Estas no son las dos cámaras que se confirmaron la última vez en este equipo.',
+	camwhich_lead_port:
+		'Una cámara está conectada a un puerto USB distinto del que usaba cuando se confirmó su página. Revisa que cada imagen corresponda a la página que indica su etiqueta.',
+	camwhich_how:
+		'Presiona la imagen de la página impar/recto. Si una imagen está de lado o al revés, gírala.',
 	camwhich_needed: 'Captua necesita esta respuesta antes de que puedas capturar.',
 	camwhich_camera: (n: number) => `Cámara ${n}`,
 	camwhich_pick_aria: (n: number) => `La cámara ${n} fotografía la página impar/recto`,
-	camwhich_turn_aria: (n: number) => `Girar la imagen de la cámara ${n} 90° en el sentido de las manecillas del reloj`,
-	camwhich_guess: (side: 'left' | 'right') => `Captua cree que es la página ${side === 'left' ? 'par/verso' : 'impar/recto'}`,
+	camwhich_turn_aria: (n: number) =>
+		`Girar la imagen de la cámara ${n} 90° en el sentido de las manecillas del reloj`,
+	camwhich_guess: (side: 'left' | 'right') =>
+		`Captua cree que es la página ${side === 'left' ? 'par/verso' : 'impar/recto'}`,
 	camwhich_frame_busy: 'Pidiéndole una imagen a la cámara…',
 	camwhich_frame_failed: 'Captua no pudo obtener una imagen de esta cámara.',
 	camwhich_refresh: 'Actualizar',
 	camwhich_confirm: 'Confirmar',
-	camwhich_err_not_connected: 'Captua no pudo guardar la respuesta porque una cámara ya no estaba conectada. Revisa que las dos cámaras estén conectadas y vuelve a presionar la imagen de la página impar/recto.',
-	camwhich_err_identity: 'Captua no pudo guardar la respuesta porque no puede identificar una de las cámaras. Avisa al administrador.',
-	camwhich_err_unavailable: 'Captua no pudo guardar qué página fotografía cada cámara. Vuelve a intentarlo en un momento.',
+	camwhich_err_not_connected:
+		'Captua no pudo guardar la respuesta porque una cámara ya no estaba conectada. Revisa que las dos cámaras estén conectadas y vuelve a presionar la imagen de la página impar/recto.',
+	camwhich_err_identity:
+		'Captua no pudo guardar la respuesta porque no puede identificar una de las cámaras. Avisa al administrador.',
+	camwhich_err_unavailable:
+		'Captua no pudo guardar qué página fotografía cada cámara. Vuelve a intentarlo en un momento.',
 	camwhich_err_failed: 'Captua no pudo guardar qué página fotografía cada cámara.',
 	tb_go_to_review: 'Revisar',
 	tb_go_to_review_title: 'Volver a la revisión de este volumen',
@@ -1257,7 +1384,8 @@ export const es = {
 	tb_back: 'Volver',
 	tb_current_user: 'Usuario actual',
 	lvm_retake: 'Volver a capturar',
-	lvm_retake_confirm: '¿Volver a capturar este registro? Captua guardará las imágenes actuales como versiones anteriores.',
+	lvm_retake_confirm:
+		'¿Volver a capturar este registro? Captua guardará las imágenes actuales como versiones anteriores.',
 	lvm_retaking: 'Capturando imagen de reemplazo…',
 	// The retake modal opens on the thumbnails; these switch to full size and back (0.3.1).
 	lvm_full_size: 'Ver en tamaño completo',
@@ -1285,7 +1413,8 @@ export const es = {
 	backup_section_title: 'Copia externa',
 	backup_section_desc:
 		'Una vez al día, Captua copia el catálogo al destino que se configuró al instalar el equipo y verifica que la copia está completa.',
-	backup_section_catalogue: 'El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.',
+	backup_section_catalogue:
+		'El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.',
 	backup_section_scope: 'Esta copia no incluye los archivos de imagen.',
 	backup_cfg_current: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string) => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
@@ -1294,14 +1423,18 @@ export const es = {
 		return `Copia verificada el ${date} ${at}.`;
 	},
 	backup_cfg_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
-		day === 'yesterday' ? 'La última copia verificada es de ayer.' : `La última copia verificada es del ${date}.`,
+		day === 'yesterday'
+			? 'La última copia verificada es de ayer.'
+			: `La última copia verificada es del ${date}.`,
 	backup_cfg_never: 'Todavía no se ha verificado ninguna copia.',
-	backup_cfg_retry: 'Mientras el equipo está encendido, Captua vuelve a intentar la copia cada cierto tiempo.',
+	backup_cfg_retry:
+		'Mientras el equipo está encendido, Captua vuelve a intentar la copia cada cierto tiempo.',
 	backup_cfg_off: 'La copia externa no está configurada en este equipo.',
 	backup_cfg_local: 'En el modo actual, Captua guarda el catálogo solo en este equipo.',
 	backup_cfg_unknown: 'No se pudo consultar el estado de la copia externa.',
 	backup_cfg_last_file: 'Archivo de la última copia',
-	backup_cfg_locked: 'Esta configuración se define al instalar el equipo y no se puede cambiar desde aquí.',
+	backup_cfg_locked:
+		'Esta configuración se define al instalar el equipo y no se puede cambiar desde aquí.',
 
 	// ── Offsite copy of the images (NEH-248, offsite-state.ts) ─────────────
 	offsite_vol_label: 'Copia externa de este volumen',
@@ -1311,12 +1444,14 @@ export const es = {
 		`Copia externa en curso: ${formatCount(verified, 'es')} de ${formatCount(total, 'es')} archivos verificados, ${formatCount(pending, 'es')} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
 	offsite_vol_attention: (refused: number, verified: number, total: number, pending: number) =>
 		`${refused === 1 ? '1 archivo requiere' : `${formatCount(refused, 'es')} archivos requieren`} atención · ${formatCount(verified, 'es')} de ${formatCount(total, 'es')} verificados, ${formatCount(pending, 'es')} ${pending === 1 ? 'pendiente' : 'pendientes'}`,
-	offsite_attention_help: 'En la copia externa ya hay otro archivo con el mismo nombre. Avisa al administrador.',
+	offsite_attention_help:
+		'En la copia externa ya hay otro archivo con el mismo nombre. Avisa al administrador.',
 	offsite_vol_empty: 'Copia externa: todavía no hay archivos para copiar',
 	offsite_vol_no_stem: 'Sin copia externa: este volumen no tiene raíz',
 	offsite_vol_off: 'Copia externa de imágenes sin configurar',
 	offsite_vol_misconfigured: 'Copia externa de imágenes mal configurada',
-	offsite_vol_mode_off: 'Solo en el escáner: Captua guarda las imágenes de este volumen en el equipo',
+	offsite_vol_mode_off:
+		'Solo en el escáner: Captua guarda las imágenes de este volumen en el equipo',
 	// A volume Captua keeps on the unit (NEH-320).
 	offsite_vol_kept: 'Captua guarda las imágenes de este volumen solo en el equipo',
 	kept_release_action: 'Incluir en el modo actual',
@@ -1329,7 +1464,8 @@ export const es = {
 	kept_keep_title: '¿Guardar este volumen solo en este equipo?',
 	kept_keep_body:
 		'Captua guarda las imágenes de este volumen solo en este equipo y lo envía a Fisqua solo cuando un administrador lo incluya.',
-	kept_keep_inside: 'Si este volumen contiene otros volúmenes, Captua también los guarda solo en este equipo.',
+	kept_keep_inside:
+		'Si este volumen contiene otros volúmenes, Captua también los guarda solo en este equipo.',
 	kept_err_already_left:
 		'Captua ya copió fuera del equipo archivos de este volumen o de algún volumen que está dentro de él, o envió alguno de estos volúmenes a Fisqua. Por eso ya no puede guardar este volumen solo en este equipo.',
 	kept_err_already_kept: 'Captua ya guarda este volumen solo en este equipo.',
@@ -1338,19 +1474,26 @@ export const es = {
 		'Este volumen está dentro de otro que Captua guarda solo en este equipo. Incluye primero ese otro volumen en el modo actual y Captua incluirá este con él.',
 	kept_err_other: 'Captua no pudo hacer el cambio. Intenta de nuevo.',
 	pd_kept_on_unit: 'Guardar solo en este equipo',
-	pd_kept_on_unit_offline: 'En el modo "Solo en el escáner", Captua guarda cada volumen nuevo solo en este equipo.',
+	pd_kept_on_unit_offline:
+		'En el modo "Solo en el escáner", Captua guarda cada volumen nuevo solo en este equipo.',
 	pd_kept_on_unit_help:
 		'Para volúmenes de prueba: Captua guarda sus imágenes solo en este equipo y no comprueba su código de referencia con Fisqua hasta que un administrador lo incluya.',
 	offsite_vol_unknown: 'No se pudo consultar la copia externa de este volumen',
-	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+	offsite_last_verified: (
+		day: 'today' | 'yesterday' | 'earlier',
+		date: string,
+		time: string
+	): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
 		if (day === 'today') return `última verificación: hoy ${at}`;
 		if (day === 'yesterday') return `última verificación: ayer ${at}`;
 		return `última verificación: el ${date} ${at}`;
 	},
 	offsite_unit_title: 'Archivos de imagen',
-	offsite_unit_off: 'La copia externa de los archivos de imagen no está configurada en este equipo.',
-	offsite_unit_mode_off: 'En el modo actual, Captua guarda los archivos de imagen solo en este equipo.',
+	offsite_unit_off:
+		'La copia externa de los archivos de imagen no está configurada en este equipo.',
+	offsite_unit_mode_off:
+		'En el modo actual, Captua guarda los archivos de imagen solo en este equipo.',
 	offsite_unit_misconfigured:
 		'La copia externa de los archivos de imagen no está bien configurada en este equipo. Avisa al administrador.',
 	offsite_unit_empty: 'Todavía no hay archivos de imagen para copiar.',
@@ -1359,8 +1502,14 @@ export const es = {
 	offsite_unit_files: (verified: number, total: number, pending: number) =>
 		`${formatCount(verified, 'es')} de ${formatCount(total, 'es')} archivos verificados, ${formatCount(pending, 'es')} ${pending === 1 ? 'pendiente' : 'pendientes'}.`,
 	offsite_unit_refused: (refused: number): string =>
-		refused === 1 ? '1 archivo requiere atención.' : `${formatCount(refused, 'es')} archivos requieren atención.`,
-	offsite_cfg_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		refused === 1
+			? '1 archivo requiere atención.'
+			: `${formatCount(refused, 'es')} archivos requieren atención.`,
+	offsite_cfg_last_verified: (
+		day: 'today' | 'yesterday' | 'earlier',
+		date: string,
+		time: string
+	): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
 		if (day === 'today') return `Último archivo verificado hoy ${at}.`;
 		if (day === 'yesterday') return `Último archivo verificado ayer ${at}.`;
@@ -1380,16 +1529,24 @@ export const es = {
 	fisqua_out_none: 'Todavía no se ha enviado a Fisqua',
 	fisqua_out_waiting: 'Captua lo enviará a Fisqua cuando la copia externa esté completa',
 	fisqua_out_sending: 'Captua está enviando el manifiesto de captura a Fisqua',
-	fisqua_out_failed: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+	fisqua_out_failed: (
+		day: 'today' | 'yesterday' | 'earlier',
+		date: string,
+		time: string
+	): string => {
 		const at = `${time.startsWith('01:') ? 'a la' : 'a las'} ${time}`;
-		const when = day === 'today' ? `hoy ${at}` : day === 'yesterday' ? `ayer ${at}` : `el ${date} ${at}`;
+		const when =
+			day === 'today' ? `hoy ${at}` : day === 'yesterday' ? `ayer ${at}` : `el ${date} ${at}`;
 		return `Captua no pudo enviar el manifiesto de captura a Fisqua; lo intentará de nuevo ${when}`;
 	},
-	fisqua_out_failed_no_time: 'Captua no pudo enviar el manifiesto de captura a Fisqua; lo intentará de nuevo',
-	fisqua_out_not_exportable: 'No se envió a Fisqua: Captua no puede generar el manifiesto de captura',
+	fisqua_out_failed_no_time:
+		'Captua no pudo enviar el manifiesto de captura a Fisqua; lo intentará de nuevo',
+	fisqua_out_not_exportable:
+		'No se envió a Fisqua: Captua no puede generar el manifiesto de captura',
 	fisqua_out_refused_by_fisqua: 'Fisqua rechazó el manifiesto de captura',
 	fisqua_out_delivered: 'Enviado a Fisqua; a la espera de que Fisqua informe el estado',
-	fisqua_out_superseded: 'No se envió: el volumen se volvió a enviar a revisión y el nuevo envío lo reemplazó',
+	fisqua_out_superseded:
+		'No se envió: el volumen se volvió a enviar a revisión y el nuevo envío lo reemplazó',
 	fisqua_out_withdrawn: 'No se envió: el volumen se retiró de revisión',
 	fisqua_st_received: 'Fisqua recibió el volumen',
 	fisqua_st_registered: 'Fisqua registró el volumen',
@@ -1412,15 +1569,18 @@ export const es = {
 		if (day === 'yesterday') return `consultado ayer ${at}`;
 		return `consultado el ${date} ${at}`;
 	},
-	fisqua_problems: (n: number): string => (n === 1 ? '1 problema' : `${formatCount(n, 'es')} problemas`),
+	fisqua_problems: (n: number): string =>
+		n === 1 ? '1 problema' : `${formatCount(n, 'es')} problemas`,
 	fisqua_notes: (n: number): string => (n === 1 ? '1 nota' : `${formatCount(n, 'es')} notas`),
 	fisqua_more: (n: number): string => `y ${formatCount(n, 'es')} más`,
 	fisqua_note_unlisted_object: (key: string): string =>
 		`La copia externa tiene un archivo que no aparece en el manifiesto de captura: ${key}`,
 	fisqua_note_missing_object: (key: string): string =>
 		`Un archivo del manifiesto de captura no está en la copia externa, pero Fisqua no lo usa para procesar el volumen. Archivo: ${key}`,
-	fisqua_rule_bad_request: 'Fisqua rechazó el manifiesto de captura por un error de formato, sin señalar el problema concreto.',
-	fisqua_rule_payload_too_large: 'Fisqua rechazó el manifiesto de captura por ser demasiado grande, sin señalar ningún problema concreto.',
+	fisqua_rule_bad_request:
+		'Fisqua rechazó el manifiesto de captura por un error de formato, sin señalar el problema concreto.',
+	fisqua_rule_payload_too_large:
+		'Fisqua rechazó el manifiesto de captura por ser demasiado grande, sin señalar ningún problema concreto.',
 	// Fisqua's own text, as it sent it.
 	fisqua_problem_from_fisqua: (message: string): string => `Mensaje de Fisqua: ${message}`,
 	fisqua_incident_object_missing:
@@ -1446,19 +1606,32 @@ export const es = {
 	fisqua_unit_env_staging:
 		'Captua envía el manifiesto de captura de cada volumen al servicio de pruebas de Fisqua (staging) cuando el volumen está en revisión y su copia externa está completa.',
 	fisqua_unit_send_none: 'Captua no ha enviado nada a Fisqua desde el último reinicio.',
-	fisqua_unit_send_done: (delivered: number, refused: number, failed: number, waiting: number): string =>
+	fisqua_unit_send_done: (
+		delivered: number,
+		refused: number,
+		failed: number,
+		waiting: number
+	): string =>
 		`Último envío: ${formatCount(delivered, 'es')} ${delivered === 1 ? 'entregado' : 'entregados'}, ${formatCount(refused, 'es')} ${refused === 1 ? 'rechazado' : 'rechazados'}, ${formatCount(failed, 'es')} por reintentar, ${formatCount(waiting, 'es')} a la espera de la copia externa.`,
-	fisqua_unit_send_config_error: 'Último envío: detenido por el error de configuración que se indica abajo.',
-	fisqua_unit_send_error: 'Captua no pudo terminar el último envío. Lo intentará de nuevo después de la próxima subida de imágenes a la copia externa.',
-	fisqua_unit_send_stopped: 'Captua interrumpió el último envío antes de terminarlo y lo retomará después de la próxima subida de imágenes a la copia externa.',
+	fisqua_unit_send_config_error:
+		'Último envío: detenido por el error de configuración que se indica abajo.',
+	fisqua_unit_send_error:
+		'Captua no pudo terminar el último envío. Lo intentará de nuevo después de la próxima subida de imágenes a la copia externa.',
+	fisqua_unit_send_stopped:
+		'Captua interrumpió el último envío antes de terminarlo y lo retomará después de la próxima subida de imágenes a la copia externa.',
 	fisqua_unit_send_other: 'Captua no le envió nada a Fisqua en la última ronda de envíos.',
-	fisqua_unit_poll_none: 'Captua no le ha preguntado a Fisqua por el estado de ningún volumen desde el último reinicio.',
+	fisqua_unit_poll_none:
+		'Captua no le ha preguntado a Fisqua por el estado de ningún volumen desde el último reinicio.',
 	fisqua_unit_poll_done: (asked: number, answered: number): string =>
 		`Última consulta de estado: Captua preguntó por ${asked === 1 ? '1 volumen' : `${formatCount(asked, 'es')} volúmenes`} y Fisqua informó el estado de ${formatCount(answered, 'es')}.`,
-	fisqua_unit_poll_config_error: 'Última consulta de estado: detenida por el error de configuración que se indica abajo.',
-	fisqua_unit_poll_error: 'Captua no pudo terminar la última consulta de estado. Volverá a consultar más tarde.',
-	fisqua_unit_poll_cooling: 'Última consulta de estado: Fisqua pidió esperar. Captua volverá a consultar más tarde.',
-	fisqua_unit_poll_other: 'En la última consulta, Captua no le preguntó a Fisqua por ningún volumen.',
+	fisqua_unit_poll_config_error:
+		'Última consulta de estado: detenida por el error de configuración que se indica abajo.',
+	fisqua_unit_poll_error:
+		'Captua no pudo terminar la última consulta de estado. Volverá a consultar más tarde.',
+	fisqua_unit_poll_cooling:
+		'Última consulta de estado: Fisqua pidió esperar. Captua volverá a consultar más tarde.',
+	fisqua_unit_poll_other:
+		'En la última consulta, Captua no le preguntó a Fisqua por ningún volumen.',
 
 	// ── Freeing space on the card and restoring (NEH-248, offsite-free.ts) ──
 	offsite_vol_stored: 'Copia externa completa',
@@ -1476,14 +1649,17 @@ export const es = {
 			? `Captua quitará 1 archivo (${formatBytes(bytes, 'es')}) de la tarjeta. Seguirá guardado en la copia externa.`
 			: `Captua quitará ${formatCount(files, 'es')} archivos (${formatBytes(bytes, 'es')}) de la tarjeta. Seguirán guardados en la copia externa.`,
 	// NEH-380: whether freed files can be brought back to this unit (`restorable`).
-	offsite_free_restorable: 'Más adelante, un administrador puede restaurar estos archivos en la tarjeta.',
+	offsite_free_restorable:
+		'Más adelante, un administrador puede restaurar estos archivos en la tarjeta.',
 	offsite_free_not_restorable:
 		'Los archivos seguirán guardados en la copia externa, pero este equipo no puede leerla: desde aquí no será posible restaurarlos en la tarjeta ni exportar el volumen.',
 	offsite_free_check_note:
 		'Antes de quitar cada archivo, Captua vuelve a comparar su checksum con el de la copia externa. Puede tardar varios minutos.',
 	offsite_plan_nothing: 'Captua no encontró archivos que se puedan liberar en este volumen.',
 	offsite_plan_left: (n: number): string =>
-		n === 1 ? 'Captua dejará 1 archivo en la tarjeta:' : `Captua dejará ${formatCount(n, 'es')} archivos en la tarjeta:`,
+		n === 1
+			? 'Captua dejará 1 archivo en la tarjeta:'
+			: `Captua dejará ${formatCount(n, 'es')} archivos en la tarjeta:`,
 	offsite_free_confirm: 'Liberar espacio',
 	offsite_running_free: 'Captua está liberando espacio en la tarjeta…',
 	offsite_running_close_note:
@@ -1496,7 +1672,9 @@ export const es = {
 				? `Captua quitó 1 archivo (${formatBytes(bytes, 'es')}) de la tarjeta.`
 				: `Captua quitó ${formatCount(files, 'es')} archivos (${formatBytes(bytes, 'es')}) de la tarjeta.`,
 	offsite_done_left: (n: number): string =>
-		n === 1 ? 'Captua dejó 1 archivo en la tarjeta:' : `Captua dejó ${formatCount(n, 'es')} archivos en la tarjeta:`,
+		n === 1
+			? 'Captua dejó 1 archivo en la tarjeta:'
+			: `Captua dejó ${formatCount(n, 'es')} archivos en la tarjeta:`,
 	offsite_restore_confirm_title: '¿Restaurar el volumen en la tarjeta?',
 	offsite_restore_confirm_body: (files: number, bytes: number): string =>
 		files === 1
@@ -1514,7 +1692,9 @@ export const es = {
 				? `Captua restauró 1 archivo (${formatBytes(bytes, 'es')}) en la tarjeta.`
 				: `Captua restauró ${formatCount(files, 'es')} archivos (${formatBytes(bytes, 'es')}) en la tarjeta.`,
 	offsite_restore_left: (n: number): string =>
-		n === 1 ? 'Captua no pudo restaurar 1 archivo:' : `Captua no pudo restaurar ${formatCount(n, 'es')} archivos:`,
+		n === 1
+			? 'Captua no pudo restaurar 1 archivo:'
+			: `Captua no pudo restaurar ${formatCount(n, 'es')} archivos:`,
 	offsite_err_no_stem:
 		'Este volumen no tiene raíz, así que ninguno de sus archivos está en la copia externa y no hay nada que liberar ni restaurar.',
 	offsite_err_not_received:
@@ -1525,7 +1705,8 @@ export const es = {
 		'Este equipo no está configurado para restaurar: necesita acceso de lectura a la copia externa. Pide a quien instaló el equipo que lo configure.',
 	offsite_err_not_in_own_folder:
 		'Algunos archivos de este volumen todavía no están en la carpeta propia del volumen, así que Captua no puede liberarlos ni restaurarlos. Captua los mueve allí al arrancar el equipo: reinicia el equipo y vuelve a intentarlo. Si después del reinicio Captua sigue sin poder liberarlos ni restaurarlos, avisa al administrador.',
-	offsite_err_job_running: 'Captua ya está liberando o restaurando archivos de este volumen. Espera a que termine.',
+	offsite_err_job_running:
+		'Captua ya está liberando o restaurando archivos de este volumen. Espera a que termine.',
 	offsite_err_drive_unavailable:
 		'El disco configurado para los proyectos no está disponible. Conéctalo y actívalo, o vuelve al almacenamiento interno, y después intenta de nuevo.',
 	offsite_err_drive_not_directory:
@@ -1534,7 +1715,8 @@ export const es = {
 		'La ruta de almacenamiento configurada para los proyectos no está en un disco conectado. Conecta y activa el disco, o vuelve al almacenamiento interno, y después intenta de nuevo.',
 	offsite_err_plan: 'Captua no pudo revisar qué se puede liberar. Intenta de nuevo en un momento.',
 	offsite_err_free: 'Captua no pudo empezar a liberar espacio. Intenta de nuevo en un momento.',
-	offsite_err_restore: 'Captua no pudo empezar a restaurar el volumen. Intenta de nuevo en un momento.',
+	offsite_err_restore:
+		'Captua no pudo empezar a restaurar el volumen. Intenta de nuevo en un momento.',
 	offsite_err_job_free:
 		'Captua se detuvo antes de terminar de liberar espacio. Revisa la línea de la copia externa del volumen y vuelve a intentarlo.',
 	offsite_err_job_restore:
@@ -1548,7 +1730,9 @@ export const es = {
 			? '1 vista previa todavía no tiene checksum SHA-256 registrado. Captua la conserva en la tarjeta porque ese checksum solo se puede calcular a partir del archivo en el equipo.'
 			: `${formatCount(n, 'es')} vistas previas todavía no tienen checksum SHA-256 registrado. Captua las conserva en la tarjeta porque ese checksum solo se puede calcular a partir del archivo en el equipo.`,
 	offsite_reason_not_in_bucket: (n: number): string =>
-		n === 1 ? '1 archivo no está en la copia externa.' : `${formatCount(n, 'es')} archivos no están en la copia externa.`,
+		n === 1
+			? '1 archivo no está en la copia externa.'
+			: `${formatCount(n, 'es')} archivos no están en la copia externa.`,
 	offsite_reason_listed_without_sha1: (n: number): string =>
 		n === 1
 			? '1 archivo aparece en la copia externa sin checksum para compararlo.'
@@ -1558,9 +1742,13 @@ export const es = {
 			? 'En la copia externa, 1 archivo no coincide con el de la tarjeta.'
 			: `En la copia externa, ${formatCount(n, 'es')} archivos no coinciden con los de la tarjeta.`,
 	offsite_reason_local_file_missing: (n: number): string =>
-		n === 1 ? '1 archivo no está en la tarjeta.' : `${formatCount(n, 'es')} archivos no están en la tarjeta.`,
+		n === 1
+			? '1 archivo no está en la tarjeta.'
+			: `${formatCount(n, 'es')} archivos no están en la tarjeta.`,
 	offsite_reason_local_file_unreadable: (n: number): string =>
-		n === 1 ? 'Captua no pudo leer 1 archivo de la tarjeta.' : `Captua no pudo leer ${formatCount(n, 'es')} archivos de la tarjeta.`,
+		n === 1
+			? 'Captua no pudo leer 1 archivo de la tarjeta.'
+			: `Captua no pudo leer ${formatCount(n, 'es')} archivos de la tarjeta.`,
 	offsite_reason_local_sha1_differs: (n: number): string =>
 		n === 1
 			? '1 archivo de la tarjeta ya no coincide con su copia externa.'
@@ -1570,7 +1758,9 @@ export const es = {
 			? '1 archivo se modificó o se eliminó mientras Captua trabajaba.'
 			: `${formatCount(n, 'es')} archivos se modificaron o se eliminaron mientras Captua trabajaba.`,
 	offsite_reason_could_not_remove: (n: number): string =>
-		n === 1 ? 'Captua no pudo quitar 1 archivo de la tarjeta.' : `Captua no pudo quitar ${formatCount(n, 'es')} archivos de la tarjeta.`,
+		n === 1
+			? 'Captua no pudo quitar 1 archivo de la tarjeta.'
+			: `Captua no pudo quitar ${formatCount(n, 'es')} archivos de la tarjeta.`,
 	offsite_reason_outside_storage: (n: number): string =>
 		n === 1
 			? '1 archivo tiene una ruta fuera del almacenamiento del equipo.'
@@ -1588,13 +1778,18 @@ export const es = {
 			? '1 archivo traído de la copia externa no coincidió con su checksum; Captua lo descartó.'
 			: `${formatCount(n, 'es')} archivos traídos de la copia externa no coincidieron con su checksum; Captua los descartó.`,
 	offsite_reason_could_not_write: (n: number): string =>
-		n === 1 ? 'Captua no pudo escribir 1 archivo en la tarjeta.' : `Captua no pudo escribir ${formatCount(n, 'es')} archivos en la tarjeta.`,
+		n === 1
+			? 'Captua no pudo escribir 1 archivo en la tarjeta.'
+			: `Captua no pudo escribir ${formatCount(n, 'es')} archivos en la tarjeta.`,
 	offsite_reason_other: (n: number): string =>
-		n === 1 ? '1 archivo, por otro motivo.' : `${formatCount(n, 'es')} archivos, por otros motivos.`,
+		n === 1
+			? '1 archivo, por otro motivo.'
+			: `${formatCount(n, 'es')} archivos, por otros motivos.`,
 
 	// ── Cola: imported digitisation lists (0.2.0) ────────────────────────────
 	queue_title: 'Cola de digitalización',
-	queue_subtitle: 'Los elementos de cada lista de digitalización importada, en el orden de la lista.',
+	queue_subtitle:
+		'Los elementos de cada lista de digitalización importada, en el orden de la lista.',
 	queue_import: 'Importar lista',
 	queue_importing: 'Importando…',
 	queue_import_file_label: 'Archivo de la lista de digitalización',
@@ -1637,33 +1832,41 @@ export const es = {
 	queue_report_list_not_stored:
 		'Captua importó la lista, pero no pudo guardar una copia del archivo, así que no puede mostrarla en la cola.',
 	queue_report_item: (position: number, code: string | null) =>
-		code ? `Elemento ${formatCount(position, 'es')} (${code})` : `Elemento ${formatCount(position, 'es')}`,
+		code
+			? `Elemento ${formatCount(position, 'es')} (${code})`
+			: `Elemento ${formatCount(position, 'es')}`,
 	// Why an item was skipped, one per reason code in app/core/list_import.py.
 	queue_reason_item_not_an_object: 'El elemento no es un objeto JSON.',
 	queue_reason_missing_reference_code: 'El elemento no tiene código de referencia.',
 	queue_reason_invalid_reference_code: 'El código de referencia no es texto o es demasiado largo.',
 	queue_reason_reference_code_padded: 'El código de referencia empieza o termina con espacios.',
-	queue_reason_reference_code_duplicated_in_list: 'Un elemento anterior de esta lista tiene el mismo código de referencia.',
+	queue_reason_reference_code_duplicated_in_list:
+		'Un elemento anterior de esta lista tiene el mismo código de referencia.',
 	queue_reason_missing_filename_stem: 'El elemento no tiene raíz.',
 	queue_reason_filename_stem_not_a_slug:
 		'La raíz solo puede tener minúsculas sin tildes ni eñe (a–z) y números, separados por guiones sencillos.',
 	queue_reason_filename_stem_too_long: 'La raíz es demasiado larga.',
-	queue_reason_filename_stem_differs_from_reference_code: 'La raíz no coincide con el código de referencia.',
-	queue_reason_filename_stem_duplicated_in_list: 'Un elemento anterior de esta lista tiene la misma raíz.',
+	queue_reason_filename_stem_differs_from_reference_code:
+		'La raíz no coincide con el código de referencia.',
+	queue_reason_filename_stem_duplicated_in_list:
+		'Un elemento anterior de esta lista tiene la misma raíz.',
 	queue_reason_missing_title: 'El elemento no tiene título.',
 	queue_reason_invalid_title: 'El título no es texto o es demasiado largo.',
 	queue_reason_invalid_dates: 'Las fechas no están en el formato AAAA-MM-DD.',
 	queue_reason_end_date_before_start: 'La fecha de fin es anterior a la fecha de inicio.',
 	queue_reason_invalid_sequence: 'El número de orden no es un entero válido.',
-	queue_reason_reference_code_on_unit: 'Ya hay un volumen con este código de referencia en este equipo.',
+	queue_reason_reference_code_on_unit:
+		'Ya hay un volumen con este código de referencia en este equipo.',
 	queue_reason_filename_stem_on_unit: 'Ya hay un volumen con esta raíz en este equipo.',
 	queue_reason_refused_by_database: 'La base de datos rechazó el volumen.',
-	queue_reason_filename_stem_is_project_directory: 'La raíz coincide con el nombre de la carpeta de un proyecto de este equipo.',
+	queue_reason_filename_stem_is_project_directory:
+		'La raíz coincide con el nombre de la carpeta de un proyecto de este equipo.',
 	queue_reason_filename_stem_directory_occupied:
 		'En este equipo ya hay archivos en una carpeta con el nombre de esta raíz, y Captua nunca mezcla los archivos de dos volúmenes.',
 	queue_reason_filename_stem_held_offsite:
 		'En la copia externa ya hay imágenes con esta raíz, así que Captua no puede asignársela a un volumen nuevo.',
-	queue_reason_mode_changed: 'Alguien cambió el modo del equipo durante la importación, así que Captua no creó este volumen.',
+	queue_reason_mode_changed:
+		'Alguien cambió el modo del equipo durante la importación, así que Captua no creó este volumen.',
 	queue_reason_unknown: (code: string) => `Captua no creó este volumen (${code}).`,
 	// Why the whole file was refused, by the response's HTTP status.
 	queue_import_err_unreadable: 'Captua no pudo leer el archivo.',
@@ -1672,12 +1875,14 @@ export const es = {
 	queue_import_err_list_reused:
 		'Captua no importó esta lista: ya se importó otra con el mismo identificador desde un archivo distinto, o Captua no pudo comprobar la importación anterior.',
 	queue_import_err_too_large: 'El archivo pesa más de 10 MB.',
-	queue_import_err_refused: 'El archivo no es una lista de digitalización que Captua pueda importar.',
+	queue_import_err_refused:
+		'El archivo no es una lista de digitalización que Captua pueda importar.',
 	queue_import_err_busy: 'Captua no pudo importar la lista en este momento. Intenta de nuevo.',
 	queue_import_err_other: 'Captua no pudo importar la lista.',
 	// ── The Fisqua queue in Cola (contract 1.7) ──────────────────────────────
 	queue_fisqua_name: (name: string) => `Cola de Fisqua: ${name}`,
-	queue_fisqua_option: (name: string, date: string) => `Cola de Fisqua: ${name}, actualizada el ${date}`,
+	queue_fisqua_option: (name: string, date: string) =>
+		`Cola de Fisqua: ${name}, actualizada el ${date}`,
 	queue_updated_at: (date: string) => `Actualizada el ${date}`,
 	queue_assignee: (who: string) => `Asignado a ${who}`,
 	queue_unassigned: 'Sin asignar',
@@ -1688,12 +1893,15 @@ export const es = {
 	queue_operator_empty: 'En la cola no hay elementos asignados a ti ni sin asignar.',
 	queue_items_empty: 'En la cola no hay elementos que mostrar.',
 	queue_retake_record: (id: number) => `Registro #${id}`,
-	queue_mark_conflict: 'Este elemento se modificó en la cola de Fisqua. Captua volvió a cargar la cola: revisa el elemento e intenta de nuevo.',
-	q_to_retake: (n: number) => (n === 1 ? '1 registro por recapturar' : `${formatCount(n, 'es')} registros por recapturar`),
+	queue_mark_conflict:
+		'Este elemento se modificó en la cola de Fisqua. Captua volvió a cargar la cola: revisa el elemento e intenta de nuevo.',
+	q_to_retake: (n: number) =>
+		n === 1 ? '1 registro por recapturar' : `${formatCount(n, 'es')} registros por recapturar`,
 
 	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────
 	retakes_title: 'Por recapturar',
-	retakes_subtitle: 'Los pares de páginas que hay que capturar de nuevo o por primera vez, en el orden de cada volumen.',
+	retakes_subtitle:
+		'Los pares de páginas que hay que capturar de nuevo o por primera vez, en el orden de cada volumen.',
 	retakes_empty: 'No hay registros por recapturar.',
 	retakes_load_error: 'No se pudo cargar la lista de registros por recapturar.',
 	retakes_retake: 'Volver a capturar',
@@ -1740,12 +1948,16 @@ export const es = {
 	mark_submit: 'Marcar como faltante',
 	mark_error: 'No se pudo marcar el par de páginas que falta. Intenta de nuevo.',
 	cap_title: (f: string | null, n: number) =>
-		f ? `Falta un par de páginas después del folio ${f}` : `Falta un par de páginas después del registro ${formatCount(n, 'es')}`,
+		f
+			? `Falta un par de páginas después del folio ${f}`
+			: `Falta un par de páginas después del registro ${formatCount(n, 'es')}`,
 	cap_where: 'Dónde va',
 	cap_from_review: 'Marcado en la revisión de Fisqua',
 	cap_after: 'Después de capturar',
 	cap_another_q: (f: string | null) =>
-		f ? `Quedó capturado. ¿Falta otro par de páginas antes del folio ${f}?` : 'Quedó capturado. ¿Falta otro par de páginas aquí?',
+		f
+			? `Quedó capturado. ¿Falta otro par de páginas antes del folio ${f}?`
+			: 'Quedó capturado. ¿Falta otro par de páginas aquí?',
 	cap_another: 'Capturar otro aquí',
 	cap_last: 'Ese era el último',
 	cap_order_note: (n: number, img: string | null) =>
@@ -1792,7 +2004,8 @@ export const es = {
 	retakes_page_missing_row: (side: 'left' | 'right') =>
 		`Nunca se fotografió la página ${side === 'left' ? 'par/verso' : 'impar/recto'}. Vuelve a capturar el par de páginas completo con las dos cámaras: Captua reemplaza la captura anterior por la nueva.`,
 	// A volume's count under its heading in Por recapturar.
-	retakes_volume_pending: (n: number) => (n === 1 ? '1 pendiente' : `${formatCount(n, 'es')} pendientes`),
+	retakes_volume_pending: (n: number) =>
+		n === 1 ? '1 pendiente' : `${formatCount(n, 'es')} pendientes`,
 	// ── Capture instruction band on the capture screen (0.2.0) ──────────────
 	lv_instruction_label: 'Instrucción de la lista',
 	lv_instruction_show_all: 'Mostrar todo',
@@ -1803,30 +2016,39 @@ export const es = {
 	// Resumen band and "Volúmenes con recapturas".
 	retake_band_title: (n: number, v: number) =>
 		`${n === 1 ? 'Un par de páginas' : `${formatCount(n, 'es')} pares de páginas`} por recapturar en ${v === 1 ? 'un volumen' : `${formatCount(v, 'es')} volúmenes`}`,
-	retake_band_body: 'Se rechazaron en la revisión o no se capturaron completos. Termina las recapturas de un volumen antes de empezar uno nuevo.',
-	retake_band_most: (name: string, n: number) => `Con más pendientes: ${name} (${formatCount(n, 'es')}).`,
+	retake_band_body:
+		'Se rechazaron en la revisión o no se capturaron completos. Termina las recapturas de un volumen antes de empezar uno nuevo.',
+	retake_band_most: (name: string, n: number) =>
+		`Con más pendientes: ${name} (${formatCount(n, 'es')}).`,
 	retake_band_cta: 'Empezar recapturas',
 	retake_vols_title: 'Volúmenes con recapturas',
-	retake_pending_of: (p: number, t: number) => `${formatCount(p, 'es')} de ${formatCount(t, 'es')} pendientes`,
+	retake_pending_of: (p: number, t: number) =>
+		`${formatCount(p, 'es')} de ${formatCount(t, 'es')} pendientes`,
 	retake_cta: 'Recapturar',
 	// Cola.
 	// Cola's sections (0.3.1), numbered by the sections shown.
 	section_progress_title: (n: number) => `${ordinalEs(n)}: termina lo que está en curso`,
 	section_progress_sub: 'Volúmenes que ya se empezaron a capturar en este equipo.',
 	section_rework_title: (n: number) => `${ordinalEs(n)}: recapturas y reescaneos`,
-	section_rework_sub: 'Volúmenes con pares de páginas por recapturar y, después, los que hay que volver a digitalizar completos.',
+	section_rework_sub:
+		'Volúmenes con pares de páginas por recapturar y, después, los que hay que volver a digitalizar completos.',
 	section_new_title: (n: number) => `${ordinalEs(n)}: nuevos materiales`,
 	section_new_sub: 'Volúmenes que nunca se han digitalizado.',
-	q_new_locked: 'Para empezar un volumen nuevo, primero hay que terminar las recapturas de un volumen.',
+	q_new_locked:
+		'Para empezar un volumen nuevo, primero hay que terminar las recapturas de un volumen.',
 	turn_recap_title: 'Turno de recapturas',
 	turn_recap_body: 'Termina las recapturas de un volumen y podrás empezar uno nuevo.',
 	turn_new_title: 'Turno de volumen nuevo',
-	turn_new_body: (name: string) => `Ya se terminaron las recapturas del volumen ${name}. Puedes empezar un volumen nuevo.`,
+	turn_new_body: (name: string) =>
+		`Ya se terminaron las recapturas del volumen ${name}. Puedes empezar un volumen nuevo.`,
 	// The volume page.
 	vol_band_title: (n: number) =>
-		n === 1 ? 'Un par de páginas por recapturar' : `${formatCount(n, 'es')} pares de páginas por recapturar`,
+		n === 1
+			? 'Un par de páginas por recapturar'
+			: `${formatCount(n, 'es')} pares de páginas por recapturar`,
 	vol_band_cta: 'Recapturar ahora',
-	vol_handover_disabled: (n: number) => (n === 1 ? 'Falta una recaptura' : `Faltan ${formatCount(n, 'es')} recapturas`),
+	vol_handover_disabled: (n: number) =>
+		n === 1 ? 'Falta una recaptura' : `Faltan ${formatCount(n, 'es')} recapturas`,
 	vol_handover_hint: 'Podrás enviar el volumen a revisión cuando termines las recapturas.',
 	// The capture screen: the block, the unlock band and the guided retake.
 	block_title: 'Primero, termina las recapturas de un volumen',
@@ -1841,7 +2063,8 @@ export const es = {
 	unlock_body: (name: string) =>
 		`Ya se terminaron las recapturas del volumen ${name}. Una vez empieces este volumen, puedes capturarlo sin límite; el siguiente turno será de recapturas.`,
 	unlock_cta: 'Empezar a capturar',
-	guide_header: (k: number, n: number, name: string) => `Recaptura ${formatCount(k, 'es')} de ${formatCount(n, 'es')} · ${name}`,
+	guide_header: (k: number, n: number, name: string) =>
+		`Recaptura ${formatCount(k, 'es')} de ${formatCount(n, 'es')} · ${name}`,
 	guide_skip: 'Saltar por ahora',
 	guide_next: (f: string) => `Siguiente: folios ${f}`,
 	// `turnNew`: the turn is now `new`.
@@ -1857,7 +2080,8 @@ export const es = {
 		`No se pudo enviar el volumen a revisión: ${n === 1 ? 'falta una recaptura' : `faltan ${formatCount(n, 'es')} recapturas`}.`,
 	vol_excluded_count: (n: number) => (n === 1 ? '1 excluido' : `${formatCount(n, 'es')} excluidos`),
 	err_upload_excluded: 'Fisqua excluyó este registro, así que no se le pueden agregar imágenes.',
-	err_delete_excluded: 'Fisqua excluyó este registro, así que solo un administrador puede eliminarlo.',
+	err_delete_excluded:
+		'Fisqua excluyó este registro, así que solo un administrador puede eliminarlo.',
 
 	// ── The unit's mode and projects setting (NEH-311, NEH-313) ─────────────
 	// The three mode labels are shared with Fisqua.
@@ -1868,8 +2092,10 @@ export const es = {
 	unit_section_desc:
 		'Define qué envía Captua fuera de este equipo y de dónde vienen los volúmenes. Cambiar el modo no mueve ningún volumen ni registro.',
 	unit_mode_legend: 'Modo',
-	unit_mode_offline_desc: 'Captua guarda las imágenes y el catálogo solo en este equipo. Los volúmenes se crean aquí.',
-	unit_mode_backup_desc: 'Captua guarda una copia externa de las imágenes y del catálogo. Los volúmenes se crean en este equipo.',
+	unit_mode_offline_desc:
+		'Captua guarda las imágenes y el catálogo solo en este equipo. Los volúmenes se crean aquí.',
+	unit_mode_backup_desc:
+		'Captua guarda una copia externa de las imágenes y del catálogo. Los volúmenes se crean en este equipo.',
 	unit_mode_fisqua_desc:
 		'Los volúmenes vienen de la cola de Fisqua. Por el enlace con Fisqua, Captua envía los volúmenes a revisión, consulta en qué estado están y recibe los resultados de la revisión. Los operarios no pueden crear volúmenes; un administrador sí, y Captua deja constancia de cada cambio.',
 	unit_current: 'Modo actual',
@@ -1891,7 +2117,8 @@ export const es = {
 		'La copia externa del catálogo no está configurada o no tiene clave de cifrado. Se configura al instalar el equipo.',
 	unit_problem_fisqua_not_configured:
 		'El enlace con Fisqua no está configurado en este equipo. Se configura al instalar el equipo.',
-	unit_problem_fisqua_unreachable: 'Captua no pudo comunicarse con Fisqua. Revisa la conexión del equipo e intenta de nuevo.',
+	unit_problem_fisqua_unreachable:
+		'Captua no pudo comunicarse con Fisqua. Revisa la conexión del equipo e intenta de nuevo.',
 	unit_problem_offsite_held:
 		'Mientras la copia externa esté en pausa en este equipo, Captua no puede enviar nada a Fisqua.',
 	unit_problem_mode_changed:
@@ -1925,13 +2152,15 @@ export const es = {
 	pd_field_stem_fisqua: 'RAÍZ (CÓDIGO DE REFERENCIA DE FISQUA)',
 	pd_fisqua_admin_note:
 		'El equipo está en modo Fisqua, así que los volúmenes suelen venir de la cola de Fisqua. La raíz tiene que ser un código de referencia que exista en Fisqua: Captua lo comprueba al guardar y deja constancia del cambio.',
-	pd_fisqua_codes_readonly: 'El equipo está en modo Fisqua: la raíz viene de Fisqua y solo un administrador puede cambiarla.',
+	pd_fisqua_codes_readonly:
+		'El equipo está en modo Fisqua: la raíz viene de Fisqua y solo un administrador puede cambiarla.',
 	pd_err_unknown_reference_code: (code: string) =>
 		`Fisqua no tiene ninguna descripción con el código ${code}. Revisa el código en Fisqua.`,
 	pd_err_stem_required_fisqua:
 		'En modo Fisqua, la raíz de un volumen es su código de referencia en Fisqua, así que no puede quedar vacía.',
 	pd_fisqua_unreachable_title: 'Captua no pudo comunicarse con Fisqua para comprobar el código',
-	pd_fisqua_no_lookup_title: 'El Fisqua conectado a este equipo no permite comprobar códigos de referencia',
+	pd_fisqua_no_lookup_title:
+		'El Fisqua conectado a este equipo no permite comprobar códigos de referencia',
 	pd_fisqua_list_instead:
 		'Por ahora no se puede guardar el volumen. En su lugar, puedes exportar de Fisqua una lista de digitalización e importarla en Cola.',
 	pd_err_volumes_from_fisqua:
@@ -1940,7 +2169,8 @@ export const es = {
 	pd_search_list_label: 'Descripciones de Fisqua',
 	pd_search_searching: 'Captua está buscando en Fisqua…',
 	pd_search_none: 'Fisqua no tiene ninguna descripción que coincida con lo que escribiste.',
-	pd_search_count: (n: number) => (n === 1 ? '1 descripción' : `${formatCount(n, 'es')} descripciones`),
+	pd_search_count: (n: number) =>
+		n === 1 ? '1 descripción' : `${formatCount(n, 'es')} descripciones`,
 	pd_search_unavailable:
 		'Captua no puede buscar en Fisqua en este momento. De todos modos, puedes escribir el código de referencia completo.',
 	pd_stem_search_help:
@@ -1964,7 +2194,8 @@ export const es = {
 
 	// ── Settings → Testing: the testing space (NEH-391) ──
 	config_section_testing: 'Pruebas',
-	testing_desc: 'El espacio de pruebas es una cuenta compartida para practicar y hacer ensayos. Sus proyectos y volúmenes se quedan en este equipo y nunca se envían a Fisqua ni a la copia externa. Los volúmenes de pruebas se eliminan cuando vence el plazo que defines aquí.',
+	testing_desc:
+		'El espacio de pruebas es una cuenta compartida para practicar y hacer ensayos. Sus proyectos y volúmenes se quedan en este equipo y nunca se envían a Fisqua ni a la copia externa. Los volúmenes de pruebas se eliminan cuando vence el plazo que defines aquí.',
 	testing_state_label: 'Estado',
 	testing_state_on: 'Activado',
 	testing_state_off: 'Desactivado',
@@ -1974,58 +2205,79 @@ export const es = {
 		`${formatCount(projects, 'es')} ${projects === 1 ? 'proyecto' : 'proyectos'} y ${formatCount(volumes, 'es')} ${volumes === 1 ? 'volumen' : 'volúmenes'} de pruebas`,
 	testing_username_label: 'Usuario',
 	testing_password_label: 'Contraseña',
-	testing_expiry_label: 'Días sin capturas nuevas antes de que Captua elimine un volumen de pruebas',
+	testing_expiry_label:
+		'Días sin capturas nuevas antes de que Captua elimine un volumen de pruebas',
 	testing_expiry_hint: 'Un número entero de 1 a 365.',
 	testing_switch_on: 'Activar',
 	testing_switch_off: 'Desactivar',
-	testing_off_confirm_text: 'La cuenta de pruebas ya no podrá iniciar sesión y se cerrarán todas las sesiones abiertas con ella. Sus proyectos y volúmenes se conservan hasta que venza el plazo.',
+	testing_off_confirm_text:
+		'La cuenta de pruebas ya no podrá iniciar sesión y se cerrarán todas las sesiones abiertas con ella. Sus proyectos y volúmenes se conservan hasta que venza el plazo.',
 	testing_off_confirm: 'Desactivar el espacio de pruebas',
 	testing_term_save: 'Guardar plazo',
 	testing_new_username_label: 'Usuario nuevo',
 	testing_rename: 'Cambiar nombre de usuario',
 	testing_new_password_label: 'Contraseña nueva',
 	testing_password_set: 'Guardar contraseña nueva',
-	testing_password_signout: 'Al cambiar la contraseña, se cierra la sesión de quienes estén usando la cuenta de pruebas.',
+	testing_password_signout:
+		'Al cambiar la contraseña, se cierra la sesión de quienes estén usando la cuenta de pruebas.',
 	testing_saved: 'Se guardó el cambio.',
 	testing_err_username: 'Escribe un nombre de usuario de 1 a 150 caracteres.',
 	testing_err_password_empty: 'Escribe una contraseña.',
 	testing_err_days: 'Escribe un número entero de días de 1 a 365.',
-	testing_err_account_required: 'Escribe un nombre de usuario y una contraseña para crear la cuenta de pruebas.',
+	testing_err_account_required:
+		'Escribe un nombre de usuario y una contraseña para crear la cuenta de pruebas.',
 	testing_err_space_off: 'El espacio de pruebas está desactivado. Actívalo primero.',
 	testing_err_username_taken: 'Ese nombre de usuario ya está en uso. Elige otro.',
 	testing_err_account_exists: 'La cuenta de pruebas ya existe.',
 	testing_err_no_account: 'Todavía no hay una cuenta de pruebas.',
-	testing_err_password_invalid: 'Esa contraseña tiene caracteres que no se pueden guardar. Elige otra.',
+	testing_err_password_invalid:
+		'Esa contraseña tiene caracteres que no se pueden guardar. Elige otra.',
 	testing_err_generic: 'No se pudo guardar el cambio. Intenta de nuevo.',
-	testing_err_load: 'Captua no pudo cargar el espacio de pruebas. Recarga la página para intentar de nuevo.',
+	testing_err_load:
+		'Captua no pudo cargar el espacio de pruebas. Recarga la página para intentar de nuevo.',
 
 	// ── The testing account's own screens (NEH-391) ──
 	testing_expires_on: (date: string): string => `Captua eliminará este volumen el ${date}.`,
-	testing_expires_due: 'Captua eliminará este volumen en la próxima limpieza, en menos de una hora.',
-	testing_err_reserve: 'No queda suficiente espacio libre para capturar en los volúmenes de pruebas: lo que queda se reserva para el trabajo real.',
-	testing_err_project_directory_taken: 'Ya hay un proyecto con este nombre o con uno que solo cambia en mayúsculas, tildes o signos de puntuación. Elige otro nombre.',
-	testing_err_project_name_invalid: 'Ese nombre no se puede usar. Elige uno más corto, con al menos una letra o un número.',
-	testing_err_volume_codes: 'Con la cuenta de pruebas no se pueden asignar la raíz ni el código de referencia de un volumen.',
-	testing_err_not_found: 'Esto no está en el espacio de pruebas o ya no existe. Captua elimina los volúmenes de pruebas cuando vence su plazo.',
+	testing_expires_due:
+		'Captua eliminará este volumen en la próxima limpieza, en menos de una hora.',
+	testing_err_reserve:
+		'No queda suficiente espacio libre para capturar en los volúmenes de pruebas: lo que queda se reserva para el trabajo real.',
+	testing_err_project_directory_taken:
+		'Ya hay un proyecto con este nombre o con uno que solo cambia en mayúsculas, tildes o signos de puntuación. Elige otro nombre.',
+	testing_err_project_name_invalid:
+		'Ese nombre no se puede usar. Elige uno más corto, con al menos una letra o un número.',
+	testing_err_volume_codes:
+		'Con la cuenta de pruebas no se pueden asignar la raíz ni el código de referencia de un volumen.',
+	testing_err_not_found:
+		'Esto no está en el espacio de pruebas o ya no existe. Captua elimina los volúmenes de pruebas cuando vence su plazo.',
 	testing_err_other: 'Captua no pudo hacerlo. Intenta de nuevo.',
-	testing_err_project_not_empty: 'Este proyecto todavía tiene volúmenes. Muévelos o elimínalos primero y después elimina el proyecto.',
-	testing_err_project_files_held: 'Captua todavía guarda en este proyecto archivos que pertenecen a otros registros. Avisa al administrador: tiene que mover esos registros.',
-	testing_err_project_storage: 'En este momento Captua no puede leer uno de los discos donde guarda los archivos de pruebas. Avisa al administrador: tiene que revisar el disco.',
-	testing_err_volume_busy: 'Captua no pudo eliminar el volumen: está ocupado o Captua no puede leer sus archivos. Intenta de nuevo más tarde.',
-	testing_delete_volume_confirm: 'Captua va a eliminar este volumen, con sus registros y sus imágenes. Esta acción no se puede deshacer.',
+	testing_err_project_not_empty:
+		'Este proyecto todavía tiene volúmenes. Muévelos o elimínalos primero y después elimina el proyecto.',
+	testing_err_project_files_held:
+		'Captua todavía guarda en este proyecto archivos que pertenecen a otros registros. Avisa al administrador: tiene que mover esos registros.',
+	testing_err_project_storage:
+		'En este momento Captua no puede leer uno de los discos donde guarda los archivos de pruebas. Avisa al administrador: tiene que revisar el disco.',
+	testing_err_volume_busy:
+		'Captua no pudo eliminar el volumen: está ocupado o Captua no puede leer sus archivos. Intenta de nuevo más tarde.',
+	testing_delete_volume_confirm:
+		'Captua va a eliminar este volumen, con sus registros y sus imágenes. Esta acción no se puede deshacer.',
 	testing_download_pictures: 'Descargar imágenes',
-	testing_cameras_not_set_up: 'Las cámaras todavía no están configuradas, así que no se puede capturar. Avisa al administrador: tiene que configurarlas.',
+	testing_cameras_not_set_up:
+		'Las cámaras todavía no están configuradas, así que no se puede capturar. Avisa al administrador: tiene que configurarlas.',
 	testing_overview_title: 'Espacio de pruebas',
-	testing_overview_body: 'Aquí puedes practicar: crea proyectos y volúmenes, captura en ellos y descarga las imágenes. Todo se queda en este equipo, y Captua elimina cada volumen de pruebas cuando se cumple un número fijo de días desde su última captura.',
+	testing_overview_body:
+		'Aquí puedes practicar: crea proyectos y volúmenes, captura en ellos y descarga las imágenes. Todo se queda en este equipo, y Captua elimina cada volumen de pruebas cuando se cumple un número fijo de días desde su última captura.',
 	testing_overview_go: 'Ir a Proyectos',
 	testing_reserve_label: 'Espacio libre reservado para el trabajo real, en GB',
-	testing_reserve_hint: 'Un número entero de 1 a 10000. Cuando el espacio libre baja de esa cifra, no se puede capturar en los volúmenes de pruebas.',
+	testing_reserve_hint:
+		'Un número entero de 1 a 10000. Cuando el espacio libre baja de esa cifra, no se puede capturar en los volúmenes de pruebas.',
 	testing_reserve_free: (gb: string): string => `Libre ahora: ${gb} GB`,
 	testing_reserve_free_unknown: 'Captua no pudo leer el espacio libre.',
 	testing_reserve_save: 'Guardar reserva',
 	testing_err_reserve_value: 'Escribe un número entero de GB de 1 a 10000.',
 	testing_clear: 'Vaciar el espacio de pruebas',
-	testing_clear_confirm_text: 'Captua va a eliminar ahora mismo todos los proyectos y volúmenes de pruebas, con sus imágenes. La cuenta de pruebas y esta configuración se conservan. Esta acción no se puede deshacer.',
+	testing_clear_confirm_text:
+		'Captua va a eliminar ahora mismo todos los proyectos y volúmenes de pruebas, con sus imágenes. La cuenta de pruebas y esta configuración se conservan. Esta acción no se puede deshacer.',
 	testing_clear_confirm: 'Vaciar ahora',
 	testing_cleared: (projects: number, volumes: number): string =>
 		`Captua eliminó ${formatCount(projects, 'es')} ${projects === 1 ? 'proyecto' : 'proyectos'} y ${formatCount(volumes, 'es')} ${volumes === 1 ? 'volumen' : 'volúmenes'}.`,
@@ -2035,49 +2287,70 @@ export const es = {
 			: `Captua no eliminó ${formatCount(n, 'es')} volúmenes porque se estaba capturando en ellos.`,
 	testing_format_jpeg: 'Solo JPEG',
 	testing_format_raw: 'RAW y JPEG',
-	testing_format_note: 'Los archivos RAW pesan mucho más, así que el espacio del equipo se llena más rápido.',
+	testing_format_note:
+		'Los archivos RAW pesan mucho más, así que el espacio del equipo se llena más rápido.',
 	testing_format_applies: 'El cambio solo se aplica a las capturas que se hagan después.',
 	testing_format_current: (format: string): string => `Formato de captura: ${format}`,
 	testing_err_capture_format_unavailable: 'Las cámaras de este equipo no ofrecen este formato.',
 	testing_err_clear: 'Captua no pudo vaciar el espacio de pruebas. Intenta de nuevo.',
-	testing_err_purge_running: 'En este momento Captua está eliminando los volúmenes de pruebas cuyo plazo venció. Intenta de nuevo en unos minutos.',
+	testing_err_purge_running:
+		'En este momento Captua está eliminando los volúmenes de pruebas cuyo plazo venció. Intenta de nuevo en unos minutos.',
 
 	// ── Copy a testing volume's pictures to a USB drive (NEH-391) ──
 	testing_usb_copy: 'Copiar a una memoria USB',
 	testing_usb_start: 'Copiar',
 	testing_usb_loading: 'Buscando memorias USB…',
 	testing_usb_refresh: 'Actualizar',
-	testing_usb_none: 'No hay ninguna memoria USB conectada. Conecta una con formato FAT32 o exFAT y presiona "Actualizar".',
+	testing_usb_none:
+		'No hay ninguna memoria USB conectada. Conecta una con formato FAT32 o exFAT y presiona "Actualizar".',
 	testing_usb_list_label: 'Memorias USB',
-	testing_usb_drive: (name: string, size: string, fileSystem: string): string => `${name}, ${size}, ${fileSystem}`,
-	testing_usb_err_list: 'Captua no pudo buscar las memorias USB. Presiona "Actualizar" para intentar de nuevo.',
+	testing_usb_drive: (name: string, size: string, fileSystem: string): string =>
+		`${name}, ${size}, ${fileSystem}`,
+	testing_usb_err_list:
+		'Captua no pudo buscar las memorias USB. Presiona "Actualizar" para intentar de nuevo.',
 	testing_usb_starting: 'Iniciando la copia…',
-	testing_usb_files: (done: number, total: number): string => `${formatCount(done, 'es')} de ${formatCount(total, 'es')} archivos copiados`,
+	testing_usb_files: (done: number, total: number): string =>
+		`${formatCount(done, 'es')} de ${formatCount(total, 'es')} archivos copiados`,
 	testing_usb_bytes: (done: string, total: string): string => `${done} de ${total}`,
 	testing_usb_progress_label: 'Avance de la copia',
 	testing_usb_close_note: 'Captua sigue copiando aunque cierres esta ventana.',
-	testing_usb_done: (folder: string): string => `Captua copió las imágenes en la carpeta ${folder} de la memoria USB.`,
+	testing_usb_done: (folder: string): string =>
+		`Captua copió las imágenes en la carpeta ${folder} de la memoria USB.`,
 	testing_usb_safe: 'Ya puedes sacar la memoria USB.',
-	testing_usb_err_not_eligible: 'Captua no puede copiar a esta memoria. Tiene que ser una memoria USB con formato FAT32 o exFAT. Presiona "Actualizar" y elige de nuevo.',
-	testing_usb_err_copy_busy: 'Captua ya está copiando a una memoria USB. Espera a que termine esa copia y vuelve a intentarlo.',
-	testing_usb_err_mount: 'Captua no pudo abrir la memoria USB. Sácala, vuelve a conectarla y presiona "Actualizar".',
-	testing_usb_err_full: 'La memoria USB no tiene espacio libre suficiente para estas imágenes. Usa una con más espacio.',
+	testing_usb_err_not_eligible:
+		'Captua no puede copiar a esta memoria. Tiene que ser una memoria USB con formato FAT32 o exFAT. Presiona "Actualizar" y elige de nuevo.',
+	testing_usb_err_copy_busy:
+		'Captua ya está copiando a una memoria USB. Espera a que termine esa copia y vuelve a intentarlo.',
+	testing_usb_err_mount:
+		'Captua no pudo abrir la memoria USB. Sácala, vuelve a conectarla y presiona "Actualizar".',
+	testing_usb_err_full:
+		'La memoria USB no tiene espacio libre suficiente para estas imágenes. Usa una con más espacio.',
 	testing_usb_err_write: 'Captua no pudo escribir en la memoria USB. Revísala e intenta de nuevo.',
-	testing_usb_err_name: 'Uno de los archivos de imagen tiene un nombre que este tipo de memoria no acepta. Avisa al administrador: tiene que revisarlo.',
-	testing_usb_err_unmount: 'Captua copió las imágenes, pero no pudo desmontar la memoria USB. No la saques: avisa al administrador, que tiene que desmontarla.',
+	testing_usb_err_name:
+		'Uno de los archivos de imagen tiene un nombre que este tipo de memoria no acepta. Avisa al administrador: tiene que revisarlo.',
+	testing_usb_err_unmount:
+		'Captua copió las imágenes, pero no pudo desmontar la memoria USB. No la saques: avisa al administrador, que tiene que desmontarla.',
 	testing_usb_err_volume_empty: 'Este volumen no tiene imágenes para copiar.',
 	testing_usb_err_real_volume: 'Captua solo copia a una memoria USB los volúmenes de pruebas.',
-	testing_usb_err_volume_busy: 'Captua está haciendo otra operación con este volumen. Espera un momento e intenta de nuevo.',
-	testing_usb_err_read: 'Captua no pudo leer una de las imágenes guardadas en el equipo. Avisa al administrador: tiene que revisarla.',
-	testing_usb_err_exists: 'La memoria USB ya tiene una carpeta con el nombre que Captua iba a usar. Espera un minuto e intenta de nuevo.',
-	testing_usb_skipped: (n: number): string => `${n === 1 ? 'No se pudo copiar 1 imagen' : `No se pudieron copiar ${formatCount(n, 'es')} imágenes`}. Avisa al administrador.`,
-	testing_usb_status_unreachable: 'Captua no puede consultar el avance de la copia en este momento, pero es posible que siga copiando. No saques la memoria USB.',
-	testing_usb_err_lost: 'Captua ya no sabe qué pasó con esta copia. No saques la memoria USB. Avisa al administrador: tiene que desmontarla.',
+	testing_usb_err_volume_busy:
+		'Captua está haciendo otra operación con este volumen. Espera un momento e intenta de nuevo.',
+	testing_usb_err_read:
+		'Captua no pudo leer una de las imágenes guardadas en el equipo. Avisa al administrador: tiene que revisarla.',
+	testing_usb_err_exists:
+		'La memoria USB ya tiene una carpeta con el nombre que Captua iba a usar. Espera un minuto e intenta de nuevo.',
+	testing_usb_skipped: (n: number): string =>
+		`${n === 1 ? 'No se pudo copiar 1 imagen' : `No se pudieron copiar ${formatCount(n, 'es')} imágenes`}. Avisa al administrador.`,
+	testing_usb_status_unreachable:
+		'Captua no puede consultar el avance de la copia en este momento, pero es posible que siga copiando. No saques la memoria USB.',
+	testing_usb_err_lost:
+		'Captua ya no sabe qué pasó con esta copia. No saques la memoria USB. Avisa al administrador: tiene que desmontarla.',
 
 	// ── Connect to Fisqua: linking the unit to a workspace by a code (NEH-345) ──
 	fisqua_link_title: 'Vincular con Fisqua',
-	fisqua_link_desc: 'Vincula este equipo con un espacio de trabajo de Fisqua. Un administrador de ese espacio de trabajo aprueba el código en la página "Escáner" de Fisqua.',
-	fisqua_link_restart_warning: 'Al vincular el equipo, Captua se reinicia, y eso tarda alrededor de un minuto. No lo vincules durante una captura.',
+	fisqua_link_desc:
+		'Vincula este equipo con un espacio de trabajo de Fisqua. Un administrador de ese espacio de trabajo aprueba el código en la página "Escáner" de Fisqua.',
+	fisqua_link_restart_warning:
+		'Al vincular el equipo, Captua se reinicia, y eso tarda alrededor de un minuto. No lo vincules durante una captura.',
 	fisqua_link_name_label: 'Nombre del equipo',
 	fisqua_link_name_hint: 'Por ejemplo, el del archivo o el de la sala. Hasta 64 caracteres.',
 	fisqua_link_name_invalid: 'Escribe un nombre de 1 a 64 caracteres.',
@@ -2090,52 +2363,69 @@ export const es = {
 	fisqua_link_lapsed: 'El código venció.',
 	fisqua_link_new_code: 'Obtener un código nuevo',
 	fisqua_link_applying: 'Código aprobado. Captua está vinculando este equipo…',
-	fisqua_link_restarting: 'Equipo vinculado. Captua se está reiniciando, y eso tarda alrededor de un minuto.',
+	fisqua_link_restarting:
+		'Equipo vinculado. Captua se está reiniciando, y eso tarda alrededor de un minuto.',
 	fisqua_link_restart_manual: 'Equipo vinculado. Reinicia el equipo para terminar.',
 	fisqua_link_restart_btn: 'Reiniciar el equipo',
 	fisqua_link_linked: (tenant: string, staging: boolean) =>
 		`Equipo vinculado con ${tenant}${staging ? ' (servicio de pruebas de Fisqua)' : ''}.`,
 	fisqua_link_current: (tenant: string) => `Este equipo está vinculado con ${tenant}.`,
-	fisqua_link_mode_hint: 'El equipo no está en el modo "Fisqua". Captua solo envía volúmenes a Fisqua en ese modo.',
+	fisqua_link_mode_hint:
+		'El equipo no está en el modo "Fisqua". Captua solo envía volúmenes a Fisqua en ese modo.',
 	fisqua_link_switch_mode: 'Cambiar al modo Fisqua',
 	fisqua_link_busy: (s: number) => `Fisqua está ocupado. Captua lo vuelve a intentar en ${s} s.`,
 	fisqua_link_retry: (s: number) => `Captua lo vuelve a intentar en ${s} s.`,
 	fisqua_link_network: 'Captua no pudo comunicarse con Fisqua. Revisa la conexión del equipo.',
-	fisqua_link_cannot_pair: 'Esta instalación de Fisqua no permite vincular equipos con un código. Pregúntale a quien instaló el equipo.',
-	fisqua_link_lost: 'Fisqua envió los datos de la vinculación, pero no llegaron a este equipo. Obtén un código nuevo y vuelve a aprobarlo.',
+	fisqua_link_cannot_pair:
+		'Esta instalación de Fisqua no permite vincular equipos con un código. Pregúntale a quien instaló el equipo.',
+	fisqua_link_lost:
+		'Fisqua envió los datos de la vinculación, pero no llegaron a este equipo. Obtén un código nuevo y vuelve a aprobarlo.',
 	fisqua_link_unknown: 'Fisqua no reconoce este código. Obtén un código nuevo.',
 	fisqua_link_wrong_env: 'La respuesta llegó de otro servicio de Fisqua. Captua no cambió nada.',
 	fisqua_link_other_workspace: (tenant: string | null) =>
 		tenant
 			? `Este equipo ya está vinculado con ${tenant} y solo se puede volver a vincular con ese espacio de trabajo. Para pasarlo a otro, pregúntale a quien instaló el equipo.`
 			: 'Este equipo ya está vinculado con un espacio de trabajo y solo se puede volver a vincular con ese mismo. Para pasarlo a otro, pregúntale a quien instaló el equipo.',
-	fisqua_link_bad_payload: 'Captua no pudo leer la respuesta de Fisqua y no cambió nada. Obtén un código nuevo.',
+	fisqua_link_bad_payload:
+		'Captua no pudo leer la respuesta de Fisqua y no cambió nada. Obtén un código nuevo.',
 	fisqua_link_failed: 'Captua no pudo guardar los datos de la vinculación y no cambió nada.',
-	fisqua_link_unverified: 'Captua guardó los datos de la vinculación, pero no pudo comprobarlos. Reinicia el equipo y vuelve a revisar esta sección.',
-	fisqua_link_overridden: 'Un ajuste del archivo .env del equipo tiene prioridad sobre la vinculación. Pregúntale a quien instaló el equipo.',
+	fisqua_link_unverified:
+		'Captua guardó los datos de la vinculación, pero no pudo comprobarlos. Reinicia el equipo y vuelve a revisar esta sección.',
+	fisqua_link_overridden:
+		'Un ajuste del archivo .env del equipo tiene prioridad sobre la vinculación. Pregúntale a quien instaló el equipo.',
 	fisqua_link_not_eligible:
 		'Se puede vincular un equipo que esté en el modo "Fisqua", o en el modo "Solo en el escáner" si todavía no está vinculado.',
 	fisqua_link_held: 'La copia externa está en pausa en este equipo. Vincúlalo cuando se reanude.',
-	fisqua_link_rclone_missing: 'A este equipo le falta el programa que sube los archivos a la copia externa, así que no se puede vincular con un código. Pregúntale a quien instaló el equipo.',
+	fisqua_link_rclone_missing:
+		'A este equipo le falta el programa que sube los archivos a la copia externa, así que no se puede vincular con un código. Pregúntale a quien instaló el equipo.',
 	fisqua_link_busy_capturing: 'Hay una captura en curso. Vincula el equipo cuando termine.',
-	fisqua_link_device_id_invalid: 'El identificador de este dispositivo no es válido. Pregúntale a quien instaló el equipo.',
-	fisqua_link_script_too_old: 'La instalación de este equipo es demasiado antigua para vincularlo con un código. Actualiza Captua o pregúntale a quien instaló el equipo.',
-	fisqua_link_script_missing: 'A este equipo le falta el programa que guarda los datos de la vinculación. Actualiza Captua o pregúntale a quien instaló el equipo.',
-	fisqua_link_finishing_uploads: 'Código aprobado. Antes de vincular el equipo, Captua está terminando una subida. Puede tardar unos minutos.',
+	fisqua_link_device_id_invalid:
+		'El identificador de este dispositivo no es válido. Pregúntale a quien instaló el equipo.',
+	fisqua_link_script_too_old:
+		'La instalación de este equipo es demasiado antigua para vincularlo con un código. Actualiza Captua o pregúntale a quien instaló el equipo.',
+	fisqua_link_script_missing:
+		'A este equipo le falta el programa que guarda los datos de la vinculación. Actualiza Captua o pregúntale a quien instaló el equipo.',
+	fisqua_link_finishing_uploads:
+		'Código aprobado. Antes de vincular el equipo, Captua está terminando una subida. Puede tardar unos minutos.',
 	fisqua_link_uploads_still_running:
 		'La subida en curso no terminó y Captua no cambió nada. Las subidas quedan en pausa hasta que reinicies el equipo. Después, obtén un código nuevo.',
-	fisqua_link_restart_required: 'Reinicia el equipo antes de obtener un código nuevo. Puede que Captua haya guardado los datos de la vinculación, que solo tienen efecto después de reiniciar el equipo.',
+	fisqua_link_restart_required:
+		'Reinicia el equipo antes de obtener un código nuevo. Puede que Captua haya guardado los datos de la vinculación, que solo tienen efecto después de reiniciar el equipo.',
 	fisqua_link_last_outcome: (text: string) => `Último intento: ${text}`,
 	fisqua_link_offsite_job_running:
 		'Captua está liberando espacio en la tarjeta o restaurando archivos en ella. Vincula el equipo cuando termine.',
-	fisqua_link_finishing_offsite_jobs: 'Código aprobado. Antes de vincular el equipo, Captua está terminando de liberar espacio en la tarjeta o de restaurar archivos en ella. Puede tardar unos minutos.',
-	fisqua_link_offsite_jobs_still_running: 'Después de diez minutos, Captua todavía estaba liberando espacio en la tarjeta o restaurando archivos en ella, así que no cambió nada. Obtén un código nuevo cuando termine.',
-	fisqua_link_prepare_failed: 'Captua no pudo preparar los datos de la vinculación y no cambió nada. Obtén un código nuevo.',
+	fisqua_link_finishing_offsite_jobs:
+		'Código aprobado. Antes de vincular el equipo, Captua está terminando de liberar espacio en la tarjeta o de restaurar archivos en ella. Puede tardar unos minutos.',
+	fisqua_link_offsite_jobs_still_running:
+		'Después de diez minutos, Captua todavía estaba liberando espacio en la tarjeta o restaurando archivos en ella, así que no cambió nada. Obtén un código nuevo cuando termine.',
+	fisqua_link_prepare_failed:
+		'Captua no pudo preparar los datos de la vinculación y no cambió nada. Obtén un código nuevo.',
 	fisqua_link_shutting_down:
 		'Captua no cambió nada: la aprobación llegó durante el apagado. Obtén un código nuevo cuando Captua vuelva a estar en marcha.',
 	fisqua_link_cancel_failed: 'Captua no pudo cancelar el código. Intenta de nuevo.',
 	fisqua_link_generic: 'Captua no pudo vincular el equipo por un motivo que no reconoce.',
-	fisqua_link_err_read: 'Captua no pudo comprobar si el equipo está vinculado. Lo vuelve a intentar cada pocos segundos.',
+	fisqua_link_err_read:
+		'Captua no pudo comprobar si el equipo está vinculado. Lo vuelve a intentar cada pocos segundos.',
 	// ── Settings sections and Network (NEH-253) ─────────────────────────────
 	// Provisional Spanish, to be reviewed.
 	config_section_network: 'Red',
@@ -2175,7 +2465,8 @@ export const es = {
 	network_warn_no_connection_title: 'Sin conexión de red.',
 	network_warn_no_connection_body:
 		'El equipo no está conectado ni por cable ni por Wi-Fi. Puedes seguir capturando y revisando.',
-	network_warn_no_connection_try: 'Conecta un cable de red o elige una de las redes Wi-Fi de abajo.',
+	network_warn_no_connection_try:
+		'Conecta un cable de red o elige una de las redes Wi-Fi de abajo.',
 	network_warn_no_address_title: 'Conectado, pero sin dirección IP.',
 	network_warn_no_address_body:
 		'La red aceptó el equipo, pero no le asignó una dirección. Sin ella, el equipo no se puede comunicar con ningún otro dispositivo, ni ningún dispositivo con él.',
@@ -2205,12 +2496,14 @@ export const es = {
 			? 'Olvida la red y vuelve a conectar el equipo a ella. Si eso no funciona, pregúntale a quien administra la red.'
 			: 'Desconecta el cable y vuelve a conectarlo. Si eso no funciona, pregúntale a quien administra la red.',
 	network_warn_other_title: 'Hay un problema con la conexión.',
-	network_readonly: 'Puedes ver el estado de la red. Los administradores y los operarios pueden conectar el equipo a una red y olvidar redes.',
+	network_readonly:
+		'Puedes ver el estado de la red. Los administradores y los operarios pueden conectar el equipo a una red y olvidar redes.',
 	network_not_permitted_notice:
 		'El sistema de este equipo no le permite a Captua cambiar la red, así que desde aquí no puedes conectar el equipo a una red ni olvidar redes. Para corregirlo, actualiza Captua o pregúntale a quien instaló el equipo.',
 	network_not_available:
 		'La configuración de red no está disponible en este dispositivo. Solo funciona en un equipo Captua, no en una máquina de desarrollo.',
-	network_service_unavailable: 'El servicio de red del equipo no responde. Intenta de nuevo en un momento.',
+	network_service_unavailable:
+		'El servicio de red del equipo no responde. Intenta de nuevo en un momento.',
 	network_err_read: 'Captua no pudo leer el estado de la red.',
 	network_err_wifi: 'Captua no pudo leer la lista de redes Wi-Fi.',
 	network_no_wifi_device: 'Este equipo no tiene Wi-Fi.',
@@ -2273,18 +2566,23 @@ export const es = {
 	network_joining_no_answer: 'El equipo todavía no responde. Puede estar cambiando de red.',
 	network_joined_title: (ssid: string) => `Conectado a ${ssid}`,
 	network_joined_body: 'El equipo está conectado.',
-	network_joined_address: (address: string) => `El equipo está conectado y tiene la dirección ${address}.`,
-	network_joined_saved: 'La red quedó guardada: el equipo se conectará automáticamente a ella cuando esté al alcance.',
+	network_joined_address: (address: string) =>
+		`El equipo está conectado y tiene la dirección ${address}.`,
+	network_joined_saved:
+		'La red quedó guardada: el equipo se conectará automáticamente a ella cuando esté al alcance.',
 	network_failed_title: (ssid: string) => `No se pudo conectar a ${ssid}`,
-	network_fail_wrong_password: 'La red no aceptó la contraseña. Revísala (fíjate en las mayúsculas y minúsculas) y vuelve a intentarlo.',
+	network_fail_wrong_password:
+		'La red no aceptó la contraseña. Revísala (fíjate en las mayúsculas y minúsculas) y vuelve a intentarlo.',
 	network_fail_wrong_credentials:
 		'La red no aceptó el usuario o la contraseña. Revisa los dos; muchas instituciones piden el correo completo, como nombre@ejemplo.edu.',
 	network_fail_server_name_mismatch:
 		'El servidor de autenticación de esta red tiene un nombre distinto del que escribiste. Revisa el nombre del servidor en las instrucciones de tu institución para esta red.',
-	network_fail_server_names: (names: string) => `El servidor se identificó con estos nombres: ${names}.`,
+	network_fail_server_names: (names: string) =>
+		`El servidor se identificó con estos nombres: ${names}.`,
 	network_fail_server_not_trusted:
 		'Este equipo no confía en el certificado del servidor de autenticación. Revisa el nombre del servidor; si es correcto, pregúntale al área de sistemas de tu institución qué certificado usa la red.',
-	network_fail_timeout: 'La red no respondió a tiempo. Acerca el equipo al punto de acceso o vuelve a intentarlo en un minuto.',
+	network_fail_timeout:
+		'La red no respondió a tiempo. Acerca el equipo al punto de acceso o vuelve a intentarlo en un minuto.',
 	network_fail_not_permitted:
 		'El sistema del equipo no permitió el cambio. Reinicia el equipo y vuelve a intentarlo; si pasa otra vez, presiona "Reportar un problema". Para enviar el reporte se necesita conexión a internet.',
 	network_fail_failed:
@@ -2301,29 +2599,38 @@ export const es = {
 	network_refusal_password_length: 'Una contraseña de Wi-Fi tiene entre 8 y 63 caracteres.',
 	network_refusal_identity_required: 'Escribe tu usuario.',
 	network_refusal_identity_invalid: 'El usuario no puede tener saltos de línea.',
-	network_refusal_anonymous_identity_invalid: 'La identidad anónima no puede tener saltos de línea.',
+	network_refusal_anonymous_identity_invalid:
+		'La identidad anónima no puede tener saltos de línea.',
 	network_refusal_method_required: 'Elige un método.',
 	network_refusal_server_name_required: 'Escribe el nombre del servidor de autenticación.',
-	network_refusal_server_name_invalid: 'Escribe un nombre de servidor como radius.ejemplo.edu, no una dirección IP.',
+	network_refusal_server_name_invalid:
+		'Escribe un nombre de servidor como radius.ejemplo.edu, no una dirección IP.',
 	network_refusal_inner_method_invalid: 'PEAP solo funciona con MSCHAPv2. Elige otro método.',
 	network_refusal_not_permitted: 'El sistema de este equipo no le permite a Captua cambiar la red.',
-	network_refusal_join_in_progress: 'El equipo ya se está conectando a una red. Espera a que termine y vuelve a intentarlo.',
-	network_refusal_other: 'El equipo no aceptó la solicitud. Revisa los campos y vuelve a intentarlo.',
-	network_err_request: 'Captua no pudo comunicarse con el equipo. Revisa la conexión y vuelve a intentarlo.',
+	network_refusal_join_in_progress:
+		'El equipo ya se está conectando a una red. Espera a que termine y vuelve a intentarlo.',
+	network_refusal_other:
+		'El equipo no aceptó la solicitud. Revisa los campos y vuelve a intentarlo.',
+	network_err_request:
+		'Captua no pudo comunicarse con el equipo. Revisa la conexión y vuelve a intentarlo.',
 	network_ind_connected: 'Conectado',
 	network_ind_problem: 'Problema de red',
 	network_ind_offline: 'Sin conexión de red',
 	network_ind_label: (state: string, name: string | null, signal: number | null) =>
-		name === null ? state : signal === null ? `${state} · ${name}` : `${state} · ${name} · señal ${signal}%`,
+		name === null
+			? state
+			: signal === null
+				? `${state} · ${name}`
+				: `${state} · ${name} · señal ${signal}%`,
 	network_ind_unknown: 'Estado de la red desconocido',
 	network_ind_connecting: 'Conectando',
 	network_stale: (time: string) =>
 		`No se pudo actualizar el estado de la red. Lo que ves es de la última actualización: ${time}.`,
 	network_unknown_title: 'Captua no pudo saber si el equipo se conectó',
-	network_unknown_body: 'Revisa el estado de la red en esta página para ver a qué red está conectado el equipo.',
+	network_unknown_body:
+		'Revisa el estado de la red en esta página para ver a qué red está conectado el equipo.',
 	network_not_received_title: 'El equipo no recibió la solicitud',
 	network_not_received_body: 'Presiona "Reintentar" para enviarla de nuevo.',
-
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',

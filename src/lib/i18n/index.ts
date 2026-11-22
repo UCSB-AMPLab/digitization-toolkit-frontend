@@ -71,20 +71,16 @@ export const m = derived(locale, (l) => catalogs[l]);
  * the backend already emits — and a dash when there is none. The badge CSS
  * classes still use the raw value.
  */
-export const roleLabel = derived(
-	m,
-	($m) =>
-		(role: string | null | undefined): string => {
-			if (!role) return '—';
-			const labels: Record<string, string> = {
-				admin: $m.role_admin,
-				operator: $m.role_operator,
-				reviewer: $m.role_reviewer,
-				testing: $m.role_testing
-			};
-			return labels[role] ?? role;
-		}
-);
+export const roleLabel = derived(m, ($m) => (role: string | null | undefined): string => {
+	if (!role) return '—';
+	const labels: Record<string, string> = {
+		admin: $m.role_admin,
+		operator: $m.role_operator,
+		reviewer: $m.role_reviewer,
+		testing: $m.role_testing
+	};
+	return labels[role] ?? role;
+});
 
 /**
  * Cookie strings for a language. The old name is written too, with the same

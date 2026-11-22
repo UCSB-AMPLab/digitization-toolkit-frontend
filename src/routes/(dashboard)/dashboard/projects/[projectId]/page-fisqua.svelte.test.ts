@@ -18,7 +18,12 @@ const gotoMock = vi.hoisted(() => vi.fn());
 const pageUrl = vi.hoisted(() => ({ href: 'http://localhost/dashboard/projects/1' }));
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/stores', () => ({
-	page: readable({ params: { projectId: '1' }, get url() { return new URL(pageUrl.href); } })
+	page: readable({
+		params: { projectId: '1' },
+		get url() {
+			return new URL(pageUrl.href);
+		}
+	})
 }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -56,7 +61,13 @@ const tomo = vol(22, 'Tomo 097', {
 });
 
 function unit(mode: string) {
-	return { mode, projectsEnabled: true, projectsShown: mode === 'offline', defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] } };
+	return {
+		mode,
+		projectsEnabled: true,
+		projectsShown: mode === 'offline',
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
 }
 
 function signIn(role: UserRole) {
@@ -64,7 +75,9 @@ function signIn(role: UserRole) {
 }
 
 async function openEdit() {
-	await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+	await userEvent.click(
+		page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions)
+	);
 	await userEvent.click(page.getByRole('button', { name: es.common_edit }));
 }
 
@@ -100,13 +113,19 @@ describe('the project page while projects are hidden (NEH-313)', () => {
 
 	it('goes to Volúmenes', async () => {
 		render(ProjectPage);
-		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard/volumes', { replaceState: true }));
+		await vi.waitFor(() =>
+			expect(gotoMock).toHaveBeenCalledWith('/dashboard/volumes', { replaceState: true })
+		);
 	});
 
 	it('carries ?editVolume through to Volúmenes', async () => {
 		pageUrl.href = 'http://localhost/dashboard/projects/1?editVolume=22';
 		render(ProjectPage);
-		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard/volumes?editVolume=22', { replaceState: true }));
+		await vi.waitFor(() =>
+			expect(gotoMock).toHaveBeenCalledWith('/dashboard/volumes?editVolume=22', {
+				replaceState: true
+			})
+		);
 		// The project page does not open the form itself.
 		expect(page.getByText(es.pd_modal_edit_title).elements()).toHaveLength(0);
 	});
@@ -120,7 +139,9 @@ describe('the project page while projects are hidden (NEH-313)', () => {
 		expect(page.getByRole('button', { name: es.pd_new_collection }).elements()).toHaveLength(0);
 		expect(screen.container.textContent).not.toContain('Tomo 097');
 		answer(unit('fisqua'));
-		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard/volumes', { replaceState: true }));
+		await vi.waitFor(() =>
+			expect(gotoMock).toHaveBeenCalledWith('/dashboard/volumes', { replaceState: true })
+		);
 		await new Promise((r) => setTimeout(r, 50));
 		expect(page.getByRole('button', { name: es.pd_new_collection }).elements()).toHaveLength(0);
 		expect(collectionsApi.listAll).not.toHaveBeenCalled();
@@ -147,20 +168,30 @@ describe('the project page while projects are hidden (NEH-313)', () => {
 	});
 
 	for (const [what, settle] of [
-		['cannot be read', (answer: (v: unknown) => void, fail: (e: unknown) => void) => fail(new Error('boom'))],
+		[
+			'cannot be read',
+			(answer: (v: unknown) => void, fail: (e: unknown) => void) => fail(new Error('boom'))
+		],
 		['shows projects', (answer: (v: unknown) => void) => answer(unit('offline'))]
 	] as const) {
 		it(`is blank while the unit read is pending, and renders once it ${what}`, async () => {
 			signIn('admin');
 			let answer!: (v: unknown) => void;
 			let fail!: (e: unknown) => void;
-			vi.mocked(systemApi.unit).mockReturnValue(new Promise((r, j) => { answer = r; fail = j; }) as never);
+			vi.mocked(systemApi.unit).mockReturnValue(
+				new Promise((r, j) => {
+					answer = r;
+					fail = j;
+				}) as never
+			);
 			const screen = render(ProjectPage);
 			await new Promise((r) => setTimeout(r, 50));
 			expect(screen.container.textContent?.trim()).toBe('');
 			settle(answer, fail);
 			await expect.element(page.getByText('Tomo 097')).toBeInTheDocument();
-			await expect.element(page.getByRole('button', { name: es.pd_new_collection })).toBeInTheDocument();
+			await expect
+				.element(page.getByRole('button', { name: es.pd_new_collection }))
+				.toBeInTheDocument();
 			expect(gotoMock).not.toHaveBeenCalled();
 		});
 	}
@@ -170,7 +201,10 @@ describe('the project page while projects are hidden (NEH-313)', () => {
 		render(ProjectPage);
 		await expect.element(page.getByText('Tomo 097')).toBeInTheDocument();
 		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
-		expect(gotoMock).not.toHaveBeenCalledWith(expect.stringContaining('/dashboard/volumes'), expect.anything());
+		expect(gotoMock).not.toHaveBeenCalledWith(
+			expect.stringContaining('/dashboard/volumes'),
+			expect.anything()
+		);
 	});
 });
 
@@ -181,7 +215,9 @@ describe('Fisqua mode, operator', () => {
 		render(Volumes);
 		await expect.element(page.getByText('Tomo 097')).toBeInTheDocument();
 		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
-		await expect.element(page.getByRole('button', { name: es.pd_new_collection })).not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('button', { name: es.pd_new_collection }))
+			.not.toBeInTheDocument();
 	});
 
 	it('edits a volume with its stem read-only and its signatura editable, and sends no stem', async () => {
@@ -205,7 +241,10 @@ describe('Fisqua mode, operator', () => {
 		vi.mocked(systemApi.unit).mockResolvedValue(unit('backup') as never);
 		vi.spyOn(collectionsApi, 'create').mockRejectedValue(
 			Object.assign(new AuthError(403, "In Fisqua mode, volumes come from Fisqua's queue."), {
-				detail: { code: 'volumes_from_fisqua', message: "In Fisqua mode, volumes come from Fisqua's queue." }
+				detail: {
+					code: 'volumes_from_fisqua',
+					message: "In Fisqua mode, volumes come from Fisqua's queue."
+				}
 			})
 		);
 		const screen = render(Volumes);
@@ -230,22 +269,44 @@ describe('Fisqua mode, admin', () => {
 
 	it('shows unknown_reference_code under the stem field', async () => {
 		vi.spyOn(collectionsApi, 'create').mockRejectedValue(
-			new ApiError('x', { code: 'unknown_reference_code', message: 'Fisqua has no description', referenceCode: 'co-ahr-not-t099' }, 422)
+			new ApiError(
+				'x',
+				{
+					code: 'unknown_reference_code',
+					message: 'Fisqua has no description',
+					referenceCode: 'co-ahr-not-t099'
+				},
+				422
+			)
 		);
 		render(Volumes);
 		await fillNew('co-ahr-not-t099');
 		const stem = page.getByLabelText(es.pd_field_stem_fisqua);
-		await expect.element(page.getByText(es.pd_err_unknown_reference_code('co-ahr-not-t099'))).toBeInTheDocument();
+		await expect
+			.element(page.getByText(es.pd_err_unknown_reference_code('co-ahr-not-t099')))
+			.toBeInTheDocument();
 		await expect.element(stem).toHaveAttribute('aria-invalid', 'true');
-		await expect.element(stem).toHaveAccessibleDescription(new RegExp(es.pd_err_unknown_reference_code('co-ahr-not-t099').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+		await expect
+			.element(stem)
+			.toHaveAccessibleDescription(
+				new RegExp(
+					es.pd_err_unknown_reference_code('co-ahr-not-t099').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+				)
+			);
 		// Typing a new code takes the refusal away.
 		await userEvent.fill(stem, 'co-ahr-not-t098');
-		await expect.element(page.getByText(es.pd_err_unknown_reference_code('co-ahr-not-t099'))).not.toBeInTheDocument();
+		await expect
+			.element(page.getByText(es.pd_err_unknown_reference_code('co-ahr-not-t099')))
+			.not.toBeInTheDocument();
 	});
 
 	it('shows stem_required under the stem field', async () => {
 		vi.spyOn(collectionsApi, 'update').mockRejectedValue(
-			new ApiError('x', { code: 'stem_required', message: 'In Fisqua mode a stem cannot be empty' }, 422)
+			new ApiError(
+				'x',
+				{ code: 'stem_required', message: 'In Fisqua mode a stem cannot be empty' },
+				422
+			)
 		);
 		render(Volumes);
 		await openEdit();
@@ -285,9 +346,14 @@ describe('keeping a new volume on the unit (NEH-320)', () => {
 		await userEvent.fill(page.getByPlaceholder(es.pd_ph_title), 'Tomo 099');
 		await userEvent.fill(page.getByLabelText(es.pd_field_stem), 'xx-test-099');
 		await userEvent.click(page.getByRole('button', { name: es.pd_create_btn }));
-		await vi.waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({
-			filename_stem: 'xx-test-099', kept_on_unit: true
-		})));
+		await vi.waitFor(() =>
+			expect(create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					filename_stem: 'xx-test-099',
+					kept_on_unit: true
+				})
+			)
+		);
 	});
 
 	it('sends no flag when the admin leaves it unticked', async () => {
@@ -302,7 +368,11 @@ describe('keeping a new volume on the unit (NEH-320)', () => {
 	it('is ticked and fixed in "Solo en el escáner"', async () => {
 		signIn('admin');
 		// Projects off, so the form is on Volúmenes.
-		vi.mocked(systemApi.unit).mockResolvedValue({ ...unit('offline'), projectsEnabled: false, projectsShown: false } as never);
+		vi.mocked(systemApi.unit).mockResolvedValue({
+			...unit('offline'),
+			projectsEnabled: false,
+			projectsShown: false
+		} as never);
 		render(Volumes);
 		await userEvent.click(page.getByRole('button', { name: es.pd_new_collection }));
 		await expect.element(box()).toBeChecked();

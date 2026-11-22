@@ -119,7 +119,8 @@ describe('the focus check and the sign-in', () => {
 
 describe('isUserRole', () => {
 	it('accepts the testing role (NEH-391) and the other three', () => {
-		for (const role of ['admin', 'operator', 'reviewer', 'testing']) expect(isUserRole(role)).toBe(true);
+		for (const role of ['admin', 'operator', 'reviewer', 'testing'])
+			expect(isUserRole(role)).toBe(true);
 		expect(isUserRole('guest')).toBe(false);
 	});
 });

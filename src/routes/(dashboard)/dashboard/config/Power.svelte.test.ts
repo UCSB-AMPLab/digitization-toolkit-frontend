@@ -41,7 +41,10 @@ describe('Configuración power section', () => {
 		const { container } = render(ConfigPage);
 
 		await page.getByRole('button', { name: 'Apagar', exact: true }).click();
-		await page.getByRole('dialog', { name: '¿Apagar el equipo?' }).getByRole('button', { name: 'Sí, apagar' }).click();
+		await page
+			.getByRole('dialog', { name: '¿Apagar el equipo?' })
+			.getByRole('button', { name: 'Sí, apagar' })
+			.click();
 
 		expect(powerSpy).toHaveBeenCalledWith('poweroff');
 		await expect

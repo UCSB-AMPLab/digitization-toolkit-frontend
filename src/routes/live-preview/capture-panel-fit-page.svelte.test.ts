@@ -28,9 +28,11 @@ import { locale } from '$lib/i18n';
 import '../../app.css';
 import LivePreview from './+page.svelte';
 
-
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function serve() {
@@ -38,7 +40,14 @@ function serve() {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/imports/digitisation-lists')) return json([]);
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 6',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: 'co-ahr-6',
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
 		if (path.includes('/cameras/capabilities')) return json({});
@@ -71,7 +80,9 @@ async function open(mode: 'single' | 'double', w: number, h: number) {
 	if (mode === 'single') {
 		(document.querySelector('.strip-btn.toggle') as HTMLElement).click();
 		await wait(200);
-		(document.querySelectorAll('input[type=radio]')[0] as HTMLInputElement).dispatchEvent(new Event('change', { bubbles: true }));
+		(document.querySelectorAll('input[type=radio]')[0] as HTMLInputElement).dispatchEvent(
+			new Event('change', { bubbles: true })
+		);
 		await wait(200);
 		(document.querySelector('.collapse-btn') as HTMLElement).click();
 	}
@@ -93,12 +104,17 @@ describe('floating controls fit the viewport (NEH-323)', () => {
 	// Around the height where the panel changes from one column to a grid:
 	// the single panel is 308px tall and the double 361px, under a 75px top
 	// offset inside the board, which sits 16px inside `.viewport-outer`.
-	for (const [mode, heights] of [['single', [606, 611, 616, 621, 626, 627, 628]], ['double', [659, 664, 669, 674, 679, 680, 681]]] as const) {
+	for (const [mode, heights] of [
+		['single', [606, 611, 616, 621, 626, 627, 628]],
+		['double', [659, 664, 669, 674, 679, 680, 681]]
+	] as const) {
 		for (const h of heights) {
 			it(`at 800x${h}, ${mode} mode: the whole panel lies inside the board`, async () => {
 				const screen = await open(mode, 800, h);
 				const board = screen.container.querySelector('.mat-board')!.getBoundingClientRect();
-				const panel = (screen.container.querySelector('.floating-controls') as HTMLElement).getBoundingClientRect();
+				const panel = (
+					screen.container.querySelector('.floating-controls') as HTMLElement
+				).getBoundingClientRect();
 				expect(panel.bottom).toBeLessThanOrEqual(board.bottom + 0.5);
 				expect(panel.left).toBeGreaterThanOrEqual(board.left - 0.5);
 			});
@@ -111,7 +127,13 @@ describe('floating controls fit the viewport (NEH-323)', () => {
 			const { outer, buttons } = boxes(screen);
 			expect(buttons.length).toBe(mode === 'double' ? 7 : 6);
 			const outside = buttons
-				.filter(({ r }) => r.top < outer.top - 0.5 || r.bottom > outer.bottom + 0.5 || r.left < outer.left - 0.5 || r.right > outer.right + 0.5)
+				.filter(
+					({ r }) =>
+						r.top < outer.top - 0.5 ||
+						r.bottom > outer.bottom + 0.5 ||
+						r.left < outer.left - 0.5 ||
+						r.right > outer.right + 0.5
+				)
 				.map(({ label }) => label);
 			expect(outside).toEqual([]);
 			for (const { r } of buttons) expect(Math.round(r.height)).toBe(44);
@@ -121,7 +143,14 @@ describe('floating controls fit the viewport (NEH-323)', () => {
 			const screen = await open(mode, 800, 480);
 			const { panel, buttons } = boxes(screen);
 			const labels = buttons.map((b) => b.label);
-			expect(labels.slice(0, 6)).toEqual(['Hide controls', 'Zoom in', 'Zoom out', 'Fit to screen', 'Grid settings', 'Capture pedal and key']);
+			expect(labels.slice(0, 6)).toEqual([
+				'Hide controls',
+				'Zoom in',
+				'Zoom out',
+				'Fit to screen',
+				'Grid settings',
+				'Capture pedal and key'
+			]);
 			if (mode === 'double') expect(labels[6]).toBe('Swap the pages of the two cameras');
 			expect(panel.querySelector('.float-divider')).toBeNull();
 			// The toggle stays on the panel's right edge, which stays at the viewport's.

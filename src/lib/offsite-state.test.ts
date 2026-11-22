@@ -63,7 +63,11 @@ describe('volumeOffsiteView', () => {
 		expect(view).toEqual({
 			kind: 'received',
 			headline: es.offsite_vol_received(412, 412),
-			lastVerified: es.offsite_last_verified('today', formatBackupDate(new Date(TODAY_0905), NOW, 'es'), '09:05'),
+			lastVerified: es.offsite_last_verified(
+				'today',
+				formatBackupDate(new Date(TODAY_0905), NOW, 'es'),
+				'09:05'
+			),
 			help: null,
 			freed: null
 		});
@@ -94,7 +98,11 @@ describe('volumeOffsiteView', () => {
 		const naive = '2026-10-23T22:30:00';
 		const state = volume({ last_verified_at: naive });
 		const when = new Date(`${naive}Z`);
-		const time = when.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hour12: false });
+		const time = when.toLocaleTimeString('es', {
+			hour: '2-digit',
+			minute: '2-digit',
+			hour12: false
+		});
 		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)?.lastVerified).toContain(time);
 	});
 
@@ -110,9 +118,17 @@ describe('volumeOffsiteView', () => {
 	});
 
 	it('says a volume without a stem is not stored offsite', () => {
-		const state = volume({ filename_stem: null, uploadable: false, total: 0, verified: 0, received: false });
+		const state = volume({
+			filename_stem: null,
+			uploadable: false,
+			total: 0,
+			verified: 0,
+			received: false
+		});
 		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)?.kind).toBe('no_stem');
-		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)?.headline).toBe(es.offsite_vol_no_stem);
+		expect(volumeOffsiteView(loaded(state), 'on', NOW, 'es', es)?.headline).toBe(
+			es.offsite_vol_no_stem
+		);
 	});
 
 	it('says the copy is not configured when the unit has it off', () => {
@@ -163,7 +179,13 @@ describe('volumeOffsiteView, for a volume freed from the card', () => {
 	});
 
 	it('writes the count and the size as Spanish does', () => {
-		const view = volumeOffsiteView(loaded(freedVolume({ freed_files: 12345 })), 'on', NOW, 'es', es);
+		const view = volumeOffsiteView(
+			loaded(freedVolume({ freed_files: 12345 })),
+			'on',
+			NOW,
+			'es',
+			es
+		);
 		expect(view?.freed).toBe('12.345 archivos liberados de la tarjeta (12,3\u00a0GB)');
 		expect(es.offsite_vol_freed(1, 2_000_000)).toBe('1 archivo liberado de la tarjeta (2\u00a0MB)');
 	});
@@ -183,7 +205,10 @@ describe('volumeOffsiteView, for a volume freed from the card', () => {
 	});
 
 	it('has no freed line when nothing was freed, or the backend does not send the counts', () => {
-		expect(volumeOffsiteView(loaded(volume({ freed_files: 0, freed_bytes: 0 })), 'on', NOW, 'es', es)?.freed).toBeNull();
+		expect(
+			volumeOffsiteView(loaded(volume({ freed_files: 0, freed_bytes: 0 })), 'on', NOW, 'es', es)
+				?.freed
+		).toBeNull();
 		expect(volumeOffsiteView(loaded(volume()), 'on', NOW, 'es', es)?.kind).toBe('received');
 	});
 });
@@ -203,17 +228,39 @@ describe('unitOffsiteView', () => {
 	it('says a misconfigured copy needs attention when the backend also reports it disabled', () => {
 		// is_enabled() is false for an invalid tenant prefix, while
 		// unit_upload_summary() gives the reason (app/core/image_upload.py).
-		const view = unitOffsiteView(unit({ enabled: false, misconfigured: 'DTK_OFFSITE_TENANT is invalid' }), NOW, 'es', es);
+		const view = unitOffsiteView(
+			unit({ enabled: false, misconfigured: 'DTK_OFFSITE_TENANT is invalid' }),
+			NOW,
+			'es',
+			es
+		);
 		expect(view).toEqual({ level: 'attention', lines: [es.offsite_unit_misconfigured] });
 	});
 
 	it('says a misconfigured copy needs attention, without the backend text', () => {
-		const view = unitOffsiteView(unit({ misconfigured: 'OFFSITE_TENANT is not set' }), NOW, 'es', es);
+		const view = unitOffsiteView(
+			unit({ misconfigured: 'OFFSITE_TENANT is not set' }),
+			NOW,
+			'es',
+			es
+		);
 		expect(view).toEqual({ level: 'attention', lines: [es.offsite_unit_misconfigured] });
 	});
 
 	it('says when there is nothing to copy yet', () => {
-		const view = unitOffsiteView(unit({ total: 0, verified: 0, pending: 0, refused: 0, volumes_received: 0, last_verified_at: null }), NOW, 'es', es);
+		const view = unitOffsiteView(
+			unit({
+				total: 0,
+				verified: 0,
+				pending: 0,
+				refused: 0,
+				volumes_received: 0,
+				last_verified_at: null
+			}),
+			NOW,
+			'es',
+			es
+		);
 		expect(view).toEqual({ level: 'empty', lines: [es.offsite_unit_empty] });
 	});
 
@@ -225,7 +272,11 @@ describe('unitOffsiteView', () => {
 			es.offsite_unit_files(1800, 2000, 198),
 			es.offsite_unit_refused(2),
 			es.offsite_attention_help,
-			es.offsite_cfg_last_verified('yesterday', formatBackupDate(new Date(YESTERDAY_1730), NOW, 'es'), '17:30')
+			es.offsite_cfg_last_verified(
+				'yesterday',
+				formatBackupDate(new Date(YESTERDAY_1730), NOW, 'es'),
+				'17:30'
+			)
 		]);
 	});
 
@@ -234,9 +285,9 @@ describe('unitOffsiteView', () => {
 		expect(unitOffsiteView(all, NOW, 'es', es)?.level).toBe('received');
 		const some = unit({ refused: 0, pending: 200 });
 		expect(unitOffsiteView(some, NOW, 'es', es)?.level).toBe('uploading');
-		expect(unitOffsiteView(unit({ refused: 0, last_verified_at: null }), NOW, 'en', en)?.lines.at(-1)).toBe(
-			en.offsite_cfg_never
-		);
+		expect(
+			unitOffsiteView(unit({ refused: 0, last_verified_at: null }), NOW, 'en', en)?.lines.at(-1)
+		).toBe(en.offsite_cfg_never);
 	});
 });
 
@@ -251,14 +302,20 @@ describe('counts in the offsite lines', () => {
 		);
 		expect(es.vol_err_stored_offsite(12345)).toContain('12.345 registros');
 		expect(en.vol_err_stored_offsite(1786)).toContain('1,786 records');
-		expect(en.offsite_unit_files(1786, 12345, 0)).toBe('1,786 of 12,345 files verified, 0 pending.');
+		expect(en.offsite_unit_files(1786, 12345, 0)).toBe(
+			'1,786 of 12,345 files verified, 0 pending.'
+		);
 	});
 });
 
 describe('unitUploadState', () => {
 	it('puts a misconfiguration before the enabled flag', () => {
-		expect(unitUploadState(unit({ enabled: false, misconfigured: 'bad prefix' }))).toBe('misconfigured');
-		expect(unitUploadState(unit({ enabled: true, misconfigured: 'bad prefix' }))).toBe('misconfigured');
+		expect(unitUploadState(unit({ enabled: false, misconfigured: 'bad prefix' }))).toBe(
+			'misconfigured'
+		);
+		expect(unitUploadState(unit({ enabled: true, misconfigured: 'bad prefix' }))).toBe(
+			'misconfigured'
+		);
 		expect(unitUploadState(unit({ enabled: false }))).toBe('off');
 		expect(unitUploadState(unit())).toBe('on');
 		expect(unitUploadState(undefined)).toBeNull();
@@ -266,13 +323,17 @@ describe('unitUploadState', () => {
 
 	it("is mode_off when the unit's mode sends nothing, before a misconfiguration (NEH-319)", () => {
 		expect(unitUploadState(unit({ mode_allows: false }))).toBe('mode_off');
-		expect(unitUploadState(unit({ mode_allows: false, misconfigured: 'bad prefix' }))).toBe('mode_off');
+		expect(unitUploadState(unit({ mode_allows: false, misconfigured: 'bad prefix' }))).toBe(
+			'mode_off'
+		);
 		expect(unitUploadState(unit({ mode_allows: false, enabled: false }))).toBe('mode_off');
 	});
 
 	it('follows the configuration when the mode allows the copy, or the backend does not say', () => {
 		expect(unitUploadState(unit({ mode_allows: true }))).toBe('on');
-		expect(unitUploadState(unit({ mode_allows: true, misconfigured: 'bad prefix' }))).toBe('misconfigured');
+		expect(unitUploadState(unit({ mode_allows: true, misconfigured: 'bad prefix' }))).toBe(
+			'misconfigured'
+		);
 		expect(unitUploadState(unit({ mode_allows: true, enabled: false }))).toBe('off');
 		// An older backend sends no mode_allows: the copy counts as allowed.
 		const older = unit();
@@ -291,7 +352,9 @@ describe("the unit's mode turns the copy off (NEH-319)", () => {
 			help: null,
 			freed: null
 		});
-		expect(volumeOffsiteView(loaded(state), 'mode_off', NOW, 'en', en)?.headline).toBe(en.offsite_vol_mode_off);
+		expect(volumeOffsiteView(loaded(state), 'mode_off', NOW, 'en', en)?.headline).toBe(
+			en.offsite_vol_mode_off
+		);
 	});
 
 	it('gives the unit its own line, level local (not drawn as off), whatever the configuration', () => {
@@ -299,7 +362,9 @@ describe("the unit's mode turns the copy off (NEH-319)", () => {
 			level: 'local',
 			lines: [es.offsite_unit_mode_off]
 		});
-		expect(unitOffsiteView(unit({ mode_allows: false, misconfigured: 'bad prefix' }), NOW, 'en', en)).toEqual({
+		expect(
+			unitOffsiteView(unit({ mode_allows: false, misconfigured: 'bad prefix' }), NOW, 'en', en)
+		).toEqual({
 			level: 'local',
 			lines: [en.offsite_unit_mode_off]
 		});
@@ -323,12 +388,24 @@ describe("the unit's mode turns the copy off (NEH-319)", () => {
 });
 
 describe('a volume Captua keeps on the unit (NEH-320)', () => {
-	const kept = volume({ kept_on_unit: true, verified: 0, pending: 0, received: false, last_verified_at: null });
+	const kept = volume({
+		kept_on_unit: true,
+		verified: 0,
+		pending: 0,
+		received: false,
+		last_verified_at: null
+	});
 
 	it('has a kept line of its own, whatever the unit copies', () => {
 		for (const unitState of ['on', 'off', 'misconfigured', null] as const) {
 			const view = volumeOffsiteView(loaded(kept), unitState, NOW, 'es', es);
-			expect(view).toEqual({ kind: 'kept', headline: es.offsite_vol_kept, lastVerified: null, help: null, freed: null });
+			expect(view).toEqual({
+				kind: 'kept',
+				headline: es.offsite_vol_kept,
+				lastVerified: null,
+				help: null,
+				freed: null
+			});
 		}
 	});
 
@@ -337,12 +414,21 @@ describe('a volume Captua keeps on the unit (NEH-320)', () => {
 	});
 
 	it('does not show for a volume not kept, nor from an older backend', () => {
-		expect(volumeOffsiteView(loaded(volume({ kept_on_unit: false })), 'on', NOW, 'es', es)?.kind).toBe('received');
+		expect(
+			volumeOffsiteView(loaded(volume({ kept_on_unit: false })), 'on', NOW, 'es', es)?.kind
+		).toBe('received');
 		expect(volumeOffsiteView(loaded(volume()), 'on', NOW, 'es', es)?.kind).toBe('received');
 	});
 
 	it('shows no Fisqua line for a kept volume', () => {
-		const fisqua = { environment: 'staging', config_error: null, held: false, hold_file: '', outbox: [], status: null } as never;
+		const fisqua = {
+			environment: 'staging',
+			config_error: null,
+			held: false,
+			hold_file: '',
+			outbox: [],
+			status: null
+		} as never;
 		expect(fisquaLineOf({ ...kept, fisqua })).toBeNull();
 		expect(fisquaLineOf({ ...volume(), fisqua })).toBe(fisqua);
 		expect(fisquaLineOf({ ...volume({ kept_on_unit: false }), fisqua: null })).toBeNull();

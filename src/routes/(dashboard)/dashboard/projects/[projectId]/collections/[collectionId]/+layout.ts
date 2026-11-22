@@ -7,20 +7,20 @@ import { projectsApi, collectionsApi } from '$lib/api';
 // volume's removal date (NEH-391). A failed fetch yields '—' instead of an
 // error, so the volume pages render even when a name is unavailable.
 export const load: LayoutLoad = async ({ params }) => {
-  const projectId    = Number(params.projectId);
-  const collectionId = Number(params.collectionId);
+	const projectId = Number(params.projectId);
+	const collectionId = Number(params.collectionId);
 
-  const [project, collection] = await Promise.all([
-    projectsApi.get(projectId).catch(() => null),
-    collectionsApi.get(collectionId).catch(() => null),
-  ]);
+	const [project, collection] = await Promise.all([
+		projectsApi.get(projectId).catch(() => null),
+		collectionsApi.get(collectionId).catch(() => null)
+	]);
 
-  return {
-    projectId,
-    collectionId,
-    projectName:    project?.name    ?? '—',
-    collectionName: collection?.name ?? '—',
-    collectionTestingExpiresAt: collection?.testing_expires_at ?? null,
-    collectionTesting: collection?.testing === true,
-  };
+	return {
+		projectId,
+		collectionId,
+		projectName: project?.name ?? '—',
+		collectionName: collection?.name ?? '—',
+		collectionTestingExpiresAt: collection?.testing_expires_at ?? null,
+		collectionTesting: collection?.testing === true
+	};
 };

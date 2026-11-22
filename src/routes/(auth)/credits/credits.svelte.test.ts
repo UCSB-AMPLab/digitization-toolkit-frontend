@@ -19,15 +19,31 @@ describe('credits page', () => {
 
 	it('shows the three paragraphs', async () => {
 		const screen = await render(Page);
-		await expect.element(screen.getByText('Captua is developed by Adelaida Ávila', { exact: false })).toBeVisible();
-		await expect.element(screen.getByText('(NEH Award HAA-304052-25: "Digitization Toolkit', { exact: false })).toBeVisible();
-		await expect.element(screen.getByText('Any views, findings, conclusions', { exact: false })).toBeVisible();
+		await expect
+			.element(screen.getByText('Captua is developed by Adelaida Ávila', { exact: false }))
+			.toBeVisible();
+		await expect
+			.element(
+				screen.getByText('(NEH Award HAA-304052-25: "Digitization Toolkit', { exact: false })
+			)
+			.toBeVisible();
+		await expect
+			.element(screen.getByText('Any views, findings, conclusions', { exact: false }))
+			.toBeVisible();
 	});
 
 	it('shows the QR code for the project page beside the text', async () => {
 		const screen = await render(Page);
-		await expect.element(screen.getByRole('img', { name: 'QR code for the Digitization Toolkit project page on the AMPL website' })).toBeVisible();
-		await expect.element(screen.getByText('Scan to learn more about the project on the AMPL website')).toBeVisible();
+		await expect
+			.element(
+				screen.getByRole('img', {
+					name: 'QR code for the Digitization Toolkit project page on the AMPL website'
+				})
+			)
+			.toBeVisible();
+		await expect
+			.element(screen.getByText('Scan to learn more about the project on the AMPL website'))
+			.toBeVisible();
 		expect(screen.container.querySelector('a[href^="http"]')).toBeNull();
 	});
 
@@ -46,6 +62,8 @@ describe('credits page', () => {
 
 	it('links back to the welcome screen', async () => {
 		const screen = await render(Page);
-		await expect.element(screen.getByRole('link', { name: 'Back / Volver' })).toHaveAttribute('href', '/welcome');
+		await expect
+			.element(screen.getByRole('link', { name: 'Back / Volver' }))
+			.toHaveAttribute('href', '/welcome');
 	});
 });

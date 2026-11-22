@@ -18,16 +18,23 @@ let registers: unknown[];
 let registerAnswer: () => Response;
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 beforeEach(() => {
 	locale.set('en');
 	authStore.clearSession();
 	registers = [];
-	registerAnswer = () => json({ id: 1, username: 'primera', email: null, role: 'admin', is_active: true });
+	registerAnswer = () =>
+		json({ id: 1, username: 'primera', email: null, role: 'admin', is_active: true });
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-		const url = new URL(typeof input === 'string' ? input : (input as Request).url, 'http://localhost:8000');
+		const url = new URL(
+			typeof input === 'string' ? input : (input as Request).url,
+			'http://localhost:8000'
+		);
 		if (url.pathname === '/auth/setup/status') return json({ needs_setup: true });
 		if (url.pathname === '/auth/register') {
 			registers.push(JSON.parse(init!.body as string));
@@ -60,7 +67,8 @@ describe('first-run setup and the password rule', () => {
 	});
 
 	it('shows the shared message for the backend’s password_too_short', async () => {
-		registerAnswer = () => json({ detail: { code: 'password_too_short', message: 'x', min_length: 8 } }, 422);
+		registerAnswer = () =>
+			json({ detail: { code: 'password_too_short', message: 'x', min_length: 8 } }, 422);
 		await submit('fake-pw8');
 		await expect.element(page.getByText(en.common_password_too_short(8))).toBeVisible();
 		expect(registers).toHaveLength(1);

@@ -72,7 +72,10 @@ export function isCaptureTimeout(error: unknown): boolean {
 }
 
 /** The baseline from a list of records alone; `target` is the record a retake or a fill captures into. */
-export function captureBefore(records: readonly RecordLike[], target: number | null = null): CaptureBefore {
+export function captureBefore(
+	records: readonly RecordLike[],
+	target: number | null = null
+): CaptureBefore {
 	const known = createKnownRecords();
 	known.listed(records);
 	return known.snapshot(target);
@@ -98,7 +101,10 @@ export interface KnownRecords {
 	/** A successful read of the volume's list. */
 	listed(records: readonly RecordLike[]): void;
 	/** A record and images a capture answer confirmed. */
-	confirmed(recordId: number | null | undefined, imageIds: readonly number[] | null | undefined): void;
+	confirmed(
+		recordId: number | null | undefined,
+		imageIds: readonly number[] | null | undefined
+	): void;
 	/** A copy of what is known now, as the baseline of a capture into `target`, or a new record. */
 	snapshot(target?: number | null): CaptureBefore;
 	reset(): void;
@@ -150,7 +156,10 @@ export interface CaptureGate {
 	acquire(kind?: 'capture' | 'test'): (() => void) | null;
 }
 
-export function createCaptureGate(onChange?: (busy: boolean) => void, ready: () => boolean = () => true): CaptureGate {
+export function createCaptureGate(
+	onChange?: (busy: boolean) => void,
+	ready: () => boolean = () => true
+): CaptureGate {
 	let busy = false;
 	return {
 		isBusy: () => busy,
@@ -181,7 +190,10 @@ export function createCaptureGate(onChange?: (busy: boolean) => void, ready: () 
  * them apart needs an id the client sends with each capture and the server
  * stores with it.
  */
-export function appearedRecord(before: CaptureBefore, after: readonly RecordLike[]): RecordLike | null {
+export function appearedRecord(
+	before: CaptureBefore,
+	after: readonly RecordLike[]
+): RecordLike | null {
 	if (before.target !== null) {
 		const record = after.find((r) => r.id === before.target);
 		const fresh = (record?.images ?? []).some((img) => !before.imageIds.has(img.id));
@@ -228,7 +240,10 @@ export function checkForCapture({ before, read, signal }: CheckOptions): Promise
 		const onAbort = () => finish({ kind: 'stopped' });
 		const schedule = () => {
 			const left = deadline - Date.now();
-			timer = setTimeout(readOnce, left > 0 ? Math.min(CHECK_INTERVAL_MS, left) : CHECK_INTERVAL_MS);
+			timer = setTimeout(
+				readOnce,
+				left > 0 ? Math.min(CHECK_INTERVAL_MS, left) : CHECK_INTERVAL_MS
+			);
 		};
 		const readOnce = async () => {
 			const madeAt = Date.now();
@@ -325,7 +340,10 @@ export async function runPageCapture<A extends CaptureAnswer, R extends RecordLi
 	} catch (error) {
 		if (!o.current()) return null;
 		if (!isCaptureTimeout(error)) throw error;
-		console.error('[capture-check] Capture request ended in a timeout; reading the records:', error);
+		console.error(
+			'[capture-check] Capture request ended in a timeout; reading the records:',
+			error
+		);
 		const controller = new AbortController();
 		o.onCheck(controller);
 		o.notice('maybe_saved');
@@ -336,7 +354,10 @@ export async function runPageCapture<A extends CaptureAnswer, R extends RecordLi
 				o.notice(null);
 				throw new CaptureNotSaved();
 			}
-			o.known.confirmed(outcome.record.id, (outcome.record.images ?? []).map((img) => img.id));
+			o.known.confirmed(
+				outcome.record.id,
+				(outcome.record.images ?? []).map((img) => img.id)
+			);
 			o.notice('found');
 			return { found: outcome.record as R };
 		} finally {

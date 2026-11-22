@@ -11,7 +11,10 @@ import { readable } from 'svelte/store';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/stores', () => ({
-	page: readable({ params: { projectId: '1' }, url: new URL('http://localhost/dashboard/projects/1') })
+	page: readable({
+		params: { projectId: '1' },
+		url: new URL('http://localhost/dashboard/projects/1')
+	})
 }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -22,8 +25,22 @@ import { resetUnit } from '$lib/unit-mode';
 import { recordRequests, type Recorder } from '$lib/test-support/testing-routes';
 import ProjectPage from './+page.svelte';
 
-const vol = { id: 11, name: 'Tomo 1', project_id: 1, created_at: '2026-11-01T00:00:00', record_count: 0, filename_stem: 'co-x-001' };
-const unit = (mode: string) => ({ mode, projectsEnabled: true, projectsShown: true, defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] }, keptVolumes: [] });
+const vol = {
+	id: 11,
+	name: 'Tomo 1',
+	project_id: 1,
+	created_at: '2026-11-01T00:00:00',
+	record_count: 0,
+	filename_stem: 'co-x-001'
+};
+const unit = (mode: string) => ({
+	mode,
+	projectsEnabled: true,
+	projectsShown: true,
+	defaultProjectId: 1,
+	prerequisites: { backup: [], fisqua: [] },
+	keptVolumes: []
+});
 
 let rec: Recorder;
 function serve(mode: string) {
@@ -59,11 +76,22 @@ async function fillAndCreate(keep: boolean) {
 
 describe('the volume form, ordinary roles', () => {
 	it('an administrator keeping the volume sends the stem, the signatura and kept_on_unit', async () => {
-		authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
+		authStore.setSession({
+			id: 1,
+			username: 'admin1',
+			email: null,
+			role: 'admin',
+			is_active: true
+		});
 		serve('backup');
 		render(ProjectPage);
 		expect(await fillAndCreate(true)).toEqual({
-			name: 'Tomo 2', project_id: 1, created_by: 'admin1', archival_metadata: { signatura: 'S-2' }, filename_stem: 'co-x-002', kept_on_unit: true
+			name: 'Tomo 2',
+			project_id: 1,
+			created_by: 'admin1',
+			archival_metadata: { signatura: 'S-2' },
+			filename_stem: 'co-x-002',
+			kept_on_unit: true
 		});
 	});
 
@@ -72,7 +100,11 @@ describe('the volume form, ordinary roles', () => {
 		serve('backup');
 		render(ProjectPage);
 		expect(await fillAndCreate(false)).toEqual({
-			name: 'Tomo 2', project_id: 1, created_by: 'op', archival_metadata: { signatura: 'S-2' }, filename_stem: 'co-x-002'
+			name: 'Tomo 2',
+			project_id: 1,
+			created_by: 'op',
+			archival_metadata: { signatura: 'S-2' },
+			filename_stem: 'co-x-002'
 		});
 	});
 

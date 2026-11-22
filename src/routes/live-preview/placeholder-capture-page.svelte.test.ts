@@ -35,34 +35,82 @@ import '../../app.css';
 import LivePreview from './+page.svelte';
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
-type Img = { id: number; record_id: number; filename: string; file_path: string; format: string; role: string; is_current: boolean };
+type Img = {
+	id: number;
+	record_id: number;
+	filename: string;
+	file_path: string;
+	format: string;
+	role: string;
+	is_current: boolean;
+};
 type Rec = {
-	id: number; title: string; status: string; sequence: number; capture_mode: string; collection_id: number; images: Img[];
-	missing_side: string | null; missing_expected: string | null; missing_note: string | null;
-	missing_request_id: string | null; closed_reason: string | null; closed_note: string | null;
+	id: number;
+	title: string;
+	status: string;
+	sequence: number;
+	capture_mode: string;
+	collection_id: number;
+	images: Img[];
+	missing_side: string | null;
+	missing_expected: string | null;
+	missing_note: string | null;
+	missing_request_id: string | null;
+	closed_reason: string | null;
+	closed_note: string | null;
 };
 
 function img(id: number, recordId: number, role: string): Img {
-	return { id, record_id: recordId, filename: `${id}.jpg`, file_path: `/${id}`, format: 'jpg', role, is_current: true };
+	return {
+		id,
+		record_id: recordId,
+		filename: `${id}.jpg`,
+		file_path: `/${id}`,
+		format: 'jpg',
+		role,
+		is_current: true
+	};
 }
 
 function pair(id: number, sequence: number): Rec {
 	return {
-		id, title: `Par ${sequence}`, status: 'in_review', sequence, capture_mode: 'dual', collection_id: 9,
+		id,
+		title: `Par ${sequence}`,
+		status: 'in_review',
+		sequence,
+		capture_mode: 'dual',
+		collection_id: 9,
 		images: [img(id * 10, id, 'left'), img(id * 10 + 1, id, 'right')],
-		missing_side: null, missing_expected: null, missing_note: null, missing_request_id: null, closed_reason: null, closed_note: null
+		missing_side: null,
+		missing_expected: null,
+		missing_note: null,
+		missing_request_id: null,
+		closed_reason: null,
+		closed_note: null
 	};
 }
 
 function placeholder(id: number, sequence: number, requestId: string | null): Rec {
 	return {
-		id, title: `Par ${sequence}`, status: 'captured', sequence, capture_mode: 'dual', collection_id: 9, images: [],
-		missing_side: 'both', missing_expected: 'Folios 90v y 91r',
-		missing_note: 'Ningún cuadro muestra el folio 91. Revisa el volumen.', missing_request_id: requestId,
-		closed_reason: null, closed_note: null
+		id,
+		title: `Par ${sequence}`,
+		status: 'captured',
+		sequence,
+		capture_mode: 'dual',
+		collection_id: 9,
+		images: [],
+		missing_side: 'both',
+		missing_expected: 'Folios 90v y 91r',
+		missing_note: 'Ningún cuadro muestra el folio 91. Revisa el volumen.',
+		missing_request_id: requestId,
+		closed_reason: null,
+		closed_note: null
 	};
 }
 
@@ -83,14 +131,28 @@ function serve() {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/records/to-retake/summary')) {
 			served.summaryReads++;
-			const pending = served.records.filter((r) => r.missing_side && !r.closed_reason).map((r) => r.id);
+			const pending = served.records
+				.filter((r) => r.missing_side && !r.closed_reason)
+				.map((r) => r.id);
 			return json({
 				pendingRecords: pending.length,
-				volumes: pending.length === 0 ? [] : [{
-					collectionId: 9, projectId: 2, name: 'Tomo 17', filenameStem: 'co-ahr-not-t017',
-					pending: pending.length, total: 0, excluded: 0, firstPendingRecordId: pending[0],
-					pendingRecordIds: pending, missingSideRecordIds: pending
-				}],
+				volumes:
+					pending.length === 0
+						? []
+						: [
+								{
+									collectionId: 9,
+									projectId: 2,
+									name: 'Tomo 17',
+									filenameStem: 'co-ahr-not-t017',
+									pending: pending.length,
+									total: 0,
+									excluded: 0,
+									firstPendingRecordId: pending[0],
+									pendingRecordIds: pending,
+									missingSideRecordIds: pending
+								}
+							],
 				turn: { state: 'recaptures', unlockedBy: null }
 			});
 		}
@@ -107,7 +169,14 @@ function serve() {
 			return json(target);
 		}
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 17', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-not-t017', custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 17',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: 'co-ahr-not-t017',
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
 		if (path.endsWith('/records/')) {
@@ -136,7 +205,10 @@ function serve() {
 			const target = served.records.find((r) => r.id === body.record_id);
 			if (target) {
 				target.missing_side = null;
-				target.images = [img(target.id * 10, target.id, 'left'), img(target.id * 10 + 1, target.id, 'right')];
+				target.images = [
+					img(target.id * 10, target.id, 'left'),
+					img(target.id * 10 + 1, target.id, 'right')
+				];
 			}
 			return json({ success: true, record_id: body.record_id });
 		}
@@ -156,7 +228,13 @@ beforeEach(() => {
 	served.recordReads = 0;
 	served.summaryReads = 0;
 	vi.mocked(goto).mockReset();
-	authStore.setSession({ id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
+	authStore.setSession({
+		id: 1,
+		username: 'operator',
+		email: null,
+		role: 'operator',
+		is_active: true
+	});
 });
 
 afterEach(() => {
@@ -169,20 +247,28 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		serve();
 		const screen = render(LivePreview);
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 95) })).toBeVisible();
+		await expect
+			.element(dialog.getByRole('heading', { name: es.cap_title(null, 95) }))
+			.toBeVisible();
 		const where = dialog.getByRole('group', { name: es.cap_where });
 		await expect.element(where).toBeVisible();
-		const thumbs = [...where.element().querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+		const thumbs = [...where.element().querySelectorAll('img')].map(
+			(i) => i.getAttribute('src') ?? ''
+		);
 		expect(thumbs.some((s) => s.includes('/records/images/410/thumbnail'))).toBe(true);
 		expect(thumbs.some((s) => s.includes('/records/images/431/thumbnail'))).toBe(true);
 		expect(where.element().querySelectorAll('[data-missing-side]')).toHaveLength(2);
 		await expect.element(dialog.getByText(es.cap_from_review)).toBeVisible();
-		await expect.element(dialog.getByText('Ningún cuadro muestra el folio 91. Revisa el volumen.')).toBeVisible();
+		await expect
+			.element(dialog.getByText('Ningún cuadro muestra el folio 91. Revisa el volumen.'))
+			.toBeVisible();
 		await expect.element(dialog.getByText('Folios 90v y 91r')).toBeVisible();
 		await expect.element(dialog.getByText(es.cap_order_note(95, null))).toBeVisible();
 		await expect.element(dialog.getByRole('button', { name: es.cap_nothing_link })).toBeVisible();
 		// No confirmation to replace images: there are none.
-		await expect.element(dialog.getByRole('button', { name: 'Volver a capturar' })).not.toBeInTheDocument();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Volver a capturar' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('shows the plain note when the placeholder did not come from a Fisqua request', async () => {
@@ -190,7 +276,9 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		serve();
 		const screen = render(LivePreview);
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByText('Ningún cuadro muestra el folio 91. Revisa el volumen.')).toBeVisible();
+		await expect
+			.element(dialog.getByText('Ningún cuadro muestra el folio 91. Revisa el volumen.'))
+			.toBeVisible();
 		await expect.element(dialog.getByText(es.cap_from_review)).not.toBeInTheDocument();
 	});
 
@@ -203,7 +291,9 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		expect(served.captures).toHaveLength(1);
 		expect(served.captures[0].path).toMatch(/\/cameras\/capture\/dual$/);
 		expect(served.captures[0].body.record_id).toBe(42);
-		await expect.element(dialog.getByRole('button', { name: es.retakes_capture, exact: true })).not.toBeInTheDocument();
+		await expect
+			.element(dialog.getByRole('button', { name: es.retakes_capture, exact: true }))
+			.not.toBeInTheDocument();
 
 		await dialog.getByRole('button', { name: es.cap_another }).click();
 		await vi.waitFor(() => expect(served.captures).toHaveLength(2));
@@ -224,7 +314,9 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		const dialog = screen.getByRole('dialog');
 		await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
 		await dialog.getByRole('button', { name: es.cap_last }).click();
-		await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+		await expect
+			.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' }))
+			.toBeVisible();
 		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 	});
 
@@ -236,7 +328,9 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		await expect.element(close).toBeVisible();
 		await close.getByRole('radio', { name: es.close_reason_skip }).click();
 		await close.getByRole('button', { name: es.close_submit }).click();
-		await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+		await expect
+			.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' }))
+			.toBeVisible();
 		expect(served.closes).toEqual([{ id: 42, body: { reason: 'foliation_skip', note: null } }]);
 		expect(served.captures).toHaveLength(0);
 	});
@@ -245,9 +339,16 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		serve();
 		const screen = render(LivePreview);
 		await screen.getByRole('dialog').getByRole('button', { name: es.cap_nothing_link }).click();
-		await screen.getByRole('dialog', { name: es.close_title }).getByRole('button', { name: es.close_back }).click();
-		await expect.element(screen.getByRole('dialog', { name: es.close_title })).not.toBeInTheDocument();
-		await expect.element(screen.getByRole('heading', { name: es.cap_title(null, 95) })).toBeVisible();
+		await screen
+			.getByRole('dialog', { name: es.close_title })
+			.getByRole('button', { name: es.close_back })
+			.click();
+		await expect
+			.element(screen.getByRole('dialog', { name: es.close_title }))
+			.not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('heading', { name: es.cap_title(null, 95) }))
+			.toBeVisible();
 	});
 
 	it('never offers a single capture for it, even with the camera in single mode', async () => {
@@ -262,7 +363,13 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 	});
 
 	it('Skip is disabled once a placeholder is filled; That was the last one opens the next with Capture and no after-panel', async () => {
-		served.records = [pair(41, 95), placeholder(42, 96, null), pair(43, 97), placeholder(44, 98, null), pair(45, 99)];
+		served.records = [
+			pair(41, 95),
+			placeholder(42, 96, null),
+			pair(43, 97),
+			placeholder(44, 98, null),
+			pair(45, 99)
+		];
 		serve();
 		const screen = render(LivePreview);
 		const dialog = screen.getByRole('dialog');
@@ -270,8 +377,12 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		await expect.element(dialog.getByText(es.cap_another_q(null))).toBeVisible();
 		await expect.element(dialog.getByRole('button', { name: 'Saltar por ahora' })).toBeDisabled();
 		await dialog.getByRole('button', { name: es.cap_last }).click();
-		await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
-		await expect.element(dialog.getByRole('button', { name: es.retakes_capture, exact: true })).toBeVisible();
+		await expect
+			.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) }))
+			.toBeVisible();
+		await expect
+			.element(dialog.getByRole('button', { name: es.retakes_capture, exact: true }))
+			.toBeVisible();
 		await expect.element(dialog.getByText(es.cap_another_q(null))).not.toBeInTheDocument();
 		await expect.element(dialog.getByRole('button', { name: 'Saltar por ahora' })).toBeEnabled();
 	});
@@ -287,7 +398,8 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		await vi.waitFor(() => expect(served.captures).toHaveLength(2));
 		await userEvent.keyboard('{Escape}');
 		await expect.element(screen.getByRole('dialog')).toBeVisible();
-		for (const b of dialog.getByRole('button', { name: es.common_close }).elements()) expect((b as HTMLButtonElement).disabled).toBe(true);
+		for (const b of dialog.getByRole('button', { name: es.common_close }).elements())
+			expect((b as HTMLButtonElement).disabled).toBe(true);
 		release();
 		await expect.element(dialog.getByRole('button', { name: es.cap_another })).toBeEnabled();
 	});
@@ -296,7 +408,10 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		current.url = BASE_URL;
 		serve();
 		const screen = render(LivePreview);
-		const item = () => [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 96'))!;
+		const item = () =>
+			[...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) =>
+				b.textContent?.includes('Par 96')
+			)!;
 		await vi.waitFor(() => expect(item()).toBeTruthy());
 		item().click();
 		const dialog = screen.getByRole('dialog');
@@ -304,10 +419,16 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		await expect.element(dialog.getByText(es.cap_another_q(null))).toBeVisible();
 		await dialog.getByRole('button', { name: es.common_close }).first().click();
 		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
-		await vi.waitFor(() => expect(item().querySelector('img')?.getAttribute('src') ?? '').toContain('/records/images/420/thumbnail'));
+		await vi.waitFor(() =>
+			expect(item().querySelector('img')?.getAttribute('src') ?? '').toContain(
+				'/records/images/420/thumbnail'
+			)
+		);
 		item().click();
 		await expect.element(screen.getByRole('dialog')).toBeVisible();
-		await expect.element(screen.getByRole('heading', { name: es.cap_title(null, 95) })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('heading', { name: es.cap_title(null, 95) }))
+			.not.toBeInTheDocument();
 	});
 
 	it('Close after a fill from the guide goes on as That was the last one does', async () => {
@@ -317,7 +438,9 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
 		await expect.element(dialog.getByText(es.cap_another_q(null))).toBeVisible();
 		await dialog.getByRole('button', { name: es.common_close }).first().click();
-		await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+		await expect
+			.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' }))
+			.toBeVisible();
 	});
 
 	it('sends the camera swap with the fill, and the title and swap with Capture another here', async () => {
@@ -332,8 +455,15 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		expect(served.captures[0].body).toMatchObject({ record_id: 42, left_camera_index: 1 });
 		await dialog.getByRole('button', { name: es.cap_another }).click();
 		await vi.waitFor(() => expect(served.captures).toHaveLength(2));
-		expect(served.captures[1].body).toMatchObject({ afterRecordId: 42, left_camera_index: 1, collection_id: 9, project_name: 'AHR' });
-		expect(String(served.captures[1].body.record_title)).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+		expect(served.captures[1].body).toMatchObject({
+			afterRecordId: 42,
+			left_camera_index: 1,
+			collection_id: 9,
+			project_name: 'AHR'
+		});
+		expect(String(served.captures[1].body.record_title)).toMatch(
+			/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/
+		);
 	});
 
 	it('after each Capture another here, the panel describes the next slot', async () => {
@@ -341,22 +471,36 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		const screen = render(LivePreview);
 		const dialog = screen.getByRole('dialog');
 		await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
-		await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 96) })).toBeVisible();
+		await expect
+			.element(dialog.getByRole('heading', { name: es.cap_title(null, 96) }))
+			.toBeVisible();
 		await expect.element(dialog.getByText(es.cap_order_note(96, null))).toBeVisible();
 		await dialog.getByRole('button', { name: es.cap_another }).click();
-		await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+		await expect
+			.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) }))
+			.toBeVisible();
 		await expect.element(dialog.getByText(es.cap_order_note(97, null))).toBeVisible();
 		const where = dialog.getByRole('group', { name: es.cap_where }).element();
-		expect([...where.querySelectorAll('img')].some((i) => (i.getAttribute('src') ?? '').includes('/records/images/5000/thumbnail'))).toBe(true);
+		expect(
+			[...where.querySelectorAll('img')].some((i) =>
+				(i.getAttribute('src') ?? '').includes('/records/images/5000/thumbnail')
+			)
+		).toBe(true);
 	});
 
 	it('a closed placeholder shows two empty pages and the Closed pill, and asks before a capture', async () => {
-		served.records[1] = { ...placeholder(42, 96, null), closed_reason: 'foliation_skip', closed_note: null };
+		served.records[1] = {
+			...placeholder(42, 96, null),
+			closed_reason: 'foliation_skip',
+			closed_note: null
+		};
 		serve();
 		const screen = render(LivePreview);
 		const dialog = screen.getByRole('dialog');
 		await expect.element(dialog.getByText(es.pill_closed, { exact: true })).toBeVisible();
-		expect(dialog.element().querySelectorAll('.img-viewer-frame[data-missing-side]')).toHaveLength(2);
+		expect(dialog.element().querySelectorAll('.img-viewer-frame[data-missing-side]')).toHaveLength(
+			2
+		);
 		expect(dialog.element().textContent).not.toContain('image_not_supported');
 		await dialog.getByRole('button', { name: 'Volver a capturar' }).click();
 		await expect.element(dialog.getByText(es.lvm_retake_confirm)).toBeVisible();
@@ -377,17 +521,29 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		function slowRecords() {
 			let release!: (ok: boolean) => void;
 			const gate = new Promise<boolean>((r) => (release = r));
-			served.recordsNext = async () => ((await gate) ? json(served.records) : json({ detail: 'boom' }, 500));
+			served.recordsNext = async () =>
+				(await gate) ? json(served.records) : json({ detail: 'boom' }, 500);
 			return release;
 		}
-		function expectLocked(screen: ReturnType<typeof render>, dialog: ReturnType<ReturnType<typeof render>['getByRole']>) {
-			const capture = [...dialog.element().querySelectorAll('button')].find((b) => b.textContent?.trim() === es.retakes_capture);
+		function expectLocked(
+			screen: ReturnType<typeof render>,
+			dialog: ReturnType<ReturnType<typeof render>['getByRole']>
+		) {
+			const capture = [...dialog.element().querySelectorAll('button')].find(
+				(b) => b.textContent?.trim() === es.retakes_capture
+			);
 			expect(capture).toBeUndefined();
-			for (const b of dialog.getByRole('button', { name: es.common_close }).elements()) expect((b as HTMLButtonElement).disabled).toBe(true);
+			for (const b of dialog.getByRole('button', { name: es.common_close }).elements())
+				expect((b as HTMLButtonElement).disabled).toBe(true);
 			for (const name of [es.cap_another, es.cap_last]) {
-				expect((dialog.getByRole('button', { name }).element() as HTMLButtonElement).disabled).toBe(true);
+				expect((dialog.getByRole('button', { name }).element() as HTMLButtonElement).disabled).toBe(
+					true
+				);
 			}
-			expect((dialog.getByRole('button', { name: 'Saltar por ahora' }).element() as HTMLButtonElement).disabled).toBe(true);
+			expect(
+				(dialog.getByRole('button', { name: 'Saltar por ahora' }).element() as HTMLButtonElement)
+					.disabled
+			).toBe(true);
 			void screen;
 		}
 
@@ -402,7 +558,9 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await userEvent.keyboard('{Escape}');
 			await expect.element(screen.getByRole('dialog')).toBeVisible();
 			release(true);
-			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+			await expect
+				.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' }))
+				.toBeVisible();
 			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 		});
 
@@ -415,7 +573,9 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await new Promise((r) => setTimeout(r, 50));
 			expectLocked(screen, dialog);
 			release(true);
-			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+			await expect
+				.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' }))
+				.toBeVisible();
 		});
 
 		it('a failed reload in the guide pauses it, and leaves nothing locked', async () => {
@@ -428,15 +588,23 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await expect.element(screen.getByText(es.retakes_load_error)).toBeVisible();
 			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 			await screen.getByRole('button', { name: es.common_retry }).click();
-			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+			await expect
+				.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' }))
+				.toBeVisible();
 		});
 
 		it('a failed reload outside the guide leaves the next modal free to close', async () => {
 			current.url = BASE_URL;
 			serve();
 			const screen = render(LivePreview);
-			const item = () => [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 97'))!;
-			const hole = () => [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 96'))!;
+			const item = () =>
+				[...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) =>
+					b.textContent?.includes('Par 97')
+				)!;
+			const hole = () =>
+				[...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) =>
+					b.textContent?.includes('Par 96')
+				)!;
 			await vi.waitFor(() => expect(hole()).toBeTruthy());
 			hole().click();
 			const dialog = await fill(screen);
@@ -456,7 +624,8 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		function holdRecords() {
 			let release!: (ok: boolean) => void;
 			const gate = new Promise<boolean>((r) => (release = r));
-			served.recordsNext = async () => ((await gate) ? json(served.records) : json({ detail: 'boom' }, 500));
+			served.recordsNext = async () =>
+				(await gate) ? json(served.records) : json({ detail: 'boom' }, 500);
 			return release;
 		}
 		async function fillFrom(screen: ReturnType<typeof render>) {
@@ -471,7 +640,10 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			current.url = BASE_URL;
 			serve();
 			const screen = render(LivePreview);
-			const hole = () => [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 96'))!;
+			const hole = () =>
+				[...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) =>
+					b.textContent?.includes('Par 96')
+				)!;
 			await vi.waitFor(() => expect(hole()).toBeTruthy());
 			hole().click();
 			const dialog = await fillFrom(screen);
@@ -479,13 +651,18 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await dialog.getByRole('button', { name: es.common_close }).first().click();
 			await new Promise((r) => setTimeout(r, 50));
 			await expect.element(screen.getByRole('dialog')).toBeVisible();
-			for (const b of dialog.getByRole('button', { name: es.common_close }).elements()) expect((b as HTMLButtonElement).disabled).toBe(true);
+			for (const b of dialog.getByRole('button', { name: es.common_close }).elements())
+				expect((b as HTMLButtonElement).disabled).toBe(true);
 			release(true);
 			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 		});
 
 		it('back to the volume, the modal stays until the navigation has finished', async () => {
-			served.records[1] = { ...placeholder(42, 96, null), closed_reason: 'foliation_skip', closed_note: null };
+			served.records[1] = {
+				...placeholder(42, 96, null),
+				closed_reason: 'foliation_skip',
+				closed_note: null
+			};
 			let arrive!: () => void;
 			vi.mocked(goto).mockImplementation(() => new Promise<void>((r) => (arrive = r)));
 			serve();
@@ -493,7 +670,9 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			const dialog = screen.getByRole('dialog');
 			await dialog.getByRole('button', { name: 'Volver a capturar' }).click();
 			await dialog.getByRole('button', { name: 'Confirmar' }).click();
-			await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard/projects/2/collections/9'));
+			await vi.waitFor(() =>
+				expect(goto).toHaveBeenCalledWith('/dashboard/projects/2/collections/9')
+			);
 			await expect.element(screen.getByRole('dialog')).toBeVisible();
 			arrive();
 			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
@@ -509,20 +688,27 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await expect.element(dialog.getByRole('button', { name: es.cap_another })).toBeDisabled();
 			await dialog.getByRole('button', { name: es.common_retry }).click();
 			await expect.element(dialog.getByText(es.cap_refresh_error)).not.toBeInTheDocument();
-			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await expect
+				.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) }))
+				.toBeVisible();
 			await expect.element(dialog.getByRole('button', { name: es.cap_another })).toBeEnabled();
 			await dialog.getByRole('button', { name: es.cap_another }).click();
 			await vi.waitFor(() => expect(served.captures).toHaveLength(3));
 			expect(served.captures[2].body.afterRecordId).toBe(500);
 		});
 
-		it('shows a neighbour\'s pages left before right, whatever order they come in', async () => {
-			served.records[0] = { ...pair(41, 95), images: [img(411, 41, 'right'), img(410, 41, 'left')] };
+		it("shows a neighbour's pages left before right, whatever order they come in", async () => {
+			served.records[0] = {
+				...pair(41, 95),
+				images: [img(411, 41, 'right'), img(410, 41, 'left')]
+			};
 			serve();
 			const screen = render(LivePreview);
 			const where = screen.getByRole('group', { name: es.cap_where });
 			await expect.element(where).toBeVisible();
-			const srcs = [...where.element().querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+			const srcs = [...where.element().querySelectorAll('img')].map(
+				(i) => i.getAttribute('src') ?? ''
+			);
 			expect(srcs[0]).toContain('/records/images/410/thumbnail');
 			expect(srcs[1]).toContain('/records/images/411/thumbnail');
 		});
@@ -535,16 +721,28 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await close.getByRole('radio', { name: es.close_reason_skip }).click();
 			const release = holdRecords();
 			await close.getByRole('button', { name: es.close_submit }).click();
-			await expect.element(screen.getByRole('dialog', { name: es.close_title })).not.toBeInTheDocument();
-			await expect.element(screen.getByRole('button', { name: es.cap_nothing_link })).toBeDisabled();
+			await expect
+				.element(screen.getByRole('dialog', { name: es.close_title }))
+				.not.toBeInTheDocument();
+			await expect
+				.element(screen.getByRole('button', { name: es.cap_nothing_link }))
+				.toBeDisabled();
 			release(true);
-			await expect.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' })).toBeVisible();
+			await expect
+				.element(screen.getByRole('region', { name: 'Terminaste las recapturas de este volumen.' }))
+				.toBeVisible();
 		});
 	});
 
 	describe('stale refreshes and a failed navigation (round 6)', () => {
 		it('a Retry still running when the operator moves on does not touch the next placeholder', async () => {
-			served.records = [pair(41, 95), placeholder(42, 96, null), pair(43, 97), placeholder(44, 98, null), pair(45, 99)];
+			served.records = [
+				pair(41, 95),
+				placeholder(42, 96, null),
+				pair(43, 97),
+				placeholder(44, 98, null),
+				pair(45, 99)
+			];
 			serve();
 			const screen = render(LivePreview);
 			const dialog = screen.getByRole('dialog');
@@ -561,11 +759,15 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			};
 			await dialog.getByRole('button', { name: es.common_retry }).click();
 			await dialog.getByRole('button', { name: es.cap_last }).click();
-			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await expect
+				.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) }))
+				.toBeVisible();
 			release();
 			await new Promise((r) => setTimeout(r, 100));
 			await expect.element(dialog.getByText(es.cap_refresh_error)).not.toBeInTheDocument();
-			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await expect
+				.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) }))
+				.toBeVisible();
 			await expect.element(dialog.getByRole('group', { name: es.cap_where })).toBeVisible();
 			// And the next fill offers Capture another here, not a stuck retry.
 			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
@@ -573,7 +775,11 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 		});
 
 		it('a rejected navigation back to the volume reloads the records and the summary in place, with no error', async () => {
-			served.records[1] = { ...placeholder(42, 96, null), closed_reason: 'foliation_skip', closed_note: null };
+			served.records[1] = {
+				...placeholder(42, 96, null),
+				closed_reason: 'foliation_skip',
+				closed_note: null
+			};
 			vi.mocked(goto).mockRejectedValue(new Error('navigation aborted'));
 			serve();
 			const screen = render(LivePreview);
@@ -587,13 +793,21 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 			await vi.waitFor(() => expect(served.recordReads).toBeGreaterThan(records));
 			expect(served.summaryReads).toBeGreaterThan(summaries);
-			await expect.element(screen.getByText('navigation aborted', { exact: false })).not.toBeInTheDocument();
+			await expect
+				.element(screen.getByText('navigation aborted', { exact: false }))
+				.not.toBeInTheDocument();
 		});
 	});
 
 	describe('only the newest read of the records is kept (round 7)', () => {
 		it('a slow retry that succeeds after the operator moved on and captured leaves the newer records', async () => {
-			served.records = [pair(41, 95), placeholder(42, 96, null), pair(43, 97), placeholder(44, 98, null), pair(45, 99)];
+			served.records = [
+				pair(41, 95),
+				placeholder(42, 96, null),
+				pair(43, 97),
+				placeholder(44, 98, null),
+				pair(45, 99)
+			];
 			serve();
 			const screen = render(LivePreview);
 			const dialog = screen.getByRole('dialog');
@@ -611,20 +825,29 @@ describe('capture screen: capturing into a placeholder (NEH-317)', () => {
 			};
 			await dialog.getByRole('button', { name: es.common_retry }).click();
 			await dialog.getByRole('button', { name: es.cap_last }).click();
-			await expect.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) })).toBeVisible();
+			await expect
+				.element(dialog.getByRole('heading', { name: es.cap_title(null, 97) }))
+				.toBeVisible();
 			await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
 			await expect.element(dialog.getByText(es.cap_another_q(null))).toBeVisible();
 			await expect.element(dialog.getByText(es.lvm_retaking)).not.toBeInTheDocument();
 			const whereImgs = () =>
-				[...dialog.getByRole('group', { name: es.cap_where }).element().querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
-			await vi.waitFor(() => expect(whereImgs().some((s) => s.includes('/records/images/440/thumbnail'))).toBe(true));
+				[
+					...dialog.getByRole('group', { name: es.cap_where }).element().querySelectorAll('img')
+				].map((i) => i.getAttribute('src') ?? '');
+			await vi.waitFor(() =>
+				expect(whereImgs().some((s) => s.includes('/records/images/440/thumbnail'))).toBe(true)
+			);
 			release();
 			await new Promise((r) => setTimeout(r, 100));
 			// The filled record keeps its images; the old snapshot was dropped.
 			expect(whereImgs().some((s) => s.includes('/records/images/440/thumbnail'))).toBe(true);
-			const strip = [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find((b) => b.textContent?.includes('Par 98'));
-			expect(strip?.querySelector('img')?.getAttribute('src') ?? '').toContain('/records/images/440/thumbnail');
+			const strip = [...screen.container.querySelectorAll<HTMLElement>('.thumbnail-item')].find(
+				(b) => b.textContent?.includes('Par 98')
+			);
+			expect(strip?.querySelector('img')?.getAttribute('src') ?? '').toContain(
+				'/records/images/440/thumbnail'
+			);
 		});
 	});
 });
-

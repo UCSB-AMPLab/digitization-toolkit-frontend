@@ -13,11 +13,11 @@ export const powerControlOpen = derived(open, (n) => n > 0);
 
 // Counts one instance as open until the returned function is called.
 export function holdPowerControlOpen(): () => void {
-  open.update((n) => n + 1);
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    open.update((n) => n - 1);
-  };
+	open.update((n) => n + 1);
+	let released = false;
+	return () => {
+		if (released) return;
+		released = true;
+		open.update((n) => n - 1);
+	};
 }

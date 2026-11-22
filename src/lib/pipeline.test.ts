@@ -32,7 +32,9 @@ describe('placeVolume', () => {
 	});
 
 	it('keeps a mostly finished volume in capture while one record is captured', () => {
-		expect(placeVolume(counts({ captured: 1, rejected: 2, in_review: 3, approved: 40 }))).toBe('capture');
+		expect(placeVolume(counts({ captured: 1, rejected: 2, in_review: 3, approved: 40 }))).toBe(
+			'capture'
+		);
 	});
 
 	it('puts a volume with rejected records and nothing captured in recapture', () => {
@@ -74,7 +76,9 @@ describe('barSegments', () => {
 	});
 
 	it('gives a single status the whole bar', () => {
-		expect(barSegments(counts({ rejected: 3 }))).toEqual([{ status: 'rejected', count: 3, percent: 100 }]);
+		expect(barSegments(counts({ rejected: 3 }))).toEqual([
+			{ status: 'rejected', count: 3, percent: 100 }
+		]);
 	});
 });
 
@@ -114,7 +118,9 @@ describe('parseApiDate', () => {
 
 	it('leaves a string with Z or an offset as given', () => {
 		expect(parseApiDate('2026-10-22T17:03:11Z').toISOString()).toBe('2026-10-22T17:03:11.000Z');
-		expect(parseApiDate('2026-10-22T12:03:11-05:00').toISOString()).toBe('2026-10-22T17:03:11.000Z');
+		expect(parseApiDate('2026-10-22T12:03:11-05:00').toISOString()).toBe(
+			'2026-10-22T17:03:11.000Z'
+		);
 	});
 });
 

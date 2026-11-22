@@ -128,7 +128,9 @@ describe('dashboard sidebar account menu', () => {
 		expect(screen.container.querySelector('.s-footer')!.textContent).not.toContain('reviewer');
 
 		await tile.click();
-		await expect.element(screen.getByRole('menuitem', { name: 'Reiniciar el equipo' })).toBeVisible();
+		await expect
+			.element(screen.getByRole('menuitem', { name: 'Reiniciar el equipo' }))
+			.toBeVisible();
 	});
 
 	it('shows the whole footer at 800x480 and leaves the nav its own scroll, expanded and collapsed', async () => {
@@ -150,7 +152,9 @@ describe('dashboard sidebar account menu', () => {
 		await screen.getByRole('button', { name: /menú lateral/ }).click();
 		await expect.poll(() => q('.sidebar').getBoundingClientRect().width).toBeLessThan(100);
 		const collapsed = check();
-		console.info(`MEASURE 800x480 admin expanded ${JSON.stringify(expanded)} collapsed ${JSON.stringify(collapsed)}`);
+		console.info(
+			`MEASURE 800x480 admin expanded ${JSON.stringify(expanded)} collapsed ${JSON.stringify(collapsed)}`
+		);
 	});
 
 	it('opens upward from the user row at 800x480, inside the screen', async () => {

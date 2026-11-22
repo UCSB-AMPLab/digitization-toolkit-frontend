@@ -33,13 +33,25 @@ import Layout from './+layout@.svelte';
 const children = createRawSnippet(() => ({ render: () => '<p>volume</p>' }));
 
 function unit(projectsShown: boolean) {
-	return { mode: projectsShown ? 'offline' : 'fisqua', projectsEnabled: projectsShown, projectsShown, defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] } };
+	return {
+		mode: projectsShown ? 'offline' : 'fisqua',
+		projectsEnabled: projectsShown,
+		projectsShown,
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
 }
 
 beforeEach(() => {
 	locale.set('es');
 	gotoMock.mockClear();
-	authStore.setSession({ id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
+	authStore.setSession({
+		id: 1,
+		username: 'operator',
+		email: null,
+		role: 'operator',
+		is_active: true
+	});
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
 });
 afterEach(() => {
@@ -53,7 +65,9 @@ describe('volume page top bar', () => {
 		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit(false) as never);
 		const screen = render(Layout, { children });
 		const crumb = page.getByRole('navigation', { name: es.col_breadcrumb_nav });
-		await expect.element(crumb.getByRole('link', { name: es.nav_volumes })).toHaveAttribute('href', '/dashboard/volumes');
+		await expect
+			.element(crumb.getByRole('link', { name: es.nav_volumes }))
+			.toHaveAttribute('href', '/dashboard/volumes');
 		await expect.element(crumb.getByText('Tomo 097')).toBeInTheDocument();
 		expect(screen.container.textContent).not.toContain('AHR Digitalización 2026');
 		await userEvent.click(page.getByRole('button', { name: es.col_back_to_volumes }));

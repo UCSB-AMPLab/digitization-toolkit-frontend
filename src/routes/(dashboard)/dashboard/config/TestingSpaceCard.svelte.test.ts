@@ -39,7 +39,15 @@ function signIn(role: UserRole) {
 }
 
 function space(over: Partial<TestingSpace> = {}): TestingSpace {
-	return { enabled: false, username: null, account_active: false, expiry_days: 30, projects: 0, volumes: 0, ...over };
+	return {
+		enabled: false,
+		username: null,
+		account_active: false,
+		expiry_days: 30,
+		projects: 0,
+		volumes: 0,
+		...over
+	};
 }
 
 type Call = { method: string; path: string; body: unknown };
@@ -74,19 +82,25 @@ function serve(opts: ServeOptions = {}) {
 		const path = new URL(url, 'http://localhost').pathname.replace(/^.*(\/system\/.*)$/, '$1');
 		const method = (init?.method ?? 'GET').toUpperCase();
 		const body = init?.body ? JSON.parse(String(init.body)) : undefined;
-		const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+		const json = (data: unknown, status = 200) =>
+			new Response(JSON.stringify(data), {
+				status,
+				headers: { 'Content-Type': 'application/json' }
+			});
 		if (path.startsWith('/system/testing')) {
 			calls.push({ method, path, body });
 			if (method === 'GET') {
 				gets += 1;
 				if (gets > 1 && opts.holdReread) await opts.holdReread;
-				if (opts.getFails || (refused && opts.afterRefuse === 'fail')) return json({ detail: 'x' }, 500);
+				if (opts.getFails || (refused && opts.afterRefuse === 'fail'))
+					return json({ detail: 'x' }, 500);
 				return json(state);
 			}
 			if (opts.holdWrite) await opts.holdWrite;
 			if (opts.network && opts.afterRefuse && opts.afterRefuse !== 'fail') state = opts.afterRefuse;
 			if (opts.network === 'reject') throw new TypeError('Failed to fetch');
-			if (opts.network === 'abort') throw new DOMException('The operation was aborted.', 'AbortError');
+			if (opts.network === 'abort')
+				throw new DOMException('The operation was aborted.', 'AbortError');
 			if (opts.refuse) {
 				refused = true;
 				if (opts.afterRefuse && opts.afterRefuse !== 'fail') state = opts.afterRefuse;
@@ -95,13 +109,28 @@ function serve(opts: ServeOptions = {}) {
 			if (opts.next) state = opts.next;
 			return json(state);
 		}
-		if (path === '/system/unit') return json({ mode: 'offline', projectsEnabled: false, projectsShown: false, defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] } });
+		if (path === '/system/unit')
+			return json({
+				mode: 'offline',
+				projectsEnabled: false,
+				projectsShown: false,
+				defaultProjectId: 1,
+				prerequisites: { backup: [], fisqua: [] }
+			});
 		return new Response('{}', { status: 500 });
 	});
-	return { calls, spy, writes: () => calls.filter((c) => c.method !== 'GET'), gets: () => calls.filter((c) => c.method === 'GET') };
+	return {
+		calls,
+		spy,
+		writes: () => calls.filter((c) => c.method !== 'GET'),
+		gets: () => calls.filter((c) => c.method === 'GET')
+	};
 }
 
-const refusal = (code: string, status: number) => ({ status, body: { detail: { code, message: BACKEND_TEXT } } });
+const refusal = (code: string, status: number) => ({
+	status,
+	body: { detail: { code, message: BACKEND_TEXT } }
+});
 
 const field = (label: string) => page.getByLabelText(label, { exact: true });
 const button = (name: string) => page.getByRole('button', { name, exact: true });
@@ -121,7 +150,8 @@ describe('Testing section', () => {
 		serve();
 		signIn('admin');
 		const { container, unmount } = render(ConfigPage);
-		const names = () => [...container.querySelectorAll('[data-settings-section]')].map((b) => b.textContent?.trim());
+		const names = () =>
+			[...container.querySelectorAll('[data-settings-section]')].map((b) => b.textContent?.trim());
 		await expect.poll(() => names()).toContain(en.config_section_testing);
 		const n = names();
 		expect(n.indexOf(en.config_section_testing)).toBe(n.indexOf(en.fisqua_link_title) + 1);
@@ -132,7 +162,9 @@ describe('Testing section', () => {
 			signIn(role);
 			store().set({ url: new URL('http://localhost/dashboard/config?section=testing') });
 			const r = render(ConfigPage);
-			await expect.element(page.getByRole('heading', { name: en.config_section_network, level: 2 })).toBeVisible();
+			await expect
+				.element(page.getByRole('heading', { name: en.config_section_network, level: 2 }))
+				.toBeVisible();
 			expect(r.container.textContent).not.toContain(en.config_section_testing);
 			r.unmount();
 		}
@@ -150,7 +182,9 @@ describe('Testing section', () => {
 		expect(s.calls).toEqual([]);
 		store().set({ url: new URL('http://localhost/dashboard/config?section=testing') });
 		render(ConfigPage);
-		await expect.element(page.getByRole('heading', { name: en.config_section_testing, level: 2 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: en.config_section_testing, level: 2 }))
+			.toBeVisible();
 		await expect.poll(() => s.calls.length).toBe(1);
 		expect(s.calls[0]).toMatchObject({ method: 'GET', path: '/system/testing' });
 	});
@@ -166,7 +200,11 @@ describe('Testing card: first switch-on', () => {
 		await field(en.testing_password_label).fill('s3cret-pass');
 		await button(en.testing_switch_on).click();
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()[0]).toEqual({ method: 'PUT', path: '/system/testing', body: { enabled: true, username: 'practice', password: 's3cret-pass', expiry_days: 30 } });
+		expect(s.writes()[0]).toEqual({
+			method: 'PUT',
+			path: '/system/testing',
+			body: { enabled: true, username: 'practice', password: 's3cret-pass', expiry_days: 30 }
+		});
 		await expect.element(page.getByText('practice', { exact: true })).toBeVisible();
 		await expect.element(button(en.testing_switch_off)).toBeVisible();
 	});
@@ -213,7 +251,12 @@ describe('Testing card: first switch-on', () => {
 		await field(en.testing_expiry_label).fill('365');
 		await button(en.testing_switch_on).click();
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()[0].body).toEqual({ enabled: true, username: 'a'.repeat(150), password: 'pw', expiry_days: 365 });
+		expect(s.writes()[0].body).toEqual({
+			enabled: true,
+			username: 'a'.repeat(150),
+			password: 'pw',
+			expiry_days: 365
+		});
 	});
 
 	it('accepts days 1', async () => {
@@ -230,8 +273,24 @@ describe('Testing card: first switch-on', () => {
 });
 
 describe('Testing card: on and off', () => {
-	const on = () => space({ enabled: true, username: 'practice', account_active: true, expiry_days: 14, projects: 2, volumes: 5 });
-	const off = () => space({ enabled: false, username: 'practice', account_active: false, expiry_days: 14, projects: 2, volumes: 5 });
+	const on = () =>
+		space({
+			enabled: true,
+			username: 'practice',
+			account_active: true,
+			expiry_days: 14,
+			projects: 2,
+			volumes: 5
+		});
+	const off = () =>
+		space({
+			enabled: false,
+			username: 'practice',
+			account_active: false,
+			expiry_days: 14,
+			projects: 2,
+			volumes: 5
+		});
 
 	it('shows on, the username and the counts', async () => {
 		serve({ state: on() });
@@ -247,13 +306,19 @@ describe('Testing card: on and off', () => {
 		const { container } = render(TestingSpaceCard);
 		await button(en.testing_switch_off).click();
 		expect(s.writes()).toEqual([]);
-		await expect.element(page.getByText(en.testing_off_confirm_text, { exact: true })).toBeVisible();
+		await expect
+			.element(page.getByText(en.testing_off_confirm_text, { exact: true }))
+			.toBeVisible();
 		await button(en.common_cancel).click();
 		expect(s.writes()).toEqual([]);
 		await button(en.testing_switch_off).click();
 		await button(en.testing_off_confirm).click();
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()[0]).toEqual({ method: 'PUT', path: '/system/testing', body: { enabled: false } });
+		expect(s.writes()[0]).toEqual({
+			method: 'PUT',
+			path: '/system/testing',
+			body: { enabled: false }
+		});
 		await expect.element(button(en.testing_switch_on)).toBeVisible();
 		expect(container.textContent).toContain(en.testing_state_off);
 	});
@@ -267,7 +332,11 @@ describe('Testing card: on and off', () => {
 		await expect.element(field(en.testing_expiry_label)).toHaveValue('14');
 		await button(en.testing_switch_on).click();
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()[0]).toEqual({ method: 'PUT', path: '/system/testing', body: { enabled: true, expiry_days: 14 } });
+		expect(s.writes()[0]).toEqual({
+			method: 'PUT',
+			path: '/system/testing',
+			body: { enabled: true, expiry_days: 14 }
+		});
 	});
 
 	it('changing the term sends enabled:true and the new days', async () => {
@@ -276,7 +345,11 @@ describe('Testing card: on and off', () => {
 		await field(en.testing_expiry_label).fill('60');
 		await button(en.testing_term_save).click();
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()[0]).toEqual({ method: 'PUT', path: '/system/testing', body: { enabled: true, expiry_days: 60 } });
+		expect(s.writes()[0]).toEqual({
+			method: 'PUT',
+			path: '/system/testing',
+			body: { enabled: true, expiry_days: 60 }
+		});
 	});
 
 	it('a bad term on an enabled space is blocked', async () => {
@@ -294,7 +367,11 @@ describe('Testing card: on and off', () => {
 		await field(en.testing_new_username_label).fill('  lab ');
 		await button(en.testing_rename).click();
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()[0]).toEqual({ method: 'PATCH', path: '/system/testing/account', body: { username: 'lab' } });
+		expect(s.writes()[0]).toEqual({
+			method: 'PATCH',
+			path: '/system/testing/account',
+			body: { username: 'lab' }
+		});
 		await expect.element(page.getByText('lab', { exact: true })).toBeVisible();
 	});
 
@@ -316,7 +393,11 @@ describe('Testing card: on and off', () => {
 		await input.fill('another-pass');
 		await button(en.testing_password_set).click();
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()[0]).toEqual({ method: 'PATCH', path: '/system/testing/account', body: { password: 'another-pass' } });
+		expect(s.writes()[0]).toEqual({
+			method: 'PATCH',
+			path: '/system/testing/account',
+			body: { password: 'another-pass' }
+		});
 		await expect.element(input).toHaveValue('');
 		expect(container.textContent).not.toContain('another-pass');
 	});
@@ -325,7 +406,9 @@ describe('Testing card: on and off', () => {
 		const s = serve({ state: on() });
 		render(TestingSpaceCard);
 		await button(en.testing_password_set).click();
-		await expect.element(page.getByText(en.testing_err_password_empty, { exact: true })).toBeVisible();
+		await expect
+			.element(page.getByText(en.testing_err_password_empty, { exact: true }))
+			.toBeVisible();
 		expect(s.writes()).toEqual([]);
 	});
 });
@@ -361,7 +444,9 @@ describe('Testing card: refusals', () => {
 			await field(en.testing_password_label).fill('pw');
 			await button(en.testing_switch_on).click();
 			await expect.element(page.getByRole('alert')).toHaveTextContent(message);
-			shown.push(((await page.getByRole('alert').element()) as HTMLElement).textContent?.trim() ?? '');
+			shown.push(
+				((await page.getByRole('alert').element()) as HTMLElement).textContent?.trim() ?? ''
+			);
 			expect(container.textContent).not.toContain(BACKEND_TEXT);
 			unmount();
 			vi.restoreAllMocks();
@@ -380,7 +465,10 @@ describe('Testing card: refusals', () => {
 	});
 
 	it('a framework validation list and a plain-string detail show the generic string', async () => {
-		for (const body of [{ detail: [{ loc: ['body', 'username'], msg: BACKEND_TEXT }] }, { detail: BACKEND_TEXT }]) {
+		for (const body of [
+			{ detail: [{ loc: ['body', 'username'], msg: BACKEND_TEXT }] },
+			{ detail: BACKEND_TEXT }
+		]) {
 			serve({ refuse: { status: 422, body } });
 			const { container, unmount } = render(TestingSpaceCard);
 			await field(en.testing_username_label).fill('practice');
@@ -426,7 +514,15 @@ describe('Testing card: refusals', () => {
 describe('Testing card: languages', () => {
 	it('renders in Spanish', async () => {
 		locale.set('es');
-		serve({ state: space({ enabled: true, username: 'practice', account_active: true, projects: 1, volumes: 1 }) });
+		serve({
+			state: space({
+				enabled: true,
+				username: 'practice',
+				account_active: true,
+				projects: 1,
+				volumes: 1
+			})
+		});
 		const { container } = render(TestingSpaceCard);
 		await expect.element(button(es.testing_switch_off)).toBeVisible();
 		expect(container.textContent).toContain(es.testing_desc);
@@ -441,8 +537,18 @@ describe('Testing card: languages', () => {
 	});
 });
 
-const acct = (over: Partial<TestingSpace> = {}) => space({ enabled: true, username: 'practice', account_active: true, expiry_days: 14, projects: 2, volumes: 5, ...over });
-const acctOff = (over: Partial<TestingSpace> = {}) => acct({ enabled: false, account_active: false, ...over });
+const acct = (over: Partial<TestingSpace> = {}) =>
+	space({
+		enabled: true,
+		username: 'practice',
+		account_active: true,
+		expiry_days: 14,
+		projects: 2,
+		volumes: 5,
+		...over
+	});
+const acctOff = (over: Partial<TestingSpace> = {}) =>
+	acct({ enabled: false, account_active: false, ...over });
 const active = async () => document.activeElement;
 const isFocused = async (name: string) => (await button(name).element()) === document.activeElement;
 
@@ -456,7 +562,9 @@ describe('Testing card: forms and the password manager', () => {
 		const form = user.closest('form')!;
 		expect(form).not.toBeNull();
 		expect(form.contains((await field(en.testing_password_label).element()) as Element)).toBe(true);
-		expect(((await field(en.testing_password_label).element()) as HTMLInputElement).autocomplete).toBe('new-password');
+		expect(
+			((await field(en.testing_password_label).element()) as HTMLInputElement).autocomplete
+		).toBe('new-password');
 	});
 
 	it('the new-password input sits in a form with the account username, read-only, autocomplete="username"', async () => {
@@ -478,7 +586,9 @@ describe('Testing card: forms and the password manager', () => {
 		await field(en.testing_new_password_label).fill('pw-by-enter');
 		await userEvent.keyboard('{Enter}');
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()).toEqual([{ method: 'PATCH', path: '/system/testing/account', body: { password: 'pw-by-enter' } }]);
+		expect(s.writes()).toEqual([
+			{ method: 'PATCH', path: '/system/testing/account', body: { password: 'pw-by-enter' } }
+		]);
 	});
 
 	it('Enter in the term field sends only the term, never a switch-off', async () => {
@@ -487,7 +597,9 @@ describe('Testing card: forms and the password manager', () => {
 		await field(en.testing_expiry_label).fill('20');
 		await userEvent.keyboard('{Enter}');
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()).toEqual([{ method: 'PUT', path: '/system/testing', body: { enabled: true, expiry_days: 20 } }]);
+		expect(s.writes()).toEqual([
+			{ method: 'PUT', path: '/system/testing', body: { enabled: true, expiry_days: 20 } }
+		]);
 	});
 
 	it('Enter in the rename field sends only the rename', async () => {
@@ -496,7 +608,9 @@ describe('Testing card: forms and the password manager', () => {
 		await field(en.testing_new_username_label).fill('lab');
 		await userEvent.keyboard('{Enter}');
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()).toEqual([{ method: 'PATCH', path: '/system/testing/account', body: { username: 'lab' } }]);
+		expect(s.writes()).toEqual([
+			{ method: 'PATCH', path: '/system/testing/account', body: { username: 'lab' } }
+		]);
 	});
 
 	it('Enter in the create form sends the first switch-on', async () => {
@@ -506,7 +620,12 @@ describe('Testing card: forms and the password manager', () => {
 		await field(en.testing_password_label).fill('pw');
 		await userEvent.keyboard('{Enter}');
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()[0].body).toEqual({ enabled: true, username: 'practice', password: 'pw', expiry_days: 30 });
+		expect(s.writes()[0].body).toEqual({
+			enabled: true,
+			username: 'practice',
+			password: 'pw',
+			expiry_days: 30
+		});
 	});
 });
 
@@ -516,7 +635,9 @@ describe('Testing card: focus', () => {
 		render(TestingSpaceCard);
 		await button(en.testing_switch_off).click();
 		await expect.poll(() => isFocused(en.common_cancel)).toBe(true);
-		const group = (await page.getByRole('group', { name: en.testing_switch_off }).element()) as HTMLElement;
+		const group = (await page
+			.getByRole('group', { name: en.testing_switch_off })
+			.element()) as HTMLElement;
 		const text = document.getElementById(group.getAttribute('aria-describedby')!);
 		expect(text?.textContent?.trim()).toBe(en.testing_off_confirm_text);
 		await button(en.common_cancel).click();
@@ -566,7 +687,11 @@ describe('Testing card: with the space off', () => {
 		await field(en.testing_expiry_label).fill('45');
 		await button(en.testing_term_save).click();
 		await expect.poll(() => s.writes().length).toBe(1);
-		expect(s.writes()[0]).toEqual({ method: 'PUT', path: '/system/testing', body: { enabled: false, expiry_days: 45 } });
+		expect(s.writes()[0]).toEqual({
+			method: 'PUT',
+			path: '/system/testing',
+			body: { enabled: false, expiry_days: 45 }
+		});
 		expect(container.textContent).toContain(en.testing_state_off);
 	});
 
@@ -603,7 +728,9 @@ describe('Testing card: with the space off', () => {
 		expect(container.querySelector('#testing-new-username')).toBeNull();
 		expect(container.querySelector('#testing-new-password')).toBeNull();
 		for (const name of [en.testing_term_save, en.testing_rename, en.testing_password_set]) {
-			expect([...container.querySelectorAll('button')].some((b) => b.textContent?.trim() === name)).toBe(false);
+			expect(
+				[...container.querySelectorAll('button')].some((b) => b.textContent?.trim() === name)
+			).toBe(false);
 		}
 		expect(s.writes()).toEqual([]);
 	});
@@ -611,7 +738,10 @@ describe('Testing card: with the space off', () => {
 
 describe('Testing card: state after a failed request', () => {
 	it('account_exists: the create form is replaced by the account that exists, and the message stays', async () => {
-		const s = serve({ refuse: refusal('account_exists', 409), afterRefuse: acctOff({ username: 'someone-else' }) });
+		const s = serve({
+			refuse: refusal('account_exists', 409),
+			afterRefuse: acctOff({ username: 'someone-else' })
+		});
 		const { container } = render(TestingSpaceCard);
 		await field(en.testing_username_label).fill('practice');
 		await field(en.testing_password_label).fill('pw');
@@ -628,7 +758,11 @@ describe('Testing card: state after a failed request', () => {
 	});
 
 	it('no_testing_account: the card shows there is no account and offers the create form', async () => {
-		const s = serve({ state: acct(), refuse: refusal('no_testing_account', 404), afterRefuse: space() });
+		const s = serve({
+			state: acct(),
+			refuse: refusal('no_testing_account', 404),
+			afterRefuse: space()
+		});
 		render(TestingSpaceCard);
 		await field(en.testing_new_username_label).fill('lab');
 		await button(en.testing_rename).click();
@@ -676,18 +810,27 @@ describe('Testing card: state after a failed request', () => {
 	it('the shown state is unchanged by a failed request until the re-read answers', async () => {
 		let release!: () => void;
 		const gate = new Promise<void>((r) => (release = r));
-		serve({ state: acct(), refuse: refusal('password_invalid', 422), afterRefuse: acctOff({ username: 'changed' }), holdReread: gate });
+		serve({
+			state: acct(),
+			refuse: refusal('password_invalid', 422),
+			afterRefuse: acctOff({ username: 'changed' }),
+			holdReread: gate
+		});
 		const { container } = render(TestingSpaceCard);
 		await field(en.testing_new_password_label).fill('pw');
 		await button(en.testing_password_set).click();
-		await expect.element(page.getByRole('alert')).toHaveTextContent(en.testing_err_password_invalid);
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent(en.testing_err_password_invalid);
 		expect(container.textContent).toContain(en.testing_state_on);
 		expect(container.textContent).toContain('practice');
 		expect(container.textContent).not.toContain('changed');
 		release();
 		await expect.poll(() => container.textContent).toContain('changed');
 		expect(container.textContent).toContain(en.testing_state_off);
-		await expect.element(page.getByRole('alert')).toHaveTextContent(en.testing_err_password_invalid);
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent(en.testing_err_password_invalid);
 	});
 
 	it('a failed switch-off keeps the confirmation and shows the error', async () => {
@@ -706,8 +849,14 @@ describe('Testing card: state after a failed request', () => {
 		await button(en.testing_off_confirm).click();
 		await expect.element(button(en.testing_switch_on)).toBeVisible();
 		await expect.poll(() => isFocused(en.testing_switch_on)).toBe(true);
-		expect(container.querySelector('button.t-btn-danger')?.textContent?.trim()).toBe(en.testing_clear);
-		expect([...container.querySelectorAll('button')].some((b) => b.textContent?.trim() === en.testing_off_confirm)).toBe(false);
+		expect(container.querySelector('button.t-btn-danger')?.textContent?.trim()).toBe(
+			en.testing_clear
+		);
+		expect(
+			[...container.querySelectorAll('button')].some(
+				(b) => b.textContent?.trim() === en.testing_off_confirm
+			)
+		).toBe(false);
 		expect(container.querySelector('#testing-expiry')).not.toBeNull();
 		expect(container.querySelector('#testing-new-username')).not.toBeNull();
 		expect(container.querySelector('#testing-new-password')).not.toBeNull();
@@ -725,7 +874,7 @@ describe('Testing card: state after a failed request', () => {
 });
 
 describe('Testing card: typed values and requests in flight', () => {
-	it('a success of one action leaves the other actions\' fields alone; passwords are cleared', async () => {
+	it("a success of one action leaves the other actions' fields alone; passwords are cleared", async () => {
 		serve({ state: acct(), next: acct({ username: 'lab' }) });
 		render(TestingSpaceCard);
 		await field(en.testing_expiry_label).fill('99');
@@ -767,7 +916,9 @@ describe('Testing card: typed values and requests in flight', () => {
 		render(ConfigPage);
 		await field(en.testing_new_password_label).fill('left-behind');
 		store().set({ url: new URL('http://localhost/dashboard/config?section=power') });
-		await expect.element(page.getByRole('heading', { name: en.config_section_power, level: 2 })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: en.config_section_power, level: 2 }))
+			.toBeVisible();
 		store().set({ url: new URL('http://localhost/dashboard/config?section=testing') });
 		await expect.element(field(en.testing_new_password_label)).toHaveValue('');
 	});
@@ -779,7 +930,18 @@ describe('Testing card: other roles', () => {
 		for (const role of ['operator', 'reviewer', 'testing'] as const) {
 			authStore.clearSession();
 			signIn(role);
-			for (const id of ['network', 'language', 'unit-mode', 'fisqua-link', 'testing', 'storage', 'offsite-copy', 'diagnostics', 'maintenance', 'power']) {
+			for (const id of [
+				'network',
+				'language',
+				'unit-mode',
+				'fisqua-link',
+				'testing',
+				'storage',
+				'offsite-copy',
+				'diagnostics',
+				'maintenance',
+				'power'
+			]) {
 				store().set({ url: new URL(`http://localhost/dashboard/config?section=${id}`) });
 				const r = render(ConfigPage);
 				await new Promise((res) => setTimeout(res, 40));

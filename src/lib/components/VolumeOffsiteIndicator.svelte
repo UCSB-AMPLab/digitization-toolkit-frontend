@@ -93,7 +93,9 @@
 
 	let fullText = $derived(
 		view
-			? [view.headline, view.freed, view.lastVerified, view.help].filter((part) => part !== null).join(' · ')
+			? [view.headline, view.freed, view.lastVerified, view.help]
+					.filter((part) => part !== null)
+					.join(' · ')
 			: ''
 	);
 	let icon = $derived(view ? icons[view.kind] : undefined);
@@ -104,10 +106,15 @@
 	<p class="offsite-indicator offsite-{view.kind}" data-kind={view.kind} title={fullText}>
 		<span class="visually-hidden">{$m.offsite_vol_label}: </span>
 		{#if icon}
-			<span class="material-symbols-outlined offsite-indicator-icon" aria-hidden="true">{icon}</span>
+			<span class="material-symbols-outlined offsite-indicator-icon" aria-hidden="true">{icon}</span
+			>
 		{/if}
 		<span class="offsite-indicator-text">
-			{view.headline}{#if view.freed}<span class="offsite-indicator-sep"> · </span>{view.freed}{/if}{#if view.lastVerified}<span class="offsite-indicator-sep"> · </span>{view.lastVerified}{/if}
+			{view.headline}{#if view.freed}<span class="offsite-indicator-sep">
+					·
+				</span>{view.freed}{/if}{#if view.lastVerified}<span class="offsite-indicator-sep">
+					·
+				</span>{view.lastVerified}{/if}
 		</span>
 	</p>
 {/if}

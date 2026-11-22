@@ -89,8 +89,15 @@ describe('modeRefusal and unitProblemText', () => {
 		{
 			message: 'The unit cannot switch to fisqua mode.',
 			problems: [
-				{ code: 'fisqua_unreachable', message: 'Fisqua did not take the unit’s new mode', error: 'timeout' },
-				{ code: 'catalogue_dump_not_configured', message: 'The offsite catalogue dump is not configured on this unit.' }
+				{
+					code: 'fisqua_unreachable',
+					message: 'Fisqua did not take the unit’s new mode',
+					error: 'timeout'
+				},
+				{
+					code: 'catalogue_dump_not_configured',
+					message: 'The offsite catalogue dump is not configured on this unit.'
+				}
 			]
 		},
 		409
@@ -102,7 +109,9 @@ describe('modeRefusal and unitProblemText', () => {
 
 	it('is null for any other error', () => {
 		expect(modeRefusal(new ApiError('x', { message: 'x' }, 409))).toBeNull();
-		expect(modeRefusal(new ApiError('x', { problems: [{ code: 'fisqua_unreachable' }] }, 500))).toBeNull();
+		expect(
+			modeRefusal(new ApiError('x', { problems: [{ code: 'fisqua_unreachable' }] }, 500))
+		).toBeNull();
 		expect(modeRefusal(new Error('x'))).toBeNull();
 	});
 
@@ -156,12 +165,20 @@ describe('gates', () => {
 describe('stemFormTarget (the capture screen’s needs-stem banner)', () => {
 	const shown = state({ mode: 'offline', projectsEnabled: true, projectsShown: true });
 	it('links to the project page while projects are shown', () => {
-		expect(stemFormTarget('operator', shown, 7, 97)).toEqual({ href: '/dashboard/projects/7?editVolume=97' });
-		expect(stemFormTarget('operator', null, 7, 97)).toEqual({ href: '/dashboard/projects/7?editVolume=97' });
+		expect(stemFormTarget('operator', shown, 7, 97)).toEqual({
+			href: '/dashboard/projects/7?editVolume=97'
+		});
+		expect(stemFormTarget('operator', null, 7, 97)).toEqual({
+			href: '/dashboard/projects/7?editVolume=97'
+		});
 	});
 	it('links to Volúmenes while projects are hidden', () => {
-		expect(stemFormTarget('admin', state(), 7, 97)).toEqual({ href: '/dashboard/volumes?editVolume=97' });
-		expect(stemFormTarget('operator', state({ mode: 'backup' }), 7, 97)).toEqual({ href: '/dashboard/volumes?editVolume=97' });
+		expect(stemFormTarget('admin', state(), 7, 97)).toEqual({
+			href: '/dashboard/volumes?editVolume=97'
+		});
+		expect(stemFormTarget('operator', state({ mode: 'backup' }), 7, 97)).toEqual({
+			href: '/dashboard/volumes?editVolume=97'
+		});
 	});
 	it('gives an operator in Fisqua mode the note instead of a link', () => {
 		expect(stemFormTarget('operator', state(), 7, 97)).toEqual({ note: true });
@@ -178,7 +195,12 @@ describe('hiddenProjectRedirect', () => {
 		expect(hiddenProjectRedirect(state(), 'x')).toBe('/dashboard/volumes');
 	});
 	it('stays while projects are shown or the state is not known', () => {
-		expect(hiddenProjectRedirect(state({ mode: 'offline', projectsEnabled: true, projectsShown: true }), '97')).toBeNull();
+		expect(
+			hiddenProjectRedirect(
+				state({ mode: 'offline', projectsEnabled: true, projectsShown: true }),
+				'97'
+			)
+		).toBeNull();
 		expect(hiddenProjectRedirect(null, '97')).toBeNull();
 	});
 });
@@ -186,7 +208,9 @@ describe('hiddenProjectRedirect', () => {
 describe('volumeBackPath', () => {
 	it('returns to Volúmenes while projects are hidden, to the project otherwise', () => {
 		expect(volumeBackPath(state({ projectsShown: false }), 7)).toBe('/dashboard/volumes');
-		expect(volumeBackPath(state({ mode: 'offline', projectsEnabled: true, projectsShown: true }), 7)).toBe('/dashboard/projects/7');
+		expect(
+			volumeBackPath(state({ mode: 'offline', projectsEnabled: true, projectsShown: true }), 7)
+		).toBe('/dashboard/projects/7');
 		expect(volumeBackPath(null, 7)).toBe('/dashboard/projects/7');
 	});
 });
@@ -198,7 +222,10 @@ describe('kept volumes (NEH-320)', () => {
 	];
 
 	it('reads keptVolumes, dropping entries of any other shape', () => {
-		const read = readUnitState({ ...body, keptVolumes: [...kept, { id: 'x', name: 'y' }, null, { id: 5, name: 'T' }] });
+		const read = readUnitState({
+			...body,
+			keptVolumes: [...kept, { id: 'x', name: 'y' }, null, { id: 5, name: 'T' }]
+		});
 		expect(read?.keptVolumes).toEqual([...kept, { id: 5, name: 'T', files: 0 }]);
 	});
 
@@ -215,8 +242,14 @@ describe('kept volumes (NEH-320)', () => {
 
 	it('sends the decision only with a switch that needs it', () => {
 		const offline = state({ mode: 'offline', projectsEnabled: false, keptVolumes: kept });
-		expect(unitChangeBody(offline, 'backup', false, 'include')).toEqual({ mode: 'backup', keptVolumes: 'include' });
-		expect(unitChangeBody(offline, 'fisqua', false, 'keep')).toEqual({ mode: 'fisqua', keptVolumes: 'keep' });
+		expect(unitChangeBody(offline, 'backup', false, 'include')).toEqual({
+			mode: 'backup',
+			keptVolumes: 'include'
+		});
+		expect(unitChangeBody(offline, 'fisqua', false, 'keep')).toEqual({
+			mode: 'fisqua',
+			keptVolumes: 'keep'
+		});
 		expect(unitChangeBody(offline, 'backup', false)).toEqual({ mode: 'backup' });
 		expect(unitChangeBody(offline, 'offline', true, 'include')).toEqual({ projectsEnabled: true });
 		const backup = state({ mode: 'backup', keptVolumes: kept });
@@ -224,7 +257,11 @@ describe('kept volumes (NEH-320)', () => {
 	});
 
 	it('translates the kept_volumes_decision problem', () => {
-		expect(unitProblemText('kept_volumes_decision', es)).toBe(es.unit_problem_kept_volumes_decision);
-		expect(unitProblemText('kept_volumes_decision', en)).toBe(en.unit_problem_kept_volumes_decision);
+		expect(unitProblemText('kept_volumes_decision', es)).toBe(
+			es.unit_problem_kept_volumes_decision
+		);
+		expect(unitProblemText('kept_volumes_decision', en)).toBe(
+			en.unit_problem_kept_volumes_decision
+		);
 	});
 });

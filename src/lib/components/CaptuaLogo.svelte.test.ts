@@ -46,13 +46,19 @@ describe('CaptuaLogo', () => {
 	});
 
 	it('stacks the seedling above the wordmark at 0.85 when asked', async () => {
-		const screen = render(CaptuaLogo, { wordmark: 'descriptor', weight: 'thin', layout: 'stacked' });
+		const screen = render(CaptuaLogo, {
+			wordmark: 'descriptor',
+			weight: 'thin',
+			layout: 'stacked'
+		});
 		const svg = screen.container.querySelector('svg.captua-logo');
 		expect(svg?.getAttribute('viewBox')).toBe('0 2 349 346');
 		const [seedling, wordmark] = [...screen.container.querySelectorAll('use')];
 		expect(seedling.getAttribute('x')).toBe('54.5');
 		expect(seedling.getAttribute('width')).toBe('240');
-		expect(wordmark.parentElement?.getAttribute('transform')).toBe('translate(26.6 255) scale(0.85)');
+		expect(wordmark.parentElement?.getAttribute('transform')).toBe(
+			'translate(26.6 255) scale(0.85)'
+		);
 	});
 
 	it('takes the seedling and wordmark inks from the --logo-* properties', async () => {

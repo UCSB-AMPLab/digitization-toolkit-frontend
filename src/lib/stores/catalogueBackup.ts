@@ -57,7 +57,11 @@ export const catalogueBackup = readable<CatalogueBackupSnapshot>({ kind: 'loadin
 		(signal) => systemApi.getCatalogueBackup(signal),
 		(result) => {
 			settledAt = Date.now();
-			set(result.ok ? { kind: 'loaded', status: result.status, receivedAt: settledAt } : { kind: 'failed' });
+			set(
+				result.ok
+					? { kind: 'loaded', status: result.status, receivedAt: settledAt }
+					: { kind: 'failed' }
+			);
 		},
 		POLL_INTERVAL_MS,
 		(error) => error instanceof AuthError,

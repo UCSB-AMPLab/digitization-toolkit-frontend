@@ -9,7 +9,10 @@
  * The last step both cameras take: one less than the smaller count. Null
  * while either count is unknown (the camera has not entered shooting mode).
  */
-export function stepRange(a: number | null | undefined, b: number | null | undefined): number | null {
+export function stepRange(
+	a: number | null | undefined,
+	b: number | null | undefined
+): number | null {
 	if (a == null || b == null || a < 1 || b < 1) return null;
 	return Math.min(a, b) - 1;
 }
@@ -29,7 +32,9 @@ export function zoomFailureDetail(thrown: unknown): string | undefined {
 	if (typeof status !== 'number') return undefined;
 	if (Array.isArray(detail)) {
 		const messages = detail
-			.map((item) => (item && typeof item === 'object' ? (item as { msg?: unknown }).msg : undefined))
+			.map((item) =>
+				item && typeof item === 'object' ? (item as { msg?: unknown }).msg : undefined
+			)
 			.filter((msg): msg is string => typeof msg === 'string' && msg.length > 0);
 		if (messages.length) return messages.join('; ');
 	}

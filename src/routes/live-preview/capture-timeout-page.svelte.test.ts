@@ -47,7 +47,10 @@ async function advance(ms: number) {
 }
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 // What nginx answers when the backend has said nothing for proxy_read_timeout.
@@ -58,30 +61,76 @@ function gatewayTimeout() {
 	});
 }
 
-type Img = { id: number; record_id: number; filename: string; file_path: string; format: string; role: string; is_current: boolean };
+type Img = {
+	id: number;
+	record_id: number;
+	filename: string;
+	file_path: string;
+	format: string;
+	role: string;
+	is_current: boolean;
+};
 type Rec = {
-	id: number; title: string; status: string; sequence: number; capture_mode: string; collection_id: number; images: Img[];
-	missing_side: string | null; missing_expected: string | null; missing_note: string | null;
-	missing_request_id: string | null; closed_reason: string | null; closed_note: string | null;
+	id: number;
+	title: string;
+	status: string;
+	sequence: number;
+	capture_mode: string;
+	collection_id: number;
+	images: Img[];
+	missing_side: string | null;
+	missing_expected: string | null;
+	missing_note: string | null;
+	missing_request_id: string | null;
+	closed_reason: string | null;
+	closed_note: string | null;
 };
 
 function img(id: number, recordId: number, role: string): Img {
-	return { id, record_id: recordId, filename: `${id}.jpg`, file_path: `/${id}`, format: 'jpg', role, is_current: true };
+	return {
+		id,
+		record_id: recordId,
+		filename: `${id}.jpg`,
+		file_path: `/${id}`,
+		format: 'jpg',
+		role,
+		is_current: true
+	};
 }
 
 function pair(id: number, sequence: number, status = 'captured'): Rec {
 	return {
-		id, title: `Par ${sequence}`, status, sequence, capture_mode: 'dual', collection_id: 9,
+		id,
+		title: `Par ${sequence}`,
+		status,
+		sequence,
+		capture_mode: 'dual',
+		collection_id: 9,
 		images: [img(id * 10, id, 'left'), img(id * 10 + 1, id, 'right')],
-		missing_side: null, missing_expected: null, missing_note: null, missing_request_id: null, closed_reason: null, closed_note: null
+		missing_side: null,
+		missing_expected: null,
+		missing_note: null,
+		missing_request_id: null,
+		closed_reason: null,
+		closed_note: null
 	};
 }
 
 function placeholder(id: number, sequence: number): Rec {
 	return {
-		id, title: `Par ${sequence}`, status: 'captured', sequence, capture_mode: 'dual', collection_id: 9, images: [],
-		missing_side: 'both', missing_expected: null, missing_note: 'Falta el folio 91.', missing_request_id: null,
-		closed_reason: null, closed_note: null
+		id,
+		title: `Par ${sequence}`,
+		status: 'captured',
+		sequence,
+		capture_mode: 'dual',
+		collection_id: 9,
+		images: [],
+		missing_side: 'both',
+		missing_expected: null,
+		missing_note: 'Falta el folio 91.',
+		missing_request_id: null,
+		closed_reason: null,
+		closed_note: null
 	};
 }
 
@@ -104,21 +153,42 @@ function serve() {
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/records/to-retake/summary')) {
-			const pending = served.records.filter((r) => r.missing_side && !r.closed_reason).map((r) => r.id);
+			const pending = served.records
+				.filter((r) => r.missing_side && !r.closed_reason)
+				.map((r) => r.id);
 			return json({
 				pendingRecords: pending.length,
-				volumes: pending.length === 0 ? [] : [{
-					collectionId: 9, projectId: 2, name: 'Tomo 17', filenameStem: 'co-ahr-not-t017',
-					pending: pending.length, total: 0, excluded: 0, firstPendingRecordId: pending[0],
-					pendingRecordIds: pending, missingSideRecordIds: pending
-				}],
+				volumes:
+					pending.length === 0
+						? []
+						: [
+								{
+									collectionId: 9,
+									projectId: 2,
+									name: 'Tomo 17',
+									filenameStem: 'co-ahr-not-t017',
+									pending: pending.length,
+									total: 0,
+									excluded: 0,
+									firstPendingRecordId: pending[0],
+									pendingRecordIds: pending,
+									missingSideRecordIds: pending
+								}
+							],
 				turn: { state: 'recaptures', unlockedBy: null }
 			});
 		}
 		if (path.endsWith('/imports/digitisation-lists')) return json([]);
 		if (/\/records\/\d+\/rejections$/.test(path)) return json([]);
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 17', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-not-t017', custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 17',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: 'co-ahr-not-t017',
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
 		if (path.endsWith('/records/')) {
@@ -171,7 +241,13 @@ beforeEach(() => {
 	served.recordReads = 0;
 	vi.mocked(goto).mockReset();
 	cameraStatus.reportSuccess();
-	authStore.setSession({ id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
+	authStore.setSession({
+		id: 1,
+		username: 'operator',
+		email: null,
+		role: 'operator',
+		is_active: true
+	});
 });
 
 afterEach(() => {
@@ -190,7 +266,9 @@ function words(el: Element): string {
 	return copy.textContent?.trim() ?? '';
 }
 const buttonIn = (name: string) =>
-	[...(dialogEl()?.querySelectorAll('button') ?? [])].find((b) => words(b) === name) as HTMLButtonElement | undefined;
+	[...(dialogEl()?.querySelectorAll('button') ?? [])].find((b) => words(b) === name) as
+		| HTMLButtonElement
+		| undefined;
 
 describe('capture screen: a retake that ends in a timeout (NEH-381)', () => {
 	it('a 504 at 120 s, then the new images at the second read: goes on as after a successful retake, with no second capture', async () => {
@@ -307,7 +385,9 @@ describe('capture screen: "Capture another here" that ends in a timeout (NEH-381
 		expect(dialogText()).toContain(es.lv_capture_maybe_saved);
 		expect(dialogText()).not.toContain(es.lvm_retake_error(''));
 		expect(buttonIn(es.cap_another)?.disabled).toBe(true);
-		const closes = [...(dialogEl()?.querySelectorAll('button') ?? [])].filter((b) => words(b) === es.common_close || b.getAttribute('aria-label') === es.common_close);
+		const closes = [...(dialogEl()?.querySelectorAll('button') ?? [])].filter(
+			(b) => words(b) === es.common_close || b.getAttribute('aria-label') === es.common_close
+		);
 		expect(closes.length).toBeGreaterThan(0);
 		for (const b of closes) expect((b as HTMLButtonElement).disabled).toBe(true);
 

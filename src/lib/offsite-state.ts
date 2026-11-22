@@ -60,7 +60,9 @@ export type VolumeOffsiteKind =
  */
 export type UnitUploadState = 'on' | 'off' | 'mode_off' | 'misconfigured';
 
-export function unitUploadState(images: UnitImageUploadSummary | null | undefined): UnitUploadState | null {
+export function unitUploadState(
+	images: UnitImageUploadSummary | null | undefined
+): UnitUploadState | null {
 	if (!images || typeof images.enabled !== 'boolean') return null;
 	if (images.mode_allows === false) return 'mode_off';
 	if (images.misconfigured) return 'misconfigured';
@@ -87,7 +89,11 @@ function verifiedAt(iso: string | null): Date | null {
 function lastVerifiedArgs(iso: string | null, now: Date, locale: string) {
 	const when = verifiedAt(iso);
 	if (!when) return null;
-	return [dayRelation(when, now), formatBackupDate(when, now, locale), formatBackupTime(when, locale)] as const;
+	return [
+		dayRelation(when, now),
+		formatBackupDate(when, now, locale),
+		formatBackupTime(when, locale)
+	] as const;
 }
 
 /**
@@ -104,7 +110,13 @@ export function volumeOffsiteView(
 ): VolumeOffsiteView | null {
 	if (snapshot.kind === 'loading') return null;
 	if (snapshot.kind === 'failed') {
-		return { kind: 'unknown', headline: msgs.offsite_vol_unknown, lastVerified: null, help: null, freed: null };
+		return {
+			kind: 'unknown',
+			headline: msgs.offsite_vol_unknown,
+			lastVerified: null,
+			help: null,
+			freed: null
+		};
 	}
 	const s = snapshot.state;
 	// Absent from a backend that predates freeing.
@@ -135,13 +147,29 @@ export function volumeOffsiteView(
 			freed
 		};
 	}
-	if (s.received && freed) return { kind: 'freed', headline: msgs.offsite_vol_stored, lastVerified, help: null, freed };
-	if (s.received) return { kind: 'received', headline: msgs.offsite_vol_received(s.verified, s.total), lastVerified, help: null, freed };
-	return { kind: 'uploading', headline: msgs.offsite_vol_uploading(s.verified, s.total, s.pending), lastVerified, help: null, freed };
+	if (s.received && freed)
+		return { kind: 'freed', headline: msgs.offsite_vol_stored, lastVerified, help: null, freed };
+	if (s.received)
+		return {
+			kind: 'received',
+			headline: msgs.offsite_vol_received(s.verified, s.total),
+			lastVerified,
+			help: null,
+			freed
+		};
+	return {
+		kind: 'uploading',
+		headline: msgs.offsite_vol_uploading(s.verified, s.total, s.pending),
+		lastVerified,
+		help: null,
+		freed
+	};
 }
 
 /** The volume's Fisqua state for VolumeFisquaLine: none for a volume Captua keeps on the unit (NEH-320). */
-export function fisquaLineOf(state: VolumeOffsiteState | null | undefined): VolumeOffsiteState['fisqua'] | null {
+export function fisquaLineOf(
+	state: VolumeOffsiteState | null | undefined
+): VolumeOffsiteState['fisqua'] | null {
 	if (!state || state.kept_on_unit) return null;
 	return state.fisqua ?? null;
 }
@@ -164,7 +192,8 @@ export function unitOffsiteView(
 	const state = unitUploadState(images);
 	if (!images || state === null) return null;
 	if (state === 'mode_off') return { level: 'local', lines: [msgs.offsite_unit_mode_off] };
-	if (state === 'misconfigured') return { level: 'attention', lines: [msgs.offsite_unit_misconfigured] };
+	if (state === 'misconfigured')
+		return { level: 'attention', lines: [msgs.offsite_unit_misconfigured] };
 	if (state === 'off') return { level: 'off', lines: [msgs.offsite_unit_off] };
 	if (images.total === 0) return { level: 'empty', lines: [msgs.offsite_unit_empty] };
 
@@ -172,7 +201,8 @@ export function unitOffsiteView(
 		msgs.offsite_unit_volumes(images.volumes_received, images.volumes),
 		msgs.offsite_unit_files(images.verified, images.total, images.pending)
 	];
-	if (images.refused > 0) lines.push(msgs.offsite_unit_refused(images.refused), msgs.offsite_attention_help);
+	if (images.refused > 0)
+		lines.push(msgs.offsite_unit_refused(images.refused), msgs.offsite_attention_help);
 	const args = lastVerifiedArgs(images.last_verified_at, now, locale);
 	lines.push(args ? msgs.offsite_cfg_last_verified(...args) : msgs.offsite_cfg_never);
 

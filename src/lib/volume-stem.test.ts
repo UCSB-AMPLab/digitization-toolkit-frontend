@@ -82,14 +82,18 @@ describe('stemConflict', () => {
 	it('reads a duplicate stem from the constraint name', () => {
 		const err = new ApiError(
 			'Another volume already uses this file name stem.',
-			{ message: 'Another volume already uses this file name stem.', constraint: 'collections_filename_stem_key' },
+			{
+				message: 'Another volume already uses this file name stem.',
+				constraint: 'collections_filename_stem_key'
+			},
 			409
 		);
 		expect(stemConflict(err)).toBe('stem_taken');
 	});
 
 	it('reads a stem change after capture from the backend message', () => {
-		const message = 'The volume has already captured images, so its file name stem cannot be changed.';
+		const message =
+			'The volume has already captured images, so its file name stem cannot be changed.';
 		expect(stemConflict(new ApiError(message, { message }, 409))).toBe('stem_fixed');
 	});
 
@@ -102,9 +106,13 @@ describe('stemConflict', () => {
 
 	it('returns null for any other error', () => {
 		// The non-empty-volume 409 carries a string detail.
-		expect(stemConflict(new ApiError('Cannot delete a non-empty collection', undefined, 409))).toBeNull();
 		expect(
-			stemConflict(new ApiError('x', { message: 'x', constraint: 'ix_collections_external_id' }, 409))
+			stemConflict(new ApiError('Cannot delete a non-empty collection', undefined, 409))
+		).toBeNull();
+		expect(
+			stemConflict(
+				new ApiError('x', { message: 'x', constraint: 'ix_collections_external_id' }, 409)
+			)
 		).toBeNull();
 		expect(stemConflict(new ApiError('nope', { message: 'nope' }, 422))).toBeNull();
 		expect(stemConflict(new Error('network'))).toBeNull();
@@ -147,13 +155,17 @@ describe('isConflict, needsStem and deleteRefused', () => {
 
 describe('isVolumeRequired', () => {
 	it('recognises the 409 for a capture that names no volume by its exact text', () => {
-		expect(isVolumeRequired(new ApiError('Captures must go into a volume.', undefined, 409))).toBe(true);
+		expect(isVolumeRequired(new ApiError('Captures must go into a volume.', undefined, 409))).toBe(
+			true
+		);
 	});
 
 	it('does not take the no-stem 409 or other errors for it', () => {
 		const noStem = 'This volume has no file name stem. Give it one before capturing into it.';
 		expect(isVolumeRequired(new ApiError(noStem, undefined, 409))).toBe(false);
-		expect(isVolumeRequired(new ApiError('Captures must go into a volume.', undefined, 422))).toBe(false);
+		expect(isVolumeRequired(new ApiError('Captures must go into a volume.', undefined, 422))).toBe(
+			false
+		);
 		expect(isVolumeRequired(null)).toBe(false);
 	});
 });
@@ -164,6 +176,8 @@ describe('isWrongRetakeVolume', () => {
 	it('recognises the 409 for a retake into another volume by its exact text', () => {
 		expect(isWrongRetakeVolume(new ApiError(retake, undefined, 409))).toBe(true);
 		expect(isWrongRetakeVolume(new ApiError(retake, undefined, 400))).toBe(false);
-		expect(isWrongRetakeVolume(new ApiError('Captures must go into a volume.', undefined, 409))).toBe(false);
+		expect(
+			isWrongRetakeVolume(new ApiError('Captures must go into a volume.', undefined, 409))
+		).toBe(false);
 	});
 });

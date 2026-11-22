@@ -49,7 +49,10 @@ const CAMERA_NOT_CONNECTED = /^Camera \d+ is not connected$/;
  * is never shown, and the caller logs the original error.
  */
 export function describeCaptureFailure(thrown: unknown, msgs: Messages): CaptureOutcome {
-	const status = typeof thrown === 'object' && thrown !== null ? (thrown as { status?: unknown }).status : undefined;
+	const status =
+		typeof thrown === 'object' && thrown !== null
+			? (thrown as { status?: unknown }).status
+			: undefined;
 	if (status === 404 && thrown instanceof Error && CAMERA_NOT_CONNECTED.test(thrown.message)) {
 		return { kind: 'error', detail: msgs.dash_camera_capture_not_connected };
 	}

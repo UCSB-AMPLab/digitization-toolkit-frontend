@@ -11,7 +11,10 @@ import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { createRawSnippet } from 'svelte';
 
-const nav = vi.hoisted(() => ({ data: {} as { [k: string]: unknown }, goto: null as unknown as ReturnType<typeof vi.fn> }));
+const nav = vi.hoisted(() => ({
+	data: {} as { [k: string]: unknown },
+	goto: null as unknown as ReturnType<typeof vi.fn>
+}));
 vi.mock('$app/navigation', () => {
 	nav.goto = vi.fn();
 	return { goto: nav.goto };
@@ -22,7 +25,9 @@ vi.mock('$app/stores', async () => {
 		page: readable({
 			params: { projectId: '1', collectionId: '7' },
 			url: new URL('http://localhost/dashboard/projects/1/collections/7'),
-			get data() { return nav.data; }
+			get data() {
+				return nav.data;
+			}
 		})
 	};
 });
@@ -34,22 +39,40 @@ import { en } from '$lib/i18n/en';
 import { resetUnit } from '$lib/unit-mode';
 import { formatApiDate } from '$lib/format-date';
 import { volumeTopbarContext, type VolumeTopbarSlot } from '$lib/volume-topbar';
-import { recordRequests, TESTING_UNIT, TESTING_USER, type Recorder } from '$lib/test-support/testing-routes';
+import {
+	recordRequests,
+	TESTING_UNIT,
+	TESTING_USER,
+	type Recorder
+} from '$lib/test-support/testing-routes';
 import Layout from './+layout@.svelte';
 import CollectionPage from './+page.svelte';
 
 const DAY = 24 * 60 * 60 * 1000;
 const children = createRawSnippet(() => ({ render: () => '<p>volume</p>' }));
 
-const image = (id: number) => ({ id, filename: `p${id}.jpg`, format: 'jpg', is_current: true, role: 'single' });
-const records = [1, 2].map((id) => ({ id, title: `Folio ${id}`, status: 'captured', sequence: id, images: [image(id * 10)] }));
+const image = (id: number) => ({
+	id,
+	filename: `p${id}.jpg`,
+	format: 'jpg',
+	is_current: true,
+	role: 'single'
+});
+const records = [1, 2].map((id) => ({
+	id,
+	title: `Folio ${id}`,
+	status: 'captured',
+	sequence: id,
+	images: [image(id * 10)]
+}));
 
 function handlers() {
 	return {
 		'GET /system/unit': TESTING_UNIT,
 		'GET /records/': records,
 		'GET /records/{rec_id}/annotations': [],
-		'GET /records/images/{img_id}/file': () => new Response(new Blob(['jpeg']), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
+		'GET /records/images/{img_id}/file': () =>
+			new Response(new Blob(['jpeg']), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
 	} as never;
 }
 
@@ -58,7 +81,11 @@ let rec: Recorder;
 beforeEach(() => {
 	locale.set('en');
 	resetUnit();
-	nav.data = { projectName: 'Practice', collectionName: 'Tomo practice', collectionTestingExpiresAt: new Date(Date.now() + 3 * DAY).toISOString() };
+	nav.data = {
+		projectName: 'Practice',
+		collectionName: 'Tomo practice',
+		collectionTestingExpiresAt: new Date(Date.now() + 3 * DAY).toISOString()
+	};
 	vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:zip');
 	vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 	vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -76,9 +103,15 @@ describe('volume top bar, testing account', () => {
 		rec = recordRequests(handlers());
 		const screen = render(Layout, { children });
 		await expect.element(page.getByRole('button', { name: en.col_live_preview })).toBeVisible();
-		const when = formatApiDate(nav.data.collectionTestingExpiresAt as string, 'en', { day: 'numeric', month: 'long', year: 'numeric' });
+		const when = formatApiDate(nav.data.collectionTestingExpiresAt as string, 'en', {
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		});
 		await expect.element(page.getByText(en.testing_expires_on(when))).toBeVisible();
-		expect(screen.container.querySelector('.testing-expiry')?.classList.contains('soon')).toBe(true);
+		expect(screen.container.querySelector('.testing-expiry')?.classList.contains('soon')).toBe(
+			true
+		);
 		await new Promise((r) => setTimeout(r, 150));
 		expect(screen.container.querySelector('.offsite-indicator')).toBeNull();
 		expect(rec.refusedList()).toEqual([]);
@@ -87,11 +120,16 @@ describe('volume top bar, testing account', () => {
 	});
 
 	it('shows no warning colour when the date is further than seven days', async () => {
-		nav.data = { ...nav.data, collectionTestingExpiresAt: new Date(Date.now() + 30 * DAY).toISOString() };
+		nav.data = {
+			...nav.data,
+			collectionTestingExpiresAt: new Date(Date.now() + 30 * DAY).toISOString()
+		};
 		rec = recordRequests(handlers());
 		const screen = render(Layout, { children });
 		await expect.poll(() => screen.container.querySelector('.testing-expiry')).not.toBeNull();
-		expect(screen.container.querySelector('.testing-expiry')?.classList.contains('soon')).toBe(false);
+		expect(screen.container.querySelector('.testing-expiry')?.classList.contains('soon')).toBe(
+			false
+		);
 	});
 });
 
@@ -108,7 +146,9 @@ describe('volume page, testing account', () => {
 		rec = recordRequests(handlers());
 		const { slot } = renderPage();
 		await expect.element(page.getByText('Folio 2')).toBeInTheDocument();
-		await expect.element(page.getByRole('button', { name: en.testing_download_pictures })).toBeVisible();
+		await expect
+			.element(page.getByRole('button', { name: en.testing_download_pictures }))
+			.toBeVisible();
 		expect(page.getByRole('button', { name: en.col_export }).elements()).toHaveLength(0);
 		expect(slot.actions).toBeNull();
 		expect(rec.refusedList()).toEqual([]);
@@ -119,10 +159,9 @@ describe('volume page, testing account', () => {
 		renderPage();
 		await expect.element(page.getByText('Folio 2')).toBeInTheDocument();
 		await page.getByRole('button', { name: en.testing_download_pictures }).click();
-		await expect.poll(() => rec.to('GET /records/images/{img_id}/file').map((r) => r.path)).toEqual([
-			'/records/images/10/file',
-			'/records/images/20/file'
-		]);
+		await expect
+			.poll(() => rec.to('GET /records/images/{img_id}/file').map((r) => r.path))
+			.toEqual(['/records/images/10/file', '/records/images/20/file']);
 		await expect.poll(() => vi.mocked(HTMLAnchorElement.prototype.click).mock.calls.length).toBe(1);
 		expect(rec.refusedList()).toEqual([]);
 	});
@@ -140,13 +179,17 @@ describe('volume page, testing account', () => {
 });
 
 describe('volume page, operator, unchanged', () => {
-	beforeEach(() => authStore.setSession({ id: 5, username: 'op', email: null, role: 'operator', is_active: true }));
+	beforeEach(() =>
+		authStore.setSession({ id: 5, username: 'op', email: null, role: 'operator', is_active: true })
+	);
 
 	it('the top bar reads the offsite copy and shows no removal date', async () => {
 		rec = recordRequests(handlers());
 		const screen = render(Layout, { children });
 		await expect.element(page.getByRole('button', { name: en.col_live_preview })).toBeVisible();
-		await expect.poll(() => rec.to('GET /collections/{collection_id}/offsite').length).toBeGreaterThan(0);
+		await expect
+			.poll(() => rec.to('GET /collections/{collection_id}/offsite').length)
+			.toBeGreaterThan(0);
 		await expect.poll(() => screen.container.querySelector('.offsite-indicator')).not.toBeNull();
 		expect(screen.container.querySelector('.testing-expiry')).toBeNull();
 	});
@@ -158,7 +201,9 @@ describe('volume page, operator, unchanged', () => {
 		await expect.element(page.getByText('Folio 2')).toBeInTheDocument();
 		await expect.poll(() => rec.to('GET /records/to-retake/summary').length).toBeGreaterThan(0);
 		await expect.element(page.getByRole('button', { name: en.col_export })).toBeVisible();
-		expect(page.getByRole('button', { name: en.testing_download_pictures }).elements()).toHaveLength(0);
+		expect(
+			page.getByRole('button', { name: en.testing_download_pictures }).elements()
+		).toHaveLength(0);
 		await expect.poll(() => slot.actions).not.toBeNull();
 		await page.getByText('Folio 1').click();
 		await expect.element(page.getByRole('button', { name: en.col_tab_comments })).toBeVisible();

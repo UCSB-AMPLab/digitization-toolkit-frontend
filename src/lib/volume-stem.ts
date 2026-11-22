@@ -114,9 +114,7 @@ export function isWrongRetakeVolume(error: unknown): boolean {
 /** Whether an error is an HTTP 409, matched by shape (ApiError carries `status`). */
 export function isConflict(error: unknown): boolean {
 	return (
-		typeof error === 'object' &&
-		error !== null &&
-		(error as { status?: unknown }).status === 409
+		typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 409
 	);
 }
 
