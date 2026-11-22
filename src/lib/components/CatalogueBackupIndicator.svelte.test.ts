@@ -249,6 +249,8 @@ describe('Scanner only mode (mode_allows false)', () => {
 	const DESC = 'Una vez al día, Captua copia el catálogo al destino que se configuró al instalar el equipo y verifica que la copia está completa.';
 	const CATALOGUE = 'El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.';
 	const SCOPE = 'Esta copia no incluye los archivos de imagen.';
+	// The text as read, with each run of whitespace (line breaks and indentation in the template) as one space.
+	const squash = (text: string | null | undefined) => (text ?? '').replace(/\s+/g, ' ').trim();
 
 	it.each([
 		['an old copy', body({ last_verified_at: ago(96 * HOUR), object: 'catalogue-2026-10-18.sql.gz.age', mode_allows: false })],
@@ -270,7 +272,7 @@ describe('Scanner only mode (mode_allows false)', () => {
 		const text = screen.container.textContent ?? '';
 		expect(text).not.toMatch(/vuelve a intentar/);
 		expect(text).not.toMatch(/Archivo de la última copia|catalogue-2026-10-18/);
-		expect(screen.container.querySelector('.desc')?.textContent?.trim()).toBe(CATALOGUE);
+		expect(squash(screen.container.querySelector('.desc')?.textContent)).toBe(squash(CATALOGUE));
 		expect(text).not.toContain(DESC);
 		expect(text).not.toContain(SCOPE);
 	});
@@ -279,7 +281,9 @@ describe('Scanner only mode (mode_allows false)', () => {
 		answer(body({ last_verified_at: ago(HOUR), mode_allows: true }));
 		const screen = render(Card);
 		await expect.element(screen.getByText('Copia verificada hoy a las 11:00.')).toBeVisible();
-		expect(screen.container.querySelector('.desc')?.textContent?.trim()).toBe(`${DESC} ${CATALOGUE} ${SCOPE}`);
+		expect(squash(screen.container.querySelector('.desc')?.textContent)).toBe(
+			squash(`${DESC} ${CATALOGUE} ${SCOPE}`)
+		);
 	});
 
 	it('the card shows the new retry wording on a late copy', async () => {
