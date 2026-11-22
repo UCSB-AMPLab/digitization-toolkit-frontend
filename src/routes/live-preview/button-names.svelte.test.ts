@@ -110,8 +110,12 @@ beforeEach(() => {
 		autofocus_calibration: true,
 		dslr_settings: false
 	});
-	vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue('data:image/gif;base64,R0lGODlhAQABAAAAACw=');
-	vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue('data:image/gif;base64,R0lGODlhAQABAAAAACw=');
+	vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(
+		'data:image/gif;base64,R0lGODlhAQABAAAAACw='
+	);
+	vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(
+		'data:image/gif;base64,R0lGODlhAQABAAAAACw='
+	);
 	vi.spyOn(recordsApi, 'listRejections').mockResolvedValue([]);
 });
 
@@ -249,7 +253,9 @@ describe('live-preview buttons have accessible names (NEH-256)', () => {
 			audit(`${cameraMode} viewport`, seen);
 			// Open the floating panel, then each of its buttons in turn: the grid
 			// and capture-key buttons open the two modals.
-			if (document.body.querySelector('.float-btn-toggle')?.getAttribute('aria-expanded') !== 'true') {
+			if (
+				document.body.querySelector('.float-btn-toggle')?.getAttribute('aria-expanded') !== 'true'
+			) {
 				await click('.float-btn-toggle');
 			}
 			const floats = [...document.body.querySelectorAll<HTMLElement>('.float-btn')];
@@ -273,7 +279,10 @@ describe('live-preview buttons have accessible names (NEH-256)', () => {
 		expect(seen.total).toBeGreaterThan(10);
 	});
 
-	for (const [mode, images] of [['single', 1], ['double', 2]] as const) {
+	for (const [mode, images] of [
+		['single', 1],
+		['double', 2]
+	] as const) {
 		it(`ImageViewerModal, ${mode}: thumbnails, full size, retake confirmation`, async () => {
 			const seen = { total: 0 };
 			render(ImageViewerModal, {
@@ -298,7 +307,12 @@ describe('live-preview buttons have accessible names (NEH-256)', () => {
 
 	it('TopBar', async () => {
 		const seen = { total: 0 };
-		render(TopBar, { onBack: vi.fn(), onGoToReview: vi.fn(), projectName: 'P', collectionName: 'C' });
+		render(TopBar, {
+			onBack: vi.fn(),
+			onGoToReview: vi.fn(),
+			projectName: 'P',
+			collectionName: 'C'
+		});
 		await wait(50);
 		audit('topbar', seen);
 		expect(seen.total).toBeGreaterThanOrEqual(2);
@@ -308,7 +322,10 @@ describe('live-preview buttons have accessible names (NEH-256)', () => {
 		const seen = { total: 0 };
 		for (const cameraMode of ['single', 'double'] as const) {
 			const screen = render(ThumbnailStrip, {
-				records: [record(1, cameraMode === 'double' ? 2 : 1), { ...record(2, 0), title: '' } as ApiRecord],
+				records: [
+					record(1, cameraMode === 'double' ? 2 : 1),
+					{ ...record(2, 0), title: '' } as ApiRecord
+				],
 				selectedRecordId: 1,
 				cameraMode,
 				onSelect: vi.fn()

@@ -99,7 +99,9 @@ describe('(dashboard) layout with a saved session and a backend that is not answ
 	});
 
 	it('ends the session and goes to /login on a 401', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(401, { detail: 'Invalid or expired token' }));
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			json(401, { detail: 'Invalid or expired token' })
+		);
 
 		render(Layout, { children });
 
@@ -109,7 +111,9 @@ describe('(dashboard) layout with a saved session and a backend that is not answ
 	});
 
 	it('ends the session on a 403 too, so /login does not send the operator back here', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(403, { detail: 'Operation not permitted' }));
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			json(403, { detail: 'Operation not permitted' })
+		);
 
 		render(Layout, { children });
 
@@ -125,8 +129,7 @@ describe('(dashboard) layout and the session renewal', () => {
 	function routed(meAnswer: () => Response | Promise<Response>) {
 		let finishRefresh!: () => void;
 		const refreshDone = new Promise<Response>((resolve) => {
-			finishRefresh = () =>
-				resolve(json(200, { access_token: null, token_type: 'cookie' }));
+			finishRefresh = () => resolve(json(200, { access_token: null, token_type: 'cookie' }));
 		});
 		const order: string[] = [];
 		vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {

@@ -57,18 +57,22 @@ export const en: Messages = {
 	login_offline: 'Server unreachable',
 	login_error_fill_all_fields: 'Please fill in all fields',
 	login_error_bad_credentials: 'Incorrect username or password',
-	login_error_unknown_role: 'Your account has a role this app does not recognize. Let whoever administers the device know.',
-	login_error_backend_unavailable: 'Could not reach the server. It may not be ready yet: wait a few seconds and try again.',
+	login_error_unknown_role:
+		'Your account has a role this app does not recognize. Let whoever administers the device know.',
+	login_error_backend_unavailable:
+		'Could not reach the server. It may not be ready yet: wait a few seconds and try again.',
 	login_error_locked_out: (minutes: number) =>
 		minutes === 1
 			? 'Too many failed attempts. Wait 1 minute before trying again.'
 			: `Too many failed attempts. Wait ${minutes} minutes before trying again.`,
-	login_error_locked_out_unknown: 'Too many failed attempts. Wait a few minutes before trying again.',
+	login_error_locked_out_unknown:
+		'Too many failed attempts. Wait a few minutes before trying again.',
 
 	// ── Session ──────────────────────────────────────────────────────────────
 	session_validating: 'Verifying session…',
 	session_backend_waiting: 'Waiting for the server to respond…',
-	session_backend_waiting_detail: 'If you have just switched the device on, the server can take a few seconds to respond. Captua will keep trying to connect and continue as soon as it can.',
+	session_backend_waiting_detail:
+		'If you have just switched the device on, the server can take a few seconds to respond. Captua will keep trying to connect and continue as soon as it can.',
 
 	// ── Navigation (dashboard) ───────────────────────────────────────────────
 	nav_section_main: 'MAIN',
@@ -111,7 +115,8 @@ export const en: Messages = {
 	tour_s5_body:
 		'Approve the pages that are right and reject, with a reason, those that need retaking. To approve, open the spread view (the open-book icon in the right-hand bar), then Annotations (the speech bubble in the left-hand bar). Only the Reviewer and Administrator roles can approve.',
 	tour_s6_title: 'Export',
-	tour_s6_where: 'Go to Projects › your project › your volume, then press the archive-box icon, the last one in the right-hand bar.',
+	tour_s6_where:
+		'Go to Projects › your project › your volume, then press the archive-box icon, the last one in the right-hand bar.',
 	tour_s6_body:
 		'With everything approved, the volume is packaged and becomes available to download.',
 	// Without projects (NEH-318): no project step, and every route from Volumes.
@@ -132,7 +137,8 @@ export const en: Messages = {
 	tour_s3_where_vol: 'Go to Volumes › your volume › Capture.',
 	tour_s4_where_vol: 'Go to Volumes › your volume › Send for review.',
 	tour_s5_where_vol: 'Go to Volumes › your volume.',
-	tour_s6_where_vol: 'Go to Volumes › your volume, then press the archive-box icon, the last one in the right-hand bar.',
+	tour_s6_where_vol:
+		'Go to Volumes › your volume, then press the archive-box icon, the last one in the right-hand bar.',
 
 	nav_logout: 'Log out',
 
@@ -143,7 +149,8 @@ export const en: Messages = {
 	status_approved: 'Approved',
 	// Fisqua's third QC decision (contract 1.6).
 	status_excluded: 'Excluded',
-	status_excluded_hint: 'Fisqua excluded this record: it is not a page of the volume, and no retake is asked for.',
+	status_excluded_hint:
+		'Fisqua excluded this record: it is not a page of the volume, and no retake is asked for.',
 	excluded_note_label: 'Reason:',
 
 	// ── Roles ────────────────────────────────────────────────────────────────
@@ -168,7 +175,8 @@ export const en: Messages = {
 	dash_storage_alert_p1: 'Storage is at ',
 	dash_storage_alert_p2: (used: string, total: string) => ` (${used} / ${total}). See `,
 	dash_storage_alert_p3: ' to free up space.',
-	dash_storage_alert_ask_admin: (used: string, total: string) => ` (${used} / ${total}). Ask an administrator or an operator to free up space.`,
+	dash_storage_alert_ask_admin: (used: string, total: string) =>
+		` (${used} / ${total}). Ask an administrator or an operator to free up space.`,
 	dash_kpi_active_projects: 'Active projects',
 	dash_kpi_collections: 'Volumes',
 	dash_kpi_total_records: 'Total records',
@@ -232,7 +240,9 @@ export const en: Messages = {
 	dash_cal_day_captures: (n: number, date: string) =>
 		n === 1 ? `1 image captured on ${date}` : `${formatCount(n, 'en')} images captured on ${date}`,
 	dash_cal_day_reviews: (n: number, date: string) =>
-		n === 1 ? `1 record reviewed on ${date}` : `${formatCount(n, 'en')} records reviewed on ${date}`,
+		n === 1
+			? `1 record reviewed on ${date}`
+			: `${formatCount(n, 'en')} records reviewed on ${date}`,
 	dash_cal_days_captures: 'Days with captures',
 	dash_cal_total_captures: 'Images captured',
 	dash_cal_days_reviews: 'Days with reviews',
@@ -243,7 +253,8 @@ export const en: Messages = {
 	config_subtitle: 'Digitization system settings',
 	config_section_language: 'Language',
 	config_language_label: 'Interface language',
-	config_language_desc: 'Changes the language across the whole app. The page reloads to apply it; your session stays open.',
+	config_language_desc:
+		'Changes the language across the whole app. The page reloads to apply it; your session stays open.',
 	config_section_storage: 'Storage',
 	config_storage_alert_pre: 'Storage is at ',
 	config_storage_alert_post: '. Consider freeing up space or expanding capacity.',
@@ -256,7 +267,8 @@ export const en: Messages = {
 	config_storage_device: 'Storage drive',
 	config_storage_device_desc: 'Connect a USB drive or SD card to save images on it',
 	config_external_active_pre: 'Using external storage. New images are saved to ',
-	config_storage_override_invalid: 'The external storage setting was invalid and could not be read; using internal storage.',
+	config_storage_override_invalid:
+		'The external storage setting was invalid and could not be read; using internal storage.',
 	config_restore_progress: 'Restoring…',
 	config_restore_default: 'Restore default',
 	config_experimental_lead: 'Experimental feature.',
@@ -283,7 +295,8 @@ export const en: Messages = {
 	config_storage_active: (path: string) => `Active storage: ${path}`,
 	// NEH-380: the storage reserve (CAPTUA_STORAGE_RESERVE_GB) and the list of
 	// volumes that can be freed, in Settings > Storage.
-	config_storage_reserve: (gb: string) => `Captua always keeps ${gb} GB free so it can keep working.`,
+	config_storage_reserve: (gb: string) =>
+		`Captua always keeps ${gb} GB free so it can keep working.`,
 	config_freeable_title: 'Volumes with space to free',
 	config_freeable_intro:
 		'Every file of these volumes is already verified in the offsite copy, so you can remove them from the card without losing them. The list goes from the most space to free to the least.',
@@ -296,7 +309,8 @@ export const en: Messages = {
 	config_freeable_free_aria: (name: string) => `Free space: ${name}`,
 	config_freeable_empty:
 		"No volume has space to free for now. A volume's space can be freed once every one of its files is verified in the offsite copy.",
-	config_freeable_error: 'Captua could not check which volumes have space to free. Try again in a moment.',
+	config_freeable_error:
+		'Captua could not check which volumes have space to free. Try again in a moment.',
 	config_freeable_mode_off:
 		"In the current mode, Captua keeps the image files only on this unit, so no volume's space can be freed.",
 	config_err_activate: 'Could not activate storage.',
@@ -332,7 +346,8 @@ export const en: Messages = {
 	config_cleaning: 'Cleaning…',
 	config_clean_tmp: 'Clean /tmp',
 	config_tmp_none: 'There were no leftover temporary files.',
-	config_tmp_deleted: (n: number) => (n === 1 ? '1 file deleted.' : `${formatCount(n, 'en')} files deleted.`),
+	config_tmp_deleted: (n: number) =>
+		n === 1 ? '1 file deleted.' : `${formatCount(n, 'en')} files deleted.`,
 	config_err_clean: 'Could not delete the files.',
 	config_section_power: 'Power',
 	config_shutdown_label: 'Shut down the scanner',
@@ -342,7 +357,8 @@ export const en: Messages = {
 	config_reboot_label: 'Restart the scanner',
 	config_reboot_desc: 'Restarts the scanner. The app will reload automatically once it is back.',
 	config_reboot_btn: 'Restart',
-	config_offline_note: 'Capturing and reviewing need no internet connection. The external copy and sending to Fisqua do.',
+	config_offline_note:
+		'Capturing and reviewing need no internet connection. The external copy and sending to Fisqua do.',
 	config_confirm_reboot_title: 'Restart the scanner?',
 	config_confirm_shutdown_title: 'Shut down the scanner?',
 	config_confirm_reboot_desc:
@@ -399,10 +415,13 @@ export const en: Messages = {
 	users_password_new_label: 'New password',
 	users_password_repeat_label: 'Confirm new password',
 	users_password_signout_note: 'When you save, Captua signs this person out on every screen.',
-	users_password_done: (name: string) => `${name} has a new password. Captua signed them out on every screen.`,
+	users_password_done: (name: string) =>
+		`${name} has a new password. Captua signed them out on every screen.`,
 	users_password_err_user_not_found: 'This user no longer exists. Reload the list.',
-	users_password_err_testing_account: 'This is the testing account. You set its password in Settings, under Testing.',
-	users_password_err_own_account: 'This is your own account. To change your password, open your account menu and choose Change password. You will need your current password.',
+	users_password_err_testing_account:
+		'This is the testing account. You set its password in Settings, under Testing.',
+	users_password_err_own_account:
+		'This is your own account. To change your password, open your account menu and choose Change password. You will need your current password.',
 	users_password_err_not_permitted: 'Only an administrator can set another person’s password.',
 	users_password_err_invalid: 'Captua did not accept this password. Try another one.',
 	users_password_err_generic: 'The password could not be saved. Try again.',
@@ -411,12 +430,15 @@ export const en: Messages = {
 	account_password_current_label: 'Current password',
 	account_password_new_label: 'New password',
 	account_password_repeat_label: 'Confirm new password',
-	account_password_signout_note: 'When you save, Captua signs you out on every screen, this one included.',
+	account_password_signout_note:
+		'When you save, Captua signs you out on every screen, this one included.',
 	account_password_val_current_required: 'Enter your current password.',
 	account_password_done_title: 'You have a new password',
-	account_password_done: 'Captua signed you out on every screen. Log in again with the new password.',
+	account_password_done:
+		'Captua signed you out on every screen. Log in again with the new password.',
 	account_password_err_wrong_current: 'The current password is not correct.',
-	account_password_err_testing_account: 'An administrator sets the testing account’s password, in Settings, under Testing.',
+	account_password_err_testing_account:
+		'An administrator sets the testing account’s password, in Settings, under Testing.',
 	account_password_err_invalid: 'Captua did not accept this password. Try another one.',
 	account_password_err_generic: 'Your password could not be changed. Try again.',
 
@@ -451,12 +473,15 @@ export const en: Messages = {
 	proj_err_delete_not_empty: (collections: number, records: number) => {
 		const volumes = collections === 1 ? '1 volume' : `${formatCount(collections, 'en')} volumes`;
 		const recs = records === 1 ? '1 record' : `${formatCount(records, 'en')} records`;
-		if (collections > 0 && records > 0) return `it still has ${volumes} and ${recs}. Move or delete them first.`;
+		if (collections > 0 && records > 0)
+			return `it still has ${volumes} and ${recs}. Move or delete them first.`;
 		const count = collections > 0 ? collections : records;
 		return `it still has ${collections > 0 ? volumes : recs}. ${count === 1 ? 'Move or delete it first.' : 'Move or delete them first.'}`;
 	},
-	proj_err_delete_files_held: 'Captua still keeps files in this project that belong to other records. Move those records first.',
-	proj_err_delete_manifest_foreign: 'its directory holds a capture manifest that does not belong to this project. Move it out of that directory first.',
+	proj_err_delete_files_held:
+		'Captua still keeps files in this project that belong to other records. Move those records first.',
+	proj_err_delete_manifest_foreign:
+		'its directory holds a capture manifest that does not belong to this project. Move it out of that directory first.',
 	proj_delete_title: 'Delete project',
 	proj_checking_contents: 'Checking contents…',
 	proj_not_empty: 'This project is not empty',
@@ -516,12 +541,14 @@ export const en: Messages = {
 	pd_val_date_range: 'The end date cannot be earlier than the start date.',
 	pd_err_create_collection: 'Could not save the volume. Try again.',
 	pd_err_delete_collection: 'Could not delete the volume. Try again.',
-	pd_err_delete_has_subvolumes: 'This volume cannot be deleted because it still contains other volumes.',
+	pd_err_delete_has_subvolumes:
+		'This volume cannot be deleted because it still contains other volumes.',
 	pd_err_move_under_review: (n: number) =>
 		n === 1
 			? 'One record in this volume is under review, so it cannot be moved. First withdraw the volume from review with "Withdraw from review".'
 			: `${formatCount(n, 'en')} records in this volume are under review, so they cannot be moved. First withdraw the volume from review with "Withdraw from review".`,
-	pd_err_delete_not_empty: 'This volume still has records. Move them to another volume before deleting it.',
+	pd_err_delete_not_empty:
+		'This volume still has records. Move them to another volume before deleting it.',
 	// A records move between a volume Captua keeps on the unit and one it does not (NEH-320).
 	pd_err_move_kept_line:
 		'Captua keeps one of these two volumes on this unit and not the other, so it cannot move the records from one to the other. Choose a volume that Captua keeps the same way, or include the kept volume in the current mode first.',
@@ -533,7 +560,8 @@ export const en: Messages = {
 		'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.',
 	vol_err_files_being_read_project:
 		'Captua is preparing a file of a volume in this project for the offsite copy. Try again in a moment.',
-	vol_err_export_running: 'Captua is exporting this volume. Wait until the export is finished, then try again.',
+	vol_err_export_running:
+		'Captua is exporting this volume. Wait until the export is finished, then try again.',
 	vol_err_export_in_subtree:
 		'Captua is exporting this volume or a volume inside it. Wait until the export is finished, then try again.',
 	vol_err_export_in_project:
@@ -575,7 +603,8 @@ export const en: Messages = {
 	pd_err_stem_differs_from_reference_code: (externalId: string, stem: string): string =>
 		`The stem has to be the volume's Fisqua reference code, "${externalId}"; "${stem}" is different. Use "${externalId}" as the stem.`,
 	pd_err_stem_taken: 'Another volume already uses this stem.',
-	pd_err_stem_fixed: 'Images have already been captured into this volume, so its stem cannot be changed.',
+	pd_err_stem_fixed:
+		'Images have already been captured into this volume, so its stem cannot be changed.',
 	pd_no_stem_badge: 'No stem',
 	pd_no_stem_title: 'This volume has no stem. Give it one before capturing.',
 	pd_delete_stem_reserved:
@@ -599,16 +628,19 @@ export const en: Messages = {
 	col_reason_done: 'Done',
 	col_reject_error: 'Could not reject the record. Please try again.',
 	col_reject_needs_reason: 'You must select at least one error.',
-	col_reject_other_needs_note: 'A rejection for "Other" needs a note. Describe the problem in Add note.',
+	col_reject_other_needs_note:
+		'A rejection for "Other" needs a note. Describe the problem in Add note.',
 	col_reject_comment_too_long: (max: number): string =>
 		`Could not reject the record: the note can be at most ${formatCount(max, 'en')} characters long, which is what Fisqua keeps. Shorten it and try again.`,
 	col_annotation_note_count: (n: number, max: number): string =>
 		`${formatCount(n, 'en')} of ${formatCount(max, 'en')} characters`,
-	col_reject_other_note_error: 'Could not reject the record: a rejection for "Other" needs a note that describes the problem.',
+	col_reject_other_note_error:
+		'Could not reject the record: a rejection for "Other" needs a note that describes the problem.',
 	col_review_approve_error: 'Could not approve the record. Please try again.',
 	// ── Send for review (NEH-260) ───────────────────────────────────
 	col_handover_send: 'Send for review',
-	col_handover_send_new: (n: number) => (n === 1 ? 'Send 1 new record' : `Send ${formatCount(n, 'en')} new records`),
+	col_handover_send_new: (n: number) =>
+		n === 1 ? 'Send 1 new record' : `Send ${formatCount(n, 'en')} new records`,
 	col_handover_take_back: 'Withdraw from review',
 	col_handover_confirm_title: 'Send the volume for review?',
 	col_handover_confirm_body: (n: number) =>
@@ -626,7 +658,10 @@ export const en: Messages = {
 			? 'One record cannot be sent yet because it has no image or its image was rejected. Capture its image again and send the volume again.'
 			: `${formatCount(n, 'en')} records cannot be sent yet because they have no image or their image was rejected. Capture their images again and send the volume again.`,
 	col_handover_refused_unchanged: 'No records were changed.',
-	col_handover_sent: (n: number) => (n === 1 ? '1 record was sent for review.' : `${formatCount(n, 'en')} records were sent for review.`),
+	col_handover_sent: (n: number) =>
+		n === 1
+			? '1 record was sent for review.'
+			: `${formatCount(n, 'en')} records were sent for review.`,
 	col_handover_nothing_to_send: 'There were no captured records to send.',
 	col_handover_send_error: 'Could not send the volume for review. Please try again.',
 	col_takeback_confirm_title: 'Withdraw the volume from review?',
@@ -647,11 +682,16 @@ export const en: Messages = {
 			: `The ${formatCount(n, 'en')} ${word} records stay as they are, because they have already been reviewed.`;
 	},
 	col_takeback_confirm_submit: 'Withdraw',
-	col_takeback_done: (n: number) => (n === 1 ? '1 record was withdrawn from review.' : `${formatCount(n, 'en')} records were withdrawn from review.`),
+	col_takeback_done: (n: number) =>
+		n === 1
+			? '1 record was withdrawn from review.'
+			: `${formatCount(n, 'en')} records were withdrawn from review.`,
 	col_takeback_nothing: 'There were no records in review to withdraw.',
 	col_takeback_error: 'Could not withdraw the volume from review. Please try again.',
-	col_review_not_sent_hint: 'This record is not in review. You can approve or reject it once it is sent for review.',
-	col_records_reload_error: 'The change was saved, but the list of records could not be refreshed. Reload the page to see the records’ current state.',
+	col_review_not_sent_hint:
+		'This record is not in review. You can approve or reject it once it is sent for review.',
+	col_records_reload_error:
+		'The change was saved, but the list of records could not be refreshed. Reload the page to see the records’ current state.',
 	col_recapture_btn: 'Recapture image',
 	col_annotation_comment_placeholder: 'Add a comment (optional)...',
 	col_annotation_note_required_placeholder: 'Describe the problem (required for "Other")...',
@@ -668,7 +708,8 @@ export const en: Messages = {
 	col_columns_aria: 'Number of columns',
 	col_filter_by_status: 'Filter by status:',
 	col_clear_filter: '× Clear',
-	col_filters_disabled_reorder: 'Filters are disabled while reordering to avoid corrupting the sequence',
+	col_filters_disabled_reorder:
+		'Filters are disabled while reordering to avoid corrupting the sequence',
 	col_image_n: (i: number) => `Image ${i}`,
 	col_renumber_modal_title: 'Renumber the records?',
 	col_renumber_desc:
@@ -683,7 +724,8 @@ export const en: Messages = {
 				: `${formatCount(n, 'en')} records renumbered.`,
 	col_reorder_stale:
 		'Records were added to or removed from this volume while you were reordering it, so Captua did not save the new order. Captua has loaded the saved order again.',
-	col_reorder_error: 'Captua could not save the new order. Captua has loaded the saved order again.',
+	col_reorder_error:
+		'Captua could not save the new order. Captua has loaded the saved order again.',
 	col_delete_record_error_title: 'Could not delete the record',
 	col_delete_record_retry: 'Try again in a moment.',
 	col_prev: 'Previous',
@@ -697,7 +739,8 @@ export const en: Messages = {
 	col_status_in_review_lc: 'in review',
 	col_status_approved_lc: 'approved',
 	col_retake: 'Retake',
-	col_retake_confirm: 'Retake this record from the capture screen? Captua keeps the current images as earlier versions.',
+	col_retake_confirm:
+		'Retake this record from the capture screen? Captua keeps the current images as earlier versions.',
 	col_delete_record_confirm: 'Permanently delete this record and all its images?',
 	// A picture of a page names the camera and the page. Role `right` is the
 	// odd/recto page, photographed by the left camera; role `left` is the
@@ -778,9 +821,11 @@ export const en: Messages = {
 	col_download_image: 'Download image',
 	// NEH-139: RAW images in the inspection viewers
 	raw_preview_badge: 'Preview (RAW)',
-	raw_preview_hint: 'The browser cannot display RAW files. This is the JPEG preview stored beside the original.',
+	raw_preview_hint:
+		'The browser cannot display RAW files. This is the JPEG preview stored beside the original.',
 	raw_thumbnail_badge: 'Thumbnail (RAW)',
-	raw_thumbnail_hint: 'The browser cannot display RAW files, and this file has no full-size preview. This is its low-resolution thumbnail.',
+	raw_thumbnail_hint:
+		'The browser cannot display RAW files, and this file has no full-size preview. This is its low-resolution thumbnail.',
 	raw_unviewable_title: 'This format cannot be displayed',
 	raw_unviewable_body: 'The browser cannot display RAW files, and this file has no preview.',
 	image_original_stored: 'The original file is stored on the device.',
@@ -789,24 +834,30 @@ export const en: Messages = {
 	image_thumbnail_badge: 'Thumbnail',
 	image_thumbnail_hint_format: (ext: string) =>
 		`The browser cannot display ${ext} files. This is the file's low-resolution thumbnail.`,
-	image_thumbnail_hint: 'This file could not be displayed at full size. This is its low-resolution thumbnail.',
+	image_thumbnail_hint:
+		'This file could not be displayed at full size. This is its low-resolution thumbnail.',
 	image_unviewable_title: 'This image cannot be displayed',
 	image_unviewable_body_format: (ext: string) =>
 		`The browser cannot display ${ext} files, and this file's thumbnail could not be displayed either.`,
 	image_unviewable_body: 'Neither this file nor its thumbnail could be displayed.',
 	// NEH-248: an image freed from the card (RecordImageDisplay.svelte)
 	freed_title: 'Image stored offsite',
-	freed_where: 'This file is kept outside the scanner, in the offsite copy, to leave room on the SD card.',
-	freed_nothing_lost: 'Nothing is lost: Captua verified the offsite copy before it removed the file from the SD card.',
-	freed_restore_hint: 'To see it at full size, an administrator can restore the volume to the SD card.',
+	freed_where:
+		'This file is kept outside the scanner, in the offsite copy, to leave room on the SD card.',
+	freed_nothing_lost:
+		'Nothing is lost: Captua verified the offsite copy before it removed the file from the SD card.',
+	freed_restore_hint:
+		'To see it at full size, an administrator can restore the volume to the SD card.',
 	// NEH-380: instead of freed_restore_hint on a unit that cannot restore (`restorable` false).
-	freed_no_restore_hint: 'This unit cannot read the offsite copy, so the full-size image cannot be seen here.',
+	freed_no_restore_hint:
+		'This unit cannot read the offsite copy, so the full-size image cannot be seen here.',
 	// NEH-380: the export, or the image ZIP, of a volume with freed files on a unit that cannot restore.
 	export_freed_no_restore:
 		"This volume's images are only in the offsite copy, which this unit cannot read, so the volume cannot be exported here.",
 	freed_thumbnail_note: 'What you see is the thumbnail, which Captua keeps on the scanner.',
 	col_export_blocked_title: 'Cannot export yet',
-	col_export_blocked_desc: 'All records must be approved before exporting. The following are not approved yet:',
+	col_export_blocked_desc:
+		'All records must be approved before exporting. The following are not approved yet:',
 	col_download_choose_title: 'Export or download',
 	col_download_choose_desc: 'Choose what to get from this volume',
 	col_bagit_option_title: 'Archive package (BagIt)',
@@ -823,11 +874,13 @@ export const en: Messages = {
 		`${n === 1 ? 'One file of this volume is stored offsite and is not' : `${formatCount(n, 'en')} files of this volume are stored offsite and are not`} on the SD card, so Captua cannot build the package. To export the volume, an administrator must first restore it from "Space on the SD card", next to the offsite copy line.`,
 	// ── Capture manifest for Fisqua ─────────────────────────────────────────
 	col_manifest_option_title: 'Capture manifest (Fisqua)',
-	col_manifest_option_desc: 'A JSON file that tells Fisqua which pages of this volume are in the offsite copy.',
+	col_manifest_option_desc:
+		'A JSON file that tells Fisqua which pages of this volume are in the offsite copy.',
 	col_manifest_requires: 'Requires sending for review and a complete offsite copy',
 	col_manifest_preparing: 'Preparing the capture manifest…',
 	col_manifest_refused_title: 'The capture manifest cannot be exported yet',
-	col_manifest_refused_body: 'Fisqua would refuse this file. Resolve the following, then export it again.',
+	col_manifest_refused_body:
+		'Fisqua would refuse this file. Resolve the following, then export it again.',
 	col_manifest_records: (ids: number[]): string => {
 		const shown = ids.slice(0, 20).join(', ');
 		const rest = ids.length - 20;
@@ -839,7 +892,8 @@ export const en: Messages = {
 		'The tenant configured on this scanner is not valid. Ask whoever manages the scanner to correct CAPTUA_OFFSITE_TENANT and restart Captua.',
 	col_manifest_rule_no_stem:
 		'The volume has no file name stem, so its images have no names Fisqua can read. Give the volume its stem (its Fisqua reference code).',
-	col_manifest_rule_no_project: 'The volume is not in a project, and the manifest names its project. Move the volume into a project.',
+	col_manifest_rule_no_project:
+		'The volume is not in a project, and the manifest names its project. Move the volume into a project.',
 	col_manifest_rule_records_captured:
 		'Some records are still captured, so the volume has not been sent for review. Send it for review when its capture is finished.',
 	col_manifest_rule_sequence_missing: 'Some records have no sequence number. Renumber the volume.',
@@ -872,7 +926,8 @@ export const en: Messages = {
 		"The volume's Fisqua reference code differs from its stem, so Captua does not send it to Fisqua. The reference code cannot be changed here: ask whoever manages the scanner to make the reference code and the stem agree, then withdraw the volume from review and send it for review again.",
 	col_manifest_rule_other: 'Fisqua would refuse the file for another reason.',
 	col_manifest_err_title: 'Could not download the capture manifest',
-	col_manifest_err_not_found: 'Captua could not find this volume. Go back to the project and open it again.',
+	col_manifest_err_not_found:
+		'Captua could not find this volume. Go back to the project and open it again.',
 	col_manifest_err: 'Captua could not prepare the capture manifest. Try again.',
 	bug_report_button: 'Report a problem',
 	bug_report_title: 'Report a problem',
@@ -930,13 +985,15 @@ export const en: Messages = {
 	cam_reconnect: 'Reconnect cameras',
 	cam_reconnect_error: 'Could not reconnect',
 	cam_section_basic: 'Basic',
-	cam_section_basic_info: 'How the page is oriented, how much light comes in, and the format it is saved in.',
+	cam_section_basic_info:
+		'How the page is oriented, how much light comes in, and the format it is saved in.',
 	cam_section_focus: 'Focus',
 	cam_section_focus_info: 'Adjust so the image comes out sharp.',
 	cam_section_settings: 'Colour and exposure',
 	cam_section_settings_info: 'Adjust so the document looks the colour it really is.',
 	cam_live_controls_unavailable: 'Appear when a connected camera supports them.',
-	cam_capabilities_failed: 'The capture system is not available, so these controls cannot be shown. Press "Reconnect cameras"; if nothing changes, restart the unit.',
+	cam_capabilities_failed:
+		'The capture system is not available, so these controls cannot be shown. Press "Reconnect cameras"; if nothing changes, restart the unit.',
 	cam_orientation: 'Orientation',
 	cam_rotate_ccw: 'Rotate 90° CCW',
 	cam_rotate_cw: 'Rotate 90° CW',
@@ -944,8 +1001,10 @@ export const en: Messages = {
 	cam_aperture: 'Aperture',
 	cam_format: 'Format',
 	// The line under the format selector. RAW+JPEG differs by camera type.
-	cam_format_note_raw_dslr: 'The camera saves a RAW file (CR2). The JPEG is inside it, and Captua copies it out for viewing.',
-	cam_format_note_raw_chdk: 'The camera sends a RAW file (DNG) and a JPEG of the same picture. Captua keeps both.',
+	cam_format_note_raw_dslr:
+		'The camera saves a RAW file (CR2). The JPEG is inside it, and Captua copies it out for viewing.',
+	cam_format_note_raw_chdk:
+		'The camera sends a RAW file (DNG) and a JPEG of the same picture. Captua keeps both.',
 	cam_format_note_jpeg: 'The camera saves a JPEG only.',
 	cam_focusing: 'Focusing…',
 	cam_autofocus: 'Autofocus',
@@ -959,7 +1018,8 @@ export const en: Messages = {
 	cam_dslr_note_p1: 'Set the lens barrel switch to ',
 	cam_dslr_note_p2: ' before capturing.',
 	cam_dslr_note_p3: 'AF causes ~12 s PTP hangs on Canon DSLRs.',
-	cam_dslr_af_warning: (mode: string) => `Lens reports ${mode}. Captures can hang until the lens switch is on MF.`,
+	cam_dslr_af_warning: (mode: string) =>
+		`Lens reports ${mode}. Captures can hang until the lens switch is on MF.`,
 	cam_wb: 'White Balance',
 	cam_wb_calibrate_aria: 'Calibrate white balance automatically',
 	cam_wb_cancel_aria: 'Cancel white balance sampling',
@@ -991,23 +1051,33 @@ export const en: Messages = {
 	lv_no_signal_right: 'No signal — Left camera',
 	lv_no_signal: 'No signal',
 	lv_check_hw: 'Check the camera connection',
-	lv_camera_missing: 'Camera not detected. Half-press its shutter button or reseat the USB cable, then press "Reconnect cameras".',
-	lv_camera_no_image: 'The camera is connected but is not sending an image. Turn the camera off and on again. If that does not help, unplug its USB cable and plug it back in.',
+	lv_camera_missing:
+		'Camera not detected. Half-press its shutter button or reseat the USB cable, then press "Reconnect cameras".',
+	lv_camera_no_image:
+		'The camera is connected but is not sending an image. Turn the camera off and on again. If that does not help, unplug its USB cable and plug it back in.',
 	lv_rotate_ccw: 'Rotate left',
 	lv_rotate_cw: 'Rotate right',
 	// A camera named inside a sentence: by the page its role gives it (the
 	// camera with role left photographs the even/verso page, on the right),
 	// by its number, or, with one camera, plainly.
-	lv_camera_in_sentence: (which: { role: 'left' | 'right' } | { number: number } | { single: true }): string =>
-		'role' in which ? `the ${which.role === 'left' ? 'right' : 'left'} camera` : 'number' in which ? `camera ${which.number}` : 'the camera',
+	lv_camera_in_sentence: (
+		which: { role: 'left' | 'right' } | { number: number } | { single: true }
+	): string =>
+		'role' in which
+			? `the ${which.role === 'left' ? 'right' : 'left'} camera`
+			: 'number' in which
+				? `camera ${which.number}`
+				: 'the camera',
 	lv_orientation_save_failed: (camera: string): string =>
 		`Captua could not save the orientation of ${camera}. It uses this orientation for captures while this screen stays open, but if you reload or reopen the screen you will see the previous one. Press "Retry" to save this orientation.`,
 	lv_controls_collapse: 'Hide controls',
 	lv_controls_expand: 'Show controls',
 	lv_grid_settings: 'Grid settings',
 	lv_swap_orientation: 'Swap the pages of the two cameras',
-	lv_orientation_swapped: 'Swap the pages of the two cameras (camera 2 now photographs the even/verso page)',
-	lv_orientation_normal: 'Swap the pages of the two cameras (camera 1 now photographs the even/verso page)',
+	lv_orientation_swapped:
+		'Swap the pages of the two cameras (camera 2 now photographs the even/verso page)',
+	lv_orientation_normal:
+		'Swap the pages of the two cameras (camera 1 now photographs the even/verso page)',
 	lv_grid_modal_title: 'Grid and guides',
 	lv_grid_modal_subtitle: 'Turn on visual framing aids.',
 	lv_grid: 'Grid',
@@ -1019,15 +1089,19 @@ export const en: Messages = {
 	lv_capture_key_learn: 'Learn from pedal',
 	lv_capture_key_learning: 'Press the pedal or key now…',
 	lv_capture_key_reset: 'Reset to default',
-	lv_capture_key_note: 'While bound to capture, this key stops activating whatever button has focus on this page. Make sure the pedal is in ordinary single-key mode, not a macro or repeat mode.',
-	lv_capture_key_modifier_only: (modifier: string) => `That device only sent ${modifier}. Press the pedal's actual key, not just a modifier.`,
+	lv_capture_key_note:
+		'While bound to capture, this key stops activating whatever button has focus on this page. Make sure the pedal is in ordinary single-key mode, not a macro or repeat mode.',
+	lv_capture_key_modifier_only: (modifier: string) =>
+		`That device only sent ${modifier}. Press the pedal's actual key, not just a modifier.`,
 	lv_capture_key_unbindable: 'That device sent a key this page cannot bind. Try pressing it again.',
 	lv_capture_key_space: 'Space',
 	lv_capture_key_settings: 'Capture pedal and key',
 	lv_capture_error: 'Capture failed',
 	lv_capture_not_ready: 'Loading the volume…',
-	lv_capture_still_working: 'The camera is taking longer than usual. Wait for Captua to finish this capture.',
-	lv_capture_maybe_saved: 'The camera did not answer in time. The capture may have been saved: wait while Captua checks.',
+	lv_capture_still_working:
+		'The camera is taking longer than usual. Wait for Captua to finish this capture.',
+	lv_capture_maybe_saved:
+		'The camera did not answer in time. The capture may have been saved: wait while Captua checks.',
 	lv_capture_found: 'The capture was saved.',
 	lv_capture_not_saved: 'No capture was saved. Check the camera and capture again.',
 	lv_records_unread: "Captua could not load this volume's records, so capture is not possible yet.",
@@ -1046,8 +1120,10 @@ export const en: Messages = {
 		"Captua captured nothing: files on disk already carry this volume's next capture numbers; let whoever administers the device know",
 	lv_err_retake_status: 'Only a captured or rejected record can be retaken',
 	lv_err_resolution_in_name: "Captua cannot put the resolution in a capture's file name",
-	lv_err_name_too_long: "Captua captured nothing: this capture's file name would be longer than 36 characters",
-	lv_err_capture_limit: 'Captua captured nothing: this volume has reached the limit of 9,999 captures; a new volume is needed',
+	lv_err_name_too_long:
+		"Captua captured nothing: this capture's file name would be longer than 36 characters",
+	lv_err_capture_limit:
+		'Captua captured nothing: this volume has reached the limit of 9,999 captures; a new volume is needed',
 	// NEH-380: the 507 `storage_reserve`, for whoever can free space and for everyone else.
 	lv_err_storage_reserve_free:
 		'Captua captured nothing: the storage is nearly full and Captua needs what is left to keep working; free space in Settings › Storage',
@@ -1092,9 +1168,11 @@ export const en: Messages = {
 	focus_continue: 'Continue',
 	focus_af_step_light:
 		'Switch the scanner light on, open the book where both pages have text and put it under the cameras. Do not use a blank page: the camera would focus on the glass and not on the book.',
-	focus_af_step_switch: 'On each lens, find the switch marked AF / MF on the side of the barrel and slide it to AF.',
+	focus_af_step_switch:
+		'On each lens, find the switch marked AF / MF on the side of the barrel and slide it to AF.',
 	focus_af_step_tick: 'A tick appears here for each camera when Captua reads AF from it.',
-	focus_test_step_hold: 'Bring the page against the glass, as you do to capture, and hold it there.',
+	focus_test_step_hold:
+		'Bring the page against the glass, as you do to capture, and hold it there.',
 	focus_test_step_take:
 		'Press the pedal or "Take test captures". Each camera focuses and then captures; this can take up to 20 seconds.',
 	focus_test_step_zoom: 'Zoom in on both captures: the text on the page must be sharp.',
@@ -1123,15 +1201,19 @@ export const en: Messages = {
 	camcheck_back: 'Back to capturing',
 	camcheck_left_page: 'Right camera · even/verso',
 	camcheck_right_page: 'Left camera · odd/recto',
-	camcheck_chip_aria: (side: 'left' | 'right') => `${side === 'left' ? 'Right camera · even/verso' : 'Left camera · odd/recto'}: show details`,
+	camcheck_chip_aria: (side: 'left' | 'right') =>
+		`${side === 'left' ? 'Right camera · even/verso' : 'Left camera · odd/recto'}: show details`,
 	camcheck_not_reachable: 'not reachable',
 	camcheck_no_capture: 'No test capture yet',
 	camcheck_taking: 'Taking the test capture…',
 	// The detail is dash_camera_capture_not_connected or _timeout, in lowercase.
 	camcheck_test_failed: (detail?: string) =>
-		detail ? `Captua could not take the test capture: ${detail}` : 'Captua could not take the test capture',
+		detail
+			? `Captua could not take the test capture: ${detail}`
+			: 'Captua could not take the test capture',
 	camcheck_frame_unreachable: 'Captua could not reach this camera.',
-	camcheck_unreachable_title: (side: 'left' | 'right') => `Captua could not reach the ${side === 'left' ? 'right' : 'left'} camera.`,
+	camcheck_unreachable_title: (side: 'left' | 'right') =>
+		`Captua could not reach the ${side === 'left' ? 'right' : 'left'} camera.`,
 	camcheck_unreachable_body:
 		'Check that the camera is switched on and that its USB cable is plugged in. Then take test captures again.',
 	camcheck_devices_failed: 'Captua could not read the list of cameras.',
@@ -1139,48 +1221,58 @@ export const en: Messages = {
 	camcheck_zoom: 'Zoom',
 	camcheck_zoom_both: 'Zoom · both cameras',
 	camcheck_zoom_each: 'Zoom · each camera',
-	camcheck_zoom_in: (who: 'both' | 'left' | 'right') => (who === 'both' ? 'Zoom in' : `Zoom in, ${who === 'left' ? 'right' : 'left'} camera`),
-	camcheck_zoom_out: (who: 'both' | 'left' | 'right') => (who === 'both' ? 'Zoom out' : `Zoom out, ${who === 'left' ? 'right' : 'left'} camera`),
+	camcheck_zoom_in: (who: 'both' | 'left' | 'right') =>
+		who === 'both' ? 'Zoom in' : `Zoom in, ${who === 'left' ? 'right' : 'left'} camera`,
+	camcheck_zoom_out: (who: 'both' | 'left' | 'right') =>
+		who === 'both' ? 'Zoom out' : `Zoom out, ${who === 'left' ? 'right' : 'left'} camera`,
 	// After the step shown: the last step, from the cameras' zoom_steps.
 	camcheck_zoom_of: (last: number) => `of ${last}`,
 	camcheck_adjust_separately: 'Adjust separately',
 	camcheck_adjust_together: 'Adjust together',
 	camcheck_match: 'Match',
-	camcheck_zoom_first: 'Take test captures first: Captua can set the zoom once both cameras have taken one.',
+	camcheck_zoom_first:
+		'Take test captures first: Captua can set the zoom once both cameras have taken one.',
 	// The detail is the backend's, in English.
 	camcheck_zoom_failed: (side: 'left' | 'right', detail?: string) =>
 		detail
 			? `Captua could not set the zoom of the ${side === 'left' ? 'right' : 'left'} camera: ${detail}`
 			: `Captua could not set the zoom of the ${side === 'left' ? 'right' : 'left'} camera.`,
 	camcheck_stale: 'The zoom was changed after these captures. Take test captures again.',
-	camcheck_focal_hint: "Captua reads each camera's focal length from the test captures. To change it, turn the zoom ring on the lens.",
+	camcheck_focal_hint:
+		"Captua reads each camera's focal length from the test captures. To change it, turn the zoom ring on the lens.",
 	camcheck_focal_read: 'Read from the test captures.',
 	camcheck_focal_value: (mm: number) => String(mm),
 	camcheck_mm: 'mm',
 	camcheck_focal_differ_title: 'The two cameras are at different focal lengths.',
-	camcheck_focal_differ_body: 'Turn one zoom ring until the two numbers match. Then take test captures again.',
+	camcheck_focal_differ_body:
+		'Turn one zoom ring until the two numbers match. Then take test captures again.',
 	camcheck_focus: 'Focus',
 	camcheck_focus_hint: 'Press 1:1 on a capture to see it at full size. The text must be sharp.',
-	camcheck_full_size_aria: (side: 'left' | 'right') => `${side === 'left' ? 'Right camera · even/verso' : 'Left camera · odd/recto'}: actual size (1:1)`,
+	camcheck_full_size_aria: (side: 'left' | 'right') =>
+		`${side === 'left' ? 'Right camera · even/verso' : 'Left camera · odd/recto'}: actual size (1:1)`,
 	camcheck_discarded: 'Captua does not save test captures to the volume.',
 	camcheck_take: 'Take test captures',
 	camcheck_viewer_title: 'Test captures at full size',
 	camcheck_viewer_hint: 'Drag a capture to move both. Check that the text is sharp on both pages.',
 	camcheck_details_title: 'Cameras',
-	camcheck_details_camera: (side: 'left' | 'right'): string => (side === 'left' ? 'Right camera · even/verso' : 'Left camera · odd/recto'),
+	camcheck_details_camera: (side: 'left' | 'right'): string =>
+		side === 'left' ? 'Right camera · even/verso' : 'Left camera · odd/recto',
 	camcheck_connection: 'Connection',
 	camcheck_connected: 'Connected',
 	camcheck_cannot_reach: 'Captua cannot reach it',
 	camcheck_model: 'Model',
-	camcheck_turn_aria: (side: 'left' | 'right') => `Turn the capture of the ${side === 'left' ? 'even/verso' : 'odd/recto'} page 90° clockwise`,
+	camcheck_turn_aria: (side: 'left' | 'right') =>
+		`Turn the capture of the ${side === 'left' ? 'even/verso' : 'odd/recto'} page 90° clockwise`,
 	camcheck_turn_title: 'Turn 90° clockwise',
 	// ── "Which camera is this?" (NEH-343) ─────────────────────────────────────
 	camwhich_open: 'Change the page of each camera',
 	camwhich_ask_title: 'Which image is the odd/recto page?',
 	camwhich_identity_title: 'Captua cannot identify one of the cameras',
-	camwhich_identity_body: 'Tell the administrator: this camera has to be set up so that Captua can identify it. Until then, no one can capture on this unit.',
+	camwhich_identity_body:
+		'Tell the administrator: this camera has to be set up so that Captua can identify it. Until then, no one can capture on this unit.',
 	camwhich_one_title: 'Captua needs both cameras connected',
-	camwhich_one_body: 'Check that both cameras are on and that the USB cables are connected. Then press "Reconnect cameras".',
+	camwhich_one_body:
+		'Check that both cameras are on and that the USB cables are connected. Then press "Reconnect cameras".',
 	camwhich_check_again: 'Reconnect cameras',
 	camwhich_rescanning: 'Captua is reconnecting the cameras…',
 	camwhich_rescan_failed: 'Captua could not reconnect the cameras.',
@@ -1188,21 +1280,28 @@ export const en: Messages = {
 	camwhich_loading: 'Captua is reading the list of cameras…',
 	camwhich_lead_unconfirmed: 'Captua does not know which page each camera photographs.',
 	camwhich_lead_conflict: 'Captua has both cameras on record for the same page.',
-	camwhich_lead_pair_changed: 'These cameras are not the pair that was last confirmed on this unit.',
-	camwhich_lead_port: 'A camera is plugged into a different USB socket than the one it used when its page was confirmed. Check that each image is of the page named on it.',
-	camwhich_how: 'Press the image of the odd/recto page. Turn an image that is sideways or upside down.',
+	camwhich_lead_pair_changed:
+		'These cameras are not the pair that was last confirmed on this unit.',
+	camwhich_lead_port:
+		'A camera is plugged into a different USB socket than the one it used when its page was confirmed. Check that each image is of the page named on it.',
+	camwhich_how:
+		'Press the image of the odd/recto page. Turn an image that is sideways or upside down.',
 	camwhich_needed: 'Captua needs this answer before you can capture.',
 	camwhich_camera: (n: number) => `Camera ${n}`,
 	camwhich_pick_aria: (n: number) => `Camera ${n} photographs the odd/recto page`,
 	camwhich_turn_aria: (n: number) => `Turn camera ${n}'s image 90° clockwise`,
-	camwhich_guess: (side: 'left' | 'right') => `Captua's guess: ${side === 'left' ? 'even/verso' : 'odd/recto'} page`,
+	camwhich_guess: (side: 'left' | 'right') =>
+		`Captua's guess: ${side === 'left' ? 'even/verso' : 'odd/recto'} page`,
 	camwhich_frame_busy: 'Asking the camera for an image…',
 	camwhich_frame_failed: 'Captua could not get an image from this camera.',
 	camwhich_refresh: 'Refresh',
 	camwhich_confirm: 'Confirm',
-	camwhich_err_not_connected: 'Captua could not save the answer because a camera was no longer connected. Check that both cameras are connected and press the image of the odd/recto page again.',
-	camwhich_err_identity: 'Captua could not save the answer because it cannot identify one of the cameras. Tell the administrator.',
-	camwhich_err_unavailable: 'Captua could not save which page each camera photographs. Try again in a moment.',
+	camwhich_err_not_connected:
+		'Captua could not save the answer because a camera was no longer connected. Check that both cameras are connected and press the image of the odd/recto page again.',
+	camwhich_err_identity:
+		'Captua could not save the answer because it cannot identify one of the cameras. Tell the administrator.',
+	camwhich_err_unavailable:
+		'Captua could not save which page each camera photographs. Try again in a moment.',
 	camwhich_err_failed: 'Captua could not save which page each camera photographs.',
 	tb_go_to_review: 'Review',
 	tb_go_to_review_title: 'Back to reviewing this volume',
@@ -1233,7 +1332,8 @@ export const en: Messages = {
 	backup_section_title: 'Offsite copy',
 	backup_section_desc:
 		'Once a day, Captua copies the catalogue to the destination configured when the scanner was installed, and verifies that the copy is complete.',
-	backup_section_catalogue: 'The catalogue is the database that links each image to its project, its volume and its place in that volume.',
+	backup_section_catalogue:
+		'The catalogue is the database that links each image to its project, its volume and its place in that volume.',
 	backup_section_scope: 'This copy does not include the image files.',
 	backup_cfg_current: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string) => {
 		if (day === 'today') return `Copy verified today at ${time}.`;
@@ -1241,7 +1341,9 @@ export const en: Messages = {
 		return `Copy verified on ${date} at ${time}.`;
 	},
 	backup_cfg_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
-		day === 'yesterday' ? 'The last verified copy is from yesterday.' : `The last verified copy is from ${date}.`,
+		day === 'yesterday'
+			? 'The last verified copy is from yesterday.'
+			: `The last verified copy is from ${date}.`,
 	backup_cfg_never: 'No copy has been verified yet.',
 	backup_cfg_retry: 'While the scanner is on, Captua retries the copy from time to time.',
 	backup_cfg_off: 'The offsite copy is not configured on this scanner.',
@@ -1279,7 +1381,7 @@ export const en: Messages = {
 		"Captua keeps this volume's images on this unit, and sends it to Fisqua only once an administrator includes it.",
 	kept_keep_inside: 'If this volume holds other volumes, Captua keeps them on this unit too.',
 	kept_err_already_left:
-		"Captua has already copied files of this volume, or of a volume inside it, offsite, or sent one of these volumes to Fisqua. So it can no longer keep this volume on this unit alone.",
+		'Captua has already copied files of this volume, or of a volume inside it, offsite, or sent one of these volumes to Fisqua. So it can no longer keep this volume on this unit alone.',
 	kept_err_already_kept: 'Captua already keeps this volume on this unit.',
 	kept_err_not_kept: 'Captua already includes this volume in the current mode.',
 	kept_err_kept_parent:
@@ -1290,7 +1392,11 @@ export const en: Messages = {
 	pd_kept_on_unit_help:
 		'For test volumes: Captua keeps its images only on this unit and does not check its reference code with Fisqua until an administrator includes it.',
 	offsite_vol_unknown: 'Could not check the offsite copy of this volume',
-	offsite_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+	offsite_last_verified: (
+		day: 'today' | 'yesterday' | 'earlier',
+		date: string,
+		time: string
+	): string => {
 		if (day === 'today') return `last verified today at ${time}`;
 		if (day === 'yesterday') return `last verified yesterday at ${time}`;
 		return `last verified on ${date} at ${time}`;
@@ -1306,8 +1412,14 @@ export const en: Messages = {
 	offsite_unit_files: (verified: number, total: number, pending: number) =>
 		`${formatCount(verified, 'en')} of ${formatCount(total, 'en')} files verified, ${formatCount(pending, 'en')} pending.`,
 	offsite_unit_refused: (refused: number): string =>
-		refused === 1 ? '1 file needs attention.' : `${formatCount(refused, 'en')} files need attention.`,
-	offsite_cfg_last_verified: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
+		refused === 1
+			? '1 file needs attention.'
+			: `${formatCount(refused, 'en')} files need attention.`,
+	offsite_cfg_last_verified: (
+		day: 'today' | 'yesterday' | 'earlier',
+		date: string,
+		time: string
+	): string => {
 		if (day === 'today') return `Last file verified today at ${time}.`;
 		if (day === 'yesterday') return `Last file verified yesterday at ${time}.`;
 		return `Last file verified on ${date} at ${time}.`;
@@ -1325,11 +1437,21 @@ export const en: Messages = {
 	fisqua_out_none: 'Not sent to Fisqua yet',
 	fisqua_out_waiting: 'Waiting for the complete offsite copy before sending to Fisqua',
 	fisqua_out_sending: 'Captua is sending the capture manifest to Fisqua',
-	fisqua_out_failed: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string): string => {
-		const when = day === 'today' ? `today at ${time}` : day === 'yesterday' ? `yesterday at ${time}` : `on ${date} at ${time}`;
+	fisqua_out_failed: (
+		day: 'today' | 'yesterday' | 'earlier',
+		date: string,
+		time: string
+	): string => {
+		const when =
+			day === 'today'
+				? `today at ${time}`
+				: day === 'yesterday'
+					? `yesterday at ${time}`
+					: `on ${date} at ${time}`;
 		return `Captua could not send the capture manifest to Fisqua; it will try again ${when}`;
 	},
-	fisqua_out_failed_no_time: 'Captua could not send the capture manifest to Fisqua; it will try again',
+	fisqua_out_failed_no_time:
+		'Captua could not send the capture manifest to Fisqua; it will try again',
 	fisqua_out_not_exportable: 'Not sent to Fisqua: Captua cannot build the capture manifest',
 	fisqua_out_refused_by_fisqua: 'Fisqua refused the capture manifest',
 	fisqua_out_delivered: 'Sent to Fisqua; waiting for its status',
@@ -1355,7 +1477,8 @@ export const en: Messages = {
 		if (day === 'yesterday') return `checked yesterday at ${time}`;
 		return `checked on ${date} at ${time}`;
 	},
-	fisqua_problems: (n: number): string => (n === 1 ? '1 problem' : `${formatCount(n, 'en')} problems`),
+	fisqua_problems: (n: number): string =>
+		n === 1 ? '1 problem' : `${formatCount(n, 'en')} problems`,
 	// Fisqua's own text, as it sent it.
 	fisqua_notes: (n: number): string => (n === 1 ? '1 note' : `${formatCount(n, 'en')} notes`),
 	fisqua_more: (n: number): string => `and ${formatCount(n, 'en')} more`,
@@ -1363,8 +1486,10 @@ export const en: Messages = {
 		`The offsite copy holds a file the capture manifest does not name: ${key}`,
 	fisqua_note_missing_object: (key: string): string =>
 		`The capture manifest names a file the offsite copy does not hold; Fisqua does not read it to process the volume: ${key}`,
-	fisqua_rule_bad_request: 'Fisqua refused the capture manifest as malformed, without naming a problem.',
-	fisqua_rule_payload_too_large: 'Fisqua refused the capture manifest as too large, without naming a problem.',
+	fisqua_rule_bad_request:
+		'Fisqua refused the capture manifest as malformed, without naming a problem.',
+	fisqua_rule_payload_too_large:
+		'Fisqua refused the capture manifest as too large, without naming a problem.',
 	fisqua_problem_from_fisqua: (message: string): string => `From Fisqua: ${message}`,
 	fisqua_incident_object_missing:
 		'Fisqua could not find some files in the offsite copy that Captua had already verified there. This needs investigating: ask whoever manages the scanner to check the offsite copy. The missing files are listed below.',
@@ -1389,18 +1514,26 @@ export const en: Messages = {
 	fisqua_unit_env_staging:
 		"Captua sends each volume's capture manifest to Fisqua's test service (staging) once the volume is in review and its offsite copy is complete.",
 	fisqua_unit_send_none: 'Captua has not sent anything to Fisqua since the last restart.',
-	fisqua_unit_send_done: (delivered: number, refused: number, failed: number, waiting: number): string =>
+	fisqua_unit_send_done: (
+		delivered: number,
+		refused: number,
+		failed: number,
+		waiting: number
+	): string =>
 		`Last send: ${formatCount(delivered, 'en')} delivered, ${formatCount(refused, 'en')} refused, ${formatCount(failed, 'en')} to try again, ${formatCount(waiting, 'en')} waiting for the offsite copy.`,
 	fisqua_unit_send_config_error: 'Last send: stopped by the configuration error below.',
-	fisqua_unit_send_error: 'Captua could not finish the last send. It tries again after the next image upload to the offsite copy.',
-	fisqua_unit_send_stopped: 'Captua stopped the last send before it finished, and continues after the next image upload to the offsite copy.',
+	fisqua_unit_send_error:
+		'Captua could not finish the last send. It tries again after the next image upload to the offsite copy.',
+	fisqua_unit_send_stopped:
+		'Captua stopped the last send before it finished, and continues after the next image upload to the offsite copy.',
 	fisqua_unit_send_other: 'Captua sent nothing to Fisqua on its last run.',
 	fisqua_unit_poll_none: 'Captua has not asked Fisqua for a status since the last restart.',
 	fisqua_unit_poll_done: (asked: number, answered: number): string =>
 		`Last status check: Captua asked about ${asked === 1 ? '1 volume' : `${formatCount(asked, 'en')} volumes`}, and Fisqua answered for ${formatCount(answered, 'en')}.`,
 	fisqua_unit_poll_config_error: 'Last status check: stopped by the configuration error below.',
 	fisqua_unit_poll_error: 'Captua could not finish the last status check. It asks again later.',
-	fisqua_unit_poll_cooling: 'Last status check: Fisqua asked Captua to wait. Captua asks again later.',
+	fisqua_unit_poll_cooling:
+		'Last status check: Fisqua asked Captua to wait. Captua asks again later.',
 	fisqua_unit_poll_other: 'On its last check, Captua asked Fisqua about no volumes.',
 
 	// ── Freeing space on the card and restoring (NEH-248, offsite-free.ts) ──
@@ -1426,7 +1559,9 @@ export const en: Messages = {
 		"Before it removes each file, Captua compares its checksum with the offsite copy's again. This can take several minutes.",
 	offsite_plan_nothing: 'Captua found no files it can free on this volume.',
 	offsite_plan_left: (n: number): string =>
-		n === 1 ? 'Captua will leave 1 file on the SD card:' : `Captua will leave ${formatCount(n, 'en')} files on the SD card:`,
+		n === 1
+			? 'Captua will leave 1 file on the SD card:'
+			: `Captua will leave ${formatCount(n, 'en')} files on the SD card:`,
 	offsite_free_confirm: 'Free space',
 	offsite_running_free: 'Captua is freeing space on the SD card…',
 	offsite_running_close_note:
@@ -1439,7 +1574,9 @@ export const en: Messages = {
 				? `Captua removed 1 file (${formatBytes(bytes, 'en')}) from the SD card.`
 				: `Captua removed ${formatCount(files, 'en')} files (${formatBytes(bytes, 'en')}) from the SD card.`,
 	offsite_done_left: (n: number): string =>
-		n === 1 ? 'Captua left 1 file on the SD card:' : `Captua left ${formatCount(n, 'en')} files on the SD card:`,
+		n === 1
+			? 'Captua left 1 file on the SD card:'
+			: `Captua left ${formatCount(n, 'en')} files on the SD card:`,
 	offsite_restore_confirm_title: 'Restore the volume to the SD card?',
 	offsite_restore_confirm_body: (files: number, bytes: number): string =>
 		files === 1
@@ -1457,17 +1594,21 @@ export const en: Messages = {
 				? `Captua restored 1 file (${formatBytes(bytes, 'en')}) to the SD card.`
 				: `Captua restored ${formatCount(files, 'en')} files (${formatBytes(bytes, 'en')}) to the SD card.`,
 	offsite_restore_left: (n: number): string =>
-		n === 1 ? 'Captua could not restore 1 file:' : `Captua could not restore ${formatCount(n, 'en')} files:`,
+		n === 1
+			? 'Captua could not restore 1 file:'
+			: `Captua could not restore ${formatCount(n, 'en')} files:`,
 	offsite_err_no_stem:
 		'This volume has no stem, so none of its files are stored offsite, and there is nothing to free or restore.',
 	offsite_err_not_received:
 		'Not every file of this volume is verified in the offsite copy yet. Wait for Captua to finish copying them.',
-	offsite_err_listing: 'Captua could not reach the offsite copy, so it checked and removed nothing. Try again later.',
+	offsite_err_listing:
+		'Captua could not reach the offsite copy, so it checked and removed nothing. Try again later.',
 	offsite_err_no_read_remote:
 		'This scanner is not set up to restore: it needs read access to the offsite copy. Ask whoever installed the scanner to set it up.',
 	offsite_err_not_in_own_folder:
 		"Some of this volume's files are not yet in the volume's own folder, so Captua cannot free or restore them. Captua moves them there at startup: restart the scanner and try again. If Captua still cannot free or restore them after the restart, tell an administrator.",
-	offsite_err_job_running: 'Captua is already freeing or restoring files of this volume. Wait for it to finish.',
+	offsite_err_job_running:
+		'Captua is already freeing or restoring files of this volume. Wait for it to finish.',
 	offsite_err_drive_unavailable:
 		'The storage drive set for projects is not available. Connect and activate it, or go back to internal storage, then try again.',
 	offsite_err_drive_not_directory:
@@ -1490,7 +1631,9 @@ export const en: Messages = {
 			? '1 preview has no SHA-256 checksum recorded yet. Captua keeps it on the SD card, because that checksum can only be computed from the file on the scanner.'
 			: `${formatCount(n, 'en')} previews have no SHA-256 checksum recorded yet. Captua keeps them on the SD card, because that checksum can only be computed from the file on the scanner.`,
 	offsite_reason_not_in_bucket: (n: number): string =>
-		n === 1 ? '1 file is not in the offsite copy.' : `${formatCount(n, 'en')} files are not in the offsite copy.`,
+		n === 1
+			? '1 file is not in the offsite copy.'
+			: `${formatCount(n, 'en')} files are not in the offsite copy.`,
 	offsite_reason_listed_without_sha1: (n: number): string =>
 		n === 1
 			? '1 file is listed in the offsite copy without a checksum to compare.'
@@ -1500,9 +1643,13 @@ export const en: Messages = {
 			? 'For 1 file, the offsite copy does not match the file on the SD card.'
 			: `For ${formatCount(n, 'en')} files, the offsite copy does not match the file on the SD card.`,
 	offsite_reason_local_file_missing: (n: number): string =>
-		n === 1 ? '1 file is not on the SD card.' : `${formatCount(n, 'en')} files are not on the SD card.`,
+		n === 1
+			? '1 file is not on the SD card.'
+			: `${formatCount(n, 'en')} files are not on the SD card.`,
 	offsite_reason_local_file_unreadable: (n: number): string =>
-		n === 1 ? 'Captua could not read 1 file on the SD card.' : `Captua could not read ${formatCount(n, 'en')} files on the SD card.`,
+		n === 1
+			? 'Captua could not read 1 file on the SD card.'
+			: `Captua could not read ${formatCount(n, 'en')} files on the SD card.`,
 	offsite_reason_local_sha1_differs: (n: number): string =>
 		n === 1
 			? '1 file on the SD card does not match its offsite copy.'
@@ -1512,7 +1659,9 @@ export const en: Messages = {
 			? '1 file was changed or deleted while Captua was working.'
 			: `${formatCount(n, 'en')} files were changed or deleted while Captua was working.`,
 	offsite_reason_could_not_remove: (n: number): string =>
-		n === 1 ? 'Captua could not remove 1 file from the SD card.' : `Captua could not remove ${formatCount(n, 'en')} files from the SD card.`,
+		n === 1
+			? 'Captua could not remove 1 file from the SD card.'
+			: `Captua could not remove ${formatCount(n, 'en')} files from the SD card.`,
 	offsite_reason_outside_storage: (n: number): string =>
 		n === 1
 			? "1 file has a path outside the scanner's storage."
@@ -1530,7 +1679,9 @@ export const en: Messages = {
 			? '1 file copied from the offsite copy did not match its checksum; Captua discarded it.'
 			: `${formatCount(n, 'en')} files copied from the offsite copy did not match their checksums; Captua discarded them.`,
 	offsite_reason_could_not_write: (n: number): string =>
-		n === 1 ? 'Captua could not write 1 file to the SD card.' : `Captua could not write ${formatCount(n, 'en')} files to the SD card.`,
+		n === 1
+			? 'Captua could not write 1 file to the SD card.'
+			: `Captua could not write ${formatCount(n, 'en')} files to the SD card.`,
 	offsite_reason_other: (n: number): string =>
 		n === 1 ? '1 file, for another reason.' : `${formatCount(n, 'en')} files, for other reasons.`,
 
@@ -1543,7 +1694,8 @@ export const en: Messages = {
 	queue_list_label: 'List',
 	queue_list_option: (name: string, date: string) => `${name}, imported ${date}`,
 	queue_imported_at: (date: string) => `Imported ${date}`,
-	queue_empty: 'No lists have been imported yet. Import a digitisation list to see its items here in order.',
+	queue_empty:
+		'No lists have been imported yet. Import a digitisation list to see its items here in order.',
 	queue_list_file_missing:
 		"Captua has no copy of this list's file, so it cannot show the list's items. Import the file again to see them.",
 	queue_load_error: 'The queue could not be loaded.',
@@ -1584,13 +1736,16 @@ export const en: Messages = {
 	queue_reason_missing_reference_code: 'The item has no reference code.',
 	queue_reason_invalid_reference_code: 'The reference code is not text, or is too long.',
 	queue_reason_reference_code_padded: 'The reference code begins or ends with spaces.',
-	queue_reason_reference_code_duplicated_in_list: 'An earlier item in this list has the same reference code.',
+	queue_reason_reference_code_duplicated_in_list:
+		'An earlier item in this list has the same reference code.',
 	queue_reason_missing_filename_stem: 'The item has no file name stem.',
 	queue_reason_filename_stem_not_a_slug:
 		'The file name stem may hold only lowercase letters a to z and digits, separated by single hyphens.',
 	queue_reason_filename_stem_too_long: 'The file name stem is too long.',
-	queue_reason_filename_stem_differs_from_reference_code: 'The file name stem is not the same as the reference code.',
-	queue_reason_filename_stem_duplicated_in_list: 'An earlier item in this list has the same file name stem.',
+	queue_reason_filename_stem_differs_from_reference_code:
+		'The file name stem is not the same as the reference code.',
+	queue_reason_filename_stem_duplicated_in_list:
+		'An earlier item in this list has the same file name stem.',
 	queue_reason_missing_title: 'The item has no title.',
 	queue_reason_invalid_title: 'The title is not text, or is too long.',
 	queue_reason_invalid_dates: 'The dates are not in the form YYYY-MM-DD.',
@@ -1599,12 +1754,14 @@ export const en: Messages = {
 	queue_reason_reference_code_on_unit: 'A volume with this reference code is already on this unit.',
 	queue_reason_filename_stem_on_unit: 'A volume with this file name stem is already on this unit.',
 	queue_reason_refused_by_database: 'The database refused the volume.',
-	queue_reason_filename_stem_is_project_directory: "The file name stem is the name of a project's folder on this unit.",
+	queue_reason_filename_stem_is_project_directory:
+		"The file name stem is the name of a project's folder on this unit.",
 	queue_reason_filename_stem_directory_occupied:
 		"A folder named as this file name stem already holds files on this unit, and Captua never merges two volumes' files.",
 	queue_reason_filename_stem_held_offsite:
 		'The offsite copy holds images under this file name stem, so Captua cannot give it to a new volume.',
-	queue_reason_mode_changed: "Someone changed the unit's mode during the import, so Captua did not create this volume.",
+	queue_reason_mode_changed:
+		"Someone changed the unit's mode during the import, so Captua did not create this volume.",
 	queue_reason_unknown: (code: string) => `Captua did not create this volume (${code}).`,
 	// Why the whole file was refused, by the response's HTTP status.
 	queue_import_err_unreadable: 'Captua could not read the file.',
@@ -1629,8 +1786,10 @@ export const en: Messages = {
 	queue_operator_empty: 'No item in the queue is assigned to you or unassigned.',
 	queue_items_empty: 'The queue has no items to show.',
 	queue_retake_record: (id: number) => `Record #${id}`,
-	queue_mark_conflict: "This item has changed in Fisqua's queue. Captua has reloaded the queue: check the item and try again.",
-	q_to_retake: (n: number) => (n === 1 ? '1 record to retake' : `${formatCount(n, 'en')} records to retake`),
+	queue_mark_conflict:
+		"This item has changed in Fisqua's queue. Captua has reloaded the queue: check the item and try again.",
+	q_to_retake: (n: number) =>
+		n === 1 ? '1 record to retake' : `${formatCount(n, 'en')} records to retake`,
 
 	// ── Por recapturar: rejected records waiting for a retake (0.2.0) ──────────
 	retakes_title: 'To retake',
@@ -1682,7 +1841,9 @@ export const en: Messages = {
 	cap_from_review: 'From Fisqua review',
 	cap_after: 'After a capture',
 	cap_another_q: (f: string | null) =>
-		f ? `Captured. Is another opening missing before folio ${f}?` : 'Captured. Is another opening missing here?',
+		f
+			? `Captured. Is another opening missing before folio ${f}?`
+			: 'Captured. Is another opening missing here?',
 	cap_another: 'Capture another here',
 	cap_last: 'That was the last one',
 	cap_order_note: (n: number, img: string | null) =>
@@ -1735,29 +1896,35 @@ export const en: Messages = {
 	// Resumen band and "Volumes with retakes".
 	retake_band_title: (n: number, v: number) =>
 		`${n === 1 ? '1 page pair' : `${formatCount(n, 'en')} page pairs`} to retake in ${v === 1 ? '1 volume' : `${formatCount(v, 'en')} volumes`}`,
-	retake_band_body: "They were rejected in review or not captured in full. Finish one volume's retakes before starting a new one.",
+	retake_band_body:
+		"They were rejected in review or not captured in full. Finish one volume's retakes before starting a new one.",
 	retake_band_most: (name: string, n: number) => `Most pending: ${name} (${formatCount(n, 'en')}).`,
 	retake_band_cta: 'Start retakes',
 	retake_vols_title: 'Volumes with retakes',
-	retake_pending_of: (p: number, t: number) => `${formatCount(p, 'en')} of ${formatCount(t, 'en')} pending`,
+	retake_pending_of: (p: number, t: number) =>
+		`${formatCount(p, 'en')} of ${formatCount(t, 'en')} pending`,
 	retake_cta: 'Retake',
 	// Cola.
 	// Cola's sections (0.3.1), numbered by the sections shown.
 	section_progress_title: (n: number) => `${ordinalEn(n)}: finish what's in progress`,
 	section_progress_sub: 'Volumes whose capture has already started on this unit.',
 	section_rework_title: (n: number) => `${ordinalEn(n)}: recaptures and rescans`,
-	section_rework_sub: 'Volumes with page pairs to recapture, then the ones to digitise again in full.',
+	section_rework_sub:
+		'Volumes with page pairs to recapture, then the ones to digitise again in full.',
 	section_new_title: (n: number) => `${ordinalEn(n)}: new material`,
 	section_new_sub: 'Volumes never digitised before.',
 	q_new_locked: 'To start a new volume, first finish the retakes of one volume.',
 	turn_recap_title: 'Retake turn',
 	turn_recap_body: 'Finish the retakes of one volume and you can start a new one.',
 	turn_new_title: 'New volume turn',
-	turn_new_body: (name: string) => `The retakes of volume ${name} are finished. You can start a new volume.`,
+	turn_new_body: (name: string) =>
+		`The retakes of volume ${name} are finished. You can start a new volume.`,
 	// The volume page.
-	vol_band_title: (n: number) => (n === 1 ? '1 page pair to retake' : `${formatCount(n, 'en')} page pairs to retake`),
+	vol_band_title: (n: number) =>
+		n === 1 ? '1 page pair to retake' : `${formatCount(n, 'en')} page pairs to retake`,
 	vol_band_cta: 'Retake now',
-	vol_handover_disabled: (n: number) => (n === 1 ? '1 retake left' : `${formatCount(n, 'en')} retakes left`),
+	vol_handover_disabled: (n: number) =>
+		n === 1 ? '1 retake left' : `${formatCount(n, 'en')} retakes left`,
 	vol_handover_hint: 'You can send the volume to review once the retakes are finished.',
 	// The capture screen: the block, the unlock band and the guided retake.
 	block_title: 'First, finish the retakes of one volume',
@@ -1772,7 +1939,8 @@ export const en: Messages = {
 	unlock_body: (name: string) =>
 		`The retakes of volume ${name} are finished. Once you start this volume you can capture it without limit; the next turn will be for retakes.`,
 	unlock_cta: 'Start capturing',
-	guide_header: (k: number, n: number, name: string) => `Retake ${formatCount(k, 'en')} of ${formatCount(n, 'en')} · ${name}`,
+	guide_header: (k: number, n: number, name: string) =>
+		`Retake ${formatCount(k, 'en')} of ${formatCount(n, 'en')} · ${name}`,
 	guide_skip: 'Skip for now',
 	guide_next: (f: string) => `Next: folios ${f}`,
 	guide_done: (turnNew: boolean) =>
@@ -1794,10 +1962,13 @@ export const en: Messages = {
 	unit_mode_backup: 'Offsite copy only',
 	unit_mode_fisqua: 'Fisqua',
 	unit_section_title: 'Unit mode',
-	unit_section_desc: 'Decides what leaves this unit and where its volumes come from. Changing it moves no volume or record.',
+	unit_section_desc:
+		'Decides what leaves this unit and where its volumes come from. Changing it moves no volume or record.',
 	unit_mode_legend: 'Mode',
-	unit_mode_offline_desc: 'Captua keeps the images and the catalogue only on this unit. Volumes are created here.',
-	unit_mode_backup_desc: 'Images and the catalogue are copied to the bucket. Volumes are created here.',
+	unit_mode_offline_desc:
+		'Captua keeps the images and the catalogue only on this unit. Volumes are created here.',
+	unit_mode_backup_desc:
+		'Images and the catalogue are copied to the bucket. Volumes are created here.',
 	unit_mode_fisqua_desc:
 		"Volumes come from Fisqua's queue. Handovers, status and review decisions go over the link. Operators can't create volumes; an administrator can, and each change is logged.",
 	unit_current: 'Current mode',
@@ -1815,10 +1986,14 @@ export const en: Messages = {
 		'The offsite copy of the images is not configured on this unit. It is set when the unit is provisioned.',
 	unit_problem_catalogue_dump_not_configured:
 		"The catalogue's offsite copy is not configured or has no encryption key. It is set when the unit is provisioned.",
-	unit_problem_fisqua_not_configured: 'The link to Fisqua is not configured on this unit. It is set when the unit is provisioned.',
-	unit_problem_fisqua_unreachable: "Fisqua could not be reached. Check the unit's connection and try again.",
-	unit_problem_offsite_held: 'The offsite copy is on hold on this unit, so nothing can be sent to Fisqua until the hold is lifted.',
-	unit_problem_mode_changed: "Someone else changed the unit's settings meanwhile. Captua has read them again: check the mode and try again.",
+	unit_problem_fisqua_not_configured:
+		'The link to Fisqua is not configured on this unit. It is set when the unit is provisioned.',
+	unit_problem_fisqua_unreachable:
+		"Fisqua could not be reached. Check the unit's connection and try again.",
+	unit_problem_offsite_held:
+		'The offsite copy is on hold on this unit, so nothing can be sent to Fisqua until the hold is lifted.',
+	unit_problem_mode_changed:
+		"Someone else changed the unit's settings meanwhile. Captua has read them again: check the mode and try again.",
 	unit_problem_other: "Captua couldn't change the mode, for a reason it doesn't recognise.",
 	// Leaving "Scanner only" with volumes Captua keeps on the unit (NEH-320).
 	unit_problem_kept_volumes_decision:
@@ -1846,19 +2021,25 @@ export const en: Messages = {
 	pd_field_stem_fisqua: 'FILE NAME STEM (FISQUA REFERENCE CODE)',
 	pd_fisqua_admin_note:
 		"The unit is in Fisqua mode. Volumes normally come from Fisqua's queue. The stem must be a reference code that exists in Fisqua; it is checked when you save, and the change is recorded in the log.",
-	pd_fisqua_codes_readonly: 'The unit is in Fisqua mode: the stem comes from Fisqua, and only an administrator can change it.',
-	pd_err_unknown_reference_code: (code: string) => `Fisqua has no description with the code ${code}. Check the code in Fisqua.`,
-	pd_err_stem_required_fisqua: "In Fisqua mode a volume's stem is its Fisqua reference code, so it can't be empty.",
+	pd_fisqua_codes_readonly:
+		'The unit is in Fisqua mode: the stem comes from Fisqua, and only an administrator can change it.',
+	pd_err_unknown_reference_code: (code: string) =>
+		`Fisqua has no description with the code ${code}. Check the code in Fisqua.`,
+	pd_err_stem_required_fisqua:
+		"In Fisqua mode a volume's stem is its Fisqua reference code, so it can't be empty.",
 	pd_fisqua_unreachable_title: "Fisqua couldn't be reached to check the code",
 	pd_fisqua_no_lookup_title: "This Fisqua can't check reference codes",
-	pd_fisqua_list_instead: "The volume can't be saved now. You can import a list file exported from Fisqua in Cola instead.",
+	pd_fisqua_list_instead:
+		"The volume can't be saved now. You can import a list file exported from Fisqua in Cola instead.",
 	pd_err_volumes_from_fisqua:
 		"In Fisqua mode, volumes come from Fisqua's queue. Only an administrator can create a volume or change its stem or reference code.",
 	pd_search_list_label: 'Fisqua descriptions',
 	pd_search_searching: 'Captua is searching Fisqua…',
 	pd_search_none: 'Fisqua has no description that matches.',
-	pd_search_count: (n: number) => (n === 1 ? '1 description' : `${formatCount(n, 'en')} descriptions`),
-	pd_search_unavailable: "Captua can't search Fisqua right now. You can still type the full reference code.",
+	pd_search_count: (n: number) =>
+		n === 1 ? '1 description' : `${formatCount(n, 'en')} descriptions`,
+	pd_search_unavailable:
+		"Captua can't search Fisqua right now. You can still type the full reference code.",
 	pd_stem_search_help:
 		'Type at least 3 characters of the reference code or of the title, and choose the Fisqua description that matches.',
 	pd_level_fonds: 'Fonds',
@@ -1871,8 +2052,10 @@ export const en: Messages = {
 	pd_level_section: 'Section',
 	pd_level_volume: 'Volume',
 	queue_unit_mode: (label: string) => `Unit mode: ${label}`,
-	queue_fisqua_volumes_line: "Volumes come from Fisqua's queue. To add a volume, ask for it to be added to the queue in Fisqua.",
-	queue_import_err_volumes_from_fisqua: "In Fisqua mode only an administrator can import a list: volumes come from Fisqua's queue.",
+	queue_fisqua_volumes_line:
+		"Volumes come from Fisqua's queue. To add a volume, ask for it to be added to the queue in Fisqua.",
+	queue_import_err_volumes_from_fisqua:
+		"In Fisqua mode only an administrator can import a list: volumes come from Fisqua's queue.",
 
 	// ── Settings → Testing: the testing space (NEH-391) ──
 	config_section_testing: 'Testing',
@@ -1909,25 +2092,35 @@ export const en: Messages = {
 	testing_err_username_taken: 'That username is already in use. Choose another.',
 	testing_err_account_exists: 'The testing account already exists.',
 	testing_err_no_account: 'There is no testing account yet.',
-	testing_err_password_invalid: 'That password has characters that cannot be stored. Choose another.',
+	testing_err_password_invalid:
+		'That password has characters that cannot be stored. Choose another.',
 	testing_err_generic: 'The change could not be saved. Try again.',
 	testing_err_load: 'Captua could not load the testing space. Reload the page to try again.',
 
 	// ── The testing account's own screens (NEH-391) ──
 	testing_expires_on: (date: string): string => `Captua will remove this volume on ${date}.`,
 	testing_expires_due: 'Captua removes this volume at its next clean-up, within the hour.',
-	testing_err_reserve: 'Not enough free space is left to capture into testing volumes. What is left is kept for real work.',
+	testing_err_reserve:
+		'Not enough free space is left to capture into testing volumes. What is left is kept for real work.',
 	testing_err_project_directory_taken:
 		'Another project already has a name like this one. Choose a name that differs by more than capital letters, accents or punctuation.',
-	testing_err_project_name_invalid: 'This name cannot be used. Choose a shorter name with at least one letter or digit.',
-	testing_err_volume_codes: "The testing account does not set a volume's file name stem or reference code.",
-	testing_err_not_found: 'This is not in the testing space or no longer exists. Captua removes testing volumes when their term ends.',
+	testing_err_project_name_invalid:
+		'This name cannot be used. Choose a shorter name with at least one letter or digit.',
+	testing_err_volume_codes:
+		"The testing account does not set a volume's file name stem or reference code.",
+	testing_err_not_found:
+		'This is not in the testing space or no longer exists. Captua removes testing volumes when their term ends.',
 	testing_err_other: 'Captua could not do this. Try again.',
-	testing_err_project_not_empty: 'This project still has volumes. Move or delete them first, then delete the project.',
-	testing_err_project_files_held: 'Captua still keeps files in this project that belong to other records. Tell an administrator, who has to move those records.',
-	testing_err_project_storage: 'Captua cannot read one of the drives that hold testing files right now. Tell an administrator, who has to check the drive.',
-	testing_err_volume_busy: 'Captua could not delete the volume: it is in use, or Captua cannot read its files. Try again later.',
-	testing_delete_volume_confirm: 'This removes the volume with its records and images. It cannot be undone.',
+	testing_err_project_not_empty:
+		'This project still has volumes. Move or delete them first, then delete the project.',
+	testing_err_project_files_held:
+		'Captua still keeps files in this project that belong to other records. Tell an administrator, who has to move those records.',
+	testing_err_project_storage:
+		'Captua cannot read one of the drives that hold testing files right now. Tell an administrator, who has to check the drive.',
+	testing_err_volume_busy:
+		'Captua could not delete the volume: it is in use, or Captua cannot read its files. Try again later.',
+	testing_delete_volume_confirm:
+		'This removes the volume with its records and images. It cannot be undone.',
 	testing_download_pictures: 'Download pictures',
 	testing_cameras_not_set_up:
 		'The cameras are not set up, so captures cannot be taken yet. Ask an administrator to set them up.',
@@ -1936,7 +2129,8 @@ export const en: Messages = {
 		'Practice here: create projects and volumes, capture into them and download the pictures. Everything stays on this unit, and Captua removes each testing volume a set number of days after its last capture.',
 	testing_overview_go: 'Go to Projects',
 	testing_reserve_label: 'Free space kept for real work, in GB',
-	testing_reserve_hint: 'A whole number from 1 to 10000. When free space falls below it, captures into testing volumes are refused.',
+	testing_reserve_hint:
+		'A whole number from 1 to 10000. When free space falls below it, captures into testing volumes are refused.',
 	testing_reserve_free: (gb: string): string => `Free now: ${gb} GB`,
 	testing_reserve_free_unknown: 'Captua could not read the free space.',
 	testing_reserve_save: 'Save reserve',
@@ -1958,45 +2152,63 @@ export const en: Messages = {
 	testing_format_current: (format: string): string => `Capture format: ${format}`,
 	testing_err_capture_format_unavailable: "The unit's cameras do not offer this format.",
 	testing_err_clear: 'Captua could not clear the testing space. Try again.',
-	testing_err_purge_running: 'Old testing work is being removed right now. Try again in a few minutes.',
+	testing_err_purge_running:
+		'Old testing work is being removed right now. Try again in a few minutes.',
 
 	// ── Copy a testing volume's pictures to a USB drive (NEH-391) ──
 	testing_usb_copy: 'Copy to USB drive',
 	testing_usb_start: 'Copy',
 	testing_usb_loading: 'Looking for USB drives…',
 	testing_usb_refresh: 'Refresh',
-	testing_usb_none: 'No USB drive found. Plug in a USB drive formatted as FAT32 or exFAT and press Refresh.',
+	testing_usb_none:
+		'No USB drive found. Plug in a USB drive formatted as FAT32 or exFAT and press Refresh.',
 	testing_usb_list_label: 'USB drives',
-	testing_usb_drive: (name: string, size: string, fileSystem: string): string => `${name}, ${size}, ${fileSystem}`,
+	testing_usb_drive: (name: string, size: string, fileSystem: string): string =>
+		`${name}, ${size}, ${fileSystem}`,
 	testing_usb_err_list: 'Captua could not read the USB drives. Press Refresh to try again.',
 	testing_usb_starting: 'Starting the copy…',
-	testing_usb_files: (done: number, total: number): string => `${formatCount(done, 'en')} of ${formatCount(total, 'en')} files copied`,
+	testing_usb_files: (done: number, total: number): string =>
+		`${formatCount(done, 'en')} of ${formatCount(total, 'en')} files copied`,
 	testing_usb_bytes: (done: string, total: string): string => `${done} of ${total}`,
 	testing_usb_progress_label: 'Copy progress',
 	testing_usb_close_note: 'Closing this window does not stop the copy.',
-	testing_usb_done: (folder: string): string => `Captua copied the pictures to the folder ${folder} on the USB drive.`,
+	testing_usb_done: (folder: string): string =>
+		`Captua copied the pictures to the folder ${folder} on the USB drive.`,
 	testing_usb_safe: 'You can remove the USB drive.',
-	testing_usb_err_not_eligible: 'Captua cannot copy to this drive. It has to be a USB drive formatted as FAT32 or exFAT. Press Refresh and choose again.',
-	testing_usb_err_copy_busy: 'Captua is already copying to a USB drive. Wait for that copy to finish, then try again.',
-	testing_usb_err_mount: 'Captua could not open the USB drive. Pull it out, plug it in again and press Refresh.',
-	testing_usb_err_full: 'The USB drive does not have enough free space for these pictures. Use a drive with more space.',
+	testing_usb_err_not_eligible:
+		'Captua cannot copy to this drive. It has to be a USB drive formatted as FAT32 or exFAT. Press Refresh and choose again.',
+	testing_usb_err_copy_busy:
+		'Captua is already copying to a USB drive. Wait for that copy to finish, then try again.',
+	testing_usb_err_mount:
+		'Captua could not open the USB drive. Pull it out, plug it in again and press Refresh.',
+	testing_usb_err_full:
+		'The USB drive does not have enough free space for these pictures. Use a drive with more space.',
 	testing_usb_err_write: 'Captua could not write to the USB drive. Check the drive and try again.',
-	testing_usb_err_name: 'One of the picture files has a name that this kind of drive does not accept. Tell an administrator, who has to look into it.',
-	testing_usb_err_unmount: 'Captua copied the pictures, but could not release the USB drive. Ask an administrator before pulling it out.',
+	testing_usb_err_name:
+		'One of the picture files has a name that this kind of drive does not accept. Tell an administrator, who has to look into it.',
+	testing_usb_err_unmount:
+		'Captua copied the pictures, but could not release the USB drive. Ask an administrator before pulling it out.',
 	testing_usb_err_volume_empty: 'This volume has no pictures to copy.',
 	testing_usb_err_real_volume: 'Only a testing volume can be copied to a USB drive.',
-	testing_usb_err_volume_busy: 'Captua is working on this volume right now. Wait a moment and try again.',
-	testing_usb_err_read: 'Captua could not read one of the pictures on the unit. Tell an administrator, who has to look into it.',
-	testing_usb_err_exists: 'The USB drive already has a folder with the name Captua needs. Wait a minute and try again.',
-	testing_usb_skipped: (n: number): string => `${formatCount(n, 'en')} ${n === 1 ? 'picture' : 'pictures'} could not be copied. Tell an administrator.`,
-	testing_usb_status_unreachable: 'Captua cannot read the progress of the copy right now. The copy may still be running. Do not pull the drive out.',
-	testing_usb_err_lost: 'Captua lost track of this copy. Do not pull the drive out. Tell an administrator, who has to unmount it.',
+	testing_usb_err_volume_busy:
+		'Captua is working on this volume right now. Wait a moment and try again.',
+	testing_usb_err_read:
+		'Captua could not read one of the pictures on the unit. Tell an administrator, who has to look into it.',
+	testing_usb_err_exists:
+		'The USB drive already has a folder with the name Captua needs. Wait a minute and try again.',
+	testing_usb_skipped: (n: number): string =>
+		`${formatCount(n, 'en')} ${n === 1 ? 'picture' : 'pictures'} could not be copied. Tell an administrator.`,
+	testing_usb_status_unreachable:
+		'Captua cannot read the progress of the copy right now. The copy may still be running. Do not pull the drive out.',
+	testing_usb_err_lost:
+		'Captua lost track of this copy. Do not pull the drive out. Tell an administrator, who has to unmount it.',
 
 	// ── Connect to Fisqua: linking the unit to a workspace by a code (NEH-345) ──
 	fisqua_link_title: 'Connect to Fisqua',
 	fisqua_link_desc:
 		"Link this unit to a Fisqua workspace. An administrator of the workspace approves the code on Fisqua's Scanner page.",
-	fisqua_link_restart_warning: 'Linking restarts Captua, which takes about a minute. Do not start it during a capture.',
+	fisqua_link_restart_warning:
+		'Linking restarts Captua, which takes about a minute. Do not start it during a capture.',
 	fisqua_link_name_label: 'Unit name',
 	fisqua_link_name_hint: 'For example the archive or the room, up to 64 characters.',
 	fisqua_link_name_invalid: 'Enter a name of 1 to 64 characters.',
@@ -2015,28 +2227,39 @@ export const en: Messages = {
 	fisqua_link_linked: (tenant: string, staging: boolean) =>
 		`Unit linked to ${tenant}${staging ? " (Fisqua's test service)" : ''}.`,
 	fisqua_link_current: (tenant: string) => `This unit is linked to ${tenant}.`,
-	fisqua_link_mode_hint: 'The unit is not in Fisqua mode. Captua sends volumes to Fisqua only in Fisqua mode.',
+	fisqua_link_mode_hint:
+		'The unit is not in Fisqua mode. Captua sends volumes to Fisqua only in Fisqua mode.',
 	fisqua_link_switch_mode: 'Switch to Fisqua mode',
 	fisqua_link_busy: (s: number) => `Fisqua is busy. Captua tries again in ${s} s.`,
 	fisqua_link_retry: (s: number) => `Captua tries again in ${s} s.`,
 	fisqua_link_network: "Captua could not reach Fisqua. Check the unit's connection.",
 	fisqua_link_cannot_pair: 'This Fisqua cannot link units by code. Ask whoever installed the unit.',
-	fisqua_link_lost: 'Fisqua issued the link, but it did not reach this unit. Get a new code and approve it again.',
+	fisqua_link_lost:
+		'Fisqua issued the link, but it did not reach this unit. Get a new code and approve it again.',
 	fisqua_link_unknown: 'Fisqua does not recognise this code. Get a new code.',
 	fisqua_link_wrong_env: 'Fisqua answered from a different environment. Captua changed nothing.',
 	fisqua_link_other_workspace: (tenant: string | null) =>
 		`${tenant ? `This unit is linked to ${tenant}.` : 'This unit is already linked to a workspace.'} A linked unit can only be linked again to the workspace it already has. To move it to another workspace, ask whoever installed the unit.`,
-	fisqua_link_bad_payload: "Captua could not read Fisqua's answer and changed nothing. Get a new code.",
+	fisqua_link_bad_payload:
+		"Captua could not read Fisqua's answer and changed nothing. Get a new code.",
 	fisqua_link_failed: 'Captua could not write the link settings and changed nothing.',
-	fisqua_link_unverified: 'Captua wrote the link settings but could not confirm them. Restart the unit, then check this section again.',
-	fisqua_link_overridden: "A setting in the unit's .env file overrides the link. Ask whoever installed the unit.",
-	fisqua_link_not_eligible: 'A unit can be linked when it is in "Fisqua" mode, or in "Scanner only" mode with no link yet.',
-	fisqua_link_held: 'The offsite copy is on hold on this unit. Link the unit once the hold is lifted.',
-	fisqua_link_rclone_missing: 'This unit lacks the program that uploads files to the offsite copy, so it cannot be linked by code. Ask whoever installed the unit.',
+	fisqua_link_unverified:
+		'Captua wrote the link settings but could not confirm them. Restart the unit, then check this section again.',
+	fisqua_link_overridden:
+		"A setting in the unit's .env file overrides the link. Ask whoever installed the unit.",
+	fisqua_link_not_eligible:
+		'A unit can be linked when it is in "Fisqua" mode, or in "Scanner only" mode with no link yet.',
+	fisqua_link_held:
+		'The offsite copy is on hold on this unit. Link the unit once the hold is lifted.',
+	fisqua_link_rclone_missing:
+		'This unit lacks the program that uploads files to the offsite copy, so it cannot be linked by code. Ask whoever installed the unit.',
 	fisqua_link_busy_capturing: 'A capture is in progress. Link the unit once it is finished.',
-	fisqua_link_device_id_invalid: "This unit's device id is not valid. Ask whoever installed the unit.",
-	fisqua_link_script_too_old: "This unit's installation is too old to link by code. Update Captua, or ask whoever installed the unit.",
-	fisqua_link_script_missing: 'This unit lacks the script that writes the link settings. Update Captua, or ask whoever installed the unit.',
+	fisqua_link_device_id_invalid:
+		"This unit's device id is not valid. Ask whoever installed the unit.",
+	fisqua_link_script_too_old:
+		"This unit's installation is too old to link by code. Update Captua, or ask whoever installed the unit.",
+	fisqua_link_script_missing:
+		'This unit lacks the script that writes the link settings. Update Captua, or ask whoever installed the unit.',
 	fisqua_link_finishing_uploads:
 		'Code approved. Captua is finishing an upload in progress before it links the unit. This can take a few minutes.',
 	fisqua_link_uploads_still_running:
@@ -2044,16 +2267,20 @@ export const en: Messages = {
 	fisqua_link_restart_required:
 		'Restart the unit before you get a new code. Captua may have written a link, and a link takes effect only after the unit restarts.',
 	fisqua_link_last_outcome: (text: string) => `Last attempt: ${text}`,
-	fisqua_link_offsite_job_running: 'Captua is freeing space on the SD card or restoring files to it. Link the unit once that has finished.',
+	fisqua_link_offsite_job_running:
+		'Captua is freeing space on the SD card or restoring files to it. Link the unit once that has finished.',
 	fisqua_link_finishing_offsite_jobs:
 		'Code approved. Before it links the unit, Captua is finishing freeing space on the SD card or restoring files to it. This can take a few minutes.',
 	fisqua_link_offsite_jobs_still_running:
 		'Captua did not finish freeing space on the SD card or restoring files to it within ten minutes, so it changed nothing. Get a new code once that has finished.',
-	fisqua_link_prepare_failed: 'Captua could not prepare the link settings and changed nothing. Get a new code.',
-	fisqua_link_shutting_down: 'Captua was shutting down and changed nothing. Get a new code once it is running again.',
+	fisqua_link_prepare_failed:
+		'Captua could not prepare the link settings and changed nothing. Get a new code.',
+	fisqua_link_shutting_down:
+		'Captua was shutting down and changed nothing. Get a new code once it is running again.',
 	fisqua_link_cancel_failed: 'Captua could not cancel the code. Try again.',
 	fisqua_link_generic: 'Captua could not link the unit, for a reason it does not recognise.',
-	fisqua_link_err_read: 'Captua could not read the state of the link. It tries again every few seconds.',
+	fisqua_link_err_read:
+		'Captua could not read the state of the link. It tries again every few seconds.',
 	// ── Settings sections and Network (NEH-253) ─────────────────────────────
 	config_section_network: 'Network',
 	config_sections_label: 'Settings sections',
@@ -2090,7 +2317,8 @@ export const en: Messages = {
 	network_signal_label: (percent: number) => `Signal ${percent}%`,
 	network_warn_try: (text: string) => `What to try: ${text}`,
 	network_warn_no_connection_title: 'No network connection.',
-	network_warn_no_connection_body: 'The unit is not connected by cable or by Wi-Fi. Capturing and reviewing still work.',
+	network_warn_no_connection_body:
+		'The unit is not connected by cable or by Wi-Fi. Capturing and reviewing still work.',
 	network_warn_no_connection_try: 'Plug in a network cable, or join a Wi-Fi network below.',
 	network_warn_no_address_title: 'Connected, but no IP address.',
 	network_warn_no_address_body:
@@ -2121,12 +2349,14 @@ export const en: Messages = {
 			? 'Forget the network and join it again. If that does not help, ask whoever manages the network.'
 			: 'Unplug the cable and plug it in again. If that does not help, ask whoever manages the network.',
 	network_warn_other_title: 'The connection has a problem.',
-	network_readonly: 'You can see the network state. Administrators and operators can join and forget networks.',
+	network_readonly:
+		'You can see the network state. Administrators and operators can join and forget networks.',
 	network_not_permitted_notice:
 		"This unit's system does not allow Captua to change the network, so joining and forgetting networks are not offered. To fix this, update Captua, or ask whoever installed the unit.",
 	network_not_available:
 		'Network settings are not available on this device. They work only on a Captua unit, not on a development machine.',
-	network_service_unavailable: "The unit's network service is not answering. Try again in a moment.",
+	network_service_unavailable:
+		"The unit's network service is not answering. Try again in a moment.",
 	network_err_read: 'Captua could not read the network state.',
 	network_err_wifi: 'Captua could not read the list of Wi-Fi networks.',
 	network_no_wifi_device: 'This unit has no Wi-Fi device.',
@@ -2134,7 +2364,8 @@ export const en: Messages = {
 	network_wifi_list_desc: 'Networks in range of the unit. Choose one to join it.',
 	network_wifi_list_desc_ro: 'Networks in range of the unit.',
 	network_refreshing: 'Refreshing…',
-	network_not_rescanned: "This unit's system does not allow Captua to scan again, so the list shows the networks found last.",
+	network_not_rescanned:
+		"This unit's system does not allow Captua to scan again, so the list shows the networks found last.",
 	network_wifi_none: 'No Wi-Fi networks in range.',
 	network_kind_open: 'Open',
 	network_kind_password: 'Password',
@@ -2169,10 +2400,12 @@ export const en: Messages = {
 		"This network asks for your institution's sign-in. Your institution's instructions for this network give the details.",
 	network_password_placeholder: 'Network password',
 	network_enterprise_password_placeholder: 'Your institutional password',
-	network_password_note: 'The password is saved on this unit. Anyone with administrator access to the unit can read it.',
+	network_password_note:
+		'The password is saved on this unit. Anyone with administrator access to the unit can read it.',
 	network_username_hint: 'Usually your full institutional address.',
 	network_server_label: 'Sign-in server name',
-	network_server_hint: 'The unit checks that the server it talks to has this name before it sends your password.',
+	network_server_hint:
+		'The unit checks that the server it talks to has this name before it sends your password.',
 	network_more_options: 'More options',
 	network_outer_identity: 'Outer identity',
 	network_outer_identity_hint: 'Leave blank unless your institution asks for one.',
@@ -2181,14 +2414,17 @@ export const en: Messages = {
 	network_method_ttls_pap: 'TTLS with PAP',
 	network_method_ttls_mschapv2: 'TTLS with MSCHAPv2',
 	network_joining_title: (ssid: string) => `Joining ${ssid}`,
-	network_joining_body: 'Connecting and asking the network for an address. This can take a few minutes.',
+	network_joining_body:
+		'Connecting and asking the network for an address. This can take a few minutes.',
 	network_joining_no_answer: 'The unit is not answering yet. It may be changing network.',
 	network_joined_title: (ssid: string) => `Joined ${ssid}`,
 	network_joined_body: 'The unit is connected.',
-	network_joined_address: (address: string) => `The unit is connected and has the address ${address}.`,
+	network_joined_address: (address: string) =>
+		`The unit is connected and has the address ${address}.`,
 	network_joined_saved: 'The network is saved: the unit joins it by itself when it is in range.',
 	network_failed_title: (ssid: string) => `Could not join ${ssid}`,
-	network_fail_wrong_password: 'The password was not accepted. Check it, including capital letters, and try again.',
+	network_fail_wrong_password:
+		'The password was not accepted. Check it, including capital letters, and try again.',
 	network_fail_wrong_credentials:
 		'The username or password was not accepted. Check both; many institutions ask for the full address, such as name@example.edu.',
 	network_fail_server_name_mismatch:
@@ -2196,16 +2432,19 @@ export const en: Messages = {
 	network_fail_server_names: (names: string) => `The server gave these names: ${names}.`,
 	network_fail_server_not_trusted:
 		"This unit does not trust the sign-in server's certificate. Check the server name; if it is right, ask your institution's IT staff which certificate the network uses.",
-	network_fail_timeout: 'The network did not answer in time. Move the unit closer to the access point, or try again in a minute.',
+	network_fail_timeout:
+		'The network did not answer in time. Move the unit closer to the access point, or try again in a minute.',
 	network_fail_not_permitted:
-		"The unit's system did not allow the change. Restart the unit and try again; if it happens again, press \"Report a problem\". Sending the report needs an internet connection.",
-	network_fail_failed: 'The unit could not join the network. Try again; if it happens again, press "Report a problem". Sending the report needs an internet connection.',
+		'The unit\'s system did not allow the change. Restart the unit and try again; if it happens again, press "Report a problem". Sending the report needs an internet connection.',
+	network_fail_failed:
+		'The unit could not join the network. Try again; if it happens again, press "Report a problem". Sending the report needs an internet connection.',
 	network_restored_true: 'The unit went back to the Wi-Fi network it was on before.',
 	network_restored_false: 'The unit could not go back to the Wi-Fi network it was on before.',
 	network_lost_title: 'Captua cannot reach the unit',
 	network_lost_body:
 		"The unit has stopped answering. It may now be on another network. On the unit's own screen, open Settings, then Network, to see which network it is on.",
-	network_refusal_ssid_invalid: "This network's name cannot be used: it must be 1 to 32 characters long, without line breaks.",
+	network_refusal_ssid_invalid:
+		"This network's name cannot be used: it must be 1 to 32 characters long, without line breaks.",
 	network_refusal_password_required: 'Enter the password.',
 	network_refusal_password_invalid: 'The password cannot contain a line break.',
 	network_refusal_password_length: 'A Wi-Fi password has 8 to 63 characters.',
@@ -2214,17 +2453,23 @@ export const en: Messages = {
 	network_refusal_anonymous_identity_invalid: 'The outer identity cannot contain a line break.',
 	network_refusal_method_required: 'Choose a method.',
 	network_refusal_server_name_required: 'Enter the sign-in server name.',
-	network_refusal_server_name_invalid: 'Enter a server name such as radius.example.edu, not an IP address.',
+	network_refusal_server_name_invalid:
+		'Enter a server name such as radius.example.edu, not an IP address.',
 	network_refusal_inner_method_invalid: 'PEAP works only with MSCHAPv2. Choose another method.',
 	network_refusal_not_permitted: "This unit's system does not allow Captua to change the network.",
-	network_refusal_join_in_progress: 'The unit is already joining a network. Wait until it finishes and try again.',
+	network_refusal_join_in_progress:
+		'The unit is already joining a network. Wait until it finishes and try again.',
 	network_refusal_other: 'The unit did not accept the request. Check the fields and try again.',
 	network_err_request: 'Captua could not reach the unit. Check the connection and try again.',
 	network_ind_connected: 'Connected',
 	network_ind_problem: 'Network problem',
 	network_ind_offline: 'Offline',
 	network_ind_label: (state: string, name: string | null, signal: number | null) =>
-		name === null ? state : signal === null ? `${state} · ${name}` : `${state} · ${name} · signal ${signal}%`,
+		name === null
+			? state
+			: signal === null
+				? `${state} · ${name}`
+				: `${state} · ${name} · signal ${signal}%`,
 	network_ind_unknown: 'Network state unknown',
 	network_ind_connecting: 'Connecting',
 	network_stale: (time: string) =>
@@ -2233,7 +2478,6 @@ export const en: Messages = {
 	network_unknown_body: 'Check the network state on this page to see which network the unit is on.',
 	network_not_received_title: 'The unit did not receive the request',
 	network_not_received_body: 'Press "Retry" to send it again.',
-
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',

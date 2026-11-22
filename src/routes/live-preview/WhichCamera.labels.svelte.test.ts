@@ -39,7 +39,11 @@ async function jpeg(w: number, h: number): Promise<Blob> {
 }
 
 function setup(codes: CameraSetupCode[]): CameraSetup {
-	return { needs_setup: true, reasons: codes.map((code) => ({ code, message: 'English', hardware_ids: [] })), confirmed_pair: null };
+	return {
+		needs_setup: true,
+		reasons: codes.map((code) => ({ code, message: 'English', hardware_ids: [] })),
+		confirmed_pair: null
+	};
 }
 
 const device = (i: number, over: Partial<CameraDevice> = {}): CameraDevice => ({
@@ -63,19 +67,22 @@ const props = (s: CameraSetup) => ({
 	onReread: vi.fn(async () => {})
 });
 
-const hit = (a: DOMRect, b: DOMRect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+const hit = (a: DOMRect, b: DOMRect) =>
+	a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 const text = (el: HTMLElement) => el.innerText.replace(/\s+/g, ' ').trim();
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 // The two cards in screen order, each with its label, its image and its
 // turn button.
 function cards() {
-	return [...document.querySelectorAll<HTMLElement>('[data-which-camera] [data-card]')].map((card) => ({
-		card,
-		pick: card.querySelector('.id-pick') as HTMLElement,
-		label: card.querySelector('.feed-label') as HTMLElement,
-		turn: card.querySelector('[data-turn]') as HTMLElement
-	}));
+	return [...document.querySelectorAll<HTMLElement>('[data-which-camera] [data-card]')].map(
+		(card) => ({
+			card,
+			pick: card.querySelector('.id-pick') as HTMLElement,
+			label: card.querySelector('.feed-label') as HTMLElement,
+			turn: card.querySelector('[data-turn]') as HTMLElement
+		})
+	);
 }
 
 // Every label is one line, inside its image with a margin, and clear of the
@@ -85,7 +92,9 @@ function fits() {
 	all.forEach(({ pick, label }, i) => {
 		const l = label.getBoundingClientRect();
 		const p = pick.getBoundingClientRect();
-		console.log(`[which labels] card ${i}: image ${p.width.toFixed(0)}px, label ${l.width.toFixed(0)}x${l.height.toFixed(0)}px`);
+		console.log(
+			`[which labels] card ${i}: image ${p.width.toFixed(0)}px, label ${l.width.toFixed(0)}x${l.height.toFixed(0)}px`
+		);
 		expect(l.height, `card ${i} height`).toBeLessThan(28);
 		expect(l.left - p.left, `card ${i} left margin`).toBeGreaterThanOrEqual(4);
 		expect(p.right - l.right, `card ${i} right margin`).toBeGreaterThanOrEqual(4);
@@ -93,7 +102,9 @@ function fits() {
 		for (const [j, other] of all.entries()) {
 			expect(hit(l, other.turn.getBoundingClientRect()), `card ${i} over turn ${j}`).toBe(false);
 			if (j !== i) {
-				expect(hit(l, other.label.getBoundingClientRect()), `card ${i} over label ${j}`).toBe(false);
+				expect(hit(l, other.label.getBoundingClientRect()), `card ${i} over label ${j}`).toBe(
+					false
+				);
 				expect(hit(l, other.card.getBoundingClientRect()), `card ${i} over card ${j}`).toBe(false);
 			}
 		}
@@ -106,7 +117,9 @@ function badge(label: HTMLElement, role: 'left' | 'right', t: typeof en) {
 	const term = role === 'left' ? t.page_term_even : t.page_term_odd;
 	expect(text(label)).toContain(`${letter} · ${term}`);
 	expect(text(label)).not.toContain(words);
-	expect(label.querySelector('.material-symbols-outlined')?.getAttribute('aria-hidden')).toBe('true');
+	expect(label.querySelector('.material-symbols-outlined')?.getAttribute('aria-hidden')).toBe(
+		'true'
+	);
 	expect(label.getAttribute('role')).toBe('img');
 	expect(label.getAttribute('aria-label')).toBe(words);
 	expect(label.getAttribute('title')).toMatch(new RegExp(`^${escape(words)}`));

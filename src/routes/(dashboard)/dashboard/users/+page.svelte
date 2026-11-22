@@ -1,1103 +1,1639 @@
 <script lang="ts">
-  // User management (/dashboard/users), admin only: the role guard in
-  // `(dashboard)/+layout.svelte` redirects every other role. Search and
-  // filters run client-side over the full list. Editing a user changes only
-  // the role and the active flag; username and email are fixed at creation.
-  // Set password (SetPasswordDialog) gives another user a new password; it is
-  // offered on every row but the testing account's and the administrator's
-  // own, whose password changes from the account menu with the current one.
-  // On success a line on the page says so.
-  //
-  // Version: 0.1.0-beta
+	// User management (/dashboard/users), admin only: the role guard in
+	// `(dashboard)/+layout.svelte` redirects every other role. Search and
+	// filters run client-side over the full list. Editing a user changes only
+	// the role and the active flag; username and email are fixed at creation.
+	// Set password (SetPasswordDialog) gives another user a new password; it is
+	// offered on every row but the testing account's and the administrator's
+	// own, whose password changes from the account menu with the current one.
+	// On success a line on the page says so.
+	//
+	// Version: 0.1.0-beta
 
-  import { onMount } from 'svelte';
-  import { usersApi, type UserRead } from '$lib/api';
-  import { m, locale, roleLabel } from '$lib/i18n';
-  import { normalizeEmail, emailFormatError } from '$lib/email-field';
-  import { dismissible } from '$lib/dialog';
-  import { authStore } from '$lib/stores/auth';
-  import { setsUserPasswords } from '$lib/unit-mode';
-  import { PASSWORD_MIN_LENGTH, passwordTooShort, isPasswordTooShortRefusal } from '$lib/password-rule';
-  import SetPasswordDialog from './SetPasswordDialog.svelte';
+	import { onMount } from 'svelte';
+	import { usersApi, type UserRead } from '$lib/api';
+	import { m, locale, roleLabel } from '$lib/i18n';
+	import { normalizeEmail, emailFormatError } from '$lib/email-field';
+	import { dismissible } from '$lib/dialog';
+	import { authStore } from '$lib/stores/auth';
+	import { setsUserPasswords } from '$lib/unit-mode';
+	import {
+		PASSWORD_MIN_LENGTH,
+		passwordTooShort,
+		isPasswordTooShortRefusal
+	} from '$lib/password-rule';
+	import SetPasswordDialog from './SetPasswordDialog.svelte';
 
-  type UserRole   = 'operator' | 'reviewer' | 'admin';
-  type UserStatus = 'active'   | 'inactive';
+	type UserRole = 'operator' | 'reviewer' | 'admin';
+	type UserStatus = 'active' | 'inactive';
 
-  let users       = $state<UserRead[]>([]);
-  let isLoading   = $state(true);
-  let loadError   = $state('');
+	let users = $state<UserRead[]>([]);
+	let isLoading = $state(true);
+	let loadError = $state('');
 
-  let searchQuery  = $state('');
-  let filterRole   = $state<UserRole | ''>('');
-  let filterStatus = $state<UserStatus | ''>('');
+	let searchQuery = $state('');
+	let filterRole = $state<UserRole | ''>('');
+	let filterStatus = $state<UserStatus | ''>('');
 
-  let filteredUsers = $derived(users.filter(u => {
-    const matchSearch = !searchQuery ||
-      u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      !!u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchRole   = !filterRole   || u.role === filterRole;
-    const matchStatus = !filterStatus ||
-      (filterStatus === 'active' ? u.is_active : !u.is_active);
-    return matchSearch && matchRole && matchStatus;
-  }));
+	let filteredUsers = $derived(
+		users.filter((u) => {
+			const matchSearch =
+				!searchQuery ||
+				u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				(!!u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()));
+			const matchRole = !filterRole || u.role === filterRole;
+			const matchStatus = !filterStatus || (filterStatus === 'active' ? u.is_active : !u.is_active);
+			return matchSearch && matchRole && matchStatus;
+		})
+	);
 
-  let openMenuId  = $state<number | null>(null);
-  let dropdownPos = $state({ top: 0, right: 0 });
+	let openMenuId = $state<number | null>(null);
+	let dropdownPos = $state({ top: 0, right: 0 });
 
-  function handleOutsideClick(e: MouseEvent) {
-    const target = e.target as HTMLElement;
-    if (!target.closest('.actions-menu-wrapper')) {
-      openMenuId = null;
-    }
-  }
+	function handleOutsideClick(e: MouseEvent) {
+		const target = e.target as HTMLElement;
+		if (!target.closest('.actions-menu-wrapper')) {
+			openMenuId = null;
+		}
+	}
 
-  let showUserModal = $state(false);
-  let isEditMode    = $state(false);
-  let editingUserId = $state<number | null>(null);
+	let showUserModal = $state(false);
+	let isEditMode = $state(false);
+	let editingUserId = $state<number | null>(null);
 
-  let formUsername  = $state('');
-  let formEmail     = $state('');
-  let formPassword  = $state('');
-  let formConfirm   = $state('');
-  let formRole      = $state<UserRole>('reviewer');
-  let formIsActive  = $state(true);
+	let formUsername = $state('');
+	let formEmail = $state('');
+	let formPassword = $state('');
+	let formConfirm = $state('');
+	let formRole = $state<UserRole>('reviewer');
+	let formIsActive = $state(true);
 
-  let showPassword  = $state(false);
-  let showConfirm   = $state(false);
+	let showPassword = $state(false);
+	let showConfirm = $state(false);
 
-  let formError     = $state('');
-  let isSaving      = $state(false);
+	let formError = $state('');
+	let isSaving = $state(false);
 
-  let showDeleteModal = $state(false);
-  let deletingUser    = $state<UserRead | null>(null);
-  let isDeleting      = $state(false);
+	let showDeleteModal = $state(false);
+	let deletingUser = $state<UserRead | null>(null);
+	let isDeleting = $state(false);
 
-  // The user whose password the dialog sets, and the one whose was set last.
-  let passwordUser    = $state<UserRead | null>(null);
-  let passwordSetFor  = $state<string | null>(null);
+	// The user whose password the dialog sets, and the one whose was set last.
+	let passwordUser = $state<UserRead | null>(null);
+	let passwordSetFor = $state<string | null>(null);
 
-  function canSetPasswordOf(user: UserRead): boolean {
-    const me = $authStore.user;
-    return setsUserPasswords(me?.role) && user.role !== 'testing' && user.id !== me?.id;
-  }
+	function canSetPasswordOf(user: UserRead): boolean {
+		const me = $authStore.user;
+		return setsUserPasswords(me?.role) && user.role !== 'testing' && user.id !== me?.id;
+	}
 
-  function openPasswordDialog(user: UserRead) {
-    openMenuId     = null;
-    passwordSetFor = null;
-    passwordUser   = user;
-  }
+	function openPasswordDialog(user: UserRead) {
+		openMenuId = null;
+		passwordSetFor = null;
+		passwordUser = user;
+	}
 
-  onMount(() => {
-    document.addEventListener('click', handleOutsideClick);
-    loadUsers();
-    return () => document.removeEventListener('click', handleOutsideClick);
-  });
+	onMount(() => {
+		document.addEventListener('click', handleOutsideClick);
+		loadUsers();
+		return () => document.removeEventListener('click', handleOutsideClick);
+	});
 
-  async function loadUsers() {
-    try {
-      isLoading = true;
-      loadError = '';
-      users = await usersApi.list();
-    } catch (err) {
-      loadError = err instanceof Error ? err.message : $m.users_err_load;
-      console.error('[Users] Error loading:', err);
-    } finally {
-      isLoading = false;
-    }
-  }
+	async function loadUsers() {
+		try {
+			isLoading = true;
+			loadError = '';
+			users = await usersApi.list();
+		} catch (err) {
+			loadError = err instanceof Error ? err.message : $m.users_err_load;
+			console.error('[Users] Error loading:', err);
+		} finally {
+			isLoading = false;
+		}
+	}
 
-  function openCreateModal() {
-    isEditMode    = false;
-    editingUserId = null;
-    formUsername  = '';
-    formEmail     = '';
-    formPassword  = '';
-    formConfirm   = '';
-    formRole      = 'reviewer';
-    formIsActive  = true;
-    formError     = '';
-    showUserModal = true;
-  }
+	function openCreateModal() {
+		isEditMode = false;
+		editingUserId = null;
+		formUsername = '';
+		formEmail = '';
+		formPassword = '';
+		formConfirm = '';
+		formRole = 'reviewer';
+		formIsActive = true;
+		formError = '';
+		showUserModal = true;
+	}
 
-  function openEditModal(user: UserRead) {
-    openMenuId    = null;
-    isEditMode    = true;
-    editingUserId = user.id;
-    formUsername  = user.username;
-    formEmail     = user.email ?? '';
-    formPassword  = '';
-    formConfirm   = '';
-    formRole      = user.role as UserRole;
-    formIsActive  = user.is_active;
-    formError     = '';
-    showUserModal = true;
-  }
+	function openEditModal(user: UserRead) {
+		openMenuId = null;
+		isEditMode = true;
+		editingUserId = user.id;
+		formUsername = user.username;
+		formEmail = user.email ?? '';
+		formPassword = '';
+		formConfirm = '';
+		formRole = user.role as UserRole;
+		formIsActive = user.is_active;
+		formError = '';
+		showUserModal = true;
+	}
 
-  async function handleSaveUser() {
-    formError = '';
+	async function handleSaveUser() {
+		formError = '';
 
-    if (isEditMode) {
-      // Edit: only role and active status can change
-      if (!editingUserId) return;
-      isSaving = true;
-      try {
-        const original = users.find(u => u.id === editingUserId)!;
-        if (formRole !== original.role) {
-          await usersApi.updateRole(editingUserId, formRole);
-        }
-        if (formIsActive !== original.is_active) {
-          await usersApi.setActive(editingUserId, formIsActive);
-        }
-        await loadUsers();
-        showUserModal = false;
-      } catch (err) {
-        formError = err instanceof Error ? err.message : $m.users_err_save;
-      } finally {
-        isSaving = false;
-      }
-    } else {
-      // Create: validate then call API
-      if (!formUsername.trim()) { formError = $m.users_val_username_required; return; }
-      if (emailFormatError(formEmail)) { formError = $m.users_val_email_format; return; }
-      if (!formPassword.trim()) { formError = $m.users_val_password_required; return; }
-      if (passwordTooShort(formPassword)) { formError = $m.common_password_too_short(PASSWORD_MIN_LENGTH); return; }
-      if (formPassword !== formConfirm) { formError = $m.users_val_password_mismatch; return; }
+		if (isEditMode) {
+			// Edit: only role and active status can change
+			if (!editingUserId) return;
+			isSaving = true;
+			try {
+				const original = users.find((u) => u.id === editingUserId)!;
+				if (formRole !== original.role) {
+					await usersApi.updateRole(editingUserId, formRole);
+				}
+				if (formIsActive !== original.is_active) {
+					await usersApi.setActive(editingUserId, formIsActive);
+				}
+				await loadUsers();
+				showUserModal = false;
+			} catch (err) {
+				formError = err instanceof Error ? err.message : $m.users_err_save;
+			} finally {
+				isSaving = false;
+			}
+		} else {
+			// Create: validate then call API
+			if (!formUsername.trim()) {
+				formError = $m.users_val_username_required;
+				return;
+			}
+			if (emailFormatError(formEmail)) {
+				formError = $m.users_val_email_format;
+				return;
+			}
+			if (!formPassword.trim()) {
+				formError = $m.users_val_password_required;
+				return;
+			}
+			if (passwordTooShort(formPassword)) {
+				formError = $m.common_password_too_short(PASSWORD_MIN_LENGTH);
+				return;
+			}
+			if (formPassword !== formConfirm) {
+				formError = $m.users_val_password_mismatch;
+				return;
+			}
 
-      isSaving = true;
-      try {
-        await usersApi.create({
-          username: formUsername.trim(),
-          email:    normalizeEmail(formEmail),
-          password: formPassword,
-          role:     formRole,
-        });
-        await loadUsers();
-        showUserModal = false;
-      } catch (err) {
-        formError = isPasswordTooShortRefusal(err)
-          ? $m.common_password_too_short(PASSWORD_MIN_LENGTH)
-          : err instanceof Error ? err.message : $m.users_err_create;
-      } finally {
-        isSaving = false;
-      }
-    }
-  }
+			isSaving = true;
+			try {
+				await usersApi.create({
+					username: formUsername.trim(),
+					email: normalizeEmail(formEmail),
+					password: formPassword,
+					role: formRole
+				});
+				await loadUsers();
+				showUserModal = false;
+			} catch (err) {
+				formError = isPasswordTooShortRefusal(err)
+					? $m.common_password_too_short(PASSWORD_MIN_LENGTH)
+					: err instanceof Error
+						? err.message
+						: $m.users_err_create;
+			} finally {
+				isSaving = false;
+			}
+		}
+	}
 
-  function openDeleteModal(user: UserRead) {
-    openMenuId      = null;
-    deletingUser    = user;
-    showDeleteModal = true;
-  }
+	function openDeleteModal(user: UserRead) {
+		openMenuId = null;
+		deletingUser = user;
+		showDeleteModal = true;
+	}
 
-  async function handleConfirmDelete() {
-    if (!deletingUser) return;
-    isDeleting = true;
-    try {
-      await usersApi.delete(deletingUser.id);
-      await loadUsers();
-      showDeleteModal = false;
-      deletingUser    = null;
-    } catch (err) {
-      console.error('[Users] Error deleting:', err);
-    } finally {
-      isDeleting = false;
-    }
-  }
+	async function handleConfirmDelete() {
+		if (!deletingUser) return;
+		isDeleting = true;
+		try {
+			await usersApi.delete(deletingUser.id);
+			await loadUsers();
+			showDeleteModal = false;
+			deletingUser = null;
+		} catch (err) {
+			console.error('[Users] Error deleting:', err);
+		} finally {
+			isDeleting = false;
+		}
+	}
 
-  function roleBadgeStyle(role: string): string {
-    const styles: Record<string, string> = {
-      operator: 'color: var(--color-primary); background: rgba(90,140,98,0.15); border-color: rgba(90,140,98,0.3)',
-      reviewer: 'color: var(--color-warning); background: rgba(208,154,68,0.15); border-color: rgba(208,154,68,0.3)',
-      admin:    'color: var(--color-secondary); background: rgba(150,177,240,0.15); border-color: rgba(150,177,240,0.3)',
-      testing:  'color: var(--color-light-grey); background: rgba(171,183,183,0.12); border-color: rgba(171,183,183,0.3)',
-    };
-    return styles[role] ?? '';
-  }
+	function roleBadgeStyle(role: string): string {
+		const styles: Record<string, string> = {
+			operator:
+				'color: var(--color-primary); background: rgba(90,140,98,0.15); border-color: rgba(90,140,98,0.3)',
+			reviewer:
+				'color: var(--color-warning); background: rgba(208,154,68,0.15); border-color: rgba(208,154,68,0.3)',
+			admin:
+				'color: var(--color-secondary); background: rgba(150,177,240,0.15); border-color: rgba(150,177,240,0.3)',
+			testing:
+				'color: var(--color-light-grey); background: rgba(171,183,183,0.12); border-color: rgba(171,183,183,0.3)'
+		};
+		return styles[role] ?? '';
+	}
 
-  function getInitials(u: UserRead): string {
-    return u.username.slice(0, 2).toUpperCase();
-  }
+	function getInitials(u: UserRead): string {
+		return u.username.slice(0, 2).toUpperCase();
+	}
 
-  function avatarBg(role: string): string {
-    const colors: Record<string, string> = {
-      operator: 'rgba(90,140,98,0.4)',
-      reviewer: 'rgba(188,130,60,0.4)',
-      admin:    'rgba(150,177,240,0.3)',
-    };
-    return colors[role] ?? 'rgba(171,183,183,0.2)';
-  }
+	function avatarBg(role: string): string {
+		const colors: Record<string, string> = {
+			operator: 'rgba(90,140,98,0.4)',
+			reviewer: 'rgba(188,130,60,0.4)',
+			admin: 'rgba(150,177,240,0.3)'
+		};
+		return colors[role] ?? 'rgba(171,183,183,0.2)';
+	}
 
-  function formatDate(iso?: string): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString($locale, { day: '2-digit', month: 'short', year: 'numeric' });
-  }
+	function formatDate(iso?: string): string {
+		if (!iso) return '—';
+		return new Date(iso).toLocaleDateString($locale, {
+			day: '2-digit',
+			month: 'short',
+			year: 'numeric'
+		});
+	}
 
-  let ROLES: { value: UserRole; label: string; desc: string }[] = $derived([
-    { value: 'reviewer', label: $m.role_reviewer,    desc: $m.role_reviewer_desc },
-    { value: 'operator', label: $m.role_operator,    desc: $m.role_operator_desc },
-    { value: 'admin',    label: $m.role_admin,       desc: $m.role_admin_desc },
-  ]);
+	let ROLES: { value: UserRole; label: string; desc: string }[] = $derived([
+		{ value: 'reviewer', label: $m.role_reviewer, desc: $m.role_reviewer_desc },
+		{ value: 'operator', label: $m.role_operator, desc: $m.role_operator_desc },
+		{ value: 'admin', label: $m.role_admin, desc: $m.role_admin_desc }
+	]);
 </script>
 
 <div class="page">
+	<!-- Header -->
+	<div class="page-header">
+		<div>
+			<h1 class="page-title">{$m.users_title}</h1>
+			<p class="page-subtitle">{$m.users_subtitle}</p>
+		</div>
+		<button class="btn-primary" onclick={openCreateModal}>
+			<svg
+				width="15"
+				height="15"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.5"
+			>
+				<line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+			</svg>
+			{$m.users_new}
+		</button>
+	</div>
 
-  <!-- Header -->
-  <div class="page-header">
-    <div>
-      <h1 class="page-title">{$m.users_title}</h1>
-      <p class="page-subtitle">{$m.users_subtitle}</p>
-    </div>
-    <button class="btn-primary" onclick={openCreateModal}>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      {$m.users_new}
-    </button>
-  </div>
+	{#if passwordSetFor}
+		<p class="page-notice" role="status">{$m.users_password_done(passwordSetFor)}</p>
+	{/if}
 
-  {#if passwordSetFor}
-    <p class="page-notice" role="status">{$m.users_password_done(passwordSetFor)}</p>
-  {/if}
+	<div class="toolbar">
+		<div class="search-wrapper">
+			<svg
+				width="15"
+				height="15"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				class="search-icon"
+			>
+				<circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+			</svg>
+			<input
+				type="text"
+				placeholder={$m.users_search_placeholder}
+				bind:value={searchQuery}
+				class="search-input"
+			/>
+		</div>
 
-  <div class="toolbar">
-    <div class="search-wrapper">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input
-        type="text"
-        placeholder={$m.users_search_placeholder}
-        bind:value={searchQuery}
-        class="search-input"
-      />
-    </div>
+		<div class="filter-group">
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+			</svg>
+			<select class="filter-select" bind:value={filterRole}>
+				<option value="">{$m.users_filter_role}</option>
+				<option value="operator">{$m.role_operator}</option>
+				<option value="reviewer">{$m.role_reviewer}</option>
+				<option value="admin">{$m.role_admin}</option>
+			</select>
+		</div>
 
-    <div class="filter-group">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-      </svg>
-      <select class="filter-select" bind:value={filterRole}>
-        <option value="">{$m.users_filter_role}</option>
-        <option value="operator">{$m.role_operator}</option>
-        <option value="reviewer">{$m.role_reviewer}</option>
-        <option value="admin">{$m.role_admin}</option>
-      </select>
-    </div>
+		<div class="filter-group">
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+			</svg>
+			<select class="filter-select" bind:value={filterStatus}>
+				<option value="">{$m.common_status}</option>
+				<option value="active">{$m.users_status_active}</option>
+				<option value="inactive">{$m.users_status_inactive}</option>
+			</select>
+		</div>
+	</div>
 
-    <div class="filter-group">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-      </svg>
-      <select class="filter-select" bind:value={filterStatus}>
-        <option value="">{$m.common_status}</option>
-        <option value="active">{$m.users_status_active}</option>
-        <option value="inactive">{$m.users_status_inactive}</option>
-      </select>
-    </div>
-  </div>
+	{#if isLoading}
+		<div class="loading-state">
+			<div class="spinner"></div>
+			<span>{$m.users_loading}</span>
+		</div>
+	{:else if loadError}
+		<div class="load-error">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<circle cx="12" cy="12" r="10" />
+				<line x1="12" y1="8" x2="12" y2="12" />
+				<line x1="12" y1="16" x2="12.01" y2="16" />
+			</svg>
+			{loadError}
+			<button class="btn-ghost" onclick={loadUsers}>{$m.common_retry}</button>
+		</div>
+	{:else if filteredUsers.length === 0}
+		<div class="empty-state">
+			<svg
+				width="40"
+				height="40"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.5"
+			>
+				<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+				<circle cx="9" cy="7" r="4" />
+				<path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+				<path d="M16 3.13a4 4 0 0 1 0 7.75" />
+			</svg>
+			<span
+				>{searchQuery || filterRole || filterStatus
+					? $m.users_empty_filtered
+					: $m.users_empty}</span
+			>
+		</div>
+	{:else}
+		<div class="table-wrapper">
+			<table class="users-table">
+				<thead>
+					<tr>
+						<th>{$m.common_user}</th>
+						<th>{$m.users_filter_role}</th>
+						<th>{$m.common_status}</th>
+						<th>{$m.users_col_registered}</th>
+						<th class="col-actions">{$m.common_actions}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each filteredUsers as user}
+						<tr class="table-row">
+							<td>
+								<div class="user-cell">
+									<div class="avatar" style="background: {avatarBg(user.role)}">
+										{getInitials(user)}
+									</div>
+									<div class="user-info">
+										<span class="user-fullname">{user.username}</span>
+										{#if user.email}
+											<span class="user-username">{user.email}</span>
+										{/if}
+									</div>
+								</div>
+							</td>
 
-  {#if isLoading}
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <span>{$m.users_loading}</span>
-    </div>
+							<td>
+								<span class="role-badge" style={roleBadgeStyle(user.role)}>
+									{$roleLabel(user.role)}
+								</span>
+							</td>
 
-  {:else if loadError}
-    <div class="load-error">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
-      {loadError}
-      <button class="btn-ghost" onclick={loadUsers}>{$m.common_retry}</button>
-    </div>
+							<td>
+								<div class="status-cell">
+									<div class="status-dot" class:active={user.is_active}></div>
+									<span class:inactive={!user.is_active}>
+										{user.is_active ? $m.users_status_active : $m.users_status_inactive}
+									</span>
+								</div>
+							</td>
 
-  {:else if filteredUsers.length === 0}
-    <div class="empty-state">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>
-      <span>{searchQuery || filterRole || filterStatus ? $m.users_empty_filtered : $m.users_empty}</span>
-    </div>
+							<td class="meta-cell">{formatDate(user.created_at)}</td>
 
-  {:else}
-    <div class="table-wrapper">
-      <table class="users-table">
-        <thead>
-          <tr>
-            <th>{$m.common_user}</th>
-            <th>{$m.users_filter_role}</th>
-            <th>{$m.common_status}</th>
-            <th>{$m.users_col_registered}</th>
-            <th class="col-actions">{$m.common_actions}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each filteredUsers as user}
-            <tr class="table-row">
-
-              <td>
-                <div class="user-cell">
-                  <div class="avatar" style="background: {avatarBg(user.role)}">
-                    {getInitials(user)}
-                  </div>
-                  <div class="user-info">
-                    <span class="user-fullname">{user.username}</span>
-                    {#if user.email}
-                      <span class="user-username">{user.email}</span>
-                    {/if}
-                  </div>
-                </div>
-              </td>
-
-              <td>
-                <span class="role-badge" style={roleBadgeStyle(user.role)}>
-                  {$roleLabel(user.role)}
-                </span>
-              </td>
-
-              <td>
-                <div class="status-cell">
-                  <div class="status-dot" class:active={user.is_active}></div>
-                  <span class:inactive={!user.is_active}>
-                    {user.is_active ? $m.users_status_active : $m.users_status_inactive}
-                  </span>
-                </div>
-              </td>
-
-              <td class="meta-cell">{formatDate(user.created_at)}</td>
-
-              <td class="col-actions">
-                <!-- The testing account is not edited, deactivated, deleted or
+							<td class="col-actions">
+								<!-- The testing account is not edited, deactivated, deleted or
                      given a new password from here: the backend refuses each. -->
-                {#if user.role !== 'testing'}
-                <div class="actions-menu-wrapper">
-                  <button
-                    class="btn-actions"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      if (openMenuId === user.id) {
-                        openMenuId = null;
-                      } else {
-                        // The dropdown is position:fixed and anchored to the button's
-                        // rect, so the container cannot clip it; near the bottom edge
-                        // it opens upwards.
-                        const btn = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                        const viewportHeight = window.innerHeight;
-                        const dropdownHeight = canSetPasswordOf(user) ? 130 : 90; // estimated dropdown height (px)
-                        const spaceBelow = viewportHeight - btn.bottom;
+								{#if user.role !== 'testing'}
+									<div class="actions-menu-wrapper">
+										<button
+											class="btn-actions"
+											onclick={(e) => {
+												e.stopPropagation();
+												if (openMenuId === user.id) {
+													openMenuId = null;
+												} else {
+													// The dropdown is position:fixed and anchored to the button's
+													// rect, so the container cannot clip it; near the bottom edge
+													// it opens upwards.
+													const btn = (e.currentTarget as HTMLElement).getBoundingClientRect();
+													const viewportHeight = window.innerHeight;
+													const dropdownHeight = canSetPasswordOf(user) ? 130 : 90; // estimated dropdown height (px)
+													const spaceBelow = viewportHeight - btn.bottom;
 
-                        if (spaceBelow < dropdownHeight) {
-                          dropdownPos = { top: btn.top - dropdownHeight - 4, right: window.innerWidth - btn.right };
-                        } else {
-                          dropdownPos = { top: btn.bottom + 4, right: window.innerWidth - btn.right };
-                        }
-                        openMenuId = user.id;
-                      }
-                    }}
-                    aria-label={$m.common_actions}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="5" r="1.5" fill="currentColor"/>
-                      <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                      <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
-                    </svg>
-                  </button>
+													if (spaceBelow < dropdownHeight) {
+														dropdownPos = {
+															top: btn.top - dropdownHeight - 4,
+															right: window.innerWidth - btn.right
+														};
+													} else {
+														dropdownPos = {
+															top: btn.bottom + 4,
+															right: window.innerWidth - btn.right
+														};
+													}
+													openMenuId = user.id;
+												}
+											}}
+											aria-label={$m.common_actions}
+										>
+											<svg
+												width="16"
+												height="16"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2"
+											>
+												<circle cx="12" cy="5" r="1.5" fill="currentColor" />
+												<circle cx="12" cy="12" r="1.5" fill="currentColor" />
+												<circle cx="12" cy="19" r="1.5" fill="currentColor" />
+											</svg>
+										</button>
 
-                  {#if openMenuId === user.id}
-                    <div class="actions-dropdown"
-                      style="top: {dropdownPos.top}px; right: {dropdownPos.right}px;">
-                      <button class="dropdown-item" onclick={() => openEditModal(user)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                        {$m.common_edit}
-                      </button>
-                      {#if canSetPasswordOf(user)}
-                        <button class="dropdown-item" onclick={() => openPasswordDialog(user)}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                          </svg>
-                          {$m.users_password_action}
-                        </button>
-                      {/if}
-                      <div class="dropdown-sep"></div>
-                      <button class="dropdown-item danger" onclick={() => openDeleteModal(user)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <polyline points="3 6 5 6 21 6"/>
-                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                          <path d="M10 11v6M14 11v6"/>
-                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                        </svg>
-                        {$m.common_delete}
-                      </button>
-                    </div>
-                  {/if}
-                </div>
-                {/if}
-              </td>
-
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
-
+										{#if openMenuId === user.id}
+											<div
+												class="actions-dropdown"
+												style="top: {dropdownPos.top}px; right: {dropdownPos.right}px;"
+											>
+												<button class="dropdown-item" onclick={() => openEditModal(user)}>
+													<svg
+														width="14"
+														height="14"
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="2"
+													>
+														<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+														<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+													</svg>
+													{$m.common_edit}
+												</button>
+												{#if canSetPasswordOf(user)}
+													<button class="dropdown-item" onclick={() => openPasswordDialog(user)}>
+														<svg
+															width="14"
+															height="14"
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="currentColor"
+															stroke-width="2"
+															aria-hidden="true"
+														>
+															<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+															<path d="M7 11V7a5 5 0 0 1 10 0v4" />
+														</svg>
+														{$m.users_password_action}
+													</button>
+												{/if}
+												<div class="dropdown-sep"></div>
+												<button class="dropdown-item danger" onclick={() => openDeleteModal(user)}>
+													<svg
+														width="14"
+														height="14"
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="2"
+													>
+														<polyline points="3 6 5 6 21 6" />
+														<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+														<path d="M10 11v6M14 11v6" />
+														<path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+													</svg>
+													{$m.common_delete}
+												</button>
+											</div>
+										{/if}
+									</div>
+								{/if}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{/if}
 </div>
 
 {#if showUserModal}
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: () => showUserModal = false, escape: false }}>
-    <!-- No Escape: it would throw away what was typed. -->
-    <div class="modal-card dialog-fit" role="dialog" aria-modal="true">
+	<div
+		class="modal-backdrop"
+		use:dismissible={{ onDismiss: () => (showUserModal = false), escape: false }}
+	>
+		<!-- No Escape: it would throw away what was typed. -->
+		<div class="modal-card dialog-fit" role="dialog" aria-modal="true">
+			<div class="modal-header">
+				<div>
+					<h3 class="modal-title">
+						{isEditMode ? $m.users_modal_edit_title : $m.users_modal_create_title}
+					</h3>
+					<p class="modal-subtitle">
+						{isEditMode ? $m.users_modal_edit_subtitle : $m.users_modal_create_subtitle}
+					</p>
+				</div>
+				<button
+					class="modal-close"
+					onclick={() => (showUserModal = false)}
+					aria-label={$m.common_close}
+				>
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+					</svg>
+				</button>
+			</div>
 
-      <div class="modal-header">
-        <div>
-          <h3 class="modal-title">
-            {isEditMode ? $m.users_modal_edit_title : $m.users_modal_create_title}
-          </h3>
-          <p class="modal-subtitle">
-            {isEditMode ? $m.users_modal_edit_subtitle : $m.users_modal_create_subtitle}
-          </p>
-        </div>
-        <button class="modal-close" onclick={() => showUserModal = false} aria-label={$m.common_close}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
+			<div class="modal-body">
+				<div class="form-field">
+					<label class="field-label">{$m.users_field_username}</label>
+					<input
+						class="field-input"
+						type="text"
+						placeholder={$m.users_ph_username}
+						bind:value={formUsername}
+						readonly={isEditMode}
+						class:field-readonly={isEditMode}
+					/>
+				</div>
 
-      <div class="modal-body">
+				<div class="form-field">
+					<label class="field-label">{$m.common_email}</label>
+					<input
+						class="field-input"
+						type="email"
+						placeholder={$m.users_ph_email}
+						bind:value={formEmail}
+						readonly={isEditMode}
+						class:field-readonly={isEditMode}
+					/>
+				</div>
 
-        <div class="form-field">
-          <label class="field-label">{$m.users_field_username}</label>
-          <input
-            class="field-input"
-            type="text"
-            placeholder={$m.users_ph_username}
-            bind:value={formUsername}
-            readonly={isEditMode}
-            class:field-readonly={isEditMode}
-          />
-        </div>
+				{#if !isEditMode}
+					<div class="form-field">
+						<label class="field-label">{$m.common_password_label}</label>
+						<div class="password-wrapper">
+							<input
+								class="field-input"
+								type={showPassword ? 'text' : 'password'}
+								placeholder={$m.users_ph_password}
+								bind:value={formPassword}
+							/>
+							<button
+								class="eye-btn"
+								onclick={() => (showPassword = !showPassword)}
+								aria-label={showPassword ? $m.common_hide_password : $m.common_show_password}
+							>
+								{#if showPassword}
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path
+											d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
+										/>
+										<line x1="1" y1="1" x2="23" y2="23" />
+									</svg>
+								{:else}
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+										<circle cx="12" cy="12" r="3" />
+									</svg>
+								{/if}
+							</button>
+						</div>
+					</div>
 
-        <div class="form-field">
-          <label class="field-label">{$m.common_email}</label>
-          <input
-            class="field-input"
-            type="email"
-            placeholder={$m.users_ph_email}
-            bind:value={formEmail}
-            readonly={isEditMode}
-            class:field-readonly={isEditMode}
-          />
-        </div>
+					<div class="form-field">
+						<label class="field-label">{$m.common_confirm_password}</label>
+						<div class="password-wrapper">
+							<input
+								class="field-input"
+								type={showConfirm ? 'text' : 'password'}
+								placeholder={$m.users_ph_confirm}
+								bind:value={formConfirm}
+							/>
+							<button
+								class="eye-btn"
+								onclick={() => (showConfirm = !showConfirm)}
+								aria-label={showConfirm ? $m.common_hide_password : $m.common_show_password}
+							>
+								{#if showConfirm}
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path
+											d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
+										/>
+										<line x1="1" y1="1" x2="23" y2="23" />
+									</svg>
+								{:else}
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+										<circle cx="12" cy="12" r="3" />
+									</svg>
+								{/if}
+							</button>
+						</div>
+					</div>
+				{/if}
 
-        {#if !isEditMode}
-          <div class="form-field">
-            <label class="field-label">{$m.common_password_label}</label>
-            <div class="password-wrapper">
-              <input
-                class="field-input"
-                type={showPassword ? 'text' : 'password'}
-                placeholder={$m.users_ph_password}
-                bind:value={formPassword}
-              />
-              <button class="eye-btn" onclick={() => showPassword = !showPassword} aria-label={showPassword ? $m.common_hide_password : $m.common_show_password}>
-                {#if showPassword}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                    <line x1="1" y1="1" x2="23" y2="23"/>
-                  </svg>
-                {:else}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                {/if}
-              </button>
-            </div>
-          </div>
+				{#if isEditMode}
+					<div class="form-field">
+						<label class="field-label">{$m.users_field_account_status}</label>
+						<button
+							class="active-toggle"
+							class:active={formIsActive}
+							onclick={() => (formIsActive = !formIsActive)}
+						>
+							<div class="toggle-track">
+								<div class="toggle-thumb"></div>
+							</div>
+							<span>{formIsActive ? $m.users_status_active : $m.users_status_inactive}</span>
+						</button>
+					</div>
+				{/if}
 
-          <div class="form-field">
-            <label class="field-label">{$m.common_confirm_password}</label>
-            <div class="password-wrapper">
-              <input
-                class="field-input"
-                type={showConfirm ? 'text' : 'password'}
-                placeholder={$m.users_ph_confirm}
-                bind:value={formConfirm}
-              />
-              <button class="eye-btn" onclick={() => showConfirm = !showConfirm} aria-label={showConfirm ? $m.common_hide_password : $m.common_show_password}>
-                {#if showConfirm}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                    <line x1="1" y1="1" x2="23" y2="23"/>
-                  </svg>
-                {:else}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                {/if}
-              </button>
-            </div>
-          </div>
-        {/if}
+				<div class="form-field">
+					<label class="field-label">
+						<svg
+							width="13"
+							height="13"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+						</svg>
+						{$m.users_field_assign_role}
+					</label>
+					<div class="roles-list">
+						{#each ROLES as roleOpt}
+							<button
+								class="role-option"
+								class:selected={formRole === roleOpt.value}
+								onclick={() => (formRole = roleOpt.value)}
+							>
+								<div class="role-option-icon">
+									{#if roleOpt.value === 'operator'}
+										<svg
+											width="18"
+											height="18"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+											<circle cx="12" cy="7" r="4" />
+										</svg>
+									{:else}
+										<svg
+											width="18"
+											height="18"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+										</svg>
+									{/if}
+								</div>
+								<div class="role-option-text">
+									<span class="role-option-label">{roleOpt.label}</span>
+									<span class="role-option-desc">{roleOpt.desc}</span>
+								</div>
+								<div class="radio-circle" class:selected={formRole === roleOpt.value}>
+									{#if formRole === roleOpt.value}
+										<div class="radio-dot"></div>
+									{/if}
+								</div>
+							</button>
+						{/each}
+					</div>
+				</div>
 
-        {#if isEditMode}
-          <div class="form-field">
-            <label class="field-label">{$m.users_field_account_status}</label>
-            <button
-              class="active-toggle"
-              class:active={formIsActive}
-              onclick={() => formIsActive = !formIsActive}
-            >
-              <div class="toggle-track">
-                <div class="toggle-thumb"></div>
-              </div>
-              <span>{formIsActive ? $m.users_status_active : $m.users_status_inactive}</span>
-            </button>
-          </div>
-        {/if}
+				{#if formError}
+					<div class="form-error">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							style="flex-shrink:0"
+						>
+							<circle cx="12" cy="12" r="10" />
+							<line x1="12" y1="8" x2="12" y2="12" />
+							<line x1="12" y1="16" x2="12.01" y2="16" />
+						</svg>
+						{formError}
+					</div>
+				{/if}
+			</div>
+			<!-- /modal-body -->
 
-        <div class="form-field">
-          <label class="field-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            {$m.users_field_assign_role}
-          </label>
-          <div class="roles-list">
-            {#each ROLES as roleOpt}
-              <button
-                class="role-option"
-                class:selected={formRole === roleOpt.value}
-                onclick={() => formRole = roleOpt.value}
-              >
-                <div class="role-option-icon">
-                  {#if roleOpt.value === 'operator'}
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                      <circle cx="12" cy="7" r="4"/>
-                    </svg>
-                  {:else}
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                  {/if}
-                </div>
-                <div class="role-option-text">
-                  <span class="role-option-label">{roleOpt.label}</span>
-                  <span class="role-option-desc">{roleOpt.desc}</span>
-                </div>
-                <div class="radio-circle" class:selected={formRole === roleOpt.value}>
-                  {#if formRole === roleOpt.value}
-                    <div class="radio-dot"></div>
-                  {/if}
-                </div>
-              </button>
-            {/each}
-          </div>
-        </div>
-
-        {#if formError}
-          <div class="form-error">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            {formError}
-          </div>
-        {/if}
-
-      </div><!-- /modal-body -->
-
-      <div class="modal-actions">
-        <button class="btn-ghost" onclick={() => showUserModal = false}>{$m.common_cancel}</button>
-        <button class="btn-crear" onclick={handleSaveUser} disabled={isSaving}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          </svg>
-          {isSaving ? $m.common_saving : isEditMode ? $m.common_save_changes : $m.users_create_btn}
-        </button>
-      </div>
-
-    </div>
-  </div>
+			<div class="modal-actions">
+				<button class="btn-ghost" onclick={() => (showUserModal = false)}>{$m.common_cancel}</button
+				>
+				<button class="btn-crear" onclick={handleSaveUser} disabled={isSaving}>
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+					</svg>
+					{isSaving ? $m.common_saving : isEditMode ? $m.common_save_changes : $m.users_create_btn}
+				</button>
+			</div>
+		</div>
+	</div>
 {/if}
 
 {#if passwordUser}
-  <SetPasswordDialog
-    user={passwordUser}
-    onCancel={() => (passwordUser = null)}
-    onDone={(updated) => { passwordSetFor = updated.username; passwordUser = null; }}
-  />
+	<SetPasswordDialog
+		user={passwordUser}
+		onCancel={() => (passwordUser = null)}
+		onDone={(updated) => {
+			passwordSetFor = updated.username;
+			passwordUser = null;
+		}}
+	/>
 {/if}
 
 {#if showDeleteModal && deletingUser}
-  <div class="modal-backdrop" use:dismissible={{ onDismiss: () => showDeleteModal = false, escape: !isDeleting, backdrop: !isDeleting }}>
-    <div class="modal-card modal-confirm dialog-fit" role="dialog" aria-modal="true" aria-labelledby="user-delete-title">
+	<div
+		class="modal-backdrop"
+		use:dismissible={{
+			onDismiss: () => (showDeleteModal = false),
+			escape: !isDeleting,
+			backdrop: !isDeleting
+		}}
+	>
+		<div
+			class="modal-card modal-confirm dialog-fit"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="user-delete-title"
+		>
+			<h3 class="confirm-title" id="user-delete-title">{$m.users_delete_title}</h3>
 
-      <h3 class="confirm-title" id="user-delete-title">{$m.users_delete_title}</h3>
+			<p class="confirm-desc">
+				{$m.users_delete_confirm_pre}
+				<strong>{deletingUser.username}</strong>{#if deletingUser.email}
+					({deletingUser.email}){/if}?
+				{$m.common_irreversible}
+			</p>
 
-      <p class="confirm-desc">
-        {$m.users_delete_confirm_pre}
-        <strong>{deletingUser.username}</strong>{#if deletingUser.email} ({deletingUser.email}){/if}?
-        {$m.common_irreversible}
-      </p>
-
-      <div class="modal-actions">
-        <button class="btn-ghost" onclick={() => showDeleteModal = false} disabled={isDeleting}>
-          {$m.common_cancel}
-        </button>
-        <button class="btn-delete" onclick={handleConfirmDelete} disabled={isDeleting}>
-          {isDeleting ? $m.common_deleting : $m.users_delete_btn}
-        </button>
-      </div>
-
-    </div>
-  </div>
+			<div class="modal-actions">
+				<button class="btn-ghost" onclick={() => (showDeleteModal = false)} disabled={isDeleting}>
+					{$m.common_cancel}
+				</button>
+				<button class="btn-delete" onclick={handleConfirmDelete} disabled={isDeleting}>
+					{isDeleting ? $m.common_deleting : $m.users_delete_btn}
+				</button>
+			</div>
+		</div>
+	</div>
 {/if}
 
 <style>
-  .page { padding: 32px; max-width: 1200px; }
+	.page {
+		padding: 32px;
+		max-width: 1200px;
+	}
 
-  /* ── Header ── */
-  .page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 28px;
-  }
+	/* ── Header ── */
+	.page-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		margin-bottom: 28px;
+	}
 
-  .page-title    { font-size: var(--text-h2); font-weight: var(--fw-black); color: var(--color-light); margin: 0 0 4px; }
-  .page-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
+	.page-title {
+		font-size: var(--text-h2);
+		font-weight: var(--fw-black);
+		color: var(--color-light);
+		margin: 0 0 4px;
+	}
+	.page-subtitle {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		margin: 0;
+	}
 
-  .page-notice {
-    margin: 0 0 20px;
-    padding: 10px 14px;
-    border: 1px solid rgba(90,140,98,0.4);
-    border-radius: var(--radius-md);
-    background-color: rgba(90,140,98,0.08);
-    color: var(--color-light);
-    font-size: var(--text-sm);
-  }
+	.page-notice {
+		margin: 0 0 20px;
+		padding: 10px 14px;
+		border: 1px solid rgba(90, 140, 98, 0.4);
+		border-radius: var(--radius-md);
+		background-color: rgba(90, 140, 98, 0.08);
+		color: var(--color-light);
+		font-size: var(--text-sm);
+	}
 
-  /* ── Buttons ── */
-  .btn-primary {
-    display: flex; align-items: center; gap: 8px;
-    background-color: var(--color-primary); color: white;
-    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
-    border: none; border-radius: var(--radius-md);
-    padding: 9px 18px; min-height: var(--touch-target-min);
-    cursor: pointer; transition: background-color var(--transition-base);
-    white-space: nowrap; flex-shrink: 0;
-  }
+	/* ── Buttons ── */
+	.btn-primary {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background-color: var(--color-primary);
+		color: white;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		border: none;
+		border-radius: var(--radius-md);
+		padding: 9px 18px;
+		min-height: var(--touch-target-min);
+		cursor: pointer;
+		transition: background-color var(--transition-base);
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
 
-  .btn-primary:hover { background-color: var(--color-primary-hover); }
+	.btn-primary:hover {
+		background-color: var(--color-primary-hover);
+	}
 
-  .btn-ghost {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: none; border: 1px solid var(--border-color);
-    border-radius: var(--radius-md); padding: 9px 18px;
-    font-family: var(--font-family); font-size: var(--text-sm);
-    color: var(--color-light-grey); cursor: pointer;
-    transition: all var(--transition-fast); min-height: var(--touch-target-min);
-    white-space: nowrap;
-  }
+	.btn-ghost {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		background: none;
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 9px 18px;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		min-height: var(--touch-target-min);
+		white-space: nowrap;
+	}
 
-  .btn-ghost:hover { color: var(--color-light); border-color: rgba(255,255,255,0.2); }
+	.btn-ghost:hover {
+		color: var(--color-light);
+		border-color: rgba(255, 255, 255, 0.2);
+	}
 
-  /* ── Toolbar ── */
-  .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+	/* ── Toolbar ── */
+	.toolbar {
+		display: flex;
+		gap: 12px;
+		margin-bottom: 20px;
+		flex-wrap: wrap;
+	}
 
-  .search-wrapper { position: relative; flex: 1; max-width: 440px; }
+	.search-wrapper {
+		position: relative;
+		flex: 1;
+		max-width: 440px;
+	}
 
-  .search-icon {
-    position: absolute; left: 12px; top: 50%;
-    transform: translateY(-50%); color: var(--color-light-grey); pointer-events: none;
-  }
+	.search-icon {
+		position: absolute;
+		left: 12px;
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--color-light-grey);
+		pointer-events: none;
+	}
 
-  .search-input {
-    width: 100%; background-color: var(--color-surface);
-    border: 1px solid var(--border-color); border-radius: var(--radius-md);
-    padding: 9px 12px 9px 36px; font-family: var(--font-family);
-    font-size: var(--text-sm); color: var(--color-light); outline: none;
-    transition: border-color var(--transition-base); min-height: var(--touch-target-min);
-  }
+	.search-input {
+		width: 100%;
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 9px 12px 9px 36px;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light);
+		outline: none;
+		transition: border-color var(--transition-base);
+		min-height: var(--touch-target-min);
+	}
 
-  .search-input:focus { border-color: var(--color-primary); }
-  .search-input::placeholder { color: var(--color-light-grey); opacity: 0.5; }
+	.search-input:focus {
+		border-color: var(--color-primary);
+	}
+	.search-input::placeholder {
+		color: var(--color-light-grey);
+		opacity: 0.5;
+	}
 
-  .filter-group {
-    display: flex; align-items: center; gap: 8px;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color); border-radius: var(--radius-md);
-    padding: 0 12px; color: var(--color-light-grey);
-    min-height: var(--touch-target-min);
-  }
+	.filter-group {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 0 12px;
+		color: var(--color-light-grey);
+		min-height: var(--touch-target-min);
+	}
 
-  .filter-select {
-    background: none; border: none; outline: none;
-    font-family: var(--font-family); font-size: var(--text-sm);
-    color: var(--color-light-grey); cursor: pointer;
-    padding: 9px 0; min-height: 0;
-  }
+	.filter-select {
+		background: none;
+		border: none;
+		outline: none;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		cursor: pointer;
+		padding: 9px 0;
+		min-height: 0;
+	}
 
-  .loading-state, .empty-state {
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 12px; padding: 60px 20px;
-    color: var(--color-light-grey); font-size: var(--text-base);
-  }
+	.loading-state,
+	.empty-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		padding: 60px 20px;
+		color: var(--color-light-grey);
+		font-size: var(--text-base);
+	}
 
-  .spinner {
-    width: 30px; height: 30px;
-    border: 3px solid var(--border-color);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
+	.spinner {
+		width: 30px;
+		height: 30px;
+		border: 3px solid var(--border-color);
+		border-top-color: var(--color-primary);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
 
-  @keyframes spin { to { transform: rotate(360deg); } }
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
 
-  .table-wrapper {
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-  }
+	.table-wrapper {
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-xl);
+		overflow: hidden;
+	}
 
-  .users-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); text-align: left; }
+	.users-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--text-sm);
+		text-align: left;
+	}
 
-  .users-table thead tr {
-    background-color: var(--color-surface-alt);
-    border-bottom: 1px solid var(--border-color);
-  }
+	.users-table thead tr {
+		background-color: var(--color-surface-alt);
+		border-bottom: 1px solid var(--border-color);
+	}
 
-  .users-table th {
-    padding: 12px 20px;
-    font-size: 11px; font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    text-transform: uppercase; letter-spacing: 0.06em;
-    white-space: nowrap;
-  }
+	.users-table th {
+		padding: 12px 20px;
+		font-size: 11px;
+		font-weight: var(--fw-bold);
+		color: var(--color-light-grey);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		white-space: nowrap;
+	}
 
-  .users-table td { padding: 14px 20px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
-  .users-table tbody tr:last-child td { border-bottom: none; }
+	.users-table td {
+		padding: 14px 20px;
+		border-bottom: 1px solid var(--border-color);
+		vertical-align: middle;
+	}
+	.users-table tbody tr:last-child td {
+		border-bottom: none;
+	}
 
-  .table-row { transition: background-color var(--transition-fast); }
-  .table-row:hover { background-color: rgba(255,255,255,0.02); }
+	.table-row {
+		transition: background-color var(--transition-fast);
+	}
+	.table-row:hover {
+		background-color: rgba(255, 255, 255, 0.02);
+	}
 
-  .user-cell { display: flex; align-items: center; gap: 12px; }
+	.user-cell {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
 
-  .avatar {
-    width: 38px; height: 38px;
-    border-radius: var(--radius-md);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: var(--fw-extrabold); font-size: 13px;
-    color: white; flex-shrink: 0;
-  }
+	.avatar {
+		width: 38px;
+		height: 38px;
+		border-radius: var(--radius-md);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-weight: var(--fw-extrabold);
+		font-size: 13px;
+		color: white;
+		flex-shrink: 0;
+	}
 
-  .user-info { display: flex; flex-direction: column; }
-  .user-fullname { font-weight: var(--fw-semibold); color: var(--color-light); }
-  .user-username { font-size: 11px; color: var(--color-light-grey); }
+	.user-info {
+		display: flex;
+		flex-direction: column;
+	}
+	.user-fullname {
+		font-weight: var(--fw-semibold);
+		color: var(--color-light);
+	}
+	.user-username {
+		font-size: 11px;
+		color: var(--color-light-grey);
+	}
 
-  .role-badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: var(--radius-full);
-    font-size: 12px; font-weight: var(--fw-semibold);
-    border: 1px solid transparent;
-    white-space: nowrap;
-  }
+	.role-badge {
+		display: inline-block;
+		padding: 4px 12px;
+		border-radius: var(--radius-full);
+		font-size: 12px;
+		font-weight: var(--fw-semibold);
+		border: 1px solid transparent;
+		white-space: nowrap;
+	}
 
-  .status-cell { display: flex; align-items: center; gap: 8px; color: var(--color-light-grey); }
+	.status-cell {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: var(--color-light-grey);
+	}
 
-  .status-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background-color: var(--color-light-grey);
-    flex-shrink: 0;
-  }
+	.status-dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background-color: var(--color-light-grey);
+		flex-shrink: 0;
+	}
 
-  .status-dot.active { background-color: var(--color-success); box-shadow: 0 0 6px rgba(111,191,115,0.4); }
+	.status-dot.active {
+		background-color: var(--color-success);
+		box-shadow: 0 0 6px rgba(111, 191, 115, 0.4);
+	}
 
-  .inactive { color: var(--color-light-grey); opacity: 0.6; }
+	.inactive {
+		color: var(--color-light-grey);
+		opacity: 0.6;
+	}
 
-  .meta-cell { color: var(--color-light-grey); font-size: var(--text-sm); }
+	.meta-cell {
+		color: var(--color-light-grey);
+		font-size: var(--text-sm);
+	}
 
-  .col-actions { text-align: center; width: 80px; }
+	.col-actions {
+		text-align: center;
+		width: 80px;
+	}
 
-  .actions-menu-wrapper { position: relative; display: inline-flex; justify-content: center; }
+	.actions-menu-wrapper {
+		position: relative;
+		display: inline-flex;
+		justify-content: center;
+	}
 
-  .btn-actions {
-    width: 36px; height: 36px;
-    border-radius: var(--radius-md);
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey); cursor: pointer;
-    transition: all var(--transition-fast); min-height: 0;
-  }
+	.btn-actions {
+		width: 36px;
+		height: 36px;
+		border-radius: var(--radius-md);
+		background-color: var(--color-surface-alt);
+		border: 1px solid var(--border-color);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--color-light-grey);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		min-height: 0;
+	}
 
-  .btn-actions:hover { border-color: var(--color-primary); color: var(--color-light); }
+	.btn-actions:hover {
+		border-color: var(--color-primary);
+		color: var(--color-light);
+	}
 
-  .actions-dropdown {
-    /* position:fixed so the container edge cannot clip it; top/right are
+	.actions-dropdown {
+		/* position:fixed so the container edge cannot clip it; top/right are
        computed in the actions button's onclick. */
-    position: fixed;
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 4px;
-    min-width: 140px;
-    box-shadow: var(--shadow-md);
-    z-index: 200;
-  }
+		position: fixed;
+		background-color: var(--color-surface-alt);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 4px;
+		min-width: 140px;
+		box-shadow: var(--shadow-md);
+		z-index: 200;
+	}
 
-  .dropdown-item {
-    display: flex; align-items: center; gap: 10px;
-    width: 100%; padding: 9px 12px;
-    background: none; border: none;
-    font-family: var(--font-family); font-size: var(--text-sm);
-    color: var(--color-light-grey); cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
-    text-align: left; min-height: 0;
-  }
+	.dropdown-item {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: 100%;
+		padding: 9px 12px;
+		background: none;
+		border: none;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		cursor: pointer;
+		border-radius: var(--radius-sm);
+		transition: all var(--transition-fast);
+		text-align: left;
+		min-height: 0;
+	}
 
-  .dropdown-item:hover { background-color: rgba(255,255,255,0.05); color: var(--color-light); }
-  .dropdown-item.danger:hover { background-color: rgba(214,103,74,0.1); color: var(--color-error); }
+	.dropdown-item:hover {
+		background-color: rgba(255, 255, 255, 0.05);
+		color: var(--color-light);
+	}
+	.dropdown-item.danger:hover {
+		background-color: rgba(214, 103, 74, 0.1);
+		color: var(--color-error);
+	}
 
-  .dropdown-sep { height: 1px; background-color: var(--border-color); margin: 4px 0; }
+	.dropdown-sep {
+		height: 1px;
+		background-color: var(--border-color);
+		margin: 4px 0;
+	}
 
-  .modal-backdrop {
-    position: fixed; inset: 0;
-    background-color: rgba(0,0,0,0.65);
-    backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 100; padding: 24px;
-  }
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background-color: rgba(0, 0, 0, 0.65);
+		backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 100;
+		padding: 24px;
+	}
 
-  .modal-card {
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 28px;
-    width: 100%; max-width: 420px;
-    box-shadow: var(--shadow-lg);
-    display: flex; flex-direction: column; gap: 16px;
-  }
+	.modal-card {
+		background-color: var(--color-surface-alt);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-xl);
+		padding: 28px;
+		width: 100%;
+		max-width: 420px;
+		box-shadow: var(--shadow-lg);
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
 
-  .modal-card::-webkit-scrollbar { width: 3px; }
-  .modal-card::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 999px; }
+	.modal-card::-webkit-scrollbar {
+		width: 3px;
+	}
+	.modal-card::-webkit-scrollbar-thumb {
+		background: var(--border-color);
+		border-radius: 999px;
+	}
 
-  .modal-confirm {
-    max-width: 440px;
-    gap: 12px;
-  }
+	.modal-confirm {
+		max-width: 440px;
+		gap: 12px;
+	}
 
-  .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-  .modal-title  { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0 0 4px; }
-  .modal-subtitle { font-size: var(--text-sm); color: var(--color-light-grey); margin: 0; }
+	.modal-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.modal-title {
+		font-size: var(--text-h3);
+		font-weight: var(--fw-bold);
+		color: var(--color-light);
+		margin: 0 0 4px;
+	}
+	.modal-subtitle {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		margin: 0;
+	}
 
-  .modal-close {
-    width: 30px; height: 30px; background: none; border: none;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey); cursor: pointer;
-    border-radius: var(--radius-sm); transition: all var(--transition-fast); flex-shrink: 0;
-  }
+	.modal-close {
+		width: 30px;
+		height: 30px;
+		background: none;
+		border: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--color-light-grey);
+		cursor: pointer;
+		border-radius: var(--radius-sm);
+		transition: all var(--transition-fast);
+		flex-shrink: 0;
+	}
 
-  .modal-close:hover { background-color: var(--color-surface); color: var(--color-light); }
+	.modal-close:hover {
+		background-color: var(--color-surface);
+		color: var(--color-light);
+	}
 
-  .modal-body { display: flex; flex-direction: column; gap: 14px; }
+	.modal-body {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
 
-  /* Form fields */
-  .form-field { display: flex; flex-direction: column; gap: 6px; }
+	/* Form fields */
+	.form-field {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
 
-  .field-label {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 11px; font-weight: var(--fw-bold);
-    color: var(--color-light-grey);
-    text-transform: uppercase; letter-spacing: 0.06em;
-  }
+	.field-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 11px;
+		font-weight: var(--fw-bold);
+		color: var(--color-light-grey);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
 
-  .field-input {
-    font-family: var(--font-family); font-size: var(--text-sm);
-    color: var(--color-light);
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color); border-radius: var(--radius-md);
-    padding: 9px 12px; outline: none;
-    transition: border-color var(--transition-base);
-    min-height: var(--touch-target-min); width: 100%;
-  }
+	.field-input {
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light);
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 9px 12px;
+		outline: none;
+		transition: border-color var(--transition-base);
+		min-height: var(--touch-target-min);
+		width: 100%;
+	}
 
-  .field-input:focus { border-color: var(--color-primary); }
-  .field-input::placeholder { color: var(--color-light-grey); opacity: 0.5; }
+	.field-input:focus {
+		border-color: var(--color-primary);
+	}
+	.field-input::placeholder {
+		color: var(--color-light-grey);
+		opacity: 0.5;
+	}
 
-  .password-wrapper { position: relative; }
-  .password-wrapper .field-input { padding-right: 40px; }
+	.password-wrapper {
+		position: relative;
+	}
+	.password-wrapper .field-input {
+		padding-right: 40px;
+	}
 
-  .eye-btn {
-    position: absolute; right: 10px; top: 50%;
-    transform: translateY(-50%);
-    background: none; border: none;
-    color: var(--color-light-grey); cursor: pointer;
-    padding: 4px; display: flex; align-items: center;
-    min-height: 0; transition: color var(--transition-fast);
-  }
+	.eye-btn {
+		position: absolute;
+		right: 10px;
+		top: 50%;
+		transform: translateY(-50%);
+		background: none;
+		border: none;
+		color: var(--color-light-grey);
+		cursor: pointer;
+		padding: 4px;
+		display: flex;
+		align-items: center;
+		min-height: 0;
+		transition: color var(--transition-fast);
+	}
 
-  .eye-btn:hover { color: var(--color-light); }
+	.eye-btn:hover {
+		color: var(--color-light);
+	}
 
-  .roles-list { display: flex; flex-direction: column; gap: 8px; }
+	.roles-list {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
 
-  .role-option {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 14px;
-    background-color: var(--color-surface);
-    border: 1px solid var(--border-color); border-radius: var(--radius-md);
-    cursor: pointer; transition: all var(--transition-fast);
-    text-align: left; width: 100%; min-height: 0;
-  }
+	.role-option {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 12px 14px;
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		text-align: left;
+		width: 100%;
+		min-height: 0;
+	}
 
-  .role-option:hover   { border-color: rgba(90,140,98,0.4); }
-  .role-option.selected { background-color: rgba(90,140,98,0.08); border-color: var(--color-primary); }
+	.role-option:hover {
+		border-color: rgba(90, 140, 98, 0.4);
+	}
+	.role-option.selected {
+		background-color: rgba(90, 140, 98, 0.08);
+		border-color: var(--color-primary);
+	}
 
-  .role-option-icon {
-    width: 36px; height: 36px;
-    border-radius: var(--radius-sm);
-    background-color: var(--color-surface-alt);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--color-light-grey); flex-shrink: 0;
-  }
+	.role-option-icon {
+		width: 36px;
+		height: 36px;
+		border-radius: var(--radius-sm);
+		background-color: var(--color-surface-alt);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--color-light-grey);
+		flex-shrink: 0;
+	}
 
-  .role-option.selected .role-option-icon { color: var(--color-primary); }
+	.role-option.selected .role-option-icon {
+		color: var(--color-primary);
+	}
 
-  .role-option-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-  .role-option-label { font-size: var(--text-sm); font-weight: var(--fw-bold); color: var(--color-light); }
-  .role-option-desc  { font-size: 11px; color: var(--color-light-grey); }
+	.role-option-text {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.role-option-label {
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		color: var(--color-light);
+	}
+	.role-option-desc {
+		font-size: 11px;
+		color: var(--color-light-grey);
+	}
 
-  .radio-circle {
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    border: 2px solid var(--border-color);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: border-color var(--transition-fast);
-  }
+	.radio-circle {
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		border: 2px solid var(--border-color);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		transition: border-color var(--transition-fast);
+	}
 
-  .radio-circle.selected { border-color: var(--color-primary); }
+	.radio-circle.selected {
+		border-color: var(--color-primary);
+	}
 
-  .radio-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background-color: var(--color-primary);
-  }
+	.radio-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background-color: var(--color-primary);
+	}
 
-  .form-error {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 14px;
-    background-color: rgba(214,103,74,0.08);
-    border: 1px solid var(--color-error);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm); color: var(--color-error); line-height: 1.4;
-  }
+	.form-error {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 14px;
+		background-color: rgba(214, 103, 74, 0.08);
+		border: 1px solid var(--color-error);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+		color: var(--color-error);
+		line-height: 1.4;
+	}
 
-  .modal-actions {
-    display: flex; gap: 12px;
-    padding-top: 4px;
-    border-top: 1px solid var(--border-color);
-  }
+	.modal-actions {
+		display: flex;
+		gap: 12px;
+		padding-top: 4px;
+		border-top: 1px solid var(--border-color);
+	}
 
-  .btn-crear {
-    flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
-    background-color: var(--color-primary); color: white;
-    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
-    border: none; border-radius: var(--radius-md);
-    padding: 9px 18px; min-height: var(--touch-target-min);
-    cursor: pointer; transition: background-color var(--transition-base);
-  }
+	.btn-crear {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		background-color: var(--color-primary);
+		color: white;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		border: none;
+		border-radius: var(--radius-md);
+		padding: 9px 18px;
+		min-height: var(--touch-target-min);
+		cursor: pointer;
+		transition: background-color var(--transition-base);
+	}
 
-  .btn-crear:hover    { background-color: var(--color-primary-hover); }
-  .btn-crear:disabled { opacity: 0.5; cursor: not-allowed; }
+	.btn-crear:hover {
+		background-color: var(--color-primary-hover);
+	}
+	.btn-crear:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 
-  .confirm-title {
-    font-size: var(--text-h3);
-    font-weight: var(--fw-bold);
-    color: var(--color-light);
-    margin: 0;
-  }
+	.confirm-title {
+		font-size: var(--text-h3);
+		font-weight: var(--fw-bold);
+		color: var(--color-light);
+		margin: 0;
+	}
 
-  .confirm-desc {
-    font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    line-height: 1.6;
-    margin: 0;
-  }
+	.confirm-desc {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		line-height: 1.6;
+		margin: 0;
+	}
 
-  .confirm-desc strong { color: var(--color-light); }
+	.confirm-desc strong {
+		color: var(--color-light);
+	}
 
-  .btn-delete {
-    flex: 1; height: 44px;
-    background-color: var(--color-error); color: white;
-    font-family: var(--font-family); font-size: var(--text-sm); font-weight: var(--fw-bold);
-    border: none; border-radius: var(--radius-md);
-    cursor: pointer; transition: opacity var(--transition-base);
-  }
+	.btn-delete {
+		flex: 1;
+		height: 44px;
+		background-color: var(--color-error);
+		color: white;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		border: none;
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		transition: opacity var(--transition-base);
+	}
 
-  .btn-delete:hover    { opacity: 0.85; }
-  .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
+	.btn-delete:hover {
+		opacity: 0.85;
+	}
+	.btn-delete:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 
-  .field-readonly {
-    opacity: 0.6;
-    cursor: default;
-    background-color: var(--color-surface-alt, rgba(255,255,255,0.03));
-  }
+	.field-readonly {
+		opacity: 0.6;
+		cursor: default;
+		background-color: var(--color-surface-alt, rgba(255, 255, 255, 0.03));
+	}
 
-  .active-toggle {
-    display: flex; align-items: center; gap: 10px;
-    background: none; border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 9px 14px; cursor: pointer;
-    font-family: var(--font-family); font-size: var(--text-sm);
-    color: var(--color-light-grey);
-    transition: all var(--transition-fast); min-height: var(--touch-target-min);
-  }
+	.active-toggle {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		background: none;
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 9px 14px;
+		cursor: pointer;
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		transition: all var(--transition-fast);
+		min-height: var(--touch-target-min);
+	}
 
-  .active-toggle.active { border-color: var(--color-primary); color: var(--color-primary); }
+	.active-toggle.active {
+		border-color: var(--color-primary);
+		color: var(--color-primary);
+	}
 
-  .toggle-track {
-    width: 36px; height: 20px;
-    background-color: var(--border-color);
-    border-radius: 10px; position: relative;
-    transition: background-color var(--transition-fast); flex-shrink: 0;
-  }
+	.toggle-track {
+		width: 36px;
+		height: 20px;
+		background-color: var(--border-color);
+		border-radius: 10px;
+		position: relative;
+		transition: background-color var(--transition-fast);
+		flex-shrink: 0;
+	}
 
-  .active-toggle.active .toggle-track { background-color: var(--color-primary); }
+	.active-toggle.active .toggle-track {
+		background-color: var(--color-primary);
+	}
 
-  .toggle-thumb {
-    width: 14px; height: 14px;
-    background-color: white; border-radius: 50%;
-    position: absolute; top: 3px; left: 3px;
-    transition: transform var(--transition-fast);
-  }
+	.toggle-thumb {
+		width: 14px;
+		height: 14px;
+		background-color: white;
+		border-radius: 50%;
+		position: absolute;
+		top: 3px;
+		left: 3px;
+		transition: transform var(--transition-fast);
+	}
 
-  .active-toggle.active .toggle-thumb { transform: translateX(16px); }
+	.active-toggle.active .toggle-thumb {
+		transform: translateX(16px);
+	}
 
-  .load-error {
-    display: flex; align-items: center; gap: 10px;
-    padding: 14px 18px;
-    background-color: rgba(214,103,74,0.08);
-    border: 1px solid var(--color-error);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm); color: var(--color-error);
-  }
+	.load-error {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 14px 18px;
+		background-color: rgba(214, 103, 74, 0.08);
+		border: 1px solid var(--color-error);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+		color: var(--color-error);
+	}
 </style>

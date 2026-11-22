@@ -39,7 +39,8 @@ import { testingRefusalText } from './testing-space';
 import { canFreeVolumes } from './unit-mode';
 
 // STEM_REQUIRED_DETAIL in app/core/volume_stem.py.
-const STEM_REQUIRED_DETAIL = 'This volume has no file name stem. Give it one before capturing into it.';
+const STEM_REQUIRED_DETAIL =
+	'This volume has no file name stem. Give it one before capturing into it.';
 
 // CAPTURE_NAME_TOO_LONG_DETAIL in app/core/capture_naming.py: the 409 for a
 // capture whose `<stem>-img_<nnnn>` would be longer than a pair id holds.
@@ -101,7 +102,9 @@ export class CaptureNotSaved extends Error {
 }
 
 function statusOf(error: unknown): unknown {
-	return typeof error === 'object' && error !== null ? (error as { status?: unknown }).status : undefined;
+	return typeof error === 'object' && error !== null
+		? (error as { status?: unknown }).status
+		: undefined;
 }
 
 /**
@@ -112,7 +115,11 @@ function statusOf(error: unknown): unknown {
 function isStorageReserve(error: unknown): boolean {
 	if (statusOf(error) !== 507) return false;
 	const detail = (error as { detail?: unknown }).detail;
-	return typeof detail === 'object' && detail !== null && (detail as { code?: unknown }).code === 'storage_reserve';
+	return (
+		typeof detail === 'object' &&
+		detail !== null &&
+		(detail as { code?: unknown }).code === 'storage_reserve'
+	);
 }
 
 /** Whether a capture was refused with the backend's 409 for a volume without a stem. */
@@ -151,7 +158,8 @@ export function captureErrorText(error: unknown, msgs: Messages, role?: string |
 	if (status === 409 && error.message === CAPTURE_LIMIT_DETAIL) return msgs.lv_err_capture_limit;
 	if (status === 404 && VOLUME_NOT_FOUND.test(error.message)) return msgs.lv_err_volume_not_found;
 	if (status === 404 && RECORD_NOT_FOUND.test(error.message)) return msgs.lv_err_record_not_found;
-	if (status === 422 && error.message === RESOLUTION_IN_FILENAME_DETAIL) return msgs.lv_err_resolution_in_name;
+	if (status === 422 && error.message === RESOLUTION_IN_FILENAME_DETAIL)
+		return msgs.lv_err_resolution_in_name;
 	const mode = status === 422 ? error.message.match(RETAKE_MODE) : null;
 	if (mode) return msgs.lv_err_retake_mode(mode[1] as 'single' | 'dual');
 	return msgs.lv_capture_error;

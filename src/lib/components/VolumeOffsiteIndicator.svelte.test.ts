@@ -79,7 +79,15 @@ describe('VolumeOffsiteIndicator — a volume Captua keeps on the unit (NEH-320)
 	it('shows the kept line, with no icon and no Fisqua line', async () => {
 		locale.set('es');
 		vi.spyOn(systemApi, 'getCatalogueBackup').mockReturnValue(new Promise(() => {}));
-		const fisqua = { environment: 'staging', config_error: null, held: false, hold_file: '', outbox: [], status: null, decisions: null };
+		const fisqua = {
+			environment: 'staging',
+			config_error: null,
+			held: false,
+			hold_file: '',
+			outbox: [],
+			status: null,
+			decisions: null
+		};
 		vi.spyOn(collectionsApi, 'getOffsiteState').mockResolvedValue(
 			state({ kept_on_unit: true, verified: 0, pending: 0, received: false, fisqua } as never)
 		);

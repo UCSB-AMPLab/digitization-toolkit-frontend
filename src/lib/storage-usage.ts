@@ -46,7 +46,8 @@ export function storageUsage(info: StorageInfo | null | undefined): StorageUsage
 	if (typeof used !== 'number' || typeof total !== 'number') return null;
 	if (!Number.isFinite(used) || !Number.isFinite(total) || total <= 0 || used < 0) return null;
 	const reserve = info.reserve_bytes;
-	const reserveBytes = typeof reserve === 'number' && Number.isFinite(reserve) && reserve > 0 ? reserve : 0;
+	const reserveBytes =
+		typeof reserve === 'number' && Number.isFinite(reserve) && reserve > 0 ? reserve : 0;
 	const percent = Math.min(100, Math.round(((used + reserveBytes) / total) * 100));
 	return {
 		usedGB: used / GIB,

@@ -259,47 +259,71 @@ export function pollPairing(opts: {
 /** The line for a refused request or a reason the unit cannot be linked now. */
 export function pairingRefusalText(code: string | null, msgs: Messages): string {
 	switch (code) {
-		case 'unit_name': return msgs.fisqua_link_name_invalid;
-		case 'mode_not_eligible': return msgs.fisqua_link_not_eligible;
-		case 'offsite_held': return msgs.fisqua_link_held;
-		case 'rclone_missing': return msgs.fisqua_link_rclone_missing;
-		case 'busy_capturing': return msgs.fisqua_link_busy_capturing;
-		case 'device_id_invalid': return msgs.fisqua_link_device_id_invalid;
-		case 'script_too_old': return msgs.fisqua_link_script_too_old;
-		case 'script_missing': return msgs.fisqua_link_script_missing;
-		case 'restart_required': return msgs.fisqua_link_restart_required;
-		case 'offsite_job_running': return msgs.fisqua_link_offsite_job_running;
+		case 'unit_name':
+			return msgs.fisqua_link_name_invalid;
+		case 'mode_not_eligible':
+			return msgs.fisqua_link_not_eligible;
+		case 'offsite_held':
+			return msgs.fisqua_link_held;
+		case 'rclone_missing':
+			return msgs.fisqua_link_rclone_missing;
+		case 'busy_capturing':
+			return msgs.fisqua_link_busy_capturing;
+		case 'device_id_invalid':
+			return msgs.fisqua_link_device_id_invalid;
+		case 'script_too_old':
+			return msgs.fisqua_link_script_too_old;
+		case 'script_missing':
+			return msgs.fisqua_link_script_missing;
+		case 'restart_required':
+			return msgs.fisqua_link_restart_required;
+		case 'offsite_job_running':
+			return msgs.fisqua_link_offsite_job_running;
 		case 'device_id_missing':
 		case 'device_id_invalid':
 		case 'device_id_unreadable':
 			return msgs.fisqua_link_device_id_invalid;
-		default: return msgs.fisqua_link_generic;
+		default:
+			return msgs.fisqua_link_generic;
 	}
 }
 
 /** The line for a final state; any state this version does not know gets the generic line. */
 export function pairingFinalText(status: PairingStatus, msgs: Messages): string {
 	switch (status.state) {
-		case 'lapsed': return msgs.fisqua_link_lapsed;
-		case 'lost_answer': return msgs.fisqua_link_lost;
-		case 'unknown': return msgs.fisqua_link_unknown;
-		case 'not_eligible': return pairingRefusalText(status.reason, msgs);
-		case 'script_missing': return msgs.fisqua_link_script_missing;
-		case 'script_too_old': return msgs.fisqua_link_script_too_old;
-		case 'cannot_pair': return msgs.fisqua_link_cannot_pair;
-		case 'wrong_environment': return msgs.fisqua_link_wrong_env;
+		case 'lapsed':
+			return msgs.fisqua_link_lapsed;
+		case 'lost_answer':
+			return msgs.fisqua_link_lost;
+		case 'unknown':
+			return msgs.fisqua_link_unknown;
+		case 'not_eligible':
+			return pairingRefusalText(status.reason, msgs);
+		case 'script_missing':
+			return msgs.fisqua_link_script_missing;
+		case 'script_too_old':
+			return msgs.fisqua_link_script_too_old;
+		case 'cannot_pair':
+			return msgs.fisqua_link_cannot_pair;
+		case 'wrong_environment':
+			return msgs.fisqua_link_wrong_env;
 		case 'other_workspace':
 			return msgs.fisqua_link_other_workspace(status.linked.tenant ?? status.currentTenant);
-		case 'bad_payload': return msgs.fisqua_link_bad_payload;
+		case 'bad_payload':
+			return msgs.fisqua_link_bad_payload;
 		case 'apply_failed':
 			if (status.reason === 'uploads_still_running') return msgs.fisqua_link_uploads_still_running;
-			if (status.reason === 'offsite_jobs_still_running') return msgs.fisqua_link_offsite_jobs_still_running;
+			if (status.reason === 'offsite_jobs_still_running')
+				return msgs.fisqua_link_offsite_jobs_still_running;
 			if (status.reason === 'prepare_failed') return msgs.fisqua_link_prepare_failed;
 			if (status.reason === 'shutting_down') return msgs.fisqua_link_shutting_down;
 			return msgs.fisqua_link_failed;
-		case 'apply_unverified': return msgs.fisqua_link_unverified;
-		case 'settings_overridden': return msgs.fisqua_link_overridden;
-		default: return msgs.fisqua_link_generic;
+		case 'apply_unverified':
+			return msgs.fisqua_link_unverified;
+		case 'settings_overridden':
+			return msgs.fisqua_link_overridden;
+		default:
+			return msgs.fisqua_link_generic;
 	}
 }
 
@@ -311,9 +335,12 @@ export function pairingFinalText(status: PairingStatus, msgs: Messages): string 
 export function pairingOutcomeText(status: PairingStatus, msgs: Messages): string | null {
 	const outcome = status.lastOutcome;
 	if (!outcome || outcome === 'cancelled' || outcome === 'ended') return null;
-	if (outcome === 'restarting' || outcome === 'restart_needed') return msgs.fisqua_link_last_outcome(msgs.fisqua_link_restart_manual);
+	if (outcome === 'restarting' || outcome === 'restart_needed')
+		return msgs.fisqua_link_last_outcome(msgs.fisqua_link_restart_manual);
 	const reason = status.state === outcome ? status.reason : null;
-	return msgs.fisqua_link_last_outcome(pairingFinalText({ ...status, state: outcome, reason }, msgs));
+	return msgs.fisqua_link_last_outcome(
+		pairingFinalText({ ...status, state: outcome, reason }, msgs)
+	);
 }
 
 /** The line while Captua waits to ask Fisqua again (`trouble`); null when there is no trouble. */

@@ -81,9 +81,19 @@
 
 {#if open && action}
 	<div class="kept-backdrop" use:toBody use:dismissible={{ onDismiss: close }}>
-		<div class="kept-card" role="dialog" aria-modal="true" aria-labelledby="kept-title" aria-describedby="kept-desc">
-			<h3 class="kept-title" id="kept-title">{action === 'release' ? $m.kept_release_title : $m.kept_keep_title}</h3>
-			<p class="kept-body" id="kept-desc">{action === 'release' ? $m.kept_release_body : $m.kept_keep_body}</p>
+		<div
+			class="kept-card"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="kept-title"
+			aria-describedby="kept-desc"
+		>
+			<h3 class="kept-title" id="kept-title">
+				{action === 'release' ? $m.kept_release_title : $m.kept_keep_title}
+			</h3>
+			<p class="kept-body" id="kept-desc">
+				{action === 'release' ? $m.kept_release_body : $m.kept_keep_body}
+			</p>
 			<!-- The page does not know whether the volume holds others, so this is said either way. -->
 			<p class="kept-body">{action === 'release' ? $m.kept_release_inside : $m.kept_keep_inside}</p>
 			{#if error}
@@ -104,26 +114,57 @@
 {/if}
 
 <style>
-	.kept-btn { min-height: 36px; padding: 0 12px; font-size: var(--text-sm); white-space: nowrap; }
+	.kept-btn {
+		min-height: 36px;
+		padding: 0 12px;
+		font-size: var(--text-sm);
+		white-space: nowrap;
+	}
 	.kept-backdrop {
-		position: fixed; inset: 0;
+		position: fixed;
+		inset: 0;
 		background-color: rgba(0, 0, 0, 0.65);
 		backdrop-filter: blur(4px);
-		display: flex; align-items: center; justify-content: center;
-		z-index: 100; padding: 24px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 100;
+		padding: 24px;
 	}
 	.kept-card {
 		background-color: var(--color-surface-alt);
 		border: 1px solid var(--border-color);
 		border-radius: var(--radius-xl);
 		padding: 28px;
-		width: 100%; max-width: 440px;
+		width: 100%;
+		max-width: 440px;
 		box-shadow: var(--shadow-lg);
-		display: flex; flex-direction: column; gap: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
-	.kept-title { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--color-light); margin: 0; }
-	.kept-body { font-size: var(--text-sm); color: var(--color-light-grey); line-height: 1.6; margin: 0; }
-	.kept-error { color: var(--color-error); }
-	.kept-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
-	.kept-actions :global(.btn) { flex: 1; }
+	.kept-title {
+		font-size: var(--text-h3);
+		font-weight: var(--fw-bold);
+		color: var(--color-light);
+		margin: 0;
+	}
+	.kept-body {
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		line-height: 1.6;
+		margin: 0;
+	}
+	.kept-error {
+		color: var(--color-error);
+	}
+	.kept-actions {
+		display: flex;
+		gap: 12px;
+		padding-top: 12px;
+		border-top: 1px solid var(--border-color);
+	}
+	.kept-actions :global(.btn) {
+		flex: 1;
+	}
 </style>

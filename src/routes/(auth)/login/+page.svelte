@@ -117,9 +117,7 @@
 				// how long in Retry-After (seconds).
 				const minutes = lockoutMinutes(retryAfterOf(error));
 				errorMessage =
-					minutes === null
-						? $m.login_error_locked_out_unknown
-						: $m.login_error_locked_out(minutes);
+					minutes === null ? $m.login_error_locked_out_unknown : $m.login_error_locked_out(minutes);
 			} else {
 				errorMessage = $m.login_error_backend_unavailable;
 				// Keep the footer's connection dot consistent with the message.
@@ -487,7 +485,6 @@
 		gap: 8px;
 	}
 
-
 	.forgot-link {
 		background: none;
 		border: none;
@@ -518,8 +515,14 @@
 		font-size: var(--text-sm);
 		line-height: 1.4;
 	}
-	.notice-title { margin: 0 0 4px; font-weight: var(--fw-bold); }
-	.notice-text { margin: 0; color: var(--color-light-grey); }
+	.notice-title {
+		margin: 0 0 4px;
+		font-weight: var(--fw-bold);
+	}
+	.notice-text {
+		margin: 0;
+		color: var(--color-light-grey);
+	}
 
 	.alert {
 		display: flex;

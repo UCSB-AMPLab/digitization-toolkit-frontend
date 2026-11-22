@@ -27,20 +27,37 @@ import '../../app.css';
 import LivePreview from './+page.svelte';
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function serve(mode: string, projectsShown: boolean) {
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/system/unit')) {
-			return json({ mode, projectsEnabled: projectsShown, projectsShown, defaultProjectId: 2, prerequisites: { backup: [], fisqua: [] } });
+			return json({
+				mode,
+				projectsEnabled: projectsShown,
+				projectsShown,
+				defaultProjectId: 2,
+				prerequisites: { backup: [], fisqua: [] }
+			});
 		}
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 17', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: null, custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 17',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: null,
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
-		if (path.endsWith('/records/to-retake/summary')) return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
+		if (path.endsWith('/records/to-retake/summary'))
+			return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
 		return json([]);
 	});
 }
@@ -65,7 +82,9 @@ describe('capture screen: the needs-stem banner and the unit mode', () => {
 		signIn('operator');
 		serve('fisqua', false);
 		const screen = render(LivePreview);
-		await expect.poll(() => banner(screen.container)?.textContent ?? '').toContain(es.pd_fisqua_codes_readonly);
+		await expect
+			.poll(() => banner(screen.container)?.textContent ?? '')
+			.toContain(es.pd_fisqua_codes_readonly);
 		expect(banner(screen.container)!.querySelector('a')).toBeNull();
 	});
 
@@ -73,7 +92,9 @@ describe('capture screen: the needs-stem banner and the unit mode', () => {
 		signIn('admin');
 		serve('fisqua', false);
 		const screen = render(LivePreview);
-		await expect.poll(() => banner(screen.container)?.querySelector('a')?.getAttribute('href')).toBe('/dashboard/volumes?editVolume=9');
+		await expect
+			.poll(() => banner(screen.container)?.querySelector('a')?.getAttribute('href'))
+			.toBe('/dashboard/volumes?editVolume=9');
 		expect(banner(screen.container)!.textContent).not.toContain(es.pd_fisqua_codes_readonly);
 	});
 
@@ -81,8 +102,15 @@ describe('capture screen: the needs-stem banner and the unit mode', () => {
 		signIn('operator');
 		serve('backup', false);
 		const screen = render(LivePreview);
-		await expect.poll(() => screen.container.querySelector('.bc-collection')?.textContent ?? '').toContain('Tomo 17');
-		await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/system\/unit$/), expect.anything()));
+		await expect
+			.poll(() => screen.container.querySelector('.bc-collection')?.textContent ?? '')
+			.toContain('Tomo 17');
+		await vi.waitFor(() =>
+			expect(globalThis.fetch).toHaveBeenCalledWith(
+				expect.stringMatching(/\/system\/unit$/),
+				expect.anything()
+			)
+		);
 		await expect.poll(() => screen.container.querySelector('.bc-project')).toBeNull();
 		expect(screen.container.textContent).not.toContain('AHR');
 	});
@@ -91,13 +119,17 @@ describe('capture screen: the needs-stem banner and the unit mode', () => {
 		signIn('operator');
 		serve('offline', true);
 		const screen = render(LivePreview);
-		await expect.poll(() => screen.container.querySelector('.bc-project')?.textContent?.trim()).toBe('AHR');
+		await expect
+			.poll(() => screen.container.querySelector('.bc-project')?.textContent?.trim())
+			.toBe('AHR');
 	});
 
 	it('links to the project page while projects are shown', async () => {
 		signIn('operator');
 		serve('offline', true);
 		const screen = render(LivePreview);
-		await expect.poll(() => banner(screen.container)?.querySelector('a')?.getAttribute('href')).toBe('/dashboard/projects/2?editVolume=9');
+		await expect
+			.poll(() => banner(screen.container)?.querySelector('a')?.getAttribute('href'))
+			.toBe('/dashboard/projects/2?editVolume=9');
 	});
 });

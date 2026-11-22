@@ -25,7 +25,10 @@ const unit = {
 };
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 beforeEach(() => {
@@ -44,7 +47,9 @@ describe('systemApi.unit and setUnit', () => {
 	});
 
 	it('sends PUT /system/unit with only the fields given', async () => {
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ ...unit, mode: 'offline' }));
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(json({ ...unit, mode: 'offline' }));
 		await systemApi.setUnit({ mode: 'offline', projectsEnabled: true });
 		const [url, init] = fetchSpy.mock.calls[0];
 		expect(String(url)).toMatch(/\/system\/unit$/);
@@ -55,7 +60,10 @@ describe('systemApi.unit and setUnit', () => {
 
 describe('a 403 with a structured detail', () => {
 	it('is an AuthError that keeps the detail and a readable message', async () => {
-		const detail = { code: 'volumes_from_fisqua', message: "In Fisqua mode, volumes come from Fisqua's queue." };
+		const detail = {
+			code: 'volumes_from_fisqua',
+			message: "In Fisqua mode, volumes come from Fisqua's queue."
+		};
 		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ detail }, 403));
 		const error = await collectionsApi.create({ name: 'Tomo 1' }).catch((e) => e);
 		expect(error).toBeInstanceOf(AuthError);
@@ -78,7 +86,9 @@ describe('a 403 with a structured detail', () => {
 describe('a 401 (regression)', () => {
 	it('still ends the session and goes to /login, structured detail or not', async () => {
 		gotoMock.mockClear();
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ detail: { code: 'x', message: 'Not authenticated' } }, 401));
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			json({ detail: { code: 'x', message: 'Not authenticated' } }, 401)
+		);
 		const error = await collectionsApi.create({ name: 'Tomo 1' }).catch((e) => e);
 		expect(error).toBeInstanceOf(AuthError);
 		expect(error.status).toBe(401);
@@ -133,7 +143,9 @@ describe('the unit store', () => {
 
 	it('drops a first read still in flight when the session changes, and reads again for the new one', async () => {
 		let answer!: (v: unknown) => void;
-		const spy = vi.spyOn(systemApi, 'unit').mockReturnValueOnce(new Promise((r) => (answer = r)) as never);
+		const spy = vi
+			.spyOn(systemApi, 'unit')
+			.mockReturnValueOnce(new Promise((r) => (answer = r)) as never);
 		const first = ensureUnit();
 		await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
 		authStore.clearSession();
@@ -155,7 +167,9 @@ describe('the unit store', () => {
 	});
 
 	it('takes a PUT answer as read for this session', async () => {
-		const spy = vi.spyOn(systemApi, 'unit').mockResolvedValue({ ...unit, mode: 'offline' } as never);
+		const spy = vi
+			.spyOn(systemApi, 'unit')
+			.mockResolvedValue({ ...unit, mode: 'offline' } as never);
 		keepUnitState(unit);
 		expect((await ensureUnit())?.mode).toBe('backup');
 		expect(spy).not.toHaveBeenCalled();

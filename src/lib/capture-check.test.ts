@@ -67,7 +67,9 @@ describe('appearedRecord', () => {
 		expect(appearedRecord(snapshot, [...before, rec(3, [30])])).toEqual(rec(3, [30]));
 		expect(appearedRecord(snapshot, [...before, rec(3, [30, 31])])).toEqual(rec(3, [30, 31]));
 		// Inserted before others (afterRecordId): its place in the list does not matter.
-		expect(appearedRecord(snapshot, [before[0], rec(3, [30, 31]), before[1]])).toEqual(rec(3, [30, 31]));
+		expect(appearedRecord(snapshot, [before[0], rec(3, [30, 31]), before[1]])).toEqual(
+			rec(3, [30, 31])
+		);
 	});
 
 	it('a new record without images is not a capture (a placeholder for a missing opening)', () => {
@@ -128,8 +130,10 @@ describe('checkForCapture', () => {
 	});
 
 	const before = [rec(1, [10])];
-	const start = (read: () => Promise<readonly RecordLike[] | null>, signal = new AbortController().signal) =>
-		checkForCapture({ before: captureBefore(before), read, signal });
+	const start = (
+		read: () => Promise<readonly RecordLike[] | null>,
+		signal = new AbortController().signal
+	) => checkForCapture({ before: captureBefore(before), read, signal });
 
 	it('the window is 180 s from the start of the check, read every 5 s', () => {
 		expect(CHECK_WINDOW_MS).toBe(180_000);
@@ -224,7 +228,8 @@ describe('checkForCapture', () => {
 		let calls = 0;
 		const read = vi.fn(() => {
 			calls++;
-			if (calls === CHECK_WINDOW_MS / CHECK_INTERVAL_MS) return new Promise<readonly RecordLike[]>((r) => (answer = r));
+			if (calls === CHECK_WINDOW_MS / CHECK_INTERVAL_MS)
+				return new Promise<readonly RecordLike[]>((r) => (answer = r));
 			return Promise.resolve(before);
 		});
 		let settled: unknown = null;
@@ -259,7 +264,9 @@ describe('createKnownRecords: what the screen knows the server holds', () => {
 		const before = known.snapshot();
 		// The first read that holds A is not capture B.
 		expect(appearedRecord(before, [rec(1, [10]), rec(2, [20, 21])])).toBeNull();
-		expect(appearedRecord(before, [rec(1, [10]), rec(2, [20, 21]), rec(3, [30])])).toEqual(rec(3, [30]));
+		expect(appearedRecord(before, [rec(1, [10]), rec(2, [20, 21]), rec(3, [30])])).toEqual(
+			rec(3, [30])
+		);
 	});
 
 	it('a retake answer confirms its new images: the next retake of the record counts only newer ones', () => {
@@ -394,7 +401,9 @@ describe("runPageCapture: the page's capture refuses on its own (NEH-381)", () =
 				return { success: true, record_id: 1, image_ids: [11] };
 			})
 		});
-		await expect(outcome).resolves.toEqual({ result: { success: true, record_id: 1, image_ids: [11] } });
+		await expect(outcome).resolves.toEqual({
+			result: { success: true, record_id: 1, image_ids: [11] }
+		});
 		expect(d.gate.isBusy()).toBe(false);
 		expect(appearedRecord(d.known.snapshot(1), [rec(1, [11])])).toBeNull();
 	});

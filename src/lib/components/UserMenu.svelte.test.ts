@@ -38,8 +38,12 @@ describe('UserMenu power entries', () => {
 		it(`offers shutdown and restart to the ${role} role`, async () => {
 			signIn(role);
 			const screen = await openMenu();
-			await expect.element(screen.getByRole('menuitem', { name: 'Apagar el equipo' })).toBeInTheDocument();
-			await expect.element(screen.getByRole('menuitem', { name: 'Reiniciar el equipo' })).toBeInTheDocument();
+			await expect
+				.element(screen.getByRole('menuitem', { name: 'Apagar el equipo' }))
+				.toBeInTheDocument();
+			await expect
+				.element(screen.getByRole('menuitem', { name: 'Reiniciar el equipo' }))
+				.toBeInTheDocument();
 		});
 	}
 
@@ -84,7 +88,9 @@ describe('UserMenu sign-out', () => {
 
 	it('posts /auth/logout with the CSRF header and clears the local user', async () => {
 		signIn('operator');
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(new Response(null, { status: 204 }));
 		const screen = render(UserMenu, { label: 'Usuario actual' });
 		await screen.getByRole('button', { name: 'Usuario actual' }).click();
 		await screen.getByRole('menuitem', { name: 'Salir' }).click();

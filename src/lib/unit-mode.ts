@@ -69,7 +69,12 @@ function keptList(value: unknown): KeptVolume[] {
 export function readUnitState(data: unknown): UnitState | null {
 	if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
 	const d = data as { [k: string]: unknown };
-	if (!isMode(d.mode) || typeof d.projectsEnabled !== 'boolean' || typeof d.projectsShown !== 'boolean') return null;
+	if (
+		!isMode(d.mode) ||
+		typeof d.projectsEnabled !== 'boolean' ||
+		typeof d.projectsShown !== 'boolean'
+	)
+		return null;
 	const pre = (d.prerequisites ?? {}) as { backup?: unknown; fisqua?: unknown };
 	return {
 		mode: d.mode,
@@ -86,7 +91,13 @@ export function readUnitState(data: unknown): UnitState | null {
  * volumes (NEH-320): leaving Scanner only mode while Captua keeps any.
  */
 export function keptDecisionNeeded(state: UnitState | null, target: UnitMode | null): boolean {
-	return !!state && state.mode === 'offline' && target !== null && target !== 'offline' && state.keptVolumes.length > 0;
+	return (
+		!!state &&
+		state.mode === 'offline' &&
+		target !== null &&
+		target !== 'offline' &&
+		state.keptVolumes.length > 0
+	);
 }
 
 /**
@@ -99,9 +110,11 @@ export function unitChangeBody(
 	projectsEnabled: boolean,
 	kept: KeptVolumesDecision | null = null
 ): { mode?: UnitMode; projectsEnabled?: boolean; keptVolumes?: KeptVolumesDecision } {
-	const body: { mode?: UnitMode; projectsEnabled?: boolean; keptVolumes?: KeptVolumesDecision } = {};
+	const body: { mode?: UnitMode; projectsEnabled?: boolean; keptVolumes?: KeptVolumesDecision } =
+		{};
 	if (selected !== state.mode) body.mode = selected;
-	if (selected === 'offline' && projectsEnabled !== state.projectsEnabled) body.projectsEnabled = projectsEnabled;
+	if (selected === 'offline' && projectsEnabled !== state.projectsEnabled)
+		body.projectsEnabled = projectsEnabled;
 	if (kept && keptDecisionNeeded(state, selected)) body.keptVolumes = kept;
 	return body;
 }
@@ -214,20 +227,30 @@ export function modeRefusal(error: unknown): string[] | null {
 	if (e.status !== 409 || typeof e.detail !== 'object' || e.detail === null) return null;
 	const problems = (e.detail as { problems?: unknown }).problems;
 	if (!Array.isArray(problems)) return null;
-	return problems.map((p) => (p && typeof p === 'object' && typeof p.code === 'string' ? p.code : ''));
+	return problems.map((p) =>
+		p && typeof p === 'object' && typeof p.code === 'string' ? p.code : ''
+	);
 }
 
 /** One translated line per problem code; the backend's English is never shown. */
 export function unitProblemText(code: string, msgs: Messages): string {
 	switch (code) {
-		case 'offsite_not_configured': return msgs.unit_problem_offsite_not_configured;
-		case 'catalogue_dump_not_configured': return msgs.unit_problem_catalogue_dump_not_configured;
-		case 'fisqua_not_configured': return msgs.unit_problem_fisqua_not_configured;
-		case 'fisqua_unreachable': return msgs.unit_problem_fisqua_unreachable;
-		case 'offsite_held': return msgs.unit_problem_offsite_held;
-		case 'mode_changed': return msgs.unit_problem_mode_changed;
-		case 'kept_volumes_decision': return msgs.unit_problem_kept_volumes_decision;
-		default: return msgs.unit_problem_other;
+		case 'offsite_not_configured':
+			return msgs.unit_problem_offsite_not_configured;
+		case 'catalogue_dump_not_configured':
+			return msgs.unit_problem_catalogue_dump_not_configured;
+		case 'fisqua_not_configured':
+			return msgs.unit_problem_fisqua_not_configured;
+		case 'fisqua_unreachable':
+			return msgs.unit_problem_fisqua_unreachable;
+		case 'offsite_held':
+			return msgs.unit_problem_offsite_held;
+		case 'mode_changed':
+			return msgs.unit_problem_mode_changed;
+		case 'kept_volumes_decision':
+			return msgs.unit_problem_kept_volumes_decision;
+		default:
+			return msgs.unit_problem_other;
 	}
 }
 
@@ -240,7 +263,10 @@ function fisquaOperator(role: string | null | undefined, state: UnitState | null
 }
 
 /** New volume: admin and operator, but no operator in Fisqua mode; the testing account in every mode. */
-export function canCreateVolumes(role: string | null | undefined, state: UnitState | null): boolean {
+export function canCreateVolumes(
+	role: string | null | undefined,
+	state: UnitState | null
+): boolean {
 	if (inTestingSpace(role)) return true;
 	return (role === 'admin' || role === 'operator') && !fisquaOperator(role, state);
 }
@@ -407,7 +433,10 @@ export function opensUnitSettings(role: string | null | undefined): boolean {
 }
 
 /** The stem and reference code read-only in the volume form: an operator in Fisqua mode. */
-export function volumeCodesReadOnly(role: string | null | undefined, state: UnitState | null): boolean {
+export function volumeCodesReadOnly(
+	role: string | null | undefined,
+	state: UnitState | null
+): boolean {
 	return fisquaOperator(role, state);
 }
 
@@ -420,10 +449,15 @@ export function projectsShownIn(state: UnitState | null): boolean {
  * Where a project page goes while projects are hidden: Volúmenes, carrying
  * `?editVolume=`; null while they are shown or the state is not known.
  */
-export function hiddenProjectRedirect(state: UnitState | null, editVolume: string | null): string | null {
+export function hiddenProjectRedirect(
+	state: UnitState | null,
+	editVolume: string | null
+): string | null {
 	if (projectsShownIn(state)) return null;
 	const id = Number(editVolume);
-	return Number.isInteger(id) && id > 0 ? `/dashboard/volumes?editVolume=${id}` : '/dashboard/volumes';
+	return Number.isInteger(id) && id > 0
+		? `/dashboard/volumes?editVolume=${id}`
+		: '/dashboard/volumes';
 }
 
 /**

@@ -18,13 +18,21 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import { authStore, type AuthUser } from '$lib/stores/auth';
 import Layout from './+layout.svelte';
 
-const user: AuthUser = { id: 1, username: 'operator1', email: null, role: 'operator', is_active: true };
+const user: AuthUser = {
+	id: 1,
+	username: 'operator1',
+	email: null,
+	role: 'operator',
+	is_active: true
+};
 
 const children = createRawSnippet(() => ({ render: () => '<p>capture screen</p>' }));
 
 function refreshCalls(spy: MockInstance<typeof fetch>) {
 	return spy.mock.calls.filter(([url, init]) => {
-		return String(url).endsWith('/auth/refresh') && (init as RequestInit | undefined)?.method === 'POST';
+		return (
+			String(url).endsWith('/auth/refresh') && (init as RequestInit | undefined)?.method === 'POST'
+		);
 	});
 }
 

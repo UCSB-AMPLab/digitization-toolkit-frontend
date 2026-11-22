@@ -39,7 +39,14 @@
 	import CatalogueBackupIndicator from '$lib/components/CatalogueBackupIndicator.svelte';
 	import AccountMenu from '$lib/components/AccountMenu.svelte';
 	import NetworkIndicator from './dashboard/config/NetworkIndicator.svelte';
-	import { canManageOffsite, ensureUnit, inTestingSpace, projectsShownIn, takesPartInWorkflow, unitState } from '$lib/unit-mode';
+	import {
+		canManageOffsite,
+		ensureUnit,
+		inTestingSpace,
+		projectsShownIn,
+		takesPartInWorkflow,
+		unitState
+	} from '$lib/unit-mode';
 	import TestingBadge from '$lib/components/TestingBadge.svelte';
 
 	let { children } = $props();
@@ -236,7 +243,9 @@
 			...section,
 			items: section.items
 				.filter((item) => item.roles.length === 0 || item.roles.includes(currentUser?.role ?? ''))
-				.filter((item) => (item.id === 'projects' ? showProjects : item.id === 'volumes' ? !showProjects : true))
+				.filter((item) =>
+					item.id === 'projects' ? showProjects : item.id === 'volumes' ? !showProjects : true
+				)
 				.map((item) => (item.id === 'retakes' ? { ...item, badge: retakeCount } : item))
 		})).filter((section) => section.items.length > 0)
 	);
@@ -298,176 +307,180 @@
 		{/if}
 	</div>
 {:else}
-<div class="shell">
-	<!-- ══════════════════════ SIDEBAR ══════════════════════ -->
-	<aside class="sidebar" class:expanded>
-		<div class="s-header">
-			<!-- The seedling and wordmark when expanded, the seedling alone when
+	<div class="shell">
+		<!-- ══════════════════════ SIDEBAR ══════════════════════ -->
+		<aside class="sidebar" class:expanded>
+			<div class="s-header">
+				<!-- The seedling and wordmark when expanded, the seedling alone when
 			     collapsed. Thick ink: the seedling is drawn at about 40px. -->
-			<div class="logo-wrap">
-				{#if expanded}
-					<CaptuaLogo class="sidebar-lockup" />
-				{:else}
-					<CaptuaLogo wordmark="none" class="sidebar-mark" />
-				{/if}
+				<div class="logo-wrap">
+					{#if expanded}
+						<CaptuaLogo class="sidebar-lockup" />
+					{:else}
+						<CaptuaLogo wordmark="none" class="sidebar-mark" />
+					{/if}
+				</div>
+
+				<button
+					class="collapse-btn"
+					onclick={() => (expanded = !expanded)}
+					aria-label={expanded ? $m.nav_collapse_sidebar : $m.nav_expand_sidebar}
+				>
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						style="transform: rotate({expanded ? 0 : 180}deg); transition: transform 0.3s ease"
+					>
+						<polyline points="15 18 9 12 15 6" />
+					</svg>
+				</button>
 			</div>
 
-			<button
-				class="collapse-btn"
-				onclick={() => (expanded = !expanded)}
-				aria-label={expanded ? $m.nav_collapse_sidebar : $m.nav_expand_sidebar}
-			>
-				<svg
-					width="14"
-					height="14"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					style="transform: rotate({expanded ? 0 : 180}deg); transition: transform 0.3s ease"
-				>
-					<polyline points="15 18 9 12 15 6" />
-				</svg>
-			</button>
-		</div>
+			<nav class="s-nav">
+				{#each visibleNav as section}
+					{#if expanded}
+						<p class="s-section-title">{$m[section.sectionKey]}</p>
+					{:else}
+						<div style="height:8px"></div>
+					{/if}
 
-		<nav class="s-nav">
-			{#each visibleNav as section}
-				{#if expanded}
-					<p class="s-section-title">{$m[section.sectionKey]}</p>
-				{:else}
-					<div style="height:8px"></div>
-				{/if}
-
-				{#each section.items as item}
-					<a
-						href={item.path}
-						class="s-item"
-						class:active={isActive(item.path)}
-						class:is-retake={item.id === 'retakes' && !!item.badge}
-						data-tour={item.id === 'queue' ? 'cola' : undefined}
-						title={!expanded ? $m[item.labelKey] : undefined}
-					>
-						{#if isActive(item.path)}
-							<div class="active-bar"></div>
-						{/if}
-
-						<span class="s-icon" class:active-icon={isActive(item.path)}>
-							{#if item.icon === 'grid'}
-								<svg
-									width="18"
-									height="18"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<rect x="3" y="3" width="7" height="7" />
-									<rect x="14" y="3" width="7" height="7" />
-									<rect x="14" y="14" width="7" height="7" />
-									<rect x="3" y="14" width="7" height="7" />
-								</svg>
-							{:else if item.icon === 'folder'}
-								<svg
-									width="18"
-									height="18"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path
-										d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
-									/>
-								</svg>
-							{:else if item.icon === 'queue'}
-								<svg
-									width="18"
-									height="18"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<line x1="10" y1="6" x2="21" y2="6" />
-									<line x1="10" y1="12" x2="21" y2="12" />
-									<line x1="10" y1="18" x2="21" y2="18" />
-									<path d="M4 6h1v4" />
-									<path d="M4 10h2" />
-									<path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
-								</svg>
-							{:else if item.icon === 'retake'}
-								<svg
-									width="18"
-									height="18"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path d="M3 12a9 9 0 1 0 3-6.7" />
-									<polyline points="3 3 3 9 9 9" />
-								</svg>
-							{:else if item.icon === 'users'}
-								<svg
-									width="18"
-									height="18"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-									<circle cx="9" cy="7" r="4" />
-									<path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-									<path d="M16 3.13a4 4 0 0 1 0 7.75" />
-								</svg>
-							{:else if item.icon === 'settings'}
-								<svg
-									width="18"
-									height="18"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<circle cx="12" cy="12" r="3" />
-									<path
-										d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-									/>
-								</svg>
+					{#each section.items as item}
+						<a
+							href={item.path}
+							class="s-item"
+							class:active={isActive(item.path)}
+							class:is-retake={item.id === 'retakes' && !!item.badge}
+							data-tour={item.id === 'queue' ? 'cola' : undefined}
+							title={!expanded ? $m[item.labelKey] : undefined}
+						>
+							{#if isActive(item.path)}
+								<div class="active-bar"></div>
 							{/if}
-						</span>
 
-						{#if expanded}
-							<span class="s-label">{$m[item.labelKey]}</span>
-							{#if item.badge}
-								<span class="s-badge" class:s-badge-retake={item.id === 'retakes'} aria-hidden={item.id === 'retakes' ? 'true' : undefined}>{item.badge}</span>
+							<span class="s-icon" class:active-icon={isActive(item.path)}>
+								{#if item.icon === 'grid'}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<rect x="3" y="3" width="7" height="7" />
+										<rect x="14" y="3" width="7" height="7" />
+										<rect x="14" y="14" width="7" height="7" />
+										<rect x="3" y="14" width="7" height="7" />
+									</svg>
+								{:else if item.icon === 'folder'}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path
+											d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+										/>
+									</svg>
+								{:else if item.icon === 'queue'}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<line x1="10" y1="6" x2="21" y2="6" />
+										<line x1="10" y1="12" x2="21" y2="12" />
+										<line x1="10" y1="18" x2="21" y2="18" />
+										<path d="M4 6h1v4" />
+										<path d="M4 10h2" />
+										<path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+									</svg>
+								{:else if item.icon === 'retake'}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M3 12a9 9 0 1 0 3-6.7" />
+										<polyline points="3 3 3 9 9 9" />
+									</svg>
+								{:else if item.icon === 'users'}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+										<circle cx="9" cy="7" r="4" />
+										<path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+										<path d="M16 3.13a4 4 0 0 1 0 7.75" />
+									</svg>
+								{:else if item.icon === 'settings'}
+									<svg
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<circle cx="12" cy="12" r="3" />
+										<path
+											d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+										/>
+									</svg>
+								{/if}
+							</span>
+
+							{#if expanded}
+								<span class="s-label">{$m[item.labelKey]}</span>
+								{#if item.badge}
+									<span
+										class="s-badge"
+										class:s-badge-retake={item.id === 'retakes'}
+										aria-hidden={item.id === 'retakes' ? 'true' : undefined}>{item.badge}</span
+									>
+								{/if}
+							{:else if item.badge}
+								<span class="s-badge-dot" class:s-badge-retake={item.id === 'retakes'}></span>
 							{/if}
-						{:else if item.badge}
-							<span class="s-badge-dot" class:s-badge-retake={item.id === 'retakes'}></span>
-						{/if}
-						{#if item.id === 'retakes' && item.badge}
-							<span class="visually-hidden">{$m.nav_retakes_count(item.badge)}</span>
-						{/if}
-					</a>
+							{#if item.id === 'retakes' && item.badge}
+								<span class="visually-hidden">{$m.nav_retakes_count(item.badge)}</span>
+							{/if}
+						</a>
+					{/each}
 				{/each}
-			{/each}
-		</nav>
+			</nav>
 
-		<!-- Status of the catalogue's off-site copy (NEH-266). Visible to every
+			<!-- Status of the catalogue's off-site copy (NEH-266). Visible to every
 		     role but testing, whose backend refuses the status (NEH-391), so
 		     nothing polls for it; it links to Settings only for roles that may
 		     open it. -->
-		{#if takesPartInWorkflow(currentUser?.role)}
-			<CatalogueBackupIndicator
-				{expanded}
-				href={canOpenOffsite ? '/dashboard/config?section=offsite-copy' : null}
-			/>
-		{/if}
+			{#if takesPartInWorkflow(currentUser?.role)}
+				<CatalogueBackupIndicator
+					{expanded}
+					href={canOpenOffsite ? '/dashboard/config?section=offsite-copy' : null}
+				/>
+			{/if}
 
-		<div class="s-footer">
-			<!-- On a tall screen the footer has three rows: Report a problem, the
+			<div class="s-footer">
+				<!-- On a tall screen the footer has three rows: Report a problem, the
 			     network status (NEH-253) and the account menu, which holds Help,
 			     shut down, restart and sign out (NEH-189) and opens upward over
 			     the content area. On a short screen (max-height 520px, as on the
@@ -479,57 +492,61 @@
 			     so they stay stacked. The navigation between header and footer
 			     takes what is left and scrolls, so every item stays reachable
 			     (measured in nav-settings.svelte.test.ts). -->
-			<div class="s-footer-row">
-				<div class="f-bug"><BugReportButton {expanded} /></div>
-				<div class="f-net"><NetworkIndicator {expanded} /></div>
-			</div>
+				<div class="s-footer-row">
+					<div class="f-bug"><BugReportButton {expanded} /></div>
+					<div class="f-net"><NetworkIndicator {expanded} /></div>
+				</div>
 
-			<AccountMenu placement="above-start" fill>
-				{#snippet trigger({ open, toggle })}
-					{#if expanded}
-						<button
-							class="user-row"
-							aria-haspopup="menu"
-							aria-expanded={open}
-							onclick={toggle}
-						>
-							<div class="user-av">{userInitials}</div>
-							<div class="user-text">
-								<span class="user-name">{currentUser?.username ?? '—'}</span>
-								{#if inTestingSpace(currentUser?.role)}
-									<span class="user-role"><TestingBadge /></span>
-								{:else}
-									<span class="user-role">{$roleLabel(currentUser?.role)}</span>
-								{/if}
-							</div>
-							<svg class="user-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-								<polyline points="18 15 12 9 6 15" />
-							</svg>
-						</button>
-					{:else}
-						{#if inTestingSpace(currentUser?.role)}
-							<TestingBadge class="collapsed-testing-badge" />
+				<AccountMenu placement="above-start" fill>
+					{#snippet trigger({ open, toggle })}
+						{#if expanded}
+							<button class="user-row" aria-haspopup="menu" aria-expanded={open} onclick={toggle}>
+								<div class="user-av">{userInitials}</div>
+								<div class="user-text">
+									<span class="user-name">{currentUser?.username ?? '—'}</span>
+									{#if inTestingSpace(currentUser?.role)}
+										<span class="user-role"><TestingBadge /></span>
+									{:else}
+										<span class="user-role">{$roleLabel(currentUser?.role)}</span>
+									{/if}
+								</div>
+								<svg
+									class="user-chevron"
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									aria-hidden="true"
+								>
+									<polyline points="18 15 12 9 6 15" />
+								</svg>
+							</button>
+						{:else}
+							{#if inTestingSpace(currentUser?.role)}
+								<TestingBadge class="collapsed-testing-badge" />
+							{/if}
+							<button
+								class="user-av-sm"
+								aria-haspopup="menu"
+								aria-expanded={open}
+								aria-label={$m.tb_current_user}
+								title={$m.tb_current_user}
+								onclick={toggle}
+							>
+								{userInitials}
+							</button>
 						{/if}
-						<button
-							class="user-av-sm"
-							aria-haspopup="menu"
-							aria-expanded={open}
-							aria-label={$m.tb_current_user}
-							title={$m.tb_current_user}
-							onclick={toggle}
-						>
-							{userInitials}
-						</button>
-					{/if}
-				{/snippet}
-			</AccountMenu>
-		</div>
-	</aside>
+					{/snippet}
+				</AccountMenu>
+			</div>
+		</aside>
 
-	<main class="content">
-		{@render children()}
-	</main>
-</div>
+		<main class="content">
+			{@render children()}
+		</main>
+	</div>
 {/if}
 
 <style>
@@ -777,14 +794,20 @@
 
 	/* Recaptures waiting (0.2.0): sand, with dark text on the badge. */
 	.s-item.is-retake,
-	.s-item.is-retake .s-icon { color: var(--color-highlight); }
-	.s-item.is-retake .s-label { font-weight: var(--fw-bold); }
+	.s-item.is-retake .s-icon {
+		color: var(--color-highlight);
+	}
+	.s-item.is-retake .s-label {
+		font-weight: var(--fw-bold);
+	}
 	.s-badge.s-badge-retake {
 		background-color: var(--color-highlight);
 		color: var(--color-bg);
 		font-weight: var(--fw-extrabold);
 	}
-	.s-badge-dot.s-badge-retake { background-color: var(--color-highlight); }
+	.s-badge-dot.s-badge-retake {
+		background-color: var(--color-highlight);
+	}
 
 	.visually-hidden {
 		position: absolute;
@@ -829,19 +852,36 @@
 		width: 100%;
 	}
 	.f-bug,
-	.f-net { display: flex; width: 100%; min-width: 0; }
+	.f-net {
+		display: flex;
+		width: 100%;
+		min-width: 0;
+	}
 
 	@media (max-height: 520px) {
-		.s-footer-row :global(.bug-btn) { min-height: var(--touch-target-min); }
-		.sidebar.expanded .s-footer-row { flex-direction: row; gap: 6px; }
-		.sidebar.expanded .f-net { order: -1; flex: 1 1 auto; }
-		.sidebar.expanded .f-bug { flex: 0 0 auto; width: auto; }
+		.s-footer-row :global(.bug-btn) {
+			min-height: var(--touch-target-min);
+		}
+		.sidebar.expanded .s-footer-row {
+			flex-direction: row;
+			gap: 6px;
+		}
+		.sidebar.expanded .f-net {
+			order: -1;
+			flex: 1 1 auto;
+		}
+		.sidebar.expanded .f-bug {
+			flex: 0 0 auto;
+			width: auto;
+		}
 		.sidebar.expanded .f-bug :global(.bug-btn) {
 			width: var(--touch-target-min);
 			min-width: var(--touch-target-min);
 			padding: 0;
 		}
-		.sidebar.expanded .f-bug :global(.bug-btn-label) { display: none; }
+		.sidebar.expanded .f-bug :global(.bug-btn-label) {
+			display: none;
+		}
 	}
 
 	/* The user row and the collapsed avatar tile are the account menu's
@@ -861,8 +901,14 @@
 		transition: background-color var(--transition-fast);
 	}
 	.user-row:hover,
-	.user-row[aria-expanded='true'] { background-color: rgba(255, 255, 255, 0.05); }
-	.user-chevron { flex-shrink: 0; margin-left: auto; color: var(--color-light-grey); }
+	.user-row[aria-expanded='true'] {
+		background-color: rgba(255, 255, 255, 0.05);
+	}
+	.user-chevron {
+		flex-shrink: 0;
+		margin-left: auto;
+		color: var(--color-light-grey);
+	}
 
 	.user-av {
 		width: 40px;
@@ -895,7 +941,9 @@
 		cursor: pointer;
 	}
 	.user-av-sm:hover,
-	.user-av-sm[aria-expanded='true'] { background-color: var(--color-primary-hover); }
+	.user-av-sm[aria-expanded='true'] {
+		background-color: var(--color-primary-hover);
+	}
 
 	.user-text {
 		display: flex;

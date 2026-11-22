@@ -9,11 +9,22 @@ import { readable } from 'svelte/store';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/stores', () => ({
-	page: readable({ params: { projectId: '1' }, url: new URL('http://localhost/dashboard/projects/1') })
+	page: readable({
+		params: { projectId: '1' },
+		url: new URL('http://localhost/dashboard/projects/1')
+	})
 }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { activityApi, collectionsApi, projectMembersApi, projectsApi, recordsApi, usersApi, type Project } from '$lib/api';
+import {
+	activityApi,
+	collectionsApi,
+	projectMembersApi,
+	projectsApi,
+	recordsApi,
+	usersApi,
+	type Project
+} from '$lib/api';
 import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
@@ -41,8 +52,16 @@ describe('project page: adding a collaborator', () => {
 	it('offers real users and not the testing account', async () => {
 		const screen = render(ProjectPage);
 		await page.getByRole('button', { name: en.pd_members }).click();
-		await expect.poll(() => [...screen.container.querySelectorAll('.add-member-select option')].map((o) => o.textContent?.trim())).toContain('ana');
-		const options = [...screen.container.querySelectorAll('.add-member-select option')].map((o) => o.textContent?.trim());
+		await expect
+			.poll(() =>
+				[...screen.container.querySelectorAll('.add-member-select option')].map((o) =>
+					o.textContent?.trim()
+				)
+			)
+			.toContain('ana');
+		const options = [...screen.container.querySelectorAll('.add-member-select option')].map((o) =>
+			o.textContent?.trim()
+		);
 		expect(options).not.toContain('unit-testing');
 	});
 });

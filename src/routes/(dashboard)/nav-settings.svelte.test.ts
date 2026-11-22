@@ -36,15 +36,27 @@ const STATUS = {
 	permissions: { scan: true, control: true, modify: true },
 	interfaces: [
 		{
-			device: 'wlan0', type: 'wifi', state: 'connected', connection: 'Archive-Office', mac: 'D8:3A:DD:4F:21:9D',
-			ipv4: ['10.0.4.117/24'], ipv6: [], gateway: '10.0.4.1', dns: ['10.0.4.1'], ssid: 'Archive-Office', signal: 72
+			device: 'wlan0',
+			type: 'wifi',
+			state: 'connected',
+			connection: 'Archive-Office',
+			mac: 'D8:3A:DD:4F:21:9D',
+			ipv4: ['10.0.4.117/24'],
+			ipv6: [],
+			gateway: '10.0.4.1',
+			dns: ['10.0.4.1'],
+			ssid: 'Archive-Office',
+			signal: 72
 		}
 	],
 	problems: []
 };
 
 function json(code: number, body: unknown) {
-	return new Response(JSON.stringify(body), { status: code, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status: code,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function serve(role: UserRole, networkCode = 200) {
@@ -56,7 +68,9 @@ function serve(role: UserRole, networkCode = 200) {
 		calls.push(url);
 		if (url.endsWith('/users/me')) return json(200, user);
 		if (url.endsWith('/network/status')) {
-			return networkCode === 200 ? json(200, STATUS) : json(networkCode, { detail: 'Network settings are not available on this device.' });
+			return networkCode === 200
+				? json(200, STATUS)
+				: json(networkCode, { detail: 'Network settings are not available on this device.' });
 		}
 		return json(500, { detail: 'not in this test' });
 	});
@@ -84,7 +98,9 @@ describe('Settings for every role', () => {
 		it(`the ${role} sees Settings in the sidebar and may open it`, async () => {
 			const { screen } = await mount(role, '/dashboard/config');
 			await expect.element(screen.getByText('protected content')).toBeVisible();
-			await expect.element(screen.getByRole('link', { name: en.nav_settings })).toHaveAttribute('href', '/dashboard/config');
+			await expect
+				.element(screen.getByRole('link', { name: en.nav_settings }))
+				.toHaveAttribute('href', '/dashboard/config');
 			expect(gotoMock).not.toHaveBeenCalledWith('/dashboard');
 		});
 
@@ -121,7 +137,11 @@ describe('Settings for every role', () => {
 	it('the offsite copy indicator links an administrator to its Settings section', async () => {
 		const { screen } = await mount('admin');
 		await expect.element(screen.getByText('protected content')).toBeVisible();
-		await expect.poll(() => screen.container.querySelector('a[href="/dashboard/config?section=offsite-copy"]')).not.toBeNull();
+		await expect
+			.poll(() =>
+				screen.container.querySelector('a[href="/dashboard/config?section=offsite-copy"]')
+			)
+			.not.toBeNull();
 	});
 
 	it('shows no network indicator when the backend answers 501', async () => {
@@ -139,12 +159,22 @@ describe('the sidebar footer at 800x480 and on a tall screen', () => {
 	});
 
 	function within(inner: DOMRect, outer: DOMRect) {
-		return inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5 && inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5;
+		return (
+			inner.top >= outer.top - 0.5 &&
+			inner.bottom <= outer.bottom + 0.5 &&
+			inner.left >= outer.left - 0.5 &&
+			inner.right <= outer.right + 0.5
+		);
 	}
 
 	const TOUCH_MIN = 44; // app.css --touch-target-min
 
-	async function mountAt(width: number, height: number, expanded: boolean, ssid = 'Archive-Office') {
+	async function mountAt(
+		width: number,
+		height: number,
+		expanded: boolean,
+		ssid = 'Archive-Office'
+	) {
 		await page.viewport(width, height);
 		STATUS.interfaces[0].ssid = ssid;
 		STATUS.interfaces[0].connection = ssid;
@@ -153,7 +183,9 @@ describe('the sidebar footer at 800x480 and on a tall screen', () => {
 		await expect.poll(() => screen.container.querySelector('a.net-status')).not.toBeNull();
 		if (!expanded) {
 			await screen.getByRole('button', { name: en.nav_collapse_sidebar }).click();
-			await expect.poll(() => screen.container.querySelector('.sidebar')?.classList.contains('expanded')).toBe(false);
+			await expect
+				.poll(() => screen.container.querySelector('.sidebar')?.classList.contains('expanded'))
+				.toBe(false);
 			// The width transition.
 			await new Promise((r) => setTimeout(r, 400));
 		}
@@ -170,7 +202,11 @@ describe('the sidebar footer at 800x480 and on a tall screen', () => {
 		const bug = sidebar.querySelector('.bug-btn') as HTMLElement;
 		const user = sidebar.querySelector(expanded ? '.user-row' : '.user-av-sm') as HTMLElement;
 		return {
-			sidebar, nav, net, bug, user,
+			sidebar,
+			nav,
+			net,
+			bug,
+			user,
 			sizes: {
 				sidebar: Math.round(sidebar.getBoundingClientRect().height),
 				nav: Math.round(navRect.height),
@@ -220,7 +256,8 @@ describe('the sidebar footer at 800x480 and on a tall screen', () => {
 		// four 45 px items), so three show whole; the nav scrolls.
 		expect(sizes.wholeItems).toBeGreaterThanOrEqual(3);
 		expect(nav.scrollHeight).toBeGreaterThan(nav.clientHeight);
-		for (const child of [...sidebar.children] as HTMLElement[]) expect(within(child.getBoundingClientRect(), sideRect)).toBe(true);
+		for (const child of [...sidebar.children] as HTMLElement[])
+			expect(within(child.getBoundingClientRect(), sideRect)).toBe(true);
 		expect(sideRect.bottom).toBeLessThanOrEqual(480);
 	});
 
@@ -228,20 +265,24 @@ describe('the sidebar footer at 800x480 and on a tall screen', () => {
 		const screen = await mountAt(800, 480, false);
 		const { sidebar, nav, net, bug, user, sizes } = measure(screen.container, false);
 		const sideRect = sidebar.getBoundingClientRect();
-		for (const el of [net, bug, user]) expect(within(el.getBoundingClientRect(), sideRect)).toBe(true);
+		for (const el of [net, bug, user])
+			expect(within(el.getBoundingClientRect(), sideRect)).toBe(true);
 		for (const el of [net, bug]) {
 			const r = el.getBoundingClientRect();
 			expect(r.height).toBeGreaterThanOrEqual(TOUCH_MIN);
 			expect(r.width).toBeGreaterThanOrEqual(TOUCH_MIN);
 		}
-		expect(net.getAttribute('aria-label')).toBe(en.network_ind_label(en.network_ind_connected, 'Archive-Office', 72));
+		expect(net.getAttribute('aria-label')).toBe(
+			en.network_ind_label(en.network_ind_connected, 'Archive-Office', 72)
+		);
 		expect(bug.getAttribute('aria-label')).toBe(en.bug_report_button);
 		expect(['auto', 'scroll']).toContain(getComputedStyle(nav).overflowY);
 		expect(nav.scrollHeight).toBeGreaterThan(nav.clientHeight);
 		// The measured floor at 800x480 collapsed: two 44 px icons do not fit
 		// side by side in the 72 px sidebar, so the footer keeps three rows.
 		expect(sizes.wholeItems).toBeGreaterThanOrEqual(3);
-		for (const child of [...sidebar.children] as HTMLElement[]) expect(within(child.getBoundingClientRect(), sideRect)).toBe(true);
+		for (const child of [...sidebar.children] as HTMLElement[])
+			expect(within(child.getBoundingClientRect(), sideRect)).toBe(true);
 	});
 
 	it('a tall screen keeps the three-row footer: bug report with its label, then the network status, then the user', async () => {
@@ -252,7 +293,9 @@ describe('the sidebar footer at 800x480 and on a tall screen', () => {
 		const userRect = user.getBoundingClientRect();
 		expect(bugRect.bottom).toBeLessThanOrEqual(netRect.top + 0.5);
 		expect(netRect.bottom).toBeLessThanOrEqual(userRect.top + 0.5);
-		expect(screen.container.querySelector('.bug-btn-label')?.getBoundingClientRect().width).toBeGreaterThan(0);
+		expect(
+			screen.container.querySelector('.bug-btn-label')?.getBoundingClientRect().width
+		).toBeGreaterThan(0);
 		expect(Math.round(netRect.width)).toBe(Math.round(bugRect.width));
 	});
 });

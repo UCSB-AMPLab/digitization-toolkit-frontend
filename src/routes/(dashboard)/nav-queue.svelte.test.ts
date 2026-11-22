@@ -28,7 +28,10 @@ import Layout from './+layout.svelte';
 const children = createRawSnippet(() => ({ render: () => '<p>protected content</p>' }));
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 // What the count endpoint answers next: a count, or an error status.
@@ -41,7 +44,9 @@ function signIn(role: UserRole) {
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const url = String(input);
 		if (url.endsWith('/records/to-retake/count')) {
-			return reply.status === 200 ? json({ count: reply.count }) : json({ detail: 'boom' }, reply.status);
+			return reply.status === 200
+				? json({ count: reply.count })
+				: json({ detail: 'boom' }, reply.status);
 		}
 		return json(user);
 	});
@@ -78,8 +83,12 @@ describe('sidebar Cola and Por recapturar', () => {
 			const projects = labels.indexOf('Proyectos');
 			expect(labels[projects + 1]).toBe('Cola');
 			expect(labels).toContain('Por recapturar');
-			await expect.element(screen.getByRole('link', { name: /^Cola/ })).toHaveAttribute('href', '/dashboard/queue');
-			await expect.element(screen.getByRole('link', { name: /^Por recapturar/ })).toHaveAttribute('href', '/dashboard/retakes');
+			await expect
+				.element(screen.getByRole('link', { name: /^Cola/ }))
+				.toHaveAttribute('href', '/dashboard/queue');
+			await expect
+				.element(screen.getByRole('link', { name: /^Por recapturar/ }))
+				.toHaveAttribute('href', '/dashboard/retakes');
 		});
 	}
 
@@ -92,7 +101,8 @@ describe('sidebar Cola and Por recapturar', () => {
 
 	it('draws the Por recapturar badge in sand with dark text (0.2.0)', async () => {
 		const { screen } = await mount('operator', 315);
-		const badge = () => screen.container.querySelector('a[href="/dashboard/retakes"] .s-badge') as HTMLElement | null;
+		const badge = () =>
+			screen.container.querySelector('a[href="/dashboard/retakes"] .s-badge') as HTMLElement | null;
 		await expect.poll(() => badge()?.textContent).toBe('315');
 		const style = getComputedStyle(badge()!);
 		expect(style.backgroundColor).toBe('rgb(225, 183, 120)');
@@ -101,8 +111,10 @@ describe('sidebar Cola and Por recapturar', () => {
 
 	it('reads the count again on each navigation, and drops the badge for 0 or for a failed count', async () => {
 		const { screen, fetchSpy } = await mount('operator', 7);
-		const badge = () => screen.container.querySelector('a[href="/dashboard/retakes"] .s-badge')?.textContent ?? null;
-		const countCalls = () => fetchSpy.mock.calls.filter(([u]) => String(u).endsWith('/records/to-retake/count')).length;
+		const badge = () =>
+			screen.container.querySelector('a[href="/dashboard/retakes"] .s-badge')?.textContent ?? null;
+		const countCalls = () =>
+			fetchSpy.mock.calls.filter(([u]) => String(u).endsWith('/records/to-retake/count')).length;
 		await expect.poll(badge).toBe('7');
 		const first = countCalls();
 

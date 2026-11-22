@@ -57,7 +57,13 @@ function status(over: Partial<PairingStatus> = {}): PairingStatus {
 }
 
 function unit(mode: 'offline' | 'backup' | 'fisqua') {
-	return { mode, projectsEnabled: false, projectsShown: false, defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] } };
+	return {
+		mode,
+		projectsEnabled: false,
+		projectsShown: false,
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
 }
 
 function refused(code: string, status = 409) {
@@ -68,7 +74,10 @@ const getCode = () => page.getByRole('button', { name: es.fisqua_link_start, exa
 const nameInput = () => page.getByRole('textbox', { name: es.fisqua_link_name_label });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function mount(get: PairingStatus | (() => Promise<PairingStatus>), mode: 'offline' | 'backup' | 'fisqua' = 'backup') {
+function mount(
+	get: PairingStatus | (() => Promise<PairingStatus>),
+	mode: 'offline' | 'backup' | 'fisqua' = 'backup'
+) {
 	const getSpy =
 		typeof get === 'function'
 			? vi.spyOn(systemApi, 'getPairing').mockImplementation(get)
@@ -100,12 +109,16 @@ describe('Conectar con Fisqua: before a code', () => {
 
 	it('sends the name and shows the code it gets back', async () => {
 		const { getSpy } = mount(status());
-		const post = vi.spyOn(systemApi, 'startPairing').mockResolvedValue(status({ state: 'requesting', unitName: 'Sala 2' }));
+		const post = vi
+			.spyOn(systemApi, 'startPairing')
+			.mockResolvedValue(status({ state: 'requesting', unitName: 'Sala 2' }));
 		await userEvent.fill(nameInput(), '  Sala 2 ');
 		await userEvent.click(getCode());
 		await vi.waitFor(() => expect(post).toHaveBeenCalledWith('Sala 2'));
 		await expect.element(page.getByText(es.fisqua_link_requesting)).toBeInTheDocument();
-		getSpy.mockResolvedValue(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 290, unitName: 'Sala 2' }));
+		getSpy.mockResolvedValue(
+			status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 290, unitName: 'Sala 2' })
+		);
 		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
 	});
 
@@ -137,21 +150,28 @@ describe('Conectar con Fisqua: before a code', () => {
 		['restart_required', 409, () => es.fisqua_link_restart_required],
 		['offsite_job_running', 409, () => es.fisqua_link_offsite_job_running],
 		['a_code_from_a_newer_backend', 409, () => es.fisqua_link_generic]
-	])('a refused request (%s) shows a translated line, never the backend English', async (code, http, text) => {
-		const { screen } = mount(status());
-		vi.spyOn(systemApi, 'startPairing').mockRejectedValue(refused(code, http));
-		await userEvent.fill(nameInput(), 'Sala 2');
-		await userEvent.click(getCode());
-		await expect.element(page.getByRole('alert').getByText(text())).toBeInTheDocument();
-		expect(screen.container.textContent).not.toContain('English');
-	});
+	])(
+		'a refused request (%s) shows a translated line, never the backend English',
+		async (code, http, text) => {
+			const { screen } = mount(status());
+			vi.spyOn(systemApi, 'startPairing').mockRejectedValue(refused(code, http));
+			await userEvent.fill(nameInput(), 'Sala 2');
+			await userEvent.click(getCode());
+			await expect.element(page.getByRole('alert').getByText(text())).toBeInTheDocument();
+			expect(screen.container.textContent).not.toContain('English');
+		}
+	);
 
 	it('a failed request with no code shows the generic line', async () => {
 		mount(status());
-		vi.spyOn(systemApi, 'startPairing').mockRejectedValue(new ApiError('Internal Server Error', undefined, 500));
+		vi.spyOn(systemApi, 'startPairing').mockRejectedValue(
+			new ApiError('Internal Server Error', undefined, 500)
+		);
 		await userEvent.fill(nameInput(), 'Sala 2');
 		await userEvent.click(getCode());
-		await expect.element(page.getByRole('alert').getByText(es.fisqua_link_generic)).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('alert').getByText(es.fisqua_link_generic))
+			.toBeInTheDocument();
 	});
 
 	it('a unit that cannot be linked now says why and disables Get a code', async () => {
@@ -181,21 +201,36 @@ describe('Conectar con Fisqua: before a code', () => {
 	});
 
 	it('a unit already linked names its workspace and offers Get a code', async () => {
-		mount(status({ currentTenant: 'archivo-x', linked: { configured: true, tenant: 'archivo-x', environment: 'production' } }));
+		mount(
+			status({
+				currentTenant: 'archivo-x',
+				linked: { configured: true, tenant: 'archivo-x', environment: 'production' }
+			})
+		);
 		await expect.element(page.getByText(es.fisqua_link_current('archivo-x'))).toBeInTheDocument();
 		await expect.element(getCode()).toBeEnabled();
 	});
 });
 
 describe('Conectar con Fisqua: the code', () => {
-	const showing = status({ state: 'showing', code: 'abcdef', expiresInSeconds: 290, unitName: 'Sala 2', renewalSecondsLeft: 540 });
+	const showing = status({
+		state: 'showing',
+		code: 'abcdef',
+		expiresInSeconds: 290,
+		unitName: 'Sala 2',
+		renewalSecondsLeft: 540
+	});
 
 	it('shows the code three and three, the seconds left and the device id, labelled', async () => {
 		const { screen } = mount(showing);
 		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
 		await expect.element(page.getByText(es.fisqua_link_expires(290))).toBeInTheDocument();
-		await expect.element(page.getByText(es.fisqua_link_code_label, { exact: true })).toBeInTheDocument();
-		await expect.element(page.getByText(es.fisqua_link_device_label, { exact: true })).toBeInTheDocument();
+		await expect
+			.element(page.getByText(es.fisqua_link_code_label, { exact: true }))
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByText(es.fisqua_link_device_label, { exact: true }))
+			.toBeInTheDocument();
 		await expect.element(page.getByText('k3m9qz7a', { exact: true })).toBeInTheDocument();
 		await expect.element(page.getByText(es.fisqua_link_waiting)).toBeInTheDocument();
 		const code = screen.container.querySelector('[data-pairing-code]');
@@ -204,7 +239,9 @@ describe('Conectar con Fisqua: the code', () => {
 
 	it('Cancel sends DELETE and shows the form again', async () => {
 		const { getSpy } = mount(showing);
-		const del = vi.spyOn(systemApi, 'cancelPairing').mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
+		const del = vi
+			.spyOn(systemApi, 'cancelPairing')
+			.mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
 		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
 		await vi.waitFor(() => expect(del).toHaveBeenCalledTimes(1));
 		getSpy.mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
@@ -216,18 +253,25 @@ describe('Conectar con Fisqua: the code', () => {
 		['lapsed', () => es.fisqua_link_lapsed],
 		['lost_answer', () => es.fisqua_link_lost],
 		['unknown', () => es.fisqua_link_unknown]
-	])('%s offers Get a new code, which renews, and shows the new state at once', async (state, text) => {
-		mount(status({ state, unitName: 'Sala 2' }));
-		const renew = vi.spyOn(systemApi, 'renewPairing').mockResolvedValue(status({ state: 'requesting', unitName: 'Sala 2' }));
-		const start = vi.spyOn(systemApi, 'startPairing');
-		await expect.element(page.getByText(text())).toBeInTheDocument();
-		vi.spyOn(systemApi, 'getPairing').mockImplementation(() => new Promise(() => {}));
-		await userEvent.click(page.getByRole('button', { name: es.fisqua_link_new_code }));
-		await vi.waitFor(() => expect(renew).toHaveBeenCalledTimes(1));
-		await expect.element(page.getByText(es.fisqua_link_requesting)).toBeInTheDocument();
-		expect(start).not.toHaveBeenCalled();
-		expect(page.getByRole('button', { name: es.fisqua_link_start, exact: true }).elements()).toHaveLength(0);
-	});
+	])(
+		'%s offers Get a new code, which renews, and shows the new state at once',
+		async (state, text) => {
+			mount(status({ state, unitName: 'Sala 2' }));
+			const renew = vi
+				.spyOn(systemApi, 'renewPairing')
+				.mockResolvedValue(status({ state: 'requesting', unitName: 'Sala 2' }));
+			const start = vi.spyOn(systemApi, 'startPairing');
+			await expect.element(page.getByText(text())).toBeInTheDocument();
+			vi.spyOn(systemApi, 'getPairing').mockImplementation(() => new Promise(() => {}));
+			await userEvent.click(page.getByRole('button', { name: es.fisqua_link_new_code }));
+			await vi.waitFor(() => expect(renew).toHaveBeenCalledTimes(1));
+			await expect.element(page.getByText(es.fisqua_link_requesting)).toBeInTheDocument();
+			expect(start).not.toHaveBeenCalled();
+			expect(
+				page.getByRole('button', { name: es.fisqua_link_start, exact: true }).elements()
+			).toHaveLength(0);
+		}
+	);
 
 	it('requesting shows that Captua is asking, with Cancel', async () => {
 		mount(status({ state: 'requesting', unitName: 'Sala 2' }));
@@ -239,13 +283,26 @@ describe('Conectar con Fisqua: the code', () => {
 		['busy', () => es.fisqua_link_busy(15)],
 		['network', () => es.fisqua_link_network],
 		['something_new', () => es.fisqua_link_retry(15)]
-	])('trouble %s while the code is shown says why, keeps the code and offers Cancel', async (trouble, text) => {
-		mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, retryAfterSeconds: 15, trouble }));
-		await expect.element(page.getByText(text())).toBeInTheDocument();
-		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
-		expect(page.getByText(es.fisqua_link_waiting).elements()).toHaveLength(0);
-		await expect.element(page.getByRole('button', { name: es.common_cancel })).toBeInTheDocument();
-	});
+	])(
+		'trouble %s while the code is shown says why, keeps the code and offers Cancel',
+		async (trouble, text) => {
+			mount(
+				status({
+					state: 'showing',
+					code: 'ABCDEF',
+					expiresInSeconds: 200,
+					retryAfterSeconds: 15,
+					trouble
+				})
+			);
+			await expect.element(page.getByText(text())).toBeInTheDocument();
+			await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
+			expect(page.getByText(es.fisqua_link_waiting).elements()).toHaveLength(0);
+			await expect
+				.element(page.getByRole('button', { name: es.common_cancel }))
+				.toBeInTheDocument();
+		}
+	);
 
 	it('trouble before the first code says why while Captua asks', async () => {
 		mount(status({ state: 'requesting', retryAfterSeconds: 10, trouble: 'network' }));
@@ -255,7 +312,9 @@ describe('Conectar con Fisqua: the code', () => {
 
 	it('Cancel shows the answer of DELETE at once', async () => {
 		mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' }));
-		vi.spyOn(systemApi, 'cancelPairing').mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
+		vi.spyOn(systemApi, 'cancelPairing').mockResolvedValue(
+			status({ state: 'cancelled', unitName: 'Sala 2' })
+		);
 		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
 		vi.spyOn(systemApi, 'getPairing').mockImplementation(() => new Promise(() => {}));
 		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
@@ -286,12 +345,15 @@ describe('Conectar con Fisqua: after approval', () => {
 		['offsite_jobs_still_running', () => es.fisqua_link_offsite_jobs_still_running],
 		['prepare_failed', () => es.fisqua_link_prepare_failed],
 		['shutting_down', () => es.fisqua_link_shutting_down]
-	])('apply_failed (%s) shows its line and lets the admin get a code again', async (reason, text) => {
-		mount(status({ state: 'apply_failed', reason, unitName: 'Sala 2' }));
-		await expect.element(page.getByText(text())).toBeInTheDocument();
-		expect(page.getByText(es.fisqua_link_failed).elements()).toHaveLength(0);
-		await expect.element(getCode()).toBeEnabled();
-	});
+	])(
+		'apply_failed (%s) shows its line and lets the admin get a code again',
+		async (reason, text) => {
+			mount(status({ state: 'apply_failed', reason, unitName: 'Sala 2' }));
+			await expect.element(page.getByText(text())).toBeInTheDocument();
+			expect(page.getByText(es.fisqua_link_failed).elements()).toHaveLength(0);
+			await expect.element(getCode()).toBeEnabled();
+		}
+	);
 
 	it('applying while the link is written shows the linking line', async () => {
 		mount(status({ state: 'applying', reason: 'writing_link' }));
@@ -303,7 +365,9 @@ describe('Conectar con Fisqua: after approval', () => {
 		await expect.element(page.getByText(es.fisqua_link_uploads_still_running)).toBeInTheDocument();
 		expect(page.getByText(es.fisqua_link_failed).elements()).toHaveLength(0);
 		await userEvent.click(page.getByRole('button', { name: es.fisqua_link_restart_btn }));
-		await expect.element(page.getByRole('dialog').getByText(es.config_confirm_reboot_title)).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('dialog').getByText(es.config_confirm_reboot_title))
+			.toBeInTheDocument();
 		await userEvent.click(page.getByRole('dialog').getByRole('button', { name: es.common_cancel }));
 	});
 
@@ -318,7 +382,12 @@ describe('Conectar con Fisqua: after approval', () => {
 			state: 'idle',
 			currentTenant: 'archivo-x',
 			linked: { configured: true, tenant: 'archivo-x', environment: 'production' },
-			result: { tenant: 'archivo-x', environment: 'production', at: '2026-11-13T10:00:00Z', by: 'admin1' }
+			result: {
+				tenant: 'archivo-x',
+				environment: 'production',
+				at: '2026-11-13T10:00:00Z',
+				by: 'admin1'
+			}
 		});
 		const { getSpy, screen } = mount(async () => {
 			if (phase === 'restarting') return status({ state: 'restarting' });
@@ -333,7 +402,9 @@ describe('Conectar con Fisqua: after approval', () => {
 		expect(screen.container.querySelector('[role="alert"]')).toBeNull();
 		expect(screen.container.textContent).not.toContain(es.fisqua_link_err_read);
 		phase = 'back';
-		await expect.element(page.getByText(es.fisqua_link_linked('archivo-x', false))).toBeInTheDocument();
+		await expect
+			.element(page.getByText(es.fisqua_link_linked('archivo-x', false)))
+			.toBeInTheDocument();
 	});
 
 	it('a GET failing after applying shows the restart too', async () => {
@@ -356,14 +427,21 @@ describe('Conectar con Fisqua: after approval', () => {
 				state: 'idle',
 				currentTenant: 'archivo-x',
 				linked: { configured: true, tenant: 'archivo-x', environment: 'staging' },
-				result: { tenant: 'archivo-x', environment: 'staging', at: '2026-11-13T10:00:00Z', by: 'admin1' }
+				result: {
+					tenant: 'archivo-x',
+					environment: 'staging',
+					at: '2026-11-13T10:00:00Z',
+					by: 'admin1'
+				}
 			});
 		}, 'fisqua');
 		await expect.element(page.getByText(es.fisqua_link_restarting)).toBeInTheDocument();
 		phase = 'down';
 		await sleep(POLL * 4);
 		phase = 'back';
-		await expect.element(page.getByText(es.fisqua_link_linked('archivo-x', true))).toBeInTheDocument();
+		await expect
+			.element(page.getByText(es.fisqua_link_linked('archivo-x', true)))
+			.toBeInTheDocument();
 	});
 
 	it('restart_needed offers the existing Restart action', async () => {
@@ -377,28 +455,46 @@ describe('Conectar con Fisqua: after approval', () => {
 
 	async function backFromRestart(mode: 'backup' | 'offline' | 'fisqua') {
 		let back = false;
-		mount(async () =>
-			back
-				? status({ currentTenant: 'archivo-x', linked: { configured: true, tenant: 'archivo-x', environment: 'production' } })
-				: status({ state: 'restarting' }),
-		mode);
+		mount(
+			async () =>
+				back
+					? status({
+							currentTenant: 'archivo-x',
+							linked: { configured: true, tenant: 'archivo-x', environment: 'production' }
+						})
+					: status({ state: 'restarting' }),
+			mode
+		);
 		await expect.element(page.getByText(es.fisqua_link_restarting)).toBeInTheDocument();
 		back = true;
-		await expect.element(page.getByText(es.fisqua_link_linked('archivo-x', false))).toBeInTheDocument();
+		await expect
+			.element(page.getByText(es.fisqua_link_linked('archivo-x', false)))
+			.toBeInTheDocument();
 	}
 
-	it.each(['production', 'something_else', null])('linked in %s shows no environment name', async (env) => {
-		let back = false;
-		const { screen } = mount(async () =>
-			back
-				? status({ currentTenant: 'archivo-x', environment: env, linked: { configured: true, tenant: 'archivo-x', environment: env } })
-				: status({ state: 'restarting', environment: env }),
-		'fisqua');
-		await expect.element(page.getByText(es.fisqua_link_restarting)).toBeInTheDocument();
-		back = true;
-		await expect.element(page.getByText(es.fisqua_link_linked('archivo-x', false))).toBeInTheDocument();
-		expect(screen.container.textContent).not.toMatch(/production|something_else|staging/);
-	});
+	it.each(['production', 'something_else', null])(
+		'linked in %s shows no environment name',
+		async (env) => {
+			let back = false;
+			const { screen } = mount(
+				async () =>
+					back
+						? status({
+								currentTenant: 'archivo-x',
+								environment: env,
+								linked: { configured: true, tenant: 'archivo-x', environment: env }
+							})
+						: status({ state: 'restarting', environment: env }),
+				'fisqua'
+			);
+			await expect.element(page.getByText(es.fisqua_link_restarting)).toBeInTheDocument();
+			back = true;
+			await expect
+				.element(page.getByText(es.fisqua_link_linked('archivo-x', false)))
+				.toBeInTheDocument();
+			expect(screen.container.textContent).not.toMatch(/production|something_else|staging/);
+		}
+	);
 
 	it('linked, outside Fisqua mode, points to the mode switch', async () => {
 		await backFromRestart('offline');
@@ -430,7 +526,15 @@ describe('Conectar con Fisqua: final states', () => {
 		['error', 'method', () => es.fisqua_link_generic],
 		['a_state_from_a_newer_backend', null, () => es.fisqua_link_generic]
 	])('%s (%s) shows its line and lets the admin get a code again', async (state, reason, text) => {
-		mount(status({ state, reason, unitName: 'Sala 2', currentTenant: 'archivo-x', linked: { configured: true, tenant: 'archivo-x', environment: 'production' } }));
+		mount(
+			status({
+				state,
+				reason,
+				unitName: 'Sala 2',
+				currentTenant: 'archivo-x',
+				linked: { configured: true, tenant: 'archivo-x', environment: 'production' }
+			})
+		);
 		await expect.element(page.getByText(text())).toBeInTheDocument();
 		await expect.element(getCode()).toBeInTheDocument();
 	});
@@ -440,10 +544,14 @@ describe('Conectar con Fisqua: restart required', () => {
 	it('on a fresh load says the unit must be restarted, names the last outcome, and disables Get a code', async () => {
 		mount(status({ state: 'idle', restartRequired: true, lastOutcome: 'settings_overridden' }));
 		await expect.element(page.getByText(es.fisqua_link_restart_required)).toBeInTheDocument();
-		await expect.element(page.getByText(es.fisqua_link_last_outcome(es.fisqua_link_overridden))).toBeInTheDocument();
+		await expect
+			.element(page.getByText(es.fisqua_link_last_outcome(es.fisqua_link_overridden)))
+			.toBeInTheDocument();
 		await expect.element(getCode()).toBeDisabled();
 		await userEvent.click(page.getByRole('button', { name: es.fisqua_link_restart_btn }));
-		await expect.element(page.getByRole('dialog').getByText(es.config_confirm_reboot_title)).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('dialog').getByText(es.config_confirm_reboot_title))
+			.toBeInTheDocument();
 		await userEvent.click(page.getByRole('dialog').getByRole('button', { name: es.common_cancel }));
 	});
 
@@ -456,19 +564,31 @@ describe('Conectar con Fisqua: restart required', () => {
 	it('over a final state, shows one Restart button and disables Get a new code', async () => {
 		mount(status({ state: 'lapsed', restartRequired: true, lastOutcome: 'lapsed' }));
 		await expect.element(page.getByText(es.fisqua_link_restart_required)).toBeInTheDocument();
-		expect(page.getByRole('button', { name: es.fisqua_link_restart_btn }).elements()).toHaveLength(1);
-		await expect.element(page.getByRole('button', { name: es.fisqua_link_new_code })).toBeDisabled();
+		expect(page.getByRole('button', { name: es.fisqua_link_restart_btn }).elements()).toHaveLength(
+			1
+		);
+		await expect
+			.element(page.getByRole('button', { name: es.fisqua_link_new_code }))
+			.toBeDisabled();
 	});
 
 	it('restart_needed with the latch shows a single Restart button', async () => {
-		mount(status({ state: 'restart_needed', restartRequired: true, lastOutcome: 'restart_needed' }));
+		mount(
+			status({ state: 'restart_needed', restartRequired: true, lastOutcome: 'restart_needed' })
+		);
 		await expect.element(page.getByText(es.fisqua_link_restart_required)).toBeInTheDocument();
-		expect(page.getByRole('button', { name: es.fisqua_link_restart_btn }).elements()).toHaveLength(1);
+		expect(page.getByRole('button', { name: es.fisqua_link_restart_btn }).elements()).toHaveLength(
+			1
+		);
 	});
 
 	it.each(['applying', 'restarting'])('is not shown while %s', async (state) => {
 		const { screen } = mount(status({ state, restartRequired: true }));
-		await expect.element(page.getByText(state === 'applying' ? es.fisqua_link_applying : es.fisqua_link_restarting)).toBeInTheDocument();
+		await expect
+			.element(
+				page.getByText(state === 'applying' ? es.fisqua_link_applying : es.fisqua_link_restarting)
+			)
+			.toBeInTheDocument();
 		expect(screen.container.textContent).not.toContain(es.fisqua_link_restart_required);
 	});
 });
@@ -481,14 +601,21 @@ describe('Conectar con Fisqua: answers that arrive late', () => {
 	}
 
 	it('drops a GET sent before an action that answers after it', async () => {
-		const showing = status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' });
+		const showing = status({
+			state: 'showing',
+			code: 'ABCDEF',
+			expiresInSeconds: 200,
+			unitName: 'Sala 2'
+		});
 		const { getSpy } = mount(showing);
 		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
 		const held = deferred<PairingStatus>();
 		getSpy.mockImplementation(() => held.promise);
 		const before = getSpy.mock.calls.length;
 		await vi.waitFor(() => expect(getSpy.mock.calls.length).toBeGreaterThan(before));
-		vi.spyOn(systemApi, 'cancelPairing').mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
+		vi.spyOn(systemApi, 'cancelPairing').mockResolvedValue(
+			status({ state: 'cancelled', unitName: 'Sala 2' })
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
 		await expect.element(getCode()).toBeInTheDocument();
 		// Later GETs never answer, so a stale answer that got through would stay on screen.
@@ -500,7 +627,12 @@ describe('Conectar con Fisqua: answers that arrive late', () => {
 	});
 
 	it('drops a GET sent while an action is in flight that answers after it', async () => {
-		const showing = status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' });
+		const showing = status({
+			state: 'showing',
+			code: 'ABCDEF',
+			expiresInSeconds: 200,
+			unitName: 'Sala 2'
+		});
 		const { getSpy } = mount(showing);
 		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
 		const action = deferred<PairingStatus>();
@@ -520,13 +652,17 @@ describe('Conectar con Fisqua: answers that arrive late', () => {
 	});
 
 	it('drops a failure of a GET sent before an action, so it does not show a read error', async () => {
-		const { getSpy } = mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' }));
+		const { getSpy } = mount(
+			status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' })
+		);
 		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
 		let fail!: (e: unknown) => void;
 		getSpy.mockImplementation(() => new Promise<PairingStatus>((_, reject) => (fail = reject)));
 		const before = getSpy.mock.calls.length;
 		await vi.waitFor(() => expect(getSpy.mock.calls.length).toBeGreaterThan(before));
-		vi.spyOn(systemApi, 'cancelPairing').mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
+		vi.spyOn(systemApi, 'cancelPairing').mockResolvedValue(
+			status({ state: 'cancelled', unitName: 'Sala 2' })
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
 		await expect.element(getCode()).toBeInTheDocument();
 		fail(new TypeError('Failed to fetch'));
@@ -538,12 +674,19 @@ describe('Conectar con Fisqua: answers that arrive late', () => {
 describe('Conectar con Fisqua: each action shows its own refusal', () => {
 	it.each([
 		['requesting', status({ state: 'requesting', unitName: 'Sala 2' })],
-		['showing', status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' })]
+		[
+			'showing',
+			status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' })
+		]
 	])('a failed Cancel in %s is shown beside Cancel', async (_, s) => {
 		mount(s);
-		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(new ApiError('Internal Server Error', undefined, 500));
+		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(
+			new ApiError('Internal Server Error', undefined, 500)
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
-		await expect.element(page.getByRole('alert').getByText(es.fisqua_link_cancel_failed)).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('alert').getByText(es.fisqua_link_cancel_failed))
+			.toBeInTheDocument();
 		expect(page.getByText(es.fisqua_link_generic).elements()).toHaveLength(0);
 	});
 
@@ -551,19 +694,27 @@ describe('Conectar con Fisqua: each action shows its own refusal', () => {
 		mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' }));
 		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(refused('something_new'));
 		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
-		await expect.element(page.getByRole('alert').getByText(es.fisqua_link_cancel_failed)).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('alert').getByText(es.fisqua_link_cancel_failed))
+			.toBeInTheDocument();
 	});
 
-	it('a Cancel refused with a known code shows that code\'s line', async () => {
+	it("a Cancel refused with a known code shows that code's line", async () => {
 		mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' }));
 		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(refused('restart_required'));
 		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
-		await expect.element(page.getByRole('alert').getByText(es.fisqua_link_restart_required)).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('alert').getByText(es.fisqua_link_restart_required))
+			.toBeInTheDocument();
 	});
 
 	it('a failed Cancel is not shown later beside Get a code', async () => {
-		const { getSpy } = mount(status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' }));
-		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(new ApiError('Internal Server Error', undefined, 500));
+		const { getSpy } = mount(
+			status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 200, unitName: 'Sala 2' })
+		);
+		vi.spyOn(systemApi, 'cancelPairing').mockRejectedValue(
+			new ApiError('Internal Server Error', undefined, 500)
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_cancel }));
 		await expect.element(page.getByRole('alert')).toBeInTheDocument();
 		getSpy.mockResolvedValue(status({ state: 'cancelled', unitName: 'Sala 2' }));
@@ -575,7 +726,9 @@ describe('Conectar con Fisqua: each action shows its own refusal', () => {
 		const { getSpy } = mount(status({ state: 'cancelled', unitName: 'Sala 2' }));
 		vi.spyOn(systemApi, 'startPairing').mockRejectedValue(refused('busy_capturing'));
 		await userEvent.click(getCode());
-		await expect.element(page.getByRole('alert').getByText(es.fisqua_link_busy_capturing)).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('alert').getByText(es.fisqua_link_busy_capturing))
+			.toBeInTheDocument();
 		getSpy.mockResolvedValue(status({ state: 'requesting', unitName: 'Sala 2' }));
 		await expect.element(page.getByText(es.fisqua_link_requesting)).toBeInTheDocument();
 		expect(page.getByRole('alert').elements()).toHaveLength(0);
@@ -607,16 +760,17 @@ describe('Conectar con Fisqua: reading and polling', () => {
 
 	it('renders no secret and requests no field named like one', async () => {
 		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
-			new Response(
-				JSON.stringify({
-					...status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 290 }),
-					collectSecret: 'cs-SECRET-1',
-					token: 'tok-SECRET-2',
-					secret: 'SECRET-3'
-				}),
-				{ status: 200, headers: { 'Content-Type': 'application/json' } }
-			)
+		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+			async () =>
+				new Response(
+					JSON.stringify({
+						...status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 290 }),
+						collectSecret: 'cs-SECRET-1',
+						token: 'tok-SECRET-2',
+						secret: 'SECRET-3'
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } }
+				)
 		);
 		const screen = render(FisquaLinkCard, { pollMs: POLL });
 		await expect.element(page.getByText('ABC-DEF', { exact: true })).toBeInTheDocument();
@@ -633,14 +787,20 @@ describe('Conectar con Fisqua: reading and polling', () => {
 		vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
 		vi.spyOn(systemApi, 'getPairing').mockResolvedValue(status());
 		vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
-		(pageStore.value as Writable<{ url: URL }>).set({ url: new URL('http://localhost/dashboard/config?section=fisqua-link') });
+		(pageStore.value as Writable<{ url: URL }>).set({
+			url: new URL('http://localhost/dashboard/config?section=fisqua-link')
+		});
 		const screen = render(ConfigPage);
 		await expect.element(getCode()).toBeInTheDocument();
-		const ids = [...screen.container.querySelectorAll('[data-settings-section]')].map((b) => b.getAttribute('data-settings-section'));
+		const ids = [...screen.container.querySelectorAll('[data-settings-section]')].map((b) =>
+			b.getAttribute('data-settings-section')
+		);
 		expect(ids.indexOf('fisqua-link')).toBe(ids.indexOf('unit-mode') + 1);
 		const sections = [...screen.container.querySelectorAll('.config-section')];
 		expect(sections).toHaveLength(1);
 		expect(sections[0].id).toBe('fisqua-link');
-		expect(sections[0].querySelector('.section-title')?.textContent?.trim()).toBe(es.fisqua_link_title);
+		expect(sections[0].querySelector('.section-title')?.textContent?.trim()).toBe(
+			es.fisqua_link_title
+		);
 	});
 });

@@ -34,7 +34,10 @@ import LivePreview from './+page.svelte';
 const USER = 3;
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
@@ -59,25 +62,61 @@ function serve(dslr: boolean, captureGate?: Promise<void>) {
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/cameras/capabilities')) {
-			return json({ backend: 'gphoto2', live_preview: true, focus_control: false, live_controls: false, zoom: false, autofocus_calibration: false, dslr_settings: dslr, continuous_preview: false, zoom_steps: !dslr });
+			return json({
+				backend: 'gphoto2',
+				live_preview: true,
+				focus_control: false,
+				live_controls: false,
+				zoom: false,
+				autofocus_calibration: false,
+				dslr_settings: dslr,
+				continuous_preview: false,
+				zoom_steps: !dslr
+			});
 		}
 		if (path.includes('/cameras/preview/')) return new Response(null, { status: 404 });
 		if (/\/cameras\/\d\/orientation$/.test(path)) {
 			const answer = deferredResponse();
-			puts.push({ path, body: JSON.parse(String((init as RequestInit | undefined)?.body)), answer });
+			puts.push({
+				path,
+				body: JSON.parse(String((init as RequestInit | undefined)?.body)),
+				answer
+			});
 			return answer.promise;
 		}
 		if (/\/cameras\/dslr\/\d\/settings$/.test(path)) return json({ focus_mode: 'Manual' });
 		if (path.endsWith('/cameras/devices')) {
 			return json([
-				{ index: 0, model: 'Canon PowerShot A2500', hardware_id: 'a', calibrated: false, zoom_steps: 64, zoom_step: 24 },
-				{ index: 1, model: 'Canon PowerShot A2500', hardware_id: 'b', calibrated: false, zoom_steps: 64, zoom_step: 24 }
+				{
+					index: 0,
+					model: 'Canon PowerShot A2500',
+					hardware_id: 'a',
+					calibrated: false,
+					zoom_steps: 64,
+					zoom_step: 24
+				},
+				{
+					index: 1,
+					model: 'Canon PowerShot A2500',
+					hardware_id: 'b',
+					calibrated: false,
+					zoom_steps: 64,
+					zoom_step: 24
+				}
 			]);
 		}
-		if (path.endsWith('/records/to-retake/summary')) return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
+		if (path.endsWith('/records/to-retake/summary'))
+			return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
 		if (path.includes('/cameras/test-capture/')) return new Promise<Response>(() => {});
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 6',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: 'co-ahr-6',
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
 		if (path.endsWith('/records/')) return json([]);
@@ -100,9 +139,15 @@ function nameOf(b: Element): string {
 	return (copy.textContent ?? '').trim();
 }
 
-const openButton = () => [...document.querySelectorAll<HTMLButtonElement>('.topbar button')].find((b) => nameOf(b) === en.camcheck_open) ?? null;
+const openButton = () =>
+	[...document.querySelectorAll<HTMLButtonElement>('.topbar button')].find(
+		(b) => nameOf(b) === en.camcheck_open
+	) ?? null;
 const check = () => document.querySelector('[data-camera-check]');
-const refocusDialog = () => [...document.querySelectorAll('[role="dialog"]')].find((d) => d.textContent?.includes(en.focus_af_title)) ?? null;
+const refocusDialog = () =>
+	[...document.querySelectorAll('[role="dialog"]')].find((d) =>
+		d.textContent?.includes(en.focus_af_title)
+	) ?? null;
 const captureButton = () => document.querySelector('.capture-btn') as HTMLButtonElement | null;
 
 function pressCaptureKey() {
@@ -116,7 +161,10 @@ beforeEach(() => {
 	clearChord();
 	locale.set('en');
 	current.url = 'http://localhost/live-preview?projectId=2&collectionId=9';
-	authStore.setSession({ id: USER, username: 'operator', email: null, role: 'operator', is_active: true }, { signIn: true });
+	authStore.setSession(
+		{ id: USER, username: 'operator', email: null, role: 'operator', is_active: true },
+		{ signIn: true }
+	);
 });
 
 afterEach(() => {
@@ -140,7 +188,9 @@ describe('capture screen: "Check cameras" (NEH-339)', () => {
 		// The volume it was opened from, in its top bar.
 		expect(check()?.textContent).toContain('Tomo 6');
 
-		const back = [...check()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => nameOf(b) === en.camcheck_back)!;
+		const back = [...check()!.querySelectorAll<HTMLButtonElement>('button')].find(
+			(b) => nameOf(b) === en.camcheck_back
+		)!;
 		back.click();
 		await expect.poll(() => check()).toBeNull();
 		expect(captureButton()).not.toBeNull();
@@ -197,8 +247,10 @@ describe('capture screen: "Check cameras" (NEH-339)', () => {
 });
 
 describe('the camera check: "Turn" (NEH-339)', () => {
-	const turn = (side: 'left' | 'right') => check()?.querySelector(`[data-frame="${side}"] button[data-turn]`) as HTMLButtonElement | null;
-	const viewportDegrees = () => [...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
+	const turn = (side: 'left' | 'right') =>
+		check()?.querySelector(`[data-frame="${side}"] button[data-turn]`) as HTMLButtonElement | null;
+	const viewportDegrees = () =>
+		[...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
 
 	it('saves the turned orientation of that camera, as the capture screen does, one save at a time', async () => {
 		serve(false);
@@ -218,7 +270,12 @@ describe('the camera check: "Turn" (NEH-339)', () => {
 		await expect.poll(() => turn('right')?.disabled).toBe(true);
 		expect(turn('left')?.disabled).toBe(false);
 
-		puts[0].answer.resolve(new Response(JSON.stringify({ index: 1, hardware_id: 'b', orientation: 180 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+		puts[0].answer.resolve(
+			new Response(JSON.stringify({ index: 1, hardware_id: 'b', orientation: 180 }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			})
+		);
 		await expect.poll(() => turn('right')?.disabled).toBe(false);
 	});
 
@@ -231,8 +288,15 @@ describe('the camera check: "Turn" (NEH-339)', () => {
 		await expect.poll(() => turn('left')?.disabled).toBe(false);
 		turn('left')!.click();
 		await expect.poll(() => puts.length).toBe(1);
-		puts[0].answer.resolve(new Response(JSON.stringify({ detail: 'nope' }), { status: 500, headers: { 'Content-Type': 'application/json' } }));
-		await expect.poll(() => errors.mock.calls.some((c) => String(c[0]).includes('Error saving orientation'))).toBe(true);
+		puts[0].answer.resolve(
+			new Response(JSON.stringify({ detail: 'nope' }), {
+				status: 500,
+				headers: { 'Content-Type': 'application/json' }
+			})
+		);
+		await expect
+			.poll(() => errors.mock.calls.some((c) => String(c[0]).includes('Error saving orientation')))
+			.toBe(true);
 		expect(viewportDegrees()).toEqual(['180°', '90°']);
 		await expect.poll(() => turn('left')?.disabled).toBe(false);
 	});

@@ -37,7 +37,11 @@ async function jpeg(w: number, h: number): Promise<Blob> {
 }
 
 function setup(codes: CameraSetupCode[], needs = codes.length > 0): CameraSetup {
-	return { needs_setup: needs, reasons: codes.map((code) => ({ code, message: 'English', hardware_ids: [] })), confirmed_pair: null };
+	return {
+		needs_setup: needs,
+		reasons: codes.map((code) => ({ code, message: 'English', hardware_ids: [] })),
+		confirmed_pair: null
+	};
 }
 
 const box = (el: Element) => el.getBoundingClientRect();
@@ -52,7 +56,9 @@ function nameOf(b: Element): string {
 }
 
 function button(name: string) {
-	return [...document.querySelectorAll<HTMLButtonElement>('[data-which-camera] button')].find((b) => nameOf(b) === name)!;
+	return [...document.querySelectorAll<HTMLButtonElement>('[data-which-camera] button')].find(
+		(b) => nameOf(b) === name
+	)!;
 }
 
 function measure(w: number, h: number) {
@@ -81,12 +87,18 @@ function measure(w: number, h: number) {
 
 	const foot = q('[data-which-camera] .sf-foot') as HTMLElement;
 	expect(box(foot).bottom).toBeLessThanOrEqual(h + 0.5);
-	expect(new Set([...foot.children].map((c) => Math.round(box(c).top + box(c).height / 2))).size).toBe(1);
+	expect(
+		new Set([...foot.children].map((c) => Math.round(box(c).top + box(c).height / 2))).size
+	).toBe(1);
 	expect(foot.scrollWidth).toBeLessThanOrEqual(foot.clientWidth + 1);
 
-	for (const b of root.querySelectorAll('button')) expect(box(b).height, nameOf(b)).toBeGreaterThanOrEqual(44);
+	for (const b of root.querySelectorAll('button'))
+		expect(box(b).height, nameOf(b)).toBeGreaterThanOrEqual(44);
 	const pick = root.querySelector('[data-card] .id-pick');
-	return { body: `${body.scrollHeight}/${body.clientHeight}`, pick: pick ? `${box(pick).width.toFixed(0)}x${box(pick).height.toFixed(0)}` : '-' };
+	return {
+		body: `${body.scrollHeight}/${body.clientHeight}`,
+		pick: pick ? `${box(pick).width.toFixed(0)}x${box(pick).height.toFixed(0)}` : '-'
+	};
 }
 
 const device = (i: number, over: Partial<CameraDevice> = {}): CameraDevice => ({
@@ -131,8 +143,13 @@ for (const [w, h] of [
 
 			it('another pair, a choice made, a guess, and a refusal', async () => {
 				vi.spyOn(console, 'error').mockImplementation(() => {});
-				vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([device(0, { role_guess: 'left' }), device(1)]);
-				vi.spyOn(camerasApi, 'setRoles').mockRejectedValue(Object.assign(new Error('x'), { status: 503 }));
+				vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([
+					device(0, { role_guess: 'left' }),
+					device(1)
+				]);
+				vi.spyOn(camerasApi, 'setRoles').mockRejectedValue(
+					Object.assign(new Error('x'), { status: 503 })
+				);
 				render(WhichCamera, props(setup(['pair_changed'])));
 				await settle();
 				(q('[data-card="1"] button[data-pick]') as HTMLButtonElement).click();
@@ -141,14 +158,22 @@ for (const [w, h] of [
 				await settle();
 				expect(document.body.textContent).toContain(msgs.camwhich_err_unavailable);
 				const m = measure(w, h);
-				console.log(`[camwhich fit ${w}x${h} ${lang}] ask + refusal: body ${m.body}px, image ${m.pick}px`);
+				console.log(
+					`[camwhich fit ${w}x${h} ${lang}] ask + refusal: body ${m.body}px, image ${m.pick}px`
+				);
 			});
 
 			it('another pair, with the longest refusal (a camera no longer connected)', async () => {
 				vi.spyOn(console, 'error').mockImplementation(() => {});
-				vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([device(0, { role_guess: 'left' }), device(1)]);
+				vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([
+					device(0, { role_guess: 'left' }),
+					device(1)
+				]);
 				vi.spyOn(camerasApi, 'setRoles').mockRejectedValue(
-					Object.assign(new Error('x'), { status: 409, detail: { code: 'camera_not_connected', message: 'x' } })
+					Object.assign(new Error('x'), {
+						status: 409,
+						detail: { code: 'camera_not_connected', message: 'x' }
+					})
 				);
 				render(WhichCamera, props(setup(['pair_changed'])));
 				await settle();
@@ -158,13 +183,17 @@ for (const [w, h] of [
 				await settle();
 				expect(document.body.textContent).toContain(msgs.camwhich_err_not_connected);
 				const m = measure(w, h);
-				console.log(`[camwhich fit ${w}x${h} ${lang}] ask + not connected: body ${m.body}px, image ${m.pick}px`);
+				console.log(
+					`[camwhich fit ${w}x${h} ${lang}] ask + not connected: body ${m.body}px, image ${m.pick}px`
+				);
 			});
 
 			it('one camera, after a reconnection that failed', async () => {
 				vi.spyOn(console, 'error').mockImplementation(() => {});
 				vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([device(0)]);
-				vi.spyOn(camerasApi, 'rescan').mockRejectedValue(Object.assign(new Error('x'), { status: 500 }));
+				vi.spyOn(camerasApi, 'rescan').mockRejectedValue(
+					Object.assign(new Error('x'), { status: 500 })
+				);
 				render(WhichCamera, props(setup(['role_unconfirmed'])));
 				await settle();
 				button(msgs.camwhich_check_again).click();
@@ -174,7 +203,10 @@ for (const [w, h] of [
 			});
 
 			it('a camera on another socket', async () => {
-				vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([device(0, { role: 'right', role_confirmed: true }), device(1, { role: 'left', role_confirmed: true })]);
+				vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([
+					device(0, { role: 'right', role_confirmed: true }),
+					device(1, { role: 'left', role_confirmed: true })
+				]);
 				render(WhichCamera, props(setup(['port_changed'])));
 				await settle();
 				const m = measure(w, h);
@@ -195,7 +227,9 @@ for (const [w, h] of [
 				await settle();
 				expect(button(msgs.common_cancel)).toBeTruthy();
 				const m = measure(w, h);
-				console.log(`[camwhich fit ${w}x${h} ${lang}] by hand: body ${m.body}px, image ${m.pick}px`);
+				console.log(
+					`[camwhich fit ${w}x${h} ${lang}] by hand: body ${m.body}px, image ${m.pick}px`
+				);
 			});
 		});
 	}

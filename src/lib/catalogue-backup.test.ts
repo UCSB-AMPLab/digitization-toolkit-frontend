@@ -96,7 +96,10 @@ describe('classifyBackup', () => {
 	});
 
 	it('is unknown for a timestamp more than 1 h in the future', () => {
-		expect(classifyBackup(status(-HOUR - SECOND), NOW)).toEqual({ level: 'unknown', verifiedAt: null });
+		expect(classifyBackup(status(-HOUR - SECOND), NOW)).toEqual({
+			level: 'unknown',
+			verifiedAt: null
+		});
 		expect(classifyBackup(status(-48 * HOUR), NOW).level).toBe('unknown');
 	});
 
@@ -112,8 +115,12 @@ describe('classifyBackup', () => {
 	});
 
 	it('is unknown for an answer it cannot read, never one of the four', () => {
-		expect(classifyBackup({ ...status(HOUR), last_verified_at: 'not a date' }, NOW).level).toBe('unknown');
-		expect(classifyBackup({ ...status(HOUR), enabled: 'yes' as unknown as boolean }, NOW).level).toBe('unknown');
+		expect(classifyBackup({ ...status(HOUR), last_verified_at: 'not a date' }, NOW).level).toBe(
+			'unknown'
+		);
+		expect(
+			classifyBackup({ ...status(HOUR), enabled: 'yes' as unknown as boolean }, NOW).level
+		).toBe('unknown');
 		expect(classifyBackup(null as unknown as CatalogueBackupStatus, NOW).level).toBe('unknown');
 	});
 });
@@ -143,7 +150,9 @@ describe('classifySnapshot (the answer held, classified at the current time)', (
 
 	it('trusts an answer up to two poll intervals old', () => {
 		expect(MAX_ANSWER_AGE_MS).toBe(2 * POLL_INTERVAL_MS);
-		expect(classifySnapshot(received(HOUR, MAX_ANSWER_AGE_MS), NOW.getTime())?.level).toBe('current');
+		expect(classifySnapshot(received(HOUR, MAX_ANSWER_AGE_MS), NOW.getTime())?.level).toBe(
+			'current'
+		);
 	});
 
 	it('is unknown for an answer older than two poll intervals', () => {
@@ -154,12 +163,20 @@ describe('classifySnapshot (the answer held, classified at the current time)', (
 	});
 
 	it('is local for a fresh answer from a unit whose mode takes no dump', () => {
-		const snap = { kind: 'loaded' as const, status: { ...status(100 * HOUR), mode_allows: false }, receivedAt: NOW.getTime() };
+		const snap = {
+			kind: 'loaded' as const,
+			status: { ...status(100 * HOUR), mode_allows: false },
+			receivedAt: NOW.getTime()
+		};
 		expect(classifySnapshot(snap, NOW.getTime())).toEqual({ level: 'local', verifiedAt: null });
 	});
 
 	it('is unknown for an answer older than two poll intervals even when not configured', () => {
-		const snap = { kind: 'loaded' as const, status: status(null, false), receivedAt: NOW.getTime() - MAX_ANSWER_AGE_MS - 1 };
+		const snap = {
+			kind: 'loaded' as const,
+			status: status(null, false),
+			receivedAt: NOW.getTime() - MAX_ANSWER_AGE_MS - 1
+		};
 		expect(classifySnapshot(snap, NOW.getTime())?.level).toBe('unknown');
 	});
 });

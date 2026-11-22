@@ -13,8 +13,20 @@ import { authStore, type AuthUser } from '$lib/stores/auth';
 import { authApi, endRejectedSession } from '$lib/api';
 import { tour } from '$lib/tour';
 
-const operator: AuthUser = { id: 1, username: 'op', email: null, role: 'operator', is_active: true };
-const testing: AuthUser = { id: 9, username: 'unit-testing', email: null, role: 'testing', is_active: true };
+const operator: AuthUser = {
+	id: 1,
+	username: 'op',
+	email: null,
+	role: 'operator',
+	is_active: true
+};
+const testing: AuthUser = {
+	id: 9,
+	username: 'unit-testing',
+	email: null,
+	role: 'testing',
+	is_active: true
+};
 
 afterEach(() => {
 	vi.restoreAllMocks();

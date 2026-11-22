@@ -9,11 +9,17 @@ import { es } from './es';
 import { en } from './en';
 
 const keys = (catalogue: Record<string, unknown>) =>
-	Object.keys(catalogue).filter((k) => k.startsWith('cam_format_note_')).sort();
+	Object.keys(catalogue)
+		.filter((k) => k.startsWith('cam_format_note_'))
+		.sort();
 
 describe('capture format strings', () => {
 	it('the two catalogues have the same cam_format_note_ keys, all strings', () => {
-		expect(keys(en)).toEqual(['cam_format_note_jpeg', 'cam_format_note_raw_chdk', 'cam_format_note_raw_dslr']);
+		expect(keys(en)).toEqual([
+			'cam_format_note_jpeg',
+			'cam_format_note_raw_chdk',
+			'cam_format_note_raw_dslr'
+		]);
 		expect(keys(es)).toEqual(keys(en));
 		for (const key of keys(es)) {
 			const value = (es as Record<string, unknown>)[key];

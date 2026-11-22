@@ -59,7 +59,11 @@ async function jpeg(w: number, h: number): Promise<Blob> {
 	return new Promise((resolve) => c.toBlob((b) => resolve(b!), 'image/jpeg', 0.5));
 }
 
-async function shot(w = 400, h = 600, focalLength: number | null = null): Promise<TestCaptureResult> {
+async function shot(
+	w = 400,
+	h = 600,
+	focalLength: number | null = null
+): Promise<TestCaptureResult> {
 	return { blob: await jpeg(w, h), seconds: 1.2, bytes: 1000, focalLength };
 }
 
@@ -85,7 +89,14 @@ function caps(over: Partial<CameraCapabilities> = {}): CameraCapabilities {
 }
 
 function device(index: number, over: Partial<CameraDevice> = {}): CameraDevice {
-	return { index, hardware_id: `hw${index}`, model: A2500, calibrated: false, location: `usb:001,00${index + 4}`, ...over };
+	return {
+		index,
+		hardware_id: `hw${index}`,
+		model: A2500,
+		calibrated: false,
+		location: `usb:001,00${index + 4}`,
+		...over
+	};
 }
 
 // A CHDK pair at step `steps[i]`, 64 steps each; null steps until shooting mode.
@@ -123,18 +134,23 @@ function renderCheck(props: Partial<Props> = {}) {
 }
 
 const view = () => document.querySelector('[data-camera-check]') as HTMLElement | null;
-const frame = (side: 'left' | 'right') => document.querySelector(`[data-frame="${side}"]`) as HTMLElement | null;
+const frame = (side: 'left' | 'right') =>
+	document.querySelector(`[data-frame="${side}"]`) as HTMLElement | null;
 // A picture's label in words: its accessible name in the badge form, its text otherwise.
 const labelWords = (side: 'left' | 'right') => {
 	const el = frame(side)?.querySelector('.feed-label');
 	return el ? (el.getAttribute('aria-label') ?? el.textContent?.trim()) : null;
 };
-const frameImg = (side: 'left' | 'right') => frame(side)?.querySelector('img') as HTMLImageElement | null;
-const zoomControl = (which: 'both' | 'left' | 'right') => document.querySelector(`[data-zoom="${which}"]`) as HTMLElement | null;
-const zoomValue = (which: 'both' | 'left' | 'right') => zoomControl(which)?.querySelector('.zc-val')?.textContent?.trim() ?? null;
+const frameImg = (side: 'left' | 'right') =>
+	frame(side)?.querySelector('img') as HTMLImageElement | null;
+const zoomControl = (which: 'both' | 'left' | 'right') =>
+	document.querySelector(`[data-zoom="${which}"]`) as HTMLElement | null;
+const zoomValue = (which: 'both' | 'left' | 'right') =>
+	zoomControl(which)?.querySelector('.zc-val')?.textContent?.trim() ?? null;
 const zoomButton = (which: 'both' | 'left' | 'right', dir: 'in' | 'out') =>
 	zoomControl(which)?.querySelector(`button[data-dir="${dir}"]`) as HTMLButtonElement | null;
-const chip = (side: 'left' | 'right') => document.querySelector(`[data-chip="${side}"]`) as HTMLButtonElement | null;
+const chip = (side: 'left' | 'right') =>
+	document.querySelector(`[data-chip="${side}"]`) as HTMLButtonElement | null;
 const text = () => view()?.textContent ?? '';
 const dialogs = () => [...document.querySelectorAll('[role="dialog"]')];
 const dialogWith = (s: string) => dialogs().find((d) => d.textContent?.includes(s)) ?? null;
@@ -149,7 +165,9 @@ function nameOf(b: Element): string {
 }
 
 function button(name: string, root: ParentNode = document): HTMLButtonElement | null {
-	return [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => nameOf(b) === name) ?? null;
+	return (
+		[...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => nameOf(b) === name) ?? null
+	);
 }
 
 async function click(name: string, root: ParentNode = document) {
@@ -171,7 +189,11 @@ async function press(b: HTMLButtonElement | null) {
 // which show with their pictures.
 async function bothTaken() {
 	await expect
-		.poll(() => (['left', 'right'] as const).filter((side) => button(en.camcheck_full_size_aria(side)) === null))
+		.poll(() =>
+			(['left', 'right'] as const).filter(
+				(side) => button(en.camcheck_full_size_aria(side)) === null
+			)
+		)
 		.toEqual([]);
 }
 
@@ -180,12 +202,19 @@ beforeEach(() => {
 	clearChord();
 	devices = a2500();
 	capsSpy = vi.spyOn(camerasApi, 'getCapabilities').mockResolvedValue(caps({ zoom_steps: true }));
-	listSpy = vi.spyOn(camerasApi, 'listDevices').mockImplementation(async () => devices.map((d) => ({ ...d })));
+	listSpy = vi
+		.spyOn(camerasApi, 'listDevices')
+		.mockImplementation(async () => devices.map((d) => ({ ...d })));
 	captureSpy = vi.spyOn(camerasApi, 'testCapture').mockImplementation(() => shot());
 	zoomSpy = vi
 		.spyOn(camerasApi, 'setZoomStep')
-		.mockImplementation(async (_i: number, step: number) => ({ detail: 'Zoom step applied', zoom_step: step }) as ZoomStepResponse);
-	vi.spyOn(camerasApi, 'getDSLRSettings').mockResolvedValue({ focus_mode: 'Manual' } as DSLRSettings);
+		.mockImplementation(
+			async (_i: number, step: number) =>
+				({ detail: 'Zoom step applied', zoom_step: step }) as ZoomStepResponse
+		);
+	vi.spyOn(camerasApi, 'getDSLRSettings').mockResolvedValue({
+		focus_mode: 'Manual'
+	} as DSLRSettings);
 });
 
 afterEach(() => {
@@ -262,16 +291,20 @@ describe('CameraCheck: test captures', () => {
 		await click(en.camcheck_take);
 		await expect.poll(() => frameImg('left')?.naturalWidth ?? 0).toBe(400);
 		expect(frameImg('right')).toBeNull();
-		expect(frame('right')?.textContent).toContain(en.camcheck_test_failed(en.dash_camera_capture_not_connected));
+		expect(frame('right')?.textContent).toContain(
+			en.camcheck_test_failed(en.dash_camera_capture_not_connected)
+		);
 
 		captureSpy.mockImplementation(() => shot(500, 600));
 		await click(en.camcheck_take);
 		expect(captureSpy).toHaveBeenCalledTimes(4);
 		await expect.poll(() => frameImg('right')?.naturalWidth ?? 0).toBe(500);
-		expect(frame('right')?.textContent).not.toContain(en.camcheck_test_failed(en.dash_camera_capture_not_connected));
+		expect(frame('right')?.textContent).not.toContain(
+			en.camcheck_test_failed(en.dash_camera_capture_not_connected)
+		);
 	});
 
-	it('another failure keeps the general message, never the backend\'s English', async () => {
+	it("another failure keeps the general message, never the backend's English", async () => {
 		captureSpy.mockRejectedValue(failure(500, 'gphoto2 error -53'));
 		renderCheck();
 		await settle();
@@ -434,24 +467,31 @@ describe('CameraCheck: stepped zoom (CHDK)', () => {
 		expect(button(en.camcheck_match)).not.toBeNull();
 	});
 
-	it('a 502 shows the backend\'s detail under the control and reads the device list again', async () => {
+	it("a 502 shows the backend's detail under the control and reads the device list again", async () => {
 		renderCheck();
 		await settle();
 		const before = listSpy.mock.calls.length;
 		zoomSpy.mockRejectedValue(failure(502, 'The camera on usb:001,004 did not move the lens'));
 		await press(zoomButton('both', 'in'));
-		const message = zoomControl('both')?.closest('.ck-sec')?.querySelector('[role="alert"]')?.textContent?.trim();
-		expect(message).toBe(en.camcheck_zoom_failed('left', 'The camera on usb:001,004 did not move the lens'));
+		const message = zoomControl('both')
+			?.closest('.ck-sec')
+			?.querySelector('[role="alert"]')
+			?.textContent?.trim();
+		expect(message).toBe(
+			en.camcheck_zoom_failed('left', 'The camera on usb:001,004 did not move the lens')
+		);
 		// Nothing goes to the second camera after the first refused.
 		expect(zoomSpy).toHaveBeenCalledTimes(1);
 		expect(listSpy.mock.calls.length).toBeGreaterThan(before);
 		expect(zoomButton('both', 'in')?.disabled).toBe(false);
 	});
 
-	it('a 422 in pydantic\'s list form shows its message', async () => {
+	it("a 422 in pydantic's list form shows its message", async () => {
 		renderCheck();
 		await settle();
-		const list = [{ type: 'int_type', loc: ['body', 'zoom_step'], msg: 'Input should be a valid integer' }];
+		const list = [
+			{ type: 'int_type', loc: ['body', 'zoom_step'], msg: 'Input should be a valid integer' }
+		];
 		zoomSpy.mockRejectedValue(failure(422, JSON.stringify(list), list));
 		await press(zoomButton('both', 'in'));
 		expect(text()).toContain(en.camcheck_zoom_failed('left', 'Input should be a valid integer'));
@@ -497,7 +537,7 @@ describe('CameraCheck: zoom read from the pictures (DSLR)', () => {
 		devices = [device(0, { model: T7 }), device(1, { model: T7 })];
 	});
 
-	it('no control; the hint until the pictures arrive, then each camera\'s focal length', async () => {
+	it("no control; the hint until the pictures arrive, then each camera's focal length", async () => {
 		captureSpy.mockImplementation(() => shot(400, 600, 27));
 		renderCheck();
 		await settle();
@@ -507,10 +547,12 @@ describe('CameraCheck: zoom read from the pictures (DSLR)', () => {
 
 		await click(en.camcheck_take);
 		await bothTaken();
-		await expect.poll(() => document.querySelector('[data-focal="left"]')?.textContent?.trim()).toBe(
+		await expect
+			.poll(() => document.querySelector('[data-focal="left"]')?.textContent?.trim())
+			.toBe(`${en.camcheck_focal_value(27)}${en.camcheck_mm}`);
+		expect(document.querySelector('[data-focal="right"]')?.textContent?.trim()).toBe(
 			`${en.camcheck_focal_value(27)}${en.camcheck_mm}`
 		);
-		expect(document.querySelector('[data-focal="right"]')?.textContent?.trim()).toBe(`${en.camcheck_focal_value(27)}${en.camcheck_mm}`);
 		expect(text()).toContain(en.camcheck_focal_read);
 		expect(text()).not.toContain(en.camcheck_focal_differ_title);
 	});
@@ -523,7 +565,9 @@ describe('CameraCheck: zoom read from the pictures (DSLR)', () => {
 		await expect.poll(() => text()).toContain(en.camcheck_focal_differ_title);
 		expect(text()).toContain(en.camcheck_focal_differ_body);
 		// Camera 1 is the left one here; the right page's value is marked.
-		expect(document.querySelector('[data-focal="left"]')?.textContent?.trim()).toBe(`${en.camcheck_focal_value(27)}${en.camcheck_mm}`);
+		expect(document.querySelector('[data-focal="left"]')?.textContent?.trim()).toBe(
+			`${en.camcheck_focal_value(27)}${en.camcheck_mm}`
+		);
 		expect(document.querySelector('[data-focal="right"]')?.classList.contains('is-off')).toBe(true);
 	});
 
@@ -542,7 +586,9 @@ describe('CameraCheck: zoom read from the pictures (DSLR)', () => {
 		renderCheck();
 		await settle();
 		await click(en.focus_refocus);
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
+		window.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true })
+		);
 		await settle();
 		expect(captureSpy).not.toHaveBeenCalled();
 	});
@@ -567,7 +613,8 @@ describe('CameraCheck: focus at full size', () => {
 		await click(en.camcheck_full_size_aria('right'));
 		const viewer = () => document.querySelector('[role="dialog"][aria-labelledby="fv-title"]');
 		await expect.poll(() => viewer()?.querySelectorAll('img').length).toBe(2);
-		const scale = (img: Element) => Number(img.getAttribute('style')?.match(/scale\(([\d.]+)\)/)?.[1] ?? NaN);
+		const scale = (img: Element) =>
+			Number(img.getAttribute('style')?.match(/scale\(([\d.]+)\)/)?.[1] ?? NaN);
 		await expect.poll(() => scale(viewer()!.querySelectorAll('img')[0])).toBeGreaterThan(1);
 		const imgs = viewer()!.querySelectorAll('img');
 		expect(scale(imgs[1])).toBeCloseTo(scale(imgs[0]), 5);
@@ -626,7 +673,9 @@ describe('CameraCheck: are my cameras OK', () => {
 
 		await press(chip('right'));
 		const details = document.querySelector('[role="dialog"][aria-labelledby="cd-title"]')!;
-		expect(details.querySelector('[data-details="right"]')?.textContent).toContain(en.camcheck_cannot_reach);
+		expect(details.querySelector('[data-details="right"]')?.textContent).toContain(
+			en.camcheck_cannot_reach
+		);
 	});
 
 	it('a device list that cannot be read says so, and claims nothing about the cameras', async () => {
@@ -640,10 +689,12 @@ describe('CameraCheck: are my cameras OK', () => {
 });
 
 describe('CameraCheck: orientation', () => {
-	const turn = (side: 'left' | 'right') => frame(side)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
-	const rotationOf = (img: Element | null | undefined) => img?.getAttribute('style')?.match(/rotate\((-?\d+)deg\)/)?.[1] ?? null;
+	const turn = (side: 'left' | 'right') =>
+		frame(side)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
+	const rotationOf = (img: Element | null | undefined) =>
+		img?.getAttribute('style')?.match(/rotate\((-?\d+)deg\)/)?.[1] ?? null;
 
-	it('shows each capture turned by its camera\'s saved orientation, the frame keeping its size', async () => {
+	it("shows each capture turned by its camera's saved orientation, the frame keeping its size", async () => {
 		captureSpy.mockImplementation(() => shot(600, 400));
 		// Camera 1 takes the left page here.
 		renderCheck({ leftIndex: 1, rotateDeg: { 0: 180, 1: 90 } });
@@ -656,7 +707,9 @@ describe('CameraCheck: orientation', () => {
 		expect(rotationOf(frameImg('right'))).toBe('180');
 		// At 90° the picture gets the frame's size with width and height swapped.
 		const f = frame('left')!;
-		await expect.poll(() => frameImg('left')?.getAttribute('style') ?? '').toContain(`width: ${f.clientHeight}px`);
+		await expect
+			.poll(() => frameImg('left')?.getAttribute('style') ?? '')
+			.toContain(`width: ${f.clientHeight}px`);
 		expect(frameImg('left')!.getAttribute('style')).toContain(`height: ${f.clientWidth}px`);
 		const after = frame('left')!.getBoundingClientRect();
 		expect(after.width).toBeCloseTo(before.width, 0);
@@ -727,7 +780,8 @@ describe('CameraCheck: orientation', () => {
 		await click(en.camcheck_full_size_aria('left'));
 		const viewer = () => document.querySelector('[role="dialog"][aria-labelledby="fv-title"]')!;
 		const imgs = () => viewer().querySelectorAll('img');
-		const scale = (img: Element) => Number(img.getAttribute('style')?.match(/scale\(([\d.]+)\)/)?.[1] ?? NaN);
+		const scale = (img: Element) =>
+			Number(img.getAttribute('style')?.match(/scale\(([\d.]+)\)/)?.[1] ?? NaN);
 		await expect.poll(() => scale(imgs()[0])).toBeGreaterThan(1);
 		expect(rotationOf(imgs()[0])).toBe('90');
 		expect(rotationOf(imgs()[1])).toBe('270');
@@ -755,7 +809,8 @@ describe('CameraCheck: EXIF orientation', () => {
 		await click(en.camcheck_take);
 		await bothTaken();
 		await expect.poll(() => frameImg('left')?.naturalWidth ?? 0).toBe(400);
-		for (const side of ['left', 'right'] as const) expect(getComputedStyle(frameImg(side)!).imageOrientation).toBe('none');
+		for (const side of ['left', 'right'] as const)
+			expect(getComputedStyle(frameImg(side)!).imageOrientation).toBe('none');
 		await click(en.camcheck_full_size_aria('left'));
 		const imgs = document.querySelectorAll('[role="dialog"][aria-labelledby="fv-title"] img');
 		expect(imgs).toHaveLength(2);
@@ -764,12 +819,24 @@ describe('CameraCheck: EXIF orientation', () => {
 });
 
 describe('CameraCheck: Escape as the assigned capture key', () => {
-	const chord = (over: Partial<{ ctrl: boolean }> = {}) => ({ key: 'Escape', ctrl: false, alt: false, meta: false, shift: false, ...over });
+	const chord = (over: Partial<{ ctrl: boolean }> = {}) => ({
+		key: 'Escape',
+		ctrl: false,
+		alt: false,
+		meta: false,
+		shift: false,
+		...over
+	});
 	// On the focused element, as a real key press: the window's capture-phase
 	// listener (dismissible) then runs before its bubble-phase one (the key).
 	function escape(ctrlKey = false) {
 		const target = document.activeElement ?? document.body;
-		const event = new KeyboardEvent('keydown', { key: 'Escape', ctrlKey, bubbles: true, cancelable: true });
+		const event = new KeyboardEvent('keydown', {
+			key: 'Escape',
+			ctrlKey,
+			bubbles: true,
+			cancelable: true
+		});
 		target.dispatchEvent(event);
 		target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', ctrlKey, bubbles: true }));
 		return event;
@@ -934,7 +1001,12 @@ describe('CameraCheck: a device listing never overwrites a newer zoom step', () 
 describe('CameraCheck: "Change which camera is which" (NEH-343)', () => {
 	it('the camera details offer it; pressing it closes the details and asks the capture screen', async () => {
 		const onChangeRoles = vi.fn();
-		render(CameraCheck, { leftIndex: 0, rotateDeg: { 0: 0, 1: 0 }, onClose: vi.fn(), onChangeRoles });
+		render(CameraCheck, {
+			leftIndex: 0,
+			rotateDeg: { 0: 0, 1: 0 },
+			onClose: vi.fn(),
+			onChangeRoles
+		});
 		await settle();
 		await press(chip('right'));
 		const details = document.querySelector('[role="dialog"][aria-labelledby="cd-title"]')!;
@@ -958,7 +1030,9 @@ describe('CameraCheck: "Change which camera is which" (NEH-343)', () => {
 		document.body.append(over);
 		const trap = trapFocus(over);
 		const dismiss = dismissible(over, { onDismiss: () => {}, escape: false });
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
+		window.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true })
+		);
 		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', bubbles: true }));
 		await settle();
 		expect(captureSpy).not.toHaveBeenCalled();
@@ -966,14 +1040,17 @@ describe('CameraCheck: "Change which camera is which" (NEH-343)', () => {
 		trap.destroy();
 		over.remove();
 		await settle();
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
+		window.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true })
+		);
 		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', bubbles: true }));
 		await expect.poll(() => captureSpy.mock.calls.length).toBeGreaterThan(0);
 	});
 });
 
 describe('CameraCheck: one operation at a time', () => {
-	const turnBtn = (side: 'left' | 'right') => frame(side)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
+	const turnBtn = (side: 'left' | 'right') =>
+		frame(side)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
 	const takeBtn = () => button(en.camcheck_take);
 
 	// Every listing after the first waits until the test answers it.
@@ -1000,7 +1077,7 @@ describe('CameraCheck: one operation at a time', () => {
 
 	afterEach(() => clearChord());
 
-	it('a second pair of test captures cannot start while the first pair\'s listing is pending', async () => {
+	it("a second pair of test captures cannot start while the first pair's listing is pending", async () => {
 		writeChord({ key: 'F9', ctrl: false, alt: false, meta: false, shift: false });
 		const held = holdListings();
 		renderCheck();

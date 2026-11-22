@@ -43,7 +43,9 @@
 	let hasDetails = $derived(
 		!!view && (!!view.configError || !!view.incident || hasProblems || view.history.length > 0)
 	);
-	let fullText = $derived(view ? [view.label, view.detail].filter((part) => part !== null).join(' · ') : '');
+	let fullText = $derived(
+		view ? [view.label, view.detail].filter((part) => part !== null).join(' · ') : ''
+	);
 
 	// Nothing left to show: the panel closes with it.
 	$effect(() => {
@@ -99,10 +101,18 @@
 				onclick={() => (open = !open)}
 			>
 				{@render line()}
-				<span class="material-symbols-outlined offsite-indicator-icon fisqua-trigger-caret" aria-hidden="true">expand_more</span>
+				<span
+					class="material-symbols-outlined offsite-indicator-icon fisqua-trigger-caret"
+					aria-hidden="true">expand_more</span
+				>
 			</button>
 		{:else}
-			<p class="offsite-indicator fisqua-indicator fisqua-{view.tone}" data-fisqua data-kind={view.kind} title={fullText}>
+			<p
+				class="offsite-indicator fisqua-indicator fisqua-{view.tone}"
+				data-fisqua
+				data-kind={view.kind}
+				title={fullText}
+			>
 				{@render line()}
 			</p>
 		{/if}
@@ -119,7 +129,13 @@
 							<ul>
 								{#each view.incident.missing as file, i (i)}
 									<li>
-										<code>{file.key}</code>{#if file.kind}<span class="fisqua-problem-records">&nbsp;· {file.kind}</span>{/if}{#if file.role}<span class="fisqua-problem-records">&nbsp;· {file.role}</span>{/if}{#if file.captureId}<span class="fisqua-problem-records">&nbsp;· {file.captureId}</span>{/if}
+										<code>{file.key}</code>{#if file.kind}<span class="fisqua-problem-records"
+												>&nbsp;· {file.kind}</span
+											>{/if}{#if file.role}<span class="fisqua-problem-records"
+												>&nbsp;· {file.role}</span
+											>{/if}{#if file.captureId}<span class="fisqua-problem-records"
+												>&nbsp;· {file.captureId}</span
+											>{/if}
 									</li>
 								{/each}
 							</ul>
@@ -129,12 +145,16 @@
 				{#if hasProblems}
 					<section class="fisqua-problems" data-problems-kind={view.problemsKind}>
 						<p class="fisqua-panel-heading">
-							{view.problemsKind === 'notes' ? $m.fisqua_notes(problemTotal) : $m.fisqua_problems(problemTotal)}
+							{view.problemsKind === 'notes'
+								? $m.fisqua_notes(problemTotal)
+								: $m.fisqua_problems(problemTotal)}
 						</p>
 						<ul>
 							{#each view.problems as problem, i (i)}
 								<li data-source={problem.fromFisqua ? 'fisqua' : 'captua'}>
-									{problem.text}{#if problem.records}<span class="fisqua-problem-records">&nbsp;{problem.records}</span>{/if}
+									{problem.text}{#if problem.records}<span class="fisqua-problem-records"
+											>&nbsp;{problem.records}</span
+										>{/if}
 								</li>
 							{/each}
 							{#if view.omitted > 0}
@@ -148,7 +168,11 @@
 						<p class="fisqua-panel-heading">{$m.fisqua_history(view.history.length)}</p>
 						<ul>
 							{#each view.history as item, i (i)}
-								<li data-kind={item.kind}>{item.label}{#if item.when}<span class="offsite-indicator-sep"> · </span>{item.when}{/if}</li>
+								<li data-kind={item.kind}>
+									{item.label}{#if item.when}<span class="offsite-indicator-sep">
+											·
+										</span>{item.when}{/if}
+								</li>
 							{/each}
 						</ul>
 					</section>

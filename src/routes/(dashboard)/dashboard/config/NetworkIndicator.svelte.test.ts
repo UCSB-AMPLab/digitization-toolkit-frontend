@@ -36,19 +36,39 @@ function iface(over: Partial<NetworkInterface> = {}): NetworkInterface {
 }
 
 const OFF_CABLE = iface({ state: 'unavailable', ipv4: [], gateway: null, dns: [] });
-const OFF_WIFI = iface({ device: 'wlan0', type: 'wifi', state: 'disconnected', ipv4: [], gateway: null, dns: [] });
+const OFF_WIFI = iface({
+	device: 'wlan0',
+	type: 'wifi',
+	state: 'disconnected',
+	ipv4: [],
+	gateway: null,
+	dns: []
+});
 
 function wifi(signal: number, ssid = 'Archive-Office') {
 	return iface({ device: 'wlan0', type: 'wifi', ssid, signal, ipv4: ['10.0.4.117/24'] });
 }
 
-function status(interfaces: NetworkInterface[], problems: NetworkStatus['problems'] = []): NetworkStatus {
-	return { hostname: 'captua', wifiDevice: 'wlan0', permissions: { scan: true, control: true, modify: true }, interfaces, problems };
+function status(
+	interfaces: NetworkInterface[],
+	problems: NetworkStatus['problems'] = []
+): NetworkStatus {
+	return {
+		hostname: 'captua',
+		wifiDevice: 'wlan0',
+		permissions: { scan: true, control: true, modify: true },
+		interfaces,
+		problems
+	};
 }
 
 function serve(code: number, body: unknown) {
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(
-		async () => new Response(JSON.stringify(body), { status: code, headers: { 'Content-Type': 'application/json' } })
+		async () =>
+			new Response(JSON.stringify(body), {
+				status: code,
+				headers: { 'Content-Type': 'application/json' }
+			})
 	);
 }
 
@@ -76,11 +96,15 @@ describe('network indicator', () => {
 		serve(200, status([OFF_CABLE, wifi(72)]));
 		const { container } = render(NetworkIndicator, { expanded: true });
 		const a = await shown(container);
-		await expect.poll(() => a.querySelector('.net-status-line')?.textContent?.trim()).toBe('Connected · Archive-Office');
+		await expect
+			.poll(() => a.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe('Connected · Archive-Office');
 		expect(filledBars(a)).toBe(4);
 		expect(a.classList.contains('tone-ok')).toBe(true);
 		expect(a.getAttribute('href')).toBe('/dashboard/config?section=network');
-		expect(a.getAttribute('aria-label')).toBe(en.network_ind_label('Connected', 'Archive-Office', 72));
+		expect(a.getAttribute('aria-label')).toBe(
+			en.network_ind_label('Connected', 'Archive-Office', 72)
+		);
 	});
 
 	it.each([
@@ -99,7 +123,9 @@ describe('network indicator', () => {
 		serve(200, status([iface(), OFF_WIFI]));
 		const { container } = render(NetworkIndicator, { expanded: true });
 		const a = await shown(container);
-		await expect.poll(() => a.querySelector('.net-status-line')?.textContent?.trim()).toBe('Connected · 192.168.10.42');
+		await expect
+			.poll(() => a.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe('Connected · 192.168.10.42');
 		expect(a.querySelector('svg.cable')).not.toBeNull();
 		expect(a.querySelector('svg.sig')).toBeNull();
 	});
@@ -108,7 +134,9 @@ describe('network indicator', () => {
 		serve(200, status([wifi(81, 'Library-Guest')], [{ code: 'no_dns', device: 'wlan0' }]));
 		const { container } = render(NetworkIndicator, { expanded: true });
 		const a = await shown(container);
-		await expect.poll(() => a.querySelector('.net-status-line')?.textContent?.trim()).toBe('Network problem · Library-Guest');
+		await expect
+			.poll(() => a.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe('Network problem · Library-Guest');
 		expect(a.classList.contains('tone-warn')).toBe(true);
 	});
 
@@ -116,7 +144,9 @@ describe('network indicator', () => {
 		serve(200, status([OFF_CABLE, OFF_WIFI], [{ code: 'no_connection', device: null }]));
 		const { container } = render(NetworkIndicator, { expanded: true });
 		const a = await shown(container);
-		await expect.poll(() => a.querySelector('.net-status-line')?.textContent?.trim()).toBe('Offline');
+		await expect
+			.poll(() => a.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe('Offline');
 		expect(a.querySelector('svg.sig')).not.toBeNull();
 		expect(filledBars(a)).toBe(0);
 		expect(a.classList.contains('tone-off')).toBe(true);
@@ -127,7 +157,9 @@ describe('network indicator', () => {
 		const { container } = render(NetworkIndicator, { expanded: false });
 		const a = await shown(container);
 		expect(a.querySelector('.net-status-line')).toBeNull();
-		expect(a.getAttribute('aria-label')).toBe(en.network_ind_label('Connected', 'Archive-Office', 72));
+		expect(a.getAttribute('aria-label')).toBe(
+			en.network_ind_label('Connected', 'Archive-Office', 72)
+		);
 		expect(a.textContent?.trim()).toBe('');
 	});
 
@@ -143,18 +175,30 @@ describe('network indicator', () => {
 
 describe('network indicator: no read has succeeded yet', () => {
 	it.each([
-		['a 503', () => serve(503, { detail: { message: 'x', problems: [{ code: 'network_manager_unavailable' }] } })],
-		['no answer', () => vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))]
-	])('the first read fails with %s: "Network state unknown" in the neutral colour', async (_, answer) => {
-		answer();
-		const { container } = render(NetworkIndicator, { expanded: true });
-		const a = await shown(container);
-		expect(a.querySelector('.net-status-line')?.textContent?.trim()).toBe(en.network_ind_unknown);
-		expect(a.classList.contains('tone-off')).toBe(true);
-		expect(filledBars(a)).toBe(0);
-		expect(a.getAttribute('aria-label')).toBe(en.network_ind_unknown);
-		expect(a.getAttribute('href')).toBe('/dashboard/config?section=network');
-	});
+		[
+			'a 503',
+			() =>
+				serve(503, {
+					detail: { message: 'x', problems: [{ code: 'network_manager_unavailable' }] }
+				})
+		],
+		[
+			'no answer',
+			() => vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
+		]
+	])(
+		'the first read fails with %s: "Network state unknown" in the neutral colour',
+		async (_, answer) => {
+			answer();
+			const { container } = render(NetworkIndicator, { expanded: true });
+			const a = await shown(container);
+			expect(a.querySelector('.net-status-line')?.textContent?.trim()).toBe(en.network_ind_unknown);
+			expect(a.classList.contains('tone-off')).toBe(true);
+			expect(filledBars(a)).toBe(0);
+			expect(a.getAttribute('aria-label')).toBe(en.network_ind_unknown);
+			expect(a.getAttribute('href')).toBe('/dashboard/config?section=network');
+		}
+	);
 
 	it('several 501s in a row still show nothing', async () => {
 		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
@@ -181,21 +225,30 @@ describe('network indicator: fix round', () => {
 		let code = 200;
 		vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
 			code === 200
-				? new Response(JSON.stringify(status([wifi(72)])), { status: 200, headers: { 'Content-Type': 'application/json' } })
+				? new Response(JSON.stringify(status([wifi(72)])), {
+						status: 200,
+						headers: { 'Content-Type': 'application/json' }
+					})
 				: new Response(JSON.stringify({ detail: 'boom' }), { status: code })
 		);
 		const { container } = render(NetworkIndicator, { expanded: true });
 		const a = await shown(container);
-		await expect.poll(() => a.querySelector('.net-status-line')?.textContent?.trim()).toBe('Connected · Archive-Office');
+		await expect
+			.poll(() => a.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe('Connected · Archive-Office');
 
 		code = 500;
 		await vi.advanceTimersByTimeAsync(NETWORK_POLL_MS);
 		await new Promise((r) => setTimeout(r, 50));
 		// One failure: still the last state.
-		expect(link(container)!.querySelector('.net-status-line')?.textContent?.trim()).toBe('Connected · Archive-Office');
+		expect(link(container)!.querySelector('.net-status-line')?.textContent?.trim()).toBe(
+			'Connected · Archive-Office'
+		);
 
 		await vi.advanceTimersByTimeAsync(NETWORK_POLL_MS);
-		await expect.poll(() => link(container)?.querySelector('.net-status-line')?.textContent?.trim()).toBe(en.network_ind_unknown);
+		await expect
+			.poll(() => link(container)?.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe(en.network_ind_unknown);
 		const b = link(container)!;
 		expect(b.classList.contains('tone-off')).toBe(true);
 		expect(filledBars(b)).toBe(0);
@@ -203,19 +256,48 @@ describe('network indicator: fix round', () => {
 
 		code = 200;
 		await vi.advanceTimersByTimeAsync(NETWORK_POLL_MS);
-		await expect.poll(() => link(container)?.querySelector('.net-status-line')?.textContent?.trim()).toBe('Connected · Archive-Office');
+		await expect
+			.poll(() => link(container)?.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe('Connected · Archive-Office');
 	});
 
 	it('Connecting when nothing is connected and an interface is connecting', async () => {
-		serve(200, status([OFF_CABLE, iface({ device: 'wlan0', type: 'wifi', state: 'connecting', ssid: null, signal: null, connection: 'eduroam', ipv4: [] })]));
+		serve(
+			200,
+			status([
+				OFF_CABLE,
+				iface({
+					device: 'wlan0',
+					type: 'wifi',
+					state: 'connecting',
+					ssid: null,
+					signal: null,
+					connection: 'eduroam',
+					ipv4: []
+				})
+			])
+		);
 		const { container } = render(NetworkIndicator, { expanded: true });
 		const a = await shown(container);
-		await expect.poll(() => a.querySelector('.net-status-line')?.textContent?.trim()).toBe(`${en.network_ind_connecting} · eduroam`);
+		await expect
+			.poll(() => a.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe(`${en.network_ind_connecting} · eduroam`);
 		expect(a.classList.contains('tone-off')).toBe(true);
 	});
 
 	it('a Wi-Fi signal of null: empty bars in the neutral colour, no percentage in the name', async () => {
-		serve(200, status([iface({ device: 'wlan0', type: 'wifi', ssid: 'Archive-Office', signal: null, ipv4: ['10.0.4.117/24'] })]));
+		serve(
+			200,
+			status([
+				iface({
+					device: 'wlan0',
+					type: 'wifi',
+					ssid: 'Archive-Office',
+					signal: null,
+					ipv4: ['10.0.4.117/24']
+				})
+			])
+		);
 		const { container } = render(NetworkIndicator, { expanded: true });
 		const a = await shown(container);
 		await expect.poll(() => a.getAttribute('aria-label')).toBe('Connected · Archive-Office');
@@ -224,10 +306,24 @@ describe('network indicator: fix round', () => {
 	});
 
 	it('an empty network name: the state alone, with no separator', async () => {
-		serve(200, status([iface({ device: 'wlan0', type: 'wifi', ssid: '', connection: '', signal: 60, ipv4: ['10.0.4.117/24'] })]));
+		serve(
+			200,
+			status([
+				iface({
+					device: 'wlan0',
+					type: 'wifi',
+					ssid: '',
+					connection: '',
+					signal: 60,
+					ipv4: ['10.0.4.117/24']
+				})
+			])
+		);
 		const { container } = render(NetworkIndicator, { expanded: true });
 		const a = await shown(container);
-		await expect.poll(() => a.querySelector('.net-status-line')?.textContent?.trim()).toBe('Connected');
+		await expect
+			.poll(() => a.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe('Connected');
 		expect(a.getAttribute('aria-label')).toBe('Connected');
 	});
 
@@ -235,6 +331,8 @@ describe('network indicator: fix round', () => {
 		serve(200, status([iface(), wifi(72)], [{ code: 'no_dns', device: 'eth0' }]));
 		const { container } = render(NetworkIndicator, { expanded: true });
 		const a = await shown(container);
-		await expect.poll(() => a.querySelector('.net-status-line')?.textContent?.trim()).toBe('Network problem · 192.168.10.42');
+		await expect
+			.poll(() => a.querySelector('.net-status-line')?.textContent?.trim())
+			.toBe('Network problem · 192.168.10.42');
 	});
 });

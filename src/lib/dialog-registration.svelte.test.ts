@@ -15,7 +15,13 @@ vi.mock('$app/stores', async () => {
 });
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { collectionsApi, projectsApi, usersApi, type Record as ApiRecord, type VolumeOffsiteState } from '$lib/api';
+import {
+	collectionsApi,
+	projectsApi,
+	usersApi,
+	type Record as ApiRecord,
+	type VolumeOffsiteState
+} from '$lib/api';
 import { openDialogCount } from '$lib/dialog';
 import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
@@ -77,9 +83,15 @@ describe('pop-ups register as dialogs while open', () => {
 	});
 
 	it('the handover dialog: registered while open, gone once closed', async () => {
-		const records = [{ id: 1, title: 'Folio 1', status: 'captured', capture_mode: 'single', images: [] }] as unknown as ApiRecord[];
+		const records = [
+			{ id: 1, title: 'Folio 1', status: 'captured', capture_mode: 'single', images: [] }
+		] as unknown as ApiRecord[];
 		const promote = vi.spyOn(collectionsApi, 'promote');
-		const screen = render(HandoverControls, { records, collectionId: 7, onChanged: async () => true });
+		const screen = render(HandoverControls, {
+			records,
+			collectionId: 7,
+			onChanged: async () => true
+		});
 		expect(openDialogCount()).toBe(0);
 		await screen.getByRole('button', { name: en.col_handover_send }).click();
 		expect(openDialogCount()).toBe(1);
@@ -93,10 +105,25 @@ describe('pop-ups register as dialogs while open', () => {
 
 	it('the offsite dialog: registered while open, closes on Escape and on its backdrop', async () => {
 		const offsite: VolumeOffsiteState = {
-			collection_id: 7, filename_stem: 'co-x', uploadable: true, total: 10, verified: 10, pending: 0,
-			refused: 0, last_verified_at: null, received: true, refusals: [], freed_files: 0, freed_bytes: 0
+			collection_id: 7,
+			filename_stem: 'co-x',
+			uploadable: true,
+			total: 10,
+			verified: 10,
+			pending: 0,
+			refused: 0,
+			last_verified_at: null,
+			received: true,
+			refusals: [],
+			freed_files: 0,
+			freed_bytes: 0
 		};
-		const screen = render(VolumeOffsiteActions, { collectionId: 7, offsite, canRestore: true, onChanged: () => {} });
+		const screen = render(VolumeOffsiteActions, {
+			collectionId: 7,
+			offsite,
+			canRestore: true,
+			onChanged: () => {}
+		});
 		expect(openDialogCount()).toBe(0);
 		await screen.getByRole('button', { name: en.offsite_manage_open }).click();
 		expect(openDialogCount()).toBe(1);
@@ -114,7 +141,13 @@ describe('pop-ups register as dialogs while open', () => {
 
 	it('the volume form: registered, closes on its backdrop, ignores Escape', async () => {
 		const onClose = vi.fn();
-		render(VolumeFormModal, { editing: null, projectId: 2, projectName: 'P', onClose, onSaved: () => {} });
+		render(VolumeFormModal, {
+			editing: null,
+			projectId: 2,
+			projectName: 'P',
+			onClose,
+			onSaved: () => {}
+		});
 		await settle();
 		expect(openDialogCount()).toBe(1);
 

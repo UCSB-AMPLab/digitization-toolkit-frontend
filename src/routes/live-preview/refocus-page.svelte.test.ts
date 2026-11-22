@@ -24,7 +24,12 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
-import { FOCUS_CHECK_AFTER_MS, clearFocusActivity, readFocusActivity, recordFocusActivity } from '$lib/focus-check';
+import {
+	FOCUS_CHECK_AFTER_MS,
+	clearFocusActivity,
+	readFocusActivity,
+	recordFocusActivity
+} from '$lib/focus-check';
 import { clearChord, readChords, DEFAULT_CHORDS } from '$lib/capture-key';
 import '../../app.css';
 import GuidedTour from '$lib/components/GuidedTour.svelte';
@@ -37,7 +42,10 @@ const USER = 3;
 const MIN = 60 * 1000;
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
@@ -65,25 +73,63 @@ function serve(dslr: boolean, served: Served = {}) {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/cameras/capabilities')) {
 			await served.capsGate;
-			return json({ backend: dslr ? 'gphoto2' : 'picamera2', live_preview: true, focus_control: !dslr, live_controls: !dslr, zoom: false, autofocus_calibration: !dslr, dslr_settings: dslr, continuous_preview: !dslr });
+			return json({
+				backend: dslr ? 'gphoto2' : 'picamera2',
+				live_preview: true,
+				focus_control: !dslr,
+				live_controls: !dslr,
+				zoom: false,
+				autofocus_calibration: !dslr,
+				dslr_settings: dslr,
+				continuous_preview: !dslr
+			});
 		}
 		if (path.includes('/cameras/preview/')) return new Response(null, { status: 404 });
 		if (/\/cameras\/dslr\/\d\/settings$/.test(path)) return json({ focus_mode: 'Manual' });
 		if (path.endsWith('/cameras/devices')) {
-			return json([{ index: 0, model: 'Canon EOS Rebel T7', hardware_id: 'a' }, { index: 1, model: 'Canon EOS Rebel T7', hardware_id: 'b' }]);
+			return json([
+				{ index: 0, model: 'Canon EOS Rebel T7', hardware_id: 'a' },
+				{ index: 1, model: 'Canon EOS Rebel T7', hardware_id: 'b' }
+			]);
 		}
 		if (path.endsWith('/records/to-retake/summary')) {
-			return json(served.summary ?? { pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
+			return json(
+				served.summary ?? {
+					pendingRecords: 0,
+					volumes: [],
+					turn: { state: 'free', unlockedBy: null }
+				}
+			);
 		}
 		if (path.includes('/cameras/test-capture/')) {
 			testCaptures.push(Number(path.split('/').pop()));
 			return new Promise<Response>(() => {});
 		}
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 6',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: 'co-ahr-6',
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
-		if (path.endsWith('/records/')) return json(served.records ?? [{ id: 41, title: 'Par 1', status: 'captured', sequence: 1, capture_mode: 'dual', collection_id: 9, images: [] }]);
+		if (path.endsWith('/records/'))
+			return json(
+				served.records ?? [
+					{
+						id: 41,
+						title: 'Par 1',
+						status: 'captured',
+						sequence: 1,
+						capture_mode: 'dual',
+						collection_id: 9,
+						images: []
+					}
+				]
+			);
 		if (path.endsWith('/cameras/capture/dual') || path.endsWith('/cameras/capture')) {
 			captures.push(path);
 			await served.captureGate;
@@ -102,9 +148,12 @@ function setStaleActivity() {
 	recordFocusActivity(USER, Date.now() - FOCUS_CHECK_AFTER_MS - MIN);
 }
 
-const refocusButton = () => document.querySelector(`button[aria-label="${en.focus_refocus}"]`) as HTMLButtonElement | null;
+const refocusButton = () =>
+	document.querySelector(`button[aria-label="${en.focus_refocus}"]`) as HTMLButtonElement | null;
 const refocusDialog = () =>
-	[...document.querySelectorAll('[role="dialog"]')].find((d) => d.textContent?.includes(en.focus_af_title)) ?? null;
+	[...document.querySelectorAll('[role="dialog"]')].find((d) =>
+		d.textContent?.includes(en.focus_af_title)
+	) ?? null;
 const captureButton = () => document.querySelector('.capture-btn') as HTMLButtonElement | null;
 
 function pressCaptureKey() {
@@ -130,7 +179,10 @@ beforeEach(() => {
 	clearChord();
 	locale.set('en');
 	current.url = 'http://localhost/live-preview?projectId=2&collectionId=9';
-	authStore.setSession({ id: USER, username: 'operator', email: null, role: 'operator', is_active: true }, { signIn: true });
+	authStore.setSession(
+		{ id: USER, username: 'operator', email: null, role: 'operator', is_active: true },
+		{ signIn: true }
+	);
 });
 
 afterEach(() => {
@@ -258,7 +310,8 @@ describe('capture screen: "Refocus" (NEH-339)', () => {
 		current.url = 'http://localhost/live-preview?projectId=2&collectionId=9&recordId=41';
 		serve(true);
 		render(LivePreview);
-		const viewer = () => document.querySelector('.img-viewer-content[aria-labelledby="lv-img-viewer-title"]');
+		const viewer = () =>
+			document.querySelector('.img-viewer-content[aria-labelledby="lv-img-viewer-title"]');
 		await expect.poll(() => viewer()).not.toBeNull();
 		await expect.poll(() => refocusButton()).not.toBeNull();
 		await settle();
@@ -270,17 +323,35 @@ describe('capture screen: "Refocus" (NEH-339)', () => {
 	});
 
 	it('waits for the recapture-turn block panel, and opens once an admin captures anyway', async () => {
-		authStore.setSession({ id: USER, username: 'admin', email: null, role: 'admin', is_active: true }, { signIn: true });
+		authStore.setSession(
+			{ id: USER, username: 'admin', email: null, role: 'admin', is_active: true },
+			{ signIn: true }
+		);
 		serve(true, {
 			records: [],
 			summary: {
 				pendingRecords: 3,
-				volumes: [{ collectionId: 30, projectId: 2, name: 'Tomo 030', filenameStem: 'co-30', pending: 3, total: 3, excluded: 0, firstPendingRecordId: 300, pendingRecordIds: [300, 301, 302] }],
+				volumes: [
+					{
+						collectionId: 30,
+						projectId: 2,
+						name: 'Tomo 030',
+						filenameStem: 'co-30',
+						pending: 3,
+						total: 3,
+						excluded: 0,
+						firstPendingRecordId: 300,
+						pendingRecordIds: [300, 301, 302]
+					}
+				],
 				turn: { state: 'recaptures', unlockedBy: null }
 			}
 		});
 		render(LivePreview);
-		const admin = () => [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === en.block_admin);
+		const admin = () =>
+			[...document.querySelectorAll<HTMLButtonElement>('button')].find(
+				(b) => b.textContent?.trim() === en.block_admin
+			);
 		await expect.poll(() => admin()).toBeTruthy();
 		await settle();
 		expect(refocusDialog()).toBeNull();
@@ -300,7 +371,11 @@ describe('the check waits for a capture in flight (NEH-339)', () => {
 	it('capabilities arriving during a capture do not open it; it opens once the capture has failed and the check is still due', async () => {
 		const caps = gate();
 		const shutter = gate();
-		const captures = serve(true, { capsGate: caps.promise, captureGate: shutter.promise, captureFails: true });
+		const captures = serve(true, {
+			capsGate: caps.promise,
+			captureGate: shutter.promise,
+			captureFails: true
+		});
 		render(LivePreview);
 		await expect.poll(() => captureButton()?.disabled).toBe(false);
 		pressCaptureKey();
@@ -397,10 +472,14 @@ describe('the check waits for a capture in flight (NEH-339)', () => {
 // registry in src/lib/dialog.ts, LiveViewport's own included, and opens once
 // the last one has closed if it is still due.
 describe('the check waits for any open dialog (NEH-339)', () => {
-	const floatButton = (label: string) => document.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement | null;
-	const modalByTitle = (id: string) => document.querySelector(`[role="dialog"][aria-labelledby="${id}"]`);
+	const floatButton = (label: string) =>
+		document.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement | null;
+	const modalByTitle = (id: string) =>
+		document.querySelector(`[role="dialog"][aria-labelledby="${id}"]`);
 	const closeIn = (id: string) =>
-		[...(modalByTitle(id)?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((b) => b.textContent?.trim() === en.common_close)!;
+		[...(modalByTitle(id)?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+			(b) => b.textContent?.trim() === en.common_close
+		)!;
 	const makeDue = () => setStaleActivity();
 
 	for (const [name, label, titleId] of [
@@ -448,27 +527,40 @@ describe('the check waits for any open dialog (NEH-339)', () => {
 		await expect.poll(() => refocusButton()).not.toBeNull();
 		floatButton(en.lv_capture_key_settings)!.click();
 		await expect.poll(() => modalByTitle('capture-key-modal-title')).not.toBeNull();
-		const learn = [...modalByTitle('capture-key-modal-title')!.querySelectorAll<HTMLButtonElement>('button')].find(
-			(b) => b.textContent?.trim() === en.lv_capture_key_learn
-		)!;
+		const learn = [
+			...modalByTitle('capture-key-modal-title')!.querySelectorAll<HTMLButtonElement>('button')
+		].find((b) => b.textContent?.trim() === en.lv_capture_key_learn)!;
 		learn.click();
-		await expect.poll(() => document.querySelector('.capture-key-status')?.textContent).toBe(en.lv_capture_key_learning);
+		await expect
+			.poll(() => document.querySelector('.capture-key-status')?.textContent)
+			.toBe(en.lv_capture_key_learning);
 
 		// The focus check over the learning dialog: its button, under the backdrop.
 		refocusButton()!.click();
 		await expect.poll(() => refocusDialog()).not.toBeNull();
-		const key = new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', bubbles: true, cancelable: true });
+		const key = new KeyboardEvent('keydown', {
+			key: 'x',
+			code: 'KeyX',
+			bubbles: true,
+			cancelable: true
+		});
 		document.body.dispatchEvent(key);
-		document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'x', code: 'KeyX', bubbles: true }));
+		document.body.dispatchEvent(
+			new KeyboardEvent('keyup', { key: 'x', code: 'KeyX', bubbles: true })
+		);
 		await settle();
 		expect(readChords()).toEqual(DEFAULT_CHORDS);
 		expect(key.defaultPrevented).toBe(false);
-		expect(document.querySelector('.capture-key-status')?.textContent).toBe(en.lv_capture_key_learning);
+		expect(document.querySelector('.capture-key-status')?.textContent).toBe(
+			en.lv_capture_key_learning
+		);
 
 		// Once the check has closed, the learning dialog takes the next key.
 		skip();
 		await expect.poll(() => refocusDialog()).toBeNull();
-		document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', bubbles: true, cancelable: true }));
+		document.body.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', bubbles: true, cancelable: true })
+		);
 		await expect.poll(() => readChords()[0]?.key).toBe('x');
 	});
 

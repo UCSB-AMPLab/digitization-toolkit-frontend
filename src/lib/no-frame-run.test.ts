@@ -3,11 +3,7 @@
 //
 // Version: 0.3.3
 import { describe, expect, it } from 'vitest';
-import {
-	createNoFrameRun,
-	LAST_PAIR_NO_FRAME_ANSWERS,
-	NO_FRAME_SECONDS
-} from './no-frame-run';
+import { createNoFrameRun, LAST_PAIR_NO_FRAME_ANSWERS, NO_FRAME_SECONDS } from './no-frame-run';
 
 function setup() {
 	let t = 1_000_000;

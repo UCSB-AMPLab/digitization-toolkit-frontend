@@ -80,7 +80,12 @@ describe('startSessionKeepalive', () => {
 	});
 
 	it('listens to pointer, key, touch and wheel input', () => {
-		expect([...SESSION_ACTIVITY_EVENTS].sort()).toEqual(['keydown', 'pointerdown', 'touchstart', 'wheel']);
+		expect([...SESSION_ACTIVITY_EVENTS].sort()).toEqual([
+			'keydown',
+			'pointerdown',
+			'touchstart',
+			'wheel'
+		]);
 		for (const type of SESSION_ACTIVITY_EVENTS) {
 			const k = setup();
 			k.target.fire(type);

@@ -22,570 +22,757 @@ const BROKEN = 'data:image/png;base64,AAAA';
 const BROKEN_THUMB = 'data:image/png;base64,BBBB';
 
 function canvasPng(w: number, h: number): string {
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#3a6ea5';
-  ctx.fillRect(0, 0, w, h);
-  return c.toDataURL('image/png');
+	const c = document.createElement('canvas');
+	c.width = w;
+	c.height = h;
+	const ctx = c.getContext('2d')!;
+	ctx.fillStyle = '#3a6ea5';
+	ctx.fillRect(0, 0, w, h);
+	return c.toDataURL('image/png');
 }
 const PREVIEW_URL = canvasPng(120, 80);
 const THUMB_URL = canvasPng(60, 40);
 
 function makeImage(overrides: Partial<RecordImage> = {}): RecordImage {
-  return { id: 1, record_id: 1, filename: 'IMG_0001.cr2', file_path: '/x', format: 'cr2', is_current: true, ...overrides };
+	return {
+		id: 1,
+		record_id: 1,
+		filename: 'IMG_0001.cr2',
+		file_path: '/x',
+		format: 'cr2',
+		is_current: true,
+		...overrides
+	};
 }
 function makeRecord(images: RecordImage[]): ApiRecord {
-  return { id: 1, title: 'Folio 1', status: 'captured', capture_mode: 'single', images } as ApiRecord;
+	return {
+		id: 1,
+		title: 'Folio 1',
+		status: 'captured',
+		capture_mode: 'single',
+		images
+	} as ApiRecord;
 }
 
 // Every src any <img> under the container has ever had, not just the last one.
 function recordImgSrcs(container: HTMLElement): string[] {
-  const seen: string[] = [];
-  const collect = () => container.querySelectorAll('img').forEach((i) => seen.push(i.getAttribute('src') ?? ''));
-  collect();
-  new MutationObserver(collect).observe(container, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] });
-  return seen;
+	const seen: string[] = [];
+	const collect = () =>
+		container.querySelectorAll('img').forEach((i) => seen.push(i.getAttribute('src') ?? ''));
+	collect();
+	new MutationObserver(collect).observe(container, {
+		subtree: true,
+		childList: true,
+		attributes: true,
+		attributeFilter: ['src']
+	});
+	return seen;
 }
 
 const modals = [
-  ['gallery modal', (record: ApiRecord) => render(GalleryModal, { record, onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() })],
-  ['live-preview modal', (record: ApiRecord) => {
-    const screen = render(LiveModal, { record, cameraMode: 'single', onClose: vi.fn(), onRetake: vi.fn() });
-    // The modal opens on thumbnails; full size is what RecordImageDisplay draws.
-    const fullSize = screen.container.querySelector<HTMLButtonElement>('.img-viewer-footer button[data-view-toggle]');
-    flushSync(() => fullSize?.click());
-    return screen;
-  }],
+	[
+		'gallery modal',
+		(record: ApiRecord) =>
+			render(GalleryModal, { record, onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() })
+	],
+	[
+		'live-preview modal',
+		(record: ApiRecord) => {
+			const screen = render(LiveModal, {
+				record,
+				cameraMode: 'single',
+				onClose: vi.fn(),
+				onRetake: vi.fn()
+			});
+			// The modal opens on thumbnails; full size is what RecordImageDisplay draws.
+			const fullSize = screen.container.querySelector<HTMLButtonElement>(
+				'.img-viewer-footer button[data-view-toggle]'
+			);
+			flushSync(() => fullSize?.click());
+			return screen;
+		}
+	]
 ] as const;
 
 describe.each(modals)('%s — RAW images (NEH-139)', (_name, renderModal) => {
-  let fileSpy: ReturnType<typeof vi.spyOn>;
-  let previewSpy: ReturnType<typeof vi.spyOn>;
-  let thumbSpy: ReturnType<typeof vi.spyOn>;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+	let fileSpy: ReturnType<typeof vi.spyOn>;
+	let previewSpy: ReturnType<typeof vi.spyOn>;
+	let thumbSpy: ReturnType<typeof vi.spyOn>;
+	let fetchSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
-    fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockImplementation((id: number) => `http://dtk.invalid/records/images/${id}/file`);
-    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
-    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
-  });
-  afterEach(() => {
-    fileSpy.mockRestore();
-    previewSpy.mockRestore();
-    thumbSpy.mockRestore();
-    fetchSpy.mockRestore();
-  });
+	beforeEach(() => {
+		fileSpy = vi
+			.spyOn(recordsApi, 'getImageFileUrl')
+			.mockImplementation((id: number) => `http://dtk.invalid/records/images/${id}/file`);
+		previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+		thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+		fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
+	});
+	afterEach(() => {
+		fileSpy.mockRestore();
+		previewSpy.mockRestore();
+		thumbSpy.mockRestore();
+		fetchSpy.mockRestore();
+	});
 
-  it('shows the JPEG preview from /preview, labelled, never the /file URL', async () => {
-    const screen = renderModal(makeRecord([makeImage()]));
-    const srcs = recordImgSrcs(screen.container);
+	it('shows the JPEG preview from /preview, labelled, never the /file URL', async () => {
+		const screen = renderModal(makeRecord([makeImage()]));
+		const srcs = recordImgSrcs(screen.container);
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
-    await expect.element(screen.getByText('Vista previa (RAW)')).toBeVisible();
-    expect(srcs).not.toContain(FILE_URL);
-  });
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(PREVIEW_URL);
+		await expect.element(screen.getByText('Vista previa (RAW)')).toBeVisible();
+		expect(srcs).not.toContain(FILE_URL);
+	});
 
-  it('falls back to the thumbnail when /preview fails (no sidecar)', async () => {
-    previewSpy.mockReturnValue(BROKEN);
-    const screen = renderModal(makeRecord([makeImage()]));
-    const srcs = recordImgSrcs(screen.container);
+	it('falls back to the thumbnail when /preview fails (no sidecar)', async () => {
+		previewSpy.mockReturnValue(BROKEN);
+		const screen = renderModal(makeRecord([makeImage()]));
+		const srcs = recordImgSrcs(screen.container);
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
-    await expect.element(screen.getByText('Miniatura (RAW)')).toBeVisible();
-    expect(srcs).not.toContain(FILE_URL);
-  });
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(THUMB_URL);
+		await expect.element(screen.getByText('Miniatura (RAW)')).toBeVisible();
+		expect(srcs).not.toContain(FILE_URL);
+	});
 
-  it('nothing displayable, master confirmed by /file: explicit state, filename, and the original is stored', async () => {
-    previewSpy.mockReturnValue(BROKEN);
-    thumbSpy.mockReturnValue(BROKEN_THUMB);
-    const screen = renderModal(makeRecord([makeImage()]));
-    const srcs = recordImgSrcs(screen.container);
+	it('nothing displayable, master confirmed by /file: explicit state, filename, and the original is stored', async () => {
+		previewSpy.mockReturnValue(BROKEN);
+		thumbSpy.mockReturnValue(BROKEN_THUMB);
+		const screen = renderModal(makeRecord([makeImage()]));
+		const srcs = recordImgSrcs(screen.container);
 
-    await expect.element(screen.getByText('No se puede mostrar este formato')).toBeVisible();
-    await expect.element(screen.getByText('IMG_0001.cr2')).toBeVisible();
-    await expect.element(screen.getByText('El archivo original está guardado en el equipo.')).toBeVisible();
-    // The check sends the session cookie (NEH-61): the URL carries no token.
-    expect(fetchSpy).toHaveBeenCalledWith(FILE_URL, expect.objectContaining({ credentials: 'include' }));
-    expect(screen.container.querySelector('img')).toBeNull();
-    expect(srcs).not.toContain(FILE_URL);
-  });
+		await expect.element(screen.getByText('No se puede mostrar este formato')).toBeVisible();
+		await expect.element(screen.getByText('IMG_0001.cr2')).toBeVisible();
+		await expect
+			.element(screen.getByText('El archivo original está guardado en el equipo.'))
+			.toBeVisible();
+		// The check sends the session cookie (NEH-61): the URL carries no token.
+		expect(fetchSpy).toHaveBeenCalledWith(
+			FILE_URL,
+			expect.objectContaining({ credentials: 'include' })
+		);
+		expect(screen.container.querySelector('img')).toBeNull();
+		expect(srcs).not.toContain(FILE_URL);
+	});
 
-  it('nothing displayable, master not confirmed: no claim that the original is stored', async () => {
-    previewSpy.mockReturnValue(BROKEN);
-    thumbSpy.mockReturnValue(BROKEN_THUMB);
-    fetchSpy.mockResolvedValue(new Response('', { status: 401 }));
-    const screen = renderModal(makeRecord([makeImage()]));
+	it('nothing displayable, master not confirmed: no claim that the original is stored', async () => {
+		previewSpy.mockReturnValue(BROKEN);
+		thumbSpy.mockReturnValue(BROKEN_THUMB);
+		fetchSpy.mockResolvedValue(new Response('', { status: 401 }));
+		const screen = renderModal(makeRecord([makeImage()]));
 
-    await expect.element(screen.getByText('No se puede mostrar este formato')).toBeVisible();
-    await expect.poll(() => fetchSpy.mock.calls.length).toBeGreaterThan(0);
-    await new Promise((r) => setTimeout(r, 50));
-    expect(screen.container.textContent).not.toContain('El archivo original está guardado');
-  });
+		await expect.element(screen.getByText('No se puede mostrar este formato')).toBeVisible();
+		await expect.poll(() => fetchSpy.mock.calls.length).toBeGreaterThan(0);
+		await new Promise((r) => setTimeout(r, 50));
+		expect(screen.container.textContent).not.toContain('El archivo original está guardado');
+	});
 
-  it('nothing displayable and /file answers 404: says the file was not found', async () => {
-    previewSpy.mockReturnValue(BROKEN);
-    thumbSpy.mockReturnValue(BROKEN_THUMB);
-    fetchSpy.mockResolvedValue(new Response('', { status: 404 }));
-    const screen = renderModal(makeRecord([makeImage()]));
+	it('nothing displayable and /file answers 404: says the file was not found', async () => {
+		previewSpy.mockReturnValue(BROKEN);
+		thumbSpy.mockReturnValue(BROKEN_THUMB);
+		fetchSpy.mockResolvedValue(new Response('', { status: 404 }));
+		const screen = renderModal(makeRecord([makeImage()]));
 
-    await expect.element(screen.getByText('No se encontró el archivo de esta imagen.')).toBeVisible();
-    expect(screen.container.textContent).not.toContain('El archivo original está guardado');
-  });
+		await expect
+			.element(screen.getByText('No se encontró el archivo de esta imagen.'))
+			.toBeVisible();
+		expect(screen.container.textContent).not.toContain('El archivo original está guardado');
+	});
 
-  it('a dual pair with one RAW side: neither side ever puts /file in an <img>', async () => {
-    previewSpy.mockImplementation((id: number) => (id === 1 ? PREVIEW_URL : BROKEN));
-    const screen = renderModal({
-      ...makeRecord([
-        makeImage({ id: 1, role: 'left', format: 'jpg', filename: 'L.jpg' }),
-        makeImage({ id: 2, role: 'right', format: 'cr2', filename: 'R.cr2' }),
-      ]),
-      capture_mode: 'dual',
-    } as ApiRecord);
-    const srcs = recordImgSrcs(screen.container);
+	it('a dual pair with one RAW side: neither side ever puts /file in an <img>', async () => {
+		previewSpy.mockImplementation((id: number) => (id === 1 ? PREVIEW_URL : BROKEN));
+		const screen = renderModal({
+			...makeRecord([
+				makeImage({ id: 1, role: 'left', format: 'jpg', filename: 'L.jpg' }),
+				makeImage({ id: 2, role: 'right', format: 'cr2', filename: 'R.cr2' })
+			]),
+			capture_mode: 'dual'
+		} as ApiRecord);
+		const srcs = recordImgSrcs(screen.container);
 
-    await expect.element(screen.getByText('Miniatura (RAW)')).toBeVisible();
-    const now = [...screen.container.querySelectorAll('img')].map((i) => i.getAttribute('src'));
-    expect(now).toEqual(expect.arrayContaining([PREVIEW_URL, THUMB_URL]));
-    expect(srcs.some((u) => u.endsWith('/file'))).toBe(false);
-  });
+		await expect.element(screen.getByText('Miniatura (RAW)')).toBeVisible();
+		const now = [...screen.container.querySelectorAll('img')].map((i) => i.getAttribute('src'));
+		expect(now).toEqual(expect.arrayContaining([PREVIEW_URL, THUMB_URL]));
+		expect(srcs.some((u) => u.endsWith('/file'))).toBe(false);
+	});
 });
 
 describe.each(modals)('%s — non-RAW images (NEH-139)', (_name, renderModal) => {
-  let fileSpy: ReturnType<typeof vi.spyOn>;
-  let previewSpy: ReturnType<typeof vi.spyOn>;
-  let thumbSpy: ReturnType<typeof vi.spyOn>;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+	let fileSpy: ReturnType<typeof vi.spyOn>;
+	let previewSpy: ReturnType<typeof vi.spyOn>;
+	let thumbSpy: ReturnType<typeof vi.spyOn>;
+	let fetchSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
-    fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(FILE_URL);
-    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
-    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
-  });
-  afterEach(() => {
-    fileSpy.mockRestore();
-    previewSpy.mockRestore();
-    thumbSpy.mockRestore();
-    fetchSpy.mockRestore();
-  });
+	beforeEach(() => {
+		fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(FILE_URL);
+		previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+		thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+		fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
+	});
+	afterEach(() => {
+		fileSpy.mockRestore();
+		previewSpy.mockRestore();
+		thumbSpy.mockRestore();
+		fetchSpy.mockRestore();
+	});
 
-  it('a TIFF is shown by its thumbnail, labelled without RAW, and /preview is never tried', async () => {
-    const screen = renderModal(makeRecord([makeImage({ format: 'tiff', filename: 'scan.tiff' })]));
-    const srcs = recordImgSrcs(screen.container);
+	it('a TIFF is shown by its thumbnail, labelled without RAW, and /preview is never tried', async () => {
+		const screen = renderModal(makeRecord([makeImage({ format: 'tiff', filename: 'scan.tiff' })]));
+		const srcs = recordImgSrcs(screen.container);
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
-    await expect.element(screen.getByText('Miniatura', { exact: true })).toBeVisible();
-    expect(screen.container.textContent).not.toContain('RAW');
-    expect(srcs).not.toContain(PREVIEW_URL);
-    expect(srcs).not.toContain(FILE_URL);
-  });
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(THUMB_URL);
+		await expect.element(screen.getByText('Miniatura', { exact: true })).toBeVisible();
+		expect(screen.container.textContent).not.toContain('RAW');
+		expect(srcs).not.toContain(PREVIEW_URL);
+		expect(srcs).not.toContain(FILE_URL);
+	});
 
-  it('a TIFF whose thumbnail fails: format-neutral state naming the format, and the original is stored', async () => {
-    thumbSpy.mockReturnValue(BROKEN_THUMB);
-    const screen = renderModal(makeRecord([makeImage({ format: 'tiff', filename: 'scan.tiff' })]));
+	it('a TIFF whose thumbnail fails: format-neutral state naming the format, and the original is stored', async () => {
+		thumbSpy.mockReturnValue(BROKEN_THUMB);
+		const screen = renderModal(makeRecord([makeImage({ format: 'tiff', filename: 'scan.tiff' })]));
 
-    await expect.element(screen.getByText('No se puede mostrar esta imagen')).toBeVisible();
-    await expect.element(screen.getByText('scan.tiff')).toBeVisible();
-    await expect.element(screen.getByText('El navegador no puede mostrar archivos TIFF', { exact: false })).toBeVisible();
-    await expect.element(screen.getByText('El archivo original está guardado en el equipo.')).toBeVisible();
-    expect(screen.container.textContent).not.toContain('RAW');
-    expect(screen.container.querySelector('img')).toBeNull();
-  });
+		await expect.element(screen.getByText('No se puede mostrar esta imagen')).toBeVisible();
+		await expect.element(screen.getByText('scan.tiff')).toBeVisible();
+		await expect
+			.element(screen.getByText('El navegador no puede mostrar archivos TIFF', { exact: false }))
+			.toBeVisible();
+		await expect
+			.element(screen.getByText('El archivo original está guardado en el equipo.'))
+			.toBeVisible();
+		expect(screen.container.textContent).not.toContain('RAW');
+		expect(screen.container.querySelector('img')).toBeNull();
+	});
 
-  it('a JPEG whose /preview fails falls back to the thumbnail instead of staying broken', async () => {
-    previewSpy.mockReturnValue(BROKEN);
-    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+	it('a JPEG whose /preview fails falls back to the thumbnail instead of staying broken', async () => {
+		previewSpy.mockReturnValue(BROKEN);
+		const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
-    await expect.element(screen.getByText('Miniatura', { exact: true })).toBeVisible();
-  });
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(THUMB_URL);
+		await expect.element(screen.getByText('Miniatura', { exact: true })).toBeVisible();
+	});
 
-  it('unmounting aborts the in-flight existence check', async () => {
-    previewSpy.mockReturnValue(BROKEN);
-    thumbSpy.mockReturnValue(BROKEN_THUMB);
-    let signal: AbortSignal | undefined;
-    fetchSpy.mockImplementation((_u: RequestInfo | URL, init?: RequestInit) => {
-      signal = init?.signal ?? undefined;
-      return new Promise<Response>(() => {});
-    });
-    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+	it('unmounting aborts the in-flight existence check', async () => {
+		previewSpy.mockReturnValue(BROKEN);
+		thumbSpy.mockReturnValue(BROKEN_THUMB);
+		let signal: AbortSignal | undefined;
+		fetchSpy.mockImplementation((_u: RequestInfo | URL, init?: RequestInit) => {
+			signal = init?.signal ?? undefined;
+			return new Promise<Response>(() => {});
+		});
+		const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
 
-    await expect.poll(() => signal).toBeDefined();
-    expect(signal!.aborted).toBe(false);
-    screen.unmount();
-    expect(signal!.aborted).toBe(true);
-  });
+		await expect.poll(() => signal).toBeDefined();
+		expect(signal!.aborted).toBe(false);
+		screen.unmount();
+		expect(signal!.aborted).toBe(true);
+	});
 });
 
 describe('gallery modal — download link', () => {
-  it('keeps the download link on /file, so it fetches the real master', async () => {
-    const fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(FILE_URL);
-    const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
-    const screen = render(GalleryModal, { record: makeRecord([makeImage()]), onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
-    expect(screen.container.querySelector('a.img-viewer-download')?.getAttribute('href')).toBe(FILE_URL);
-    fileSpy.mockRestore();
-    previewSpy.mockRestore();
-  });
+	it('keeps the download link on /file, so it fetches the real master', async () => {
+		const fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockReturnValue(FILE_URL);
+		const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+		const screen = render(GalleryModal, {
+			record: makeRecord([makeImage()]),
+			onClose: vi.fn(),
+			onRetake: vi.fn(),
+			onDelete: vi.fn()
+		});
+		expect(screen.container.querySelector('a.img-viewer-download')?.getAttribute('href')).toBe(
+			FILE_URL
+		);
+		fileSpy.mockRestore();
+		previewSpy.mockRestore();
+	});
 });
 
 // NEH-248: a file freed from the card is answered 410 with a body that says it
 // is stored offsite (_freed in app/api/records.py). It must never look missing.
 function freed410(kind: 'capture' | 'preview', restorable?: boolean): Response {
-  const detail = {
-    ...(restorable === undefined ? {} : { restorable }),
-    message: 'This file is stored offsite and has been freed from the card to make room. An admin can restore the volume to bring it back.',
-    stored_offsite: true,
-    image_id: 1,
-    kind,
-    key: 'rionegro/co-x/captures/IMG_0001.cr2',
-    freed_at: '2026-10-20T14:03:00+00:00',
-  };
-  return new Response(JSON.stringify({ detail }), { status: 410, headers: { 'Content-Type': 'application/json' } });
+	const detail = {
+		...(restorable === undefined ? {} : { restorable }),
+		message:
+			'This file is stored offsite and has been freed from the card to make room. An admin can restore the volume to bring it back.',
+		stored_offsite: true,
+		image_id: 1,
+		kind,
+		key: 'rionegro/co-x/captures/IMG_0001.cr2',
+		freed_at: '2026-10-20T14:03:00+00:00'
+	};
+	return new Response(JSON.stringify({ detail }), {
+		status: 410,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 describe.each(modals)('%s — images freed from the card (NEH-248)', (_name, renderModal) => {
-  let fileSpy: ReturnType<typeof vi.spyOn>;
-  let previewSpy: ReturnType<typeof vi.spyOn>;
-  let thumbSpy: ReturnType<typeof vi.spyOn>;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+	let fileSpy: ReturnType<typeof vi.spyOn>;
+	let previewSpy: ReturnType<typeof vi.spyOn>;
+	let thumbSpy: ReturnType<typeof vi.spyOn>;
+	let fetchSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
-    fileSpy = vi.spyOn(recordsApi, 'getImageFileUrl').mockImplementation((id: number) => `http://dtk.invalid/records/images/${id}/file`);
-    // The <img> cannot load the freed preview; fetch reads its 410.
-    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(BROKEN);
-    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((u: RequestInfo | URL) =>
-      Promise.resolve(String(u) === BROKEN ? freed410('preview') : freed410('capture')),
-    );
-  });
-  afterEach(() => {
-    fileSpy.mockRestore();
-    previewSpy.mockRestore();
-    thumbSpy.mockRestore();
-    fetchSpy.mockRestore();
-  });
+	beforeEach(() => {
+		fileSpy = vi
+			.spyOn(recordsApi, 'getImageFileUrl')
+			.mockImplementation((id: number) => `http://dtk.invalid/records/images/${id}/file`);
+		// The <img> cannot load the freed preview; fetch reads its 410.
+		previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(BROKEN);
+		thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+		fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockImplementation((u: RequestInfo | URL) =>
+				Promise.resolve(String(u) === BROKEN ? freed410('preview') : freed410('capture'))
+			);
+	});
+	afterEach(() => {
+		fileSpy.mockRestore();
+		previewSpy.mockRestore();
+		thumbSpy.mockRestore();
+		fetchSpy.mockRestore();
+	});
 
-  for (const [restorable, shown, hidden] of [
-    [false, 'Este equipo no puede leer la copia externa', 'un administrador puede restaurar'],
-    [true, 'un administrador puede restaurar', 'Este equipo no puede leer la copia externa'],
-  ] as const) {
-    it(`the panel's hint follows the 410's restorable (${restorable}) (NEH-380)`, async () => {
-      fetchSpy.mockImplementation((u: RequestInfo | URL) =>
-        Promise.resolve(String(u) === BROKEN ? freed410('preview', restorable) : freed410('capture', restorable)),
-      );
-      const screen = renderModal(makeRecord([makeImage()]));
-      await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
-      await screen.getByRole('button', { name: 'Mostrar todo' }).click();
-      await expect.element(screen.getByText(shown, { exact: false })).toBeVisible();
-      expect(screen.container.textContent).not.toContain(hidden);
-    });
-  }
+	for (const [restorable, shown, hidden] of [
+		[false, 'Este equipo no puede leer la copia externa', 'un administrador puede restaurar'],
+		[true, 'un administrador puede restaurar', 'Este equipo no puede leer la copia externa']
+	] as const) {
+		it(`the panel's hint follows the 410's restorable (${restorable}) (NEH-380)`, async () => {
+			fetchSpy.mockImplementation((u: RequestInfo | URL) =>
+				Promise.resolve(
+					String(u) === BROKEN ? freed410('preview', restorable) : freed410('capture', restorable)
+				)
+			);
+			const screen = renderModal(makeRecord([makeImage()]));
+			await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+			await screen.getByRole('button', { name: 'Mostrar todo' }).click();
+			await expect.element(screen.getByText(shown, { exact: false })).toBeVisible();
+			expect(screen.container.textContent).not.toContain(hidden);
+		});
+	}
 
-  it('a freed RAW preview: the thumbnail, with the calm panel instead of the thumbnail badge', async () => {
-    const screen = renderModal(makeRecord([makeImage()]));
+	it('a freed RAW preview: the thumbnail, with the calm panel instead of the thumbnail badge', async () => {
+		const screen = renderModal(makeRecord([makeImage()]));
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
-    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
-    // Over a thumbnail the panel is one line; "Mostrar todo" opens the rest.
-    await expect.element(screen.getByText('No se perdió nada', { exact: false })).not.toBeInTheDocument();
-    await screen.getByRole('button', { name: 'Mostrar todo' }).click();
-    await expect.element(screen.getByText('No se perdió nada', { exact: false })).toBeVisible();
-    await expect.element(screen.getByText('un administrador puede restaurar el volumen', { exact: false })).toBeVisible();
-    await expect.element(screen.getByText('Lo que ves es la miniatura, que Captua conserva en el equipo.')).toBeVisible();
-    expect(screen.container.textContent).not.toContain('Miniatura (RAW)');
-    expect(fetchSpy).toHaveBeenCalledWith(BROKEN, expect.objectContaining({ credentials: 'include' }));
-  });
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(THUMB_URL);
+		await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+		// Over a thumbnail the panel is one line; "Mostrar todo" opens the rest.
+		await expect
+			.element(screen.getByText('No se perdió nada', { exact: false }))
+			.not.toBeInTheDocument();
+		await screen.getByRole('button', { name: 'Mostrar todo' }).click();
+		await expect.element(screen.getByText('No se perdió nada', { exact: false })).toBeVisible();
+		await expect
+			.element(screen.getByText('un administrador puede restaurar el volumen', { exact: false }))
+			.toBeVisible();
+		await expect
+			.element(screen.getByText('Lo que ves es la miniatura, que Captua conserva en el equipo.'))
+			.toBeVisible();
+		expect(screen.container.textContent).not.toContain('Miniatura (RAW)');
+		expect(fetchSpy).toHaveBeenCalledWith(
+			BROKEN,
+			expect.objectContaining({ credentials: 'include' })
+		);
+	});
 
-  it('over a thumbnail the panel is collapsed to its title and the toggle shows and hides the rest', async () => {
-    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+	it('over a thumbnail the panel is collapsed to its title and the toggle shows and hides the rest', async () => {
+		const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
 
-    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
-    const toggle = screen.getByRole('button', { name: 'Mostrar todo' });
-    await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
-    for (const t of ['Este archivo está guardado fuera del equipo', 'No se perdió nada', 'un administrador puede restaurar', 'Lo que ves es la miniatura']) {
-      expect(screen.container.textContent).not.toContain(t);
-    }
+		await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+		const toggle = screen.getByRole('button', { name: 'Mostrar todo' });
+		await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
+		for (const t of [
+			'Este archivo está guardado fuera del equipo',
+			'No se perdió nada',
+			'un administrador puede restaurar',
+			'Lo que ves es la miniatura'
+		]) {
+			expect(screen.container.textContent).not.toContain(t);
+		}
 
-    await toggle.click();
-    await expect.element(screen.getByRole('button', { name: 'Mostrar menos' })).toHaveAttribute('aria-expanded', 'true');
-    for (const t of ['Este archivo está guardado fuera del equipo', 'No se perdió nada', 'un administrador puede restaurar', 'Lo que ves es la miniatura']) {
-      expect(screen.container.textContent).toContain(t);
-    }
+		await toggle.click();
+		await expect
+			.element(screen.getByRole('button', { name: 'Mostrar menos' }))
+			.toHaveAttribute('aria-expanded', 'true');
+		for (const t of [
+			'Este archivo está guardado fuera del equipo',
+			'No se perdió nada',
+			'un administrador puede restaurar',
+			'Lo que ves es la miniatura'
+		]) {
+			expect(screen.container.textContent).toContain(t);
+		}
 
-    await screen.getByRole('button', { name: 'Mostrar menos' }).click();
-    expect(screen.container.textContent).not.toContain('No se perdió nada');
-  });
+		await screen.getByRole('button', { name: 'Mostrar menos' }).click();
+		expect(screen.container.textContent).not.toContain('No se perdió nada');
+	});
 
-  it('a freed JPEG master: the same panel over its thumbnail', async () => {
-    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+	it('a freed JPEG master: the same panel over its thumbnail', async () => {
+		const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
 
-    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
-    expect(screen.container.textContent).not.toContain('Miniatura');
-  });
+		await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(THUMB_URL);
+		expect(screen.container.textContent).not.toContain('Miniatura');
+	});
 
-  it('a freed file with no thumbnail: the panel alone, never "not found" or "cannot display"', async () => {
-    thumbSpy.mockReturnValue(BROKEN_THUMB);
-    const screen = renderModal(makeRecord([makeImage()]));
+	it('a freed file with no thumbnail: the panel alone, never "not found" or "cannot display"', async () => {
+		thumbSpy.mockReturnValue(BROKEN_THUMB);
+		const screen = renderModal(makeRecord([makeImage()]));
 
-    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
-    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
-    expect(screen.container.querySelector('img')).toBeNull();
-    // With no thumbnail the panel stays whole, with no toggle.
-    await expect.element(screen.getByText('No se perdió nada', { exact: false })).toBeVisible();
-    await expect.element(screen.getByText('un administrador puede restaurar el volumen', { exact: false })).toBeVisible();
-    expect(screen.container.querySelector('[data-testid="image-freed"] button')).toBeNull();
-    expect(screen.container.textContent).not.toContain('Lo que ves es la miniatura');
-    expect(screen.container.textContent).not.toContain('No se encontró el archivo');
-    expect(screen.container.textContent).not.toContain('No se puede mostrar');
-  });
+		await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+		await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+		expect(screen.container.querySelector('img')).toBeNull();
+		// With no thumbnail the panel stays whole, with no toggle.
+		await expect.element(screen.getByText('No se perdió nada', { exact: false })).toBeVisible();
+		await expect
+			.element(screen.getByText('un administrador puede restaurar el volumen', { exact: false }))
+			.toBeVisible();
+		expect(screen.container.querySelector('[data-testid="image-freed"] button')).toBeNull();
+		expect(screen.container.textContent).not.toContain('Lo que ves es la miniatura');
+		expect(screen.container.textContent).not.toContain('No se encontró el archivo');
+		expect(screen.container.textContent).not.toContain('No se puede mostrar');
+	});
 
-  it('a master /file answers 410 for, with nothing else to show: the panel', async () => {
-    thumbSpy.mockReturnValue(BROKEN_THUMB);
-    // The preview probe says nothing; only /file says the master is freed.
-    fetchSpy.mockImplementation((u: RequestInfo | URL) =>
-      Promise.resolve(String(u) === BROKEN ? new Response('', { status: 404 }) : freed410('capture')),
-    );
-    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
+	it('a master /file answers 410 for, with nothing else to show: the panel', async () => {
+		thumbSpy.mockReturnValue(BROKEN_THUMB);
+		// The preview probe says nothing; only /file says the master is freed.
+		fetchSpy.mockImplementation((u: RequestInfo | URL) =>
+			Promise.resolve(
+				String(u) === BROKEN ? new Response('', { status: 404 }) : freed410('capture')
+			)
+		);
+		const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg' })]));
 
-    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
-    expect(screen.container.textContent).not.toContain('No se encontró el archivo');
-  });
+		await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+		expect(screen.container.textContent).not.toContain('No se encontró el archivo');
+	});
 
-  it('a /preview that fails for another reason keeps the ordinary thumbnail badge', async () => {
-    fetchSpy.mockResolvedValue(new Response('', { status: 404 }));
-    const screen = renderModal(makeRecord([makeImage()]));
+	it('a /preview that fails for another reason keeps the ordinary thumbnail badge', async () => {
+		fetchSpy.mockResolvedValue(new Response('', { status: 404 }));
+		const screen = renderModal(makeRecord([makeImage()]));
 
-    await expect.element(screen.getByText('Miniatura (RAW)')).toBeVisible();
-    await new Promise((r) => setTimeout(r, 50));
-    expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
-  });
+		await expect.element(screen.getByText('Miniatura (RAW)')).toBeVisible();
+		await new Promise((r) => setTimeout(r, 50));
+		expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
+	});
 });
 
-describe.each(modals)('%s — a freed image shown only by its thumbnail (NEH-248)', (_name, renderModal) => {
-  let previewSpy: ReturnType<typeof vi.spyOn>;
-  let thumbSpy: ReturnType<typeof vi.spyOn>;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+describe.each(modals)(
+	'%s — a freed image shown only by its thumbnail (NEH-248)',
+	(_name, renderModal) => {
+		let previewSpy: ReturnType<typeof vi.spyOn>;
+		let thumbSpy: ReturnType<typeof vi.spyOn>;
+		let fetchSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
-    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
-    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
-  });
-  afterEach(() => {
-    previewSpy.mockRestore();
-    thumbSpy.mockRestore();
-    fetchSpy.mockRestore();
-  });
+		beforeEach(() => {
+			previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+			thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+			fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
+		});
+		afterEach(() => {
+			previewSpy.mockRestore();
+			thumbSpy.mockRestore();
+			fetchSpy.mockRestore();
+		});
 
-  it('a TIFF whose master is freed: the panel over its thumbnail, read from the record', async () => {
-    const screen = renderModal(makeRecord([makeImage({ format: 'tif', filename: 'f.tif', master_freed_at: '2026-10-20T14:03:00' })]));
+		it('a TIFF whose master is freed: the panel over its thumbnail, read from the record', async () => {
+			const screen = renderModal(
+				makeRecord([
+					makeImage({ format: 'tif', filename: 'f.tif', master_freed_at: '2026-10-20T14:03:00' })
+				])
+			);
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
-    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
-    await screen.getByRole('button', { name: 'Mostrar todo' }).click();
-    await expect.element(screen.getByText('Lo que ves es la miniatura, que Captua conserva en el equipo.')).toBeVisible();
-    expect(screen.container.textContent).not.toContain('Miniatura');
-  });
+			await expect
+				.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+				.toBe(THUMB_URL);
+			await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+			await screen.getByRole('button', { name: 'Mostrar todo' }).click();
+			await expect
+				.element(screen.getByText('Lo que ves es la miniatura, que Captua conserva en el equipo.'))
+				.toBeVisible();
+			expect(screen.container.textContent).not.toContain('Miniatura');
+		});
 
-  it('a TIFF whose master is on the card keeps the ordinary thumbnail badge', async () => {
-    const screen = renderModal(makeRecord([makeImage({ format: 'tif', filename: 'f.tif' })]));
+		it('a TIFF whose master is on the card keeps the ordinary thumbnail badge', async () => {
+			const screen = renderModal(makeRecord([makeImage({ format: 'tif', filename: 'f.tif' })]));
 
-    await expect.element(screen.getByText('Miniatura', { exact: true })).toBeVisible();
-    expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
-  });
+			await expect.element(screen.getByText('Miniatura', { exact: true })).toBeVisible();
+			expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
+		});
 
-  it('a JPEG with the field set but a /preview that loads: the image, no panel (the 410 decides)', async () => {
-    const screen = renderModal(makeRecord([makeImage({ format: 'jpg', filename: 'f.jpg', master_freed_at: '2026-10-20T14:03:00' })]));
+		it('a JPEG with the field set but a /preview that loads: the image, no panel (the 410 decides)', async () => {
+			const screen = renderModal(
+				makeRecord([
+					makeImage({ format: 'jpg', filename: 'f.jpg', master_freed_at: '2026-10-20T14:03:00' })
+				])
+			);
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
-    await new Promise((r) => setTimeout(r, 50));
-    expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
-  });
-});
+			await expect
+				.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+				.toBe(PREVIEW_URL);
+			await new Promise((r) => setTimeout(r, 50));
+			expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
+		});
+	}
+);
 
 describe('gallery modal — a RAW preview restored on its own (NEH-248)', () => {
-  it('drops the freed panel and shows the preview once preview_freed_at is cleared', async () => {
-    const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(BROKEN);
-    const thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(freed410('preview')));
-    const freedAt = '2026-10-20T14:03:00';
-    // The master's restore failed, so it stays freed; only the preview is back.
-    const before = makeRecord([makeImage({ master_freed_at: freedAt, preview_freed_at: freedAt })]);
-    const after = makeRecord([makeImage({ master_freed_at: freedAt, preview_freed_at: null })]);
-    const screen = render(GalleryModal, { record: before, onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
-    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+	it('drops the freed panel and shows the preview once preview_freed_at is cleared', async () => {
+		const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(BROKEN);
+		const thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockImplementation(() => Promise.resolve(freed410('preview')));
+		const freedAt = '2026-10-20T14:03:00';
+		// The master's restore failed, so it stays freed; only the preview is back.
+		const before = makeRecord([makeImage({ master_freed_at: freedAt, preview_freed_at: freedAt })]);
+		const after = makeRecord([makeImage({ master_freed_at: freedAt, preview_freed_at: null })]);
+		const screen = render(GalleryModal, {
+			record: before,
+			onClose: vi.fn(),
+			onRetake: vi.fn(),
+			onDelete: vi.fn()
+		});
+		await expect.element(screen.getByTestId('image-freed')).toBeVisible();
 
-    previewSpy.mockReturnValue(PREVIEW_URL);
-    await screen.rerender({ record: after });
+		previewSpy.mockReturnValue(PREVIEW_URL);
+		await screen.rerender({ record: after });
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
-    await expect.element(screen.getByTestId('image-freed')).not.toBeInTheDocument();
-    await expect.element(screen.getByText('Vista previa (RAW)')).toBeVisible();
-    previewSpy.mockRestore();
-    thumbSpy.mockRestore();
-    fetchSpy.mockRestore();
-  });
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(PREVIEW_URL);
+		await expect.element(screen.getByTestId('image-freed')).not.toBeInTheDocument();
+		await expect.element(screen.getByText('Vista previa (RAW)')).toBeVisible();
+		previewSpy.mockRestore();
+		thumbSpy.mockRestore();
+		fetchSpy.mockRestore();
+	});
 });
 
 describe('gallery modal — download link of a freed master (NEH-248)', () => {
-  it('offers no download for a master freed from the card', async () => {
-    const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
-    const screen = render(GalleryModal, {
-      record: makeRecord([makeImage({ master_freed_at: '2026-10-20T14:03:00' })]),
-      onClose: vi.fn(),
-      onRetake: vi.fn(),
-      onDelete: vi.fn(),
-    });
-    expect(screen.container.querySelector('a.img-viewer-download')).toBeNull();
-    previewSpy.mockRestore();
-  });
+	it('offers no download for a master freed from the card', async () => {
+		const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+		const screen = render(GalleryModal, {
+			record: makeRecord([makeImage({ master_freed_at: '2026-10-20T14:03:00' })]),
+			onClose: vi.fn(),
+			onRetake: vi.fn(),
+			onDelete: vi.fn()
+		});
+		expect(screen.container.querySelector('a.img-viewer-download')).toBeNull();
+		previewSpy.mockRestore();
+	});
 });
 
 // An in-place reload after a free (NEH-248) marks an image freed while its
 // /preview is already on screen. The URL does not change, so the <img> keeps
 // the image it loaded and fires no error: /preview has to be asked again.
 describe('gallery modal — a displayed preview freed by an in-place reload (NEH-248)', () => {
-  let previewSpy: ReturnType<typeof vi.spyOn>;
-  let thumbSpy: ReturnType<typeof vi.spyOn>;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
-  const freedAt = '2026-10-20T14:03:00';
+	let previewSpy: ReturnType<typeof vi.spyOn>;
+	let thumbSpy: ReturnType<typeof vi.spyOn>;
+	let fetchSpy: ReturnType<typeof vi.spyOn>;
+	const freedAt = '2026-10-20T14:03:00';
 
-  beforeEach(() => {
-    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
-    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
-  });
-  afterEach(() => {
-    previewSpy.mockRestore();
-    thumbSpy.mockRestore();
-    fetchSpy.mockRestore();
-  });
+	beforeEach(() => {
+		previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(PREVIEW_URL);
+		thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+		fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
+	});
+	afterEach(() => {
+		previewSpy.mockRestore();
+		thumbSpy.mockRestore();
+		fetchSpy.mockRestore();
+	});
 
-  async function freeInPlace(before: RecordImage, after: RecordImage, kind: 'capture' | 'preview') {
-    const screen = render(GalleryModal, { record: makeRecord([before]), onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
-    fetchSpy.mockImplementation(() => Promise.resolve(freed410(kind)));
-    await screen.rerender({ record: makeRecord([after]) });
-    return screen;
-  }
+	async function freeInPlace(before: RecordImage, after: RecordImage, kind: 'capture' | 'preview') {
+		const screen = render(GalleryModal, {
+			record: makeRecord([before]),
+			onClose: vi.fn(),
+			onRetake: vi.fn(),
+			onDelete: vi.fn()
+		});
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(PREVIEW_URL);
+		fetchSpy.mockImplementation(() => Promise.resolve(freed410(kind)));
+		await screen.rerender({ record: makeRecord([after]) });
+		return screen;
+	}
 
-  it('a JPEG master: moves to the thumbnail with the panel, asking /preview past the cache', async () => {
-    const jpg = { format: 'jpg', filename: 'f.jpg' };
-    const screen = await freeInPlace(makeImage(jpg), makeImage({ ...jpg, master_freed_at: freedAt }), 'capture');
+	it('a JPEG master: moves to the thumbnail with the panel, asking /preview past the cache', async () => {
+		const jpg = { format: 'jpg', filename: 'f.jpg' };
+		const screen = await freeInPlace(
+			makeImage(jpg),
+			makeImage({ ...jpg, master_freed_at: freedAt }),
+			'capture'
+		);
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
-    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
-    expect(fetchSpy).toHaveBeenCalledWith(PREVIEW_URL, expect.objectContaining({ cache: 'no-store' }));
-    expect(screen.container.querySelector('a.img-viewer-download')).toBeNull();
-  });
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(THUMB_URL);
+		await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+		expect(fetchSpy).toHaveBeenCalledWith(
+			PREVIEW_URL,
+			expect.objectContaining({ cache: 'no-store' })
+		);
+		expect(screen.container.querySelector('a.img-viewer-download')).toBeNull();
+	});
 
-  it('a RAW preview: moves to the thumbnail with the panel, and keeps the master download', async () => {
-    const screen = await freeInPlace(makeImage(), makeImage({ preview_freed_at: freedAt }), 'preview');
+	it('a RAW preview: moves to the thumbnail with the panel, and keeps the master download', async () => {
+		const screen = await freeInPlace(
+			makeImage(),
+			makeImage({ preview_freed_at: freedAt }),
+			'preview'
+		);
 
-    await expect.poll(() => screen.container.querySelector('img')?.getAttribute('src')).toBe(THUMB_URL);
-    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
-    expect(screen.container.querySelector('a.img-viewer-download')).not.toBeNull();
-  });
+		await expect
+			.poll(() => screen.container.querySelector('img')?.getAttribute('src'))
+			.toBe(THUMB_URL);
+		await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+		expect(screen.container.querySelector('a.img-viewer-download')).not.toBeNull();
+	});
 
-  it('a RAW master freed with its preview kept: the preview stays, no panel', async () => {
-    const screen = await freeInPlace(makeImage(), makeImage({ master_freed_at: freedAt }), 'capture');
+	it('a RAW master freed with its preview kept: the preview stays, no panel', async () => {
+		const screen = await freeInPlace(
+			makeImage(),
+			makeImage({ master_freed_at: freedAt }),
+			'capture'
+		);
 
-    await new Promise((r) => setTimeout(r, 50));
-    expect(screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
-    expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
-  });
+		await new Promise((r) => setTimeout(r, 50));
+		expect(screen.container.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
+		expect(screen.container.textContent).not.toContain('Imagen guardada en la copia externa');
+	});
 });
 
 // The records can be older than a free (one run elsewhere, say), so the 410
 // can say a master is freed while the cached master_freed_at does not.
 describe('gallery modal — download of a master the 410 says is freed (NEH-248)', () => {
-  let previewSpy: ReturnType<typeof vi.spyOn>;
-  let thumbSpy: ReturnType<typeof vi.spyOn>;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+	let previewSpy: ReturnType<typeof vi.spyOn>;
+	let thumbSpy: ReturnType<typeof vi.spyOn>;
+	let fetchSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
-    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(BROKEN);
-    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
-  });
-  afterEach(() => {
-    previewSpy.mockRestore();
-    thumbSpy.mockRestore();
-    fetchSpy.mockRestore();
-  });
+	beforeEach(() => {
+		previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(BROKEN);
+		thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+	});
+	afterEach(() => {
+		previewSpy.mockRestore();
+		thumbSpy.mockRestore();
+		fetchSpy.mockRestore();
+	});
 
-  function renderWith(kind: 'capture' | 'preview', image: RecordImage) {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(freed410(kind)));
-    return render(GalleryModal, { record: makeRecord([image]), onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() });
-  }
+	function renderWith(kind: 'capture' | 'preview', image: RecordImage) {
+		fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockImplementation(() => Promise.resolve(freed410(kind)));
+		return render(GalleryModal, {
+			record: makeRecord([image]),
+			onClose: vi.fn(),
+			onRetake: vi.fn(),
+			onDelete: vi.fn()
+		});
+	}
 
-  it('a JPEG whose /preview answers a master 410: the panel, and no download', async () => {
-    const screen = renderWith('capture', makeImage({ format: 'jpg', filename: 'f.jpg' }));
+	it('a JPEG whose /preview answers a master 410: the panel, and no download', async () => {
+		const screen = renderWith('capture', makeImage({ format: 'jpg', filename: 'f.jpg' }));
 
-    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
-    await expect.poll(() => screen.container.querySelector('a.img-viewer-download')).toBeNull();
-  });
+		await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+		await expect.poll(() => screen.container.querySelector('a.img-viewer-download')).toBeNull();
+	});
 
-  it('a RAW whose /preview answers a preview 410: the panel, and the master download stays', async () => {
-    const screen = renderWith('preview', makeImage());
+	it('a RAW whose /preview answers a preview 410: the panel, and the master download stays', async () => {
+		const screen = renderWith('preview', makeImage());
 
-    await expect.element(screen.getByTestId('image-freed')).toBeVisible();
-    await new Promise((r) => setTimeout(r, 50));
-    expect(screen.container.querySelector('a.img-viewer-download')).not.toBeNull();
-  });
+		await expect.element(screen.getByTestId('image-freed')).toBeVisible();
+		await new Promise((r) => setTimeout(r, 50));
+		expect(screen.container.querySelector('a.img-viewer-download')).not.toBeNull();
+	});
 });
-
 
 // NEH-380: the hint takes `restorable` from the volume's offsite state, passed
 // down to RecordImageDisplay; a 410's value counts only where no state is given.
 describe('the freed hint follows the volume state (NEH-380)', () => {
-  const hintFalse = 'Este equipo no puede leer la copia externa';
-  const hintTrue = 'un administrador puede restaurar';
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
-  let thumbSpy: ReturnType<typeof vi.spyOn>;
-  beforeEach(() => {
-    thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
-  });
-  afterEach(() => {
-    thumbSpy.mockRestore();
-    fetchSpy?.mockRestore();
-  });
+	const hintFalse = 'Este equipo no puede leer la copia externa';
+	const hintTrue = 'un administrador puede restaurar';
+	let fetchSpy: ReturnType<typeof vi.spyOn>;
+	let thumbSpy: ReturnType<typeof vi.spyOn>;
+	beforeEach(() => {
+		thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(THUMB_URL);
+	});
+	afterEach(() => {
+		thumbSpy.mockRestore();
+		fetchSpy?.mockRestore();
+	});
 
-  const tiff = () => makeImage({ format: 'tif', filename: 'f.tif', master_freed_at: '2026-10-20T14:03:00+00:00' });
-  const open = async (screen: ReturnType<typeof render>) => {
-    await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
-    const toggle = screen.container.querySelector<HTMLButtonElement>('.freed-panel-toggle');
-    if (toggle) flushSync(() => toggle.click());
-  };
+	const tiff = () =>
+		makeImage({ format: 'tif', filename: 'f.tif', master_freed_at: '2026-10-20T14:03:00+00:00' });
+	const open = async (screen: ReturnType<typeof render>) => {
+		await expect.element(screen.getByText('Imagen guardada en la copia externa')).toBeVisible();
+		const toggle = screen.container.querySelector<HTMLButtonElement>('.freed-panel-toggle');
+		if (toggle) flushSync(() => toggle.click());
+	};
 
-  for (const [label, renderIt] of [
-    ['gallery modal', (restorable?: boolean) =>
-      render(GalleryModal, { record: makeRecord([tiff()]), restorable, onClose: vi.fn(), onRetake: vi.fn(), onDelete: vi.fn() })],
-    ['live-preview modal', (restorable?: boolean) => {
-      const screen = render(LiveModal, { record: makeRecord([tiff()]), restorable, cameraMode: 'single', onClose: vi.fn(), onRetake: vi.fn() });
-      const fullSize = screen.container.querySelector<HTMLButtonElement>('.img-viewer-footer button[data-view-toggle]');
-      flushSync(() => fullSize?.click());
-      return screen;
-    }],
-  ] as const) {
-    it(`${label}: a TIFF freed by the record alone, on a unit that cannot restore, gets the cannot hint`, async () => {
-      const screen = renderIt(false);
-      await open(screen);
-      await expect.element(screen.getByText(hintFalse, { exact: false })).toBeVisible();
-      expect(screen.container.textContent).not.toContain(hintTrue);
-    });
+	for (const [label, renderIt] of [
+		[
+			'gallery modal',
+			(restorable?: boolean) =>
+				render(GalleryModal, {
+					record: makeRecord([tiff()]),
+					restorable,
+					onClose: vi.fn(),
+					onRetake: vi.fn(),
+					onDelete: vi.fn()
+				})
+		],
+		[
+			'live-preview modal',
+			(restorable?: boolean) => {
+				const screen = render(LiveModal, {
+					record: makeRecord([tiff()]),
+					restorable,
+					cameraMode: 'single',
+					onClose: vi.fn(),
+					onRetake: vi.fn()
+				});
+				const fullSize = screen.container.querySelector<HTMLButtonElement>(
+					'.img-viewer-footer button[data-view-toggle]'
+				);
+				flushSync(() => fullSize?.click());
+				return screen;
+			}
+		]
+	] as const) {
+		it(`${label}: a TIFF freed by the record alone, on a unit that cannot restore, gets the cannot hint`, async () => {
+			const screen = renderIt(false);
+			await open(screen);
+			await expect.element(screen.getByText(hintFalse, { exact: false })).toBeVisible();
+			expect(screen.container.textContent).not.toContain(hintTrue);
+		});
 
-    it(`${label}: the volume state wins over a 410 that says otherwise`, async () => {
-      fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
-        Promise.resolve(new Response(JSON.stringify({ detail: { stored_offsite: true, kind: 'capture', restorable: false } }), { status: 410 })),
-      );
-      const screen = renderIt(true);
-      await open(screen);
-      await expect.element(screen.getByText(hintTrue, { exact: false })).toBeVisible();
-      expect(screen.container.textContent).not.toContain(hintFalse);
-    });
-  }
+		it(`${label}: the volume state wins over a 410 that says otherwise`, async () => {
+			fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+				Promise.resolve(
+					new Response(
+						JSON.stringify({
+							detail: { stored_offsite: true, kind: 'capture', restorable: false }
+						}),
+						{ status: 410 }
+					)
+				)
+			);
+			const screen = renderIt(true);
+			await open(screen);
+			await expect.element(screen.getByText(hintTrue, { exact: false })).toBeVisible();
+			expect(screen.container.textContent).not.toContain(hintFalse);
+		});
+	}
 });

@@ -35,7 +35,9 @@ function drawProbe(): HTMLButtonElement {
 // Chromium sets the hover state of an element drawn under a pointer that has
 // not moved some frames after layout; this waits well past that.
 async function settle(): Promise<void> {
-	await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+	await new Promise<void>((resolve) =>
+		requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+	);
 	await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
@@ -100,7 +102,10 @@ export function pointerResetSuite(name: string): void {
 		it('can be left over a control', leavePointerOver);
 		it('is not over the control the test before left it on', expectNotHovered);
 		it('can be left over a control in a frame at 1920x1080', leavePointerOverLargestFrame);
-		it('is not over a control at a corner or the centre of a frame at 1920x1080', expectNoSpotHovered);
+		it(
+			'is not over a control at a corner or the centre of a frame at 1920x1080',
+			expectNoSpotHovered
+		);
 		it('is left over a control for the file after', leavePointerOver);
 	});
 }

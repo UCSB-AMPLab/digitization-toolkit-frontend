@@ -27,16 +27,29 @@ import '../../app.css';
 import LivePreview from './+page.svelte';
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((yes) => { resolve = yes; });
+	const promise = new Promise<T>((yes) => {
+		resolve = yes;
+	});
 	return { promise, resolve };
 }
 
-const record = { id: 41, title: 'Par 1', status: 'rejected', sequence: 1, capture_mode: 'single', collection_id: 9, images: [] };
+const record = {
+	id: 41,
+	title: 'Par 1',
+	status: 'rejected',
+	sequence: 1,
+	capture_mode: 'single',
+	collection_id: 9,
+	images: []
+};
 
 // Answers the capture POST through `capture`, set by each test, so the test
 // decides when it returns and with what.
@@ -45,14 +58,30 @@ function serve(capture: () => Promise<Response>) {
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/cameras/capabilities')) {
-			return json({ backend: 'gphoto2', live_preview: true, focus_control: false, live_controls: false, zoom: false, autofocus_calibration: false, dslr_settings: true, continuous_preview: false });
+			return json({
+				backend: 'gphoto2',
+				live_preview: true,
+				focus_control: false,
+				live_controls: false,
+				zoom: false,
+				autofocus_calibration: false,
+				dslr_settings: true,
+				continuous_preview: false
+			});
 		}
 		if (path.includes('/cameras/preview/')) return new Response(null, { status: 404 });
 		if (path.endsWith('/records/to-retake/summary')) {
 			return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
 		}
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 6',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: 'co-ahr-6',
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
 		if (path.endsWith('/records/')) return json([record]);
@@ -65,12 +94,19 @@ function serve(capture: () => Promise<Response>) {
 	return captures;
 }
 
-const refreshButton = () => document.querySelector('.refresh-preview-btn') as HTMLButtonElement | null;
+const refreshButton = () =>
+	document.querySelector('.refresh-preview-btn') as HTMLButtonElement | null;
 
 beforeEach(() => {
 	locale.set('es');
 	current.url = 'http://localhost/live-preview?projectId=2&collectionId=9&recordId=41';
-	authStore.setSession({ id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
+	authStore.setSession({
+		id: 1,
+		username: 'operator',
+		email: null,
+		role: 'operator',
+		is_active: true
+	});
 	// A focus check just done, so the DSLR unit's check (NEH-339) does not open over the retake.
 	recordFocusActivity(1, Date.now());
 });

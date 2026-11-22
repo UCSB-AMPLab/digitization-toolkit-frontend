@@ -6,14 +6,18 @@
 // 401 follows the same order.
 //
 // Version: 0.3.3
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const gotoMock = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { authApi, projectsApi, LOGOUT_TIMEOUT_MS, SESSION_REFRESH_TIMEOUT_MS } from './api';
-import { SESSION_RENEW_INTERVAL_MS, sessionRenewals, startSessionKeepalive } from './session-keepalive';
+import {
+	SESSION_RENEW_INTERVAL_MS,
+	sessionRenewals,
+	startSessionKeepalive
+} from './session-keepalive';
 import { authStore, type AuthUser } from './stores/auth';
 
 const user: AuthUser = { id: 1, username: 'op1', email: null, role: 'operator', is_active: true };

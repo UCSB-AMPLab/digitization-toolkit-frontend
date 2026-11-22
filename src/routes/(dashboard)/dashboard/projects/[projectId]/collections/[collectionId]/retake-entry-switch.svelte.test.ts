@@ -9,7 +9,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
-const pageStore = vi.hoisted(() => ({ value: null as null | import('svelte/store').Writable<unknown> }));
+const pageStore = vi.hoisted(() => ({
+	value: null as null | import('svelte/store').Writable<unknown>
+}));
 
 function pageAt(collectionId: string) {
 	return {
@@ -35,7 +37,13 @@ import SnippetHost from '$lib/test-support/SnippetHost.svelte';
 import '../../../../../../../app.css';
 import CollectionPage from './+page.svelte';
 
-const operator: AuthUser = { id: 2, username: 'op1', email: null, role: 'operator', is_active: true };
+const operator: AuthUser = {
+	id: 2,
+	username: 'op1',
+	email: null,
+	role: 'operator',
+	is_active: true
+};
 
 function rec(id: number, sequence: number, status: ApiRecord['status']): ApiRecord {
 	return { id, title: `Par ${id}`, status, sequence, images: [] } as unknown as ApiRecord;
@@ -44,7 +52,19 @@ function rec(id: number, sequence: number, status: ApiRecord['status']): ApiReco
 // Volume 7 has three pending, its first record 1; volume 8 has none.
 const summaryA: RetakeSummary = {
 	pendingRecords: 3,
-	volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 7', filenameStem: 'co-7', pending: 3, total: 3, excluded: 0, firstPendingRecordId: 1, pendingRecordIds: [1, 2, 3] }],
+	volumes: [
+		{
+			collectionId: 7,
+			projectId: 1,
+			name: 'Tomo 7',
+			filenameStem: 'co-7',
+			pending: 3,
+			total: 3,
+			excluded: 0,
+			firstPendingRecordId: 1,
+			pendingRecordIds: [1, 2, 3]
+		}
+	],
 	turn: { state: 'recaptures', unlockedBy: null }
 };
 
@@ -61,12 +81,19 @@ afterEach(() => {
 
 async function openAThenB(secondSummary: () => Promise<RetakeSummary>) {
 	vi.spyOn(recordsApi, 'listAll').mockImplementation(async (params) =>
-		params?.collection_id === 8 ? [rec(20, 1, 'captured')] : [rec(1, 1, 'captured'), rec(2, 2, 'captured')]
+		params?.collection_id === 8
+			? [rec(20, 1, 'captured')]
+			: [rec(1, 1, 'captured'), rec(2, 2, 'captured')]
 	);
-	const summary = vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValueOnce(summaryA).mockImplementation(secondSummary);
+	const summary = vi
+		.spyOn(recordsApi, 'toRetakeSummary')
+		.mockResolvedValueOnce(summaryA)
+		.mockImplementation(secondSummary);
 	const slot: VolumeTopbarSlot = { actions: null, reloadRecords: null };
 	const screen = render(CollectionPage, { context: volumeTopbarContext(slot) });
-	await expect.element(screen.getByRole('region', { name: '3 pares de páginas por recapturar' })).toBeVisible();
+	await expect
+		.element(screen.getByRole('region', { name: '3 pares de páginas por recapturar' }))
+		.toBeVisible();
 
 	pageStore.value?.set(pageAt('8'));
 	await expect.element(screen.getByText('Par 20')).toBeInTheDocument();
@@ -76,8 +103,13 @@ async function openAThenB(secondSummary: () => Promise<RetakeSummary>) {
 	return { screen, actions };
 }
 
-async function expectNothingFromA(screen: ReturnType<typeof render>, actions: ReturnType<typeof render>) {
-	await expect.element(screen.getByText('por recapturar', { exact: false })).not.toBeInTheDocument();
+async function expectNothingFromA(
+	screen: ReturnType<typeof render>,
+	actions: ReturnType<typeof render>
+) {
+	await expect
+		.element(screen.getByText('por recapturar', { exact: false }))
+		.not.toBeInTheDocument();
 	expect(screen.container.querySelector('a[href*="collectionId=8&recordId=1"]')).toBeNull();
 	await expect.element(actions.getByRole('button', { name: 'Enviar a revisión' })).toBeEnabled();
 	await expect.element(actions.getByRole('button', { name: /^Faltan/ })).not.toBeInTheDocument();
@@ -100,7 +132,9 @@ describe('volume page: the recapture count follows the volume', () => {
 		);
 		let releaseA: () => void = () => {};
 		vi.spyOn(recordsApi, 'toRetakeSummary')
-			.mockImplementationOnce(() => new Promise<RetakeSummary>((resolve) => (releaseA = () => resolve(summaryA))))
+			.mockImplementationOnce(
+				() => new Promise<RetakeSummary>((resolve) => (releaseA = () => resolve(summaryA)))
+			)
 			.mockImplementation(() => new Promise<RetakeSummary>(() => {}));
 		const slot: VolumeTopbarSlot = { actions: null, reloadRecords: null };
 		const screen = render(CollectionPage, { context: volumeTopbarContext(slot) });
@@ -123,17 +157,33 @@ describe('volume page: the recapture count follows the volume', () => {
 		vi.spyOn(recordsApi, 'toRetakeSummary')
 			.mockResolvedValueOnce({
 				pendingRecords: 1,
-				volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 7', filenameStem: 'co-7', pending: 1, total: 1, excluded: 0, firstPendingRecordId: 2, pendingRecordIds: [2] }],
+				volumes: [
+					{
+						collectionId: 7,
+						projectId: 1,
+						name: 'Tomo 7',
+						filenameStem: 'co-7',
+						pending: 1,
+						total: 1,
+						excluded: 0,
+						firstPendingRecordId: 2,
+						pendingRecordIds: [2]
+					}
+				],
 				turn: { state: 'recaptures', unlockedBy: null }
 			})
 			.mockRejectedValue(new Error('boom'));
 		const slot: VolumeTopbarSlot = { actions: null, reloadRecords: null };
 		const screen = render(CollectionPage, { context: volumeTopbarContext(slot) });
-		await expect.element(screen.getByRole('region', { name: 'Un par de páginas por recapturar' })).toBeVisible();
+		await expect
+			.element(screen.getByRole('region', { name: 'Un par de páginas por recapturar' }))
+			.toBeVisible();
 
 		await expect.poll(() => slot.reloadRecords).not.toBeNull();
 		expect(await slot.reloadRecords!()).toBe(true);
-		await expect.element(screen.getByText('por recapturar', { exact: false })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByText('por recapturar', { exact: false }))
+			.not.toBeInTheDocument();
 		await expect.poll(() => slot.actions).not.toBeNull();
 		const actions = render(SnippetHost, { snippet: slot.actions! });
 		await expect.element(actions.getByRole('button', { name: 'Enviar a revisión' })).toBeEnabled();

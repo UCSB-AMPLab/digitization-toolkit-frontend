@@ -10,7 +10,14 @@
 //   E2E_USERNAME, E2E_PASSWORD
 //
 // Version: 0.1.0-beta
-import { test, expect, testStem, signInBrowser, type APIRequestContext, type Page } from './fixtures';
+import {
+	test,
+	expect,
+	testStem,
+	signInBrowser,
+	type APIRequestContext,
+	type Page
+} from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh210';
@@ -105,9 +112,18 @@ async function teardown(request: APIRequestContext, token: string, projectId: nu
 }
 
 async function openGallery(page: Page, ctx: SetupResult) {
-	await signInBrowser(page, API_BASE, { username: E2E_USERNAME, password: E2E_PASSWORD }, {
-		id: 0, username: E2E_USERNAME, email: 'e2e@example.com', role: 'admin', is_active: true
-	});
+	await signInBrowser(
+		page,
+		API_BASE,
+		{ username: E2E_USERNAME, password: E2E_PASSWORD },
+		{
+			id: 0,
+			username: E2E_USERNAME,
+			email: 'e2e@example.com',
+			role: 'admin',
+			is_active: true
+		}
+	);
 	await page.goto(`/dashboard/projects/${ctx.projectId}/collections/${ctx.collectionId}`);
 	// The records are fetched on the client after hydration, so a visible
 	// title means the toolbar's handlers are attached. A view switch clicked
@@ -123,7 +139,9 @@ async function expectNoReviewActions(page: Page) {
 	await expect(page.getByRole('button', { name: 'Rechazar' })).toHaveCount(0);
 	// No per-record send inside the gallery. The volume's top bar offers
 	// sending the whole volume (NEH-260), which is not a review ruling.
-	await expect(page.locator('.gallery-content').getByRole('button', { name: 'Enviar a revisión' })).toHaveCount(0);
+	await expect(
+		page.locator('.gallery-content').getByRole('button', { name: 'Enviar a revisión' })
+	).toHaveCount(0);
 	await expect(page.locator('.action-bar')).toHaveCount(0);
 	await expect(page.locator('input[type="checkbox"]')).toHaveCount(0);
 	await expect(page.locator('.selectable-overlay, .selectable-check')).toHaveCount(0);
@@ -140,7 +158,9 @@ test.describe('Gallery — no review actions (NEH-210)', () => {
 		await teardown(request, ctx.token, ctx.projectId);
 	});
 
-	test('list view: no approve/reject/select control, and clicking a row navigates to Book view instead of selecting it', async ({ page }) => {
+	test('list view: no approve/reject/select control, and clicking a row navigates to Book view instead of selecting it', async ({
+		page
+	}) => {
 		await openGallery(page, ctx);
 		await expect(page.getByText('Record A')).toBeVisible();
 		await expectNoReviewActions(page);
@@ -153,7 +173,9 @@ test.describe('Gallery — no review actions (NEH-210)', () => {
 		await expectNoReviewActions(page);
 	});
 
-	test('grid view: toolbar keeps Filtros/Renumerar/Reordenar/columns, but no approve/reject control anywhere', async ({ page }) => {
+	test('grid view: toolbar keeps Filtros/Renumerar/Reordenar/columns, but no approve/reject control anywhere', async ({
+		page
+	}) => {
 		await openGallery(page, ctx);
 		await page.getByTitle('Vista cuadrícula').click();
 

@@ -47,15 +47,18 @@ const NO_STEM =
 	'This volume has no file name stem, so none of its files are stored offsite and none can be freed or restored.';
 const NOT_RECEIVED =
 	'Not every file of this volume is verified in the offsite bucket yet, so its files cannot be freed from the card. Wait for the upload to finish.';
-const EXPORT = 'An export of this volume is queued or running. Wait for it to finish, then try again.';
-const FILES_BEING_READ = 'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.';
+const EXPORT =
+	'An export of this volume is queued or running. Wait for it to finish, then try again.';
+const FILES_BEING_READ =
+	'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.';
 const LISTING =
 	'The offsite bucket could not be listed, so nothing could be checked against it and nothing was freed. Try again later.';
 const NO_READ_REMOTE =
 	'Restore is not set up on this unit: it needs read access to the offsite bucket (CAPTUA_OFFSITE_READ_REMOTE), and none is configured.';
 const NOT_IN_OWN_FOLDER =
 	"Some of this volume's files have not yet been moved into the volume's own folder, so its files cannot be freed from the card or restored. Captua moves them the next time it starts. If they are still not moved after a restart, the backend's log says why (for example, the folder already holds files that are not this volume's); once that is cleared and Captua has restarted, the volume can be freed.";
-const JOB_RUNNING = 'Files of this volume are already being freed or restored. Wait for that to finish.';
+const JOB_RUNNING =
+	'Files of this volume are already being freed or restored. Wait for that to finish.';
 const DRIVE_UNAVAILABLE =
 	'The storage drive set for projects is not available. Connect and activate the drive, or revert to internal storage, then try again.';
 const NOT_A_DIRECTORY =
@@ -63,22 +66,31 @@ const NOT_A_DIRECTORY =
 const NOT_MOUNTED =
 	'The storage path set for projects is not on a mounted drive. Connect and activate the drive, or revert to internal storage, then try again.';
 
-const refused409 = (message: string, extra: object = {}) => new ApiError(message, { message, ...extra }, 409);
+const refused409 = (message: string, extra: object = {}) =>
+	new ApiError(message, { message, ...extra }, 409);
 
 describe('offsiteActionErrorText', () => {
 	it('maps each 409 of the free, the dry run and the restore', () => {
 		expect(offsiteActionErrorText(refused409(NO_STEM), 'free', es)).toBe(es.offsite_err_no_stem);
-		expect(offsiteActionErrorText(refused409(NOT_RECEIVED, { total: 4, verified: 3 }), 'plan', es)).toBe(
-			es.offsite_err_not_received
-		);
-		expect(offsiteActionErrorText(refused409(EXPORT), 'free', es)).toBe(es.vol_err_export_running);
-		expect(offsiteActionErrorText(refused409(FILES_BEING_READ), 'restore', es)).toBe(es.vol_err_files_being_read);
-		expect(offsiteActionErrorText(refused409(LISTING, { error: 'rclone: timeout' }), 'plan', en)).toBe(
-			en.offsite_err_listing
-		);
-		expect(offsiteActionErrorText(refused409(NO_READ_REMOTE), 'restore', es)).toBe(es.offsite_err_no_read_remote);
 		expect(
-			offsiteActionErrorText(refused409(NOT_IN_OWN_FOLDER, { folder: 'x/', images_outside_own_folder: 2 }), 'free', es)
+			offsiteActionErrorText(refused409(NOT_RECEIVED, { total: 4, verified: 3 }), 'plan', es)
+		).toBe(es.offsite_err_not_received);
+		expect(offsiteActionErrorText(refused409(EXPORT), 'free', es)).toBe(es.vol_err_export_running);
+		expect(offsiteActionErrorText(refused409(FILES_BEING_READ), 'restore', es)).toBe(
+			es.vol_err_files_being_read
+		);
+		expect(
+			offsiteActionErrorText(refused409(LISTING, { error: 'rclone: timeout' }), 'plan', en)
+		).toBe(en.offsite_err_listing);
+		expect(offsiteActionErrorText(refused409(NO_READ_REMOTE), 'restore', es)).toBe(
+			es.offsite_err_no_read_remote
+		);
+		expect(
+			offsiteActionErrorText(
+				refused409(NOT_IN_OWN_FOLDER, { folder: 'x/', images_outside_own_folder: 2 }),
+				'free',
+				es
+			)
 		).toBe(es.offsite_err_not_in_own_folder);
 		expect(offsiteActionErrorText(refused409(JOB_RUNNING, { job_id: 'abc' }), 'restore', es)).toBe(
 			es.offsite_err_job_running
@@ -86,22 +98,24 @@ describe('offsiteActionErrorText', () => {
 	});
 
 	it('maps the 503 of a storage root that cannot take writes, a string detail', () => {
-		expect(offsiteActionErrorText(new ApiError(DRIVE_UNAVAILABLE, undefined, 503), 'restore', es)).toBe(
-			es.offsite_err_drive_unavailable
-		);
-		expect(offsiteActionErrorText(new ApiError(NOT_A_DIRECTORY, undefined, 503), 'restore', es)).toBe(
-			es.offsite_err_drive_not_directory
-		);
+		expect(
+			offsiteActionErrorText(new ApiError(DRIVE_UNAVAILABLE, undefined, 503), 'restore', es)
+		).toBe(es.offsite_err_drive_unavailable);
+		expect(
+			offsiteActionErrorText(new ApiError(NOT_A_DIRECTORY, undefined, 503), 'restore', es)
+		).toBe(es.offsite_err_drive_not_directory);
 		expect(offsiteActionErrorText(new ApiError(NOT_MOUNTED, undefined, 503), 'restore', en)).toBe(
 			en.offsite_err_drive_not_mounted
 		);
 	});
 
 	it('needs the status as well as the text', () => {
-		expect(offsiteActionErrorText(new ApiError(NO_STEM, undefined, 422), 'free', es)).toBe(es.offsite_err_free);
-		expect(offsiteActionErrorText(new ApiError(DRIVE_UNAVAILABLE, undefined, 409), 'restore', es)).toBe(
-			es.offsite_err_restore
+		expect(offsiteActionErrorText(new ApiError(NO_STEM, undefined, 422), 'free', es)).toBe(
+			es.offsite_err_free
 		);
+		expect(
+			offsiteActionErrorText(new ApiError(DRIVE_UNAVAILABLE, undefined, 409), 'restore', es)
+		).toBe(es.offsite_err_restore);
 	});
 
 	it("gives an unknown text the action's generic message, never the backend text", () => {
@@ -112,20 +126,28 @@ describe('offsiteActionErrorText', () => {
 		expect(offsiteActionErrorText(new ApiError('Bad gateway', undefined, 503), 'restore', es)).toBe(
 			es.offsite_err_restore
 		);
-		expect(offsiteActionErrorText(new TypeError('Failed to fetch'), 'free', es)).toBe(es.offsite_err_free);
+		expect(offsiteActionErrorText(new TypeError('Failed to fetch'), 'free', es)).toBe(
+			es.offsite_err_free
+		);
 		expect(offsiteActionErrorText('not an error', 'plan', es)).toBe(es.offsite_err_plan);
 	});
 });
 
 describe('offsiteJobErrorText', () => {
 	it('maps the listing failure, which carries the listing error after the message', () => {
-		expect(offsiteJobErrorText(`${LISTING} (rclone lsjson: exit 1)`, 'free', es)).toBe(es.offsite_err_listing);
+		expect(offsiteJobErrorText(`${LISTING} (rclone lsjson: exit 1)`, 'free', es)).toBe(
+			es.offsite_err_listing
+		);
 	});
 
 	it('maps the refusals the job checks again, and a storage root lost during a restore', () => {
-		expect(offsiteJobErrorText(NOT_IN_OWN_FOLDER, 'free', es)).toBe(es.offsite_err_not_in_own_folder);
+		expect(offsiteJobErrorText(NOT_IN_OWN_FOLDER, 'free', es)).toBe(
+			es.offsite_err_not_in_own_folder
+		);
 		expect(offsiteJobErrorText(NO_STEM, 'restore', es)).toBe(es.offsite_err_no_stem);
-		expect(offsiteJobErrorText(DRIVE_UNAVAILABLE, 'restore', en)).toBe(en.offsite_err_drive_unavailable);
+		expect(offsiteJobErrorText(DRIVE_UNAVAILABLE, 'restore', en)).toBe(
+			en.offsite_err_drive_unavailable
+		);
 	});
 
 	it("gives anything else the action's job failure message", () => {
@@ -161,7 +183,12 @@ describe('refusalLines', () => {
 	});
 
 	it("words the restore's reasons", () => {
-		const refused = [entry('copy_failed'), entry('sha1_differs'), entry('local_file_differs'), entry('could_not_write')];
+		const refused = [
+			entry('copy_failed'),
+			entry('sha1_differs'),
+			entry('local_file_differs'),
+			entry('could_not_write')
+		];
 		expect(refusalLines(refused, en)).toEqual([
 			en.offsite_reason_local_file_differs(1),
 			en.offsite_reason_copy_failed(1),
@@ -171,8 +198,15 @@ describe('refusalLines', () => {
 	});
 
 	it('counts reasons it does not know, and those without one, together at the end', () => {
-		const refused = [entry('something_new'), { ...entry('x'), reason: undefined }, entry('changed')];
-		expect(refusalLines(refused, es)).toEqual([es.offsite_reason_changed(1), es.offsite_reason_other(2)]);
+		const refused = [
+			entry('something_new'),
+			{ ...entry('x'), reason: undefined },
+			entry('changed')
+		];
+		expect(refusalLines(refused, es)).toEqual([
+			es.offsite_reason_changed(1),
+			es.offsite_reason_other(2)
+		]);
 	});
 
 	it('is empty when nothing was refused', () => {
@@ -187,7 +221,15 @@ describe('freedExportText and freedZipText: restorable (NEH-380)', () => {
 	it("the export's 409: the restore message unless the unit cannot restore", () => {
 		for (const msgs of [es, en]) {
 			const with_ = (restorable?: boolean) =>
-				new ApiError(freedText(3), { message: freedText(3), freed_image_ids: [1, 2, 3], ...(restorable === undefined ? {} : { restorable }) }, 409);
+				new ApiError(
+					freedText(3),
+					{
+						message: freedText(3),
+						freed_image_ids: [1, 2, 3],
+						...(restorable === undefined ? {} : { restorable })
+					},
+					409
+				);
 			expect(freedExportText(with_(false), msgs)).toBe(msgs.export_freed_no_restore);
 			expect(freedExportText(with_(true), msgs)).toBe(msgs.col_export_freed(3));
 			expect(freedExportText(with_(), msgs)).toBe(msgs.col_export_freed(3));
@@ -195,8 +237,12 @@ describe('freedExportText and freedZipText: restorable (NEH-380)', () => {
 	});
 
 	it("the export job's failure: its error text and its detail", () => {
-		expect(freedExportText(freedText(2), es, { reason: 'freed_files', restorable: false })).toBe(es.export_freed_no_restore);
-		expect(freedExportText(freedText(2), es, { reason: 'freed_files', restorable: true })).toBe(es.col_export_freed(2));
+		expect(freedExportText(freedText(2), es, { reason: 'freed_files', restorable: false })).toBe(
+			es.export_freed_no_restore
+		);
+		expect(freedExportText(freedText(2), es, { reason: 'freed_files', restorable: true })).toBe(
+			es.col_export_freed(2)
+		);
 		expect(freedExportText(freedText(2), es, null)).toBe(es.col_export_freed(2));
 		expect(freedExportText('Something else failed', es, { restorable: false })).toBeNull();
 		expect(freedExportText(new ApiError('x', {}, 409), es)).toBeNull();
@@ -214,7 +260,11 @@ describe('freedExportCount', () => {
 		`${n} file(s) of this volume are stored offsite and freed from the card. Restore the volume before exporting it.`;
 
 	it("reads the count of the export's 409", () => {
-		const err = new ApiError(freedText(3), { message: freedText(3), freed_image_ids: [1, 2, 3] }, 409);
+		const err = new ApiError(
+			freedText(3),
+			{ message: freedText(3), freed_image_ids: [1, 2, 3] },
+			409
+		);
 		expect(freedExportCount(err)).toBe(3);
 	});
 
@@ -265,20 +315,26 @@ describe('pollOffsiteJob', () => {
 			() => Promise.resolve(status('done'))
 		];
 		const fetchStatus = vi.fn(() => answers.shift()!());
-		expect((await pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, maxFailures: 3 })).state).toBe('done');
+		expect(
+			(await pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, maxFailures: 3 })).state
+		).toBe('done');
 	});
 
 	it('gives up after that many failed requests in a row, with the last error', async () => {
 		const last = new TypeError('Failed to fetch');
 		const fetchStatus = vi.fn(() => Promise.reject(last));
-		await expect(pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, maxFailures: 3 })).rejects.toBe(last);
+		await expect(
+			pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, maxFailures: 3 })
+		).rejects.toBe(last);
 		expect(fetchStatus).toHaveBeenCalledTimes(3);
 	});
 
 	it('gives up at once when the backend no longer knows the job', async () => {
 		const lost = new ApiError('Job not found', undefined, 404);
 		const fetchStatus = vi.fn(() => Promise.reject(lost));
-		await expect(pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, maxFailures: 5 })).rejects.toBe(lost);
+		await expect(
+			pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, maxFailures: 5 })
+		).rejects.toBe(lost);
 		expect(fetchStatus).toHaveBeenCalledTimes(1);
 	});
 
@@ -317,13 +373,21 @@ describe('offsiteOffer', () => {
 	});
 
 	it('offers restoring a volume with freed files, and freeing what is left', () => {
-		expect(offsiteOffer(state({ freed_files: 4, freed_bytes: 100 }))).toEqual({ free: true, restore: true });
-		expect(offsiteOffer(state({ freed_files: 10, freed_bytes: 100 }))).toEqual({ free: false, restore: true });
+		expect(offsiteOffer(state({ freed_files: 4, freed_bytes: 100 }))).toEqual({
+			free: true,
+			restore: true
+		});
+		expect(offsiteOffer(state({ freed_files: 10, freed_bytes: 100 }))).toEqual({
+			free: false,
+			restore: true
+		});
 	});
 
 	it('offers no freeing before the volume is received, nor for a volume without a stem', () => {
 		expect(offsiteOffer(state({ verified: 8, pending: 2, received: false })).free).toBe(false);
-		expect(offsiteOffer(state({ uploadable: false, total: 0, verified: 0, received: false }))).toEqual({
+		expect(
+			offsiteOffer(state({ uploadable: false, total: 0, verified: 0, received: false }))
+		).toEqual({
 			free: false,
 			restore: false
 		});
@@ -348,7 +412,10 @@ describe('planSummary', () => {
 	});
 
 	it('says how many files and bytes would be removed, and what would be left and why', () => {
-		const summary = planSummary(plan(412, 12_300_000_000, [entry('no_preview_digest'), entry('no_preview_digest', 2)]), es);
+		const summary = planSummary(
+			plan(412, 12_300_000_000, [entry('no_preview_digest'), entry('no_preview_digest', 2)]),
+			es
+		);
 		expect(summary).toEqual({
 			canFree: true,
 			body: es.offsite_plan_will_free(412, 12_300_000_000),
@@ -382,7 +449,11 @@ describe('resultSummary', () => {
 	});
 
 	it("reports a free's files and bytes, and the files it left", () => {
-		const summary = resultSummary('free', result({ freed: { files: 410, bytes: 12e9 }, refused: [entry('local_sha1_differs')] }), es);
+		const summary = resultSummary(
+			'free',
+			result({ freed: { files: 410, bytes: 12e9 }, refused: [entry('local_sha1_differs')] }),
+			es
+		);
 		expect(summary).toEqual({
 			title: es.offsite_free_done_title,
 			body: es.offsite_free_done(410, 12e9),
@@ -392,7 +463,11 @@ describe('resultSummary', () => {
 	});
 
 	it("reports a restore's files and bytes, and the files it could not restore", () => {
-		const summary = resultSummary('restore', result({ restored: { files: 2, bytes: 5e7 }, refused: [entry('copy_failed')] }), en);
+		const summary = resultSummary(
+			'restore',
+			result({ restored: { files: 2, bytes: 5e7 }, refused: [entry('copy_failed')] }),
+			en
+		);
 		expect(summary).toEqual({
 			title: en.offsite_restore_done_title,
 			body: en.offsite_restore_done(2, 5e7),
@@ -407,7 +482,10 @@ describe('resultSummary', () => {
 });
 
 describe('runOffsiteJob', () => {
-	const job = (state: OffsiteJobStatus['state'], over: Partial<OffsiteJobStatus> = {}): OffsiteJobStatus => ({
+	const job = (
+		state: OffsiteJobStatus['state'],
+		over: Partial<OffsiteJobStatus> = {}
+	): OffsiteJobStatus => ({
 		job_id: 'j1',
 		collection_id: 7,
 		action: 'free',
@@ -417,11 +495,25 @@ describe('runOffsiteJob', () => {
 		...over
 	});
 	const start = (): Promise<OffsiteJobStart> =>
-		Promise.resolve({ job_id: 'j1', state: 'queued', action: 'free', status_url: '/collections/7/offsite/jobs/j1' });
+		Promise.resolve({
+			job_id: 'j1',
+			state: 'queued',
+			action: 'free',
+			status_url: '/collections/7/offsite/jobs/j1'
+		});
 	const opts = { intervalMs: 10, wait: () => Promise.resolve() };
 
 	it('starts the job, polls it by its id and returns its result', async () => {
-		const done = job('done', { result: { collection_id: 7, filename_stem: 'co-x', freed: { files: 1, bytes: 9 }, files: [], refused: [], manifest: null } });
+		const done = job('done', {
+			result: {
+				collection_id: 7,
+				filename_stem: 'co-x',
+				freed: { files: 1, bytes: 9 },
+				files: [],
+				refused: [],
+				manifest: null
+			}
+		});
 		const getJob = vi.fn(() => Promise.resolve(done));
 		const outcome = await runOffsiteJob('free', start, getJob, opts, es);
 		expect(getJob).toHaveBeenCalledWith('j1', expect.any(AbortSignal));
@@ -442,7 +534,10 @@ describe('runOffsiteJob', () => {
 		});
 
 		const lost = () => Promise.reject(new ApiError('Job not found', undefined, 404));
-		expect(await runOffsiteJob('free', start, lost, opts, es)).toEqual({ kind: 'error', text: es.offsite_err_job_lost });
+		expect(await runOffsiteJob('free', start, lost, opts, es)).toEqual({
+			kind: 'error',
+			text: es.offsite_err_job_lost
+		});
 
 		const down = () => Promise.reject(new TypeError('Failed to fetch'));
 		expect(await runOffsiteJob('free', start, down, { ...opts, maxFailures: 2 }, es)).toEqual({
@@ -454,12 +549,18 @@ describe('runOffsiteJob', () => {
 	it('is aborted, not an error, when the caller stops it', async () => {
 		const controller = new AbortController();
 		controller.abort();
-		expect(await runOffsiteJob('free', start, vi.fn(), { ...opts, signal: controller.signal }, es)).toEqual({ kind: 'aborted' });
+		expect(
+			await runOffsiteJob('free', start, vi.fn(), { ...opts, signal: controller.signal }, es)
+		).toEqual({ kind: 'aborted' });
 	});
 });
 
 describe('freedCountsChanged', () => {
-	const counts = (collectionId: number, files: number, bytes: number) => ({ collectionId, files, bytes });
+	const counts = (collectionId: number, files: number, bytes: number) => ({
+		collectionId,
+		files,
+		bytes
+	});
 
 	it('is false on the first reading of a volume: the page has just loaded its records', () => {
 		expect(freedCountsChanged(null, counts(7, 4, 100), 7)).toBe(false);
@@ -483,18 +584,28 @@ describe('freedCountsChanged', () => {
 
 describe('freedCountsOf', () => {
 	it('reads a backend without the freed counts as nothing freed', () => {
-		const s = { collection_id: 7, freed_files: undefined, freed_bytes: undefined } as unknown as VolumeOffsiteState;
+		const s = {
+			collection_id: 7,
+			freed_files: undefined,
+			freed_bytes: undefined
+		} as unknown as VolumeOffsiteState;
 		expect(freedCountsOf(s)).toEqual({ collectionId: 7, files: 0, bytes: 0 });
 	});
 });
 
 describe('freedAfterRead', () => {
-	const counts = (collectionId: number, files: number, bytes: number) => ({ collectionId, files, bytes });
+	const counts = (collectionId: number, files: number, bytes: number) => ({
+		collectionId,
+		files,
+		bytes
+	});
 
 	it('moves on without reloading on the first reading of a volume, or when nothing changed', async () => {
 		const reload = vi.fn(() => Promise.resolve(true));
 		expect(await freedAfterRead(null, counts(7, 4, 100), 7, reload)).toEqual(counts(7, 4, 100));
-		expect(await freedAfterRead(counts(7, 4, 100), counts(7, 4, 100), 7, reload)).toEqual(counts(7, 4, 100));
+		expect(await freedAfterRead(counts(7, 4, 100), counts(7, 4, 100), 7, reload)).toEqual(
+			counts(7, 4, 100)
+		);
 		expect(reload).not.toHaveBeenCalled();
 	});
 
@@ -519,13 +630,19 @@ describe('freedAfterRead', () => {
 
 	it('keeps the change pending when the reload throws or there is nothing to reload with', async () => {
 		const throws = vi.fn(() => Promise.reject(new Error('down')));
-		expect(await freedAfterRead(counts(7, 0, 0), counts(7, 4, 100), 7, throws)).toEqual(counts(7, 0, 0));
-		expect(await freedAfterRead(counts(7, 0, 0), counts(7, 4, 100), 7, null)).toEqual(counts(7, 0, 0));
+		expect(await freedAfterRead(counts(7, 0, 0), counts(7, 4, 100), 7, throws)).toEqual(
+			counts(7, 0, 0)
+		);
+		expect(await freedAfterRead(counts(7, 0, 0), counts(7, 4, 100), 7, null)).toEqual(
+			counts(7, 0, 0)
+		);
 	});
 
 	it('never reloads for a volume other than the one shown', async () => {
 		const reload = vi.fn(() => Promise.resolve(true));
-		expect(await freedAfterRead(counts(7, 0, 0), counts(8, 4, 100), 8, reload)).toEqual(counts(8, 4, 100));
+		expect(await freedAfterRead(counts(7, 0, 0), counts(8, 4, 100), 8, reload)).toEqual(
+			counts(8, 4, 100)
+		);
 		expect(reload).not.toHaveBeenCalled();
 	});
 });
@@ -541,7 +658,12 @@ describe('pollOffsiteJob, with a request that never answers', () => {
 			return hung();
 		});
 		await expect(
-			pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, maxFailures: 2, requestTimeoutMs: 20 })
+			pollOffsiteJob(fetchStatus, {
+				intervalMs: 10,
+				wait: noWait,
+				maxFailures: 2,
+				requestTimeoutMs: 20
+			})
 		).rejects.toMatchObject({ name: 'TimeoutError' });
 		expect(fetchStatus).toHaveBeenCalledTimes(2);
 		// The request itself is aborted, not only abandoned.
@@ -549,10 +671,19 @@ describe('pollOffsiteJob, with a request that never answers', () => {
 	});
 
 	it('asks again after a timed-out request and returns the answer that follows', async () => {
-		const done: OffsiteJobStatus = { job_id: 'j', collection_id: 7, action: 'free', state: 'done', result: null, error: null };
+		const done: OffsiteJobStatus = {
+			job_id: 'j',
+			collection_id: 7,
+			action: 'free',
+			state: 'done',
+			result: null,
+			error: null
+		};
 		const answers = [hung, () => Promise.resolve(done)];
 		const fetchStatus = vi.fn(() => answers.shift()!());
-		expect(await pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, requestTimeoutMs: 20 })).toBe(done);
+		expect(
+			await pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, requestTimeoutMs: 20 })
+		).toBe(done);
 	});
 
 	it("passes the caller's abort to the request in flight and stops at once", async () => {
@@ -564,7 +695,12 @@ describe('pollOffsiteJob, with a request that never answers', () => {
 			return hung();
 		});
 		await expect(
-			pollOffsiteJob(fetchStatus, { intervalMs: 10, wait: noWait, signal: controller.signal, requestTimeoutMs: 60_000 })
+			pollOffsiteJob(fetchStatus, {
+				intervalMs: 10,
+				wait: noWait,
+				signal: controller.signal,
+				requestTimeoutMs: 60_000
+			})
 		).rejects.toMatchObject({ name: 'AbortError' });
 		expect(inFlight?.aborted).toBe(true);
 	});
@@ -573,7 +709,12 @@ describe('pollOffsiteJob, with a request that never answers', () => {
 describe('runOffsiteJob, closed while a request hangs', () => {
 	const opts = { intervalMs: 10, wait: () => Promise.resolve(), requestTimeoutMs: 60_000 };
 	const started = (): Promise<OffsiteJobStart> =>
-		Promise.resolve({ job_id: 'j1', state: 'queued', action: 'restore', status_url: '/collections/7/offsite/jobs/j1' });
+		Promise.resolve({
+			job_id: 'j1',
+			state: 'queued',
+			action: 'restore',
+			status_url: '/collections/7/offsite/jobs/j1'
+		});
 
 	it('settles as aborted when the poll request hangs', async () => {
 		const controller = new AbortController();
@@ -581,7 +722,9 @@ describe('runOffsiteJob, closed while a request hangs', () => {
 			setTimeout(() => controller.abort(), 5);
 			return new Promise<OffsiteJobStatus>(() => {});
 		});
-		expect(await runOffsiteJob('restore', started, getJob, { ...opts, signal: controller.signal }, es)).toEqual({
+		expect(
+			await runOffsiteJob('restore', started, getJob, { ...opts, signal: controller.signal }, es)
+		).toEqual({
 			kind: 'aborted'
 		});
 	});
@@ -592,7 +735,9 @@ describe('runOffsiteJob, closed while a request hangs', () => {
 			setTimeout(() => controller.abort(), 5);
 			return new Promise<OffsiteJobStart>(() => {});
 		});
-		expect(await runOffsiteJob('free', start, vi.fn(), { ...opts, signal: controller.signal }, es)).toEqual({
+		expect(
+			await runOffsiteJob('free', start, vi.fn(), { ...opts, signal: controller.signal }, es)
+		).toEqual({
 			kind: 'aborted'
 		});
 	});

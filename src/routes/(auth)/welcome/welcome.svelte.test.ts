@@ -50,7 +50,10 @@ describe('welcome splash', () => {
 
 	it('puts the English button first', async () => {
 		const screen = await render(Page);
-		const labels = screen.getByRole('button').elements().map((b) => b.textContent?.trim());
+		const labels = screen
+			.getByRole('button')
+			.elements()
+			.map((b) => b.textContent?.trim());
 		expect(labels).toEqual(['Get started in English', 'Empezar en español']);
 	});
 
@@ -62,19 +65,30 @@ describe('welcome splash', () => {
 		expect(es.element().getAttribute('lang')).toBe('es');
 		await expect.element(en.getByRole('button', { name: 'Get started in English' })).toBeVisible();
 		await expect.element(es.getByRole('button', { name: 'Empezar en español' })).toBeVisible();
-		expect(screen.getByRole('heading', { level: 2 }).elements().map((h) => h.textContent)).toEqual(['Hello!', '¡Hola!']);
+		expect(
+			screen
+				.getByRole('heading', { level: 2 })
+				.elements()
+				.map((h) => h.textContent)
+		).toEqual(['Hello!', '¡Hola!']);
 	});
 
 	it('names the page heading after the logo, once', async () => {
 		const screen = await render(Page);
-		await expect.element(screen.getByRole('heading', { level: 1, name: 'Captua' })).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('heading', { level: 1, name: 'Captua' }))
+			.toBeInTheDocument();
 	});
 
 	it('credits the NEH award and links to the credits page', async () => {
 		const screen = await render(Page);
 		await expect.element(screen.getByText('HAA-304052-25', { exact: false })).toBeVisible();
-		await expect.element(screen.getByRole('img', { name: 'National Endowment for the Humanities' })).toBeVisible();
-		await expect.element(screen.getByRole('link', { name: 'Credits / Créditos' })).toHaveAttribute('href', '/credits');
+		await expect
+			.element(screen.getByRole('img', { name: 'National Endowment for the Humanities' }))
+			.toBeVisible();
+		await expect
+			.element(screen.getByRole('link', { name: 'Credits / Créditos' }))
+			.toHaveAttribute('href', '/credits');
 	});
 
 	it('goes to login when setup is done', async () => {

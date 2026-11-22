@@ -35,7 +35,8 @@ async function jpeg(w: number, h: number): Promise<Blob> {
 }
 
 const box = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
-const overlaps = (a: DOMRect, b: DOMRect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+const overlaps = (a: DOMRect, b: DOMRect) =>
+	a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
 function button(name: string) {
 	return [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
@@ -48,7 +49,9 @@ function smallText(): string[] {
 	const dialog = document.querySelector('[role="dialog"]')!;
 	return [...dialog.querySelectorAll<HTMLElement>('*')]
 		.filter((el) => !el.closest('svg'))
-		.filter((el) => [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim()))
+		.filter((el) =>
+			[...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim())
+		)
 		.filter((el) => parseFloat(getComputedStyle(el).fontSize) < 12)
 		.map((el) => `${el.className}: ${el.textContent?.trim()}`);
 }
@@ -74,25 +77,40 @@ function footerRow() {
 	const buttons = [...footer.querySelectorAll('button')].map((b) => b.getBoundingClientRect());
 	const tops = new Set(buttons.map((r) => Math.round(r.top)));
 	const used = buttons.reduce((sum, r) => sum + r.width, 0);
-	return { rows: tops.size, height: footer.getBoundingClientRect().height, used, width: footer.clientWidth };
+	return {
+		rows: tops.size,
+		height: footer.getBoundingClientRect().height,
+		used,
+		width: footer.clientWidth
+	};
 }
 
 function bodyFits() {
 	const body = document.querySelector('.rf-body') as HTMLElement;
 	const card = box('[role="dialog"]');
-	return { scroll: body.scrollHeight, client: body.clientHeight, cardBottom: card.bottom, cardHeight: card.height };
+	return {
+		scroll: body.scrollHeight,
+		client: body.clientHeight,
+		cardBottom: card.bottom,
+		cardHeight: card.height
+	};
 }
 
 beforeEach(async () => {
 	await browserPage.viewport(800, 480);
-	vi.spyOn(camerasApi, 'getDSLRSettings').mockResolvedValue({ focus_mode: 'One Shot' } as DSLRSettings);
+	vi.spyOn(camerasApi, 'getDSLRSettings').mockResolvedValue({
+		focus_mode: 'One Shot'
+	} as DSLRSettings);
 });
 
 afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-for (const [lang, msgs] of [['en', en], ['es', es]] as const) {
+for (const [lang, msgs] of [
+	['en', en],
+	['es', es]
+] as const) {
 	describe(`at 800x480, ${lang}`, () => {
 		beforeEach(() => locale.set(lang as Locale));
 
@@ -125,7 +143,9 @@ for (const [lang, msgs] of [['en', en], ['es', es]] as const) {
 			expect(paneDuring).toBeCloseTo(paneBefore, 0);
 
 			answer([{ blob: await jpeg(3000, 2000), seconds: 4, bytes: 1, focalLength: 27 }]);
-			await expect.poll(() => document.querySelector('[data-pane="left"] img')?.clientWidth ?? 0).toBeGreaterThan(0);
+			await expect
+				.poll(() => document.querySelector('[data-pane="left"] img')?.clientWidth ?? 0)
+				.toBeGreaterThan(0);
 			await settle();
 			const after = bodyFits();
 			const paneAfter = box('[data-pane="left"] .rf-frame').height;
@@ -141,7 +161,12 @@ for (const [lang, msgs] of [['en', en], ['es', es]] as const) {
 			);
 
 			const frames = [box('[data-pane="left"] .rf-frame'), box('[data-pane="right"] .rf-frame')];
-			for (const name of [msgs.col_fit_screen_aria, msgs.col_zoom_actual_aria, msgs.lv_zoom_out, msgs.lv_zoom_in]) {
+			for (const name of [
+				msgs.col_fit_screen_aria,
+				msgs.col_zoom_actual_aria,
+				msgs.lv_zoom_out,
+				msgs.lv_zoom_in
+			]) {
 				const r = button(name).getBoundingClientRect();
 				expect(r.height).toBeGreaterThanOrEqual(44);
 				expect(r.width).toBeGreaterThanOrEqual(44);
@@ -153,7 +178,9 @@ for (const [lang, msgs] of [['en', en], ['es', es]] as const) {
 		});
 
 		it('two failures fit too, and their messages are not cut off', async () => {
-			vi.spyOn(camerasApi, 'testCapture').mockRejectedValue(Object.assign(new Error('timeout'), { status: 504 }));
+			vi.spyOn(camerasApi, 'testCapture').mockRejectedValue(
+				Object.assign(new Error('timeout'), { status: 504 })
+			);
 			render(RefocusModal, { leftIndex: 0, onClose: vi.fn() });
 			await settle();
 			button(msgs.focus_next).click();
@@ -166,11 +193,15 @@ for (const [lang, msgs] of [['en', en], ['es', es]] as const) {
 			const left = messageInFrame('left');
 			const right = messageInFrame('right');
 			expect(smallText()).toEqual([]);
-			console.log(`[fit ${lang}] two failures: panes ${left.frame.toFixed(0)}px, messages ${left.message.toFixed(0)}px and ${right.message.toFixed(0)}px`);
+			console.log(
+				`[fit ${lang}] two failures: panes ${left.frame.toFixed(0)}px, messages ${left.message.toFixed(0)}px and ${right.message.toFixed(0)}px`
+			);
 		});
 
 		it('"Show steps" over two failure lists: the panes keep the lists whole and only then the body scrolls', async () => {
-			vi.spyOn(camerasApi, 'testCapture').mockRejectedValue(Object.assign(new Error('timeout'), { status: 504 }));
+			vi.spyOn(camerasApi, 'testCapture').mockRejectedValue(
+				Object.assign(new Error('timeout'), { status: 504 })
+			);
 			render(RefocusModal, { leftIndex: 0, onClose: vi.fn() });
 			await settle();
 			button(msgs.focus_next).click();
@@ -212,7 +243,9 @@ for (const [lang, msgs] of [['en', en], ['es', es]] as const) {
 			const mf = bodyFits();
 			expect(mf.scroll).toBeLessThanOrEqual(mf.client + 1);
 			expect(mf.cardBottom).toBeLessThanOrEqual(480);
-			console.log(`[fit ${lang}] AF stage body ${af.scroll}px in ${af.client}px, card ${af.cardHeight.toFixed(0)}px; MF stage body ${mf.scroll}px in ${mf.client}px, card ${mf.cardHeight.toFixed(0)}px`);
+			console.log(
+				`[fit ${lang}] AF stage body ${af.scroll}px in ${af.client}px, card ${af.cardHeight.toFixed(0)}px; MF stage body ${mf.scroll}px in ${mf.client}px, card ${mf.cardHeight.toFixed(0)}px`
+			);
 		});
 	});
 }

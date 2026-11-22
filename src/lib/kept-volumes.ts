@@ -51,7 +51,9 @@ export function keptActionErrorText(error: unknown, msgs: Messages): string {
 	if (typeof error === 'object' && error !== null) {
 		const e = error as { status?: unknown; detail?: unknown };
 		const code =
-			typeof e.detail === 'object' && e.detail !== null ? (e.detail as { code?: unknown }).code : undefined;
+			typeof e.detail === 'object' && e.detail !== null
+				? (e.detail as { code?: unknown }).code
+				: undefined;
 		if (e.status === 409 && code === 'already_left_unit') return msgs.kept_err_already_left;
 		if (e.status === 409 && code === 'already_kept_on_unit') return msgs.kept_err_already_kept;
 		if (e.status === 409 && code === 'not_kept_on_unit') return msgs.kept_err_not_kept;

@@ -53,7 +53,11 @@ function refusalCode(error: unknown): { status: unknown; code: string } | null {
  * its own generic line. Null for every role but the testing account: an
  * administrator who names testing material gets the text it always got.
  */
-export function testingRefusalText(error: unknown, msgs: Messages, role: string | null | undefined): string | null {
+export function testingRefusalText(
+	error: unknown,
+	msgs: Messages,
+	role: string | null | undefined
+): string | null {
 	if (!inTestingSpace(role)) return null;
 	const found = refusalCode(error);
 	if (!found) return null;
@@ -101,11 +105,18 @@ export function usbFailureText(code: string | null | undefined, msgs: Messages):
  * gets the generic testing line, so the backend's English is never shown.
  * Null for every other role.
  */
-export function testingProjectDeleteText(error: unknown, msgs: Messages, role: string | null | undefined): string | null {
+export function testingProjectDeleteText(
+	error: unknown,
+	msgs: Messages,
+	role: string | null | undefined
+): string | null {
 	if (!inTestingSpace(role)) return null;
 	const coded = testingRefusalText(error, msgs, role);
 	if (coded) return coded;
-	const status = typeof error === 'object' && error !== null ? (error as { status?: unknown }).status : undefined;
+	const status =
+		typeof error === 'object' && error !== null
+			? (error as { status?: unknown }).status
+			: undefined;
 	if (status === 503) return msgs.testing_err_project_storage;
 	if (status === 404) return msgs.testing_err_not_found;
 	return msgs.testing_err_other;

@@ -31,7 +31,14 @@ import { en } from '$lib/i18n/en';
 import { recordFocusActivity } from '$lib/focus-check';
 import { clearChord } from '$lib/capture-key';
 import { resetUnit } from '$lib/unit-mode';
-import { json, recordRequests, refusal, TESTING_UNIT, TESTING_USER, type Recorder } from '$lib/test-support/testing-routes';
+import {
+	json,
+	recordRequests,
+	refusal,
+	TESTING_UNIT,
+	TESTING_USER,
+	type Recorder
+} from '$lib/test-support/testing-routes';
 import '../../app.css';
 import LivePreview from './+page.svelte';
 
@@ -44,11 +51,35 @@ async function settle(n = 5) {
 }
 
 const NOT_NEEDED = { needs_setup: false, reasons: [], confirmed_pair: { left: 'a', right: 'b' } };
-const NEEDED = { needs_setup: true, reasons: [{ code: 'role_unconfirmed', message: 'English', hardware_ids: ['b'] }], confirmed_pair: null };
-const CAPS = { backend: 'gphoto2', live_preview: true, focus_control: true, live_controls: true, zoom: true,
-	autofocus_calibration: true, dslr_settings: false, continuous_preview: true, zoom_steps: true, image_formats: ['JPEG', 'RAW+JPEG'] };
-const row = (index: number, hardware_id: string, role: string) => ({ index, hardware_id, model: 'Canon PowerShot A2500', calibrated: false,
-	role, role_confirmed: true, role_guess: null, has_aperture_control: true, zoom_step: 0, zoom_steps: 5 });
+const NEEDED = {
+	needs_setup: true,
+	reasons: [{ code: 'role_unconfirmed', message: 'English', hardware_ids: ['b'] }],
+	confirmed_pair: null
+};
+const CAPS = {
+	backend: 'gphoto2',
+	live_preview: true,
+	focus_control: true,
+	live_controls: true,
+	zoom: true,
+	autofocus_calibration: true,
+	dslr_settings: false,
+	continuous_preview: true,
+	zoom_steps: true,
+	image_formats: ['JPEG', 'RAW+JPEG']
+};
+const row = (index: number, hardware_id: string, role: string) => ({
+	index,
+	hardware_id,
+	model: 'Canon PowerShot A2500',
+	calibrated: false,
+	role,
+	role_confirmed: true,
+	role_guess: null,
+	has_aperture_control: true,
+	zoom_step: 0,
+	zoom_steps: 5
+});
 
 let rec: Recorder;
 let captureAnswer: () => Response;
@@ -61,13 +92,27 @@ function serve(setup: object = NOT_NEEDED) {
 		'GET /cameras/devices': [row(0, 'a', 'left'), row(1, 'b', 'right')],
 		'GET /cameras/preview/{camera_index}': () => new Response(null, { status: 404 }),
 		'GET /cameras/dslr/{camera_index}/settings': {},
-		'GET /projects/{project_id}': { id: 2, name: 'Practice', testing: true, capture_format: 'JPEG' },
-		'GET /collections/{collection_id}': { id: 9, name: 'Tomo practice', project_id: 2, created_at: '2026-11-01T00:00:00',
-			filename_stem: 'testing-000009', testing: true, testing_expires_at: '2026-12-20T00:00:00Z', custom_attributes: null },
+		'GET /projects/{project_id}': {
+			id: 2,
+			name: 'Practice',
+			testing: true,
+			capture_format: 'JPEG'
+		},
+		'GET /collections/{collection_id}': {
+			id: 9,
+			name: 'Tomo practice',
+			project_id: 2,
+			created_at: '2026-11-01T00:00:00',
+			filename_stem: 'testing-000009',
+			testing: true,
+			testing_expires_at: '2026-12-20T00:00:00Z',
+			custom_attributes: null
+		},
 		'GET /records/': [],
 		'POST /cameras/capture/dual': () => captureAnswer(),
 		'POST /cameras/capture': () => captureAnswer(),
-		'POST /cameras/test-capture/{camera_index}': () => new Response(new Blob(['jpeg']), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
+		'POST /cameras/test-capture/{camera_index}': () =>
+			new Response(new Blob(['jpeg']), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
 	} as never);
 }
 
@@ -80,7 +125,9 @@ function nameOf(b: Element): string {
 	copy.querySelectorAll('.material-symbols-outlined').forEach((icon) => icon.remove());
 	return (copy.textContent ?? '').trim();
 }
-const button = (name: string) => [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => nameOf(b) === name) ?? null;
+const button = (name: string) =>
+	[...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => nameOf(b) === name) ??
+	null;
 
 beforeEach(() => {
 	localStorage.clear();
@@ -119,8 +166,17 @@ describe('capture screen, testing account', () => {
 		button(en.cam_panel_expand_aria)!.click();
 		await expect.poll(() => button(en.cam_histogram)).not.toBeNull();
 		await settle();
-		for (const name of [en.cam_reconnect, en.cam_section_basic, en.cam_section_focus, en.cam_section_settings,
-			en.lv_rotate_ccw, en.lv_rotate_cw, en.cam_rotate_ccw, en.cam_rotate_cw, en.tb_go_to_review]) {
+		for (const name of [
+			en.cam_reconnect,
+			en.cam_section_basic,
+			en.cam_section_focus,
+			en.cam_section_settings,
+			en.lv_rotate_ccw,
+			en.lv_rotate_cw,
+			en.cam_rotate_ccw,
+			en.cam_rotate_cw,
+			en.tb_go_to_review
+		]) {
 			expect(button(name), name).toBeNull();
 		}
 		expect(button(en.cam_histogram)).not.toBeNull();
@@ -128,13 +184,18 @@ describe('capture screen, testing account', () => {
 		expect(text()).not.toContain(en.block_title);
 	});
 
-	it('captures with the operator\'s body, the project\'s name as the API gives it, and nothing refused after', async () => {
+	it("captures with the operator's body, the project's name as the API gives it, and nothing refused after", async () => {
 		serve();
 		render(LivePreview);
 		await expect.poll(() => captureButton()?.disabled).toBe(false);
 		captureButton()!.click();
-		await expect.poll(() => rec.to('POST /cameras/capture/dual').length + rec.to('POST /cameras/capture').length).toBe(1);
-		const body = [...rec.to('POST /cameras/capture/dual'), ...rec.to('POST /cameras/capture')][0].body as { [k: string]: unknown };
+		await expect
+			.poll(
+				() => rec.to('POST /cameras/capture/dual').length + rec.to('POST /cameras/capture').length
+			)
+			.toBe(1);
+		const body = [...rec.to('POST /cameras/capture/dual'), ...rec.to('POST /cameras/capture')][0]
+			.body as { [k: string]: unknown };
 		expect(body.project_name).toBe('Practice');
 		expect(body.collection_id).toBe(9);
 		expect('capture_format' in body).toBe(false);
@@ -146,7 +207,11 @@ describe('capture screen, testing account', () => {
 	const cases: [string, () => Response, string][] = [
 		['testing_reserve', () => refusal(507, 'testing_reserve'), en.testing_err_reserve],
 		['not_found', () => refusal(404, 'not_found'), en.testing_err_not_found],
-		['anything else', () => json({ detail: 'Backend text that is never shown.' }, 500), en.lv_capture_error]
+		[
+			'anything else',
+			() => json({ detail: 'Backend text that is never shown.' }, 500),
+			en.lv_capture_error
+		]
 	];
 	for (const [label, answer, message] of cases) {
 		it(`shows its own message when a capture is refused for ${label}`, async () => {
@@ -189,7 +254,9 @@ describe('capture screen, testing account', () => {
 		button(en.common_close)?.click();
 		await settle();
 		button(en.camcheck_take)!.click();
-		await expect.poll(() => rec.to('POST /cameras/test-capture/{camera_index}').length).toBeGreaterThan(0);
+		await expect
+			.poll(() => rec.to('POST /cameras/test-capture/{camera_index}').length)
+			.toBeGreaterThan(0);
 		await settle();
 		expect(rec.refusedList()).toEqual([]);
 	});
@@ -197,7 +264,10 @@ describe('capture screen, testing account', () => {
 
 describe('capture screen, operator, unchanged', () => {
 	it('keeps the set-up controls and the review button, and reads the lists and the retake summary', async () => {
-		authStore.setSession({ id: 3, username: 'operator', email: null, role: 'operator', is_active: true }, { signIn: true });
+		authStore.setSession(
+			{ id: 3, username: 'operator', email: null, role: 'operator', is_active: true },
+			{ signIn: true }
+		);
 		recordFocusActivity(3, Date.now());
 		serve();
 		render(LivePreview);
@@ -205,7 +275,13 @@ describe('capture screen, operator, unchanged', () => {
 		button(en.cam_panel_expand_aria)!.click();
 		await expect.poll(() => button(en.cam_histogram)).not.toBeNull();
 		await settle();
-		for (const name of [en.cam_reconnect, en.cam_section_basic, en.cam_section_focus, en.tb_go_to_review]) expect(button(name), name).not.toBeNull();
+		for (const name of [
+			en.cam_reconnect,
+			en.cam_section_basic,
+			en.cam_section_focus,
+			en.tb_go_to_review
+		])
+			expect(button(name), name).not.toBeNull();
 		expect(rec.to('GET /imports/digitisation-lists').length).toBe(1);
 		expect(rec.to('GET /records/to-retake/summary').length).toBeGreaterThan(0);
 		expect(document.querySelector('.topbar .testing-badge')).toBeNull();
@@ -214,7 +290,10 @@ describe('capture screen, operator, unchanged', () => {
 
 describe('capture screen, operator: each control the testing account does not get', () => {
 	beforeEach(() => {
-		authStore.setSession({ id: 3, username: 'operator', email: null, role: 'operator', is_active: true }, { signIn: true });
+		authStore.setSession(
+			{ id: 3, username: 'operator', email: null, role: 'operator', is_active: true },
+			{ signIn: true }
+		);
 		recordFocusActivity(3, Date.now());
 	});
 
@@ -224,13 +303,25 @@ describe('capture screen, operator: each control the testing account does not ge
 		await expect.poll(() => captureButton()?.disabled).toBe(false);
 		button(en.cam_panel_expand_aria)!.click();
 		await expect.poll(() => button(en.cam_reconnect)).not.toBeNull();
-		for (const name of [en.cam_section_basic, en.cam_section_focus, en.cam_section_settings]) expect(button(name), name).not.toBeNull();
+		for (const name of [en.cam_section_basic, en.cam_section_focus, en.cam_section_settings])
+			expect(button(name), name).not.toBeNull();
 		button(en.cam_reconnect)!.click();
-		await expect.poll(() => rec.requests.filter((r) => r.method === 'POST' && r.path === '/cameras/rescan').length).toBe(1);
+		await expect
+			.poll(
+				() => rec.requests.filter((r) => r.method === 'POST' && r.path === '/cameras/rescan').length
+			)
+			.toBe(1);
 		// Basic is open by default.
 		await expect.poll(() => button(en.cam_rotate_cw)).not.toBeNull();
 		button(en.cam_rotate_cw)!.click();
-		await expect.poll(() => rec.requests.filter((r) => r.method === 'PUT' && /\/cameras\/\d\/orientation$/.test(r.path)).length).toBeGreaterThan(0);
+		await expect
+			.poll(
+				() =>
+					rec.requests.filter(
+						(r) => r.method === 'PUT' && /\/cameras\/\d\/orientation$/.test(r.path)
+					).length
+			)
+			.toBeGreaterThan(0);
 	});
 
 	it('the viewport rotation', async () => {
@@ -239,7 +330,14 @@ describe('capture screen, operator: each control the testing account does not ge
 		await expect.poll(() => captureButton()?.disabled).toBe(false);
 		expect(button(en.lv_rotate_ccw)).not.toBeNull();
 		button(en.lv_rotate_cw)!.click();
-		await expect.poll(() => rec.requests.filter((r) => r.method === 'PUT' && /\/cameras\/\d\/orientation$/.test(r.path)).length).toBeGreaterThan(0);
+		await expect
+			.poll(
+				() =>
+					rec.requests.filter(
+						(r) => r.method === 'PUT' && /\/cameras\/\d\/orientation$/.test(r.path)
+					).length
+			)
+			.toBeGreaterThan(0);
 	});
 
 	it('the camera check: Turn, the zoom steps and "which camera is which"', async () => {
@@ -251,10 +349,24 @@ describe('capture screen, operator: each control the testing account does not ge
 		await settle();
 		expect(text()).toContain(en.camcheck_zoom_both);
 		button(en.camcheck_take)!.click();
-		await expect.poll(() => document.querySelectorAll('[data-camera-check] [data-turn]').length).toBeGreaterThan(0);
-		await expect.poll(() => (document.querySelector('[data-camera-check] [data-turn]') as HTMLButtonElement).disabled).toBe(false);
+		await expect
+			.poll(() => document.querySelectorAll('[data-camera-check] [data-turn]').length)
+			.toBeGreaterThan(0);
+		await expect
+			.poll(
+				() =>
+					(document.querySelector('[data-camera-check] [data-turn]') as HTMLButtonElement).disabled
+			)
+			.toBe(false);
 		(document.querySelector('[data-camera-check] [data-turn]') as HTMLButtonElement).click();
-		await expect.poll(() => rec.requests.filter((r) => r.method === 'PUT' && /\/cameras\/\d\/orientation$/.test(r.path)).length).toBeGreaterThan(0);
+		await expect
+			.poll(
+				() =>
+					rec.requests.filter(
+						(r) => r.method === 'PUT' && /\/cameras\/\d\/orientation$/.test(r.path)
+					).length
+			)
+			.toBeGreaterThan(0);
 		(document.querySelector('[data-camera-check] [data-chip="left"]') as HTMLButtonElement).click();
 		await expect.poll(() => button(en.camwhich_open)?.disabled).toBe(false);
 		button(en.camwhich_open)!.click();

@@ -43,7 +43,10 @@ const FAILED1 = en.lv_orientation_save_failed('camera 2');
 const FAILED_ES0 = es.lv_orientation_save_failed('la cámara 1');
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
@@ -63,7 +66,12 @@ function deferredResponse() {
 type Put = { path: string; body: unknown; answer: ReturnType<typeof deferredResponse> };
 let puts: Put[] = [];
 
-const body = (index: number, hardware_id: string) => ({ index, model: 'Canon PowerShot A2500', hardware_id, calibrated: false });
+const body = (index: number, hardware_id: string) => ({
+	index,
+	model: 'Canon PowerShot A2500',
+	hardware_id,
+	calibrated: false
+});
 // The set-up the next /cameras/setup request answers; null answers nothing
 // usable, so the roles stay unconfirmed.
 let setupAnswer: unknown = null;
@@ -75,12 +83,26 @@ function serve() {
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/cameras/capabilities')) {
-			return json({ backend: 'gphoto2', live_preview: true, focus_control: false, live_controls: false, zoom: false, autofocus_calibration: false, dslr_settings: false, continuous_preview: false, zoom_steps: false });
+			return json({
+				backend: 'gphoto2',
+				live_preview: true,
+				focus_control: false,
+				live_controls: false,
+				zoom: false,
+				autofocus_calibration: false,
+				dslr_settings: false,
+				continuous_preview: false,
+				zoom_steps: false
+			});
 		}
 		if (path.includes('/cameras/preview/')) return new Response(null, { status: 404 });
 		if (/\/cameras\/\d\/orientation$/.test(path)) {
 			const answer = deferredResponse();
-			puts.push({ path, body: JSON.parse(String((init as RequestInit | undefined)?.body)), answer });
+			puts.push({
+				path,
+				body: JSON.parse(String((init as RequestInit | undefined)?.body)),
+				answer
+			});
 			return answer.promise;
 		}
 		if (path.endsWith('/cameras/setup') && setupAnswer !== null) return json(setupAnswer);
@@ -88,9 +110,17 @@ function serve() {
 			listings += 1;
 			return json(deviceList);
 		}
-		if (path.endsWith('/records/to-retake/summary')) return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
+		if (path.endsWith('/records/to-retake/summary'))
+			return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 6',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: 'co-ahr-6',
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
 		if (path.endsWith('/records/')) return json([]);
@@ -109,12 +139,16 @@ const feed = (name: string) =>
 		const label = f.querySelector('.feed-label');
 		return label?.textContent?.trim() === name || label?.getAttribute('aria-label') === name;
 	}) ?? null;
-const rotateCw = (name: string) => feed(name)?.querySelector(`button[aria-label="${en.lv_rotate_cw}"]`) as HTMLButtonElement | null;
-const degreesOf = (name: string) => feed(name)?.querySelector('.feed-rotate-deg')?.textContent?.trim();
+const rotateCw = (name: string) =>
+	feed(name)?.querySelector(`button[aria-label="${en.lv_rotate_cw}"]`) as HTMLButtonElement | null;
+const degreesOf = (name: string) =>
+	feed(name)?.querySelector('.feed-rotate-deg')?.textContent?.trim();
 
 // "Reconnect cameras" in the camera panel, opened first if it is collapsed.
 async function reconnect() {
-	const expand = document.querySelector<HTMLButtonElement>(`button[aria-label="${en.cam_panel_expand_aria}"]`);
+	const expand = document.querySelector<HTMLButtonElement>(
+		`button[aria-label="${en.cam_panel_expand_aria}"]`
+	);
 	if (expand) {
 		expand.click();
 		await settle();
@@ -128,9 +162,14 @@ async function reconnect() {
 }
 const alerts = () => [...document.querySelectorAll('[role="alert"]')];
 const notice = (text: string) => alerts().find((a) => a.textContent?.includes(text)) ?? null;
-const notices = () => alerts().filter((a) => [FAILED0, FAILED1].some((t) => a.textContent?.includes(t)));
+const notices = () =>
+	alerts().filter((a) => [FAILED0, FAILED1].some((t) => a.textContent?.includes(t)));
 const retryIn = (el: Element | null, label = en.common_retry) =>
-	(el ? [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === label) : null) ?? null;
+	(el
+		? [...el.querySelectorAll<HTMLButtonElement>('button')].find(
+				(b) => b.textContent?.trim() === label
+			)
+		: null) ?? null;
 
 beforeEach(() => {
 	puts = [];
@@ -142,7 +181,10 @@ beforeEach(() => {
 	locale.set('en');
 	recordFocusActivity(USER, Date.now());
 	current.url = 'http://localhost/live-preview?projectId=2&collectionId=9';
-	authStore.setSession({ id: USER, username: 'operator', email: null, role: 'operator', is_active: true }, { signIn: true });
+	authStore.setSession(
+		{ id: USER, username: 'operator', email: null, role: 'operator', is_active: true },
+		{ signIn: true }
+	);
 	serve();
 });
 
@@ -168,7 +210,9 @@ describe('capture screen: an orientation that could not be saved', () => {
 		expect(notice(FAILED0)).toBeNull();
 		fail(puts[0]);
 		await expect.poll(() => notice(FAILED0)).not.toBeNull();
-		expect(errors.mock.calls.some((c) => String(c[0]).includes('Error saving orientation'))).toBe(true);
+		expect(errors.mock.calls.some((c) => String(c[0]).includes('Error saving orientation'))).toBe(
+			true
+		);
 		expect(degreesOf(LAB0)).toBe('180°');
 		expect(retryIn(notice(FAILED0))).not.toBeNull();
 		expect(notices().length).toBe(1);
@@ -287,7 +331,9 @@ describe('capture screen: an orientation that could not be saved', () => {
 		render(LivePreview);
 		const lab0 = `${es.cam_fallback_name} 1`;
 		await expect.poll(() => degreesOf(lab0)).toBe('90°');
-		feed(lab0)!.querySelector<HTMLButtonElement>(`button[aria-label="${es.lv_rotate_cw}"]`)!.click();
+		feed(lab0)!
+			.querySelector<HTMLButtonElement>(`button[aria-label="${es.lv_rotate_cw}"]`)!
+			.click();
 		await expect.poll(() => puts.length).toBe(1);
 		fail(puts[0]);
 		await expect.poll(() => notice(FAILED_ES0)).not.toBeNull();
@@ -312,7 +358,9 @@ describe('capture screen: an orientation that could not be saved', () => {
 		await expect.poll(() => puts.length).toBe(2);
 		expect(puts[1].path.endsWith('/cameras/1/orientation')).toBe(true);
 		fail(puts[1]);
-		await expect.poll(() => notice(en.lv_orientation_save_failed('the left camera'))).not.toBeNull();
+		await expect
+			.poll(() => notice(en.lv_orientation_save_failed('the left camera')))
+			.not.toBeNull();
 	});
 
 	it('roles confirmed, in Spanish: the notice names the camera by its side', async () => {
@@ -321,21 +369,29 @@ describe('capture screen: an orientation that could not be saved', () => {
 		setupAnswer = { needs_setup: false, reasons: [], confirmed_pair: { left: 'a', right: 'b' } };
 		render(LivePreview);
 		await expect.poll(() => degreesOf(es.lv_camera_left_alt)).toBe('90°');
-		feed(es.lv_camera_left_alt)!.querySelector<HTMLButtonElement>(`button[aria-label="${es.lv_rotate_cw}"]`)!.click();
+		feed(es.lv_camera_left_alt)!
+			.querySelector<HTMLButtonElement>(`button[aria-label="${es.lv_rotate_cw}"]`)!
+			.click();
 		await expect.poll(() => puts.length).toBe(1);
 		fail(puts[0]);
-		await expect.poll(() => notice(es.lv_orientation_save_failed('la cámara derecha'))).not.toBeNull();
+		await expect
+			.poll(() => notice(es.lv_orientation_save_failed('la cámara derecha')))
+			.not.toBeNull();
 	});
 
 	it('single-camera mode: the notice says "the camera"', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		await ready();
-		const expand = document.querySelector<HTMLButtonElement>(`button[aria-label="${en.cam_panel_expand_aria}"]`);
+		const expand = document.querySelector<HTMLButtonElement>(
+			`button[aria-label="${en.cam_panel_expand_aria}"]`
+		);
 		if (expand) {
 			expand.click();
 			await settle();
 		}
-		const single = [...document.querySelectorAll<HTMLElement>('label.radio-label')].find((l) => l.textContent?.trim() === en.cam_mode_single);
+		const single = [...document.querySelectorAll<HTMLElement>('label.radio-label')].find(
+			(l) => l.textContent?.trim() === en.cam_mode_single
+		);
 		single!.click();
 		await settle();
 		const model = 'Canon PowerShot A2500';

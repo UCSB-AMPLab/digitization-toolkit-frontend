@@ -9,16 +9,16 @@ const PREFIX = 'captua_';
 const LEGACY_PREFIX = 'dtk_';
 
 export const STORAGE_KEYS = {
-  captureChord: `${PREFIX}capture_chord`,
-  activityView: `${PREFIX}activity_view`,
-  inProgressView: `${PREFIX}dashboard_in_progress_view`,
-  tourSeen: (userId: number | string) => `${PREFIX}tour_visto:${userId}`,
-  // NEH-339: the time (ms since the epoch) of the user's last focus check or capture.
-  focusCheck: (userId: number | string) => `${PREFIX}focus_check:${userId}`
+	captureChord: `${PREFIX}capture_chord`,
+	activityView: `${PREFIX}activity_view`,
+	inProgressView: `${PREFIX}dashboard_in_progress_view`,
+	tourSeen: (userId: number | string) => `${PREFIX}tour_visto:${userId}`,
+	// NEH-339: the time (ms since the epoch) of the user's last focus check or capture.
+	focusCheck: (userId: number | string) => `${PREFIX}focus_check:${userId}`
 } as const;
 
 function legacyName(key: string): string {
-  return key.startsWith(PREFIX) ? LEGACY_PREFIX + key.slice(PREFIX.length) : key;
+	return key.startsWith(PREFIX) ? LEGACY_PREFIX + key.slice(PREFIX.length) : key;
 }
 
 /**
@@ -27,35 +27,35 @@ function legacyName(key: string): string {
  * read, for a caller that must tell "nothing stored" from "storage broken".
  */
 export function readStoredStrict(key: string): string | null {
-  const current = localStorage.getItem(key);
-  if (current !== null) return current;
-  const legacy = localStorage.getItem(legacyName(key));
-  if (legacy === null) return null;
-  try {
-    localStorage.setItem(key, legacy);
-  } catch {
-    // Quota or private mode: the old value is still returned for this load.
-  }
-  return legacy;
+	const current = localStorage.getItem(key);
+	if (current !== null) return current;
+	const legacy = localStorage.getItem(legacyName(key));
+	if (legacy === null) return null;
+	try {
+		localStorage.setItem(key, legacy);
+	} catch {
+		// Quota or private mode: the old value is still returned for this load.
+	}
+	return legacy;
 }
 
 /** As readStoredStrict, but a storage failure yields null. */
 export function readStored(key: string): string | null {
-  try {
-    return readStoredStrict(key);
-  } catch {
-    return null;
-  }
+	try {
+		return readStoredStrict(key);
+	} catch {
+		return null;
+	}
 }
 
 /** Writes the `captua_` key only. Returns false when storage refused. */
 export function writeStored(key: string, value: string): boolean {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch {
-    return false;
-  }
+	try {
+		localStorage.setItem(key, value);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**
@@ -63,11 +63,11 @@ export function writeStored(key: string, value: string): boolean {
  * from the old entry on the next read.
  */
 export function removeStored(key: string): void {
-  for (const name of [key, legacyName(key)]) {
-    try {
-      localStorage.removeItem(name);
-    } catch {
-      // Nothing to clear when storage is unavailable.
-    }
-  }
+	for (const name of [key, legacyName(key)]) {
+		try {
+			localStorage.removeItem(name);
+		} catch {
+			// Nothing to clear when storage is unavailable.
+		}
+	}
 }

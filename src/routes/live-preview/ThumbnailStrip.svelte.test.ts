@@ -23,18 +23,42 @@ function pairRecord(): ApiRecord {
 		status: 'captured',
 		capture_mode: 'dual',
 		images: [
-			{ id: 21, record_id: 2, filename: 'r.jpg', file_path: '/r', format: 'jpg', role: 'right', is_current: true },
-			{ id: 20, record_id: 2, filename: 'l.jpg', file_path: '/l', format: 'jpg', role: 'left', is_current: true }
+			{
+				id: 21,
+				record_id: 2,
+				filename: 'r.jpg',
+				file_path: '/r',
+				format: 'jpg',
+				role: 'right',
+				is_current: true
+			},
+			{
+				id: 20,
+				record_id: 2,
+				filename: 'l.jpg',
+				file_path: '/l',
+				format: 'jpg',
+				role: 'left',
+				is_current: true
+			}
 		]
 	} as ApiRecord;
 }
 
 afterEach(() => locale.set('es'));
 
-for (const [lang, msgs] of [['en', en], ['es', es]] as const) {
+for (const [lang, msgs] of [
+	['en', en],
+	['es', es]
+] as const) {
 	it(`double mode (${lang}): camera letter and symbol from the role, the page term, both facts`, async () => {
 		locale.set(lang);
-		const screen = render(ThumbnailStrip, { records: [pairRecord()], selectedRecordId: null, cameraMode: 'double', onSelect: vi.fn() });
+		const screen = render(ThumbnailStrip, {
+			records: [pairRecord()],
+			selectedRecordId: null,
+			cameraMode: 'double',
+			onSelect: vi.fn()
+		});
 		const found = [...screen.container.querySelectorAll<HTMLElement>('.thumb-badge')].map((b) => ({
 			letter: b.querySelector('.badge-letter')?.textContent?.trim(),
 			icon: b.querySelector('.material-symbols-outlined')?.textContent?.trim(),
@@ -42,21 +66,32 @@ for (const [lang, msgs] of [['en', en], ['es', es]] as const) {
 			right: b.classList.contains('right')
 		}));
 		expect(found).toEqual([
-			{ letter: msgs.badge_cam_right, icon: 'photo_camera', title: msgs.cam_page_even, right: false },
+			{
+				letter: msgs.badge_cam_right,
+				icon: 'photo_camera',
+				title: msgs.cam_page_even,
+				right: false
+			},
 			{ letter: msgs.badge_cam_left, icon: 'photo_camera', title: msgs.cam_page_odd, right: true }
 		]);
-		expect([...screen.container.querySelectorAll('.page-term')].map((t) => t.textContent?.trim())).toEqual([msgs.page_term_even, msgs.page_term_odd]);
-		expect([...screen.container.querySelectorAll('img')].map((i) => i.getAttribute('alt'))).toEqual([
-			`Folio 12 · ${msgs.cam_page_even}`,
-			`Folio 12 · ${msgs.cam_page_odd}`
-		]);
+		expect(
+			[...screen.container.querySelectorAll('.page-term')].map((t) => t.textContent?.trim())
+		).toEqual([msgs.page_term_even, msgs.page_term_odd]);
+		expect([...screen.container.querySelectorAll('img')].map((i) => i.getAttribute('alt'))).toEqual(
+			[`Folio 12 · ${msgs.cam_page_even}`, `Folio 12 · ${msgs.cam_page_odd}`]
+		);
 	});
 }
 
 describe('single mode', () => {
 	it('names neither a camera nor a page', async () => {
 		locale.set('en');
-		const screen = render(ThumbnailStrip, { records: [pairRecord()], selectedRecordId: null, cameraMode: 'single', onSelect: vi.fn() });
+		const screen = render(ThumbnailStrip, {
+			records: [pairRecord()],
+			selectedRecordId: null,
+			cameraMode: 'single',
+			onSelect: vi.fn()
+		});
 		expect(screen.container.querySelector('.thumb-badge')).toBeNull();
 		expect(screen.container.querySelector('.page-term')).toBeNull();
 		expect(screen.container.querySelector('img')?.getAttribute('alt')).toBe('Folio 12');

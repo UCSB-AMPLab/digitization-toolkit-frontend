@@ -22,11 +22,20 @@ import Layout from './+layout.svelte';
 const children = createRawSnippet(() => ({ render: () => '<p>protected content</p>' }));
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function unit(mode: string, projectsShown: boolean) {
-	return { mode, projectsEnabled: projectsShown, projectsShown, defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] } };
+	return {
+		mode,
+		projectsEnabled: projectsShown,
+		projectsShown,
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
 }
 
 async function mount(role: UserRole, unitAnswer: Response) {
@@ -44,7 +53,9 @@ async function mount(role: UserRole, unitAnswer: Response) {
 }
 
 function labels(screen: { container: HTMLElement }) {
-	return [...screen.container.querySelectorAll('.s-nav .s-label')].map((l) => l.textContent?.trim());
+	return [...screen.container.querySelectorAll('.s-nav .s-label')].map((l) =>
+		l.textContent?.trim()
+	);
 }
 
 beforeEach(() => locale.set('es'));
@@ -61,7 +72,9 @@ describe('sidebar Volúmenes', () => {
 			const l = labels(screen);
 			expect(l).not.toContain('Proyectos');
 			expect(l[l.indexOf('Volúmenes') + 1]).toBe('Cola');
-			await expect.element(screen.getByRole('link', { name: /^Volúmenes/ })).toHaveAttribute('href', '/dashboard/volumes');
+			await expect
+				.element(screen.getByRole('link', { name: /^Volúmenes/ }))
+				.toHaveAttribute('href', '/dashboard/volumes');
 		});
 	}
 

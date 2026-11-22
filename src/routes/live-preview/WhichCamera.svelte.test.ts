@@ -14,7 +14,13 @@ import { tick } from 'svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { camerasApi, type CameraDevice, type CameraRolesResponse, type CameraSetup, type CameraSetupCode } from '$lib/api';
+import {
+	camerasApi,
+	type CameraDevice,
+	type CameraRolesResponse,
+	type CameraSetup,
+	type CameraSetupCode
+} from '$lib/api';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import '../../app.css';
@@ -52,7 +58,17 @@ function failure(status: number, detail?: unknown): Error {
 const A2500 = 'Canon PowerShot A2500';
 
 function device(index: number, over: Partial<CameraDevice> = {}): CameraDevice {
-	return { index, hardware_id: `hw${index}`, model: A2500, calibrated: false, location: `usb:001,00${index + 4}`, role: null, role_confirmed: false, role_guess: null, ...over };
+	return {
+		index,
+		hardware_id: `hw${index}`,
+		model: A2500,
+		calibrated: false,
+		location: `usb:001,00${index + 4}`,
+		role: null,
+		role_confirmed: false,
+		role_guess: null,
+		...over
+	};
 }
 
 function setup(codes: CameraSetupCode[], needs = codes.length > 0): CameraSetup {
@@ -64,7 +80,10 @@ function setup(codes: CameraSetupCode[], needs = codes.length > 0): CameraSetup 
 }
 
 const saved: CameraRolesResponse = {
-	devices: [device(0, { role: 'right', role_confirmed: true }), device(1, { role: 'left', role_confirmed: true })],
+	devices: [
+		device(0, { role: 'right', role_confirmed: true }),
+		device(1, { role: 'left', role_confirmed: true })
+	],
 	setup: setup([])
 };
 
@@ -74,7 +93,14 @@ let frameSpy: MockInstance<typeof camerasApi.previewFrame>;
 let rolesSpy: MockInstance<typeof camerasApi.setRoles>;
 let rescanSpy: MockInstance<typeof camerasApi.rescan>;
 
-function renderWhich(props: Partial<{ setup: CameraSetup | null; cancellable: boolean; rotateDeg: Record<number, number>; savingOrientation: Record<number, boolean> }> = {}) {
+function renderWhich(
+	props: Partial<{
+		setup: CameraSetup | null;
+		cancellable: boolean;
+		rotateDeg: Record<number, number>;
+		savingOrientation: Record<number, boolean>;
+	}> = {}
+) {
 	const onSaved = vi.fn();
 	const onCancel = vi.fn();
 	const onReread = vi.fn(async () => {});
@@ -100,12 +126,16 @@ function renderWhich(props: Partial<{ setup: CameraSetup | null; cancellable: bo
 
 const view = () => document.querySelector('[data-which-camera]') as HTMLElement | null;
 const text = () => view()?.textContent ?? '';
-const card = (index: number) => document.querySelector(`[data-card="${index}"]`) as HTMLElement | null;
-const pick = (index: number) => card(index)?.querySelector('button[data-pick]') as HTMLButtonElement | null;
+const card = (index: number) =>
+	document.querySelector(`[data-card="${index}"]`) as HTMLElement | null;
+const pick = (index: number) =>
+	card(index)?.querySelector('button[data-pick]') as HTMLButtonElement | null;
 // A label's words: its accessible name in the badge form, its text otherwise.
-const wordsOf = (el: Element | null | undefined) => (el ? (el.getAttribute('aria-label') ?? el.textContent?.trim() ?? null) : null);
+const wordsOf = (el: Element | null | undefined) =>
+	el ? (el.getAttribute('aria-label') ?? el.textContent?.trim() ?? null) : null;
 const labelOf = (index: number) => wordsOf(card(index)?.querySelector('.feed-label'));
-const turnOf = (index: number) => card(index)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
+const turnOf = (index: number) =>
+	card(index)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
 const imgOf = (index: number) => card(index)?.querySelector('img') as HTMLImageElement | null;
 
 function nameOf(b: Element): string {
@@ -117,7 +147,11 @@ function nameOf(b: Element): string {
 }
 
 function button(name: string): HTMLButtonElement | null {
-	return [...document.querySelectorAll<HTMLButtonElement>('[data-which-camera] button')].find((b) => nameOf(b) === name) ?? null;
+	return (
+		[...document.querySelectorAll<HTMLButtonElement>('[data-which-camera] button')].find(
+			(b) => nameOf(b) === name
+		) ?? null
+	);
 }
 
 async function click(name: string) {
@@ -139,10 +173,14 @@ function escape() {
 beforeEach(() => {
 	locale.set('en');
 	devices = [device(0), device(1)];
-	listSpy = vi.spyOn(camerasApi, 'listDevices').mockImplementation(async () => devices.map((d) => ({ ...d })));
+	listSpy = vi
+		.spyOn(camerasApi, 'listDevices')
+		.mockImplementation(async () => devices.map((d) => ({ ...d })));
 	frameSpy = vi.spyOn(camerasApi, 'previewFrame').mockImplementation(() => jpeg());
 	rolesSpy = vi.spyOn(camerasApi, 'setRoles').mockResolvedValue(saved);
-	rescanSpy = vi.spyOn(camerasApi, 'rescan').mockImplementation(async () => devices.map((d) => ({ ...d })));
+	rescanSpy = vi
+		.spyOn(camerasApi, 'rescan')
+		.mockImplementation(async () => devices.map((d) => ({ ...d })));
 });
 
 afterEach(() => {
@@ -248,8 +286,11 @@ describe('WhichCamera: asking which image is the odd/recto page', () => {
 		expect(button('No, they are where they were')).toBeNull();
 	});
 
-	it('Captua\'s guess is shown faintly, and chooses nothing', async () => {
-		devices = [device(0, { role: 'left', role_confirmed: true }), device(1, { role_guess: 'right', role_guess_source: 'port' })];
+	it("Captua's guess is shown faintly, and chooses nothing", async () => {
+		devices = [
+			device(0, { role: 'left', role_confirmed: true }),
+			device(1, { role_guess: 'right', role_guess_source: 'port' })
+		];
 		renderWhich();
 		await settle();
 		expect(card(1)?.textContent).toContain(en.camwhich_guess('right'));
@@ -264,10 +305,13 @@ describe('WhichCamera: asking which image is the odd/recto page', () => {
 describe('WhichCamera: a known camera on another USB socket', () => {
 	beforeEach(() => {
 		// Camera 1 has role `right` (the odd/recto page) on record; camera 2 has role `left` (the even/verso page).
-		devices = [device(0, { role: 'right', role_confirmed: true }), device(1, { role: 'left', role_confirmed: true })];
+		devices = [
+			device(0, { role: 'right', role_confirmed: true }),
+			device(1, { role: 'left', role_confirmed: true })
+		];
 	});
 
-	it('asks the ask screen\'s question, with the images under their current labels, nothing pressed and no yes/no', async () => {
+	it("asks the ask screen's question, with the images under their current labels, nothing pressed and no yes/no", async () => {
 		renderWhich({ setup: setup(['port_changed']) });
 		await settle();
 		expect(text()).toContain(en.camwhich_ask_title);
@@ -285,7 +329,9 @@ describe('WhichCamera: a known camera on another USB socket', () => {
 			expect(pick(i)?.getAttribute('aria-label'), `card ${i}`).toBe(en.camwhich_pick_aria(i + 1));
 		}
 		// The even/verso picture (role left) first, on the left.
-		const order = [...document.querySelectorAll('[data-card]')].map((c) => c.getAttribute('data-card'));
+		const order = [...document.querySelectorAll('[data-card]')].map((c) =>
+			c.getAttribute('data-card')
+		);
 		expect(order).toEqual(['1', '0']);
 		// Nothing pressed: the operator has to press.
 		expect(pick(0)?.getAttribute('aria-pressed')).toBe('false');
@@ -409,7 +455,9 @@ describe('WhichCamera: a save refused', () => {
 	beforeEach(() => vi.spyOn(console, 'error').mockImplementation(() => {}));
 
 	it('409 camera not connected: reads the devices and the set-up again and asks to choose again', async () => {
-		rolesSpy.mockRejectedValueOnce(failure(409, { code: 'camera_not_connected', message: 'Camera hw1 is not connected' }));
+		rolesSpy.mockRejectedValueOnce(
+			failure(409, { code: 'camera_not_connected', message: 'Camera hw1 is not connected' })
+		);
 		const { onReread, onSaved } = renderWhich();
 		await settle();
 		pick(0)!.click();
@@ -426,7 +474,9 @@ describe('WhichCamera: a save refused', () => {
 	});
 
 	it('409: passes the listing it reads again to the capture screen', async () => {
-		rolesSpy.mockRejectedValueOnce(failure(409, { code: 'camera_not_connected', message: 'English' }));
+		rolesSpy.mockRejectedValueOnce(
+			failure(409, { code: 'camera_not_connected', message: 'English' })
+		);
 		const { onDevices } = renderWhich();
 		await settle();
 		pick(0)!.click();
@@ -437,7 +487,9 @@ describe('WhichCamera: a save refused', () => {
 	});
 
 	it('409 identity unusable: says so and reads again', async () => {
-		rolesSpy.mockRejectedValueOnce(failure(409, { code: 'camera_identity_unusable', message: 'English' }));
+		rolesSpy.mockRejectedValueOnce(
+			failure(409, { code: 'camera_identity_unusable', message: 'English' })
+		);
 		const { onReread } = renderWhich();
 		await settle();
 		pick(0)!.click();
@@ -519,7 +571,7 @@ describe('WhichCamera: the frames', () => {
 		expect(revoke).toHaveBeenCalledTimes(4);
 	});
 
-	it('shows each frame turned by its camera\'s saved orientation', async () => {
+	it("shows each frame turned by its camera's saved orientation", async () => {
 		renderWhich({ rotateDeg: { 0: 90, 1: 270 } });
 		await settle();
 		await expect.poll(() => imgOf(0)?.getAttribute('style') ?? '').toContain('rotate(90deg)');
@@ -572,7 +624,15 @@ describe('WhichCamera: dismissing', () => {
 describe('WhichCamera: leaving the capture screen', () => {
 	const variants: [string, () => void, CameraSetup][] = [
 		['asking', () => {}, setup(['role_unconfirmed'])],
-		['another socket', () => (devices = [device(0, { role: 'right', role_confirmed: true }), device(1, { role: 'left', role_confirmed: true })]), setup(['port_changed'])],
+		[
+			'another socket',
+			() =>
+				(devices = [
+					device(0, { role: 'right', role_confirmed: true }),
+					device(1, { role: 'left', role_confirmed: true })
+				]),
+			setup(['port_changed'])
+		],
 		['an identity Captua cannot use', () => {}, setup(['identity_missing'])],
 		['one camera', () => (devices = [device(0)]), setup(['role_unconfirmed'])]
 	];

@@ -36,7 +36,9 @@ describe('placeholder openings, Spanish (approved)', () => {
 		expect(es.cap_where).toBe('Dónde va');
 		expect(es.cap_from_review).toBe('Marcado en la revisión de Fisqua');
 		expect(es.cap_after).toBe('Después de capturar');
-		expect(es.cap_another_q('92r')).toBe('Quedó capturado. ¿Falta otro par de páginas antes del folio 92r?');
+		expect(es.cap_another_q('92r')).toBe(
+			'Quedó capturado. ¿Falta otro par de páginas antes del folio 92r?'
+		);
 		expect(es.cap_another).toBe('Capturar otro aquí');
 		expect(es.cap_last).toBe('Ese era el último');
 		expect(es.cap_order_note(95, 'img_0798')).toBe(
@@ -53,7 +55,9 @@ describe('placeholder openings, Spanish (approved)', () => {
 		expect(es.close_legend).toBe('¿Qué encontraste?');
 		expect(es.close_reason_skip).toBe('La foliación salta un número; no falta ninguna hoja');
 		expect(es.close_reason_leaf_missing).toBe('Al volumen le falta esa hoja');
-		expect(es.close_reason_elsewhere).toBe('Estas páginas ya están capturadas en otra parte del volumen');
+		expect(es.close_reason_elsewhere).toBe(
+			'Estas páginas ya están capturadas en otra parte del volumen'
+		);
 		expect(es.close_reason_other).toBe('Otra cosa');
 		expect(es.close_details).toBe('Detalles');
 		expect(es.close_back).toBe('Volver a la captura');
@@ -126,7 +130,9 @@ describe('placeholder openings, without a folio or a capture number (new, not ye
 describe('the close dialog for a missing page (new, not yet reviewed)', () => {
 	it('Spanish', () => {
 		expect(es.close_page_title).toBe('Aquí no hay ninguna página que capturar');
-		expect(es.close_page_reason_elsewhere).toBe('Esta página ya está capturada en otra parte del volumen');
+		expect(es.close_page_reason_elsewhere).toBe(
+			'Esta página ya está capturada en otra parte del volumen'
+		);
 		expect(es.close_page_submit).toBe('Cerrar la página');
 		expect(es.close_page_after_note).toBe(
 			'Una página cerrada ya no cuenta como recaptura, así que no impide enviar el volumen a revisión. Cuando envíes el volumen, esa página va con él a Fisqua, junto con el motivo.'
@@ -139,7 +145,9 @@ describe('the close dialog for a missing page (new, not yet reviewed)', () => {
 		expect(en.close_page_body).toBe(
 			'The missing page is closed and stays in the volume with your reason, so reviewers can see what was checked.'
 		);
-		expect(en.close_page_reason_elsewhere).toBe('The page is already captured elsewhere in the volume');
+		expect(en.close_page_reason_elsewhere).toBe(
+			'The page is already captured elsewhere in the volume'
+		);
 		expect(en.close_page_submit).toBe('Close the page');
 		expect(en.close_page_after_note).toBe(
 			"A closed page no longer counts as a retake, so it doesn't hold the volume back. It goes to Fisqua with the volume, carrying its reason."
@@ -151,9 +159,13 @@ describe('the close dialog for a missing page (new, not yet reviewed)', () => {
 
 describe('reviewed changes to the new strings (round 3)', () => {
 	it('Spanish', () => {
-		expect(es.legend_never).toBe('Sin capturar: nunca se capturó una página o el par de páginas completo');
+		expect(es.legend_never).toBe(
+			'Sin capturar: nunca se capturó una página o el par de páginas completo'
+		);
 		expect(es.legend_closed).toBe('Cerrado: tiene un motivo anotado y ya no hay que recapturarlo');
-		expect(es.mark_pick_hint).toBe('Elige el registro que va justo antes del par de páginas que falta.');
+		expect(es.mark_pick_hint).toBe(
+			'Elige el registro que va justo antes del par de páginas que falta.'
+		);
 		expect(es.mark_error).toBe('No se pudo marcar el par de páginas que falta. Intenta de nuevo.');
 		expect(es.close_err_failed).toBe('No se pudo cerrar el par de páginas. Intenta de nuevo.');
 		expect(es.close_page_err_failed).toBe('No se pudo cerrar la página. Intenta de nuevo.');

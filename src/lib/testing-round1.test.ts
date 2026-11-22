@@ -24,12 +24,13 @@ import {
 } from './unit-mode';
 import { en } from './i18n/en';
 
-const err = (status: number, detail: unknown, message = 'Backend text') => Object.assign(new Error(message), { status, detail });
+const err = (status: number, detail: unknown, message = 'Backend text') =>
+	Object.assign(new Error(message), { status, detail });
 const notFound = () => err(404, { code: 'not_found', message: 'Not found.' }, 'Not found.');
 const reserve = () => err(507, { code: 'testing_reserve', message: 'x' });
 const codes = () => err(409, { code: 'testing_volume_codes', message: 'x' });
 
-describe('the testing messages are the testing account\'s only', () => {
+describe("the testing messages are the testing account's only", () => {
 	it('volume save', () => {
 		expect(volumeSaveErrorText(notFound(), en, 'testing')).toBe(en.testing_err_not_found);
 		expect(volumeSaveErrorText(codes(), en, 'testing')).toBe(en.testing_err_volume_codes);
@@ -41,7 +42,8 @@ describe('the testing messages are the testing account\'s only', () => {
 
 	it('volume delete', () => {
 		expect(volumeDeleteErrorText(notFound(), en, 'testing')).toBe(en.testing_err_not_found);
-		for (const role of ['admin', 'operator', undefined]) expect(volumeDeleteErrorText(notFound(), en, role)).toBe(en.pd_err_delete_collection);
+		for (const role of ['admin', 'operator', undefined])
+			expect(volumeDeleteErrorText(notFound(), en, role)).toBe(en.pd_err_delete_collection);
 	});
 
 	it('capture', () => {

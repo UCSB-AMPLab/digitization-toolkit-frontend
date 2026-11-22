@@ -212,9 +212,11 @@ describe('request time limits', () => {
 	});
 
 	it('a request that answers in time leaves no timer behind', async () => {
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-			new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
-		);
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(
+				new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+			);
 		await expect(projectsApi.list()).resolves.toEqual([]);
 
 		const signal = (fetchSpy.mock.calls[0][1] as RequestInit).signal!;

@@ -80,8 +80,12 @@ export function barSegments(counts: StatusCounts): BarSegment[] {
  * in it). Within a stage, the volume whose status changed most recently comes
  * first; volumes with no status change at all go last, in id order.
  */
-export function groupByStage<T extends CollectionActivity>(rows: T[]): { [K in PipelineStage]: T[] } {
-	const groups = { capture: [], recapture: [], review: [], approved: [] } as { [K in PipelineStage]: T[] };
+export function groupByStage<T extends CollectionActivity>(
+	rows: T[]
+): { [K in PipelineStage]: T[] } {
+	const groups = { capture: [], recapture: [], review: [], approved: [] } as {
+		[K in PipelineStage]: T[];
+	};
 	for (const row of rows) groups[placeVolume(row.status_counts)].push(row);
 	for (const stage of PIPELINE_STAGES) {
 		groups[stage].sort((a, b) => {

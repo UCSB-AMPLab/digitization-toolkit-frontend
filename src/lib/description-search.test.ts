@@ -19,19 +19,32 @@ import { es } from './i18n/es';
 import { en } from './i18n/en';
 
 function match(code: string, extra: Partial<DescriptionMatch> = {}): DescriptionMatch {
-	return { referenceCode: code, title: `Title of ${code}`, level: 'file', dates: { display: '1790', start: '1790', end: '1790' }, ...extra };
+	return {
+		referenceCode: code,
+		title: `Title of ${code}`,
+		level: 'file',
+		dates: { display: '1790', start: '1790', end: '1790' },
+		...extra
+	};
 }
 
 function deferred<T>() {
 	let resolve!: (v: T) => void;
 	let reject!: (e: unknown) => void;
-	const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+	const promise = new Promise<T>((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
 	return { promise, resolve, reject };
 }
 
 function setup() {
 	const views: SearchView[] = [];
-	const calls: { q: string; signal: AbortSignal; answer: ReturnType<typeof deferred<{ results: DescriptionMatch[]; search?: boolean }>> }[] = [];
+	const calls: {
+		q: string;
+		signal: AbortSignal;
+		answer: ReturnType<typeof deferred<{ results: DescriptionMatch[]; search?: boolean }>>;
+	}[] = [];
 	const search = vi.fn((q: string, signal: AbortSignal) => {
 		const answer = deferred<{ results: DescriptionMatch[]; search?: boolean }>();
 		calls.push({ q, signal, answer });
@@ -175,7 +188,9 @@ describe('the states', () => {
 		const { controller, calls, last } = setup();
 		controller.input('---');
 		await vi.advanceTimersByTimeAsync(400);
-		calls[0].answer.reject(Object.assign(new Error('x'), { status: 400, detail: { code: 'query_too_short' } }));
+		calls[0].answer.reject(
+			Object.assign(new Error('x'), { status: 400, detail: { code: 'query_too_short' } })
+		);
 		await vi.advanceTimersByTimeAsync(0);
 		expect(last()).toEqual({ state: 'idle', results: [] });
 	});
@@ -224,12 +239,16 @@ describe('levelLabel', () => {
 
 describe('the approved wording', () => {
 	it('of the search lines and the search help', () => {
-		expect(es.pd_search_none).toBe('Fisqua no tiene ninguna descripción que coincida con lo que escribiste.');
+		expect(es.pd_search_none).toBe(
+			'Fisqua no tiene ninguna descripción que coincida con lo que escribiste.'
+		);
 		expect(en.pd_search_none).toBe('Fisqua has no description that matches.');
 		expect(es.pd_search_unavailable).toBe(
 			'Captua no puede buscar en Fisqua en este momento. De todos modos, puedes escribir el código de referencia completo.'
 		);
-		expect(en.pd_search_unavailable).toBe("Captua can't search Fisqua right now. You can still type the full reference code.");
+		expect(en.pd_search_unavailable).toBe(
+			"Captua can't search Fisqua right now. You can still type the full reference code."
+		);
 		expect(es.pd_stem_search_help).toBe(
 			'Escribe al menos 3 caracteres del código de referencia o del título y elige la descripción de Fisqua que corresponda.'
 		);
@@ -281,13 +300,23 @@ describe('nameFromTitle', () => {
 
 describe('matchMeta', () => {
 	it('joins the dates and the level with " · "', () => {
-		expect(matchMeta(match('a', { level: 'file', dates: { display: '1790-1795', start: null, end: null } }), es))
-			.toBe('1790-1795 · Unidad documental compuesta');
+		expect(
+			matchMeta(
+				match('a', { level: 'file', dates: { display: '1790-1795', start: null, end: null } }),
+				es
+			)
+		).toBe('1790-1795 · Unidad documental compuesta');
 	});
 
 	it('leaves out empty dates or level', () => {
-		expect(matchMeta(match('a', { level: 'item', dates: { display: '', start: null, end: null } }), es)).toBe('Unidad documental simple');
-		expect(matchMeta(match('a', { level: 'item', dates: { display: null, start: null, end: null } }), en)).toBe('Item');
-		expect(matchMeta(match('a', { level: null, dates: { display: '1801', start: null, end: null } }), en)).toBe('1801');
+		expect(
+			matchMeta(match('a', { level: 'item', dates: { display: '', start: null, end: null } }), es)
+		).toBe('Unidad documental simple');
+		expect(
+			matchMeta(match('a', { level: 'item', dates: { display: null, start: null, end: null } }), en)
+		).toBe('Item');
+		expect(
+			matchMeta(match('a', { level: null, dates: { display: '1801', start: null, end: null } }), en)
+		).toBe('1801');
 	});
 });

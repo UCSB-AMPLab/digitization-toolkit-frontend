@@ -28,59 +28,67 @@ import { cameraStatus } from '$lib/stores/cameras';
 import { clearChord, writeChord } from '$lib/capture-key';
 
 afterEach(() => {
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
 
 function baseProps(overrides: Record<string, unknown> = {}) {
-  return {
-    cameraMode: 'single' as const,
-    shutterSpeed: '1/125s',
-    iso: '100',
-    aperture: '5.6',
-    projectId: 1,
-    projectName: 'Test project',
-    collectionId: 1,
-    onCaptureDone: vi.fn(),
-    devices: [],
-    rotateDeg: { 0: 0, 1: 0 },
-    onRotateDegChange: vi.fn(),
-    ...overrides
-  };
+	return {
+		cameraMode: 'single' as const,
+		shutterSpeed: '1/125s',
+		iso: '100',
+		aperture: '5.6',
+		projectId: 1,
+		projectName: 'Test project',
+		collectionId: 1,
+		onCaptureDone: vi.fn(),
+		devices: [],
+		rotateDeg: { 0: 0, 1: 0 },
+		onRotateDegChange: vi.fn(),
+		...overrides
+	};
 }
 
 // A real PNG, drawn on an offscreen canvas, so the <img> the component
 // renders from the resulting blob URL actually decodes and reports
 // naturalWidth/naturalHeight — a fabricated non-image Blob wouldn't.
 async function framePng(w: number, h: number): Promise<Blob> {
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    ctx.fillStyle = '#606060';
-    ctx.fillRect(0, 0, w, h);
-  }
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('canvas.toBlob returned null'))), 'image/png');
-  });
+	const canvas = document.createElement('canvas');
+	canvas.width = w;
+	canvas.height = h;
+	const ctx = canvas.getContext('2d');
+	if (ctx) {
+		ctx.fillStyle = '#606060';
+		ctx.fillRect(0, 0, w, h);
+	}
+	return await new Promise<Blob>((resolve, reject) => {
+		canvas.toBlob(
+			(blob) => (blob ? resolve(blob) : reject(new Error('canvas.toBlob returned null'))),
+			'image/png'
+		);
+	});
 }
 
 // Stubs the same GET /cameras/preview/{index} the component's own polling
 // code calls (see fetchPreview in LiveViewport.svelte) — one frame size per
 // camera index; a missing index 404s, same as an unconnected camera.
 function stubPreviewFetch(sizes: Partial<Record<number, { w: number; h: number }>>) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
-      const match = url.match(/\/cameras\/preview\/(\d+)/);
-      const size = match ? sizes[Number(match[1])] : undefined;
-      if (!size) return new Response(null, { status: 404 });
-      const blob = await framePng(size.w, size.h);
-      return new Response(blob, { status: 200 });
-    })
-  );
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async (input: RequestInfo | URL) => {
+			const url =
+				typeof input === 'string'
+					? input
+					: input instanceof URL
+						? input.href
+						: (input as Request).url;
+			const match = url.match(/\/cameras\/preview\/(\d+)/);
+			const size = match ? sizes[Number(match[1])] : undefined;
+			if (!size) return new Response(null, { status: 404 });
+			const blob = await framePng(size.w, size.h);
+			return new Response(blob, { status: 200 });
+		})
+	);
 }
 
 // Mounts into a generously-sized target, then pins .mat-board to an exact
@@ -88,110 +96,122 @@ function stubPreviewFetch(sizes: Partial<Record<number, { w: number; h: number }
 // to fight the component's own flex/padding chain (.viewport-outer's
 // padding, centering, etc.) to land on an exact pixel board size.
 function renderViewport(props: ReturnType<typeof baseProps>) {
-  const target = document.createElement('div');
-  target.style.cssText = 'width: 2000px; height: 2000px;';
-  document.body.appendChild(target);
-  const screen = render(LiveViewport, { target, props });
-  const matBoard = screen.container.querySelector('.mat-board') as HTMLElement;
-  matBoard.style.cssText = 'width: 1000px; height: 600px; flex-shrink: 0;';
-  return screen;
+	const target = document.createElement('div');
+	target.style.cssText = 'width: 2000px; height: 2000px;';
+	document.body.appendChild(target);
+	const screen = render(LiveViewport, { target, props });
+	const matBoard = screen.container.querySelector('.mat-board') as HTMLElement;
+	matBoard.style.cssText = 'width: 1000px; height: 600px; flex-shrink: 0;';
+	return screen;
 }
 
 function withinPx(actual: number, expected: number, eps = 1): boolean {
-  return Math.abs(actual - expected) <= eps;
+	return Math.abs(actual - expected) <= eps;
 }
 
 function isInside(inner: DOMRect, outer: DOMRect, eps = 1): boolean {
-  return (
-    inner.left >= outer.left - eps &&
-    inner.top >= outer.top - eps &&
-    inner.right <= outer.right + eps &&
-    inner.bottom <= outer.bottom + eps
-  );
+	return (
+		inner.left >= outer.left - eps &&
+		inner.top >= outer.top - eps &&
+		inner.right <= outer.right + eps &&
+		inner.bottom <= outer.bottom + eps
+	);
 }
 
 async function waitForNaturalWidth(
-  screen: { container: HTMLElement },
-  selector: string,
-  expected: number
+	screen: { container: HTMLElement },
+	selector: string,
+	expected: number
 ) {
-  await expect
-    .poll(
-      () => {
-        const img = screen.container.querySelector(selector) as HTMLImageElement | null;
-        return img?.naturalWidth ?? 0;
-      },
-      { timeout: 5000 }
-    )
-    .toBe(expected);
+	await expect
+		.poll(
+			() => {
+				const img = screen.container.querySelector(selector) as HTMLImageElement | null;
+				return img?.naturalWidth ?? 0;
+			},
+			{ timeout: 5000 }
+		)
+		.toBe(expected);
 }
 
 describe('LiveViewport — the viewport takes its shape from the frames (NEH-222)', () => {
-  it('single mode, rotation 0: a 16:9 frame in a 1000x600 board is height-limited (1000x562.5)', async () => {
-    stubPreviewFetch({ 0: { w: 1600, h: 900 } });
-    const screen = renderViewport(baseProps({ cameraMode: 'single', rotateDeg: { 0: 0 } }));
+	it('single mode, rotation 0: a 16:9 frame in a 1000x600 board is height-limited (1000x562.5)', async () => {
+		stubPreviewFetch({ 0: { w: 1600, h: 900 } });
+		const screen = renderViewport(baseProps({ cameraMode: 'single', rotateDeg: { 0: 0 } }));
 
-    await waitForNaturalWidth(screen, '.camera-feed:first-child img.feed-img', 1600);
+		await waitForNaturalWidth(screen, '.camera-feed:first-child img.feed-img', 1600);
 
-    await expect
-      .poll(
-        () => {
-          const rect = (screen.container.querySelector('.camera-viewport') as HTMLElement).getBoundingClientRect();
-          return withinPx(rect.width, 1000) && withinPx(rect.height, 562.5);
-        },
-        { timeout: 5000 }
-      )
-      .toBe(true);
+		await expect
+			.poll(
+				() => {
+					const rect = (
+						screen.container.querySelector('.camera-viewport') as HTMLElement
+					).getBoundingClientRect();
+					return withinPx(rect.width, 1000) && withinPx(rect.height, 562.5);
+				},
+				{ timeout: 5000 }
+			)
+			.toBe(true);
 
-    const viewportRect = (screen.container.querySelector('.camera-viewport') as HTMLElement).getBoundingClientRect();
-    const boardRect = (screen.container.querySelector('.mat-board') as HTMLElement).getBoundingClientRect();
-    expect(isInside(viewportRect, boardRect)).toBe(true);
-  });
+		const viewportRect = (
+			screen.container.querySelector('.camera-viewport') as HTMLElement
+		).getBoundingClientRect();
+		const boardRect = (
+			screen.container.querySelector('.mat-board') as HTMLElement
+		).getBoundingClientRect();
+		expect(isInside(viewportRect, boardRect)).toBe(true);
+	});
 
-  it('single mode, rotation 90: the same 16:9 frame inverts and is width-limited (337.5x600)', async () => {
-    stubPreviewFetch({ 0: { w: 1600, h: 900 } });
-    const screen = renderViewport(baseProps({ cameraMode: 'single', rotateDeg: { 0: 90 } }));
+	it('single mode, rotation 90: the same 16:9 frame inverts and is width-limited (337.5x600)', async () => {
+		stubPreviewFetch({ 0: { w: 1600, h: 900 } });
+		const screen = renderViewport(baseProps({ cameraMode: 'single', rotateDeg: { 0: 90 } }));
 
-    await waitForNaturalWidth(screen, '.camera-feed:first-child img.feed-img', 1600);
+		await waitForNaturalWidth(screen, '.camera-feed:first-child img.feed-img', 1600);
 
-    await expect
-      .poll(
-        () => {
-          const rect = (screen.container.querySelector('.camera-viewport') as HTMLElement).getBoundingClientRect();
-          return withinPx(rect.width, 337.5) && withinPx(rect.height, 600);
-        },
-        { timeout: 5000 }
-      )
-      .toBe(true);
+		await expect
+			.poll(
+				() => {
+					const rect = (
+						screen.container.querySelector('.camera-viewport') as HTMLElement
+					).getBoundingClientRect();
+					return withinPx(rect.width, 337.5) && withinPx(rect.height, 600);
+				},
+				{ timeout: 5000 }
+			)
+			.toBe(true);
 
-    const viewportRect = (screen.container.querySelector('.camera-viewport') as HTMLElement).getBoundingClientRect();
-    const boardRect = (screen.container.querySelector('.mat-board') as HTMLElement).getBoundingClientRect();
-    expect(isInside(viewportRect, boardRect)).toBe(true);
-  });
+		const viewportRect = (
+			screen.container.querySelector('.camera-viewport') as HTMLElement
+		).getBoundingClientRect();
+		const boardRect = (
+			screen.container.querySelector('.mat-board') as HTMLElement
+		).getBoundingClientRect();
+		expect(isInside(viewportRect, boardRect)).toBe(true);
+	});
 
-  it('double mode: panels split proportionally to each camera\'s own displayed aspect', async () => {
-    // cam0 (left) rotated 90: a 3:2 frame displays at 2:3 ≈ 0.6667.
-    // cam1 (right) at 0: a 16:9 frame displays at 16:9 ≈ 1.7778.
-    stubPreviewFetch({ 0: { w: 1200, h: 800 }, 1: { w: 1600, h: 900 } });
-    const screen = renderViewport(baseProps({ cameraMode: 'double', rotateDeg: { 0: 90, 1: 0 } }));
+	it("double mode: panels split proportionally to each camera's own displayed aspect", async () => {
+		// cam0 (left) rotated 90: a 3:2 frame displays at 2:3 ≈ 0.6667.
+		// cam1 (right) at 0: a 16:9 frame displays at 16:9 ≈ 1.7778.
+		stubPreviewFetch({ 0: { w: 1200, h: 800 }, 1: { w: 1600, h: 900 } });
+		const screen = renderViewport(baseProps({ cameraMode: 'double', rotateDeg: { 0: 90, 1: 0 } }));
 
-    await waitForNaturalWidth(screen, '.camera-feed:first-child img.feed-img', 1200);
-    await waitForNaturalWidth(screen, '.camera-feed:last-child img.feed-img', 1600);
+		await waitForNaturalWidth(screen, '.camera-feed:first-child img.feed-img', 1200);
+		await waitForNaturalWidth(screen, '.camera-feed:last-child img.feed-img', 1600);
 
-    const expectedRatio = (2 / 3) / (16 / 9);
+		const expectedRatio = 2 / 3 / (16 / 9);
 
-    await expect
-      .poll(
-        () => {
-          const feeds = screen.container.querySelectorAll('.camera-feed');
-          const left = (feeds[0] as HTMLElement).getBoundingClientRect().width;
-          const right = (feeds[1] as HTMLElement).getBoundingClientRect().width;
-          return Math.abs(left / right - expectedRatio) < 0.01;
-        },
-        { timeout: 5000 }
-      )
-      .toBe(true);
-  });
+		await expect
+			.poll(
+				() => {
+					const feeds = screen.container.querySelectorAll('.camera-feed');
+					const left = (feeds[0] as HTMLElement).getBoundingClientRect().width;
+					const right = (feeds[1] as HTMLElement).getBoundingClientRect().width;
+					return Math.abs(left / right - expectedRatio) < 0.01;
+				},
+				{ timeout: 5000 }
+			)
+			.toBe(true);
+	});
 });
 
 // NEH-228: a capture key the appliance can learn — the ownsEvent/shouldTrigger
@@ -199,603 +219,637 @@ describe('LiveViewport — the viewport takes its shape from the frames (NEH-222
 // receives it. stubPreviewFetch({}) 404s both camera indices: these tests
 // don't care what the feed shows, only that fetch never hits a real network.
 function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((yes) => { resolve = yes; });
-  return { promise, resolve };
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((yes) => {
+		resolve = yes;
+	});
+	return { promise, resolve };
 }
 
 describe('LiveViewport — capture key (NEH-228)', () => {
-  beforeEach(() => {
-    locale.set('en');
-  });
+	beforeEach(() => {
+		locale.set('en');
+	});
 
-  // A stored chord set by one test must not bleed into the next — most of
-  // this describe block relies on the default (space) chord.
-  afterEach(() => {
-    clearChord();
-  });
+	// A stored chord set by one test must not bleed into the next — most of
+	// this describe block relies on the default (space) chord.
+	afterEach(() => {
+		clearChord();
+	});
 
-  it('the configured key fires exactly one capture', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('the configured key fires exactly one capture', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
 
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
-    await tick();
-    expect(captureSpy.mock.calls.length).toBe(1);
-  });
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+		await tick();
+		expect(captureSpy.mock.calls.length).toBe(1);
+	});
 
-  it('a held key (repeat) fires once', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('a held key (repeat) fires once', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
 
-    // The pedal held down: the browser keeps sending keydown with repeat=true.
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true }));
-    await tick();
-    expect(captureSpy.mock.calls.length).toBe(1);
-  });
+		// The pedal held down: the browser keeps sending keydown with repeat=true.
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true }));
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true }));
+		await tick();
+		expect(captureSpy.mock.calls.length).toBe(1);
+	});
 
-  it('a key pressed while a capture is in flight does not fire a second', async () => {
-    const pending = deferred<CaptureResponse>();
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockReturnValue(pending.promise);
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('a key pressed while a capture is in flight does not fire a second', async () => {
+		const pending = deferred<CaptureResponse>();
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockReturnValue(pending.promise);
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
 
-    // Release arrives (clears the held latch) but the capture itself is
-    // still in flight — a fresh press must not start a second one.
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await tick();
-    expect(captureSpy.mock.calls.length).toBe(1);
+		// Release arrives (clears the held latch) but the capture itself is
+		// still in flight — a fresh press must not start a second one.
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await tick();
+		expect(captureSpy.mock.calls.length).toBe(1);
 
-    pending.resolve({ success: true });
-  });
+		pending.resolve({ success: true });
+	});
 
-  it('a key pressed with a focused button fires a capture and does not activate the button', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps());
+	it('a key pressed with a focused button fires a capture and does not activate the button', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		const screen = renderViewport(baseProps());
 
-    const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
-    await zoomIn.click();
-    const transform = () =>
-      (screen.container.querySelector('.camera-feeds-wrapper') as HTMLElement).style.transform;
-    const afterClick = transform();
+		const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
+		await zoomIn.click();
+		const transform = () =>
+			(screen.container.querySelector('.camera-feeds-wrapper') as HTMLElement).style.transform;
+		const afterClick = transform();
 
-    // A real, trusted keyboard event — only this proves preventDefault
-    // actually suppressed the button's own Space-activates-button default;
-    // a script-dispatched KeyboardEvent never carries a native default to
-    // suppress in the first place.
-    await userEvent.keyboard(' ');
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-    expect(transform()).toBe(afterClick);
-  });
+		// A real, trusted keyboard event — only this proves preventDefault
+		// actually suppressed the button's own Space-activates-button default;
+		// a script-dispatched KeyboardEvent never carries a native default to
+		// suppress in the first place.
+		await userEvent.keyboard(' ');
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		expect(transform()).toBe(afterClick);
+	});
 
-  it('releasing the modifier before the key still clears the latch (a shifted chord)', async () => {
-    // Shift+2 decodes to '@' on a US layout — the chord that fires is keyed
-    // on that, but the physical key never changes: code 'Digit2' throughout.
-    writeChord({ key: '@', ctrl: false, alt: false, meta: false, shift: true });
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('releasing the modifier before the key still clears the latch (a shifted chord)', async () => {
+		// Shift+2 decodes to '@' on a US layout — the chord that fires is keyed
+		// on that, but the physical key never changes: code 'Digit2' throughout.
+		writeChord({ key: '@', ctrl: false, alt: false, meta: false, shift: true });
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: '@', code: 'Digit2', shiftKey: true }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(
+			new KeyboardEvent('keydown', { key: '@', code: 'Digit2', shiftKey: true })
+		);
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
 
-    // Shift lets go first: the key's own release now reports key '2', not
-    // '@'. Matching against chord.key would miss this and leave the latch
-    // stuck — matching against the physical code ('Digit2') still catches it.
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift', code: 'ShiftLeft' }));
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: '2', code: 'Digit2' }));
-    await tick();
+		// Shift lets go first: the key's own release now reports key '2', not
+		// '@'. Matching against chord.key would miss this and leave the latch
+		// stuck — matching against the physical code ('Digit2') still catches it.
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift', code: 'ShiftLeft' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: '2', code: 'Digit2' }));
+		await tick();
 
-    // The latch cleared, so a fresh press of the same chord fires again.
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: '@', code: 'Digit2', shiftKey: true }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
-  });
+		// The latch cleared, so a fresh press of the same chord fires again.
+		window.dispatchEvent(
+			new KeyboardEvent('keydown', { key: '@', code: 'Digit2', shiftKey: true })
+		);
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
+	});
 
-  it('with nothing stored, b starts exactly one capture', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('with nothing stored, b starts exactly one capture', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
-    await tick();
-    expect(captureSpy.mock.calls.length).toBe(1);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
+		await tick();
+		expect(captureSpy.mock.calls.length).toBe(1);
+	});
 
-  it('with nothing stored, B with shift off (Caps Lock on) starts one capture', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('with nothing stored, B with shift off (Caps Lock on) starts one capture', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'B', code: 'KeyB' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'B', code: 'KeyB' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+	});
 
-  it('Shift+B does not start a capture', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('Shift+B does not start a capture', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'B', code: 'KeyB', shiftKey: true }));
-    await tick();
-    await new Promise((r) => setTimeout(r, 100));
-    expect(captureSpy.mock.calls.length).toBe(0);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'B', code: 'KeyB', shiftKey: true }));
+		await tick();
+		await new Promise((r) => setTimeout(r, 100));
+		expect(captureSpy.mock.calls.length).toBe(0);
+	});
 
-  it('a keyup that reports a different case from the keydown still releases the latch', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('a keyup that reports a different case from the keydown still releases the latch', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
 
-    // Caps Lock was switched on while the key was down: the release reports 'B'.
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'B', code: 'KeyB' }));
-    await tick();
+		// Caps Lock was switched on while the key was down: the release reports 'B'.
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'B', code: 'KeyB' }));
+		await tick();
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
+	});
 
-  it('after another key is stored, neither space nor b starts a capture', async () => {
-    writeChord({ key: 'x', ctrl: false, alt: false, meta: false, shift: false });
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('after another key is stored, neither space nor b starts a capture', async () => {
+		writeChord({ key: 'x', ctrl: false, alt: false, meta: false, shift: false });
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
-    await tick();
-    await new Promise((r) => setTimeout(r, 100));
-    expect(captureSpy.mock.calls.length).toBe(0);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
+		await tick();
+		await new Promise((r) => setTimeout(r, 100));
+		expect(captureSpy.mock.calls.length).toBe(0);
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code: 'KeyX' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code: 'KeyX' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+	});
 
-  it('a keyup for a different physical key leaves the latch alone', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('a keyup for a different physical key leaves the latch alone', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
 
-    // Some other key's release must not clear the space's latch.
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter' }));
-    await tick();
+		// Some other key's release must not clear the space's latch.
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter' }));
+		await tick();
 
-    // The latch is still armed, so a fresh (non-repeat) press of the
-    // configured chord must not fire a second capture.
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
-    await tick();
-    expect(captureSpy.mock.calls.length).toBe(1);
+		// The latch is still armed, so a fresh (non-repeat) press of the
+		// configured chord must not fire a second capture.
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+		await tick();
+		expect(captureSpy.mock.calls.length).toBe(1);
 
-    // Releasing the key that actually holds the latch clears it normally.
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
-  });
+		// Releasing the key that actually holds the latch clears it normally.
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
+	});
 
-  it('a press and release that both report no usable code still clears the latch (fires twice)', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('a press and release that both report no usable code still clears the latch (fires twice)', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
 
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
-    await tick();
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+		await tick();
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
+	});
 
-  it('a press with a code but a release without one still clears the latch (fires twice)', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    renderViewport(baseProps());
+	it('a press with a code but a release without one still clears the latch (fires twice)', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		renderViewport(baseProps());
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
 
-    // The release itself carries no usable code — an unidentifiable
-    // release is still a release, so the latch must not survive it.
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
-    await tick();
+		// The release itself carries no usable code — an unidentifiable
+		// release is still a release, so the latch must not survive it.
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+		await tick();
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
+	});
 });
 
 // NEH-181: the record title is archival data, so the title sent at capture
 // is a timestamp whatever language the operator's interface is in.
 describe('LiveViewport — default record title (NEH-181)', () => {
-  const ISO_LOCAL = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/;
+	const ISO_LOCAL = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/;
 
-  afterEach(() => {
-    clearChord();
-    locale.set('en');
-  });
+	afterEach(() => {
+		clearChord();
+		locale.set('en');
+	});
 
-  for (const lang of ['es', 'en'] as const) {
-    it(`single capture sends a timestamp title with the UI in ${lang}`, async () => {
-      locale.set(lang);
-      const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-      stubPreviewFetch({});
-      renderViewport(baseProps());
+	for (const lang of ['es', 'en'] as const) {
+		it(`single capture sends a timestamp title with the UI in ${lang}`, async () => {
+			locale.set(lang);
+			const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+			stubPreviewFetch({});
+			renderViewport(baseProps());
 
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-      await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-      expect(captureSpy.mock.calls[0][0].record_title).toMatch(ISO_LOCAL);
-    });
+			window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+			await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+			expect(captureSpy.mock.calls[0][0].record_title).toMatch(ISO_LOCAL);
+		});
 
-    it(`dual capture sends a timestamp title with the UI in ${lang}`, async () => {
-      locale.set(lang);
-      const dualSpy = vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true });
-      stubPreviewFetch({});
-      renderViewport(baseProps({ cameraMode: 'double' }));
+		it(`dual capture sends a timestamp title with the UI in ${lang}`, async () => {
+			locale.set(lang);
+			const dualSpy = vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true });
+			stubPreviewFetch({});
+			renderViewport(baseProps({ cameraMode: 'double' }));
 
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-      await expect.poll(() => dualSpy.mock.calls.length).toBe(1);
-      expect(dualSpy.mock.calls[0][0].record_title).toMatch(ISO_LOCAL);
-    });
-  }
+			window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+			await expect.poll(() => dualSpy.mock.calls.length).toBe(1);
+			expect(dualSpy.mock.calls[0][0].record_title).toMatch(ISO_LOCAL);
+		});
+	}
 });
 
 describe('LiveViewport — a volume without a stem', () => {
-  beforeEach(() => {
-    locale.set('es');
-    cameraStatus.reportSuccess();
-  });
+	beforeEach(() => {
+		locale.set('es');
+		cameraStatus.reportSuccess();
+	});
 
-  afterEach(() => {
-    clearChord();
-    cameraStatus.reportSuccess();
-    locale.set('en');
-  });
+	afterEach(() => {
+		clearChord();
+		cameraStatus.reportSuccess();
+		locale.set('en');
+	});
 
-  it('disables capture, says why and links to the volume form', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps({
-      needsStem: true,
-      stemFormHref: '/dashboard/projects/1?editVolume=1',
-    }));
+	it('disables capture, says why and links to the volume form', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		stubPreviewFetch({});
+		const screen = renderViewport(
+			baseProps({
+				needsStem: true,
+				stemFormHref: '/dashboard/projects/1?editVolume=1'
+			})
+		);
 
-    const button = screen.container.querySelector('.capture-btn') as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
-    expect(button.title).toBe(es.lv_needs_stem);
-    const banner = screen.container.querySelector('.needs-stem-banner') as HTMLElement;
-    expect(banner.textContent).toContain(es.lv_needs_stem);
-    const link = banner.querySelector('a') as HTMLAnchorElement;
-    expect(link.textContent?.trim()).toBe(es.lv_needs_stem_link);
-    expect(link.getAttribute('href')).toBe('/dashboard/projects/1?editVolume=1');
+		const button = screen.container.querySelector('.capture-btn') as HTMLButtonElement;
+		expect(button.disabled).toBe(true);
+		expect(button.title).toBe(es.lv_needs_stem);
+		const banner = screen.container.querySelector('.needs-stem-banner') as HTMLElement;
+		expect(banner.textContent).toContain(es.lv_needs_stem);
+		const link = banner.querySelector('a') as HTMLAnchorElement;
+		expect(link.textContent?.trim()).toBe(es.lv_needs_stem_link);
+		expect(link.getAttribute('href')).toBe('/dashboard/projects/1?editVolume=1');
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
-    await tick();
-    expect(captureSpy).not.toHaveBeenCalled();
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+		await tick();
+		expect(captureSpy).not.toHaveBeenCalled();
+	});
 
-  it('shows the note it is given in place of the link to the form (NEH-311)', async () => {
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps({
-      needsStem: true,
-      stemFormHref: '',
-      stemNote: es.pd_fisqua_codes_readonly,
-    }));
-    const banner = screen.container.querySelector('.needs-stem-banner') as HTMLElement;
-    expect(banner.textContent).toContain(es.lv_needs_stem);
-    expect(banner.textContent).toContain(es.pd_fisqua_codes_readonly);
-    expect(banner.querySelector('a')).toBeNull();
-  });
+	it('shows the note it is given in place of the link to the form (NEH-311)', async () => {
+		stubPreviewFetch({});
+		const screen = renderViewport(
+			baseProps({
+				needsStem: true,
+				stemFormHref: '',
+				stemNote: es.pd_fisqua_codes_readonly
+			})
+		);
+		const banner = screen.container.querySelector('.needs-stem-banner') as HTMLElement;
+		expect(banner.textContent).toContain(es.lv_needs_stem);
+		expect(banner.textContent).toContain(es.pd_fisqua_codes_readonly);
+		expect(banner.querySelector('a')).toBeNull();
+	});
 
-  it('on a 409 for a volume without a stem, shows no backend text in the error banner', async () => {
-    const backend = 'This volume has no file name stem. Give it one before capturing into it.';
-    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
-    const onStemRefused = vi.fn(async () => true);
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps({ onStemRefused }));
+	it('on a 409 for a volume without a stem, shows no backend text in the error banner', async () => {
+		const backend = 'This volume has no file name stem. Give it one before capturing into it.';
+		vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+		const onStemRefused = vi.fn(async () => true);
+		stubPreviewFetch({});
+		const screen = renderViewport(baseProps({ onStemRefused }));
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect.poll(() => onStemRefused.mock.calls.length).toBe(1);
-    await tick();
-    expect(screen.container.querySelector('.capture-error-banner')).toBeNull();
-    expect(screen.container.textContent).not.toContain(backend);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect.poll(() => onStemRefused.mock.calls.length).toBe(1);
+		await tick();
+		expect(screen.container.querySelector('.capture-error-banner')).toBeNull();
+		expect(screen.container.textContent).not.toContain(backend);
+	});
 
-  it('on the 409 for a capture that names no volume, shows the catalogue error, not the backend text', async () => {
-    const backend = 'Captures must go into a volume.';
-    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
-    const onStemRefused = vi.fn(async () => false);
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps({ onStemRefused }));
+	it('on the 409 for a capture that names no volume, shows the catalogue error, not the backend text', async () => {
+		const backend = 'Captures must go into a volume.';
+		vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+		const onStemRefused = vi.fn(async () => false);
+		stubPreviewFetch({});
+		const screen = renderViewport(baseProps({ onStemRefused }));
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect
-      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
-      .toContain(es.lv_err_no_volume);
-    expect(screen.container.textContent).not.toContain(backend);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect
+			.poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+			.toContain(es.lv_err_no_volume);
+		expect(screen.container.textContent).not.toContain(backend);
+	});
 
-  it('on the 409 for a retake into another volume, shows the catalogue error, not the backend text', async () => {
-    const backend = "A retake must go into the record's own volume.";
-    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
-    const onStemRefused = vi.fn(async () => false);
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps({ onStemRefused }));
+	it('on the 409 for a retake into another volume, shows the catalogue error, not the backend text', async () => {
+		const backend = "A retake must go into the record's own volume.";
+		vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+		const onStemRefused = vi.fn(async () => false);
+		stubPreviewFetch({});
+		const screen = renderViewport(baseProps({ onStemRefused }));
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect
-      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
-      .toContain(es.lv_err_retake_volume);
-    expect(screen.container.textContent).not.toContain(backend);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect
+			.poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+			.toContain(es.lv_err_retake_volume);
+		expect(screen.container.textContent).not.toContain(backend);
+	});
 
-  it('on the no-stem 409 when the volume reads back with a stem, shows the needs-stem message', async () => {
-    const backend = 'This volume has no file name stem. Give it one before capturing into it.';
-    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
-    const onStemRefused = vi.fn(async () => false);
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps({ onStemRefused }));
+	it('on the no-stem 409 when the volume reads back with a stem, shows the needs-stem message', async () => {
+		const backend = 'This volume has no file name stem. Give it one before capturing into it.';
+		vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 409));
+		const onStemRefused = vi.fn(async () => false);
+		stubPreviewFetch({});
+		const screen = renderViewport(baseProps({ onStemRefused }));
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect
-      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
-      .toContain(es.lv_needs_stem);
-    expect(screen.container.textContent).not.toContain(backend);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect
+			.poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+			.toContain(es.lv_needs_stem);
+		expect(screen.container.textContent).not.toContain(backend);
+	});
 
-  it('on the 404 for an unknown volume, shows the catalogue error, not the backend text', async () => {
-    const backend = 'Collection 7 not found';
-    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 404));
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps({}));
+	it('on the 404 for an unknown volume, shows the catalogue error, not the backend text', async () => {
+		const backend = 'Collection 7 not found';
+		vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, undefined, 404));
+		stubPreviewFetch({});
+		const screen = renderViewport(baseProps({}));
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect
-      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
-      .toContain(es.lv_err_volume_not_found);
-    expect(screen.container.textContent).not.toContain(backend);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect
+			.poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+			.toContain(es.lv_err_volume_not_found);
+		expect(screen.container.textContent).not.toContain(backend);
+	});
 
-  it('on a 409 for another reason, shows the generic capture error, not the backend text', async () => {
-    const backend = 'Some other conflict';
-    vi.spyOn(camerasApi, 'capture').mockRejectedValue(new ApiError(backend, { message: backend }, 409));
-    const onStemRefused = vi.fn(async () => false);
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps({ onStemRefused }));
+	it('on a 409 for another reason, shows the generic capture error, not the backend text', async () => {
+		const backend = 'Some other conflict';
+		vi.spyOn(camerasApi, 'capture').mockRejectedValue(
+			new ApiError(backend, { message: backend }, 409)
+		);
+		const onStemRefused = vi.fn(async () => false);
+		stubPreviewFetch({});
+		const screen = renderViewport(baseProps({ onStemRefused }));
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect.poll(() => onStemRefused.mock.calls.length).toBe(1);
-    await expect
-      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
-      .toContain(es.lv_capture_error);
-    expect(screen.container.textContent).not.toContain(backend);
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect.poll(() => onStemRefused.mock.calls.length).toBe(1);
+		await expect
+			.poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+			.toContain(es.lv_capture_error);
+		expect(screen.container.textContent).not.toContain(backend);
+	});
 
-  it('on a capture answered with success false, shows the catalogue message, not the backend error', async () => {
-    vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: false, error: 'Camera 0 is not connected' });
-    stubPreviewFetch({});
-    const screen = renderViewport(baseProps({}));
+	it('on a capture answered with success false, shows the catalogue message, not the backend error', async () => {
+		vi.spyOn(camerasApi, 'capture').mockResolvedValue({
+			success: false,
+			error: 'Camera 0 is not connected'
+		});
+		stubPreviewFetch({});
+		const screen = renderViewport(baseProps({}));
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect
-      .poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
-      .toContain(es.lv_err_camera_not_connected(0));
-    expect(screen.container.textContent).not.toContain('Camera 0 is not connected');
-  });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect
+			.poll(() => screen.container.querySelector('.capture-error-banner')?.textContent ?? '')
+			.toContain(es.lv_err_camera_not_connected(0));
+		expect(screen.container.textContent).not.toContain('Camera 0 is not connected');
+	});
 });
 
 // NEH-323: the capture key has its own button and dialog, apart from the
 // grid and guides.
 describe('LiveViewport — capture key button and dialog (NEH-323)', () => {
-  beforeEach(() => {
-    locale.set('en');
-    stubPreviewFetch({});
-  });
-  afterEach(() => {
-    clearChord();
-  });
+	beforeEach(() => {
+		locale.set('en');
+		stubPreviewFetch({});
+	});
+	afterEach(() => {
+		clearChord();
+	});
 
-  const keyButton = () => page.getByRole('button', { name: en.lv_capture_key_settings });
-  const gridButton = () => page.getByRole('button', { name: en.lv_grid_settings });
-  const dialog = () => document.querySelector('[role="dialog"]') as HTMLElement | null;
-  const dialogText = () => dialog()?.textContent ?? '';
+	const keyButton = () => page.getByRole('button', { name: en.lv_capture_key_settings });
+	const gridButton = () => page.getByRole('button', { name: en.lv_grid_settings });
+	const dialog = () => document.querySelector('[role="dialog"]') as HTMLElement | null;
+	const dialogText = () => dialog()?.textContent ?? '';
 
-  it('has a button labelled for the capture key that opens its dialog', async () => {
-    renderViewport(baseProps());
-    await expect.element(keyButton()).toBeVisible();
-    expect(keyButton().element().getAttribute('title')).toBe(en.lv_capture_key_settings);
-    expect(dialog()).toBeNull();
-    await userEvent.click(keyButton());
-    await expect.poll(() => dialogText()).toContain(en.lv_capture_key_settings);
-    expect(dialog()?.getAttribute('aria-modal')).toBe('true');
-    expect(dialog()?.getAttribute('aria-labelledby')).toBeTruthy();
-  });
+	it('has a button labelled for the capture key that opens its dialog', async () => {
+		renderViewport(baseProps());
+		await expect.element(keyButton()).toBeVisible();
+		expect(keyButton().element().getAttribute('title')).toBe(en.lv_capture_key_settings);
+		expect(dialog()).toBeNull();
+		await userEvent.click(keyButton());
+		await expect.poll(() => dialogText()).toContain(en.lv_capture_key_settings);
+		expect(dialog()?.getAttribute('aria-modal')).toBe('true');
+		expect(dialog()?.getAttribute('aria-labelledby')).toBeTruthy();
+	});
 
-  it('sits directly after the grid button', async () => {
-    renderViewport(baseProps());
-    const grid = gridButton().element();
-    expect(grid.nextElementSibling).toBe(keyButton().element());
-  });
+	it('sits directly after the grid button', async () => {
+		renderViewport(baseProps());
+		const grid = gridButton().element();
+		expect(grid.nextElementSibling).toBe(keyButton().element());
+	});
 
-  it('the dialog holds the learn and reset buttons and the note', async () => {
-    renderViewport(baseProps());
-    await userEvent.click(keyButton());
-    await expect.element(page.getByRole('button', { name: en.lv_capture_key_learn })).toBeVisible();
-    await expect.element(page.getByRole('button', { name: en.lv_capture_key_reset })).toBeVisible();
-    expect(dialogText()).toContain(en.lv_capture_key_note);
-  });
+	it('the dialog holds the learn and reset buttons and the note', async () => {
+		renderViewport(baseProps());
+		await userEvent.click(keyButton());
+		await expect.element(page.getByRole('button', { name: en.lv_capture_key_learn })).toBeVisible();
+		await expect.element(page.getByRole('button', { name: en.lv_capture_key_reset })).toBeVisible();
+		expect(dialogText()).toContain(en.lv_capture_key_note);
+	});
 
-  it('shows both default keys', async () => {
-    renderViewport(baseProps());
-    await userEvent.click(keyButton());
-    await expect.poll(() => dialogText()).toContain(en.lv_capture_key_current(`${en.lv_capture_key_space} / b`));
-  });
+	it('shows both default keys', async () => {
+		renderViewport(baseProps());
+		await userEvent.click(keyButton());
+		await expect
+			.poll(() => dialogText())
+			.toContain(en.lv_capture_key_current(`${en.lv_capture_key_space} / b`));
+	});
 
-  it('learning a key replaces both defaults, and reset restores both', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    renderViewport(baseProps());
-    await userEvent.click(keyButton());
-    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', cancelable: true }));
-    await expect.poll(() => dialogText()).toContain(en.lv_capture_key_current('x'));
-    expect(dialogText()).not.toContain('/ b');
+	it('learning a key replaces both defaults, and reset restores both', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		renderViewport(baseProps());
+		await userEvent.click(keyButton());
+		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
+		window.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', cancelable: true })
+		);
+		await expect.poll(() => dialogText()).toContain(en.lv_capture_key_current('x'));
+		expect(dialogText()).not.toContain('/ b');
 
-    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_reset }));
-    await expect.poll(() => dialogText()).toContain(en.lv_capture_key_current(`${en.lv_capture_key_space} / b`));
+		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_reset }));
+		await expect
+			.poll(() => dialogText())
+			.toContain(en.lv_capture_key_current(`${en.lv_capture_key_space} / b`));
 
-    // The dialog is open, so close it, then both defaults capture again.
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
-    await expect.poll(() => dialog()).toBeNull();
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
-  });
+		// The dialog is open, so close it, then both defaults capture again.
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+		await expect.poll(() => dialog()).toBeNull();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
+	});
 
-  it('the grid dialog no longer holds them', async () => {
-    renderViewport(baseProps());
-    await userEvent.click(gridButton());
-    await expect.poll(() => dialogText()).toContain(en.lv_grid_modal_title);
-    expect(dialogText()).not.toContain(en.lv_capture_key_learn);
-    expect(dialogText()).not.toContain(en.lv_capture_key_reset);
-    expect(dialogText()).not.toContain(en.lv_capture_key_note);
-    expect(dialog()?.querySelector('.capture-key-row')).toBeNull();
-  });
+	it('the grid dialog no longer holds them', async () => {
+		renderViewport(baseProps());
+		await userEvent.click(gridButton());
+		await expect.poll(() => dialogText()).toContain(en.lv_grid_modal_title);
+		expect(dialogText()).not.toContain(en.lv_capture_key_learn);
+		expect(dialogText()).not.toContain(en.lv_capture_key_reset);
+		expect(dialogText()).not.toContain(en.lv_capture_key_note);
+		expect(dialog()?.querySelector('.capture-key-row')).toBeNull();
+	});
 
-  it('Escape closes the dialog when no key is being learned', async () => {
-    renderViewport(baseProps());
-    await userEvent.click(keyButton());
-    await expect.poll(() => dialog()).not.toBeNull();
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
-    await expect.poll(() => dialog()).toBeNull();
-  });
+	it('Escape closes the dialog when no key is being learned', async () => {
+		renderViewport(baseProps());
+		await userEvent.click(keyButton());
+		await expect.poll(() => dialog()).not.toBeNull();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+		await expect.poll(() => dialog()).toBeNull();
+	});
 
-  it('Escape does not close the dialog while a key is being learned', async () => {
-    renderViewport(baseProps());
-    await userEvent.click(keyButton());
-    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
-    await expect.element(page.getByText(en.lv_capture_key_learning)).toBeVisible();
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
-    await tick();
-    expect(dialog()).not.toBeNull();
-  });
+	it('Escape does not close the dialog while a key is being learned', async () => {
+		renderViewport(baseProps());
+		await userEvent.click(keyButton());
+		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
+		await expect.element(page.getByText(en.lv_capture_key_learning)).toBeVisible();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+		await tick();
+		expect(dialog()).not.toBeNull();
+	});
 
-  it('closing with Close stops learning', async () => {
-    renderViewport(baseProps());
-    await userEvent.click(keyButton());
-    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
-    await userEvent.click(page.getByRole('button', { name: en.common_close }));
-    await expect.poll(() => dialog()).toBeNull();
-    // Learning is over: a key now neither re-binds nor is swallowed by it.
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-  });
+	it('closing with Close stops learning', async () => {
+		renderViewport(baseProps());
+		await userEvent.click(keyButton());
+		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
+		await userEvent.click(page.getByRole('button', { name: en.common_close }));
+		await expect.poll(() => dialog()).toBeNull();
+		// Learning is over: a key now neither re-binds nor is swallowed by it.
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+	});
 
-  it('closing by the backdrop stops learning', async () => {
-    renderViewport(baseProps());
-    await userEvent.click(keyButton());
-    await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
-    (document.querySelector('.modal-backdrop') as HTMLElement).click();
-    await expect.poll(() => dialog()).toBeNull();
-    await userEvent.click(keyButton());
-    await expect.element(page.getByRole('button', { name: en.lv_capture_key_learn })).toBeVisible();
-    expect(dialogText()).not.toContain(en.lv_capture_key_learning);
-  });
+	it('closing by the backdrop stops learning', async () => {
+		renderViewport(baseProps());
+		await userEvent.click(keyButton());
+		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
+		(document.querySelector('.modal-backdrop') as HTMLElement).click();
+		await expect.poll(() => dialog()).toBeNull();
+		await userEvent.click(keyButton());
+		await expect.element(page.getByRole('button', { name: en.lv_capture_key_learn })).toBeVisible();
+		expect(dialogText()).not.toContain(en.lv_capture_key_learning);
+	});
 
-  it('with the dialog open the capture key does not trigger a capture', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    renderViewport(baseProps());
-    await userEvent.click(keyButton());
-    await expect.poll(() => dialog()).not.toBeNull();
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    await tick();
-    await new Promise((r) => setTimeout(r, 100));
-    expect(captureSpy).not.toHaveBeenCalled();
-  });
+	it('with the dialog open the capture key does not trigger a capture', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		renderViewport(baseProps());
+		await userEvent.click(keyButton());
+		await expect.poll(() => dialog()).not.toBeNull();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		await tick();
+		await new Promise((r) => setTimeout(r, 100));
+		expect(captureSpy).not.toHaveBeenCalled();
+	});
 
-  it('at 800x480 the button is visible and the dialog fits with its Close button', async () => {
-    await page.viewport(800, 480);
-    const target = document.createElement('div');
-    target.style.cssText = 'width: 800px; height: 480px; display: flex;';
-    document.body.appendChild(target);
-    render(LiveViewport, { target, props: baseProps() });
-    await expect.element(keyButton()).toBeVisible();
-    const b = keyButton().element().getBoundingClientRect();
-    expect(b.bottom).toBeLessThanOrEqual(480);
-    await userEvent.click(keyButton());
-    await expect.poll(() => dialog()).not.toBeNull();
-    const card = dialog()!.getBoundingClientRect();
-    const close = page.getByRole('button', { name: en.common_close }).element().getBoundingClientRect();
-    expect(card.top).toBeGreaterThanOrEqual(0);
-    expect(card.bottom).toBeLessThanOrEqual(480);
-    expect(close.bottom).toBeLessThanOrEqual(480);
-    expect(close.right).toBeLessThanOrEqual(800);
-  });
+	it('at 800x480 the button is visible and the dialog fits with its Close button', async () => {
+		await page.viewport(800, 480);
+		const target = document.createElement('div');
+		target.style.cssText = 'width: 800px; height: 480px; display: flex;';
+		document.body.appendChild(target);
+		render(LiveViewport, { target, props: baseProps() });
+		await expect.element(keyButton()).toBeVisible();
+		const b = keyButton().element().getBoundingClientRect();
+		expect(b.bottom).toBeLessThanOrEqual(480);
+		await userEvent.click(keyButton());
+		await expect.poll(() => dialog()).not.toBeNull();
+		const card = dialog()!.getBoundingClientRect();
+		const close = page
+			.getByRole('button', { name: en.common_close })
+			.element()
+			.getBoundingClientRect();
+		expect(card.top).toBeGreaterThanOrEqual(0);
+		expect(card.bottom).toBeLessThanOrEqual(480);
+		expect(close.bottom).toBeLessThanOrEqual(480);
+		expect(close.right).toBeLessThanOrEqual(800);
+	});
 });
 
 // In single-camera mode the pane, the preview and the capture use camera
 // index 0; `swapped` orders a pair only, and is kept for the return to dual.
 describe('LiveViewport — the swap orders a pair only', () => {
-  beforeEach(() => {
-    locale.set('en');
-    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
-  });
+	beforeEach(() => {
+		locale.set('en');
+		stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+	});
 
-  const degrees = () => [...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
-  const swapButton = () => document.querySelector(`button[aria-label="${en.lv_swap_orientation}"]`) as HTMLButtonElement | null;
+	const degrees = () =>
+		[...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
+	const swapButton = () =>
+		document.querySelector(
+			`button[aria-label="${en.lv_swap_orientation}"]`
+		) as HTMLButtonElement | null;
 
-  it('swapped in dual mode, then single: shows, turns and captures camera 0; back in dual it is still swapped', async () => {
-    const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-    const dualSpy = vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true });
-    const onRotateDegChange = vi.fn();
-    const screen = renderViewport(baseProps({ cameraMode: 'double', rotateDeg: { 0: 90, 1: 180 }, onRotateDegChange }));
-    await expect.poll(() => degrees()).toEqual(['90°', '180°']);
-    swapButton()!.click();
-    await expect.poll(() => degrees()).toEqual(['180°', '90°']);
+	it('swapped in dual mode, then single: shows, turns and captures camera 0; back in dual it is still swapped', async () => {
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		const dualSpy = vi.spyOn(camerasApi, 'captureDual').mockResolvedValue({ success: true });
+		const onRotateDegChange = vi.fn();
+		const screen = renderViewport(
+			baseProps({ cameraMode: 'double', rotateDeg: { 0: 90, 1: 180 }, onRotateDegChange })
+		);
+		await expect.poll(() => degrees()).toEqual(['90°', '180°']);
+		swapButton()!.click();
+		await expect.poll(() => degrees()).toEqual(['180°', '90°']);
 
-    await screen.rerender({ cameraMode: 'single' });
-    await expect.poll(() => degrees()).toEqual(['90°']);
-    (document.querySelector(`.feed-rotate-btn[aria-label="${en.lv_rotate_cw}"]`) as HTMLButtonElement).click();
-    expect(onRotateDegChange).toHaveBeenLastCalledWith(0, 180);
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
-    await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-    expect(captureSpy.mock.calls[0][0].camera_index).toBe(0);
+		await screen.rerender({ cameraMode: 'single' });
+		await expect.poll(() => degrees()).toEqual(['90°']);
+		(
+			document.querySelector(
+				`.feed-rotate-btn[aria-label="${en.lv_rotate_cw}"]`
+			) as HTMLButtonElement
+		).click();
+		expect(onRotateDegChange).toHaveBeenLastCalledWith(0, 180);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
+		expect(captureSpy.mock.calls[0][0].camera_index).toBe(0);
 
-    await screen.rerender({ cameraMode: 'double' });
-    await expect.poll(() => degrees()).toEqual(['180°', '90°']);
-    expect(swapButton()?.classList.contains('float-btn-active')).toBe(true);
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
-    await expect.poll(() => dualSpy.mock.calls.length).toBe(1);
-    expect(dualSpy.mock.calls[0][0].left_camera_index).toBe(1);
-  });
+		await screen.rerender({ cameraMode: 'double' });
+		await expect.poll(() => degrees()).toEqual(['180°', '90°']);
+		expect(swapButton()?.classList.contains('float-btn-active')).toBe(true);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+		await expect.poll(() => dualSpy.mock.calls.length).toBe(1);
+		expect(dualSpy.mock.calls[0][0].left_camera_index).toBe(1);
+	});
 });
 
 // NEH-379: once the roles are confirmed (`swapLocked`), the left pane shows
@@ -804,76 +858,100 @@ describe('LiveViewport — the swap orders a pair only', () => {
 // camera step and the panes name their camera by number only; in
 // single-camera mode they name neither a side nor a page.
 describe('LiveViewport — pane names', () => {
-  const alts = () => [...document.querySelectorAll<HTMLImageElement>('img.feed-img')].map((i) => i.getAttribute('alt'));
-  const noSignal = () => [...document.querySelectorAll('.no-stream > span')].map((s) => s.textContent?.trim());
-  // Frames that never arrive: the panes show "No signal".
-  const hangPreviews = () => vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+	const alts = () =>
+		[...document.querySelectorAll<HTMLImageElement>('img.feed-img')].map((i) =>
+			i.getAttribute('alt')
+		);
+	const noSignal = () =>
+		[...document.querySelectorAll('.no-stream > span')].map((s) => s.textContent?.trim());
+	// Frames that never arrive: the panes show "No signal".
+	const hangPreviews = () =>
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => new Promise<Response>(() => {}))
+		);
 
-  beforeEach(() => locale.set('en'));
+	beforeEach(() => locale.set('en'));
 
-  it('roles confirmed: both facts on each picture, the camera on "No signal"', async () => {
-    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
-    renderViewport(baseProps({ cameraMode: 'double', swapLocked: true, swapped: true }));
-    await expect.poll(() => alts()).toEqual([en.lv_camera_left_alt, en.lv_camera_right_alt]);
-    expect(alts()).toEqual(['Right camera · even/verso', 'Left camera · odd/recto']);
-  });
+	it('roles confirmed: both facts on each picture, the camera on "No signal"', async () => {
+		stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+		renderViewport(baseProps({ cameraMode: 'double', swapLocked: true, swapped: true }));
+		await expect.poll(() => alts()).toEqual([en.lv_camera_left_alt, en.lv_camera_right_alt]);
+		expect(alts()).toEqual(['Right camera · even/verso', 'Left camera · odd/recto']);
+	});
 
-  it('roles confirmed, no frame yet: "No signal" names the camera', async () => {
-    hangPreviews();
-    renderViewport(baseProps({ cameraMode: 'double', swapLocked: true }));
-    await expect.poll(() => noSignal()).toEqual([en.lv_no_signal_left, en.lv_no_signal_right]);
-  });
+	it('roles confirmed, no frame yet: "No signal" names the camera', async () => {
+		hangPreviews();
+		renderViewport(baseProps({ cameraMode: 'double', swapLocked: true }));
+		await expect.poll(() => noSignal()).toEqual([en.lv_no_signal_left, en.lv_no_signal_right]);
+	});
 
-  it('roles not confirmed: the plain camera name and number of the camera in each pane', async () => {
-    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
-    renderViewport(baseProps({ cameraMode: 'double', swapLocked: false, swapped: true }));
-    await expect.poll(() => alts()).toEqual([`${en.cam_fallback_name} 2`, `${en.cam_fallback_name} 1`]);
-  });
+	it('roles not confirmed: the plain camera name and number of the camera in each pane', async () => {
+		stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+		renderViewport(baseProps({ cameraMode: 'double', swapLocked: false, swapped: true }));
+		await expect
+			.poll(() => alts())
+			.toEqual([`${en.cam_fallback_name} 2`, `${en.cam_fallback_name} 1`]);
+	});
 
-  it('roles not confirmed, no frame yet: "No signal" alone', async () => {
-    hangPreviews();
-    renderViewport(baseProps({ cameraMode: 'double', swapLocked: false }));
-    await expect.poll(() => noSignal()).toEqual([en.lv_no_signal, en.lv_no_signal]);
-  });
+	it('roles not confirmed, no frame yet: "No signal" alone', async () => {
+		hangPreviews();
+		renderViewport(baseProps({ cameraMode: 'double', swapLocked: false }));
+		await expect.poll(() => noSignal()).toEqual([en.lv_no_signal, en.lv_no_signal]);
+	});
 
-  const feedLabels = () => [...document.querySelectorAll<HTMLElement>('.feed-label')].map((l) => [l.textContent?.trim(), l.getAttribute('title')]);
-  const cams = [
-    { index: 0, label: 'Cam A', model: 'ModelA' },
-    { index: 1, label: '', model: 'ModelB' }
-  ] as unknown as CameraDevice[];
+	const feedLabels = () =>
+		[...document.querySelectorAll<HTMLElement>('.feed-label')].map((l) => [
+			l.textContent?.trim(),
+			l.getAttribute('title')
+		]);
+	const cams = [
+		{ index: 0, label: 'Cam A', model: 'ModelA' },
+		{ index: 1, label: '', model: 'ModelB' }
+	] as unknown as CameraDevice[];
 
-  it('roles confirmed: the visible label under each picture is the both-facts label, the words and then the camera as its title', async () => {
-    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
-    renderViewport(baseProps({ cameraMode: 'double', swapLocked: true, devices: cams }));
-    await expect.poll(() => feedLabels()).toEqual([[en.lv_camera_left_alt, `${en.lv_camera_left_alt} · Cam A`], [en.lv_camera_right_alt, `${en.lv_camera_right_alt} · ModelB`]]);
-  });
+	it('roles confirmed: the visible label under each picture is the both-facts label, the words and then the camera as its title', async () => {
+		stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+		renderViewport(baseProps({ cameraMode: 'double', swapLocked: true, devices: cams }));
+		await expect
+			.poll(() => feedLabels())
+			.toEqual([
+				[en.lv_camera_left_alt, `${en.lv_camera_left_alt} · Cam A`],
+				[en.lv_camera_right_alt, `${en.lv_camera_right_alt} · ModelB`]
+			]);
+	});
 
-  it('roles not confirmed: the visible label is the camera name and number, as the alt, the camera as its title', async () => {
-    stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
-    renderViewport(baseProps({ cameraMode: 'double', swapLocked: false, devices: cams }));
-    await expect.poll(() => feedLabels()).toEqual([[`${en.cam_fallback_name} 1`, 'Cam A'], [`${en.cam_fallback_name} 2`, 'ModelB']]);
-  });
+	it('roles not confirmed: the visible label is the camera name and number, as the alt, the camera as its title', async () => {
+		stubPreviewFetch({ 0: { w: 40, h: 30 }, 1: { w: 40, h: 30 } });
+		renderViewport(baseProps({ cameraMode: 'double', swapLocked: false, devices: cams }));
+		await expect
+			.poll(() => feedLabels())
+			.toEqual([
+				[`${en.cam_fallback_name} 1`, 'Cam A'],
+				[`${en.cam_fallback_name} 2`, 'ModelB']
+			]);
+	});
 
-  it('single-camera mode: the camera label, no number and no brackets', async () => {
-    stubPreviewFetch({ 0: { w: 40, h: 30 } });
-    renderViewport(baseProps({ cameraMode: 'single', swapLocked: true, devices: cams }));
-    await expect.poll(() => feedLabels()).toEqual([['Cam A', null]]);
-  });
+	it('single-camera mode: the camera label, no number and no brackets', async () => {
+		stubPreviewFetch({ 0: { w: 40, h: 30 } });
+		renderViewport(baseProps({ cameraMode: 'single', swapLocked: true, devices: cams }));
+		await expect.poll(() => feedLabels()).toEqual([['Cam A', null]]);
+	});
 
-  it('single-camera mode without a device: the fallback name alone', async () => {
-    stubPreviewFetch({ 0: { w: 40, h: 30 } });
-    renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
-    await expect.poll(() => feedLabels()).toEqual([[en.cam_fallback_name, null]]);
-  });
+	it('single-camera mode without a device: the fallback name alone', async () => {
+		stubPreviewFetch({ 0: { w: 40, h: 30 } });
+		renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
+		await expect.poll(() => feedLabels()).toEqual([[en.cam_fallback_name, null]]);
+	});
 
-  it('single-camera mode: neither a side nor a page, in Spanish too', async () => {
-    locale.set('es');
-    stubPreviewFetch({ 0: { w: 40, h: 30 } });
-    const screen = renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
-    await expect.poll(() => alts()).toEqual([es.cam_fallback_name]);
-    screen.unmount();
-    hangPreviews();
-    renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
-    await expect.poll(() => noSignal()).toEqual([es.lv_no_signal]);
-  });
+	it('single-camera mode: neither a side nor a page, in Spanish too', async () => {
+		locale.set('es');
+		stubPreviewFetch({ 0: { w: 40, h: 30 } });
+		const screen = renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
+		await expect.poll(() => alts()).toEqual([es.cam_fallback_name]);
+		screen.unmount();
+		hangPreviews();
+		renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
+		await expect.poll(() => noSignal()).toEqual([es.lv_no_signal]);
+	});
 });
