@@ -9,7 +9,7 @@
 	//
 	// Version: 0.3.3
 
-	import { recordsApi, type Record, type RecordImage } from '$lib/api';
+	import { recordsApi, type Record } from '$lib/api';
 	import { m } from '$lib/i18n';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';

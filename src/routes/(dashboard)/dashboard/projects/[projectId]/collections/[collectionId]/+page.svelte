@@ -357,7 +357,6 @@
 		try {
 			// Export runs as a background job on the appliance
 			const { job_id } = await collectionsApi.exportBagit(collectionId);
-			// eslint-disable-next-line no-constant-condition
 			while (true) {
 				await new Promise((r) => setTimeout(r, 700));
 				const st = await collectionsApi.getExportStatus(collectionId, job_id);
@@ -461,7 +460,7 @@
 				const blob = await res.blob();
 				const ext = (img.format || img.filename?.split('.').pop() || 'jpg').toLowerCase();
 				const base = (r.title || `registro-${r.id}`)
-					.replace(/[\/\\:*?"<>|]+/g, '')
+					.replace(/[/\\:*?"<>|]+/g, '')
 					.replace(/\s+/g, '_');
 				const seq = String(done + 1).padStart(3, '0');
 				zip.file(`${seq}_${base}_${img.id}.${ext}`, blob);
@@ -474,7 +473,7 @@
 			a.href = url;
 			const safeName =
 				(collectionName || `coleccion-${collectionId}`)
-					.replace(/[\/\\:*?"<>|]+/g, '')
+					.replace(/[/\\:*?"<>|]+/g, '')
 					.replace(/\s+/g, '_') || `coleccion-${collectionId}`;
 			a.download = `${safeName}-imagenes.zip`;
 			document.body.appendChild(a);

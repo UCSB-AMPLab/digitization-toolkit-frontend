@@ -7,7 +7,7 @@
 	// Version: 0.1.0-beta
 
 	import { authApi } from '$lib/api';
-	import { m, setLanguage, type Locale } from '$lib/i18n';
+	import { setLanguage, type Locale } from '$lib/i18n';
 	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 	import nehSeal from '$lib/assets/neh-preferred-seal-white.png';
 

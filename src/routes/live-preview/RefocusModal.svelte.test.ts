@@ -641,7 +641,6 @@ describe('RefocusModal: slow and stale readings', () => {
 			return answer.promise;
 		});
 	}
-	const open = (cam: number) => pending.filter((p) => p.cam === cam);
 	const mode = (focus_mode: string) => ({ focus_mode }) as DSLRSettings;
 
 	it('records an answer that takes longer than a poll, with one request per camera pending at a time', async () => {

@@ -61,7 +61,6 @@
 
 	let isAdmin = $derived(userRole === 'admin');
 	let isOperator = $derived(userRole === 'operator');
-	let isReviewer = $derived(userRole === 'reviewer');
 	let canSeeCameras = $derived(canSeeCameraPanels(userRole));
 	// From the store, so nothing of the other roles' Overview mounts for the
 	// testing account before the subscription runs.

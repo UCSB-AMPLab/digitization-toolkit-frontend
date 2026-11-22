@@ -11,7 +11,6 @@
 		buildGrid,
 		moveFocus,
 		parseLocalDate,
-		WEEKS,
 		type CalendarMetric
 	} from '$lib/activity-calendar';
 

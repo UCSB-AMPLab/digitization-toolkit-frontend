@@ -194,7 +194,6 @@
 
 	let members = $state<ProjectMember[]>([]);
 	let showMembersModal = $state(false);
-	let memberSearchQuery = $state('');
 	let allUsers = $state<UserRead[]>([]);
 	let addUserId = $state<number | null>(null);
 	let addRole = $state<'operator' | 'reviewer'>('reviewer');

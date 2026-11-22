@@ -343,7 +343,7 @@
 				cameraStatus.reportFailure(msg);
 				showFocusResult(false, msg);
 			}
-		} catch (error) {
+		} catch {
 			const msg = $m.cam_af_error;
 			cameraStatus.reportFailure(msg);
 			showFocusResult(false, msg);
