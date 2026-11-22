@@ -37,12 +37,15 @@
     onRetake,
     onDelete,
     userRole = null,
+    restorable,
   }: {
     record: Record;
     onClose: () => void;
     onRetake: (record: Record) => void;
     onDelete: (record: Record) => void;
     userRole?: string | null;
+    /** Whether this unit can restore freed files, from the volume's offsite state (NEH-380). */
+    restorable?: boolean;
   } = $props();
 
   // Lock: in_review and approved block delete for non-admins, and retake for
@@ -249,7 +252,7 @@
 
           <!-- NEH-139: a RAW is shown through its JPEG preview or its thumbnail,
                never as a broken image -->
-          <RecordImageDisplay image={img} onMasterFreed={(f) => (masterFreedById[img.id] = f)}>
+          <RecordImageDisplay image={img} {restorable} onMasterFreed={(f) => (masterFreedById[img.id] = f)}>
             {#snippet children(src, onerror)}
               <img
                 {src}

@@ -25,6 +25,7 @@
 // Version: 0.1.0-beta
 
 import type { RecordImage } from '$lib/api';
+import type { Messages } from '$lib/i18n';
 
 /** RAW suffixes, the same list as the backend's `_RAW_SUFFIXES`. */
 export const RAW_FORMATS: ReadonlySet<string> = new Set(['cr2', 'nef', 'arw', 'raf', 'dng', 'raw']);
@@ -86,6 +87,8 @@ export function displayCandidates(img: Pick<RecordImage, 'id' | 'format' | 'file
 export interface FreedFile {
   kind: 'capture' | 'preview';
   freedAt: string | null;
+  /** Whether this unit can restore the file (the 410's `restorable`, NEH-380); unset when the backend does not say. */
+  restorable?: boolean;
 }
 
 /**
@@ -97,9 +100,21 @@ export function freedFromBody(status: number, body: unknown): FreedFile | null {
   if (status !== 410 || typeof body !== 'object' || body === null) return null;
   const detail = (body as { detail?: unknown }).detail;
   if (typeof detail !== 'object' || detail === null) return null;
-  const d = detail as { stored_offsite?: unknown; kind?: unknown; freed_at?: unknown };
+  const d = detail as { stored_offsite?: unknown; kind?: unknown; freed_at?: unknown; restorable?: unknown };
   if (d.stored_offsite !== true) return null;
-  return { kind: d.kind === 'preview' ? 'preview' : 'capture', freedAt: typeof d.freed_at === 'string' ? d.freed_at : null };
+  const freed: FreedFile = { kind: d.kind === 'preview' ? 'preview' : 'capture', freedAt: typeof d.freed_at === 'string' ? d.freed_at : null };
+  if (typeof d.restorable === 'boolean') freed.restorable = d.restorable;
+  return freed;
+}
+
+/**
+ * The freed panel's last line: that an administrator can restore the volume,
+ * unless the unit said it cannot (`restorable` false). An older backend,
+ * which does not say, and a freed state read from the record alone get the
+ * restore hint, as before.
+ */
+export function freedHintText(freed: FreedFile | null, msgs: Pick<Messages, 'freed_restore_hint' | 'freed_no_restore_hint'>): string {
+  return freed?.restorable === false ? msgs.freed_no_restore_hint : msgs.freed_restore_hint;
 }
 
 /**

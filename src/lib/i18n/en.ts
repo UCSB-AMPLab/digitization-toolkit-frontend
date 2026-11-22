@@ -168,7 +168,7 @@ export const en: Messages = {
 	dash_storage_alert_p1: 'Storage is at ',
 	dash_storage_alert_p2: (used: string, total: string) => ` (${used} / ${total}). See `,
 	dash_storage_alert_p3: ' to free up space.',
-	dash_storage_alert_ask_admin: (used: string, total: string) => ` (${used} / ${total}). Tell the administrator so they can free up space.`,
+	dash_storage_alert_ask_admin: (used: string, total: string) => ` (${used} / ${total}). Ask an administrator or an operator to free up space.`,
 	dash_kpi_active_projects: 'Active projects',
 	dash_kpi_collections: 'Volumes',
 	dash_kpi_total_records: 'Total records',
@@ -281,6 +281,24 @@ export const en: Messages = {
 	config_unknown_location: 'unknown location',
 	config_err_mount: 'Could not mount the device.',
 	config_storage_active: (path: string) => `Active storage: ${path}`,
+	// NEH-380: the storage reserve (CAPTUA_STORAGE_RESERVE_GB) and the list of
+	// volumes that can be freed, in Settings > Storage.
+	config_storage_reserve: (gb: string) => `Captua always keeps ${gb} GB free so it can keep working.`,
+	config_freeable_title: 'Volumes with space to free',
+	config_freeable_intro:
+		'Every file of these volumes is already verified in the offsite copy, so you can remove them from the card without losing them. The list goes from the most space to free to the least.',
+	config_freeable_space: (bytes: number): string => `${formatBytes(bytes, 'en')} to free`,
+	config_freeable_total: (volumes: number, bytes: number): string =>
+		volumes === 1
+			? `1 volume, ${formatBytes(bytes, 'en')} to free in all`
+			: `${formatCount(volumes, 'en')} volumes, ${formatBytes(bytes, 'en')} to free in all`,
+	config_freeable_free: 'Free space',
+	config_freeable_free_aria: (name: string) => `Free space: ${name}`,
+	config_freeable_empty:
+		"No volume has space to free for now. A volume's space can be freed once every one of its files is verified in the offsite copy.",
+	config_freeable_error: 'Captua could not check which volumes have space to free. Try again in a moment.',
+	config_freeable_mode_off:
+		"In the current mode, Captua keeps the image files only on this unit, so no volume's space can be freed.",
 	config_err_activate: 'Could not activate storage.',
 	config_err_unmount: 'Could not unmount the device.',
 	config_restored_default: 'Restored default storage.',
@@ -781,6 +799,11 @@ export const en: Messages = {
 	freed_where: 'This file is kept outside the scanner, in the offsite copy, to leave room on the SD card.',
 	freed_nothing_lost: 'Nothing is lost: Captua verified the offsite copy before it removed the file from the SD card.',
 	freed_restore_hint: 'To see it at full size, an administrator can restore the volume to the SD card.',
+	// NEH-380: instead of freed_restore_hint on a unit that cannot restore (`restorable` false).
+	freed_no_restore_hint: 'This unit cannot read the offsite copy, so the full-size image cannot be seen here.',
+	// NEH-380: the export, or the image ZIP, of a volume with freed files on a unit that cannot restore.
+	export_freed_no_restore:
+		"This volume's images are only in the offsite copy, which this unit cannot read, so the volume cannot be exported here.",
 	freed_thumbnail_note: 'What you see is the thumbnail, which Captua keeps on the scanner.',
 	col_export_blocked_title: 'Cannot export yet',
 	col_export_blocked_desc: 'All records must be approved before exporting. The following are not approved yet:',
@@ -1025,6 +1048,11 @@ export const en: Messages = {
 	lv_err_resolution_in_name: "Captua cannot put the resolution in a capture's file name",
 	lv_err_name_too_long: "Captua captured nothing: this capture's file name would be longer than 36 characters",
 	lv_err_capture_limit: 'Captua captured nothing: this volume has reached the limit of 9,999 captures; a new volume is needed',
+	// NEH-380: the 507 `storage_reserve`, for whoever can free space and for everyone else.
+	lv_err_storage_reserve_free:
+		'Captua captured nothing: the storage is nearly full and Captua needs what is left to keep working; free space in Settings › Storage',
+	lv_err_storage_reserve:
+		'Captua captured nothing: the storage is nearly full and Captua needs what is left to keep working; ask an administrator or an operator to free space',
 	lv_capture_btn: 'Capture',
 	lv_zoom_in: 'Zoom in',
 	lv_zoom_out: 'Zoom out',
@@ -1390,7 +1418,10 @@ export const en: Messages = {
 		files === 1
 			? `Captua will remove 1 file (${formatBytes(bytes, 'en')}) from the SD card. It will still be stored in the offsite copy.`
 			: `Captua will remove ${formatCount(files, 'en')} files (${formatBytes(bytes, 'en')}) from the SD card. They will still be stored in the offsite copy.`,
-	offsite_plan_restore_later: 'An administrator can restore the volume later with "Restore to the SD card".',
+	// NEH-380: whether freed files can be brought back to this unit (`restorable`).
+	offsite_free_restorable: 'An administrator can restore these files to the card later.',
+	offsite_free_not_restorable:
+		'The files will stay stored in the offsite copy, but this unit cannot read it: from here it will not be possible to restore them to the card or to export the volume.',
 	offsite_free_check_note:
 		"Before it removes each file, Captua compares its checksum with the offsite copy's again. This can take several minutes.",
 	offsite_plan_nothing: 'Captua found no files it can free on this volume.',

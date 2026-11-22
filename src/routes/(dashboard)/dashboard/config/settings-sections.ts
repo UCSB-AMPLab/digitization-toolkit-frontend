@@ -1,6 +1,8 @@
 // The sections of Settings (/dashboard/config, NEH-253) and the roles that
 // may open each. Network and Language are every role's; the Unit group is
-// the administrator's. The page shows only the sections of the signed-in
+// the administrator's, except Storage, which the operator opens too to free
+// space (NEH-380; UnitSections shows the operator its usage figure and the
+// list of volumes that can be freed, not the drive controls). The page shows only the sections of the signed-in
 // role, and a section asked for that the role may not open (by URL or by
 // state) resolves to Network, so a non-admin never renders an admin section.
 // The testing role (NEH-391) sees what every non-admin sees, plus Power, so it
@@ -10,7 +12,7 @@
 // Version: 0.3.5
 
 import type { StringMessageKey } from '$lib/i18n';
-import { inTestingSpace, opensUnitSettings } from '$lib/unit-mode';
+import { canFreeVolumes, inTestingSpace, opensUnitSettings } from '$lib/unit-mode';
 
 export interface SettingsSection {
 	id: string;
@@ -36,7 +38,9 @@ export const DEFAULT_SECTION = 'network';
 
 export function sectionsFor(role: string | null | undefined): SettingsSection[] {
 	if (inTestingSpace(role)) return SETTINGS_SECTIONS.filter((s) => !s.unit || s.id === 'power');
-	return SETTINGS_SECTIONS.filter((s) => !s.unit || opensUnitSettings(role));
+	return SETTINGS_SECTIONS.filter(
+		(s) => !s.unit || opensUnitSettings(role) || (s.id === 'storage' && canFreeVolumes(role))
+	);
 }
 
 /** The section to show for `requested`: itself when the role may open it, else Network. */

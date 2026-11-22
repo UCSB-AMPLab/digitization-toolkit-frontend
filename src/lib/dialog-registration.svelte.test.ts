@@ -96,7 +96,7 @@ describe('pop-ups register as dialogs while open', () => {
 			collection_id: 7, filename_stem: 'co-x', uploadable: true, total: 10, verified: 10, pending: 0,
 			refused: 0, last_verified_at: null, received: true, refusals: [], freed_files: 0, freed_bytes: 0
 		};
-		const screen = render(VolumeOffsiteActions, { collectionId: 7, offsite, onChanged: () => {} });
+		const screen = render(VolumeOffsiteActions, { collectionId: 7, offsite, canRestore: true, onChanged: () => {} });
 		expect(openDialogCount()).toBe(0);
 		await screen.getByRole('button', { name: en.offsite_manage_open }).click();
 		expect(openDialogCount()).toBe(1);

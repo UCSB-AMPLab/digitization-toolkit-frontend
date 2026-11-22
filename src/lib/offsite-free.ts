@@ -216,6 +216,36 @@ export function freedExportCount(error: unknown): number | null {
 	return match ? Number(match[1]) : null;
 }
 
+function restorableIn(detail: unknown): boolean | undefined {
+	if (typeof detail !== 'object' || detail === null) return undefined;
+	const r = (detail as { restorable?: unknown }).restorable;
+	return typeof r === 'boolean' ? r : undefined;
+}
+
+/**
+ * The message for an export refused because masters are freed from the card,
+ * or null for any other error: from the export's 409 (an ApiError, whose
+ * detail carries `restorable`) or from a failed export job (its `error`, and
+ * its `detail` as `jobDetail`). When the unit says it cannot restore
+ * (`restorable` false, NEH-380), the message says the volume cannot be
+ * exported here; otherwise, and from an older backend that does not say, it
+ * is the restore message as before.
+ */
+export function freedExportText(error: unknown, msgs: Messages, jobDetail?: unknown): string | null {
+	const n = freedExportCount(error);
+	if (n === null) return null;
+	const detail = typeof error === 'string' ? jobDetail : (error as { detail?: unknown }).detail;
+	return restorableIn(detail) === false ? msgs.export_freed_no_restore : msgs.col_export_freed(n);
+}
+
+/** The message for an image ZIP that met a freed file: col_zip_freed, unless the unit says it cannot restore. */
+export function freedZipText(freed: { restorable?: boolean }, msgs: Messages): string {
+	return freed.restorable === false ? msgs.export_freed_no_restore : msgs.col_zip_freed;
+}
+
+/** How often a free or a restore job's status is asked for, by its dialog and by the Storage section's watch. */
+export const OFFSITE_POLL_INTERVAL_MS = 2000;
+
 export interface PollOptions {
 	intervalMs: number;
 	/** Resolves after `ms`; a stand-in in tests. */
@@ -297,13 +327,15 @@ export async function pollOffsiteJob(
 /**
  * Which actions an admin is offered for the volume: freeing once every file
  * is verified offsite and some verified file is still on the card, restoring
- * once any file is freed. The backend checks again and refuses with 409.
+ * once any file is freed, unless the unit says it cannot restore
+ * (`restorable` false, NEH-380; an older backend that does not say is offered
+ * it as before). The backend checks again and refuses with 409.
  */
 export function offsiteOffer(state: VolumeOffsiteState): { free: boolean; restore: boolean } {
 	const freed = state.freed_files ?? 0;
 	return {
 		free: state.uploadable && state.received && state.verified > freed,
-		restore: state.uploadable && freed > 0
+		restore: state.uploadable && freed > 0 && state.restorable !== false
 	};
 }
 

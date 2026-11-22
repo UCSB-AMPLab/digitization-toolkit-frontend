@@ -2,7 +2,8 @@
   // Settings page (/dashboard/config), for every role (NEH-253). A list of
   // sections, then the one chosen: Network and Language for everyone, and
   // for administrators the Unit group, whose sections (UnitSections) are the
-  // ones this page held before it was split. Which sections a role sees and
+  // ones this page held before it was split, of which the operator opens
+  // Storage only (NEH-380). Which sections a role sees and
   // may open is decided in settings-sections.ts; a section asked for that the
   // role may not open shows Network instead.
   //
@@ -24,7 +25,7 @@
   import NetworkSection from './NetworkSection.svelte';
   import UnitSections from './UnitSections.svelte';
   import { resolveSection, sectionInUrl, sectionsFor } from './settings-sections';
-  import { inTestingSpace, opensUnitSettings } from '$lib/unit-mode';
+  import { opensUnitSettings } from '$lib/unit-mode';
 
   // Available languages. The catalogue lives in `$lib/i18n`; this list only
   // names them for the selector.
@@ -136,8 +137,9 @@
             </div>
           </div>
         </div>
-      {:else if (isAdmin || inTestingSpace(role)) && current.unit}
-        <UnitSections section={current.id} />
+      {:else if current.unit}
+        <!-- `current` is one of the role's sections (resolveSection). -->
+        <UnitSections section={current.id} canManageDrives={isAdmin} />
       {/if}
     </div>
   </div>

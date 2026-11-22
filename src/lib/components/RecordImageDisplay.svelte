@@ -38,6 +38,7 @@
     isBrowserDisplayable,
     isRawImage,
     freedFromMetadata,
+    freedHintText,
     previewFreedByMetadata,
     probeFreed,
     type FreedFile,
@@ -48,6 +49,7 @@
     image,
     children,
     onMasterFreed,
+    restorable,
   }: {
     image: Pick<RecordImage, 'id' | 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>;
     /** Draws the <img>: receives the URL to show and the error handler. */
@@ -55,6 +57,10 @@
     /** Told whether a 410 has said the master itself is freed, whatever the
      *  record's master_freed_at says; a freed RAW preview does not count. */
     onMasterFreed?: (freed: boolean) => void;
+    /** Whether this unit can restore freed files, from the volume's offsite state
+     *  (GET /collections/{id}/offsite, NEH-380); unset where no volume state is at
+     *  hand, and then a 410's own `restorable` is read. */
+    restorable?: boolean;
   } = $props();
 
   // Resolve again only when the image changes, not each time the parent
@@ -157,6 +163,10 @@
   }
 
   const isFreed = $derived(freed !== null || master === 'freed');
+  // The hint's reading of `restorable`: the volume state first, then the 410's.
+  const hint = $derived(
+    freedHintText({ kind: freed?.kind ?? 'capture', freedAt: freed?.freedAt ?? null, restorable: restorable ?? freed?.restorable }, $m),
+  );
 
   const thumbnailHint = $derived(
     raw ? $m.raw_thumbnail_hint : unsupportedExt ? $m.image_thumbnail_hint_format(unsupportedExt) : $m.image_thumbnail_hint,
@@ -176,7 +186,7 @@
       {#if freedOpen}
         <span>{$m.freed_where}</span>
         <span>{$m.freed_nothing_lost}</span>
-        <span>{$m.freed_restore_hint}</span>
+        <span>{hint}</span>
         <span class="freed-panel-note">{$m.freed_thumbnail_note}</span>
       {/if}
     </div>
@@ -186,7 +196,7 @@
       <strong class="freed-panel-title">{$m.freed_title}</strong>
       <span>{$m.freed_where}</span>
       <span>{$m.freed_nothing_lost}</span>
-      <span>{$m.freed_restore_hint}</span>
+      <span>{hint}</span>
     </div>
   {/if}
 {/snippet}

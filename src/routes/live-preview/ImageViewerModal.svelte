@@ -77,6 +77,7 @@
     busy = false,
     captureLocked = false,
     captureNote = null,
+    restorable,
   }: {
     record: ApiRecord;
     cameraMode: 'single' | 'double';
@@ -93,6 +94,8 @@
     busy?: boolean;
     captureLocked?: boolean;
     captureNote?: string | null;
+    /** Whether this unit can restore freed files, from the volume's offsite state (NEH-380). */
+    restorable?: boolean;
   } = $props();
 
   let isPlaceholder = $derived(!!placeholder && record.missing_side === 'both' && !record.closed_reason);
@@ -392,7 +395,7 @@
             <!-- NEH-139: a RAW image is shown through its JPEG preview or its
                  thumbnail, never as a broken image; a freed master gets the
                  calm notice (NEH-248) -->
-            <RecordImageDisplay image={img}>
+            <RecordImageDisplay image={img} {restorable}>
               {#snippet children(src, onerror)}
                 <img
                   {src}
