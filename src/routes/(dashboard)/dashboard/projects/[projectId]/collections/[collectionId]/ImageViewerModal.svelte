@@ -7,7 +7,7 @@
 	// A dual record that misses a side (0.3.2) shows that page as an empty
 	// frame that says so (MissingPage), on its side.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { recordsApi, type Record } from '$lib/api';
 	import { m } from '$lib/i18n';

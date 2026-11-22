@@ -5,7 +5,7 @@
 // it, on mount, on a timer or after an action. The operator's page stays as
 // it was.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

@@ -3,7 +3,7 @@
 // whichever runs second in a browser page starts where the first left the
 // pointer.
 //
-// Version: 0.3.7
+// Version: 0.3.0
 import { pointerResetSuite } from './test-pointer-probe';
 
 pointerResetSuite('b');

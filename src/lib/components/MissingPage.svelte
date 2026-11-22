@@ -7,7 +7,7 @@
 	// capture screen's modal, the gallery's modal, the spread and the grid
 	// tile) draw it.
 	//
-	// Version: 0.3.2
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 	import type { MissingSide } from '$lib/api';

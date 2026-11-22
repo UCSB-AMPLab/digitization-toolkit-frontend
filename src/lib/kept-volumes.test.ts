@@ -1,7 +1,7 @@
 // Keeping a volume on the unit, and releasing it (NEH-320): which action the
 // volume page offers, and the message for each refusal.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';

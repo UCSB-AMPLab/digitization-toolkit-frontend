@@ -11,7 +11,7 @@
 // The browser's own requests are left as they are; no failure in them has
 // been traced to this.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { test as base } from '@playwright/test';
 
 export const test = base.extend({

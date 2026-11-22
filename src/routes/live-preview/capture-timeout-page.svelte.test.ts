@@ -5,6 +5,8 @@
 // after a successful one, and sends no second capture. Leaving the screen
 // stops the reads. Every request is answered by a fetch mock keyed on the
 // path; a capture held by the test is answered with nginx's 504 page.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

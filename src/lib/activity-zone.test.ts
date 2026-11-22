@@ -3,7 +3,7 @@
 // daylight-saving changes whatever zone the code runs in. Each test sets
 // process.env.TZ itself, which Node applies to Date and Intl at once.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

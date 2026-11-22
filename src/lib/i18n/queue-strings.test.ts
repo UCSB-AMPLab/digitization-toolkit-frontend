@@ -1,7 +1,7 @@
 // Cola's strings (0.3.1): the three section headings, numbered by the
 // sections shown, and the done mark, which now says finished.
 //
-// Version: 0.3.1
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';

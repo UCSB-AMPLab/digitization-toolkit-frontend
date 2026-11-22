@@ -13,7 +13,7 @@
 // frame's size with width and height swapped, centred, and the geometry of
 // src/lib/pan-zoom.ts accounts for the swap, so 1:1 and the pan bounds hold.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import {
 	isSwapped,

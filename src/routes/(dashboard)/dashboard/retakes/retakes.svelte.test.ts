@@ -5,7 +5,7 @@
 // record, in the project the row gives. Placeholders and missing pages get
 // Capture and a way to close them. The API is mocked.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

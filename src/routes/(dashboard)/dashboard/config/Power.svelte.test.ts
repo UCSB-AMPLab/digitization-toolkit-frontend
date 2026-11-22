@@ -3,7 +3,7 @@
 // the Power card rather than in a dialog. Since NEH-253 the Power section is
 // one of the administrator's sections, opened with ?section=power.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

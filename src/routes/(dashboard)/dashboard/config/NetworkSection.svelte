@@ -48,7 +48,7 @@
 	// status shows a connected network that the list does not contain, the list
 	// is read again once for that network.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onMount, untrack } from 'svelte';
 	import { get } from 'svelte/store';

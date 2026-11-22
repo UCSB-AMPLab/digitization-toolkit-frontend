@@ -9,7 +9,7 @@
 // can shut the unit down or restart it.
 // The backend enforces the same roles on every route these sections use.
 //
-// Version: 0.3.5
+// Version: 0.3.0
 
 import type { StringMessageKey } from '$lib/i18n';
 import { canFreeVolumes, inTestingSpace, opensUnitSettings } from '$lib/unit-mode';

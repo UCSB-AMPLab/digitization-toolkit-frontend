@@ -14,7 +14,7 @@
 	// and the thumbnail strip on screen (--ci-expanded-max). Without an
 	// instruction, nothing is drawn.
 	//
-	// Version: 0.2.0
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 	import { actionLabel } from '$lib/queue-labels';

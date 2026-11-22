@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Version: 0.1.1
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 	// Toolbar on the right edge of the volume gallery, shown in every view mode.

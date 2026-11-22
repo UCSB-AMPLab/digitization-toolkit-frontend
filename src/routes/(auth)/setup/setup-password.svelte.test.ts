@@ -2,6 +2,8 @@
 // new password is held to (NEH-395): at least 8 characters counted as the
 // backend counts them, checked before anything is sent, with the shared
 // message; the backend's `password_too_short` refusal gets the same message.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

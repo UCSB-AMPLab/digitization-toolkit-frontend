@@ -4,7 +4,7 @@
 	// `label` the bars are an image with that name; without one they are
 	// decoration and hidden from assistive technology.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 	import { signalBars } from './network-text';
 
 	let { signal, label = null }: { signal: number | null; label?: string | null } = $props();

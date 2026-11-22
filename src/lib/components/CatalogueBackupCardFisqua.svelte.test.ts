@@ -2,7 +2,7 @@
 // GET /system/catalogue-backup answer the card already polls. Fixtures are
 // shaped as unit_fisqua_summary in app/core/fisqua_outbox.py.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

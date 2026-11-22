@@ -4,7 +4,7 @@
 // the right camera. Without a confirmed set-up the panels say "Camera 1"
 // and "Camera 2", by index.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

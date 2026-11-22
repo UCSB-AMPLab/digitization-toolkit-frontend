@@ -3,7 +3,7 @@
 // came), and reads the focal length the backend may attach. The dashboard's
 // call stays as it was.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

@@ -15,7 +15,7 @@
 	// the seedling is drawn below about 90px tall; thin keeps the finer drawing
 	// above that.
 	//
-	// Version: 0.1.0
+	// Version: 0.3.0
 
 	import { locale } from '$lib/i18n';
 	import seedlingThin from '$lib/assets/brand/captua-seedling-thin.svg';

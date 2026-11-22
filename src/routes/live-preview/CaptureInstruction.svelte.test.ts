@@ -4,7 +4,7 @@
 // keeps its room on the 800x480 kiosk; "Mostrar todo" opens the whole text and
 // "Mostrar menos" closes it. Without an instruction, nothing is drawn.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

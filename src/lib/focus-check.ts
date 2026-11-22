@@ -11,7 +11,7 @@
 // The time is passed in, never read here, so the rules are tested without
 // timers. No import of api.ts, so the tests run in plain node.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { FocusModeKind } from './focus-mode';
 import { STORAGE_KEYS, readStored, removeStored, writeStored } from './storage-keys';

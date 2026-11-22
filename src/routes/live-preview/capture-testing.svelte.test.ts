@@ -7,7 +7,7 @@
 // own message. The operator keeps every control (which-camera-page and the
 // other page tests assert the rest of the operator's screen).
 //
-// Version: 0.1.1
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

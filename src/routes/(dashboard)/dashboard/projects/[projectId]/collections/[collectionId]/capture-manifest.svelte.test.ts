@@ -3,7 +3,7 @@
 // saved under the server's file name; a 409 lists its problems in the
 // catalogue's words, and a 404 says the volume was not found.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

@@ -8,7 +8,7 @@
 	// as a status region, and the notice is cleared when the page is left, so
 	// it is shown for that one visit.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';

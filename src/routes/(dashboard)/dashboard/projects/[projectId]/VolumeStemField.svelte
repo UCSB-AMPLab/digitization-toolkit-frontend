@@ -14,7 +14,7 @@
 	// fills the field with its reference code and tells the form (`onchoose`).
 	// The admin can still type a whole code; saving checks it as before.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 	import { onDestroy, untrack } from 'svelte';
 	import { m } from '$lib/i18n';
 	import { fisquaApi } from '$lib/api';

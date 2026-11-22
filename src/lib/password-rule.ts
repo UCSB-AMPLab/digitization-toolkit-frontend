@@ -5,6 +5,8 @@
 // `password_too_short` refusal with the same message
 // (common_password_too_short). Characters are counted as the backend counts
 // them, by code point, so an emoji is one character, not two UTF-16 units.
+//
+// Version: 0.3.0
 
 export const PASSWORD_MIN_LENGTH = 8;
 

@@ -1,7 +1,7 @@
 // NEH-339: when the capture screen asks the operator to check focus by
 // itself, and what the last stage of the check says about the lens readings.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {

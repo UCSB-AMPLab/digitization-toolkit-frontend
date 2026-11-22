@@ -61,7 +61,7 @@
 	// anything else holds it (NEH-381); the Refocus dialog opened from here
 	// gets the same gate.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { camerasApi, type CameraCapabilities, type CameraDevice } from '$lib/api';

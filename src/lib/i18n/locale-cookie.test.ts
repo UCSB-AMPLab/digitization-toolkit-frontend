@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
 import { LEGACY_LOCALE_COOKIE, LOCALE_COOKIE, localeCookies, localeFromCookies } from './index';

@@ -19,7 +19,7 @@
 	// The keyboard stays in the dialog (trapFocus): the focus moves in on
 	// open, Tab wraps inside, and the focus goes back on close.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import {
 		recordsApi,

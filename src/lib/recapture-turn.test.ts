@@ -3,7 +3,7 @@
 // volume the queue offers first, the folios of the next guided retake, and
 // which record the guided retake opens next.
 //
-// Version: 0.3.2
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import type { QueueItem, RetakeSummary, StatusCounts } from './api';
 import {

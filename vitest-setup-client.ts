@@ -8,7 +8,7 @@
 // (movePointerOffPage in vite.config.ts), where it is over nothing, at any
 // size of the test frame.
 //
-// Version: 0.3.7
+// Version: 0.3.0
 import { beforeEach } from 'vitest';
 import { commands } from 'vitest/browser';
 

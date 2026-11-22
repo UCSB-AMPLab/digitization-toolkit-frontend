@@ -8,7 +8,7 @@
 // error behave as they did before. Last-pair mode shows the notice after 3
 // such answers in a row.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from '@vitest/browser/context';

@@ -37,7 +37,7 @@
 // connection there is, and the section says that the list could not be read
 // or that the status is old.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { NetworkStatus, SavedWifiNetwork, WifiNetwork, WifiScan } from '$lib/api';
 

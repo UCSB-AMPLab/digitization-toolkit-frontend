@@ -153,7 +153,7 @@
 	// one (leaveVolume) and reads the new one's records; a request that names a
 	// record the current volume's known records lack is not sent.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { focusCheckNeeded, recordFocusActivity } from '$lib/focus-check';

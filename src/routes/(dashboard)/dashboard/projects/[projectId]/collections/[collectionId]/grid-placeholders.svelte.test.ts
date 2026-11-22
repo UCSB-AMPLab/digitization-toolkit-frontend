@@ -6,7 +6,7 @@
 // grid. Admin and operator can mark an opening missing from the toolbar or
 // between two tiles, through the mark dialog.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import '../../../../../../../app.css';

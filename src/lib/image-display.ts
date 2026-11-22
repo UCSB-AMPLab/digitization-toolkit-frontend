@@ -22,7 +22,7 @@
 // (probeFreed) and shows a freed file as stored offsite, never as missing.
 // ============================================================================
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { RecordImage } from '$lib/api';
 import type { Messages } from '$lib/i18n';

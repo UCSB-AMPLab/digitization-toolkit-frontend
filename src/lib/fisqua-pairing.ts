@@ -11,7 +11,7 @@
 //
 // No import of api.ts, so these helpers can be tested in plain node.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 

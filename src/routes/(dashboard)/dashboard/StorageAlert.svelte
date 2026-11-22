@@ -17,7 +17,7 @@
 	// operator, and the sentence does not mention Settings. The percentage
 	// counts the space Captua keeps for its own work (storage-usage.ts).
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { systemApi } from '$lib/api';

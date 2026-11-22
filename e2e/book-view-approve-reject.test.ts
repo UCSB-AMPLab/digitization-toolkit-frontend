@@ -12,7 +12,7 @@
 // `e2e_neh209` account provisioned in this dev environment):
 //   E2E_USERNAME, E2E_PASSWORD
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { test, expect, testStem, signInBrowser, type APIRequestContext } from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';

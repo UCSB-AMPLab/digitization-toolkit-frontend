@@ -4,7 +4,7 @@
 // unit's name; renew and cancel send nothing. Refusals keep the status and
 // the detail, from which the card reads the code.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

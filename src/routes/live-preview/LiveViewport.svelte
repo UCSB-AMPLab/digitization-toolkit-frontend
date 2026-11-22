@@ -37,7 +37,7 @@
 	// starts no check, the still-working timer is cancelled, and the last
 	// capture shown in last-pair mode goes.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { m } from '$lib/i18n';

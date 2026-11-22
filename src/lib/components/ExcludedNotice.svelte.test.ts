@@ -2,7 +2,7 @@
 // means, and Fisqua's reason when its latest exclusion carries one, read from
 // GET /collections/{id}/status-changes (newest first).
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

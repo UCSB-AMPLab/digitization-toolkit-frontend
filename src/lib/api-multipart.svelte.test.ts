@@ -3,7 +3,7 @@
 // with its boundary; the session cookie and the CSRF header still go; the body is the FormData
 // itself, with the file under `file`. A JSON request keeps its Content-Type.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

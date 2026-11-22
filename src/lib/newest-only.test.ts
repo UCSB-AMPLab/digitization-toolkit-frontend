@@ -2,7 +2,7 @@
 // assigned; an older one is discarded whoever started it, and its caller
 // learns the newest one's outcome.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it, vi } from 'vitest';
 import { newestOnly } from './newest-only';
 

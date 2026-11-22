@@ -1,7 +1,7 @@
 // Redacts secrets in text captured for the bug report (NEH-94): masks email
 // addresses, JWTs, GitHub tokens and Bearer values.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 const PATTERNS: Array<[RegExp, string]> = [
 	// JWT: eyJ... . ... . ...

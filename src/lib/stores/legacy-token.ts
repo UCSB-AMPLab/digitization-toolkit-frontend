@@ -8,7 +8,7 @@
 // then send the browser to /login once. The key is gone after that, so the
 // next load does not come back here.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { browser } from '$app/environment';
 

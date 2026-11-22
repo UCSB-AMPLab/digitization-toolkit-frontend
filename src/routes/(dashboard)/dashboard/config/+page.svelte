@@ -16,7 +16,7 @@
 	// current section's tab is on screen, also when the URL names one at the
 	// end of the row.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';

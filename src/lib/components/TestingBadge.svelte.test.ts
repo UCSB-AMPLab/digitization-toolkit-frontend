@@ -1,6 +1,6 @@
 // The badge that marks a testing project or volume (NEH-391).
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { locale } from '$lib/i18n';

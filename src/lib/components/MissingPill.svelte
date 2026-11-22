@@ -5,7 +5,7 @@
 	// record missing one page. Nothing for any other record. The grid tile,
 	// the spread and the gallery's modal draw it.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 	import type { Record } from '$lib/api';

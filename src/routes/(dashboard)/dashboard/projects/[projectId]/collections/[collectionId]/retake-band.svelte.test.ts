@@ -3,7 +3,7 @@
 // ahora" opens the capture screen on the rejected record with the lowest
 // sequence. No band without rejected records; no link for a reviewer.
 //
-// Version: 0.3.7
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { readable } from 'svelte/store';

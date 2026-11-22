@@ -3,7 +3,7 @@
 // Fisqua's queue, and no list import for an operator, while an admin keeps
 // it; a 403 volumes_from_fisqua on an import is shown translated.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

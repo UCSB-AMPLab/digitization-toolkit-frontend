@@ -23,6 +23,8 @@
 	// The keyboard stays in the dialog (trapFocus), and the focus starts in the
 	// new-password field. Escape and Cancel close it while no request runs; a
 	// tap on the backdrop does not, so a stray tap loses nothing.
+	//
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { usersApi, ApiError, AuthError, type UserRead } from '$lib/api';

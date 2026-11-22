@@ -5,7 +5,7 @@
 // UTF-8 length; an institutional password, username and outer identity by
 // line breaks only; the sign-in server name by the backend's host-name rule.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
 import { joinFormProblems, type JoinForm } from './network-text';

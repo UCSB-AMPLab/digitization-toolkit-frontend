@@ -3,7 +3,7 @@
 // with the sections the page had before. The section is read from
 // ?section=; a non-admin asking for an admin section by URL gets Network.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';

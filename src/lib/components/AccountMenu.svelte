@@ -16,7 +16,7 @@
 	// sets in Settings. Like the power confirmation, the dialog is rendered
 	// outside the menu, since openChangePassword closes the menu.
 	//
-	// Version: 0.1.2
+	// Version: 0.3.0
 
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';

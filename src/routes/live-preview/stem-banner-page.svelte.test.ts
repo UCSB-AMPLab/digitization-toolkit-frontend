@@ -4,7 +4,7 @@
 // the note that only an administrator can change the stem instead of the
 // link. Every request is answered by a fetch mock keyed on the path.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

@@ -8,7 +8,7 @@
 // changes nothing. From the camera check's details the step opens by hand,
 // can be cancelled, and goes back to the check.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

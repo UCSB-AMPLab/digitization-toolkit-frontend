@@ -8,7 +8,7 @@
 	// own, whose password changes from the account menu with the current one.
 	// On success a line on the page says so.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { usersApi, type UserRead } from '$lib/api';

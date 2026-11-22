@@ -4,7 +4,7 @@
 // so the page's controls sit in the bar without the layout loading the
 // records a second time (NEH-260).
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { getContext, setContext, type Snippet } from 'svelte';
 

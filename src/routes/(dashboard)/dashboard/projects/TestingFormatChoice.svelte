@@ -5,7 +5,7 @@
 	// show it only while the unit's cameras offer both formats. The radios
 	// always show `value`, which the owner changes.
 	//
-	// Version: 0.1.0
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 	import type { CaptureFormat } from '$lib/api';

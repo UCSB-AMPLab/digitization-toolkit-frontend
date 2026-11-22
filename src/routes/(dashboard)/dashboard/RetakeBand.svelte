@@ -11,7 +11,7 @@
 	// through retakeProgress, since the backend's total leaves them out.
 	// ============================================================================
 	//
-	// Version: 0.3.2
+	// Version: 0.3.0
 
 	import type { RetakeSummary } from '$lib/api';
 	import { m } from '$lib/i18n';

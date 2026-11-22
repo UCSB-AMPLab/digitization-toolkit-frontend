@@ -1,4 +1,4 @@
-// Version: 0.1.1
+// Version: 0.3.0
 
 import type { LayoutLoad } from './$types';
 import { projectsApi, collectionsApi } from '$lib/api';

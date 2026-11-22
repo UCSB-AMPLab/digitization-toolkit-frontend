@@ -4,6 +4,8 @@
 // only for an administrator; the dialog checks the two fields before it
 // sends, carries the target's username for the browser's password manager,
 // and shows each refusal in the interface's own words.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

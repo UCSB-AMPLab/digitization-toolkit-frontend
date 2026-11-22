@@ -3,6 +3,8 @@
 // preview" in the viewport is disabled, so no preview frame is asked of the
 // cameras in the middle of the capture. It is enabled again once the
 // capture has answered, whether it succeeded or failed.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

@@ -16,7 +16,7 @@
 	// `disabled` (NEH-381): while a capture is in flight or being checked, no
 	// thumbnail can be activated, by pointer or keyboard.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { recordsApi, type Record, type RecordImage } from '$lib/api';
 	import { m } from '$lib/i18n';

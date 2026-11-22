@@ -4,7 +4,7 @@
 // (single and double mode, panels and dropdowns open, modals open, a record
 // selected) and lists any button whose name is empty.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

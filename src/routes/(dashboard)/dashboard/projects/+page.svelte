@@ -11,7 +11,7 @@
 	// unit's cameras offer both formats (GET /cameras/capabilities), and
 	// otherwise nothing about the format is sent.
 	//
-	// Version: 0.1.4
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';

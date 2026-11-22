@@ -6,7 +6,7 @@
 // other than the one last confirmed; then two cameras on the same page;
 // then a role not confirmed. And the left camera the saved roles decide.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { hardwareKey, leftIndexFromRoles, whichScreen } from './camera-roles';
 import type { CameraDevice, CameraSetup, CameraSetupCode } from './api';

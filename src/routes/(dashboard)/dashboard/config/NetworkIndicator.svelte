@@ -17,7 +17,7 @@
 	// failed reads in a row, until a read succeeds; a single failed read
 	// after a good one keeps the last state.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 	import { onMount } from 'svelte';
 	import { m } from '$lib/i18n';
 	import { networkIndicator, networkState, watchNetworkStatus } from '$lib/stores/network';

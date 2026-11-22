@@ -3,7 +3,7 @@
 // 409s of POST /records/{id}/close-missing shown in the dialog, and the
 // closed record handed back on success.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';

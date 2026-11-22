@@ -2,6 +2,8 @@
 // freed (NEH-380). Fixtures are shaped as get_storage_info and
 // list_freeable_volumes in app/api/system.py; the plan and the free job as
 // app/api/collections.py answers them.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';

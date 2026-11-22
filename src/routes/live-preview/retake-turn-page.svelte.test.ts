@@ -10,7 +10,7 @@
 // - in the guide, the thumbnails of the next records are preloaded (0.3.1).
 // Every request is answered by a fetch mock keyed on the path.
 //
-// Version: 0.3.2
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

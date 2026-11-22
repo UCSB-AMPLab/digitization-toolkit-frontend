@@ -22,7 +22,7 @@
 	// A testing volume also offers a copy of its pictures to a USB drive, to the
 	// testing account and the administrator (UsbCopyDialog.svelte).
 	//
-	// Version: 0.3.5
+	// Version: 0.3.0
 
 	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/stores';

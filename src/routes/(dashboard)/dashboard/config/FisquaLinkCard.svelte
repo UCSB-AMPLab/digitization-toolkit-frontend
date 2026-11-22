@@ -33,7 +33,7 @@
 	// a linked unit outside Fisqua mode is pointed to the unit-mode section,
 	// whose switch does the rest.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { m } from '$lib/i18n';

@@ -3,7 +3,7 @@
 	// the muted grey of the status badges. It takes an optional class and is
 	// placed by the page that shows it.
 	//
-	// Version: 0.1.0
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 

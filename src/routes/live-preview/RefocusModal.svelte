@@ -40,7 +40,7 @@
 	// src/lib/capture-check.ts) for their requests, and send nothing while
 	// anything else holds it (NEH-381).
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onDestroy, untrack } from 'svelte';
 	import { camerasApi } from '$lib/api';

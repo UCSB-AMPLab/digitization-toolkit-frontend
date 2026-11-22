@@ -3,7 +3,7 @@
 // with "hacer" in Spanish; and the wording names the glass without saying
 // whether the glass or the book moves.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';

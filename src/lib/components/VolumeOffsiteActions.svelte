@@ -22,7 +22,7 @@
 	// onChanged names the volume its job was started for.
 	// ============================================================================
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { tick } from 'svelte';
 	import {

@@ -6,7 +6,7 @@
 	// dropdowns are rendered outside the scrolling panel with `position: fixed`,
 	// at coordinates taken from their trigger button each time one opens.
 	//
-	// Version: 0.1.1
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { createCameraRefresh } from '$lib/camera-refresh';

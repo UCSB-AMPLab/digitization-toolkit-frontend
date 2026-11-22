@@ -4,7 +4,7 @@
 //
 // No import of the catalogue index, which imports the catalogues.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { parseApiDate } from './pipeline';
 

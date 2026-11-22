@@ -4,6 +4,8 @@
 	// `password` and `text`, and its accessible name says what a press does.
 	// `autocomplete` is the caller's (current-password or new-password), so
 	// the browser's password manager reads each field for what it is.
+	//
+	// Version: 0.3.0
 
 	import { m } from '$lib/i18n';
 

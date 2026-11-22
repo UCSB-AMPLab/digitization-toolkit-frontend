@@ -2,7 +2,7 @@
 // review requires the full-size Book view, so no approve/reject control
 // (individual or bulk) may ever render in the grid toolbar or on a card.
 //
-// Version: 0.3.2
+// Version: 0.3.0
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 // .image-grid's grid-template-columns (the --grid-cols mapping) lives in the

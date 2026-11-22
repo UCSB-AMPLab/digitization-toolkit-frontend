@@ -10,7 +10,7 @@
 	// refusal, no target, and no move. The backend's English goes to the console
 	// only. `onChanged` reloads the page's list; `onClose` closes the dialog.
 	//
-	// Version: 0.3.5
+	// Version: 0.3.0
 	import { onMount, untrack } from 'svelte';
 	import { m } from '$lib/i18n';
 	import { authStore } from '$lib/stores/auth';

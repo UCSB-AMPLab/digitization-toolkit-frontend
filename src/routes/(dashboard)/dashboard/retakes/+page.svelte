@@ -31,7 +31,7 @@
 	// close button, since its rejection stands and it must be retaken.
 	// ============================================================================
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';

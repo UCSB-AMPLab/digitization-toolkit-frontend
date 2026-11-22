@@ -3,7 +3,7 @@
 // check or capture since the sign-in, or none in the last 15 minutes. While
 // the check is open the capture key does not capture.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

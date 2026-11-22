@@ -2,7 +2,7 @@
 // and the join dialog. Every code the backend sends is translated here; the
 // backend's English is never shown.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { Messages } from '$lib/i18n';
 import type { WifiNetwork, WifiSecurity } from '$lib/api';

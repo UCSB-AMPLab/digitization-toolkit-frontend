@@ -17,7 +17,7 @@
 	// Fisqua's review (NEH-318, $lib/tour.ts). The volume view renders the
 	// line once, in its top bar.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 	import { m, locale } from '$lib/i18n';
 	import type { VolumeFisquaState } from '$lib/api';
 	import { volumeFisquaView, type FisquaTone } from '$lib/fisqua-state';

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Version: 0.2.1
+	// Version: 0.3.0
 
 	import type { Record } from '$lib/api';
 	import { m } from '$lib/i18n';

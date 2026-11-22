@@ -2,7 +2,7 @@
 // dialog can refuse it while closing would lose something, and only a click
 // on the backdrop itself counts.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 import {

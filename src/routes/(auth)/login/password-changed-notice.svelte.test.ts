@@ -3,6 +3,8 @@
 // page (NEH-395). The login page shows the confirmation above the form, in a
 // status region, from the one-shot loginNotice store, and clears the notice
 // when the page is left, so it is shown for that one visit only.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

@@ -6,7 +6,7 @@
 	// /collections/{id}/status-changes, and only for an excluded record. If the
 	// history cannot be read, the notice shows without the reason.
 	//
-	// Version: 0.2.1
+	// Version: 0.3.0
 
 	import { collectionsApi, type Record } from '$lib/api';
 	import { m } from '$lib/i18n';

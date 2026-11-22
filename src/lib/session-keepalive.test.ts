@@ -5,7 +5,7 @@
 // while signed out, nor between a sign-out and the next sign-in, and a
 // sign-out can wait for the renewal in flight.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { describe, expect, it, vi } from 'vitest';
 import {
 	SESSION_ACTIVITY_EVENTS,

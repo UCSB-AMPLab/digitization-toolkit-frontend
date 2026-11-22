@@ -38,7 +38,7 @@
 	// retake or capture starts. The keyboard stays in the window (trapFocus, as
 	// in the screen's other dialogs), so nothing under it is reached by Tab.
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import type { Snippet } from 'svelte';
 	import { recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';

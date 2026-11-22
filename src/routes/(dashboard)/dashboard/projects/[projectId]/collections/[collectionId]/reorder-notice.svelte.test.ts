@@ -2,7 +2,7 @@
 // list and the grid for the loading state. The notice that says why the
 // drag was not saved must still be on screen once the records are back.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

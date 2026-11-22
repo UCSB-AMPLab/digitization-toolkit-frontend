@@ -4,7 +4,7 @@
 // volume that opens its first pending record, and no capture links for a
 // reviewer, who cannot capture.
 //
-// Version: 0.3.2
+// Version: 0.3.0
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

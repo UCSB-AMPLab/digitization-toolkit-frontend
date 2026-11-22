@@ -6,7 +6,7 @@
 	// reports that setup is not needed or cannot be reached, and after the
 	// account is created.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';

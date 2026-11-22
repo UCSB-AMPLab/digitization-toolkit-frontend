@@ -6,7 +6,7 @@
 // picture's alt. The letter is printed from the stored role, so the
 // position class follows the role, not the letter.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 

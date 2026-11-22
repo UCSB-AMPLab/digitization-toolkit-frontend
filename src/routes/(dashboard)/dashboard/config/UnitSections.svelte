@@ -14,7 +14,7 @@
 	// activate, revert to internal storage) only with `canManageDrives`, the
 	// administrator.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { untrack } from 'svelte';
 	import { m, locale } from '$lib/i18n';

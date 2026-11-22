@@ -9,6 +9,8 @@
 //   still-working timer writes nothing once the screen has gone.
 // Every request is answered by a fetch mock keyed on the path; the page's
 // URL is a store the tests can change.
+//
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';

@@ -2,7 +2,7 @@
 // project status, so a row's text depends on the project alone and never on
 // its position in the list.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

@@ -2,7 +2,7 @@
 // role. Operators and reviewers have no Settings page and the top-bar avatar
 // menu is not on the dashboard, so this is their way to shut the unit down.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

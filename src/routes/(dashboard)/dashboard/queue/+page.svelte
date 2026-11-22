@@ -44,7 +44,7 @@
 	// has its own message, and the mode is read again.
 	// ============================================================================
 	//
-	// Version: 0.3.3
+	// Version: 0.3.0
 
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';

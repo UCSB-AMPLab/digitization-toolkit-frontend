@@ -2,7 +2,7 @@
 // credential is an httpOnly cookie the backend sets at login (NEH-61); this
 // store never sees it. There is a session when there is a user.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';

@@ -11,7 +11,7 @@
 	// under the breadcrumb, the date Captua removes the volume; it has no
 	// offsite copy line, which the backend refuses it, so nothing polls for it.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';

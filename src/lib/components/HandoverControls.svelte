@@ -22,7 +22,7 @@
 	// captured records that miss a side are counted.
 	// ============================================================================
 	//
-	// Version: 0.3.2
+	// Version: 0.3.0
 
 	import { tick } from 'svelte';
 	import { collectionsApi, type Record } from '$lib/api';

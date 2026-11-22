@@ -5,7 +5,7 @@
 // (canCreateVolumes): an administrator still can, and gets the Volúmenes
 // tour. The tour has to teach the screens the operator actually has.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/environment', () => ({ browser: false }));

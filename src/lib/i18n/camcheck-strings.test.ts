@@ -6,7 +6,7 @@
 // language exclaims, names a collection or uses guillemets; the Spanish says
 // "Presiona", "equipo" and "capturas de prueba", the terms already in use.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';

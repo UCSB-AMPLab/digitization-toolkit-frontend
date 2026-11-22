@@ -2,7 +2,7 @@
 // progress, its end and each failure, in both languages, and the polling
 // that stops when the dialog closes or is destroyed.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';

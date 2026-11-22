@@ -32,7 +32,7 @@
 // one with projects, as every other gate takes an unknown state, and it
 // changes to the unit's own as soon as the state arrives.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { derived, get, writable } from 'svelte/store';
 import { browser } from '$app/environment';

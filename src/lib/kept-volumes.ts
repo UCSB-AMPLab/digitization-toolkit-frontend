@@ -6,7 +6,7 @@
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`), as volume-errors.ts does.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 import type { VolumeOffsiteState } from '$lib/api';

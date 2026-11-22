@@ -4,7 +4,7 @@
 // administrator's and the operator's list stay as they were. The absence of a
 // Status column is checked in projects-no-status.svelte.test.ts.
 //
-// Version: 0.1.4
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

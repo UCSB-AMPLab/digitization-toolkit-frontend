@@ -16,7 +16,7 @@
 // captures (507 `storage_reserve`). The "used / total" figures stay the
 // real ones. An older backend that sends no reserve is read as reserve 0.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { StorageInfo } from './api';
 

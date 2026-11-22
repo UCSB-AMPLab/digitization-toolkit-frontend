@@ -3,7 +3,7 @@
 // found only under the old name is copied across and the old entry stays.
 // Writes go to the new name only.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 const PREFIX = 'captua_';
 const LEGACY_PREFIX = 'dtk_';

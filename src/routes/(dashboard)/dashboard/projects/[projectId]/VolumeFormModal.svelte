@@ -34,7 +34,7 @@
 	// Fisqua. Its form has no stem, reference code or "keep on this unit"
 	// field, and sends no filename_stem, external_id or kept_on_unit.
 	//
-	// Version: 0.3.4
+	// Version: 0.3.0
 
 	import { untrack } from 'svelte';
 	import { m } from '$lib/i18n';

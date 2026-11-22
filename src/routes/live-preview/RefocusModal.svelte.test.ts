@@ -5,7 +5,7 @@
 // The focus mode each camera reports is read every 3 s on the first and last
 // stages, never while a test capture runs.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';

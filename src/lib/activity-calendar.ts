@@ -8,7 +8,7 @@
 // so no local offset or daylight-saving change can move a key by a day,
 // whatever zone the code runs in.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { DailyActivity } from './api';
 

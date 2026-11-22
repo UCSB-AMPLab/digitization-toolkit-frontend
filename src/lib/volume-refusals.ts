@@ -23,7 +23,7 @@
 // caller's generic message instead of being shown as the wrong one. No import
 // of api.ts, so the tests run in plain node.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 

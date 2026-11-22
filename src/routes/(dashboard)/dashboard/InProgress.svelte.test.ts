@@ -2,7 +2,7 @@
 // from mocked GET /activity/collections data, the actions on each card, and
 // what the block shows when the endpoint fails.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';

@@ -3,7 +3,7 @@
 // keystroke, answers to older queries ignored, each answer's state, and the
 // level labels.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	SEARCH_DELAY_MS,

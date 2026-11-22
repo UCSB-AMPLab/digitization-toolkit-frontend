@@ -17,7 +17,7 @@
 	// Fisqua decision moves it, so Reject and Approve stay disabled and the
 	// review section says what the exclusion means.
 	//
-	// Version: 0.2.2
+	// Version: 0.3.0
 
 	import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
 	import { recordsApi, ApiError } from '$lib/api';

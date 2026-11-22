@@ -3,7 +3,7 @@
 // or more than one with a count from 2 to 50), what should be there and a
 // note for the operator, and sends POST /collections/{id}/records/missing-opening.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';

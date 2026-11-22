@@ -29,7 +29,7 @@
 // No Svelte imports and no direct `window` references, so the node test
 // project can test the module.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 // Ten minutes: far inside the eight hours, so a session in use never comes
 // near its end, and short enough that an idle session ends at most ten

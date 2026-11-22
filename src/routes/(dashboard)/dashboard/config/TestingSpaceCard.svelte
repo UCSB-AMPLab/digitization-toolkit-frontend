@@ -49,7 +49,7 @@
 	// being captured into, that those were left. Focus goes to Cancel when the
 	// confirmation opens and back to the clear button when it closes.
 	//
-	// Version: 0.3.1
+	// Version: 0.3.0
 
 	import { onMount, tick } from 'svelte';
 	import { m, locale } from '$lib/i18n';

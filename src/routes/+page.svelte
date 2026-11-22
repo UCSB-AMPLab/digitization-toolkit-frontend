@@ -3,7 +3,7 @@
 	// `/dashboard`, whose layout validates the session cookie against
 	// `/users/me`; no stored user goes to `/welcome`.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';

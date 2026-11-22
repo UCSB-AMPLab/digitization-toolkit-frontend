@@ -8,7 +8,7 @@
 // Fisqua without 1.10 answers `search: false`: the form stops searching and
 // shows nothing. Saving the volume still runs the exact 1.8 check.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 import type { DescriptionMatch, DescriptionSearchAnswer } from './api';

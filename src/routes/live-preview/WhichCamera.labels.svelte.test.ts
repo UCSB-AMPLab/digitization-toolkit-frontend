@@ -8,7 +8,7 @@
 // they show from the start, the even/verso page's image first. At the
 // unit's 800x480 screen and at 1920x1080, with app.css, in both languages.
 //
-// Version: 0.3.3
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';

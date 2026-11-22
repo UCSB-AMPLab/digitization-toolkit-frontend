@@ -2,7 +2,7 @@
 // gets the text it got before; the removal line's three states; and the role
 // decisions of the testing slice, each in unit-mode.ts.
 //
-// Version: 0.1.0
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { volumeDeleteErrorText, volumeSaveErrorText } from './volume-errors';
 import { captureErrorText } from './capture-errors';

@@ -3,7 +3,7 @@
 // of approved records plus excluded ones goes to the backend, and one with a
 // record still in review shows that record as the blocker and asks nothing.
 //
-// Version: 0.2.1
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
