@@ -61,7 +61,8 @@ async function openChooser() {
 	return dialog;
 }
 
-const chooserGone = () => document.body.textContent?.includes(es.col_download_choose_title) ?? false;
+const chooserGone = () =>
+	document.body.textContent?.includes(es.col_download_choose_title) ?? false;
 
 describe('export chooser at 800×480', () => {
 	it('fits the screen and scrolls inside, with its title and Close button reachable', async () => {

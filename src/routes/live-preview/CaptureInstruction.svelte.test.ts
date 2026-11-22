@@ -21,32 +21,46 @@ describe('CaptureInstruction', () => {
 	});
 
 	it('shows the notes with the action as their label', async () => {
-		const screen = render(CaptureInstruction, { instruction: { notes: '117r, 116v; 193r, 192v', action: 'spot-recapture' } });
+		const screen = render(CaptureInstruction, {
+			instruction: { notes: '117r, 116v; 193r, 192v', action: 'spot-recapture' }
+		});
 		const band = screen.getByRole('note', { name: 'Recaptura puntual' });
 		await expect.element(band).toBeVisible();
 		await expect.element(band.getByText('117r, 116v; 193r, 192v')).toBeVisible();
 		// Short notes need no toggle.
-		await expect.element(screen.getByRole('button', { name: 'Mostrar todo' })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Mostrar todo' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('uses a general label when the item has no action, and shows an unknown action as given', async () => {
-		const plain = render(CaptureInstruction, { instruction: { notes: 'Todo el tomo', action: null } });
-		await expect.element(plain.getByRole('note', { name: 'Instrucción de la lista' })).toBeVisible();
+		const plain = render(CaptureInstruction, {
+			instruction: { notes: 'Todo el tomo', action: null }
+		});
+		await expect
+			.element(plain.getByRole('note', { name: 'Instrucción de la lista' }))
+			.toBeVisible();
 		plain.unmount();
 
-		const odd = render(CaptureInstruction, { instruction: { notes: 'Todo el tomo', action: 'rescan-cover' } });
+		const odd = render(CaptureInstruction, {
+			instruction: { notes: 'Todo el tomo', action: 'rescan-cover' }
+		});
 		await expect.element(odd.getByRole('note', { name: 'rescan-cover' })).toBeVisible();
 	});
 
 	it('shows an action alone when the item has no notes', async () => {
-		const screen = render(CaptureInstruction, { instruction: { notes: null, action: 'full-rescan' } });
+		const screen = render(CaptureInstruction, {
+			instruction: { notes: null, action: 'full-rescan' }
+		});
 		const band = screen.getByRole('note', { name: 'Reescaneo completo' });
 		await expect.element(band).toBeVisible();
 		expect(band.element().querySelector('.ci-notes')).toBeNull();
 	});
 
 	it('collapsed, keeps long notes to two lines and under 15vh, with Mostrar todo to open them', async () => {
-		const screen = render(CaptureInstruction, { instruction: { notes: LONG, action: 'spot-recapture' } });
+		const screen = render(CaptureInstruction, {
+			instruction: { notes: LONG, action: 'spot-recapture' }
+		});
 		const band = screen.getByRole('note').element() as HTMLElement;
 		const toggle = screen.getByRole('button', { name: 'Mostrar todo' });
 		await expect.element(toggle).toBeVisible();

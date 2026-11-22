@@ -33,15 +33,19 @@ describe('zoomFailureDetail', () => {
 		expect(zoomFailureDetail(failure(502, 'The camera on usb:001,004 did not answer'))).toBe(
 			'The camera on usb:001,004 did not answer'
 		);
-		expect(zoomFailureDetail(failure(422, 'zoom_step must be between 0 and 63'))).toBe('zoom_step must be between 0 and 63');
+		expect(zoomFailureDetail(failure(422, 'zoom_step must be between 0 and 63'))).toBe(
+			'zoom_step must be between 0 and 63'
+		);
 	});
 
-	it('joins the messages of pydantic\'s list form', () => {
+	it("joins the messages of pydantic's list form", () => {
 		const list = [
 			{ type: 'int_type', loc: ['body', 'zoom_step'], msg: 'Input should be a valid integer' },
 			{ type: 'missing', loc: ['body'], msg: 'Field required' }
 		];
-		expect(zoomFailureDetail(failure(422, JSON.stringify(list), list))).toBe('Input should be a valid integer; Field required');
+		expect(zoomFailureDetail(failure(422, JSON.stringify(list), list))).toBe(
+			'Input should be a valid integer; Field required'
+		);
 	});
 
 	it('is undefined for a failure with no answer from the backend', () => {

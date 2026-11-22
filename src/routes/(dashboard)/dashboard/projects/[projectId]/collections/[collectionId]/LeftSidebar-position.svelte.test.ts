@@ -22,7 +22,12 @@ function props(currentIndex: number, totalRecords: number) {
 		onRotateRight: vi.fn(),
 		onRecordUpdated: vi.fn(),
 		onRecapture: vi.fn(),
-		currentRecord: { id: 1, title: 'Folio 1', status: 'captured', images: [] } as unknown as ApiRecord,
+		currentRecord: {
+			id: 1,
+			title: 'Folio 1',
+			status: 'captured',
+			images: []
+		} as unknown as ApiRecord,
 		userRole: 'reviewer'
 	};
 }

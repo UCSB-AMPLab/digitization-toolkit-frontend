@@ -7,8 +7,12 @@ import { en } from './en';
 
 describe('Fisqua mode: the read-only stem of an operator', () => {
 	it('names only the stem', () => {
-		expect(es.pd_fisqua_codes_readonly).toBe('El equipo está en modo Fisqua: la raíz viene de Fisqua y solo un administrador puede cambiarla.');
-		expect(en.pd_fisqua_codes_readonly).toBe('The unit is in Fisqua mode: the stem comes from Fisqua, and only an administrator can change it.');
+		expect(es.pd_fisqua_codes_readonly).toBe(
+			'El equipo está en modo Fisqua: la raíz viene de Fisqua y solo un administrador puede cambiarla.'
+		);
+		expect(en.pd_fisqua_codes_readonly).toBe(
+			'The unit is in Fisqua mode: the stem comes from Fisqua, and only an administrator can change it.'
+		);
 	});
 });
 
@@ -16,8 +20,12 @@ describe('Scanner only mode: the catalogue copy (NEH-319)', () => {
 	it('says where the catalogue is kept', () => {
 		expect(es.backup_ind_local).toBe('Catálogo solo en el escáner');
 		expect(en.backup_ind_local).toBe('Catalogue on the scanner only');
-		expect(es.backup_cfg_local).toBe('En el modo actual, Captua guarda el catálogo solo en este equipo.');
-		expect(en.backup_cfg_local).toBe('In the current mode, Captua keeps the catalogue only on this scanner.');
+		expect(es.backup_cfg_local).toBe(
+			'En el modo actual, Captua guarda el catálogo solo en este equipo.'
+		);
+		expect(en.backup_cfg_local).toBe(
+			'In the current mode, Captua keeps the catalogue only on this scanner.'
+		);
 	});
 
 	it('describes the copy and the catalogue in separate strings', () => {
@@ -36,7 +44,11 @@ describe('Scanner only mode: the catalogue copy (NEH-319)', () => {
 	});
 
 	it('names who retries the copy', () => {
-		expect(es.backup_cfg_retry).toBe('Mientras el equipo está encendido, Captua vuelve a intentar la copia cada cierto tiempo.');
-		expect(en.backup_cfg_retry).toBe('While the scanner is on, Captua retries the copy from time to time.');
+		expect(es.backup_cfg_retry).toBe(
+			'Mientras el equipo está encendido, Captua vuelve a intentar la copia cada cierto tiempo.'
+		);
+		expect(en.backup_cfg_retry).toBe(
+			'While the scanner is on, Captua retries the copy from time to time.'
+		);
 	});
 });

@@ -36,8 +36,12 @@ type Search = (q: string, signal: AbortSignal) => Promise<DescriptionSearchAnswe
 function isQueryTooShort(error: unknown): boolean {
 	if (typeof error !== 'object' || error === null) return false;
 	const e = error as { status?: unknown; detail?: unknown };
-	return e.status === 400 && typeof e.detail === 'object' && e.detail !== null
-		&& (e.detail as { code?: unknown }).code === 'query_too_short';
+	return (
+		e.status === 400 &&
+		typeof e.detail === 'object' &&
+		e.detail !== null &&
+		(e.detail as { code?: unknown }).code === 'query_too_short'
+	);
 }
 
 /** The debounced search: `input` on every change of the field, `cancel` when the field stops searching. */
@@ -138,5 +142,7 @@ export function nameFromTitle(title: string): string {
 
 /** A match's dates and level, joined with " · ", leaving out either when empty. */
 export function matchMeta(match: DescriptionMatch, m: Messages): string {
-	return [match.dates?.display ?? '', levelLabel(match.level, m)].filter((part) => part.trim() !== '').join(' · ');
+	return [match.dates?.display ?? '', levelLabel(match.level, m)]
+		.filter((part) => part.trim() !== '')
+		.join(' · ');
 }

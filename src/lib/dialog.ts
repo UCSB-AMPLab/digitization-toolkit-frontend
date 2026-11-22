@@ -123,7 +123,11 @@ export function trapFocus(node: HTMLElement) {
 	const items = () =>
 		[...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => {
 			if (!(el instanceof HTMLInputElement) || el.type !== 'radio' || !el.name) return true;
-			const group = [...node.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${CSS.escape(el.name)}"]`)];
+			const group = [
+				...node.querySelectorAll<HTMLInputElement>(
+					`input[type="radio"][name="${CSS.escape(el.name)}"]`
+				)
+			];
 			const checked = group.find((r) => r.checked);
 			return checked ? el === checked : el === group[0];
 		});

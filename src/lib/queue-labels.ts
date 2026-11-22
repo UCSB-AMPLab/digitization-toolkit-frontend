@@ -29,7 +29,8 @@ const REASON_KEYS: { [reason: string]: keyof Messages } = {
 	missing_filename_stem: 'queue_reason_missing_filename_stem',
 	filename_stem_not_a_slug: 'queue_reason_filename_stem_not_a_slug',
 	filename_stem_too_long: 'queue_reason_filename_stem_too_long',
-	filename_stem_differs_from_reference_code: 'queue_reason_filename_stem_differs_from_reference_code',
+	filename_stem_differs_from_reference_code:
+		'queue_reason_filename_stem_differs_from_reference_code',
 	filename_stem_duplicated_in_list: 'queue_reason_filename_stem_duplicated_in_list',
 	missing_title: 'queue_reason_missing_title',
 	invalid_title: 'queue_reason_invalid_title',
@@ -58,16 +59,26 @@ export function importReasonText(m: Messages, reason: string): string {
  * Fisqua mode, NEH-311) has its own.
  */
 export function importErrorText(m: Messages, status: number | undefined, detail?: unknown): string {
-	if (status === 403 && (detail as { code?: unknown } | null | undefined)?.code === 'volumes_from_fisqua') {
+	if (
+		status === 403 &&
+		(detail as { code?: unknown } | null | undefined)?.code === 'volumes_from_fisqua'
+	) {
 		return m.queue_import_err_volumes_from_fisqua;
 	}
 	switch (status) {
-		case 400: return m.queue_import_err_unreadable;
-		case 403: return m.queue_import_err_needs_admin;
-		case 409: return m.queue_import_err_list_reused;
-		case 413: return m.queue_import_err_too_large;
-		case 422: return m.queue_import_err_refused;
-		case 503: return m.queue_import_err_busy;
-		default: return m.queue_import_err_other;
+		case 400:
+			return m.queue_import_err_unreadable;
+		case 403:
+			return m.queue_import_err_needs_admin;
+		case 409:
+			return m.queue_import_err_list_reused;
+		case 413:
+			return m.queue_import_err_too_large;
+		case 422:
+			return m.queue_import_err_refused;
+		case 503:
+			return m.queue_import_err_busy;
+		default:
+			return m.queue_import_err_other;
 	}
 }

@@ -19,7 +19,9 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('camerasApi.testCapture', () => {
 	it('without options: no query, and no focal length when the header is absent', async () => {
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(image({ 'X-Capture-Seconds': '4.200' }));
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(image({ 'X-Capture-Seconds': '4.200' }));
 		const result = await camerasApi.testCapture(1);
 		const url = new URL(String(fetchSpy.mock.calls[0][0]), 'http://localhost');
 		expect(url.pathname.endsWith('/cameras/test-capture/1')).toBe(true);
@@ -29,7 +31,9 @@ describe('camerasApi.testCapture', () => {
 	});
 
 	it('with focusCheck: ?focus_check=true, and the focal length in millimetres', async () => {
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(image({ 'X-Focal-Length': '27.5' }));
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(image({ 'X-Focal-Length': '27.5' }));
 		const result = await camerasApi.testCapture(0, { focusCheck: true });
 		const url = new URL(String(fetchSpy.mock.calls[0][0]), 'http://localhost');
 		expect(url.pathname.endsWith('/cameras/test-capture/0')).toBe(true);

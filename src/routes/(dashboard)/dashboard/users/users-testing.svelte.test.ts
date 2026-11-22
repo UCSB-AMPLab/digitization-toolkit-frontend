@@ -16,15 +16,33 @@ import '../../../../app.css';
 import UsersPage from './+page.svelte';
 
 const users = [
-	{ id: 1, username: 'ana', email: null, role: 'operator', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-	{ id: 2, username: 'unit-testing', email: null, role: 'testing', is_active: true, created_at: '2026-01-01T00:00:00Z' }
+	{
+		id: 1,
+		username: 'ana',
+		email: null,
+		role: 'operator',
+		is_active: true,
+		created_at: '2026-01-01T00:00:00Z'
+	},
+	{
+		id: 2,
+		username: 'unit-testing',
+		email: null,
+		role: 'testing',
+		is_active: true,
+		created_at: '2026-01-01T00:00:00Z'
+	}
 ];
 
 beforeEach(() => {
 	locale.set('en');
 	authStore.setSession({ id: 3, username: 'admin', email: null, role: 'admin', is_active: true });
 	vi.spyOn(globalThis, 'fetch').mockImplementation(
-		async () => new Response(JSON.stringify(users), { status: 200, headers: { 'Content-Type': 'application/json' } })
+		async () =>
+			new Response(JSON.stringify(users), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			})
 	);
 });
 afterEach(() => {
@@ -33,7 +51,9 @@ afterEach(() => {
 });
 
 function rowOf(container: HTMLElement, name: string) {
-	return [...container.querySelectorAll('tr.table-row')].find((r) => r.textContent?.includes(name)) as HTMLElement;
+	return [...container.querySelectorAll('tr.table-row')].find((r) =>
+		r.textContent?.includes(name)
+	) as HTMLElement;
 }
 
 describe('Users page and the testing role', () => {
@@ -53,7 +73,9 @@ describe('Users page and the testing role', () => {
 		await expect.element(screen.getByRole('dialog')).toBeVisible();
 		const dialog = screen.container.querySelector('[role="dialog"]')!;
 		expect(dialog.textContent).not.toContain('Testing');
-		const optionValues = [...screen.container.querySelectorAll('option')].map((o) => o.getAttribute('value'));
+		const optionValues = [...screen.container.querySelectorAll('option')].map((o) =>
+			o.getAttribute('value')
+		);
 		expect(optionValues).not.toContain('testing');
 	});
 });

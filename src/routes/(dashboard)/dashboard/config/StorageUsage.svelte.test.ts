@@ -37,7 +37,10 @@ function storage(usedGB: number, totalGB: number, available = true) {
 }
 
 function json(status: number, body: unknown) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 /** `/system/storage` answers with `storageAnswer`; everything else with a 500. */
@@ -50,9 +53,7 @@ function serve(storageAnswer: Response) {
 }
 
 async function usageRow(container: HTMLElement) {
-	await expect
-		.poll(() => container.querySelector('[data-storage-used]'))
-		.not.toBeNull();
+	await expect.poll(() => container.querySelector('[data-storage-used]')).not.toBeNull();
 	return container.querySelector('[data-storage-used]') as HTMLElement;
 }
 

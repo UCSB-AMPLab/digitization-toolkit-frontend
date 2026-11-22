@@ -41,7 +41,13 @@ export interface NetworkState {
 	lastReadAt: number | null;
 }
 
-const INITIAL: NetworkState = { status: null, error: null, loading: false, failures: 0, lastReadAt: null };
+const INITIAL: NetworkState = {
+	status: null,
+	error: null,
+	loading: false,
+	failures: 0,
+	lastReadAt: null
+};
 
 export const networkState = writable<NetworkState>({ ...INITIAL });
 
@@ -82,11 +88,21 @@ export function readNetworkStatus(data: unknown): NetworkStatus | null {
 	if (typeof data !== 'object' || data === null) return null;
 	const d = data as Record<string, unknown>;
 	if (!Array.isArray(d.interfaces) || !Array.isArray(d.problems)) return null;
-	const p = (typeof d.permissions === 'object' && d.permissions !== null ? d.permissions : {}) as Record<string, unknown>;
-	const interfaces = d.interfaces.map(readInterface).filter((i): i is NetworkInterface => i !== null);
+	const p = (
+		typeof d.permissions === 'object' && d.permissions !== null ? d.permissions : {}
+	) as Record<string, unknown>;
+	const interfaces = d.interfaces
+		.map(readInterface)
+		.filter((i): i is NetworkInterface => i !== null);
 	const problems = d.problems
-		.filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null && typeof x.code === 'string')
-		.map((x) => ({ code: x.code as string, device: typeof x.device === 'string' ? x.device : null }));
+		.filter(
+			(x): x is Record<string, unknown> =>
+				typeof x === 'object' && x !== null && typeof x.code === 'string'
+		)
+		.map((x) => ({
+			code: x.code as string,
+			device: typeof x.device === 'string' ? x.device : null
+		}));
 	return {
 		hostname: typeof d.hostname === 'string' ? d.hostname : '',
 		wifiDevice: typeof d.wifiDevice === 'string' ? d.wifiDevice : null,
@@ -114,8 +130,21 @@ export function refreshNetworkStatus(): Promise<void> {
 		try {
 			const status = readNetworkStatus(await networkApi.status(controller.signal));
 			if (startedIn !== generation) return;
-			if (status) networkState.set({ status, error: null, loading: false, failures: 0, lastReadAt: Date.now() });
-			else networkState.update((s) => ({ ...s, error: 'failed', loading: false, failures: s.failures + 1 }));
+			if (status)
+				networkState.set({
+					status,
+					error: null,
+					loading: false,
+					failures: 0,
+					lastReadAt: Date.now()
+				});
+			else
+				networkState.update((s) => ({
+					...s,
+					error: 'failed',
+					loading: false,
+					failures: s.failures + 1
+				}));
 		} catch (error) {
 			if (startedIn !== generation) return;
 			// An aborted read has no status, so it is 'failed'.
@@ -197,7 +226,8 @@ export function resetNetworkStatus(): void {
 	generation += 1;
 	readers = 0;
 	stopTimer();
-	if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityChange);
+	if (typeof document !== 'undefined')
+		document.removeEventListener('visibilitychange', onVisibilityChange);
 	inFlight = null;
 	lastRead = 0;
 	networkState.set({ ...INITIAL });
@@ -242,9 +272,12 @@ export function networkIndicator(status: NetworkStatus): NetworkIndicatorView {
 		if (connecting) return viewOf(connecting, 'connecting');
 		return { state: 'offline', via: null, name: null, signal: null };
 	}
-	const troubled = new Set(status.problems.map((p) => p.device).filter((d): d is string => d !== null));
-	const withProblem = connected.find((i) => i.type === 'wifi' && troubled.has(i.device))
-		?? connected.find((i) => troubled.has(i.device));
+	const troubled = new Set(
+		status.problems.map((p) => p.device).filter((d): d is string => d !== null)
+	);
+	const withProblem =
+		connected.find((i) => i.type === 'wifi' && troubled.has(i.device)) ??
+		connected.find((i) => troubled.has(i.device));
 	if (withProblem) return viewOf(withProblem, 'problem');
 	return viewOf(connected.find((i) => i.type === 'wifi') ?? connected[0], 'connected');
 }

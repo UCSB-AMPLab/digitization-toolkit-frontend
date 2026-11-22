@@ -99,7 +99,11 @@ describe('newestOnly', () => {
 	it('a single load reports its own outcome, failure included', async () => {
 		const apply = vi.fn((v: number) => v > 0);
 		let next: () => Promise<number> = () => Promise.resolve(3);
-		const load = newestOnly(() => next(), apply, () => {});
+		const load = newestOnly(
+			() => next(),
+			apply,
+			() => {}
+		);
 		await expect(load()).resolves.toEqual({ ok: true, own: true });
 		next = () => Promise.resolve(0);
 		await expect(load()).resolves.toEqual({ ok: false, own: false });

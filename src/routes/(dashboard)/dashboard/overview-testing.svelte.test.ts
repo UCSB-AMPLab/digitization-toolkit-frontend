@@ -16,7 +16,12 @@ import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { resetUnit } from '$lib/unit-mode';
-import { recordRequests, TESTING_UNIT, TESTING_USER, type Recorder } from '$lib/test-support/testing-routes';
+import {
+	recordRequests,
+	TESTING_UNIT,
+	TESTING_USER,
+	type Recorder
+} from '$lib/test-support/testing-routes';
 import Overview from './+page.svelte';
 
 let rec: Recorder;
@@ -24,7 +29,10 @@ let rec: Recorder;
 function serve() {
 	rec = recordRequests({
 		'GET /system/unit': TESTING_UNIT,
-		'GET /projects/': [{ id: 1, name: 'A', created_at: '2026-11-01T00:00:00' }, { id: 2, name: 'B', created_at: '2026-11-01T00:00:00' }],
+		'GET /projects/': [
+			{ id: 1, name: 'A', created_at: '2026-11-01T00:00:00' },
+			{ id: 2, name: 'B', created_at: '2026-11-01T00:00:00' }
+		],
 		'GET /collections/count': { count: 3 },
 		'GET /collections/': [],
 		'GET /records/count': { count: 5 },
@@ -47,10 +55,14 @@ describe('Overview, testing account', () => {
 		authStore.setSession(TESTING_USER);
 		serve();
 		const screen = render(Overview);
-		await expect.element(page.getByRole('heading', { name: en.testing_overview_title })).toBeVisible();
+		await expect
+			.element(page.getByRole('heading', { name: en.testing_overview_title }))
+			.toBeVisible();
 		await expect.element(page.getByText(en.testing_overview_body)).toBeVisible();
 		await expect.element(page.getByText(en.testing_counts(2, 3))).toBeVisible();
-		await expect.element(page.getByRole('link', { name: en.testing_overview_go })).toHaveAttribute('href', '/dashboard/projects');
+		await expect
+			.element(page.getByRole('link', { name: en.testing_overview_go }))
+			.toHaveAttribute('href', '/dashboard/projects');
 		await new Promise((r) => setTimeout(r, 150));
 		expect(rec.refusedList()).toEqual([]);
 		expect(screen.container.querySelector('.kpi-grid')).toBeNull();

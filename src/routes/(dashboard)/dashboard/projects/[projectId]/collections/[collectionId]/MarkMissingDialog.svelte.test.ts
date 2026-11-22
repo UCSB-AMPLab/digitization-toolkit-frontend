@@ -16,7 +16,14 @@ import { locale } from '$lib/i18n';
 import { es } from '$lib/i18n/es';
 import MarkMissingDialog from './MarkMissingDialog.svelte';
 
-const after = { id: 41, title: 'Registro 95', status: 'in_review', capture_mode: 'dual', sequence: 95, images: [] } as ApiRecord;
+const after = {
+	id: 41,
+	title: 'Registro 95',
+	status: 'in_review',
+	capture_mode: 'dual',
+	sequence: 95,
+	images: []
+} as ApiRecord;
 
 describe('MarkMissingDialog', () => {
 	let onCancel: ReturnType<typeof vi.fn<() => void>>;
@@ -29,7 +36,8 @@ describe('MarkMissingDialog', () => {
 	});
 	afterEach(() => vi.restoreAllMocks());
 
-	const mount = () => render(MarkMissingDialog, { collectionId: 17, afterRecord: after, n: 95, onCancel, onMarked });
+	const mount = () =>
+		render(MarkMissingDialog, { collectionId: 17, afterRecord: after, n: 95, onCancel, onMarked });
 
 	it('names the record, and asks how many, what should be there and a note', async () => {
 		const screen = mount();
@@ -38,8 +46,12 @@ describe('MarkMissingDialog', () => {
 		const group = dialog.getByRole('group', { name: es.mark_count_legend });
 		await expect.element(group).toBeVisible();
 		await expect.element(group.getByRole('radio', { name: es.mark_count_unknown })).toBeChecked();
-		await expect.element(group.getByRole('radio', { name: es.mark_count_one, exact: true })).toBeInTheDocument();
-		await expect.element(group.getByRole('radio', { name: es.mark_count_more })).toBeInTheDocument();
+		await expect
+			.element(group.getByRole('radio', { name: es.mark_count_one, exact: true }))
+			.toBeInTheDocument();
+		await expect
+			.element(group.getByRole('radio', { name: es.mark_count_more }))
+			.toBeInTheDocument();
 		await expect.element(dialog.getByRole('textbox', { name: es.mark_expected })).toBeVisible();
 		await expect.element(dialog.getByRole('textbox', { name: es.mark_note })).toBeVisible();
 		await expect.element(dialog.getByRole('button', { name: es.mark_cancel })).toBeVisible();
@@ -51,7 +63,12 @@ describe('MarkMissingDialog', () => {
 		const screen = mount();
 		await screen.getByRole('button', { name: es.mark_submit }).click();
 		await vi.waitFor(() => expect(onMarked).toHaveBeenCalled());
-		expect(spy).toHaveBeenCalledWith(17, { afterRecordId: 41, count: null, expected: null, note: null });
+		expect(spy).toHaveBeenCalledWith(17, {
+			afterRecordId: 41,
+			count: null,
+			expected: null,
+			note: null
+		});
 	});
 
 	it('sends one, with what should be there and the note', async () => {
@@ -59,11 +76,16 @@ describe('MarkMissingDialog', () => {
 		const screen = mount();
 		await screen.getByRole('radio', { name: es.mark_count_one, exact: true }).click();
 		await screen.getByRole('textbox', { name: es.mark_expected }).fill('Folios 90v y 91r');
-		await screen.getByRole('textbox', { name: es.mark_note }).fill('Ningún cuadro muestra el folio 91.');
+		await screen
+			.getByRole('textbox', { name: es.mark_note })
+			.fill('Ningún cuadro muestra el folio 91.');
 		await screen.getByRole('button', { name: es.mark_submit }).click();
 		await vi.waitFor(() => expect(onMarked).toHaveBeenCalled());
 		expect(spy).toHaveBeenCalledWith(17, {
-			afterRecordId: 41, count: 1, expected: 'Folios 90v y 91r', note: 'Ningún cuadro muestra el folio 91.'
+			afterRecordId: 41,
+			count: 1,
+			expected: 'Folios 90v y 91r',
+			note: 'Ningún cuadro muestra el folio 91.'
 		});
 	});
 
@@ -77,7 +99,14 @@ describe('MarkMissingDialog', () => {
 		await expect.element(number).toHaveValue(2);
 		await number.fill('3');
 		await screen.getByRole('button', { name: es.mark_submit }).click();
-		await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(17, { afterRecordId: 41, count: 3, expected: null, note: null }));
+		await vi.waitFor(() =>
+			expect(spy).toHaveBeenCalledWith(17, {
+				afterRecordId: 41,
+				count: 3,
+				expected: null,
+				note: null
+			})
+		);
 	});
 
 	it('keeps the count within 2 and 50', async () => {
@@ -86,7 +115,14 @@ describe('MarkMissingDialog', () => {
 		await screen.getByRole('radio', { name: es.mark_count_more }).click();
 		await screen.getByRole('spinbutton', { name: es.mark_count_number_aria }).fill('80');
 		await screen.getByRole('button', { name: es.mark_submit }).click();
-		await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(17, { afterRecordId: 41, count: 50, expected: null, note: null }));
+		await vi.waitFor(() =>
+			expect(spy).toHaveBeenCalledWith(17, {
+				afterRecordId: 41,
+				count: 50,
+				expected: null,
+				note: null
+			})
+		);
 	});
 
 	it('shows an error in the dialog when the backend refuses', async () => {

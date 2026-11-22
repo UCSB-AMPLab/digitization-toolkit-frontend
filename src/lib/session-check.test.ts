@@ -143,11 +143,19 @@ function countingSignal() {
 	const live = new Set<EventListenerOrEventListenerObject>();
 	const add = signal.addEventListener.bind(signal);
 	const remove = signal.removeEventListener.bind(signal);
-	signal.addEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: AddEventListenerOptions | boolean) => {
+	signal.addEventListener = ((
+		type: string,
+		listener: EventListenerOrEventListenerObject,
+		options?: AddEventListenerOptions | boolean
+	) => {
 		if (type === 'abort') live.add(listener);
 		add(type, listener, options);
 	}) as AbortSignal['addEventListener'];
-	signal.removeEventListener = ((type: string, listener: EventListenerOrEventListenerObject, options?: EventListenerOptions | boolean) => {
+	signal.removeEventListener = ((
+		type: string,
+		listener: EventListenerOrEventListenerObject,
+		options?: EventListenerOptions | boolean
+	) => {
 		if (type === 'abort') live.delete(listener);
 		remove(type, listener, options);
 	}) as AbortSignal['removeEventListener'];
@@ -201,4 +209,3 @@ describe('abortableSleep', () => {
 		await expect(abortableSleep(10000, controller.signal)).resolves.toBeUndefined();
 	});
 });
-

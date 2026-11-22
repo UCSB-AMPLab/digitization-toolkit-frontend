@@ -37,7 +37,9 @@ afterEach(() => {
 });
 
 function rowText(container: Element, name: string): string {
-	const row = [...container.querySelectorAll('tbody tr')].find((r) => r.textContent?.includes(name));
+	const row = [...container.querySelectorAll('tbody tr')].find((r) =>
+		r.textContent?.includes(name)
+	);
 	return row?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 }
 

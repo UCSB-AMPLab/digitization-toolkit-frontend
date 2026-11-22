@@ -17,7 +17,10 @@ interface StatusChangeLike {
  * into "excluded", or null when that change has none. `changes` is the
  * volume's history, newest first, as the backend lists it.
  */
-export function exclusionNote(changes: readonly StatusChangeLike[], recordId: number): string | null {
+export function exclusionNote(
+	changes: readonly StatusChangeLike[],
+	recordId: number
+): string | null {
 	const latest = changes.find((c) => c.record_id === recordId && c.to_status === 'excluded');
 	const note = latest?.note?.trim();
 	return note ? note : null;

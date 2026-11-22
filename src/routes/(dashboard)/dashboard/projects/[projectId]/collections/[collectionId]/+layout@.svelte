@@ -1,280 +1,322 @@
 <script lang="ts">
-  // Full-screen shell for a volume's gallery. The `@` in the filename makes
-  // this layout inherit from the root layout instead of the (dashboard) one,
-  // so the dashboard navigation sidebar is not rendered. It holds the session
-  // guard and the top bar (breadcrumb, offsite copy line, camera button); the
-  // page fills the rest of the screen. While the unit hides projects
-  // (NEH-313), the breadcrumb starts with "Volúmenes", a link to the list,
-  // instead of the project's name, and the back button returns there.
-  //
-  // For the testing account (NEH-391) the bar has the Capture button and,
-  // under the breadcrumb, the date Captua removes the volume; it has no
-  // offsite copy line, which the backend refuses it, so nothing polls for it.
-  //
-  // Version: 0.3.4
+	// Full-screen shell for a volume's gallery. The `@` in the filename makes
+	// this layout inherit from the root layout instead of the (dashboard) one,
+	// so the dashboard navigation sidebar is not rendered. It holds the session
+	// guard and the top bar (breadcrumb, offsite copy line, camera button); the
+	// page fills the rest of the screen. While the unit hides projects
+	// (NEH-313), the breadcrumb starts with "Volúmenes", a link to the list,
+	// instead of the project's name, and the back button returns there.
+	//
+	// For the testing account (NEH-391) the bar has the Capture button and,
+	// under the breadcrumb, the date Captua removes the volume; it has no
+	// offsite copy line, which the backend refuses it, so nothing polls for it.
+	//
+	// Version: 0.3.4
 
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
-  import { authStore } from '$lib/stores/auth';
-  import { m } from '$lib/i18n';
-  import UserMenu from '$lib/components/UserMenu.svelte';
-  import VolumeOffsiteIndicator from '$lib/components/VolumeOffsiteIndicator.svelte';
-  import VolumeOffsiteActions from '$lib/components/VolumeOffsiteActions.svelte';
-  import VolumeKeptActions from '$lib/components/VolumeKeptActions.svelte';
-  import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
-  import type { VolumeOffsiteState } from '$lib/api';
-  import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
-  import { canCapture, canFreeVolumes, canManageOffsite, canRestoreVolumes, ensureUnit, inTestingSpace, projectsShownIn, takesPartInWorkflow, unitState, volumeBackPath } from '$lib/unit-mode';
-  import { testingExpiry } from '$lib/testing-space';
-  import { formatApiDate } from '$lib/format-date';
-  import { locale } from '$lib/i18n';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { authStore } from '$lib/stores/auth';
+	import { m } from '$lib/i18n';
+	import UserMenu from '$lib/components/UserMenu.svelte';
+	import VolumeOffsiteIndicator from '$lib/components/VolumeOffsiteIndicator.svelte';
+	import VolumeOffsiteActions from '$lib/components/VolumeOffsiteActions.svelte';
+	import VolumeKeptActions from '$lib/components/VolumeKeptActions.svelte';
+	import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
+	import type { VolumeOffsiteState } from '$lib/api';
+	import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
+	import {
+		canCapture,
+		canFreeVolumes,
+		canManageOffsite,
+		canRestoreVolumes,
+		ensureUnit,
+		inTestingSpace,
+		projectsShownIn,
+		takesPartInWorkflow,
+		unitState,
+		volumeBackPath
+	} from '$lib/unit-mode';
+	import { testingExpiry } from '$lib/testing-space';
+	import { formatApiDate } from '$lib/format-date';
+	import { locale } from '$lib/i18n';
 
-  let { children } = $props();
+	let { children } = $props();
 
-  // Controls the page puts in the bar: send for review and take back (NEH-260).
-  const topbarSlot = $state<VolumeTopbarSlot>({ actions: null, reloadRecords: null });
-  setVolumeTopbar(topbarSlot);
+	// Controls the page puts in the bar: send for review and take back (NEH-260).
+	const topbarSlot = $state<VolumeTopbarSlot>({ actions: null, reloadRecords: null });
+	setVolumeTopbar(topbarSlot);
 
-  let projectId    = $derived(Number($page.params.projectId) || 0);
-  let collectionId = $derived(Number($page.params.collectionId) || 0);
+	let projectId = $derived(Number($page.params.projectId) || 0);
+	let collectionId = $derived(Number($page.params.collectionId) || 0);
 
-  let currentUser = $state<any>(null);
+	let currentUser = $state<any>(null);
 
-  onMount(() => {
-    const unsub = authStore.subscribe((s) => {
-      currentUser = s.user;
-      // Shared session guard (NEH-66), also used by live-preview and the page.
-      authStore.requireSession();
-    });
-    ensureUnit();
-    return unsub;
-  });
+	onMount(() => {
+		const unsub = authStore.subscribe((s) => {
+			currentUser = s.user;
+			// Shared session guard (NEH-66), also used by live-preview and the page.
+			authStore.requireSession();
+		});
+		ensureUnit();
+		return unsub;
+	});
 
-  let canOpenCamera = $derived(canCapture(currentUser?.role));
-  // The offsite copy line: not for the testing account. Read from the store,
-  // so the line is never mounted for it before the subscription runs.
-  // Nothing is mounted for it while the signed-in role is not known.
-  let showsOffsite = $derived(!!$authStore.user && takesPartInWorkflow($authStore.user.role));
+	let canOpenCamera = $derived(canCapture(currentUser?.role));
+	// The offsite copy line: not for the testing account. Read from the store,
+	// so the line is never mounted for it before the subscription runs.
+	// Nothing is mounted for it while the signed-in role is not known.
+	let showsOffsite = $derived(!!$authStore.user && takesPartInWorkflow($authStore.user.role));
 
-  // Space on the card (NEH-248, NEH-380): free for the admin and the
-  // operator, restore for the admin only. The button sits next to the
-  // breadcrumb and the offsite copy line, which is what shows what is freed.
-  // The backend refuses these routes to other roles.
-  // Beside it, keep the volume on the unit or release it (NEH-320), admin
-  // only; a release only once the unit mode is known and is not Scanner only (keptActionOf).
-  let isAdmin = $derived(canManageOffsite(currentUser?.role));
-  let canFree = $derived(canFreeVolumes(currentUser?.role));
-  let canRestore = $derived(canRestoreVolumes(currentUser?.role));
-  // The last state the line read: a poll that fails keeps it, so an open
-  // dialog is not closed under the admin; it is matched to the volume shown.
-  let offsiteState = $state<VolumeOffsiteState | null>(null);
-  let offsiteRefresh = $state(0);
-  // What the line last read as freed. When it changes on the volume shown, a
-  // free or a restore has moved files, whether or not its dialog was still
-  // open, so the page reloads the records and their freed state.
-  let lastFreed: FreedCounts | null = null;
+	// Space on the card (NEH-248, NEH-380): free for the admin and the
+	// operator, restore for the admin only. The button sits next to the
+	// breadcrumb and the offsite copy line, which is what shows what is freed.
+	// The backend refuses these routes to other roles.
+	// Beside it, keep the volume on the unit or release it (NEH-320), admin
+	// only; a release only once the unit mode is known and is not Scanner only (keptActionOf).
+	let isAdmin = $derived(canManageOffsite(currentUser?.role));
+	let canFree = $derived(canFreeVolumes(currentUser?.role));
+	let canRestore = $derived(canRestoreVolumes(currentUser?.role));
+	// The last state the line read: a poll that fails keeps it, so an open
+	// dialog is not closed under the admin; it is matched to the volume shown.
+	let offsiteState = $state<VolumeOffsiteState | null>(null);
+	let offsiteRefresh = $state(0);
+	// What the line last read as freed. When it changes on the volume shown, a
+	// free or a restore has moved files, whether or not its dialog was still
+	// open, so the page reloads the records and their freed state.
+	let lastFreed: FreedCounts | null = null;
 
-  function offsiteRead(s: VolumeOffsiteState | null) {
-    if (!s) return;
-    offsiteState = s;
-    // The page's image screens read whether a restore is possible from here.
-    topbarSlot.offsite = { collectionId: s.collection_id, restorable: s.restorable };
-    const next = freedCountsOf(s);
-    // Advanced only once the records reloaded; a failed reload is tried
-    // again on the next poll (freedAfterRead).
-    const forId = collectionId;
-    freedAfterRead(lastFreed, next, forId, topbarSlot.reloadRecords).then((last) => {
-      if (collectionId === forId) lastFreed = last;
-    });
-  }
+	function offsiteRead(s: VolumeOffsiteState | null) {
+		if (!s) return;
+		offsiteState = s;
+		// The page's image screens read whether a restore is possible from here.
+		topbarSlot.offsite = { collectionId: s.collection_id, restorable: s.restorable };
+		const next = freedCountsOf(s);
+		// Advanced only once the records reloaded; a failed reload is tried
+		// again on the next poll (freedAfterRead).
+		const forId = collectionId;
+		freedAfterRead(lastFreed, next, forId, topbarSlot.reloadRecords).then((last) => {
+			if (collectionId === forId) lastFreed = last;
+		});
+	}
 
-  // A job's end, for the volume it was started for: ask the line again. A
-  // job of a volume no longer shown changes nothing here.
-  function offsiteChanged(forId: number) {
-    if (forId === collectionId) offsiteRefresh += 1;
-  }
+	// A job's end, for the volume it was started for: ask the line again. A
+	// job of a volume no longer shown changes nothing here.
+	function offsiteChanged(forId: number) {
+		if (forId === collectionId) offsiteRefresh += 1;
+	}
 
-  // Project and volume names come from the load in +layout.ts.
-  let projectName    = $derived(($page.data as any).projectName    ?? '—');
-  let collectionName = $derived(($page.data as any).collectionName ?? '—');
-  // When Captua removes a testing volume, for the testing account only.
-  let expiry = $derived(
-    inTestingSpace($authStore.user?.role) ? testingExpiry(($page.data as any).collectionTestingExpiresAt) : null
-  );
+	// Project and volume names come from the load in +layout.ts.
+	let projectName = $derived(($page.data as any).projectName ?? '—');
+	let collectionName = $derived(($page.data as any).collectionName ?? '—');
+	// When Captua removes a testing volume, for the testing account only.
+	let expiry = $derived(
+		inTestingSpace($authStore.user?.role)
+			? testingExpiry(($page.data as any).collectionTestingExpiresAt)
+			: null
+	);
 </script>
 
 <div class="gallery-shell">
+	<div class="topbar">
+		<div class="topbar-left">
+			<button
+				class="btn-back"
+				onclick={() => goto(volumeBackPath($unitState, projectId))}
+				aria-label={projectsShownIn($unitState) ? $m.col_back_to_project : $m.col_back_to_volumes}
+			>
+				<span class="material-symbols-outlined" style="font-size:20px">arrow_back</span>
+			</button>
 
-  <div class="topbar">
+			<!-- Breadcrumb, with the volume's offsite copy line below it (NEH-248) -->
+			<div class="topbar-title">
+				<nav class="breadcrumb" aria-label={$m.col_breadcrumb_nav}>
+					{#if projectsShownIn($unitState)}
+						<span class="bc-item bc-project">{projectName}</span>
+					{:else}
+						<a class="bc-item bc-project bc-link" href="/dashboard/volumes">{$m.nav_volumes}</a>
+					{/if}
+					<span class="bc-sep">/</span>
+					<span class="bc-item bc-collection">{collectionName}</span>
+				</nav>
+				{#if showsOffsite}
+					<VolumeOffsiteIndicator {collectionId} refresh={offsiteRefresh} onState={offsiteRead} />
+				{/if}
+				{#if expiry}
+					<p class="testing-expiry" class:soon={expiry.soon}>
+						{expiry.due
+							? $m.testing_expires_due
+							: $m.testing_expires_on(
+									formatApiDate(expiry.at.toISOString(), $locale, {
+										day: 'numeric',
+										month: 'long',
+										year: 'numeric'
+									})
+								)}
+					</p>
+				{/if}
+			</div>
+			{#if canFree && offsiteState && offsiteState.collection_id === collectionId}
+				{#key collectionId}
+					<VolumeOffsiteActions
+						{collectionId}
+						offsite={offsiteState}
+						{canRestore}
+						onChanged={offsiteChanged}
+					/>
+					{#if isAdmin}
+						<!-- Keep the volume on the unit, or release it (NEH-320). -->
+						<VolumeKeptActions
+							{collectionId}
+							offsite={offsiteState}
+							{isAdmin}
+							mode={$unitState?.mode ?? null}
+							onChanged={offsiteChanged}
+						/>
+					{/if}
+				{/key}
+			{/if}
+		</div>
 
-    <div class="topbar-left">
-      <button
-        class="btn-back"
-        onclick={() => goto(volumeBackPath($unitState, projectId))}
-        aria-label={projectsShownIn($unitState) ? $m.col_back_to_project : $m.col_back_to_volumes}
-      >
-        <span class="material-symbols-outlined" style="font-size:20px">arrow_back</span>
-      </button>
+		<!-- Camera button for operator, admin and the testing account -->
+		<div class="topbar-right">
+			{@render topbarSlot.actions?.()}
 
-      <!-- Breadcrumb, with the volume's offsite copy line below it (NEH-248) -->
-      <div class="topbar-title">
-        <nav class="breadcrumb" aria-label={$m.col_breadcrumb_nav}>
-          {#if projectsShownIn($unitState)}
-            <span class="bc-item bc-project">{projectName}</span>
-          {:else}
-            <a class="bc-item bc-project bc-link" href="/dashboard/volumes">{$m.nav_volumes}</a>
-          {/if}
-          <span class="bc-sep">/</span>
-          <span class="bc-item bc-collection">{collectionName}</span>
-        </nav>
-        {#if showsOffsite}
-          <VolumeOffsiteIndicator {collectionId} refresh={offsiteRefresh} onState={offsiteRead} />
-        {/if}
-        {#if expiry}
-          <p class="testing-expiry" class:soon={expiry.soon}>
-            {expiry.due ? $m.testing_expires_due : $m.testing_expires_on(formatApiDate(expiry.at.toISOString(), $locale, { day: 'numeric', month: 'long', year: 'numeric' }))}
-          </p>
-        {/if}
-      </div>
-      {#if canFree && offsiteState && offsiteState.collection_id === collectionId}
-        {#key collectionId}
-          <VolumeOffsiteActions {collectionId} offsite={offsiteState} {canRestore} onChanged={offsiteChanged} />
-          {#if isAdmin}
-            <!-- Keep the volume on the unit, or release it (NEH-320). -->
-            <VolumeKeptActions {collectionId} offsite={offsiteState} {isAdmin} mode={$unitState?.mode ?? null}
-              onChanged={offsiteChanged} />
-          {/if}
-        {/key}
-      {/if}
-    </div>
+			{#if canOpenCamera}
+				<button
+					class="btn-camera"
+					data-tour="capturar"
+					onclick={() => goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`)}
+					title={$m.col_open_in_camera}
+				>
+					<span class="material-symbols-outlined" style="font-size:18px">photo_camera</span>
+					<span>{$m.col_live_preview}</span>
+				</button>
+			{/if}
 
-    <!-- Camera button for operator, admin and the testing account -->
-    <div class="topbar-right">
+			<!-- Identity and sign-out. The avatar opens the menu (NEH-234). -->
+			<UserMenu label={$m.col_current_user} />
+		</div>
+	</div>
 
-      {@render topbarSlot.actions?.()}
-
-      {#if canOpenCamera}
-        <button
-          class="btn-camera"
-          data-tour="capturar"
-          onclick={() => goto(`/live-preview?projectId=${projectId}&collectionId=${collectionId}`)}
-          title={$m.col_open_in_camera}
-        >
-          <span class="material-symbols-outlined" style="font-size:18px">photo_camera</span>
-          <span>{$m.col_live_preview}</span>
-        </button>
-      {/if}
-
-      <!-- Identity and sign-out. The avatar opens the menu (NEH-234). -->
-      <UserMenu label={$m.col_current_user} />
-
-    </div>
-  </div>
-
-  <div class="gallery-content">
-    {@render children?.()}
-  </div>
-
+	<div class="gallery-content">
+		{@render children?.()}
+	</div>
 </div>
 
 <style>
-  .gallery-shell {
-    display: flex;
-    flex-direction: column;
-    width: 100vw;
-    height: 100vh;
-    background-color: var(--color-bg);
-    overflow: hidden;
-  }
+	.gallery-shell {
+		display: flex;
+		flex-direction: column;
+		width: 100vw;
+		height: 100vh;
+		background-color: var(--color-bg);
+		overflow: hidden;
+	}
 
-  /* ── TOPBAR ── */
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 16px;
-    height: 72px;
-    flex-shrink: 0;
-    /* Same background and border as the Live Preview top bar. */
-    background-color: var(--color-surface-alt);
-    border-bottom: 2px solid var(--color-primary);
-  }
+	/* ── TOPBAR ── */
+	.topbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 16px;
+		height: 72px;
+		flex-shrink: 0;
+		/* Same background and border as the Live Preview top bar. */
+		background-color: var(--color-surface-alt);
+		border-bottom: 2px solid var(--color-primary);
+	}
 
-  .topbar-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-  }
+	.topbar-left {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-width: 0;
+	}
 
-  .testing-expiry { margin: 2px 0 0; font-size: var(--text-xs); color: var(--color-light-grey); }
-  .testing-expiry.soon { color: var(--color-warning); }
+	.testing-expiry {
+		margin: 2px 0 0;
+		font-size: var(--text-xs);
+		color: var(--color-light-grey);
+	}
+	.testing-expiry.soon {
+		color: var(--color-warning);
+	}
 
-  .topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
+	.topbar-right {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
 
-  /* Mirrored by `.btn-review` in live-preview/TopBar.svelte: keep the two
+	/* Mirrored by `.btn-review` in live-preview/TopBar.svelte: keep the two
      in step. Touch-target minimum height (44px). */
-  .btn-camera {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 10px 20px;
-    min-height: var(--touch-target-min);
-    border-radius: var(--radius-full);
-    border: none;
-    background-color: var(--color-primary);
-    color: var(--color-light);
-    font-family: var(--font-family);
-    font-size: 13px;
-    font-weight: var(--fw-bold);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background-color var(--transition-base);
-  }
-  .btn-camera:hover { background-color: var(--color-primary-hover); }
+	.btn-camera {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 10px 20px;
+		min-height: var(--touch-target-min);
+		border-radius: var(--radius-full);
+		border: none;
+		background-color: var(--color-primary);
+		color: var(--color-light);
+		font-family: var(--font-family);
+		font-size: 13px;
+		font-weight: var(--fw-bold);
+		cursor: pointer;
+		white-space: nowrap;
+		transition: background-color var(--transition-base);
+	}
+	.btn-camera:hover {
+		background-color: var(--color-primary-hover);
+	}
 
-  .btn-back {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border: none;
-    border-radius: 50%;
-    background: var(--color-bg);
-    color: var(--color-light);
-    cursor: pointer;
-  }
-  .btn-back:hover { background: var(--border-color); }
+	.btn-back {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 34px;
+		height: 34px;
+		border: none;
+		border-radius: 50%;
+		background: var(--color-bg);
+		color: var(--color-light);
+		cursor: pointer;
+	}
+	.btn-back:hover {
+		background: var(--border-color);
+	}
 
-  .breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-  }
-  .bc-item {
-    color: var(--color-light-grey);
-  }
-  .bc-collection {
-    color: var(--color-light);
-    font-weight: var(--fw-bold);
-  }
-  .bc-sep { color: var(--color-light-grey); }
-  .bc-link { text-decoration: none; }
-  .bc-link:hover { color: var(--color-light); text-decoration: underline; }
+	.breadcrumb {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 13px;
+	}
+	.bc-item {
+		color: var(--color-light-grey);
+	}
+	.bc-collection {
+		color: var(--color-light);
+		font-weight: var(--fw-bold);
+	}
+	.bc-sep {
+		color: var(--color-light-grey);
+	}
+	.bc-link {
+		text-decoration: none;
+	}
+	.bc-link:hover {
+		color: var(--color-light);
+		text-decoration: underline;
+	}
 
-
-  .gallery-content {
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
+	.gallery-content {
+		flex: 1;
+		overflow: hidden;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
 </style>

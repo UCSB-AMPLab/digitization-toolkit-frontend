@@ -27,7 +27,10 @@ const volume: Collection = {
 	filename_stem: 'co-t007',
 	stem_reserved: true
 };
-const targets: Collection[] = [volume, { id: 8, name: 'Tomo 8', project_id: 1, created_at: '2026-10-01T00:00:00' }];
+const targets: Collection[] = [
+	volume,
+	{ id: 8, name: 'Tomo 8', project_id: 1, created_at: '2026-10-01T00:00:00' }
+];
 
 let rec: Recorder;
 let onClose: Mock<() => void>;
@@ -98,7 +101,9 @@ describe.each(['operator', 'admin'] as const)('the %s', (role) => {
 		const screen = open();
 		await expect.element(page.getByText(en.pd_delete_stem_reserved)).toBeVisible();
 		expect(screen.container.textContent).not.toContain(en.testing_delete_volume_confirm);
-		await expect.element(page.getByRole('button', { name: en.pd_delete_collection_title })).toBeDisabled();
+		await expect
+			.element(page.getByRole('button', { name: en.pd_delete_collection_title }))
+			.toBeDisabled();
 	});
 
 	it('still sees the move select for a volume with records that reserves no stem', async () => {
@@ -112,6 +117,8 @@ describe.each(['operator', 'admin'] as const)('the %s', (role) => {
 		});
 		await expect.element(page.getByLabelText(en.pd_move_label)).toBeVisible();
 		expect(screen.container.textContent).not.toContain(en.testing_delete_volume_confirm);
-		await expect.element(page.getByRole('button', { name: en.pd_delete_collection_title })).toBeDisabled();
+		await expect
+			.element(page.getByRole('button', { name: en.pd_delete_collection_title }))
+			.toBeDisabled();
 	});
 });

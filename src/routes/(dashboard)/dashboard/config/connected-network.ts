@@ -51,27 +51,46 @@ export interface ConnectedWifi {
  * The Wi-Fi networks the status shows as connected; null when the status is unknown.
  * `controlledOnly` keeps the interface named by `status.wifiDevice` and no other.
  */
-export function connectedWifi(status: NetworkStatus | null, statusFailed: boolean, controlledOnly = false): ConnectedWifi[] | null {
+export function connectedWifi(
+	status: NetworkStatus | null,
+	statusFailed: boolean,
+	controlledOnly = false
+): ConnectedWifi[] | null {
 	if (!status || statusFailed) return null;
 	const out: ConnectedWifi[] = [];
 	for (const i of status.interfaces) {
 		if (controlledOnly && (status.wifiDevice === null || i.device !== status.wifiDevice)) continue;
-		if (i.type === 'wifi' && i.state === 'connected' && i.ssid) out.push({ ssid: i.ssid, connection: i.connection });
+		if (i.type === 'wifi' && i.state === 'connected' && i.ssid)
+			out.push({ ssid: i.ssid, connection: i.connection });
 	}
 	return out;
 }
 
 /** The scan with its connected markers taken from the status; unchanged when the status is unknown. */
-export function markConnected(scan: WifiScan, status: NetworkStatus | null, statusFailed: boolean): WifiScan {
+export function markConnected(
+	scan: WifiScan,
+	status: NetworkStatus | null,
+	statusFailed: boolean
+): WifiScan {
 	const anyInterface = connectedWifi(status, statusFailed);
 	if (anyInterface === null) return scan;
 	const controlled = connectedWifi(status, statusFailed, true) ?? [];
-	const networks: WifiNetwork[] = scan.networks.map((n) => ({ ...n, inUse: controlled.some((c) => c.ssid === n.ssid) }));
-	const saved: SavedWifiNetwork[] = scan.saved.map((s) => ({ ...s, active: isActiveProfile(s, scan.saved, anyInterface) }));
+	const networks: WifiNetwork[] = scan.networks.map((n) => ({
+		...n,
+		inUse: controlled.some((c) => c.ssid === n.ssid)
+	}));
+	const saved: SavedWifiNetwork[] = scan.saved.map((s) => ({
+		...s,
+		active: isActiveProfile(s, scan.saved, anyInterface)
+	}));
 	return { ...scan, networks, saved };
 }
 
-function isActiveProfile(profile: SavedWifiNetwork, all: SavedWifiNetwork[], connected: ConnectedWifi[]): boolean {
+function isActiveProfile(
+	profile: SavedWifiNetwork,
+	all: SavedWifiNetwork[],
+	connected: ConnectedWifi[]
+): boolean {
 	return connected.some((c) => {
 		if (profile.ssid !== c.ssid) return false;
 		const sameSsid = all.filter((s) => s.ssid === c.ssid);
@@ -90,9 +109,12 @@ export function connectedKey(status: NetworkStatus | null, statusFailed: boolean
 }
 
 /** Whether the status shows a connected network that the list does not contain. */
-export function listLacksConnected(scan: WifiScan, status: NetworkStatus | null, statusFailed: boolean): boolean {
+export function listLacksConnected(
+	scan: WifiScan,
+	status: NetworkStatus | null,
+	statusFailed: boolean
+): boolean {
 	const connected = connectedWifi(status, statusFailed, true);
 	if (!connected) return false;
 	return connected.some((c) => !scan.networks.some((n) => n.ssid === c.ssid));
 }
-

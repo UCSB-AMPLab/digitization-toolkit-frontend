@@ -31,7 +31,10 @@ import '../../app.css';
 import LivePreview from './+page.svelte';
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 async function framePng() {
@@ -44,20 +47,45 @@ async function framePng() {
 	return await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), 'image/png'));
 }
 
-const body = (index: number, hardware_id: string) => ({ index, model: 'Canon PowerShot A2500', hardware_id, calibrated: false });
+const body = (index: number, hardware_id: string) => ({
+	index,
+	model: 'Canon PowerShot A2500',
+	hardware_id,
+	calibrated: false
+});
 
 function serve() {
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/cameras/capabilities')) {
-			return json({ backend: 'gphoto2', live_preview: true, focus_control: false, live_controls: false, zoom: false, autofocus_calibration: false, dslr_settings: false, continuous_preview: false, zoom_steps: false });
+			return json({
+				backend: 'gphoto2',
+				live_preview: true,
+				focus_control: false,
+				live_controls: false,
+				zoom: false,
+				autofocus_calibration: false,
+				dslr_settings: false,
+				continuous_preview: false,
+				zoom_steps: false
+			});
 		}
 		if (path.includes('/cameras/preview/')) return new Response(await framePng(), { status: 200 });
-		if (path.endsWith('/cameras/setup')) return json({ needs_setup: false, reasons: [], confirmed_pair: { left: 'a', right: 'b' } });
-		if (path.endsWith('/cameras/devices') || path.endsWith('/cameras/rescan')) return json([body(0, 'a'), body(1, 'b')]);
-		if (path.endsWith('/records/to-retake/summary')) return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
+		if (path.endsWith('/cameras/setup'))
+			return json({ needs_setup: false, reasons: [], confirmed_pair: { left: 'a', right: 'b' } });
+		if (path.endsWith('/cameras/devices') || path.endsWith('/cameras/rescan'))
+			return json([body(0, 'a'), body(1, 'b')]);
+		if (path.endsWith('/records/to-retake/summary'))
+			return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 6',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: 'co-ahr-6',
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
 		return json([]);
@@ -67,7 +95,10 @@ function serve() {
 beforeEach(() => {
 	localStorage.clear();
 	current.url = 'http://localhost/live-preview?projectId=2&collectionId=9';
-	authStore.setSession({ id: 3, username: 'operator', email: null, role: 'operator', is_active: true }, { signIn: true });
+	authStore.setSession(
+		{ id: 3, username: 'operator', email: null, role: 'operator', is_active: true },
+		{ signIn: true }
+	);
 	serve();
 });
 
@@ -87,7 +118,11 @@ async function open(lang: 'en' | 'es', w: number, h: number) {
 	await browserPage.viewport(w, h);
 	render(LivePreview);
 	const t = lang === 'en' ? en : es;
-	await expect.poll(() => document.querySelector('.camera-feed img')?.getAttribute('alt') === t.lv_camera_left_alt).toBe(true);
+	await expect
+		.poll(
+			() => document.querySelector('.camera-feed img')?.getAttribute('alt') === t.lv_camera_left_alt
+		)
+		.toBe(true);
 	await expect.poll(() => document.querySelectorAll('.camera-feed img').length).toBe(2);
 	await expect.poll(() => document.querySelectorAll('.feed-source').length).toBe(2);
 	await wait(400);
@@ -100,7 +135,8 @@ async function open(lang: 'en' | 'es', w: number, h: number) {
 	};
 }
 
-const hit = (a: DOMRect, b: DOMRect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+const hit = (a: DOMRect, b: DOMRect) =>
+	a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 const text = (el: HTMLElement) => el.innerText.replace(/\s+/g, ' ').trim();
 
 describe('pane labels fit their panes (confirmed pair, double mode)', () => {
@@ -108,7 +144,13 @@ describe('pane labels fit their panes (confirmed pair, double mode)', () => {
 		it(`at 800x480 in ${lang}: one line, inside the pane, clear of the source label, in the badge form`, async () => {
 			const { t, panes, labels, sources } = await open(lang, 800, 480);
 			const rects = labels.map((l) => l.getBoundingClientRect());
-			console.log(`${lang} 800x480 panes`, panes.map((p) => p.clientWidth), 'labels', rects.map((r) => Math.round(r.width)), rects.map((r) => Math.round(r.height)));
+			console.log(
+				`${lang} 800x480 panes`,
+				panes.map((p) => p.clientWidth),
+				'labels',
+				rects.map((r) => Math.round(r.width)),
+				rects.map((r) => Math.round(r.height))
+			);
 			rects.forEach((r, i) => {
 				const pane = panes[i].getBoundingClientRect();
 				expect(r.height).toBeLessThan(40);
@@ -119,19 +161,30 @@ describe('pane labels fit their panes (confirmed pair, double mode)', () => {
 			expect(hit(rects[0], rects[1])).toBe(false);
 			expect(text(labels[0])).toContain(`${t.badge_cam_right} · ${t.page_term_even}`);
 			expect(text(labels[1])).toContain(`${t.badge_cam_left} · ${t.page_term_odd}`);
-			expect(labels[0].querySelector('.material-symbols-outlined')?.getAttribute('aria-hidden')).toBe('true');
+			expect(
+				labels[0].querySelector('.material-symbols-outlined')?.getAttribute('aria-hidden')
+			).toBe('true');
 			expect(text(labels[0])).not.toContain(t.lv_camera_left_alt);
 			expect(labels[0].getAttribute('aria-label')).toBe(t.lv_camera_left_alt);
 			expect(labels[1].getAttribute('aria-label')).toBe(t.lv_camera_right_alt);
-			expect(labels[0].getAttribute('title')).toMatch(new RegExp(`^${t.lv_camera_left_alt.replace('/', '\\/')}`));
-			expect(labels[1].getAttribute('title')).toMatch(new RegExp(`^${t.lv_camera_right_alt.replace('/', '\\/')}`));
+			expect(labels[0].getAttribute('title')).toMatch(
+				new RegExp(`^${t.lv_camera_left_alt.replace('/', '\\/')}`)
+			);
+			expect(labels[1].getAttribute('title')).toMatch(
+				new RegExp(`^${t.lv_camera_right_alt.replace('/', '\\/')}`)
+			);
 			expect(panes[0].querySelector('img')?.getAttribute('alt')).toBe(t.lv_camera_left_alt);
 		});
 
 		it(`at 1920x1080 in ${lang}: the words on one line, nothing overlapping`, async () => {
 			const { t, panes, labels, sources } = await open(lang, 1920, 1080);
 			const rects = labels.map((l) => l.getBoundingClientRect());
-			console.log(`${lang} 1920x1080 panes`, panes.map((p) => p.clientWidth), 'labels', rects.map((r) => Math.round(r.width)));
+			console.log(
+				`${lang} 1920x1080 panes`,
+				panes.map((p) => p.clientWidth),
+				'labels',
+				rects.map((r) => Math.round(r.width))
+			);
 			expect(text(labels[0])).toBe(t.lv_camera_left_alt);
 			expect(text(labels[1])).toBe(t.lv_camera_right_alt);
 			rects.forEach((r, i) => {

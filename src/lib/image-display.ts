@@ -33,24 +33,29 @@ export const RAW_FORMATS: ReadonlySet<string> = new Set(['cr2', 'nef', 'arw', 'r
 /** Masters /preview sends as they are, the same list as the backend's
  *  `_BROWSER_DISPLAYABLE_SUFFIXES`. Anything else that is not RAW (TIFF, for
  *  one) gets a 404 from /preview. */
-export const BROWSER_DISPLAYABLE_FORMATS: ReadonlySet<string> = new Set(['jpg', 'jpeg', 'png', 'webp']);
+export const BROWSER_DISPLAYABLE_FORMATS: ReadonlySet<string> = new Set([
+	'jpg',
+	'jpeg',
+	'png',
+	'webp'
+]);
 
 type ImageLike = Pick<RecordImage, 'format' | 'filename'>;
 
 /** The image's format: the backend's `format` field (the stored file's
  *  lower-cased suffix), or the filename's extension when it is empty. */
 export function formatOf(img: ImageLike): string {
-  const fmt = (img.format ?? '').toLowerCase().replace(/^\./, '');
-  if (fmt) return fmt;
-  return img.filename?.includes('.') ? img.filename.split('.').pop()!.toLowerCase() : '';
+	const fmt = (img.format ?? '').toLowerCase().replace(/^\./, '');
+	if (fmt) return fmt;
+	return img.filename?.includes('.') ? img.filename.split('.').pop()!.toLowerCase() : '';
 }
 
 export function isRawImage(img: ImageLike): boolean {
-  return RAW_FORMATS.has(formatOf(img));
+	return RAW_FORMATS.has(formatOf(img));
 }
 
 export function isBrowserDisplayable(img: ImageLike): boolean {
-  return BROWSER_DISPLAYABLE_FORMATS.has(formatOf(img));
+	return BROWSER_DISPLAYABLE_FORMATS.has(formatOf(img));
 }
 
 /**
@@ -63,32 +68,35 @@ export function isBrowserDisplayable(img: ImageLike): boolean {
  * The /file URL is never a candidate.
  */
 export type DisplayCandidate =
-  | { kind: 'original'; url: string }
-  | { kind: 'preview'; url: string }
-  | { kind: 'thumbnail'; url: string };
+	| { kind: 'original'; url: string }
+	| { kind: 'preview'; url: string }
+	| { kind: 'thumbnail'; url: string };
 
 export interface ImageUrlSource {
-  getImagePreviewUrl(imageId: number): string;
-  getImageThumbnailUrl(imageId: number): string;
+	getImagePreviewUrl(imageId: number): string;
+	getImageThumbnailUrl(imageId: number): string;
 }
 
-export function displayCandidates(img: Pick<RecordImage, 'id' | 'format' | 'filename'>, api: ImageUrlSource): DisplayCandidate[] {
-  const thumbnail: DisplayCandidate = { kind: 'thumbnail', url: api.getImageThumbnailUrl(img.id) };
-  if (isRawImage(img)) {
-    return [{ kind: 'preview', url: api.getImagePreviewUrl(img.id) }, thumbnail];
-  }
-  if (isBrowserDisplayable(img)) {
-    return [{ kind: 'original', url: api.getImagePreviewUrl(img.id) }, thumbnail];
-  }
-  return [thumbnail];
+export function displayCandidates(
+	img: Pick<RecordImage, 'id' | 'format' | 'filename'>,
+	api: ImageUrlSource
+): DisplayCandidate[] {
+	const thumbnail: DisplayCandidate = { kind: 'thumbnail', url: api.getImageThumbnailUrl(img.id) };
+	if (isRawImage(img)) {
+		return [{ kind: 'preview', url: api.getImagePreviewUrl(img.id) }, thumbnail];
+	}
+	if (isBrowserDisplayable(img)) {
+		return [{ kind: 'original', url: api.getImagePreviewUrl(img.id) }, thumbnail];
+	}
+	return [thumbnail];
 }
 
 /** A file freed from the card: the master ("capture") or a RAW master's preview, and when. */
 export interface FreedFile {
-  kind: 'capture' | 'preview';
-  freedAt: string | null;
-  /** Whether this unit can restore the file (the 410's `restorable`, NEH-380); unset when the backend does not say. */
-  restorable?: boolean;
+	kind: 'capture' | 'preview';
+	freedAt: string | null;
+	/** Whether this unit can restore the file (the 410's `restorable`, NEH-380); unset when the backend does not say. */
+	restorable?: boolean;
 }
 
 /**
@@ -97,14 +105,22 @@ export interface FreedFile {
  * app/core/offsite_free.py). Any other answer is not read as freed.
  */
 export function freedFromBody(status: number, body: unknown): FreedFile | null {
-  if (status !== 410 || typeof body !== 'object' || body === null) return null;
-  const detail = (body as { detail?: unknown }).detail;
-  if (typeof detail !== 'object' || detail === null) return null;
-  const d = detail as { stored_offsite?: unknown; kind?: unknown; freed_at?: unknown; restorable?: unknown };
-  if (d.stored_offsite !== true) return null;
-  const freed: FreedFile = { kind: d.kind === 'preview' ? 'preview' : 'capture', freedAt: typeof d.freed_at === 'string' ? d.freed_at : null };
-  if (typeof d.restorable === 'boolean') freed.restorable = d.restorable;
-  return freed;
+	if (status !== 410 || typeof body !== 'object' || body === null) return null;
+	const detail = (body as { detail?: unknown }).detail;
+	if (typeof detail !== 'object' || detail === null) return null;
+	const d = detail as {
+		stored_offsite?: unknown;
+		kind?: unknown;
+		freed_at?: unknown;
+		restorable?: unknown;
+	};
+	if (d.stored_offsite !== true) return null;
+	const freed: FreedFile = {
+		kind: d.kind === 'preview' ? 'preview' : 'capture',
+		freedAt: typeof d.freed_at === 'string' ? d.freed_at : null
+	};
+	if (typeof d.restorable === 'boolean') freed.restorable = d.restorable;
+	return freed;
 }
 
 /**
@@ -113,8 +129,11 @@ export function freedFromBody(status: number, body: unknown): FreedFile | null {
  * which does not say, and a freed state read from the record alone get the
  * restore hint, as before.
  */
-export function freedHintText(freed: FreedFile | null, msgs: Pick<Messages, 'freed_restore_hint' | 'freed_no_restore_hint'>): string {
-  return freed?.restorable === false ? msgs.freed_no_restore_hint : msgs.freed_restore_hint;
+export function freedHintText(
+	freed: FreedFile | null,
+	msgs: Pick<Messages, 'freed_restore_hint' | 'freed_no_restore_hint'>
+): string {
+	return freed?.restorable === false ? msgs.freed_no_restore_hint : msgs.freed_restore_hint;
 }
 
 /**
@@ -124,10 +143,10 @@ export function freedHintText(freed: FreedFile | null, msgs: Pick<Messages, 'fre
  * decides, and when the master is not freed.
  */
 export function freedFromMetadata(
-  img: Pick<RecordImage, 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>,
+	img: Pick<RecordImage, 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>
 ): FreedFile | null {
-  if (isRawImage(img) || isBrowserDisplayable(img)) return null;
-  return img.master_freed_at ? { kind: 'capture', freedAt: img.master_freed_at } : null;
+	if (isRawImage(img) || isBrowserDisplayable(img)) return null;
+	return img.master_freed_at ? { kind: 'capture', freedAt: img.master_freed_at } : null;
 }
 
 /**
@@ -138,11 +157,11 @@ export function freedFromMetadata(
  * in-place reload, when the <img> already holds the preview it loaded.
  */
 export function previewFreedByMetadata(
-  img: Pick<RecordImage, 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>,
+	img: Pick<RecordImage, 'format' | 'filename' | 'master_freed_at' | 'preview_freed_at'>
 ): boolean {
-  if (isRawImage(img)) return !!img.preview_freed_at;
-  if (isBrowserDisplayable(img)) return !!img.master_freed_at;
-  return false;
+	if (isRawImage(img)) return !!img.preview_freed_at;
+	if (isBrowserDisplayable(img)) return !!img.master_freed_at;
+	return false;
 }
 
 /**
@@ -151,22 +170,26 @@ export function previewFreedByMetadata(
  * 410's small JSON body is read; any other request is aborted as soon as the
  * headers arrive.
  */
-export async function probeFreed(url: string, fetchFn: typeof fetch = fetch, signal?: AbortSignal): Promise<FreedFile | null> {
-  const controller = new AbortController();
-  if (signal?.aborted) return null;
-  signal?.addEventListener('abort', () => controller.abort(), { once: true });
-  try {
-    const res = await fetchFn(url, { signal: controller.signal });
-    if (res.status !== 410) {
-      controller.abort();
-      return null;
-    }
-    const body = await res.json().catch(() => null);
-    controller.abort();
-    return freedFromBody(res.status, body);
-  } catch {
-    return null;
-  }
+export async function probeFreed(
+	url: string,
+	fetchFn: typeof fetch = fetch,
+	signal?: AbortSignal
+): Promise<FreedFile | null> {
+	const controller = new AbortController();
+	if (signal?.aborted) return null;
+	signal?.addEventListener('abort', () => controller.abort(), { once: true });
+	try {
+		const res = await fetchFn(url, { signal: controller.signal });
+		if (res.status !== 410) {
+			controller.abort();
+			return null;
+		}
+		const body = await res.json().catch(() => null);
+		controller.abort();
+		return freedFromBody(res.status, body);
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -180,26 +203,26 @@ export async function probeFreed(url: string, fetchFn: typeof fetch = fetch, sig
 export type MasterCheck = 'stored' | 'missing' | 'freed' | 'unknown';
 
 export async function checkMasterStored(
-  fileUrl: string,
-  fetchFn: typeof fetch = fetch,
-  signal?: AbortSignal,
+	fileUrl: string,
+	fetchFn: typeof fetch = fetch,
+	signal?: AbortSignal
 ): Promise<MasterCheck> {
-  const controller = new AbortController();
-  // The caller's signal (e.g. the component unmounting) cancels the request too.
-  if (signal?.aborted) return 'unknown';
-  signal?.addEventListener('abort', () => controller.abort(), { once: true });
-  try {
-    const res = await fetchFn(fileUrl, { signal: controller.signal });
-    if (res.status === 410) {
-      const body = await res.json().catch(() => null);
-      controller.abort();
-      return freedFromBody(410, body) ? 'freed' : 'unknown';
-    }
-    controller.abort();
-    if (res.status === 200) return 'stored';
-    if (res.status === 404) return 'missing';
-    return 'unknown';
-  } catch {
-    return 'unknown';
-  }
+	const controller = new AbortController();
+	// The caller's signal (e.g. the component unmounting) cancels the request too.
+	if (signal?.aborted) return 'unknown';
+	signal?.addEventListener('abort', () => controller.abort(), { once: true });
+	try {
+		const res = await fetchFn(fileUrl, { signal: controller.signal });
+		if (res.status === 410) {
+			const body = await res.json().catch(() => null);
+			controller.abort();
+			return freedFromBody(410, body) ? 'freed' : 'unknown';
+		}
+		controller.abort();
+		if (res.status === 200) return 'stored';
+		if (res.status === 404) return 'missing';
+		return 'unknown';
+	} catch {
+		return 'unknown';
+	}
 }

@@ -17,7 +17,13 @@ import { keepUnitState, resetUnit } from '$lib/unit-mode';
 import Overview from './+page.svelte';
 
 function unit(projectsShown: boolean) {
-	return { mode: projectsShown ? 'offline' : 'backup', projectsEnabled: projectsShown, projectsShown, defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] } };
+	return {
+		mode: projectsShown ? 'offline' : 'backup',
+		projectsEnabled: projectsShown,
+		projectsShown,
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
 }
 
 beforeEach(() => {

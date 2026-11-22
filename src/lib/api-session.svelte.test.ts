@@ -41,7 +41,7 @@ afterEach(() => {
 	authStore.clearSession();
 });
 
-describe('a 401 and this tab\'s session', () => {
+describe("a 401 and this tab's session", () => {
 	it('clears the session and goes to /login when this tab had a session', async () => {
 		authStore.setSession(user);
 		const fetchSpy = respond401();
@@ -58,13 +58,16 @@ describe('a 401 and this tab\'s session', () => {
 		respond401();
 
 		await expect(
-			authApi.register({ username: 'admin', email: 'a@example.com', password: 'Password123!' }, 'wrong')
+			authApi.register(
+				{ username: 'admin', email: 'a@example.com', password: 'Password123!' },
+				'wrong'
+			)
 		).rejects.toBeInstanceOf(AuthError);
 
 		expect(gotoMock).not.toHaveBeenCalled();
 	});
 
-	it('clears a session whose cookie another tab\'s logout removed', async () => {
+	it("clears a session whose cookie another tab's logout removed", async () => {
 		// What logging out in another tab leaves behind: the backend cleared
 		// the cookie for every tab, and this tab's authStore still holds the
 		// old session, so the next request gets a 401.

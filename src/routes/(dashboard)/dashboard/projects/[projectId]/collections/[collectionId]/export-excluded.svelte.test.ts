@@ -37,7 +37,16 @@ function rec(id: number, status: ApiRecord['status']): ApiRecord {
 		sequence: id,
 		collection_id: 7,
 		capture_mode: 'single',
-		images: [{ id: 100 + id, record_id: id, filename: `f${id}.jpg`, file_path: '/x', format: 'jpg', is_current: true }]
+		images: [
+			{
+				id: 100 + id,
+				record_id: id,
+				filename: `f${id}.jpg`,
+				file_path: '/x',
+				format: 'jpg',
+				is_current: true
+			}
+		]
 	} as unknown as ApiRecord;
 }
 

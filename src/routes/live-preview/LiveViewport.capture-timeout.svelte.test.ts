@@ -68,7 +68,12 @@ function recordsHolder(initial: Rec[]) {
 		state,
 		read,
 		confirmed,
-		captureCheck: { records: () => state.records, snapshot: () => captureBefore(state.records), confirmed, read }
+		captureCheck: {
+			records: () => state.records,
+			snapshot: () => captureBefore(state.records),
+			confirmed,
+			read
+		}
 	};
 }
 
@@ -119,7 +124,10 @@ beforeEach(() => {
 	cameraStatus.reportSuccess();
 	// Every preview and capabilities request fails at once; the capture
 	// itself is mocked on camerasApi.
-	vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })));
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => new Response(null, { status: 404 }))
+	);
 	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
 });
 
@@ -186,7 +194,10 @@ describe('LiveViewport — a capture that ends in a timeout (NEH-381)', () => {
 
 			holder.state.answers = [
 				[{ id: 1, images: [{ id: 10 }] }],
-				[{ id: 1, images: [{ id: 10 }] }, { id: 2, images: [{ id: 20 }] }]
+				[
+					{ id: 1, images: [{ id: 10 }] },
+					{ id: 2, images: [{ id: 20 }] }
+				]
 			];
 			await advance(4_999);
 			expect(holder.read).toHaveBeenCalledTimes(0);
@@ -219,7 +230,17 @@ describe('LiveViewport — a capture that ends in a timeout (NEH-381)', () => {
 		await advance(120_000);
 		answer.reject(gatewayTimeout());
 		await settle();
-		holder.state.answers = [[{ id: 7, images: [{ id: 70, role: 'left' }, { id: 71, role: 'right' }] }]];
+		holder.state.answers = [
+			[
+				{
+					id: 7,
+					images: [
+						{ id: 70, role: 'left' },
+						{ id: 71, role: 'right' }
+					]
+				}
+			]
+		];
 		await advance(5_000);
 		expect(noteText()).toBe(en.lv_capture_found);
 		expect(props.onCaptureDone).toHaveBeenCalledTimes(1);
@@ -464,7 +485,9 @@ describe('LiveViewport — the capture gate (NEH-381)', () => {
 		const captureGate = createCaptureGate();
 		const hold = captureGate.acquire()!;
 		const holder = recordsHolder([]);
-		renderViewport(baseProps({ captureCheck: holder.captureCheck, captureGate, captureBusy: false }));
+		renderViewport(
+			baseProps({ captureCheck: holder.captureCheck, captureGate, captureBusy: false })
+		);
 		await settle();
 		expect(captureButton().disabled).toBe(false);
 		captureButton().click();
@@ -477,18 +500,37 @@ describe('LiveViewport — the capture gate (NEH-381)', () => {
 
 describe('LiveViewport — every other failure behaves as before (NEH-381)', () => {
 	const cases: [string, () => Promise<CaptureResponse>, string][] = [
-		['a 500', () => Promise.reject(new ApiError('Internal Server Error', undefined, 500)), en.lv_capture_error],
+		[
+			'a 500',
+			() => Promise.reject(new ApiError('Internal Server Error', undefined, 500)),
+			en.lv_capture_error
+		],
 		['a 502', () => Promise.reject(new ApiError('HTTP 502', undefined, 502)), en.lv_capture_error],
-		['a 409', () => Promise.reject(new ApiError('Some other conflict', undefined, 409)), en.lv_capture_error],
-		['a 404', () => Promise.reject(new ApiError('Collection 7 not found', undefined, 404)), en.lv_err_volume_not_found],
-		['success false', () => Promise.resolve({ success: false, error: 'Camera 0 is not connected' }), en.lv_err_camera_not_connected(0)],
+		[
+			'a 409',
+			() => Promise.reject(new ApiError('Some other conflict', undefined, 409)),
+			en.lv_capture_error
+		],
+		[
+			'a 404',
+			() => Promise.reject(new ApiError('Collection 7 not found', undefined, 404)),
+			en.lv_err_volume_not_found
+		],
+		[
+			'success false',
+			() => Promise.resolve({ success: false, error: 'Camera 0 is not connected' }),
+			en.lv_err_camera_not_connected(0)
+		],
 		['a network error', () => Promise.reject(new TypeError('Failed to fetch')), en.lv_capture_error]
 	];
 	for (const [name, answer, message] of cases) {
 		it(`${name}: the failure message at once, the controls free, no read of the records`, async () => {
 			const captureSpy = vi.spyOn(camerasApi, 'capture').mockImplementation(answer);
 			const holder = recordsHolder([]);
-			const props = baseProps({ captureCheck: holder.captureCheck, onStemRefused: vi.fn(async () => false) });
+			const props = baseProps({
+				captureCheck: holder.captureCheck,
+				onStemRefused: vi.fn(async () => false)
+			});
 			renderViewport(props);
 			await settle();
 

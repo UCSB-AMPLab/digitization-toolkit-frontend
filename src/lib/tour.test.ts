@@ -35,7 +35,10 @@ const HIDDEN_OFFLINE = state();
 const HIDDEN_BACKUP = state({ mode: 'backup', projectsEnabled: true });
 const FISQUA = state({ mode: 'fisqua' });
 
-const catalogs = { es: es as unknown as Record<string, unknown>, en: en as unknown as Record<string, unknown> };
+const catalogs = {
+	es: es as unknown as Record<string, unknown>,
+	en: en as unknown as Record<string, unknown>
+};
 
 function text(lang: 'es' | 'en', key: string): string {
 	return catalogs[lang][key] as string;
@@ -55,7 +58,14 @@ describe('projects shown', () => {
 	it('keeps the six steps, starting with the project', () => {
 		for (const s of [SHOWN, null]) {
 			const steps = tourSteps(s);
-			expect(ids(steps)).toEqual(['tour_s1', 'tour_s2', 'tour_s3', 'tour_s4', 'tour_s5', 'tour_s6']);
+			expect(ids(steps)).toEqual([
+				'tour_s1',
+				'tour_s2',
+				'tour_s3',
+				'tour_s4',
+				'tour_s5',
+				'tour_s6'
+			]);
 			expect(steps[0].target).toBe('nuevo-proyecto');
 			expect(steps[0].match.test('/dashboard/projects')).toBe(true);
 			expect(steps[1].match.test('/dashboard/projects/4')).toBe(true);
@@ -75,7 +85,9 @@ describe('projects hidden (Scanner only without projects, Offsite copy only)', (
 			expect(first.match.test('/dashboard/volumes')).toBe(true);
 			expect(first.match.test('/dashboard/projects/4')).toBe(false);
 			// The capture, send, approve and export steps stay on the volume page.
-			expect(steps.slice(1).every((step) => step.match.test('/dashboard/projects/4/collections/9'))).toBe(true);
+			expect(
+				steps.slice(1).every((step) => step.match.test('/dashboard/projects/4/collections/9'))
+			).toBe(true);
 		}
 	});
 
@@ -114,7 +126,13 @@ describe('Fisqua mode', () => {
 
 	it('highlights Cola on every screen with the side menu, and not on the volume screen', () => {
 		const first = tourSteps(FISQUA, 'operator')[0];
-		for (const path of ['/dashboard', '/dashboard/', '/dashboard/volumes', '/dashboard/queue', '/dashboard/retakes']) {
+		for (const path of [
+			'/dashboard',
+			'/dashboard/',
+			'/dashboard/volumes',
+			'/dashboard/queue',
+			'/dashboard/retakes'
+		]) {
 			expect(first.match.test(path)).toBe(true);
 		}
 		expect(first.match.test('/dashboard/projects/4/collections/9')).toBe(false);
@@ -171,7 +189,13 @@ describe('Fisqua mode', () => {
 	it('follows the review in place of approving, and keeps export from Volúmenes', () => {
 		const steps = tourSteps(FISQUA, 'operator');
 		expect(steps.map((s) => s.lesson)).toEqual(['volume', 'capture', 'send', 'follow', 'export']);
-		expect(ids(steps)).toEqual(['tour_s2_fisqua', 'tour_s3_fisqua', 'tour_s4', 'tour_s5_fisqua', 'tour_s6']);
+		expect(ids(steps)).toEqual([
+			'tour_s2_fisqua',
+			'tour_s3_fisqua',
+			'tour_s4',
+			'tour_s5_fisqua',
+			'tour_s6'
+		]);
 		const exp = steps[4];
 		expect(exp.target).toBe('exportar');
 		expect(exp.where).toBe('tour_s6_where_vol');
@@ -309,7 +333,13 @@ describe('the position when the steps change mid-tour', () => {
 	});
 
 	function signInAs(role: 'admin' | 'operator') {
-		authStore.setSession({ id: role === 'admin' ? 2 : 1, username: role, email: null, role, is_active: true });
+		authStore.setSession({
+			id: role === 'admin' ? 2 : 1,
+			username: role,
+			email: null,
+			role,
+			is_active: true
+		});
 	}
 
 	it('moves from approve to following the review when the operator signs in', () => {

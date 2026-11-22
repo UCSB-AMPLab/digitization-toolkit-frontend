@@ -57,9 +57,15 @@ describe('the failure messages', () => {
 		expect(usbFailureText('testing_volume_busy', es)).toBe(es.testing_usb_err_volume_busy);
 		expect(usbFailureText('not_found', en)).toBe(en.testing_err_not_found);
 		expect(usbFailureText('not_found', es)).toBe(es.testing_err_not_found);
-		expect(en.testing_usb_err_volume_busy).toBe('Captua is working on this volume right now. Wait a moment and try again.');
-		expect(en.testing_usb_err_real_volume).toBe('Only a testing volume can be copied to a USB drive.');
-		expect(en.testing_usb_err_read).toBe('Captua could not read one of the pictures on the unit. Tell an administrator, who has to look into it.');
+		expect(en.testing_usb_err_volume_busy).toBe(
+			'Captua is working on this volume right now. Wait a moment and try again.'
+		);
+		expect(en.testing_usb_err_real_volume).toBe(
+			'Only a testing volume can be copied to a USB drive.'
+		);
+		expect(en.testing_usb_err_read).toBe(
+			'Captua could not read one of the pictures on the unit. Tell an administrator, who has to look into it.'
+		);
 		expect(en.testing_usb_err_exists).toBe(
 			'The USB drive already has a folder with the name Captua needs. Wait a minute and try again.'
 		);
@@ -71,14 +77,18 @@ describe('the failure messages', () => {
 		);
 		expect('testing_usb_left_mounted' in en).toBe(false);
 		expect('testing_usb_left_mounted' in es).toBe(false);
-		expect(en.testing_usb_skipped(3)).toBe('3 pictures could not be copied. Tell an administrator.');
+		expect(en.testing_usb_skipped(3)).toBe(
+			'3 pictures could not be copied. Tell an administrator.'
+		);
 	});
 	it('returns null for a code it does not know', () => {
 		expect(usbFailureText('usb_something_else', en)).toBeNull();
 		expect(usbFailureText(null, en)).toBeNull();
 	});
 	it('reads the code from a refusal detail', () => {
-		expect(usbFailureCode({ status: 409, detail: { code: 'usb_copy_busy', message: 'x' } })).toBe('usb_copy_busy');
+		expect(usbFailureCode({ status: 409, detail: { code: 'usb_copy_busy', message: 'x' } })).toBe(
+			'usb_copy_busy'
+		);
 		expect(usbFailureCode({ status: 500, detail: 'text' })).toBeNull();
 		expect(usbFailureCode(new Error('x'))).toBeNull();
 	});
@@ -87,14 +97,19 @@ describe('the failure messages', () => {
 		const eligible = { status: 422, detail: { code: 'usb_not_eligible' } };
 		expect(testingRefusalText(busy, en, 'testing')).toBe(en.testing_usb_err_copy_busy);
 		expect(testingRefusalText(eligible, es, 'testing')).toBe(es.testing_usb_err_not_eligible);
-		expect(testingRefusalText({ status: 500, detail: { code: 'usb_copy_busy' } }, en, 'testing')).toBeNull();
+		expect(
+			testingRefusalText({ status: 500, detail: { code: 'usb_copy_busy' } }, en, 'testing')
+		).toBeNull();
 		expect(testingRefusalText(busy, en, 'admin')).toBeNull();
 	});
 });
 
 describe('the dialog strings', () => {
 	it('have the same testing_usb_ keys in both catalogues', () => {
-		const keys = (c: object) => Object.keys(c).filter((k) => k.startsWith('testing_usb_')).sort();
+		const keys = (c: object) =>
+			Object.keys(c)
+				.filter((k) => k.startsWith('testing_usb_'))
+				.sort();
 		expect(keys(en).length).toBeGreaterThan(CODES.length);
 		expect(keys(es)).toEqual(keys(en));
 	});

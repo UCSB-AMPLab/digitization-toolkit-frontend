@@ -25,7 +25,12 @@
 	// Version: 0.1.0-beta
 
 	import { tick } from 'svelte';
-	import { collectionsApi, type FreePlan, type OffsiteJobResult, type VolumeOffsiteState } from '$lib/api';
+	import {
+		collectionsApi,
+		type FreePlan,
+		type OffsiteJobResult,
+		type VolumeOffsiteState
+	} from '$lib/api';
 	import { m } from '$lib/i18n';
 	import { dismissible } from '$lib/dialog';
 	import {
@@ -62,7 +67,6 @@
 		onJobStarted?: (collectionId: number, action: 'free' | 'restore', jobId: string) => void;
 	} = $props();
 
-
 	type Step =
 		| { kind: 'menu' }
 		| { kind: 'planning' }
@@ -87,7 +91,9 @@
 	});
 
 	let planView = $derived(step?.kind === 'plan' ? planSummary(step.plan, $m) : null);
-	let resultView = $derived(step?.kind === 'done' ? resultSummary(step.action, step.result, $m) : null);
+	let resultView = $derived(
+		step?.kind === 'done' ? resultSummary(step.action, step.result, $m) : null
+	);
 	let freedLine = $derived(
 		offsite && (offsite.freed_files ?? 0) > 0
 			? $m.offsite_vol_freed(offsite.freed_files ?? 0, offsite.freed_bytes ?? 0)
@@ -138,7 +144,11 @@
 	}
 
 	function askRestore() {
-		step = { kind: 'confirm-restore', files: offsite?.freed_files ?? 0, bytes: offsite?.freed_bytes ?? 0 };
+		step = {
+			kind: 'confirm-restore',
+			files: offsite?.freed_files ?? 0,
+			bytes: offsite?.freed_bytes ?? 0
+		};
 		focusCard();
 	}
 
@@ -151,7 +161,9 @@
 		const outcome = await runOffsiteJob(
 			action,
 			async () => {
-				const started = await (action === 'free' ? collectionsApi.startFree(forId) : collectionsApi.startRestore(forId));
+				const started = await (action === 'free'
+					? collectionsApi.startFree(forId)
+					: collectionsApi.startRestore(forId));
 				onJobStarted?.(forId, action, started.job_id);
 				return started;
 			},
@@ -163,7 +175,10 @@
 		// A job may have changed files even when it failed part way.
 		onChanged(forId);
 		if (outcome.kind === 'aborted' || controller.signal.aborted) return;
-		step = outcome.kind === 'done' ? { kind: 'done', action, result: outcome.result } : { kind: 'error', action, text: outcome.text };
+		step =
+			outcome.kind === 'done'
+				? { kind: 'done', action, result: outcome.result }
+				: { kind: 'error', action, text: outcome.text };
 		focusCard();
 	}
 
@@ -252,7 +267,9 @@
 					<button class="btn btn-ghost" onclick={close}>{$m.common_cancel}</button>
 				</div>
 			{:else if step.kind === 'plan' && planView}
-				<h3 id="offsite-dialog-title" class="offsite-dialog-title">{$m.offsite_free_confirm_title}</h3>
+				<h3 id="offsite-dialog-title" class="offsite-dialog-title">
+					{$m.offsite_free_confirm_title}
+				</h3>
 				<p class="offsite-dialog-body">{planView.body}</p>
 				{#if planView.leftTitle}
 					<p class="offsite-dialog-body">{planView.leftTitle}</p>
@@ -272,18 +289,26 @@
 					{/if}
 				{/if}
 				<div class="offsite-dialog-actions">
-					<button class="btn btn-ghost" onclick={close}>{planView.canFree ? $m.common_cancel : $m.common_close}</button>
+					<button class="btn btn-ghost" onclick={close}
+						>{planView.canFree ? $m.common_cancel : $m.common_close}</button
+					>
 					{#if planView.canFree}
-						<button class="btn btn-primary" onclick={() => run('free')}>{$m.offsite_free_confirm}</button>
+						<button class="btn btn-primary" onclick={() => run('free')}
+							>{$m.offsite_free_confirm}</button
+						>
 					{/if}
 				</div>
 			{:else if step.kind === 'confirm-restore'}
-				<h3 id="offsite-dialog-title" class="offsite-dialog-title">{$m.offsite_restore_confirm_title}</h3>
+				<h3 id="offsite-dialog-title" class="offsite-dialog-title">
+					{$m.offsite_restore_confirm_title}
+				</h3>
 				<p class="offsite-dialog-body">{$m.offsite_restore_confirm_body(step.files, step.bytes)}</p>
 				<p class="offsite-dialog-body offsite-dialog-muted">{$m.offsite_restore_space_note}</p>
 				<div class="offsite-dialog-actions">
 					<button class="btn btn-ghost" onclick={close}>{$m.common_cancel}</button>
-					<button class="btn btn-primary" onclick={() => run('restore')}>{$m.offsite_restore_confirm}</button>
+					<button class="btn btn-primary" onclick={() => run('restore')}
+						>{$m.offsite_restore_confirm}</button
+					>
 				</div>
 			{:else if step.kind === 'running'}
 				<h3 id="offsite-dialog-title" class="offsite-dialog-title">

@@ -56,7 +56,10 @@ export interface BackupClassification {
  * that it is missing. Further in the future, one of the two clocks is wrong
  * by more than skew explains and the age means nothing, so it is unknown.
  */
-export function classifyBackup(status: CatalogueBackupStatus, now: Date | number): BackupClassification {
+export function classifyBackup(
+	status: CatalogueBackupStatus,
+	now: Date | number
+): BackupClassification {
 	if (!status || typeof status.enabled !== 'boolean') return { level: 'unknown', verifiedAt: null };
 	// Scanner only (offline) mode takes no dump. A missing field (older backend) counts as allowed.
 	if (status.mode_allows === false) return { level: 'local', verifiedAt: null };
@@ -87,7 +90,10 @@ export type CatalogueBackupSnapshot =
  * older than MAX_ANSWER_AGE_MS: an answer that could not be refreshed for that
  * long says nothing about the copy now.
  */
-export function classifySnapshot(snapshot: CatalogueBackupSnapshot, now: number): BackupClassification | null {
+export function classifySnapshot(
+	snapshot: CatalogueBackupSnapshot,
+	now: number
+): BackupClassification | null {
 	if (snapshot.kind === 'loading') return null;
 	if (snapshot.kind === 'failed') return { level: 'unknown', verifiedAt: null };
 	if (now - snapshot.receivedAt > MAX_ANSWER_AGE_MS) return { level: 'unknown', verifiedAt: null };
@@ -148,7 +154,9 @@ export const REQUEST_TIMEOUT_MS = 20 * 1000;
  */
 export const RECLASSIFY_INTERVAL_MS = 60 * 1000;
 
-export type PollResult<T = CatalogueBackupStatus> = { ok: true; status: T } | { ok: false; error: unknown };
+export type PollResult<T = CatalogueBackupStatus> =
+	| { ok: true; status: T }
+	| { ok: false; error: unknown };
 
 /**
  * Fetch now, then again `intervalMs` after each answer, success or failure.
@@ -194,7 +202,9 @@ export function startPolling<T = CatalogueBackupStatus>(
 			const status = await Promise.race([
 				fetcher(controller.signal),
 				new Promise<never>((_resolve, reject) =>
-					controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true })
+					controller.signal.addEventListener('abort', () => reject(controller.signal.reason), {
+						once: true
+					})
 				)
 			]);
 			result = { ok: true, status };

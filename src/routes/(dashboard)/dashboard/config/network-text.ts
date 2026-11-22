@@ -40,8 +40,13 @@ export function formatReadTime(ms: number, locale: 'es' | 'en', now: number = Da
 	const at = new Date(ms);
 	const today = new Date(now);
 	const sameYear = at.getFullYear() === today.getFullYear();
-	const sameDay = sameYear && at.getMonth() === today.getMonth() && at.getDate() === today.getDate();
-	const time: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+	const sameDay =
+		sameYear && at.getMonth() === today.getMonth() && at.getDate() === today.getDate();
+	const time: Intl.DateTimeFormatOptions = {
+		hour: '2-digit',
+		minute: '2-digit',
+		second: '2-digit'
+	};
 	const options: Intl.DateTimeFormatOptions = sameDay
 		? time
 		: { ...time, day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) };
@@ -51,7 +56,8 @@ export function formatReadTime(ms: number, locale: 'es' | 'en', now: number = Da
 /** The networks in range, the one in use first, then by signal. */
 export function orderNetworks(networks: WifiNetwork[]): WifiNetwork[] {
 	return [...networks].sort(
-		(a, b) => Number(b.inUse) - Number(a.inUse) || b.signal - a.signal || a.ssid.localeCompare(b.ssid)
+		(a, b) =>
+			Number(b.inUse) - Number(a.inUse) || b.signal - a.signal || a.ssid.localeCompare(b.ssid)
 	);
 }
 
@@ -102,18 +108,31 @@ export function statusWarning(code: string, wifi: boolean, msgs: Messages): Stat
 /** The sentence for a failed join (GET /network/wifi/join `problem.code`). */
 export function joinFailureText(code: string | null | undefined, msgs: Messages): string {
 	switch (code) {
-		case 'wrong_password': return msgs.network_fail_wrong_password;
-		case 'wrong_credentials': return msgs.network_fail_wrong_credentials;
-		case 'server_name_mismatch': return msgs.network_fail_server_name_mismatch;
-		case 'server_not_trusted': return msgs.network_fail_server_not_trusted;
-		case 'timeout': return msgs.network_fail_timeout;
-		case 'not_permitted': return msgs.network_fail_not_permitted;
-		default: return msgs.network_fail_failed;
+		case 'wrong_password':
+			return msgs.network_fail_wrong_password;
+		case 'wrong_credentials':
+			return msgs.network_fail_wrong_credentials;
+		case 'server_name_mismatch':
+			return msgs.network_fail_server_name_mismatch;
+		case 'server_not_trusted':
+			return msgs.network_fail_server_not_trusted;
+		case 'timeout':
+			return msgs.network_fail_timeout;
+		case 'not_permitted':
+			return msgs.network_fail_not_permitted;
+		default:
+			return msgs.network_fail_failed;
 	}
 }
 
 /** Where a refusal of POST /network/wifi/join is shown: beside a field, or in the dialog. */
-export type JoinField = 'password' | 'identity' | 'anonymousIdentity' | 'method' | 'serverName' | 'dialog';
+export type JoinField =
+	| 'password'
+	| 'identity'
+	| 'anonymousIdentity'
+	| 'method'
+	| 'serverName'
+	| 'dialog';
 
 export function refusalField(code: string): JoinField {
 	switch (code) {
@@ -139,21 +158,36 @@ export function refusalField(code: string): JoinField {
 
 export function refusalText(code: string, msgs: Messages): string {
 	switch (code) {
-		case 'ssid_invalid': return msgs.network_refusal_ssid_invalid;
-		case 'password_required': return msgs.network_refusal_password_required;
-		case 'password_invalid': return msgs.network_refusal_password_invalid;
-		case 'password_length': return msgs.network_refusal_password_length;
-		case 'identity_required': return msgs.network_refusal_identity_required;
-		case 'identity_invalid': return msgs.network_refusal_identity_invalid;
-		case 'anonymous_identity_invalid': return msgs.network_refusal_anonymous_identity_invalid;
-		case 'method_required': return msgs.network_refusal_method_required;
-		case 'server_name_required': return msgs.network_refusal_server_name_required;
-		case 'server_name_invalid': return msgs.network_refusal_server_name_invalid;
-		case 'inner_method_invalid': return msgs.network_refusal_inner_method_invalid;
-		case 'no_wifi_device': return msgs.network_no_wifi_device;
-		case 'not_permitted': return msgs.network_refusal_not_permitted;
-		case 'join_in_progress': return msgs.network_refusal_join_in_progress;
-		default: return msgs.network_refusal_other;
+		case 'ssid_invalid':
+			return msgs.network_refusal_ssid_invalid;
+		case 'password_required':
+			return msgs.network_refusal_password_required;
+		case 'password_invalid':
+			return msgs.network_refusal_password_invalid;
+		case 'password_length':
+			return msgs.network_refusal_password_length;
+		case 'identity_required':
+			return msgs.network_refusal_identity_required;
+		case 'identity_invalid':
+			return msgs.network_refusal_identity_invalid;
+		case 'anonymous_identity_invalid':
+			return msgs.network_refusal_anonymous_identity_invalid;
+		case 'method_required':
+			return msgs.network_refusal_method_required;
+		case 'server_name_required':
+			return msgs.network_refusal_server_name_required;
+		case 'server_name_invalid':
+			return msgs.network_refusal_server_name_invalid;
+		case 'inner_method_invalid':
+			return msgs.network_refusal_inner_method_invalid;
+		case 'no_wifi_device':
+			return msgs.network_no_wifi_device;
+		case 'not_permitted':
+			return msgs.network_refusal_not_permitted;
+		case 'join_in_progress':
+			return msgs.network_refusal_join_in_progress;
+		default:
+			return msgs.network_refusal_other;
 	}
 }
 
@@ -164,7 +198,9 @@ export function refusalCodes(error: unknown): string[] | null {
 	if (e.status !== 409 || typeof e.detail !== 'object' || e.detail === null) return null;
 	const problems = (e.detail as { problems?: unknown }).problems;
 	if (!Array.isArray(problems)) return null;
-	return problems.map((p) => (p && typeof p === 'object' && typeof p.code === 'string' ? p.code : ''));
+	return problems.map((p) =>
+		p && typeof p === 'object' && typeof p.code === 'string' ? p.code : ''
+	);
 }
 
 // The backend's _LINE_BREAKS: a value with one would end its passwd-file line early.
@@ -205,17 +241,20 @@ export interface JoinForm {
  */
 export function joinFormProblems(form: JoinForm): string[] {
 	const codes: string[] = [];
-	if (!form.ssid || utf8Length(form.ssid) > 32 || LINE_BREAK.test(form.ssid)) codes.push('ssid_invalid');
+	if (!form.ssid || utf8Length(form.ssid) > 32 || LINE_BREAK.test(form.ssid))
+		codes.push('ssid_invalid');
 	if (form.security === 'password') {
 		if (!form.password) codes.push('password_required');
 		else if (CONTROL_CHARACTER.test(form.password)) codes.push('password_invalid');
-		else if (utf8Length(form.password) < 8 || utf8Length(form.password) > 63) codes.push('password_length');
+		else if (utf8Length(form.password) < 8 || utf8Length(form.password) > 63)
+			codes.push('password_length');
 	} else if (form.security === 'enterprise') {
 		if (!form.password) codes.push('password_required');
 		else if (LINE_BREAK.test(form.password)) codes.push('password_invalid');
 		if (!form.identity) codes.push('identity_required');
 		else if (LINE_BREAK.test(form.identity)) codes.push('identity_invalid');
-		if (form.anonymousIdentity && LINE_BREAK.test(form.anonymousIdentity)) codes.push('anonymous_identity_invalid');
+		if (form.anonymousIdentity && LINE_BREAK.test(form.anonymousIdentity))
+			codes.push('anonymous_identity_invalid');
 		if (!form.serverName) codes.push('server_name_required');
 		else if (!validServerName(form.serverName)) codes.push('server_name_invalid');
 	}

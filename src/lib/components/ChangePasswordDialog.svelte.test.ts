@@ -36,14 +36,20 @@ let sent: Sent[];
 let resetAnswer: () => Response | Promise<Response>;
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function serve() {
 	sent = [];
 	resetAnswer = () => json({ detail: 'password updated successfully' });
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-		const url = new URL(typeof input === 'string' ? input : (input as Request).url, 'http://localhost:8000');
+		const url = new URL(
+			typeof input === 'string' ? input : (input as Request).url,
+			'http://localhost:8000'
+		);
 		const method = (init?.method ?? 'GET').toUpperCase();
 		const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
 		sent.push({ method, path: url.pathname, body });
@@ -71,9 +77,15 @@ async function openDialog(msgs = en) {
 }
 
 async function fill(current: string, next: string, repeat: string, msgs = en) {
-	await userEvent.fill(page.getByLabelText(msgs.account_password_current_label, { exact: true }), current);
+	await userEvent.fill(
+		page.getByLabelText(msgs.account_password_current_label, { exact: true }),
+		current
+	);
 	await userEvent.fill(page.getByLabelText(msgs.account_password_new_label, { exact: true }), next);
-	await userEvent.fill(page.getByLabelText(msgs.account_password_repeat_label, { exact: true }), repeat);
+	await userEvent.fill(
+		page.getByLabelText(msgs.account_password_repeat_label, { exact: true }),
+		repeat
+	);
 	await page.getByRole('button', { name: msgs.common_save, exact: true }).click();
 }
 
@@ -100,7 +112,9 @@ describe('who sees Change password', () => {
 			serve();
 			signIn(role);
 			await openMenu();
-			await expect.element(page.getByRole('menuitem', { name: en.account_password_action })).toBeVisible();
+			await expect
+				.element(page.getByRole('menuitem', { name: en.account_password_action }))
+				.toBeVisible();
 			expect(changesOwnPassword(role)).toBe(true);
 		});
 	}
@@ -110,7 +124,9 @@ describe('who sees Change password', () => {
 		authStore.setSession(TESTING_USER);
 		await openMenu();
 		await expect.element(page.getByRole('menuitem', { name: en.nav_logout })).toBeVisible();
-		expect(page.getByRole('menuitem', { name: en.account_password_action }).elements()).toHaveLength(0);
+		expect(
+			page.getByRole('menuitem', { name: en.account_password_action }).elements()
+		).toHaveLength(0);
 		expect(changesOwnPassword('testing')).toBe(false);
 		expect(rec.refusedList()).toEqual([]);
 	});
@@ -126,8 +142,14 @@ describe('the form', () => {
 		expect(username.value).toBe('user-operator');
 		expect(username.readOnly).toBe(true);
 		const passwords = [...form.querySelectorAll('input[type="password"]')] as HTMLInputElement[];
-		expect(passwords.map((i) => i.autocomplete)).toEqual(['current-password', 'new-password', 'new-password']);
-		expect(document.activeElement).toBe(page.getByLabelText(en.account_password_current_label, { exact: true }).element());
+		expect(passwords.map((i) => i.autocomplete)).toEqual([
+			'current-password',
+			'new-password',
+			'new-password'
+		]);
+		expect(document.activeElement).toBe(
+			page.getByLabelText(en.account_password_current_label, { exact: true }).element()
+		);
 	});
 
 	it('sends nothing while the new password and its repeat differ', async () => {
@@ -144,7 +166,9 @@ describe('the form', () => {
 		signIn('operator');
 		await openDialog();
 		await fill(CURRENT, 'fake-pw', 'fake-pw');
-		await expect.element(page.getByRole('alert')).toHaveTextContent(en.common_password_too_short(8));
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent(en.common_password_too_short(8));
 		expect(resets()).toEqual([]);
 	});
 
@@ -153,12 +177,17 @@ describe('the form', () => {
 		signIn('operator');
 		await openDialog();
 		await fill('', NEW, NEW);
-		await expect.element(page.getByRole('alert')).toHaveTextContent(en.account_password_val_current_required);
+		await expect
+			.element(page.getByRole('alert'))
+			.toHaveTextContent(en.account_password_val_current_required);
 		expect(resets()).toEqual([]);
 	});
 });
 
-const LOCALES: [Locale, typeof en][] = [['en', en], ['es', es]];
+const LOCALES: [Locale, typeof en][] = [
+	['en', en],
+	['es', es]
+];
 
 describe('a wrong current password', () => {
 	for (const [lang, msgs] of LOCALES) {
@@ -169,7 +198,9 @@ describe('a wrong current password', () => {
 			signIn('reviewer');
 			await openDialog(msgs);
 			await fill(CURRENT, NEW, NEW, msgs);
-			await expect.element(page.getByRole('alert')).toHaveTextContent(msgs.account_password_err_wrong_current);
+			await expect
+				.element(page.getByRole('alert'))
+				.toHaveTextContent(msgs.account_password_err_wrong_current);
 			await expect.element(page.getByRole('dialog')).toBeVisible();
 			expect(authStore.getUser()).not.toBeNull();
 			expect(goto).not.toHaveBeenCalled();
@@ -190,14 +221,26 @@ describe('other refusals', () => {
 
 	for (const [lang, msgs] of LOCALES) {
 		const cases: [string, () => Response, string][] = [
-			['testing_account', () => json({ detail: { code: 'testing_account', message: 'x' } }, 403), msgs.account_password_err_testing_account],
-			['password_too_short', () => json({ detail: { code: 'password_too_short', message: 'x', min_length: 8 } }, 422), msgs.common_password_too_short(8)],
+			[
+				'testing_account',
+				() => json({ detail: { code: 'testing_account', message: 'x' } }, 403),
+				msgs.account_password_err_testing_account
+			],
+			[
+				'password_too_short',
+				() => json({ detail: { code: 'password_too_short', message: 'x', min_length: 8 } }, 422),
+				msgs.common_password_too_short(8)
+			],
 			[
 				'the login throttle, with Retry-After',
-				() => new Response(JSON.stringify({ detail: 'Too many failed login attempts. Try again later.' }), {
-					status: 429,
-					headers: { 'Content-Type': 'application/json', 'Retry-After': '300' }
-				}),
+				() =>
+					new Response(
+						JSON.stringify({ detail: 'Too many failed login attempts. Try again later.' }),
+						{
+							status: 429,
+							headers: { 'Content-Type': 'application/json', 'Retry-After': '300' }
+						}
+					),
 				msgs.login_error_locked_out(5)
 			],
 			[
@@ -205,7 +248,11 @@ describe('other refusals', () => {
 				() => json({ detail: 'Too many failed login attempts. Try again later.' }, 429),
 				msgs.login_error_locked_out_unknown
 			],
-			['a 422', () => json({ detail: [{ type: 'string_type' }] }, 422), msgs.account_password_err_invalid],
+			[
+				'a 422',
+				() => json({ detail: [{ type: 'string_type' }] }, 422),
+				msgs.account_password_err_invalid
+			],
 			['a 500', () => json({ detail: 'boom' }, 500), msgs.account_password_err_generic]
 		];
 		for (const [name, response, text] of cases) {
@@ -234,7 +281,11 @@ describe('success', () => {
 
 			await expect.poll(() => get(loginNotice)).toBe('password_changed');
 			expect(resets()).toEqual([
-				{ method: 'POST', path: '/auth/password-reset', body: { old_password: CURRENT, new_password: NEW } }
+				{
+					method: 'POST',
+					path: '/auth/password-reset',
+					body: { old_password: CURRENT, new_password: NEW }
+				}
 			]);
 			expect(authStore.getUser()).toBeNull();
 			expect(goto).toHaveBeenCalledWith('/login');
@@ -295,7 +346,13 @@ describe('success', () => {
 		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
 
 		// B signs in on the same screen, as the login page does.
-		const b = { id: 31, username: 'otra-persona', email: null, role: 'reviewer' as const, is_active: true };
+		const b = {
+			id: 31,
+			username: 'otra-persona',
+			email: null,
+			role: 'reviewer' as const,
+			is_active: true
+		};
 		authStore.setSession(b, { signIn: true });
 		sessionRenewals.resume();
 		vi.mocked(goto).mockClear();

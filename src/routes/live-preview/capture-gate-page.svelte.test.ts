@@ -63,7 +63,10 @@ async function advance(ms: number) {
 }
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function gatewayTimeout() {
@@ -73,22 +76,58 @@ function gatewayTimeout() {
 	});
 }
 
-type Img = { id: number; record_id: number; filename: string; file_path: string; format: string; role: string; is_current: boolean };
+type Img = {
+	id: number;
+	record_id: number;
+	filename: string;
+	file_path: string;
+	format: string;
+	role: string;
+	is_current: boolean;
+};
 type Rec = {
-	id: number; title: string; status: string; sequence: number; capture_mode: string; collection_id: number; images: Img[];
-	missing_side: string | null; missing_expected: string | null; missing_note: string | null;
-	missing_request_id: string | null; closed_reason: string | null; closed_note: string | null;
+	id: number;
+	title: string;
+	status: string;
+	sequence: number;
+	capture_mode: string;
+	collection_id: number;
+	images: Img[];
+	missing_side: string | null;
+	missing_expected: string | null;
+	missing_note: string | null;
+	missing_request_id: string | null;
+	closed_reason: string | null;
+	closed_note: string | null;
 };
 
 function img(id: number, recordId: number, role: string): Img {
-	return { id, record_id: recordId, filename: `${id}.jpg`, file_path: `/${id}`, format: 'jpg', role, is_current: true };
+	return {
+		id,
+		record_id: recordId,
+		filename: `${id}.jpg`,
+		file_path: `/${id}`,
+		format: 'jpg',
+		role,
+		is_current: true
+	};
 }
 
 function pair(id: number, sequence: number): Rec {
 	return {
-		id, title: `Par ${sequence}`, status: 'captured', sequence, capture_mode: 'dual', collection_id: 9,
+		id,
+		title: `Par ${sequence}`,
+		status: 'captured',
+		sequence,
+		capture_mode: 'dual',
+		collection_id: 9,
 		images: [img(id * 10, id, 'left'), img(id * 10 + 1, id, 'right')],
-		missing_side: null, missing_expected: null, missing_note: null, missing_request_id: null, closed_reason: null, closed_note: null
+		missing_side: null,
+		missing_expected: null,
+		missing_note: null,
+		missing_request_id: null,
+		closed_reason: null,
+		closed_note: null
 	};
 }
 
@@ -121,12 +160,20 @@ function serve() {
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const url = new URL(String(input), 'http://localhost');
 		const path = url.pathname;
-		if (path.endsWith('/records/to-retake/summary')) return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
+		if (path.endsWith('/records/to-retake/summary'))
+			return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
 		if (path.endsWith('/imports/digitisation-lists')) return json([]);
 		if (/\/records\/\d+\/rejections$/.test(path)) return json([]);
 		if (/\/collections\/\d+$/.test(path)) {
 			const id = Number(path.split('/').pop());
-			return json({ id, name: `Tomo ${id}`, project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: `stem-${id}`, custom_attributes: null });
+			return json({
+				id,
+				name: `Tomo ${id}`,
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: `stem-${id}`,
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
 		if (path.endsWith('/cameras/capabilities')) return json(served.capabilities);
@@ -134,7 +181,9 @@ function serve() {
 			served.recordReads++;
 			const next = served.recordsNext.shift();
 			if (next) return next();
-			return json(url.searchParams.get('collection_id') === '10' ? served.records10 : served.records);
+			return json(
+				url.searchParams.get('collection_id') === '10' ? served.records10 : served.records
+			);
 		}
 		if (path.endsWith('/cameras/capture') || path.endsWith('/cameras/capture/dual')) {
 			const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
@@ -169,7 +218,13 @@ beforeEach(() => {
 	served.recordReads = 0;
 	served.capabilities = {};
 	cameraStatus.reportSuccess();
-	authStore.setSession({ id: 1, username: 'operator', email: null, role: 'operator', is_active: true });
+	authStore.setSession({
+		id: 1,
+		username: 'operator',
+		email: null,
+		role: 'operator',
+		is_active: true
+	});
 	// No automatic focus check on opening the screen.
 	recordFocusActivity(1, Date.now() + 60 * 60 * 1000);
 });
@@ -187,20 +242,26 @@ function words(el: Element): string {
 	return copy.textContent?.trim() ?? '';
 }
 const dialogs = () => [...document.querySelectorAll('[role="dialog"]')] as HTMLElement[];
-const dialogText = () => dialogs().map((d) => d.textContent ?? '').join(' ');
+const dialogText = () =>
+	dialogs()
+		.map((d) => d.textContent ?? '')
+		.join(' ');
 const buttonIn = (root: ParentNode | null, name: string) =>
-	[...(root?.querySelectorAll('button') ?? [])].find((b) => words(b) === name || b.getAttribute('aria-label') === name) as
-		| HTMLButtonElement
-		| undefined;
+	[...(root?.querySelectorAll('button') ?? [])].find(
+		(b) => words(b) === name || b.getAttribute('aria-label') === name
+	) as HTMLButtonElement | undefined;
 const thumb = (title: string) =>
-	[...document.querySelectorAll<HTMLButtonElement>('.thumbnail-item')].find((b) => b.textContent?.includes(title));
+	[...document.querySelectorAll<HTMLButtonElement>('.thumbnail-item')].find((b) =>
+		b.textContent?.includes(title)
+	);
 const captureButton = () => document.querySelector('button.capture-btn') as HTMLButtonElement;
 const press = () => {
 	window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
 	window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
 };
 const viewerTitle = () => document.querySelector('.img-viewer-title')?.textContent?.trim() ?? '';
-const stripSources = () => [...document.querySelectorAll('.thumbnail-item img')].map((i) => i.getAttribute('src') ?? '');
+const stripSources = () =>
+	[...document.querySelectorAll('.thumbnail-item img')].map((i) => i.getAttribute('src') ?? '');
 
 async function screenReady() {
 	await vi.waitFor(() => expect(thumb('Par 97')).toBeTruthy());
@@ -232,7 +293,9 @@ async function viewportCaptureTimedOut() {
 	await advance(120_000);
 	answer(gatewayTimeout());
 	await settle();
-	expect(document.querySelector('.capture-note-banner')?.textContent).toContain(es.lv_capture_maybe_saved);
+	expect(document.querySelector('.capture-note-banner')?.textContent).toContain(
+		es.lv_capture_maybe_saved
+	);
 }
 
 describe('capture screen: what the screen knows the server holds (NEH-381)', () => {
@@ -248,18 +311,24 @@ describe('capture screen: what the screen knows the server holds (NEH-381)', () 
 		await vi.waitFor(() => expect(served.recordReads).toBeGreaterThanOrEqual(2));
 		await settle();
 		const a = served.records[served.records.length - 1];
-		expect(stripSources().some((src) => src.includes(`/records/images/${a.images[0].id}/`))).toBe(false);
+		expect(stripSources().some((src) => src.includes(`/records/images/${a.images[0].id}/`))).toBe(
+			false
+		);
 
 		// Capture B times out; the first read shows A, not B.
 		await viewportCaptureTimedOut();
 		await advance(5_000);
-		expect(document.querySelector('.capture-note-banner')?.textContent).toContain(es.lv_capture_maybe_saved);
+		expect(document.querySelector('.capture-note-banner')?.textContent).toContain(
+			es.lv_capture_maybe_saved
+		);
 		expect(captureButton().disabled).toBe(true);
 
 		// B is stored: the next read finds it.
 		appendPair(700);
 		await advance(5_000);
-		expect(document.querySelector('.capture-note-banner')?.textContent).toContain(es.lv_capture_found);
+		expect(document.querySelector('.capture-note-banner')?.textContent).toContain(
+			es.lv_capture_found
+		);
 		expect(captureButton().disabled).toBe(false);
 		expect(served.captures).toHaveLength(2);
 	});
@@ -271,7 +340,11 @@ describe('capture screen: what the screen knows the server holds (NEH-381)', () 
 // moved without being listed here.
 const ENTRY_POINTS = {
 	'LiveViewport.svelte': ['the capture button', 'the capture key and pedal'],
-	'+page.svelte': ['Retake and Confirm in the image window', 'Capture in a placeholder', 'Capture another here'],
+	'+page.svelte': [
+		'Retake and Confirm in the image window',
+		'Capture in a placeholder',
+		'Capture another here'
+	],
 	'CameraCheck.svelte': ['Check cameras (its test captures)'],
 	'RefocusModal.svelte': ['Refocus (its test captures)']
 } as const;
@@ -345,7 +418,11 @@ describe('capture screen: one gate for starting a capture (NEH-381)', () => {
 	});
 
 	it('the list of entry points names every capture request the capture screen can send', () => {
-		const sources = import.meta.glob('./*.svelte', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+		const sources = import.meta.glob('./*.svelte', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		}) as Record<string, string>;
 		const calls: Record<string, number> = {};
 		for (const [path, source] of Object.entries(sources)) {
 			const n = (source.match(/camerasApi\.(capture|captureDual|testCapture)\(/g) ?? []).length;
@@ -353,7 +430,12 @@ describe('capture screen: one gate for starting a capture (NEH-381)', () => {
 		}
 		expect(Object.keys(calls).sort()).toEqual(Object.keys(ENTRY_POINTS).sort());
 		// LiveViewport: single and dual; the page: the retake's two and Capture another here.
-		expect(calls).toEqual({ 'LiveViewport.svelte': 2, '+page.svelte': 3, 'CameraCheck.svelte': 1, 'RefocusModal.svelte': 1 });
+		expect(calls).toEqual({
+			'LiveViewport.svelte': 2,
+			'+page.svelte': 3,
+			'CameraCheck.svelte': 1,
+			'RefocusModal.svelte': 1
+		});
 	});
 });
 
@@ -396,7 +478,9 @@ describe('capture screen: a request and a read belong to the volume they began i
 
 		// The first read of the check stays unanswered; the volume changes meanwhile.
 		let answerRead!: () => void;
-		served.recordsNext = [() => new Promise<Response>((r) => (answerRead = () => r(json(served.records))))];
+		served.recordsNext = [
+			() => new Promise<Response>((r) => (answerRead = () => r(json(served.records))))
+		];
 		await advance(5_000);
 		current.set('http://localhost/live-preview?projectId=2&collectionId=10');
 		await settle();
@@ -431,7 +515,9 @@ describe('capture screen: a request and a read belong to the volume they began i
 describe('capture screen: no capture before the volume has been read (NEH-381)', () => {
 	it('while the first read of the records is pending, neither the button nor the key sends a capture', async () => {
 		let answerRead!: () => void;
-		served.recordsNext = [() => new Promise<Response>((r) => (answerRead = () => r(json(served.records))))];
+		served.recordsNext = [
+			() => new Promise<Response>((r) => (answerRead = () => r(json(served.records))))
+		];
 		serve();
 		render(LivePreview);
 		await vi.waitFor(() => expect(served.recordReads).toBe(1));
@@ -492,12 +578,18 @@ describe('capture screen: the image window is modal (NEH-381)', () => {
 
 describe('capture screen: another volume clears the old one (NEH-381)', () => {
 	it('a placeholder fill pending when the volume changes: the window closes, the old success is dropped, nothing targets the old record', async () => {
-		served.records = [pair(41, 95), { ...pair(42, 96), images: [], missing_side: 'both' }, pair(43, 97)];
+		served.records = [
+			pair(41, 95),
+			{ ...pair(42, 96), images: [], missing_side: 'both' },
+			pair(43, 97)
+		];
 		current.url = `${BASE_URL}&recordId=42`;
 		serve();
 		const screen = render(LivePreview);
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByRole('button', { name: es.retakes_capture, exact: true })).toBeVisible();
+		await expect
+			.element(dialog.getByRole('button', { name: es.retakes_capture, exact: true }))
+			.toBeVisible();
 		const answer = holdNextCapture();
 		await dialog.getByRole('button', { name: es.retakes_capture, exact: true }).click();
 		await vi.waitFor(() => expect(served.captures).toHaveLength(1));
@@ -524,7 +616,9 @@ describe('capture screen: another volume clears the old one (NEH-381)', () => {
 describe('capture screen: a failed first read of the records (NEH-381)', () => {
 	const unread = () => document.body.textContent?.includes(es.lv_records_unread) ?? false;
 	const retry = () =>
-		[...document.querySelectorAll<HTMLButtonElement>('.lv-records-unread button')].find((b) => words(b) === es.common_retry);
+		[...document.querySelectorAll<HTMLButtonElement>('.lv-records-unread button')].find(
+			(b) => words(b) === es.common_retry
+		);
 
 	it('says why capture is unavailable, with a retry that reads again; on success the message goes and capture works', async () => {
 		served.recordsNext = [async () => json({ detail: 'down' }, 500)];
@@ -544,7 +638,10 @@ describe('capture screen: a failed first read of the records (NEH-381)', () => {
 	});
 
 	it('a retry that fails again keeps the message and the button', async () => {
-		served.recordsNext = [async () => json({ detail: 'down' }, 500), async () => json({ detail: 'down' }, 500)];
+		served.recordsNext = [
+			async () => json({ detail: 'down' }, 500),
+			async () => json({ detail: 'down' }, 500)
+		];
 		serve();
 		render(LivePreview);
 		await vi.waitFor(() => expect(retry()).toBeTruthy());
@@ -557,7 +654,9 @@ describe('capture screen: a failed first read of the records (NEH-381)', () => {
 
 	it('while the first read is only pending, nothing new is shown', async () => {
 		let answerRead!: () => void;
-		served.recordsNext = [() => new Promise<Response>((r) => (answerRead = () => r(json(served.records))))];
+		served.recordsNext = [
+			() => new Promise<Response>((r) => (answerRead = () => r(json(served.records))))
+		];
 		serve();
 		render(LivePreview);
 		await vi.waitFor(() => expect(served.recordReads).toBe(1));

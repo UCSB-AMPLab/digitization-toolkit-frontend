@@ -47,7 +47,10 @@ describe('joinFormProblems: the SSID', () => {
 	});
 
 	it('comes before the password codes', () => {
-		expect(joinFormProblems(form({ ssid: '', password: '' }))).toEqual(['ssid_invalid', 'password_required']);
+		expect(joinFormProblems(form({ ssid: '', password: '' }))).toEqual([
+			'ssid_invalid',
+			'password_required'
+		]);
 	});
 });
 
@@ -78,7 +81,16 @@ describe('joinFormProblems: a WPA2/WPA3 password', () => {
 
 describe('joinFormProblems: an institutional network', () => {
 	it('accepts a tab in the password, the username and the outer identity', () => {
-		expect(joinFormProblems(form({ ...ENTERPRISE, password: '\tpass', identity: 'j\tdoe', anonymousIdentity: 'any\tone' }))).toEqual([]);
+		expect(
+			joinFormProblems(
+				form({
+					...ENTERPRISE,
+					password: '\tpass',
+					identity: 'j\tdoe',
+					anonymousIdentity: 'any\tone'
+				})
+			)
+		).toEqual([]);
 	});
 
 	it('has no length rule for the password', () => {
@@ -88,16 +100,27 @@ describe('joinFormProblems: an institutional network', () => {
 
 	it('refuses line breaks and NUL, field by field, in the backend order', () => {
 		expect(
-			joinFormProblems(form({ ...ENTERPRISE, password: 'a\nb', identity: 'j\rdoe', anonymousIdentity: 'any\u0000one', serverName: '10.0.0.1' }))
-		).toEqual(['password_invalid', 'identity_invalid', 'anonymous_identity_invalid', 'server_name_invalid']);
+			joinFormProblems(
+				form({
+					...ENTERPRISE,
+					password: 'a\nb',
+					identity: 'j\rdoe',
+					anonymousIdentity: 'any\u0000one',
+					serverName: '10.0.0.1'
+				})
+			)
+		).toEqual([
+			'password_invalid',
+			'identity_invalid',
+			'anonymous_identity_invalid',
+			'server_name_invalid'
+		]);
 	});
 
 	it('missing fields', () => {
-		expect(joinFormProblems(form({ security: 'enterprise', password: '', identity: '', serverName: '' }))).toEqual([
-			'password_required',
-			'identity_required',
-			'server_name_required'
-		]);
+		expect(
+			joinFormProblems(form({ security: 'enterprise', password: '', identity: '', serverName: '' }))
+		).toEqual(['password_required', 'identity_required', 'server_name_required']);
 	});
 
 	it.each([

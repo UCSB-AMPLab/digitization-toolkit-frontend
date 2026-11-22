@@ -37,7 +37,10 @@ describe('ExcludedNotice', () => {
 	afterEach(() => spy.mockRestore());
 
 	it("shows the hint and Fisqua's reason when the latest exclusion has a note", async () => {
-		spy.mockResolvedValue([change({ id: 2, note: 'Prueba del soporte' }), change({ id: 1, note: 'Más antigua' })]);
+		spy.mockResolvedValue([
+			change({ id: 2, note: 'Prueba del soporte' }),
+			change({ id: 1, note: 'Más antigua' })
+		]);
 		const screen = render(ExcludedNotice, { record: record() });
 		await expect.element(screen.getByText(es.status_excluded_hint)).toBeInTheDocument();
 		await expect.element(screen.getByText('Prueba del soporte')).toBeInTheDocument();

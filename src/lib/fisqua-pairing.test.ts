@@ -50,10 +50,21 @@ describe('readPairingStatus', () => {
 			token: 't-1',
 			apiKey: 'k-1',
 			linked: { ...ANSWER.linked, token: 't-2' },
-			result: { tenant: 'archivo-x', environment: 'production', at: '2026-11-13T10:00:00Z', by: 'admin1', secret: 's-2' }
+			result: {
+				tenant: 'archivo-x',
+				environment: 'production',
+				at: '2026-11-13T10:00:00Z',
+				by: 'admin1',
+				secret: 's-2'
+			}
 		});
 		expect(JSON.stringify(s)).not.toMatch(/secret|token|apiKey|cs-1|s-1|t-1|t-2|k-1|s-2/i);
-		expect(s?.result).toEqual({ tenant: 'archivo-x', environment: 'production', at: '2026-11-13T10:00:00Z', by: 'admin1' });
+		expect(s?.result).toEqual({
+			tenant: 'archivo-x',
+			environment: 'production',
+			at: '2026-11-13T10:00:00Z',
+			by: 'admin1'
+		});
 	});
 
 	it('reads a missing or malformed field as null rather than failing', () => {
@@ -68,14 +79,25 @@ describe('readPairingStatus', () => {
 	});
 
 	it('keeps restartRequired and lastOutcome, and reads them as false and null when absent', () => {
-		const s = readPairingStatus({ ...ANSWER, state: 'idle', restartRequired: true, lastOutcome: 'apply_unverified' });
+		const s = readPairingStatus({
+			...ANSWER,
+			state: 'idle',
+			restartRequired: true,
+			lastOutcome: 'apply_unverified'
+		});
 		expect([s?.restartRequired, s?.lastOutcome]).toEqual([true, 'apply_unverified']);
 		const bare = readPairingStatus({ state: 'idle' });
 		expect([bare?.restartRequired, bare?.lastOutcome]).toEqual([false, null]);
 	});
 
 	it('keeps the reason, the trouble and the device id error', () => {
-		const s = readPairingStatus({ ...ANSWER, state: 'not_eligible', reason: 'offsite_held', trouble: 'busy', deviceIdError: 'invalid' });
+		const s = readPairingStatus({
+			...ANSWER,
+			state: 'not_eligible',
+			reason: 'offsite_held',
+			trouble: 'busy',
+			deviceIdError: 'invalid'
+		});
 		expect([s?.reason, s?.trouble, s?.deviceIdError]).toEqual(['offsite_held', 'busy', 'invalid']);
 	});
 
@@ -100,13 +122,24 @@ describe('groupCode', () => {
 
 describe('pairingErrorCode', () => {
 	it('reads detail.code, whatever the status', () => {
-		expect(pairingErrorCode({ status: 409, detail: { code: 'offsite_held', message: 'English' } })).toBe('offsite_held');
-		expect(pairingErrorCode({ status: 422, detail: { code: 'unit_name', message: 'English' } })).toBe('unit_name');
+		expect(
+			pairingErrorCode({ status: 409, detail: { code: 'offsite_held', message: 'English' } })
+		).toBe('offsite_held');
+		expect(
+			pairingErrorCode({ status: 422, detail: { code: 'unit_name', message: 'English' } })
+		).toBe('unit_name');
 	});
 
 	it('is null for any other body', () => {
-		expect(pairingErrorCode({ status: 409, detail: { message: 'x', problems: [{ code: 'rclone_missing' }] } })).toBeNull();
-		expect(pairingErrorCode({ status: 422, detail: [{ loc: ['body', 'unitName'], msg: 'too long' }] })).toBeNull();
+		expect(
+			pairingErrorCode({
+				status: 409,
+				detail: { message: 'x', problems: [{ code: 'rclone_missing' }] }
+			})
+		).toBeNull();
+		expect(
+			pairingErrorCode({ status: 422, detail: [{ loc: ['body', 'unitName'], msg: 'too long' }] })
+		).toBeNull();
 		expect(pairingErrorCode({ status: 500 })).toBeNull();
 		expect(pairingErrorCode({ status: 409, detail: 'string' })).toBeNull();
 		expect(pairingErrorCode(new Error('x'))).toBeNull();
@@ -182,7 +215,12 @@ describe('pollPairing', () => {
 
 	it('keeps polling after a failed read', async () => {
 		const read = vi.fn().mockRejectedValue(new Error('down'));
-		const stop = pollPairing({ read, intervalMs: 100, hiddenStopMs: 1000, doc: new FakeDocument() });
+		const stop = pollPairing({
+			read,
+			intervalMs: 100,
+			hiddenStopMs: 1000,
+			doc: new FakeDocument()
+		});
 		await vi.advanceTimersByTimeAsync(250);
 		expect(read).toHaveBeenCalledTimes(3);
 		stop();
@@ -205,7 +243,13 @@ describe('pollPairing', () => {
 
 	it('gives up on a read that does not answer in time and polls again', async () => {
 		const read = vi.fn(() => new Promise<void>(() => {}));
-		const stop = pollPairing({ read, intervalMs: 100, hiddenStopMs: 100_000, timeoutMs: 500, doc: new FakeDocument() });
+		const stop = pollPairing({
+			read,
+			intervalMs: 100,
+			hiddenStopMs: 100_000,
+			timeoutMs: 500,
+			doc: new FakeDocument()
+		});
 		await vi.advanceTimersByTimeAsync(0);
 		expect(read).toHaveBeenCalledTimes(1);
 		await vi.advanceTimersByTimeAsync(600);

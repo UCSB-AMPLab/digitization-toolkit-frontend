@@ -35,13 +35,14 @@ export interface HandoverCounts {
 	excluded: number;
 }
 
-export function handoverCounts(records: Pick<Record, 'status' | 'missing_side' | 'closed_reason'>[]): HandoverCounts {
+export function handoverCounts(
+	records: Pick<Record, 'status' | 'missing_side' | 'closed_reason'>[]
+): HandoverCounts {
 	const c: HandoverCounts = { captured: 0, inReview: 0, approved: 0, rejected: 0, excluded: 0 };
 	for (const r of records) {
 		if (r.status === 'captured') {
 			if (r.missing_side == null || r.closed_reason) c.captured++;
-		}
-		else if (r.status === 'in_review') c.inReview++;
+		} else if (r.status === 'in_review') c.inReview++;
 		else if (r.status === 'approved') c.approved++;
 		else if (r.status === 'rejected') c.rejected++;
 		else if (r.status === 'excluded') c.excluded++;
@@ -66,8 +67,12 @@ export function handoverOffer(c: HandoverCounts): HandoverOffer {
 }
 
 /** The captured records that miss a side and are not closed, which no send hands over. */
-export function missingSideCount(records: Pick<Record, 'status' | 'missing_side' | 'closed_reason'>[]): number {
-	return records.filter((r) => r.status === 'captured' && r.missing_side != null && !r.closed_reason).length;
+export function missingSideCount(
+	records: Pick<Record, 'status' | 'missing_side' | 'closed_reason'>[]
+): number {
+	return records.filter(
+		(r) => r.status === 'captured' && r.missing_side != null && !r.closed_reason
+	).length;
 }
 
 /**

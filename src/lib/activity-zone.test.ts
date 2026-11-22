@@ -31,9 +31,12 @@ function series(end: string, days: number): DailyActivity[] {
 }
 
 function respondEmpty() {
-	return vi.spyOn(globalThis, 'fetch').mockImplementation(
-		async () => new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
-	);
+	return vi
+		.spyOn(globalThis, 'fetch')
+		.mockImplementation(
+			async () =>
+				new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+		);
 }
 
 describe('activityApi.daily sends the zone', () => {
@@ -60,7 +63,9 @@ describe('activityApi.daily sends the zone', () => {
 	it('sends only the offset when no zone is known', async () => {
 		const fetchSpy = respondEmpty();
 		await activityApi.daily(7, null, 300);
-		expect(String(fetchSpy.mock.calls[0][0])).toMatch(/\/activity\/daily\?days=7&tz_offset_minutes=300$/);
+		expect(String(fetchSpy.mock.calls[0][0])).toMatch(
+			/\/activity\/daily\?days=7&tz_offset_minutes=300$/
+		);
 	});
 
 	it('reports no zone when Intl throws', () => {
@@ -79,7 +84,13 @@ const WINDOWS = [
 	{ end: '2026-03-10', change: '2026-03-08' },
 	{ end: '2026-09-08', change: '2026-09-06' }
 ];
-const ZONES = ['UTC', 'America/Los_Angeles', 'America/Bogota', 'America/Santiago', 'Pacific/Kiritimati'];
+const ZONES = [
+	'UTC',
+	'America/Los_Angeles',
+	'America/Bogota',
+	'America/Santiago',
+	'Pacific/Kiritimati'
+];
 
 describe('buildGrid keys across DST changes in a fixed zone', () => {
 	for (const { end, change } of WINDOWS) {

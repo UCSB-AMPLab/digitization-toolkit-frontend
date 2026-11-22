@@ -31,8 +31,12 @@ function storage(usedGB: number, totalGB: number, available = true) {
 function respond(...bodies: Array<{ status: number; body: unknown }>) {
 	const spy = vi.spyOn(globalThis, 'fetch');
 	for (const { status, body } of bodies) {
-		spy.mockImplementationOnce(async () =>
-			new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+		spy.mockImplementationOnce(
+			async () =>
+				new Response(JSON.stringify(body), {
+					status,
+					headers: { 'Content-Type': 'application/json' }
+				})
 		);
 	}
 	return spy;
@@ -81,7 +85,10 @@ describe('dashboard storage banner', () => {
 	});
 
 	it('reads again when the page becomes visible, and drops the banner if that read fails', async () => {
-		const fetchSpy = respond({ status: 200, body: storage(57, 60) }, { status: 503, body: { detail: 'down' } });
+		const fetchSpy = respond(
+			{ status: 200, body: storage(57, 60) },
+			{ status: 503, body: { detail: 'down' } }
+		);
 		const { container } = render(StorageAlert);
 		await expect.poll(() => banner(container)).not.toBeNull();
 
@@ -110,13 +117,21 @@ describe('dashboard storage banner: the Settings link (NEH-253, NEH-380)', () =>
 
 	it('tells the reviewer to ask an administrator or an operator, with no Settings text or link', async () => {
 		locale.set('en');
-		authStore.setSession({ id: 2, username: 'reviewer', email: null, role: 'reviewer', is_active: true });
+		authStore.setSession({
+			id: 2,
+			username: 'reviewer',
+			email: null,
+			role: 'reviewer',
+			is_active: true
+		});
 		respond({ status: 200, body: storage(51, 60) });
 		const { container } = render(StorageAlert);
 		await expect.poll(() => banner(container)).not.toBeNull();
 		expect(banner(container)!.querySelector('a')).toBeNull();
 		expect(banner(container)!.textContent).not.toContain(en.nav_settings);
-		expect(en.dash_storage_alert_ask_admin('51 GB', '60 GB')).toContain('an administrator or an operator');
+		expect(en.dash_storage_alert_ask_admin('51 GB', '60 GB')).toContain(
+			'an administrator or an operator'
+		);
 		expect(banner(container)!.textContent?.replace(/\s+/g, ' ').trim()).toBe(
 			`${en.dash_storage_alert_p1}85%${en.dash_storage_alert_ask_admin('51 GB', '60 GB')}`
 		);
@@ -124,7 +139,13 @@ describe('dashboard storage banner: the Settings link (NEH-253, NEH-380)', () =>
 
 	it('counts the storage reserve in the percentage', async () => {
 		locale.set('en');
-		authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
+		authStore.setSession({
+			id: 1,
+			username: 'admin1',
+			email: null,
+			role: 'admin',
+			is_active: true
+		});
 		// 49 of 60 GiB used is 82%; with 2 GB kept back it is 85%.
 		respond({ status: 200, body: { ...storage(49, 60), reserve_bytes: 2 * 10 ** 9 } });
 		const { container } = render(StorageAlert);

@@ -37,6 +37,10 @@
 </svg>
 
 <style>
-	.sig { flex-shrink: 0; }
-	.off { opacity: 0.22; }
+	.sig {
+		flex-shrink: 0;
+	}
+	.off {
+		opacity: 0.22;
+	}
 </style>

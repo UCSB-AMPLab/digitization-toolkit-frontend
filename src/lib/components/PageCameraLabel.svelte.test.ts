@@ -12,7 +12,11 @@ import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import PageCameraLabel from './PageCameraLabel.svelte';
 
-const text = (el: Element) => (el.textContent ?? '').replace(/photo_camera/, '').replace(/\s+/g, ' ').trim();
+const text = (el: Element) =>
+	(el.textContent ?? '')
+		.replace(/photo_camera/, '')
+		.replace(/\s+/g, ' ')
+		.trim();
 
 afterEach(() => locale.set('en'));
 
@@ -22,13 +26,28 @@ for (const [lang, t] of [
 ] as const) {
 	describe(`PageCameraLabel, ${lang}`, () => {
 		const cases = [
-			{ role: 'left' as const, words: t.cam_page_even, letter: t.badge_cam_right, term: t.page_term_even },
-			{ role: 'right' as const, words: t.cam_page_odd, letter: t.badge_cam_left, term: t.page_term_odd }
+			{
+				role: 'left' as const,
+				words: t.cam_page_even,
+				letter: t.badge_cam_right,
+				term: t.page_term_even
+			},
+			{
+				role: 'right' as const,
+				words: t.cam_page_odd,
+				letter: t.badge_cam_left,
+				term: t.page_term_odd
+			}
 		];
 		for (const c of cases) {
 			it(`role ${c.role} in 279px: the badge form`, () => {
 				locale.set(lang as Locale);
-				const { container } = render(PageCameraLabel, { role: c.role, width: 279, class: 'feed-label right', id: 'x-label' });
+				const { container } = render(PageCameraLabel, {
+					role: c.role,
+					width: 279,
+					class: 'feed-label right',
+					id: 'x-label'
+				});
 				const el = container.querySelector('.feed-label') as HTMLElement;
 				expect(el.classList.contains('right')).toBe(true);
 				expect(el.id).toBe('x-label');
@@ -44,7 +63,11 @@ for (const [lang, t] of [
 
 			it(`role ${c.role} in 280px: the words`, () => {
 				locale.set(lang as Locale);
-				const { container } = render(PageCameraLabel, { role: c.role, width: 280, class: 'feed-label' });
+				const { container } = render(PageCameraLabel, {
+					role: c.role,
+					width: 280,
+					class: 'feed-label'
+				});
 				const el = container.querySelector('.feed-label') as HTMLElement;
 				expect(text(el)).toBe(c.words);
 				expect(el.getAttribute('role')).toBeNull();
@@ -56,13 +79,22 @@ for (const [lang, t] of [
 
 		it('before it is measured (width 0): the badge form', () => {
 			locale.set(lang as Locale);
-			const { container } = render(PageCameraLabel, { role: 'left', width: 0, class: 'feed-label' });
+			const { container } = render(PageCameraLabel, {
+				role: 'left',
+				width: 0,
+				class: 'feed-label'
+			});
 			expect(container.querySelector('.feed-label')?.getAttribute('role')).toBe('img');
 		});
 
 		it('extra title text follows the words in the title', () => {
 			locale.set(lang as Locale);
-			const { container } = render(PageCameraLabel, { role: 'right', width: 100, title: 'Canon EOS Rebel T7', class: 'feed-label' });
+			const { container } = render(PageCameraLabel, {
+				role: 'right',
+				width: 100,
+				title: 'Canon EOS Rebel T7',
+				class: 'feed-label'
+			});
 			const el = container.querySelector('.feed-label') as HTMLElement;
 			expect(el.getAttribute('title')).toBe(`${t.cam_page_odd} · Canon EOS Rebel T7`);
 			expect(el.getAttribute('aria-label')).toBe(t.cam_page_odd);

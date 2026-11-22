@@ -23,7 +23,11 @@ beforeEach(() => {
 	authStore.clearSession();
 	loginNotice.set(null);
 	vi.spyOn(globalThis, 'fetch').mockImplementation(
-		async () => new Response(JSON.stringify({ status: 'ok' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+		async () =>
+			new Response(JSON.stringify({ status: 'ok' }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			})
 	);
 });
 afterEach(() => {
@@ -31,7 +35,10 @@ afterEach(() => {
 	loginNotice.set(null);
 });
 
-const LOCALES: [Locale, typeof en][] = [['en', en], ['es', es]];
+const LOCALES: [Locale, typeof en][] = [
+	['en', en],
+	['es', es]
+];
 
 describe('the password-changed notice on the login page', () => {
 	for (const [lang, msgs] of LOCALES) {
@@ -43,7 +50,9 @@ describe('the password-changed notice on the login page', () => {
 			await expect.element(notice).toHaveTextContent(msgs.account_password_done_title);
 			await expect.element(notice).toHaveTextContent(msgs.account_password_done);
 			const form = page.getByLabelText(msgs.common_username_label).element();
-			expect(notice.element().compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+			expect(
+				notice.element().compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING
+			).toBeTruthy();
 		});
 	}
 
@@ -57,7 +66,9 @@ describe('the password-changed notice on the login page', () => {
 		render(LoginPage);
 		await expect.element(page.getByLabelText(en.common_username_label)).toBeVisible();
 		loginNotice.set('password_changed');
-		await expect.element(page.getByRole('status')).toHaveTextContent(en.account_password_done_title);
+		await expect
+			.element(page.getByRole('status'))
+			.toHaveTextContent(en.account_password_done_title);
 	});
 
 	it('is cleared when the page is left, so the next visit shows nothing', async () => {

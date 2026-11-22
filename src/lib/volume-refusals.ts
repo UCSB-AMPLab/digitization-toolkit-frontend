@@ -32,7 +32,8 @@ const VOLUME_CHANGED_MESSAGE = 'The volume changed while it was being renumbered
 
 const FILES_BEING_READ_MESSAGE =
 	'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.';
-const EXPORT_RUNNING_MESSAGE = 'An export of this collection is running. Wait for it to finish, then try again.';
+const EXPORT_RUNNING_MESSAGE =
+	'An export of this collection is running. Wait for it to finish, then try again.';
 const EXPORT_IN_SUBTREE_MESSAGE =
 	'An export of this collection, or of a collection inside it, is running. Wait for it to finish, then try again.';
 const EXPORT_IN_PROJECT_MESSAGE =
@@ -44,7 +45,8 @@ const FILES_CHANGING_MESSAGE =
 const STORED_OFFSITE_MESSAGE =
 	"This record's files are already stored offsite under this volume, so it cannot be moved to another volume.";
 // The start of the move-records 409; the rest carries the count and the ids.
-const STORED_OFFSITE_MOVE = /^Cannot move: \d+ record\(s\) have files already stored offsite under this volume: /;
+const STORED_OFFSITE_MOVE =
+	/^Cannot move: \d+ record\(s\) have files already stored offsite under this volume: /;
 
 // The 409s for a record Fisqua excluded, from add_image_to_record and
 // _locked_detail in app/api/records.py.
@@ -89,10 +91,16 @@ export function renumberErrorText(error: unknown, msgs: Messages): string {
  * projects page, `scope` 'project' words the offsite case for a volume of the
  * project, since the request there is about the project.
  */
-export function fileHoldText(error: unknown, msgs: Messages, scope: 'volume' | 'project' = 'volume'): string | null {
+export function fileHoldText(
+	error: unknown,
+	msgs: Messages,
+	scope: 'volume' | 'project' = 'volume'
+): string | null {
 	switch (refusal(error, 409)) {
 		case FILES_BEING_READ_MESSAGE:
-			return scope === 'project' ? msgs.vol_err_files_being_read_project : msgs.vol_err_files_being_read;
+			return scope === 'project'
+				? msgs.vol_err_files_being_read_project
+				: msgs.vol_err_files_being_read;
 		case EXPORT_RUNNING_MESSAGE:
 			return msgs.vol_err_export_running;
 		case EXPORT_IN_SUBTREE_MESSAGE:
@@ -117,7 +125,10 @@ export function storedOffsiteCount(error: unknown): number | null {
 	if (message === STORED_OFFSITE_MESSAGE) return 1;
 	if (!STORED_OFFSITE_MOVE.test(message)) return null;
 	const detail = (error as { detail?: unknown }).detail;
-	const ids = typeof detail === 'object' && detail !== null ? (detail as { blocking_record_ids?: unknown }).blocking_record_ids : undefined;
+	const ids =
+		typeof detail === 'object' && detail !== null
+			? (detail as { blocking_record_ids?: unknown }).blocking_record_ids
+			: undefined;
 	return Array.isArray(ids) && ids.length > 0 ? ids.length : null;
 }
 

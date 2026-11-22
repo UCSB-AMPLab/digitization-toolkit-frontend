@@ -38,7 +38,10 @@ import LivePreview from './+page.svelte';
 const USER = 3;
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
@@ -49,9 +52,20 @@ async function settle() {
 	}
 }
 
-type Row = { index: number; hardware_id: string; role?: string | null; role_confirmed?: boolean; orientation?: number | null; orientation_saved?: boolean };
+type Row = {
+	index: number;
+	hardware_id: string;
+	role?: string | null;
+	role_confirmed?: boolean;
+	orientation?: number | null;
+	orientation_saved?: boolean;
+};
 const NOT_NEEDED = { needs_setup: false, reasons: [], confirmed_pair: { left: 'a', right: 'b' } };
-const needed = (code: string) => ({ needs_setup: true, reasons: [{ code, message: 'English', hardware_ids: ['b'] }], confirmed_pair: null });
+const needed = (code: string) => ({
+	needs_setup: true,
+	reasons: [{ code, message: 'English', hardware_ids: ['b'] }],
+	confirmed_pair: null
+});
 
 let setupAnswers: (() => Response | Promise<Response>)[];
 let setupCalls: number;
@@ -86,7 +100,17 @@ function serve() {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		const method = (init as RequestInit | undefined)?.method ?? 'GET';
 		if (path.endsWith('/cameras/capabilities')) {
-			return json({ backend: 'gphoto2', live_preview: true, focus_control: false, live_controls: false, zoom: false, autofocus_calibration: false, dslr_settings: false, continuous_preview: false, zoom_steps: false });
+			return json({
+				backend: 'gphoto2',
+				live_preview: true,
+				focus_control: false,
+				live_controls: false,
+				zoom: false,
+				autofocus_calibration: false,
+				dslr_settings: false,
+				continuous_preview: false,
+				zoom_steps: false
+			});
 		}
 		if (path.endsWith('/cameras/setup')) {
 			setupCalls += 1;
@@ -109,9 +133,17 @@ function serve() {
 			return json(list);
 		}
 		if (/\/cameras\/\d\/orientation$/.test(path)) return json({});
-		if (path.endsWith('/records/to-retake/summary')) return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
+		if (path.endsWith('/records/to-retake/summary'))
+			return json({ pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null } });
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: 'co-ahr-6', custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 6',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: 'co-ahr-6',
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
 		if (path.endsWith('/records/')) return json([]);
@@ -133,17 +165,23 @@ function nameOf(b: Element): string {
 }
 
 const buttonIn = (root: ParentNode | null, name: string) =>
-	root ? ([...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => nameOf(b) === name) ?? null) : null;
+	root
+		? ([...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => nameOf(b) === name) ??
+			null)
+		: null;
 const step = () => document.querySelector('[data-which-camera]') as HTMLElement | null;
 const check = () => document.querySelector('[data-camera-check]') as HTMLElement | null;
 const openCheck = () => buttonIn(document.querySelector('.topbar'), en.camcheck_open);
 const captureButton = () => document.querySelector('.capture-btn') as HTMLButtonElement | null;
-const card = (index: number) => document.querySelector(`[data-card="${index}"]`) as HTMLElement | null;
+const card = (index: number) =>
+	document.querySelector(`[data-card="${index}"]`) as HTMLElement | null;
 
 // On the focused element, as a real key press.
 function press(key: string, code = key) {
 	const target = document.activeElement ?? document.body;
-	target.dispatchEvent(new KeyboardEvent('keydown', { key, code, bubbles: true, cancelable: true }));
+	target.dispatchEvent(
+		new KeyboardEvent('keydown', { key, code, bubbles: true, cancelable: true })
+	);
 	target.dispatchEvent(new KeyboardEvent('keyup', { key, code, bubbles: true }));
 }
 
@@ -159,14 +197,22 @@ beforeEach(() => {
 	captures = [];
 	captureBodies = [];
 	nav.goto.mockReset();
-	deviceLists = [[row(0, 'a', { role: 'left', role_confirmed: true }), row(1, 'b', { role: 'right', role_confirmed: true })]];
+	deviceLists = [
+		[
+			row(0, 'a', { role: 'left', role_confirmed: true }),
+			row(1, 'b', { role: 'right', role_confirmed: true })
+		]
+	];
 	localStorage.clear();
 	clearChord();
 	locale.set('en');
 	// No focus check over the screen.
 	recordFocusActivity(USER, Date.now());
 	current.url = 'http://localhost/live-preview?projectId=2&collectionId=9';
-	authStore.setSession({ id: USER, username: 'operator', email: null, role: 'operator', is_active: true }, { signIn: true });
+	authStore.setSession(
+		{ id: USER, username: 'operator', email: null, role: 'operator', is_active: true },
+		{ signIn: true }
+	);
 	serve();
 });
 
@@ -225,7 +271,13 @@ describe('capture screen: set-up needed', () => {
 
 	it('Confirm saves the roles, the step closes, and the capture screen captures again', async () => {
 		setupAnswers = [() => json(needed('role_unconfirmed'))];
-		roleAnswers = [() => json({ devices: [row(0, 'a', { role: 'right' }), row(1, 'b', { role: 'left' })], setup: NOT_NEEDED })];
+		roleAnswers = [
+			() =>
+				json({
+					devices: [row(0, 'a', { role: 'right' }), row(1, 'b', { role: 'left' })],
+					setup: NOT_NEEDED
+				})
+		];
 		render(LivePreview);
 		await expect.poll(() => card(1)).not.toBeNull();
 		(card(0)!.querySelector('button[data-pick]') as HTMLButtonElement).click();
@@ -251,7 +303,16 @@ describe('capture screen: set-up needed', () => {
 			},
 			() => json(NOT_NEEDED)
 		];
-		roleAnswers = [() => json({ devices: [row(0, 'a', { role: 'right', role_confirmed: true }), row(1, 'b', { role: 'left', role_confirmed: true })], setup: NOT_NEEDED })];
+		roleAnswers = [
+			() =>
+				json({
+					devices: [
+						row(0, 'a', { role: 'right', role_confirmed: true }),
+						row(1, 'b', { role: 'left', role_confirmed: true })
+					],
+					setup: NOT_NEEDED
+				})
+		];
 		render(LivePreview);
 		await expect.poll(() => card(1)).not.toBeNull();
 		await expect.poll(() => setupCalls).toBe(2);
@@ -288,7 +349,9 @@ describe('capture screen: set-up needed', () => {
 	it('a 409 camera not connected reads the set-up again', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		setupAnswers = [() => json(needed('role_unconfirmed'))];
-		roleAnswers = [() => json({ detail: { code: 'camera_not_connected', message: 'English' } }, 409)];
+		roleAnswers = [
+			() => json({ detail: { code: 'camera_not_connected', message: 'English' } }, 409)
+		];
 		render(LivePreview);
 		await expect.poll(() => card(0)).not.toBeNull();
 		const before = setupCalls;
@@ -335,7 +398,11 @@ describe('capture screen: when the page asks', () => {
 		buttonIn(check(), en.camcheck_back)!.click();
 		await expect.poll(() => check()).toBeNull();
 
-		(document.querySelector(`button[aria-label="${en.cam_panel_expand_aria}"]`) as HTMLButtonElement).click();
+		(
+			document.querySelector(
+				`button[aria-label="${en.cam_panel_expand_aria}"]`
+			) as HTMLButtonElement
+		).click();
 		await settle();
 		buttonIn(document, en.cam_reconnect)!.click();
 		await expect.poll(() => setupCalls).toBe(6);
@@ -346,7 +413,10 @@ describe('capture screen: when the page asks', () => {
 	});
 
 	it('a listing of the same bodies does not ask again', async () => {
-		deviceLists = [[row(0, 'a'), row(1, 'A2500_idx1')], [row(0, 'a'), row(1, 'A2500_idx1')]];
+		deviceLists = [
+			[row(0, 'a'), row(1, 'A2500_idx1')],
+			[row(0, 'a'), row(1, 'A2500_idx1')]
+		];
 		render(LivePreview);
 		await expect.poll(() => setupCalls).toBe(2);
 		await new Promise((r) => realSetTimeout(r, 1500));
@@ -354,7 +424,12 @@ describe('capture screen: when the page asks', () => {
 	});
 
 	it('needed after the tab comes back: the step opens over the camera check, which waits under it', async () => {
-		setupAnswers = [() => json(NOT_NEEDED), () => json(NOT_NEEDED), () => json(NOT_NEEDED), () => json(needed('pair_changed'))];
+		setupAnswers = [
+			() => json(NOT_NEEDED),
+			() => json(NOT_NEEDED),
+			() => json(NOT_NEEDED),
+			() => json(needed('pair_changed'))
+		];
 		render(LivePreview);
 		await expect.poll(() => setupCalls).toBe(2);
 		await expect.poll(() => openCheck()?.disabled).toBe(false);
@@ -446,13 +521,22 @@ describe('capture screen: "Leave the capture screen" while set-up is needed', ()
 });
 
 describe('capture screen: the saved roles decide left and right', () => {
-	const swapControl = () => document.querySelector(`button[aria-label="${en.lv_swap_orientation}"]`) as HTMLButtonElement | null;
-	const viewportDegrees = () => [...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
+	const swapControl = () =>
+		document.querySelector(
+			`button[aria-label="${en.lv_swap_orientation}"]`
+		) as HTMLButtonElement | null;
+	const viewportDegrees = () =>
+		[...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
 	// The set-up as the backend reports it once body "b" is confirmed as the left page.
 	const B_LEFT = { needs_setup: false, reasons: [], confirmed_pair: { left: 'b', right: 'a' } };
 
 	it('the body confirmed as the left page is on the left and in the captures; no swap control', async () => {
-		deviceLists = [[row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })]];
+		deviceLists = [
+			[
+				row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }),
+				row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })
+			]
+		];
 		setupAnswers = [() => json(B_LEFT)];
 		render(LivePreview);
 		await expect.poll(() => viewportDegrees()).toEqual(['180°', '90°']);
@@ -466,7 +550,16 @@ describe('capture screen: the saved roles decide left and right', () => {
 	it('after a confirm that makes camera 2 the left page, the next capture and the panes follow', async () => {
 		deviceLists = [[row(0, 'a', { orientation: 90 }), row(1, 'b', { orientation: 180 })]];
 		setupAnswers = [() => json(needed('role_unconfirmed'))];
-		roleAnswers = [() => json({ devices: [row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })], setup: B_LEFT })];
+		roleAnswers = [
+			() =>
+				json({
+					devices: [
+						row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }),
+						row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })
+					],
+					setup: B_LEFT
+				})
+		];
 		render(LivePreview);
 		await expect.poll(() => card(1)).not.toBeNull();
 		expect(viewportDegrees()).toEqual(['90°', '180°']);
@@ -483,7 +576,12 @@ describe('capture screen: the saved roles decide left and right', () => {
 	});
 
 	it('the camera check then has the left page camera on its left', async () => {
-		deviceLists = [[row(0, 'a', { role: 'right', role_confirmed: true }), row(1, 'b', { role: 'left', role_confirmed: true })]];
+		deviceLists = [
+			[
+				row(0, 'a', { role: 'right', role_confirmed: true }),
+				row(1, 'b', { role: 'left', role_confirmed: true })
+			]
+		];
 		setupAnswers = [() => json(B_LEFT)];
 		render(LivePreview);
 		await expect.poll(() => setupCalls).toBe(2);
@@ -494,8 +592,20 @@ describe('capture screen: the saved roles decide left and right', () => {
 		await expect.poll(() => check()).not.toBeNull();
 		// "Turn" on the check's left pane saves camera 2's orientation.
 		const orientationPuts = () =>
-			vi.mocked(globalThis.fetch).mock.calls.map((c) => new URL(String(c[0]), 'http://localhost').pathname).filter((p) => p.endsWith('/orientation'));
-		await expect.poll(() => (check()!.querySelector('[data-frame="left"] button[data-turn]') as HTMLButtonElement | null)?.disabled).toBe(false);
+			vi
+				.mocked(globalThis.fetch)
+				.mock.calls.map((c) => new URL(String(c[0]), 'http://localhost').pathname)
+				.filter((p) => p.endsWith('/orientation'));
+		await expect
+			.poll(
+				() =>
+					(
+						check()!.querySelector(
+							'[data-frame="left"] button[data-turn]'
+						) as HTMLButtonElement | null
+					)?.disabled
+			)
+			.toBe(false);
 		(check()!.querySelector('[data-frame="left"] button[data-turn]') as HTMLButtonElement).click();
 		await expect.poll(() => orientationPuts().length).toBe(1);
 		expect(orientationPuts()[0].endsWith('/cameras/1/orientation')).toBe(true);
@@ -503,12 +613,16 @@ describe('capture screen: the saved roles decide left and right', () => {
 
 	it('in single-camera mode the pane and the capture use camera index 0 whatever the roles; a pair follows the roles in either mode', async () => {
 		const chooseMode = async (label: string) => {
-			const expand = document.querySelector(`button[aria-label="${en.cam_panel_expand_aria}"]`) as HTMLButtonElement | null;
+			const expand = document.querySelector(
+				`button[aria-label="${en.cam_panel_expand_aria}"]`
+			) as HTMLButtonElement | null;
 			if (expand) {
 				expand.click();
 				await settle();
 			}
-			const option = [...document.querySelectorAll('label.radio-label')].find((l) => l.textContent?.trim() === label);
+			const option = [...document.querySelectorAll('label.radio-label')].find(
+				(l) => l.textContent?.trim() === label
+			);
 			(option!.querySelector('input') as HTMLInputElement).click();
 			await settle();
 		};
@@ -516,11 +630,18 @@ describe('capture screen: the saved roles decide left and right', () => {
 		// operator is in single-camera mode.
 		let release!: () => void;
 		const held = new Promise<void>((r) => (release = r));
-		setupAnswers = [async () => {
-			await held;
-			return json(B_LEFT);
-		}];
-		deviceLists = [[row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })]];
+		setupAnswers = [
+			async () => {
+				await held;
+				return json(B_LEFT);
+			}
+		];
+		deviceLists = [
+			[
+				row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }),
+				row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })
+			]
+		];
 		render(LivePreview);
 		await expect.poll(() => setupCalls).toBeGreaterThanOrEqual(1);
 		await expect.poll(() => viewportDegrees()).toEqual(['90°', '180°']);
@@ -540,16 +661,37 @@ describe('capture screen: the saved roles decide left and right', () => {
 		// The camera check shows the pair, in single mode too: the left page
 		// camera (index 1) on its left, so "Turn" there saves camera 1.
 		const orientationPuts = () =>
-			vi.mocked(globalThis.fetch).mock.calls.map((c) => new URL(String(c[0]), 'http://localhost').pathname).filter((p) => p.endsWith('/orientation'));
+			vi
+				.mocked(globalThis.fetch)
+				.mock.calls.map((c) => new URL(String(c[0]), 'http://localhost').pathname)
+				.filter((p) => p.endsWith('/orientation'));
 		await expect.poll(() => openCheck()?.disabled).toBe(false);
 		openCheck()!.click();
 		await expect.poll(() => check()).not.toBeNull();
-		await expect.poll(() => (check()!.querySelector('[data-frame="left"] button[data-turn]') as HTMLButtonElement | null)?.disabled).toBe(false);
+		await expect
+			.poll(
+				() =>
+					(
+						check()!.querySelector(
+							'[data-frame="left"] button[data-turn]'
+						) as HTMLButtonElement | null
+					)?.disabled
+			)
+			.toBe(false);
 		(check()!.querySelector('[data-frame="left"] button[data-turn]') as HTMLButtonElement).click();
 		await expect.poll(() => orientationPuts().length).toBe(1);
 		expect(orientationPuts()[0].endsWith('/cameras/1/orientation')).toBe(true);
 		// The check closes once the save is done.
-		await expect.poll(() => (check()!.querySelector('[data-frame="left"] button[data-turn]') as HTMLButtonElement | null)?.disabled).toBe(false);
+		await expect
+			.poll(
+				() =>
+					(
+						check()!.querySelector(
+							'[data-frame="left"] button[data-turn]'
+						) as HTMLButtonElement | null
+					)?.disabled
+			)
+			.toBe(false);
 		buttonIn(check(), en.camcheck_back)!.click();
 		await expect.poll(() => check()).toBeNull();
 
@@ -588,7 +730,12 @@ describe('capture screen: the saved roles decide left and right', () => {
 	});
 
 	it('without a confirmed pair in the set-up the swap control stays, whatever roles the listing carries', async () => {
-		deviceLists = [[row(0, 'a', { role: 'left', role_confirmed: true }), row(1, 'b', { role: 'right', role_confirmed: true })]];
+		deviceLists = [
+			[
+				row(0, 'a', { role: 'left', role_confirmed: true }),
+				row(1, 'b', { role: 'right', role_confirmed: true })
+			]
+		];
 		setupAnswers = [() => json({ ...NOT_NEEDED, confirmed_pair: null })];
 		render(LivePreview);
 		await expect.poll(() => setupCalls).toBe(2);
@@ -601,11 +748,22 @@ describe('capture screen: the saved roles decide left and right', () => {
 // through answers, and an answer counts only when nothing started later has
 // answered: set-up reads, device listings and role saves share one order.
 describe('capture screen: answers that started before a newer one', () => {
-	const viewportDegrees = () => [...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
+	const viewportDegrees = () =>
+		[...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
 	// A pair confirmed with camera 2 (body "b") as the left page.
-	const SAVED_B_LEFT = { needs_setup: false, reasons: [], confirmed_pair: { left: 'b', right: 'a' } };
-	const savedRows = () => [row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })];
-	const oldRows = () => [row(0, 'a', { role: 'left', role_confirmed: true, orientation: 90 }), row(1, 'b', { role: 'right', role_confirmed: true, orientation: 180 })];
+	const SAVED_B_LEFT = {
+		needs_setup: false,
+		reasons: [],
+		confirmed_pair: { left: 'b', right: 'a' }
+	};
+	const savedRows = () => [
+		row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90 }),
+		row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180 })
+	];
+	const oldRows = () => [
+		row(0, 'a', { role: 'left', role_confirmed: true, orientation: 90 }),
+		row(1, 'b', { role: 'right', role_confirmed: true, orientation: 180 })
+	];
 
 	it('a failed read does not end the capture hold while a read started after it is pending', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -720,10 +878,12 @@ describe('capture screen: capture waits for the first set-up answer', () => {
 	let release!: () => void;
 	function gate(answer: () => Response) {
 		const held = new Promise<void>((r) => (release = r));
-		setupAnswers = [async () => {
-			await held;
-			return answer();
-		}];
+		setupAnswers = [
+			async () => {
+				await held;
+				return answer();
+			}
+		];
 	}
 	// Records whether the capture button was ever enabled, from now on.
 	function watchEnabled() {
@@ -793,11 +953,11 @@ describe('capture screen: capture waits for the first set-up answer', () => {
 		expect(captureButton()!.disabled).toBe(true);
 		expect(captures.length).toBe(0);
 	});
-
 });
 
 describe('capture screen: the rotation follows the role once the roles are saved', () => {
-	const viewportDegrees = () => [...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
+	const viewportDegrees = () =>
+		[...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
 	const B_LEFT = { needs_setup: false, reasons: [], confirmed_pair: { left: 'b', right: 'a' } };
 
 	async function answerWhichCamera() {
@@ -809,15 +969,45 @@ describe('capture screen: the rotation follows the role once the roles are saved
 	}
 
 	it('a body with no saved orientation takes the default of its new role, on screen and in the captures', async () => {
-		deviceLists = [[row(0, 'a', { orientation: 90, orientation_saved: false }), row(1, 'b', { orientation: 90, orientation_saved: false })]];
-		listAfterSave = [[row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false }), row(1, 'b', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false })]];
+		deviceLists = [
+			[
+				row(0, 'a', { orientation: 90, orientation_saved: false }),
+				row(1, 'b', { orientation: 90, orientation_saved: false })
+			]
+		];
+		listAfterSave = [
+			[
+				row(0, 'a', {
+					role: 'right',
+					role_confirmed: true,
+					orientation: 90,
+					orientation_saved: false
+				}),
+				row(1, 'b', {
+					role: 'left',
+					role_confirmed: true,
+					orientation: 270,
+					orientation_saved: false
+				})
+			]
+		];
 		setupAnswers = [() => json(needed('role_unconfirmed'))];
 		roleAnswers = [
 			() =>
 				json({
 					devices: [
-						row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false }),
-						row(1, 'b', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false })
+						row(0, 'a', {
+							role: 'right',
+							role_confirmed: true,
+							orientation: 90,
+							orientation_saved: false
+						}),
+						row(1, 'b', {
+							role: 'left',
+							role_confirmed: true,
+							orientation: 270,
+							orientation_saved: false
+						})
 					],
 					setup: B_LEFT
 				})
@@ -833,14 +1023,29 @@ describe('capture screen: the rotation follows the role once the roles are saved
 	});
 
 	it('a body with a saved orientation keeps it when it gets a role', async () => {
-		deviceLists = [[row(0, 'a', { orientation: 90, orientation_saved: true }), row(1, 'b', { orientation: 180, orientation_saved: true })]];
+		deviceLists = [
+			[
+				row(0, 'a', { orientation: 90, orientation_saved: true }),
+				row(1, 'b', { orientation: 180, orientation_saved: true })
+			]
+		];
 		setupAnswers = [() => json(needed('role_unconfirmed'))];
 		roleAnswers = [
 			() =>
 				json({
 					devices: [
-						row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: true }),
-						row(1, 'b', { role: 'left', role_confirmed: true, orientation: 180, orientation_saved: true })
+						row(0, 'a', {
+							role: 'right',
+							role_confirmed: true,
+							orientation: 90,
+							orientation_saved: true
+						}),
+						row(1, 'b', {
+							role: 'left',
+							role_confirmed: true,
+							orientation: 180,
+							orientation_saved: true
+						})
 					],
 					setup: B_LEFT
 				})
@@ -854,14 +1059,29 @@ describe('capture screen: the rotation follows the role once the roles are saved
 	});
 
 	it('a camera the operator turned by hand in this session keeps that rotation', async () => {
-		deviceLists = [[row(0, 'a', { orientation: 90, orientation_saved: false }), row(1, 'b', { orientation: 90, orientation_saved: false })]];
+		deviceLists = [
+			[
+				row(0, 'a', { orientation: 90, orientation_saved: false }),
+				row(1, 'b', { orientation: 90, orientation_saved: false })
+			]
+		];
 		setupAnswers = [() => json(needed('role_unconfirmed'))];
 		roleAnswers = [
 			() =>
 				json({
 					devices: [
-						row(0, 'a', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false }),
-						row(1, 'b', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false })
+						row(0, 'a', {
+							role: 'right',
+							role_confirmed: true,
+							orientation: 90,
+							orientation_saved: false
+						}),
+						row(1, 'b', {
+							role: 'left',
+							role_confirmed: true,
+							orientation: 270,
+							orientation_saved: false
+						})
 					],
 					setup: B_LEFT
 				})
@@ -880,7 +1100,12 @@ describe('capture screen: the rotation follows the role once the roles are saved
 	});
 
 	it('an answer without device rows changes no rotation', async () => {
-		deviceLists = [[row(0, 'a', { orientation: 90, orientation_saved: false }), row(1, 'b', { orientation: 180, orientation_saved: false })]];
+		deviceLists = [
+			[
+				row(0, 'a', { orientation: 90, orientation_saved: false }),
+				row(1, 'b', { orientation: 180, orientation_saved: false })
+			]
+		];
 		setupAnswers = [() => json(needed('role_unconfirmed'))];
 		roleAnswers = [() => json({ devices: [], setup: B_LEFT })];
 		render(LivePreview);
@@ -899,7 +1124,10 @@ describe('capture screen: the rotation follows the role once the roles are saved
 		row(0, 'a', { role: 'right', role_confirmed: true, orientation: a, orientation_saved: false }),
 		row(1, 'b', { role: 'left', role_confirmed: true, orientation: b, orientation_saved: false })
 	];
-	const PRE = () => [row(0, 'a', { orientation: 90, orientation_saved: false }), row(1, 'b', { orientation: 90, orientation_saved: false })];
+	const PRE = () => [
+		row(0, 'a', { orientation: 90, orientation_saved: false }),
+		row(1, 'b', { orientation: 90, orientation_saved: false })
+	];
 
 	it('a listing requested before the save that answers after it does not put the old rotation back', async () => {
 		let release!: () => void;
@@ -938,10 +1166,15 @@ describe('capture screen: the rotation follows the role once the roles are saved
 		// The reconnect from the panel starts now and answers after the save;
 		// the listing the save asks for is held too, so only the reconnect's
 		// rows can change what is on screen.
-		(document.querySelector(`button[aria-label="${en.cam_panel_expand_aria}"]`) as HTMLButtonElement).click();
+		(
+			document.querySelector(
+				`button[aria-label="${en.cam_panel_expand_aria}"]`
+			) as HTMLButtonElement
+		).click();
 		await expect.poll(() => document.querySelector('.btn-reconnect')).not.toBeNull();
 		const reconnectCall = deviceCalls + 1;
-		holdListing = (call) => (call === reconnectCall ? held : rolePuts.length > 0 ? refreshHeld : null);
+		holdListing = (call) =>
+			call === reconnectCall ? held : rolePuts.length > 0 ? refreshHeld : null;
 		(document.querySelector('.btn-reconnect') as HTMLButtonElement).click();
 		await expect.poll(() => deviceCalls).toBe(reconnectCall);
 		await answerWhichCamera();
@@ -1004,13 +1237,42 @@ describe('capture screen: the rotation follows the role once the roles are saved
 		const held = new Promise<void>((r) => (release = r));
 		holdListing = (call) => (call === 1 ? held : null);
 		deviceLists = [PRE()];
-		listAfterSave = [UNSET(90, 270), [row(0, 'a', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false }), row(1, 'b', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false })]];
+		listAfterSave = [
+			UNSET(90, 270),
+			[
+				row(0, 'a', {
+					role: 'left',
+					role_confirmed: true,
+					orientation: 270,
+					orientation_saved: false
+				}),
+				row(1, 'b', {
+					role: 'right',
+					role_confirmed: true,
+					orientation: 90,
+					orientation_saved: false
+				})
+			]
+		];
 		setupAnswers = [() => json(needed('role_unconfirmed'))];
 		roleAnswers = [
 			() => json({ devices: UNSET(90, 270), setup: B_LEFT }),
 			() =>
 				json({
-					devices: [row(0, 'a', { role: 'left', role_confirmed: true, orientation: 270, orientation_saved: false }), row(1, 'b', { role: 'right', role_confirmed: true, orientation: 90, orientation_saved: false })],
+					devices: [
+						row(0, 'a', {
+							role: 'left',
+							role_confirmed: true,
+							orientation: 270,
+							orientation_saved: false
+						}),
+						row(1, 'b', {
+							role: 'right',
+							role_confirmed: true,
+							orientation: 90,
+							orientation_saved: false
+						})
+					],
 					setup: NOT_NEEDED
 				})
 		];
@@ -1021,7 +1283,10 @@ describe('capture screen: the rotation follows the role once the roles are saved
 		await expect.poll(() => check()).not.toBeNull();
 		(check()!.querySelector('[data-chip="left"]') as HTMLButtonElement).click();
 		await settle();
-		buttonIn(document.querySelector('[role="dialog"][aria-labelledby="cd-title"]'), en.camwhich_open)!.click();
+		buttonIn(
+			document.querySelector('[role="dialog"][aria-labelledby="cd-title"]'),
+			en.camwhich_open
+		)!.click();
 		await expect.poll(() => step()).not.toBeNull();
 		await expect.poll(() => card(0)).not.toBeNull();
 		(card(0)!.querySelector('button[data-pick]') as HTMLButtonElement).click();

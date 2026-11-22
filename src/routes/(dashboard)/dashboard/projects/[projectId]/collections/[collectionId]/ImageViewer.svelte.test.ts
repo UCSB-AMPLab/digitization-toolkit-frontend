@@ -17,280 +17,414 @@ import { locale } from '$lib/i18n';
 // resolve once the <img> loads — a 1x1 placeholder would report 1x1 and
 // never exercise the "zoomed past the frame" geometry this feature is for.
 function make1200x800DataUrl(): string {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1200;
-  canvas.height = 800;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#3a6ea5';
-  ctx.fillRect(0, 0, 1200, 800);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, 100, 100);
-  return canvas.toDataURL('image/png');
+	const canvas = document.createElement('canvas');
+	canvas.width = 1200;
+	canvas.height = 800;
+	const ctx = canvas.getContext('2d')!;
+	ctx.fillStyle = '#3a6ea5';
+	ctx.fillRect(0, 0, 1200, 800);
+	ctx.fillStyle = '#ffffff';
+	ctx.fillRect(0, 0, 100, 100);
+	return canvas.toDataURL('image/png');
 }
 
 function makeImage(overrides: Partial<RecordImage> = {}): RecordImage {
-  return {
-    id: 1,
-    record_id: 1,
-    filename: 'left.jpg',
-    file_path: '/x',
-    format: 'jpeg',
-    is_current: true,
-    role: 'left',
-    ...overrides,
-  };
+	return {
+		id: 1,
+		record_id: 1,
+		filename: 'left.jpg',
+		file_path: '/x',
+		format: 'jpeg',
+		is_current: true,
+		role: 'left',
+		...overrides
+	};
 }
 
 function makeRecord(overrides: Partial<ApiRecord> = {}): ApiRecord {
-  return {
-    id: 1,
-    title: 'Test record',
-    status: 'in_review',
-    capture_mode: 'dual',
-    images: [
-      makeImage({ id: 1, role: 'left', filename: 'left.jpg' }),
-      makeImage({ id: 2, role: 'right', filename: 'right.jpg' }),
-    ],
-    ...overrides,
-  };
+	return {
+		id: 1,
+		title: 'Test record',
+		status: 'in_review',
+		capture_mode: 'dual',
+		images: [
+			makeImage({ id: 1, role: 'left', filename: 'left.jpg' }),
+			makeImage({ id: 2, role: 'right', filename: 'right.jpg' })
+		],
+		...overrides
+	};
 }
 
 function baseProps(overrides: Record<string, unknown> = {}) {
-  return {
-    viewMode: 'spread' as const,
-    records: [makeRecord()],
-    selectedRecordId: 1,
-    zoom: 2,
-    rotation: 0,
-    onPrev: vi.fn(),
-    onNext: vi.fn(),
-    ...overrides,
-  };
+	return {
+		viewMode: 'spread' as const,
+		records: [makeRecord()],
+		selectedRecordId: 1,
+		zoom: 2,
+		rotation: 0,
+		onPrev: vi.fn(),
+		onNext: vi.fn(),
+		...overrides
+	};
 }
 
 describe('ImageViewer — drag-to-pan and out-of-frame caption (NEH-230)', () => {
-  let getImagePreviewUrlSpy: ReturnType<typeof vi.spyOn>;
-  const dataUrl = make1200x800DataUrl();
+	let getImagePreviewUrlSpy: ReturnType<typeof vi.spyOn>;
+	const dataUrl = make1200x800DataUrl();
 
-  beforeEach(() => {
-    // The real getImagePreviewUrl builds a URL against the API host, which
-    // won't resolve to a real image in a headless browser test — point it
-    // at a canvas-drawn data URL instead, so naturalWidth/Height are real.
-    getImagePreviewUrlSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(dataUrl);
-  });
+	beforeEach(() => {
+		// The real getImagePreviewUrl builds a URL against the API host, which
+		// won't resolve to a real image in a headless browser test — point it
+		// at a canvas-drawn data URL instead, so naturalWidth/Height are real.
+		getImagePreviewUrlSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(dataUrl);
+	});
 
-  afterEach(() => {
-    getImagePreviewUrlSpy.mockRestore();
-  });
+	afterEach(() => {
+		getImagePreviewUrlSpy.mockRestore();
+	});
 
-  it('dragging the left frame pans the left image (translate is nonzero after a drag)', async () => {
-    const screen = render(ImageViewer, baseProps({ zoom: 2 }));
-    const img = screen.container.querySelector('img.spread-image.left') as HTMLImageElement;
-    const frame = img.closest('.spread-frame') as HTMLElement;
+	it('dragging the left frame pans the left image (translate is nonzero after a drag)', async () => {
+		const screen = render(ImageViewer, baseProps({ zoom: 2 }));
+		const img = screen.container.querySelector('img.spread-image.left') as HTMLImageElement;
+		const frame = img.closest('.spread-frame') as HTMLElement;
 
-    // Wait for the image to load so naturalWidth/Height resolve and the
-    // frame has been measured (frame elements are laid out synchronously,
-    // but naturalWidth needs a decode tick).
-    await expect.poll(() => img.naturalWidth).toBeGreaterThan(0);
-    await expect.poll(() => (frame.getBoundingClientRect().width > 0)).toBe(true);
-    // bind:clientWidth/clientHeight is driven by a ResizeObserver callback,
-    // which can land a frame or two after the raw DOM already has a size —
-    // give it real animation-frame ticks to catch up before starting the
-    // drag, or the frame's measured bounds are still 0 and the drag is a
-    // no-op (dragToFraction leaves an axis with bounds 0 unmoved).
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+		// Wait for the image to load so naturalWidth/Height resolve and the
+		// frame has been measured (frame elements are laid out synchronously,
+		// but naturalWidth needs a decode tick).
+		await expect.poll(() => img.naturalWidth).toBeGreaterThan(0);
+		await expect.poll(() => frame.getBoundingClientRect().width > 0).toBe(true);
+		// bind:clientWidth/clientHeight is driven by a ResizeObserver callback,
+		// which can land a frame or two after the raw DOM already has a size —
+		// give it real animation-frame ticks to catch up before starting the
+		// drag, or the frame's measured bounds are still 0 and the drag is a
+		// no-op (dragToFraction leaves an axis with bounds 0 unmoved).
+		await new Promise<void>((resolve) =>
+			requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+		);
 
-    frame.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, button: 0, isPrimary: true, clientX: 100, clientY: 100, bubbles: true }));
-    frame.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, button: 0, isPrimary: true, clientX: 60, clientY: 80, bubbles: true }));
-    frame.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, button: 0, isPrimary: true, clientX: 60, clientY: 80, bubbles: true }));
+		frame.dispatchEvent(
+			new PointerEvent('pointerdown', {
+				pointerId: 1,
+				button: 0,
+				isPrimary: true,
+				clientX: 100,
+				clientY: 100,
+				bubbles: true
+			})
+		);
+		frame.dispatchEvent(
+			new PointerEvent('pointermove', {
+				pointerId: 1,
+				button: 0,
+				isPrimary: true,
+				clientX: 60,
+				clientY: 80,
+				bubbles: true
+			})
+		);
+		frame.dispatchEvent(
+			new PointerEvent('pointerup', {
+				pointerId: 1,
+				button: 0,
+				isPrimary: true,
+				clientX: 60,
+				clientY: 80,
+				bubbles: true
+			})
+		);
 
-    await expect.poll(() => img.style.transform).not.toBe('translate(0px, 0px) scale(2) rotate(0deg)');
-    expect(img.style.transform.startsWith('translate(')).toBe(true);
-  });
+		await expect
+			.poll(() => img.style.transform)
+			.not.toBe('translate(0px, 0px) scale(2) rotate(0deg)');
+		expect(img.style.transform.startsWith('translate(')).toBe(true);
+	});
 
-  it('at zoom 1 (fit) the transform is translate(0px, 0px) scale(1) rotate(0deg)', async () => {
-    const screen = render(ImageViewer, baseProps({ zoom: 1 }));
-    const img = screen.container.querySelector('img.spread-image.left') as HTMLImageElement;
+	it('at zoom 1 (fit) the transform is translate(0px, 0px) scale(1) rotate(0deg)', async () => {
+		const screen = render(ImageViewer, baseProps({ zoom: 1 }));
+		const img = screen.container.querySelector('img.spread-image.left') as HTMLImageElement;
 
-    await expect.poll(() => img.naturalWidth).toBeGreaterThan(0);
-    await expect.poll(() => img.style.transform).toBe('translate(0px, 0px) scale(1) rotate(0deg)');
-  });
+		await expect.poll(() => img.naturalWidth).toBeGreaterThan(0);
+		await expect.poll(() => img.style.transform).toBe('translate(0px, 0px) scale(1) rotate(0deg)');
+	});
 
-  it('the caption is not absolutely positioned and sits below the image frame', async () => {
-    const screen = render(ImageViewer, baseProps());
-    const img = screen.container.querySelector('img.spread-image.left') as HTMLImageElement;
-    const frame = img.closest('.spread-frame') as HTMLElement;
-    const label = screen.container.querySelector('.spread-label') as HTMLElement;
+	it('the caption is not absolutely positioned and sits below the image frame', async () => {
+		const screen = render(ImageViewer, baseProps());
+		const img = screen.container.querySelector('img.spread-image.left') as HTMLImageElement;
+		const frame = img.closest('.spread-frame') as HTMLElement;
+		const label = screen.container.querySelector('.spread-label') as HTMLElement;
 
-    await expect.poll(() => img.naturalWidth).toBeGreaterThan(0);
+		await expect.poll(() => img.naturalWidth).toBeGreaterThan(0);
 
-    expect(getComputedStyle(label).position).not.toBe('absolute');
-    expect(label.getBoundingClientRect().top).toBeGreaterThanOrEqual(frame.getBoundingClientRect().bottom);
-  });
+		expect(getComputedStyle(label).position).not.toBe('absolute');
+		expect(label.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+			frame.getBoundingClientRect().bottom
+		);
+	});
 
-  it('a second finger does not corrupt an in-progress drag', async () => {
-    // Chromium only treats pointerId 1 (the system mouse) as a real "active
-    // pointer" for setPointerCapture purposes when the pointerdown is a
-    // synthetic dispatchEvent rather than a real touch — a genuine second
-    // touch point (id 2) has no such standing HW state, so
-    // setPointerCapture(2) throws NotFoundError regardless of app logic.
-    // Stub it so this test exercises the component's own pointer-id
-    // bookkeeping (the actual thing under test) rather than that browser
-    // capture precondition.
-    const captureSpy = vi.spyOn(HTMLElement.prototype, 'setPointerCapture').mockImplementation(() => {});
+	it('a second finger does not corrupt an in-progress drag', async () => {
+		// Chromium only treats pointerId 1 (the system mouse) as a real "active
+		// pointer" for setPointerCapture purposes when the pointerdown is a
+		// synthetic dispatchEvent rather than a real touch — a genuine second
+		// touch point (id 2) has no such standing HW state, so
+		// setPointerCapture(2) throws NotFoundError regardless of app logic.
+		// Stub it so this test exercises the component's own pointer-id
+		// bookkeeping (the actual thing under test) rather than that browser
+		// capture precondition.
+		const captureSpy = vi
+			.spyOn(HTMLElement.prototype, 'setPointerCapture')
+			.mockImplementation(() => {});
 
-    const screen = render(ImageViewer, baseProps({ zoom: 2 }));
-    const img = screen.container.querySelector('img.spread-image.left') as HTMLImageElement;
-    const frame = img.closest('.spread-frame') as HTMLElement;
+		const screen = render(ImageViewer, baseProps({ zoom: 2 }));
+		const img = screen.container.querySelector('img.spread-image.left') as HTMLImageElement;
+		const frame = img.closest('.spread-frame') as HTMLElement;
 
-    await expect.poll(() => img.naturalWidth).toBeGreaterThan(0);
-    await expect.poll(() => (frame.getBoundingClientRect().width > 0)).toBe(true);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+		await expect.poll(() => img.naturalWidth).toBeGreaterThan(0);
+		await expect.poll(() => frame.getBoundingClientRect().width > 0).toBe(true);
+		await new Promise<void>((resolve) =>
+			requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+		);
 
-    function translateX(): number {
-      const match = img.style.transform.match(/^translate\(([-\d.]+)px/);
-      return match ? Number(match[1]) : NaN;
-    }
+		function translateX(): number {
+			const match = img.style.transform.match(/^translate\(([-\d.]+)px/);
+			return match ? Number(match[1]) : NaN;
+		}
 
-    const before = translateX();
+		const before = translateX();
 
-    // First finger goes down and starts the drag.
-    frame.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, button: 0, isPrimary: true, clientX: 100, clientY: 100, bubbles: true }));
-    // A second finger touches down on the same frame mid-drag — this must
-    // be ignored (not overwrite the first pointer's last coordinates), or
-    // the next move computes its delta against the second finger's down
-    // position instead of the first finger's, producing a huge spurious
-    // jump (the review's reproduction: -290px for a 10px move).
-    frame.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 2, button: 0, isPrimary: false, clientX: 400, clientY: 100, bubbles: true }));
+		// First finger goes down and starts the drag.
+		frame.dispatchEvent(
+			new PointerEvent('pointerdown', {
+				pointerId: 1,
+				button: 0,
+				isPrimary: true,
+				clientX: 100,
+				clientY: 100,
+				bubbles: true
+			})
+		);
+		// A second finger touches down on the same frame mid-drag — this must
+		// be ignored (not overwrite the first pointer's last coordinates), or
+		// the next move computes its delta against the second finger's down
+		// position instead of the first finger's, producing a huge spurious
+		// jump (the review's reproduction: -290px for a 10px move).
+		frame.dispatchEvent(
+			new PointerEvent('pointerdown', {
+				pointerId: 2,
+				button: 0,
+				isPrimary: false,
+				clientX: 400,
+				clientY: 100,
+				bubbles: true
+			})
+		);
 
-    frame.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, button: 0, isPrimary: true, clientX: 110, clientY: 100, bubbles: true }));
-    await expect.poll(translateX).not.toBeNaN();
-    const afterFirstMove = translateX();
-    expect(afterFirstMove).toBeCloseTo(before + 10, 0); // tolerance ~1px, not -290
+		frame.dispatchEvent(
+			new PointerEvent('pointermove', {
+				pointerId: 1,
+				button: 0,
+				isPrimary: true,
+				clientX: 110,
+				clientY: 100,
+				bubbles: true
+			})
+		);
+		await expect.poll(translateX).not.toBeNaN();
+		const afterFirstMove = translateX();
+		expect(afterFirstMove).toBeCloseTo(before + 10, 0); // tolerance ~1px, not -290
 
-    // The second finger lifts — the first finger's drag must survive it.
-    frame.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2, button: 0, isPrimary: false, clientX: 400, clientY: 100, bubbles: true }));
+		// The second finger lifts — the first finger's drag must survive it.
+		frame.dispatchEvent(
+			new PointerEvent('pointerup', {
+				pointerId: 2,
+				button: 0,
+				isPrimary: false,
+				clientX: 400,
+				clientY: 100,
+				bubbles: true
+			})
+		);
 
-    frame.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, button: 0, isPrimary: true, clientX: 120, clientY: 100, bubbles: true }));
-    await expect.poll(translateX).toBeCloseTo(afterFirstMove + 10, 0);
-    const afterSecondMove = translateX();
+		frame.dispatchEvent(
+			new PointerEvent('pointermove', {
+				pointerId: 1,
+				button: 0,
+				isPrimary: true,
+				clientX: 120,
+				clientY: 100,
+				bubbles: true
+			})
+		);
+		await expect.poll(translateX).toBeCloseTo(afterFirstMove + 10, 0);
+		const afterSecondMove = translateX();
 
-    // First finger lifts — the drag ends; a further move for that same
-    // (now stale) pointer id changes nothing.
-    frame.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, button: 0, isPrimary: true, clientX: 120, clientY: 100, bubbles: true }));
-    frame.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, button: 0, isPrimary: true, clientX: 200, clientY: 200, bubbles: true }));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(translateX()).toBeCloseTo(afterSecondMove, 0);
+		// First finger lifts — the drag ends; a further move for that same
+		// (now stale) pointer id changes nothing.
+		frame.dispatchEvent(
+			new PointerEvent('pointerup', {
+				pointerId: 1,
+				button: 0,
+				isPrimary: true,
+				clientX: 120,
+				clientY: 100,
+				bubbles: true
+			})
+		);
+		frame.dispatchEvent(
+			new PointerEvent('pointermove', {
+				pointerId: 1,
+				button: 0,
+				isPrimary: true,
+				clientX: 200,
+				clientY: 200,
+				bubbles: true
+			})
+		);
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(translateX()).toBeCloseTo(afterSecondMove, 0);
 
-    captureSpy.mockRestore();
-  });
+		captureSpy.mockRestore();
+	});
 });
 
 describe('ImageViewer — the spread names each camera and page (NEH-379)', () => {
-  let previewSpy: ReturnType<typeof vi.spyOn>;
-  beforeEach(() => {
-    locale.set('es');
-    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(make1200x800DataUrl());
-  });
-  afterEach(() => previewSpy.mockRestore());
+	let previewSpy: ReturnType<typeof vi.spyOn>;
+	beforeEach(() => {
+		locale.set('es');
+		previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(make1200x800DataUrl());
+	});
+	afterEach(() => previewSpy.mockRestore());
 
-  it('the even/verso picture on the left with the right camera, the odd/recto picture on the right with the left camera', async () => {
-    const screen = render(ImageViewer, baseProps({ zoom: 1 }));
-    await expect.poll(() => screen.container.querySelector('img.spread-image.right')).not.toBeNull();
-    // The words: the accessible name in the badge form, the text otherwise.
-    const sides = [...screen.container.querySelectorAll('.spread-side')].map((s) => s.getAttribute('aria-label') ?? s.textContent?.trim());
-    expect(sides).toEqual([es.col_left_page_short, es.col_right_page_short]);
-    expect(sides).toEqual(['Cámara derecha · par/verso', 'Cámara izquierda · impar/recto']);
-    expect(screen.container.querySelector('img.spread-image.left')?.getAttribute('alt')).toBe(es.col_left_page_short);
-    expect(screen.container.querySelector('img.spread-image.right')?.getAttribute('alt')).toBe(es.col_right_page_short);
-  });
+	it('the even/verso picture on the left with the right camera, the odd/recto picture on the right with the left camera', async () => {
+		const screen = render(ImageViewer, baseProps({ zoom: 1 }));
+		await expect
+			.poll(() => screen.container.querySelector('img.spread-image.right'))
+			.not.toBeNull();
+		// The words: the accessible name in the badge form, the text otherwise.
+		const sides = [...screen.container.querySelectorAll('.spread-side')].map(
+			(s) => s.getAttribute('aria-label') ?? s.textContent?.trim()
+		);
+		expect(sides).toEqual([es.col_left_page_short, es.col_right_page_short]);
+		expect(sides).toEqual(['Cámara derecha · par/verso', 'Cámara izquierda · impar/recto']);
+		expect(screen.container.querySelector('img.spread-image.left')?.getAttribute('alt')).toBe(
+			es.col_left_page_short
+		);
+		expect(screen.container.querySelector('img.spread-image.right')?.getAttribute('alt')).toBe(
+			es.col_right_page_short
+		);
+	});
 
-  it('a single-camera image names neither a camera nor a page', async () => {
-    const record = makeRecord({ capture_mode: 'single', images: [makeImage({ id: 5, role: 'single', filename: 'one.jpg' })] });
-    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
-    await expect.poll(() => screen.container.querySelector('img.spread-image.left')).not.toBeNull();
-    expect(screen.container.querySelector('.spread-side')).toBeNull();
-    expect(screen.container.querySelector('img.spread-image.left')?.getAttribute('alt')).toBe(es.col_image_alt(5));
-  });
+	it('a single-camera image names neither a camera nor a page', async () => {
+		const record = makeRecord({
+			capture_mode: 'single',
+			images: [makeImage({ id: 5, role: 'single', filename: 'one.jpg' })]
+		});
+		const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+		await expect.poll(() => screen.container.querySelector('img.spread-image.left')).not.toBeNull();
+		expect(screen.container.querySelector('.spread-side')).toBeNull();
+		expect(screen.container.querySelector('img.spread-image.left')?.getAttribute('alt')).toBe(
+			es.col_image_alt(5)
+		);
+	});
 });
 
 // NEH-139: the spread view is the main review viewer; a page whose /preview
 // cannot be loaded (a RAW master without a sidecar) shows its thumbnail,
 // labelled, instead of a broken image.
 describe('ImageViewer — preview fallback (NEH-139)', () => {
-  it('preview fails, thumbnail shows', async () => {
-    const thumbUrl = make1200x800DataUrl();
-    const previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue('data:image/png;base64,AAAA');
-    const thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(thumbUrl);
-    try {
-      const screen = render(ImageViewer, baseProps({
-        records: [makeRecord({
-          images: [
-            makeImage({ id: 1, role: 'left', format: 'cr2', filename: 'left.cr2' }),
-            makeImage({ id: 2, role: 'right', format: 'cr2', filename: 'right.cr2' }),
-          ],
-        })],
-      }));
-      const left = () => screen.container.querySelector('img.spread-image.left') as HTMLImageElement | null;
-      await expect.poll(() => left()?.getAttribute('src')).toBe(thumbUrl);
-      await expect.poll(() => left()!.naturalWidth).toBeGreaterThan(0);
-      expect(screen.container.querySelectorAll('.spread-frame')[0].textContent).toContain('Miniatura (RAW)');
-    } finally {
-      previewSpy.mockRestore();
-      thumbSpy.mockRestore();
-    }
-  });
+	it('preview fails, thumbnail shows', async () => {
+		const thumbUrl = make1200x800DataUrl();
+		const previewSpy = vi
+			.spyOn(recordsApi, 'getImagePreviewUrl')
+			.mockReturnValue('data:image/png;base64,AAAA');
+		const thumbSpy = vi.spyOn(recordsApi, 'getImageThumbnailUrl').mockReturnValue(thumbUrl);
+		try {
+			const screen = render(
+				ImageViewer,
+				baseProps({
+					records: [
+						makeRecord({
+							images: [
+								makeImage({ id: 1, role: 'left', format: 'cr2', filename: 'left.cr2' }),
+								makeImage({ id: 2, role: 'right', format: 'cr2', filename: 'right.cr2' })
+							]
+						})
+					]
+				})
+			);
+			const left = () =>
+				screen.container.querySelector('img.spread-image.left') as HTMLImageElement | null;
+			await expect.poll(() => left()?.getAttribute('src')).toBe(thumbUrl);
+			await expect.poll(() => left()!.naturalWidth).toBeGreaterThan(0);
+			expect(screen.container.querySelectorAll('.spread-frame')[0].textContent).toContain(
+				'Miniatura (RAW)'
+			);
+		} finally {
+			previewSpy.mockRestore();
+			thumbSpy.mockRestore();
+		}
+	});
 });
 
 describe('ImageViewer — an opening with a page never photographed (0.3.2)', () => {
-  let previewSpy: ReturnType<typeof vi.spyOn>;
-  beforeEach(() => {
-    locale.set('es');
-    previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(make1200x800DataUrl());
-  });
-  afterEach(() => previewSpy.mockRestore());
+	let previewSpy: ReturnType<typeof vi.spyOn>;
+	beforeEach(() => {
+		locale.set('es');
+		previewSpy = vi.spyOn(recordsApi, 'getImagePreviewUrl').mockReturnValue(make1200x800DataUrl());
+	});
+	afterEach(() => previewSpy.mockRestore());
 
-  function frames(container: HTMLElement): HTMLElement[] {
-    return [...container.querySelectorAll<HTMLElement>('.spread-frame')];
-  }
+	function frames(container: HTMLElement): HTMLElement[] {
+		return [...container.querySelectorAll<HTMLElement>('.spread-frame')];
+	}
 
-  it('missing the left page: the left frame is empty and says so, the right image keeps its side', async () => {
-    const record = makeRecord({ missing_side: 'left', images: [makeImage({ id: 2, role: 'right', filename: 'right.jpg' })] });
-    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
-    const [left, right] = frames(screen.container);
-    await expect.element(left).toHaveTextContent(es.missing_page);
-    expect(left.querySelector('[data-missing-side="left"]')).not.toBeNull();
-    expect(left.querySelector('img')).toBeNull();
-    expect(right.querySelector('img.spread-image.right')).not.toBeNull();
-    expect(right.textContent).not.toContain(es.missing_page);
-  });
+	it('missing the left page: the left frame is empty and says so, the right image keeps its side', async () => {
+		const record = makeRecord({
+			missing_side: 'left',
+			images: [makeImage({ id: 2, role: 'right', filename: 'right.jpg' })]
+		});
+		const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+		const [left, right] = frames(screen.container);
+		await expect.element(left).toHaveTextContent(es.missing_page);
+		expect(left.querySelector('[data-missing-side="left"]')).not.toBeNull();
+		expect(left.querySelector('img')).toBeNull();
+		expect(right.querySelector('img.spread-image.right')).not.toBeNull();
+		expect(right.textContent).not.toContain(es.missing_page);
+	});
 
-  it('missing the right page: the right frame is empty and says so, the left image keeps its side', async () => {
-    const record = makeRecord({ missing_side: 'right', images: [makeImage({ id: 1, role: 'left', filename: 'left.jpg' })] });
-    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
-    const [left, right] = frames(screen.container);
-    await expect.element(right).toHaveTextContent(es.missing_page);
-    expect(right.querySelector('[data-missing-side="right"]')).not.toBeNull();
-    expect(left.querySelector('img.spread-image.left')).not.toBeNull();
-    expect(left.textContent).not.toContain(es.missing_page);
-  });
+	it('missing the right page: the right frame is empty and says so, the left image keeps its side', async () => {
+		const record = makeRecord({
+			missing_side: 'right',
+			images: [makeImage({ id: 1, role: 'left', filename: 'left.jpg' })]
+		});
+		const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+		const [left, right] = frames(screen.container);
+		await expect.element(right).toHaveTextContent(es.missing_page);
+		expect(right.querySelector('[data-missing-side="right"]')).not.toBeNull();
+		expect(left.querySelector('img.spread-image.left')).not.toBeNull();
+		expect(left.textContent).not.toContain(es.missing_page);
+	});
 
-  it('a placeholder for a whole opening (NEH-317): both frames are empty and say so, with its pill', async () => {
-    const record = makeRecord({ capture_mode: 'dual', missing_side: 'both', images: [] });
-    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
-    const [left, right] = frames(screen.container);
-    await expect.element(left).toHaveTextContent(es.missing_page);
-    await expect.element(right).toHaveTextContent(es.missing_page);
-    expect(left.querySelector('[data-missing-side="left"]')).not.toBeNull();
-    expect(right.querySelector('[data-missing-side="right"]')).not.toBeNull();
-    await expect.element(screen.getByText(es.pill_opening_missing)).toBeVisible();
-  });
+	it('a placeholder for a whole opening (NEH-317): both frames are empty and say so, with its pill', async () => {
+		const record = makeRecord({ capture_mode: 'dual', missing_side: 'both', images: [] });
+		const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+		const [left, right] = frames(screen.container);
+		await expect.element(left).toHaveTextContent(es.missing_page);
+		await expect.element(right).toHaveTextContent(es.missing_page);
+		expect(left.querySelector('[data-missing-side="left"]')).not.toBeNull();
+		expect(right.querySelector('[data-missing-side="right"]')).not.toBeNull();
+		await expect.element(screen.getByText(es.pill_opening_missing)).toBeVisible();
+	});
 
-  it('a closed placeholder keeps the empty frames, with the Closed pill', async () => {
-    const record = makeRecord({ capture_mode: 'dual', missing_side: 'both', closed_reason: 'foliation_skip', images: [] });
-    const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
-    await expect.element(screen.getByText(es.pill_closed, { exact: true })).toBeVisible();
-    expect(screen.container.querySelectorAll('[data-missing-side]')).toHaveLength(2);
-    expect(screen.container.textContent).not.toContain(es.pill_opening_missing);
-  });
+	it('a closed placeholder keeps the empty frames, with the Closed pill', async () => {
+		const record = makeRecord({
+			capture_mode: 'dual',
+			missing_side: 'both',
+			closed_reason: 'foliation_skip',
+			images: []
+		});
+		const screen = render(ImageViewer, baseProps({ records: [record], zoom: 1 }));
+		await expect.element(screen.getByText(es.pill_closed, { exact: true })).toBeVisible();
+		expect(screen.container.querySelectorAll('[data-missing-side]')).toHaveLength(2);
+		expect(screen.container.textContent).not.toContain(es.pill_opening_missing);
+	});
 });

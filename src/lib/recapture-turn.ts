@@ -43,7 +43,8 @@ function isVolume(v: unknown): v is RetakeSummaryVolume {
 		x.pendingRecordIds.every((id) => typeof id === 'number') &&
 		// Absent from a backend before 0.3.2, which then has none.
 		(x.missingSideRecordIds === undefined ||
-			(Array.isArray(x.missingSideRecordIds) && x.missingSideRecordIds.every((id) => typeof id === 'number')))
+			(Array.isArray(x.missingSideRecordIds) &&
+				x.missingSideRecordIds.every((id) => typeof id === 'number')))
 	);
 }
 
@@ -51,7 +52,12 @@ function isVolume(v: unknown): v is RetakeSummaryVolume {
 export function readRetakeSummary(data: unknown): RetakeSummary | null {
 	if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
 	const x = data as { pendingRecords?: unknown; volumes?: unknown; turn?: unknown };
-	if (typeof x.pendingRecords !== 'number' || !Array.isArray(x.volumes) || !x.volumes.every(isVolume)) return null;
+	if (
+		typeof x.pendingRecords !== 'number' ||
+		!Array.isArray(x.volumes) ||
+		!x.volumes.every(isVolume)
+	)
+		return null;
 	const turn = x.turn as { state?: unknown; unlockedBy?: unknown } | null | undefined;
 	if (!turn || typeof turn.state !== 'string' || !TURN_STATES.has(turn.state)) return null;
 	return data as RetakeSummary;
@@ -108,7 +114,10 @@ export function retakeVolumeMap(summary: RetakeSummary | null): Map<number, Reta
  * Siguiente follows its own sections (0.3.1, $lib/queue), which put work in
  * progress first, so the two can differ.
  */
-export function preferredRetakeVolume(summary: RetakeSummary | null, items: QueueItem[]): RetakeSummaryVolume | null {
+export function preferredRetakeVolume(
+	summary: RetakeSummary | null,
+	items: QueueItem[]
+): RetakeSummaryVolume | null {
 	const volumes = retakeVolumeMap(summary);
 	for (const item of items) {
 		const volume = item.collectionId != null ? volumes.get(item.collectionId) : undefined;
@@ -151,6 +160,10 @@ export function deferToBack(order: number[], id: number): number[] {
  * pending. `exceptId` leaves the open record out, to say what comes after
  * it. Null when none is.
  */
-export function guideNextId(order: number[], isPending: (id: number) => boolean, exceptId?: number): number | null {
+export function guideNextId(
+	order: number[],
+	isPending: (id: number) => boolean,
+	exceptId?: number
+): number | null {
 	return order.find((id) => id !== exceptId && isPending(id)) ?? null;
 }

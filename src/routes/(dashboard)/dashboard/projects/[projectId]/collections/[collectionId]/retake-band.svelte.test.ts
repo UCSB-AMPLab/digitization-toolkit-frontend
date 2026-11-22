@@ -55,18 +55,38 @@ describe('volume page: recapture band', () => {
 		const band = screen.getByRole('region', { name: '2 pares de páginas por recapturar' });
 		await expect.element(band).toBeVisible();
 		const link = band.getByRole('link', { name: 'Recapturar ahora' });
-		await expect.element(link).toHaveAttribute('href', '/live-preview?projectId=1&collectionId=7&recordId=6');
+		await expect
+			.element(link)
+			.toHaveAttribute('href', '/live-preview?projectId=1&collectionId=7&recordId=6');
 		// The background colour has a transition (.btn in app.css), so it is
 		// read until it settles on the resting colour.
-		await expect.poll(() => getComputedStyle(link.element()).backgroundColor).toBe('rgb(225, 183, 120)');
+		await expect
+			.poll(() => getComputedStyle(link.element()).backgroundColor)
+			.toBe('rgb(225, 183, 120)');
 		expect(getComputedStyle(link.element()).color).toBe('rgb(19, 17, 16)');
 	});
 
 	it('counts the records prepared for retake as the summary does, and opens its first pending record', async () => {
-		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(6, 6, 'rejected'), rec(8, 8, 'captured')]);
+		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([
+			rec(1, 1, 'captured'),
+			rec(6, 6, 'rejected'),
+			rec(8, 8, 'captured')
+		]);
 		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
 			pendingRecords: 3,
-			volumes: [{ collectionId: 7, projectId: 1, name: 'Tomo 066', filenameStem: 'co-66', pending: 3, total: 3, excluded: 0, firstPendingRecordId: 1, pendingRecordIds: [1, 6, 8] }],
+			volumes: [
+				{
+					collectionId: 7,
+					projectId: 1,
+					name: 'Tomo 066',
+					filenameStem: 'co-66',
+					pending: 3,
+					total: 3,
+					excluded: 0,
+					firstPendingRecordId: 1,
+					pendingRecordIds: [1, 6, 8]
+				}
+			],
 			turn: { state: 'recaptures', unlockedBy: null }
 		});
 		const screen = render(CollectionPage);
@@ -78,37 +98,67 @@ describe('volume page: recapture band', () => {
 	});
 
 	it('takes the summary over the records on screen: nothing pending there means no band, even with a rejected record shown', async () => {
-		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(2, 2, 'rejected')]);
+		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([
+			rec(1, 1, 'captured'),
+			rec(2, 2, 'rejected')
+		]);
 		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
-			pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null }
+			pendingRecords: 0,
+			volumes: [],
+			turn: { state: 'free', unlockedBy: null }
 		});
 		const screen = render(CollectionPage);
 		await expect.element(screen.getByText('Par 2')).toBeInTheDocument();
-		await expect.poll(() => (recordsApi.toRetakeSummary as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBeGreaterThan(0);
-		await expect.element(screen.getByText('por recapturar', { exact: false })).not.toBeInTheDocument();
+		await expect
+			.poll(
+				() =>
+					(recordsApi.toRetakeSummary as unknown as { mock: { calls: unknown[] } }).mock.calls
+						.length
+			)
+			.toBeGreaterThan(0);
+		await expect
+			.element(screen.getByText('por recapturar', { exact: false }))
+			.not.toBeInTheDocument();
 	});
 
 	it('shows no band when the summary has nothing pending for the volume', async () => {
-		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(2, 2, 'approved')]);
+		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([
+			rec(1, 1, 'captured'),
+			rec(2, 2, 'approved')
+		]);
 		vi.spyOn(recordsApi, 'toRetakeSummary').mockResolvedValue({
-			pendingRecords: 0, volumes: [], turn: { state: 'free', unlockedBy: null }
+			pendingRecords: 0,
+			volumes: [],
+			turn: { state: 'free', unlockedBy: null }
 		});
 		const screen = render(CollectionPage);
 		await expect.element(screen.getByText('Par 2')).toBeInTheDocument();
-		await expect.element(screen.getByText('por recapturar', { exact: false })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByText('por recapturar', { exact: false }))
+			.not.toBeInTheDocument();
 	});
 
 	it('uses the singular for one', async () => {
-		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(3, 3, 'rejected')]);
+		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([
+			rec(1, 1, 'captured'),
+			rec(3, 3, 'rejected')
+		]);
 		const screen = render(CollectionPage);
-		await expect.element(screen.getByRole('region', { name: 'Un par de páginas por recapturar' })).toBeVisible();
+		await expect
+			.element(screen.getByRole('region', { name: 'Un par de páginas por recapturar' }))
+			.toBeVisible();
 	});
 
 	it('shows no band without rejected records', async () => {
-		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([rec(1, 1, 'captured'), rec(2, 2, 'approved')]);
+		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([
+			rec(1, 1, 'captured'),
+			rec(2, 2, 'approved')
+		]);
 		const screen = render(CollectionPage);
 		await expect.element(screen.getByText('Par 2')).toBeInTheDocument();
-		await expect.element(screen.getByText('por recapturar', { exact: false })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByText('por recapturar', { exact: false }))
+			.not.toBeInTheDocument();
 	});
 
 	it('gives a reviewer the band but no link', async () => {
@@ -117,14 +167,24 @@ describe('volume page: recapture band', () => {
 		const screen = render(CollectionPage);
 		const band = screen.getByRole('region', { name: 'Un par de páginas por recapturar' });
 		await expect.element(band).toBeVisible();
-		await expect.element(band.getByRole('link', { name: 'Recapturar ahora' })).not.toBeInTheDocument();
+		await expect
+			.element(band.getByRole('link', { name: 'Recapturar ahora' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('leaves a closed missing record out of the records on screen: it is not pending (NEH-317)', async () => {
 		vi.spyOn(recordsApi, 'listAll').mockResolvedValue([
 			rec(1, 1, 'captured'),
-			{ ...rec(2, 2, 'captured'), missing_side: 'both', closed_reason: 'foliation_skip' } as ApiRecord,
-			{ ...rec(4, 4, 'captured'), missing_side: 'left', closed_reason: 'captured_elsewhere' } as ApiRecord,
+			{
+				...rec(2, 2, 'captured'),
+				missing_side: 'both',
+				closed_reason: 'foliation_skip'
+			} as ApiRecord,
+			{
+				...rec(4, 4, 'captured'),
+				missing_side: 'left',
+				closed_reason: 'captured_elsewhere'
+			} as ApiRecord,
 			rec(5, 5, 'rejected')
 		]);
 		const screen = render(CollectionPage);

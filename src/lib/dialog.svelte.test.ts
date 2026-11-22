@@ -5,7 +5,15 @@
 // Version: 0.1.0-beta
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { dialogOpen, dialogsAbove, dismissible, openDialogCount, openDialogsOutside, trapFocus, type DismissOptions } from './dialog';
+import {
+	dialogOpen,
+	dialogsAbove,
+	dismissible,
+	openDialogCount,
+	openDialogsOutside,
+	trapFocus,
+	type DismissOptions
+} from './dialog';
 
 const opened: { destroy: () => void }[] = [];
 
@@ -73,7 +81,11 @@ describe('dismissible', () => {
 
 	it('ignores an Escape that something else has already handled, and other keys', () => {
 		const dialog = openDialog();
-		const handled = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+		const handled = new KeyboardEvent('keydown', {
+			key: 'Escape',
+			bubbles: true,
+			cancelable: true
+		});
 		handled.preventDefault();
 		document.body.dispatchEvent(handled);
 		document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -111,7 +123,12 @@ describe('trapFocus, one dialog over another', () => {
 		return node;
 	}
 	const pressTab = (shiftKey = false) => {
-		const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+		const event = new KeyboardEvent('keydown', {
+			key: 'Tab',
+			shiftKey,
+			bubbles: true,
+			cancelable: true
+		});
 		document.activeElement?.dispatchEvent(event);
 		return event;
 	};
@@ -153,7 +170,12 @@ describe('dismissible, Escape decided per key press', () => {
 		const lower = openDialog();
 		const escape = vi.fn((event: KeyboardEvent) => !event.ctrlKey);
 		const upper = openDialog({ escape });
-		const ctrl = new KeyboardEvent('keydown', { key: 'Escape', ctrlKey: true, bubbles: true, cancelable: true });
+		const ctrl = new KeyboardEvent('keydown', {
+			key: 'Escape',
+			ctrlKey: true,
+			bubbles: true,
+			cancelable: true
+		});
 		document.body.dispatchEvent(ctrl);
 		expect(escape).toHaveBeenCalledWith(ctrl);
 		expect(upper.onDismiss).not.toHaveBeenCalled();
@@ -247,7 +269,7 @@ describe('the open-dialog registry', () => {
 		expect(seen).toEqual([false, true, false]);
 	});
 
-	it('counts the dialogs outside the given elements: those that are not the caller\'s own', () => {
+	it("counts the dialogs outside the given elements: those that are not the caller's own", () => {
 		const mine = openDialog();
 		expect(openDialogsOutside([mine.backdrop])).toBe(0);
 		const other = trapped(true);

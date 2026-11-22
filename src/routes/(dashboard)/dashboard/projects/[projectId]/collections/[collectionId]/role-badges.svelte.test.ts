@@ -28,8 +28,24 @@ function pairRecord(): ApiRecord {
 		status: 'in_review',
 		capture_mode: 'dual',
 		images: [
-			{ id: 21, record_id: 2, filename: 'right.jpg', file_path: '/r', format: 'jpg', role: 'right', is_current: true },
-			{ id: 20, record_id: 2, filename: 'left.jpg', file_path: '/l', format: 'jpg', role: 'left', is_current: true }
+			{
+				id: 21,
+				record_id: 2,
+				filename: 'right.jpg',
+				file_path: '/r',
+				format: 'jpg',
+				role: 'right',
+				is_current: true
+			},
+			{
+				id: 20,
+				record_id: 2,
+				filename: 'left.jpg',
+				file_path: '/l',
+				format: 'jpg',
+				role: 'left',
+				is_current: true
+			}
 		]
 	} as ApiRecord;
 }
@@ -40,7 +56,17 @@ function singleRecord(): ApiRecord {
 		title: 'Folio 13',
 		status: 'in_review',
 		capture_mode: 'single',
-		images: [{ id: 30, record_id: 3, filename: 'one.jpg', file_path: '/o', format: 'jpg', role: 'single', is_current: true }]
+		images: [
+			{
+				id: 30,
+				record_id: 3,
+				filename: 'one.jpg',
+				file_path: '/o',
+				format: 'jpg',
+				role: 'single',
+				is_current: true
+			}
+		]
 	} as ApiRecord;
 }
 
@@ -63,12 +89,25 @@ function badges(root: HTMLElement, selector: string) {
 
 function expectPair(found: ReturnType<typeof badges>, msgs: Catalogue) {
 	expect(found).toEqual([
-		{ letter: msgs.badge_cam_right, icon: 'photo_camera', iconHidden: 'true', title: msgs.cam_page_even, right: false },
-		{ letter: msgs.badge_cam_left, icon: 'photo_camera', iconHidden: 'true', title: msgs.cam_page_odd, right: true }
+		{
+			letter: msgs.badge_cam_right,
+			icon: 'photo_camera',
+			iconHidden: 'true',
+			title: msgs.cam_page_even,
+			right: false
+		},
+		{
+			letter: msgs.badge_cam_left,
+			icon: 'photo_camera',
+			iconHidden: 'true',
+			title: msgs.cam_page_odd,
+			right: true
+		}
 	]);
 }
 
-const terms = (root: HTMLElement) => [...root.querySelectorAll('.page-term')].map((t) => t.textContent?.trim());
+const terms = (root: HTMLElement) =>
+	[...root.querySelectorAll('.page-term')].map((t) => t.textContent?.trim());
 
 afterEach(() => locale.set('es'));
 
@@ -76,28 +115,55 @@ for (const [lang, msgs] of langs) {
 	describe(`role badges (${lang})`, () => {
 		it('gallery strip: camera letter and symbol from the role, the page term, both facts as the title', async () => {
 			locale.set(lang as 'en' | 'es');
-			const screen = render(ThumbnailStrip, { records: [pairRecord()], selectedRecordId: null, viewMode: 'spread', onSelect: vi.fn() });
+			const screen = render(ThumbnailStrip, {
+				records: [pairRecord()],
+				selectedRecordId: null,
+				viewMode: 'spread',
+				onSelect: vi.fn()
+			});
 			expectPair(badges(screen.container as HTMLElement, '.role-badge'), msgs);
-			expect(terms(screen.container as HTMLElement)).toEqual([msgs.page_term_even, msgs.page_term_odd]);
+			expect(terms(screen.container as HTMLElement)).toEqual([
+				msgs.page_term_even,
+				msgs.page_term_odd
+			]);
 			const alts = [...screen.container.querySelectorAll('img')].map((i) => i.getAttribute('alt'));
 			expect(alts).toEqual([`Folio 12 · ${msgs.cam_page_even}`, `Folio 12 · ${msgs.cam_page_odd}`]);
 		});
 
 		it('grid tile: the same, and the alt names the record, the camera and the page', async () => {
 			locale.set(lang as 'en' | 'es');
-			const screen = render(GridView, { records: [pairRecord()], collectionId: 1, onRecordsUpdate: vi.fn(), onRecordClick: vi.fn() });
+			const screen = render(GridView, {
+				records: [pairRecord()],
+				collectionId: 1,
+				onRecordsUpdate: vi.fn(),
+				onRecordClick: vi.fn()
+			});
 			expectPair(badges(screen.container as HTMLElement, '.role-badge'), msgs);
-			expect(terms(screen.container as HTMLElement)).toEqual([msgs.page_term_even, msgs.page_term_odd]);
-			const alts = [...screen.container.querySelectorAll('img.card-image')].map((i) => i.getAttribute('alt'));
+			expect(terms(screen.container as HTMLElement)).toEqual([
+				msgs.page_term_even,
+				msgs.page_term_odd
+			]);
+			const alts = [...screen.container.querySelectorAll('img.card-image')].map((i) =>
+				i.getAttribute('alt')
+			);
 			expect(alts).toEqual([`Folio 12 · ${msgs.cam_page_even}`, `Folio 12 · ${msgs.cam_page_odd}`]);
 		});
 
 		it('list view: the same', async () => {
 			locale.set(lang as 'en' | 'es');
-			const screen = render(ListView, { records: [pairRecord()], collectionId: 1, onRecordClick: vi.fn() });
+			const screen = render(ListView, {
+				records: [pairRecord()],
+				collectionId: 1,
+				onRecordClick: vi.fn()
+			});
 			expectPair(badges(screen.container as HTMLElement, '.role-badge'), msgs);
-			expect(terms(screen.container as HTMLElement)).toEqual([msgs.page_term_even, msgs.page_term_odd]);
-			const alts = [...screen.container.querySelectorAll('img.row-thumb')].map((i) => i.getAttribute('alt'));
+			expect(terms(screen.container as HTMLElement)).toEqual([
+				msgs.page_term_even,
+				msgs.page_term_odd
+			]);
+			const alts = [...screen.container.querySelectorAll('img.row-thumb')].map((i) =>
+				i.getAttribute('alt')
+			);
 			expect(alts).toEqual([`Folio 12 · ${msgs.cam_page_even}`, `Folio 12 · ${msgs.cam_page_odd}`]);
 		});
 
@@ -122,10 +188,17 @@ for (const [lang, msgs] of langs) {
 				right: p.classList.contains('role-right')
 			}));
 			expect(pills).toEqual([
-				{ letter: msgs.badge_cam_right, icon: 'photo_camera', title: msgs.cam_page_even, right: false },
+				{
+					letter: msgs.badge_cam_right,
+					icon: 'photo_camera',
+					title: msgs.cam_page_even,
+					right: false
+				},
 				{ letter: msgs.badge_cam_left, icon: 'photo_camera', title: msgs.cam_page_odd, right: true }
 			]);
-			const titles = [...screen.container.querySelectorAll('.img-section-title')].map((t) => t.textContent?.trim());
+			const titles = [...screen.container.querySelectorAll('.img-section-title')].map((t) =>
+				t.textContent?.trim()
+			);
 			expect(titles).toEqual([msgs.col_role_left, msgs.col_role_right]);
 			// The pill is the one announcement of camera and page; the section title beside it is hidden from assistive technology.
 			const pillEls = [...screen.container.querySelectorAll<HTMLElement>('.role-pill')];
@@ -135,7 +208,9 @@ for (const [lang, msgs] of langs) {
 			]);
 			for (const p of pillEls) {
 				expect(p.querySelector('.badge-letter')?.getAttribute('aria-hidden')).toBe('true');
-				expect(p.parentElement?.querySelector('.img-section-title')?.getAttribute('aria-hidden')).toBe('true');
+				expect(
+					p.parentElement?.querySelector('.img-section-title')?.getAttribute('aria-hidden')
+				).toBe('true');
 			}
 		});
 	});
@@ -144,9 +219,23 @@ for (const [lang, msgs] of langs) {
 describe('role badges: a single-camera capture', () => {
 	it('shows neither a camera nor a page term', async () => {
 		locale.set('en');
-		const strip = render(ThumbnailStrip, { records: [singleRecord()], selectedRecordId: null, viewMode: 'spread', onSelect: vi.fn() });
-		const grid = render(GridView, { records: [singleRecord()], collectionId: 1, onRecordsUpdate: vi.fn(), onRecordClick: vi.fn() });
-		const list = render(ListView, { records: [singleRecord()], collectionId: 1, onRecordClick: vi.fn() });
+		const strip = render(ThumbnailStrip, {
+			records: [singleRecord()],
+			selectedRecordId: null,
+			viewMode: 'spread',
+			onSelect: vi.fn()
+		});
+		const grid = render(GridView, {
+			records: [singleRecord()],
+			collectionId: 1,
+			onRecordsUpdate: vi.fn(),
+			onRecordClick: vi.fn()
+		});
+		const list = render(ListView, {
+			records: [singleRecord()],
+			collectionId: 1,
+			onRecordClick: vi.fn()
+		});
 		for (const s of [strip, grid, list]) {
 			expect(s.container.querySelector('.role-badge')).toBeNull();
 			expect(s.container.querySelector('.page-term')).toBeNull();

@@ -44,7 +44,10 @@ export function sectionsFor(role: string | null | undefined): SettingsSection[] 
 }
 
 /** The section to show for `requested`: itself when the role may open it, else Network. */
-export function resolveSection(requested: string | null | undefined, role: string | null | undefined): SettingsSection {
+export function resolveSection(
+	requested: string | null | undefined,
+	role: string | null | undefined
+): SettingsSection {
 	const allowed = sectionsFor(role);
 	return allowed.find((s) => s.id === requested) ?? allowed.find((s) => s.id === DEFAULT_SECTION)!;
 }

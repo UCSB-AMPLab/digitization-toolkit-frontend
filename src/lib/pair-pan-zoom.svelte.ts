@@ -81,7 +81,10 @@ export class PairPanZoom {
 				this.rotations[i]
 			);
 			const scale = pageScale(this.zoom, this.oneToOnes[i] ?? 1, this.oneToOneRef);
-			const bounds = panBounds(screenExtent(fitted, this.rotations[i], scale), { w: this.frameW[i] ?? 0, h: this.frameH[i] ?? 0 });
+			const bounds = panBounds(screenExtent(fitted, this.rotations[i], scale), {
+				w: this.frameW[i] ?? 0,
+				h: this.frameH[i] ?? 0
+			});
 			return { scale, pan: panPixels(this.pan, bounds) as Pan, bounds };
 		})
 	);

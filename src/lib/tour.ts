@@ -50,73 +50,85 @@ import { authStore, userRole } from '$lib/stores/auth';
  * place in the work (lessonRank), so a switch between the two tours moves
  * from one to the other (reconcileTourIndex).
  */
-export const TOUR_LESSONS = ['project', 'volume', 'capture', 'send', 'follow', 'approve', 'export'] as const;
+export const TOUR_LESSONS = [
+	'project',
+	'volume',
+	'capture',
+	'send',
+	'follow',
+	'approve',
+	'export'
+] as const;
 export type TourLesson = (typeof TOUR_LESSONS)[number];
 
 export type TourStep = {
-  /** What the step teaches. */
-  lesson: TourLesson;
-  /** Prefix of the step's i18n keys (`<id>_title`, `<id>_body`, `<id>_where`). */
-  id: string;
-  /** The route this step belongs to. */
-  match: RegExp;
-  /**
-   * data-tour attribute of the highlighted control. null when the interface
-   * has no such control yet — the step is explained without pointing at
-   * anything.
-   */
-  target: string | null;
-  /** Where the box goes relative to the target, if it fits. */
-  side: 'top' | 'bottom' | 'left' | 'right';
-  /** The route hint's key, when it is not `<id>_where`. */
-  where?: string;
+	/** What the step teaches. */
+	lesson: TourLesson;
+	/** Prefix of the step's i18n keys (`<id>_title`, `<id>_body`, `<id>_where`). */
+	id: string;
+	/** The route this step belongs to. */
+	match: RegExp;
+	/**
+	 * data-tour attribute of the highlighted control. null when the interface
+	 * has no such control yet — the step is explained without pointing at
+	 * anything.
+	 */
+	target: string | null;
+	/** Where the box goes relative to the target, if it fits. */
+	side: 'top' | 'bottom' | 'left' | 'right';
+	/** The route hint's key, when it is not `<id>_where`. */
+	where?: string;
 };
 
 /** The i18n keys of a step's title, body and route hint. */
 export function tourKeys(step: TourStep): { title: string; body: string; where: string } {
-  return { title: `${step.id}_title`, body: `${step.id}_body`, where: step.where ?? `${step.id}_where` };
+	return {
+		title: `${step.id}_title`,
+		body: `${step.id}_body`,
+		where: step.where ?? `${step.id}_where`
+	};
 }
 
-const PROJECTS    = /^\/dashboard\/projects\/?$/;
-const PROJECT     = /^\/dashboard\/projects\/\d+\/?$/;
-const COLLECTION  = /^\/dashboard\/projects\/\d+\/collections\/\d+/;
-const VOLUMES     = /^\/dashboard\/volumes\/?$/;
-const QUEUE       = /^\/dashboard\/queue\/?$/;
+const PROJECTS = /^\/dashboard\/projects\/?$/;
+const PROJECT = /^\/dashboard\/projects\/\d+\/?$/;
+const COLLECTION = /^\/dashboard\/projects\/\d+\/collections\/\d+/;
+const VOLUMES = /^\/dashboard\/volumes\/?$/;
+const QUEUE = /^\/dashboard\/queue\/?$/;
 // Every dashboard screen with the side menu. The volume screen and the
 // capture screen have their own layout, without it.
-const WITH_MENU   = /^\/dashboard(?!\/projects\/\d+\/collections\/)(\/.*)?$/;
+const WITH_MENU = /^\/dashboard(?!\/projects\/\d+\/collections\/)(\/.*)?$/;
 
 // Capture, send for review, approve and export: the same in every mode. The
 // volume page keeps its route under the project while projects are hidden.
 const VOLUME_STEPS: TourStep[] = [
-  // Below: the capture button sits in the top bar, so a box above it would
-  // be pressed against the edge or cover the bar itself.
-  { lesson: 'capture', id: 'tour_s3', match: COLLECTION, target: 'capturar',        side: 'bottom' },
-  // Below, like capture: both sit in the top bar. The button exists only
-  // when there are captures not yet sent, so in an empty volume the step is
-  // explained without a highlight — the intended fallback.
-  { lesson: 'send',    id: 'tour_s4', match: COLLECTION, target: 'entregar',        side: 'bottom' },
-  // The approve button sits in the annotations panel against the left edge,
-  // and the export button in the toolbar against the right edge: the box
-  // goes on the side with room. Approve exists only in book view with the
-  // annotations panel open, for reviewers and admins, so the step text says
-  // how to reach it.
-  { lesson: 'approve', id: 'tour_s5', match: COLLECTION, target: 'aprobar',         side: 'right'  },
-  { lesson: 'export',  id: 'tour_s6', match: COLLECTION, target: 'exportar',        side: 'left'   },
+	// Below: the capture button sits in the top bar, so a box above it would
+	// be pressed against the edge or cover the bar itself.
+	{ lesson: 'capture', id: 'tour_s3', match: COLLECTION, target: 'capturar', side: 'bottom' },
+	// Below, like capture: both sit in the top bar. The button exists only
+	// when there are captures not yet sent, so in an empty volume the step is
+	// explained without a highlight — the intended fallback.
+	{ lesson: 'send', id: 'tour_s4', match: COLLECTION, target: 'entregar', side: 'bottom' },
+	// The approve button sits in the annotations panel against the left edge,
+	// and the export button in the toolbar against the right edge: the box
+	// goes on the side with room. Approve exists only in book view with the
+	// annotations panel open, for reviewers and admins, so the step text says
+	// how to reach it.
+	{ lesson: 'approve', id: 'tour_s5', match: COLLECTION, target: 'aprobar', side: 'right' },
+	{ lesson: 'export', id: 'tour_s6', match: COLLECTION, target: 'exportar', side: 'left' }
 ];
 
 export const TOUR_STEPS: TourStep[] = [
-  { lesson: 'project', id: 'tour_s1', match: PROJECTS,   target: 'nuevo-proyecto',  side: 'left'   },
-  { lesson: 'volume',  id: 'tour_s2', match: PROJECT,    target: 'nuevo-volumen',   side: 'left'   },
-  ...VOLUME_STEPS,
+	{ lesson: 'project', id: 'tour_s1', match: PROJECTS, target: 'nuevo-proyecto', side: 'left' },
+	{ lesson: 'volume', id: 'tour_s2', match: PROJECT, target: 'nuevo-volumen', side: 'left' },
+	...VOLUME_STEPS
 ];
 
 // Without projects, the later steps give their route from Volúmenes.
 const FROM_VOLUMES: TourStep[] = VOLUME_STEPS.map((s) => ({ ...s, where: `${s.id}_where_vol` }));
 
 const STEPS_WITHOUT_PROJECTS: TourStep[] = [
-  { lesson: 'volume', id: 'tour_s2_vol', match: VOLUMES, target: 'nuevo-volumen', side: 'left' },
-  ...FROM_VOLUMES,
+	{ lesson: 'volume', id: 'tour_s2_vol', match: VOLUMES, target: 'nuevo-volumen', side: 'left' },
+	...FROM_VOLUMES
 ];
 
 const [SEND_FROM_VOLUMES] = FROM_VOLUMES.filter((s) => s.lesson === 'send');
@@ -130,24 +142,43 @@ const [EXPORT_FROM_VOLUMES] = FROM_VOLUMES.filter((s) => s.lesson === 'export');
 // a highlight. Its details panel opens where the box sits, so GuidedTour
 // steps aside while it is open.
 const STEPS_FISQUA: TourStep[] = [
-  { lesson: 'volume',  id: 'tour_s2_fisqua', match: WITH_MENU,  target: 'cola', side: 'right' },
-  { lesson: 'capture', id: 'tour_s3_fisqua', match: QUEUE,      target: null,   side: 'bottom', where: 'tour_s2_fisqua_where' },
-  SEND_FROM_VOLUMES,
-  { lesson: 'follow',  id: 'tour_s5_fisqua', match: COLLECTION, target: 'fisqua-estado', side: 'bottom', where: 'tour_s5_where_vol' },
-  EXPORT_FROM_VOLUMES,
+	{ lesson: 'volume', id: 'tour_s2_fisqua', match: WITH_MENU, target: 'cola', side: 'right' },
+	{
+		lesson: 'capture',
+		id: 'tour_s3_fisqua',
+		match: QUEUE,
+		target: null,
+		side: 'bottom',
+		where: 'tour_s2_fisqua_where'
+	},
+	SEND_FROM_VOLUMES,
+	{
+		lesson: 'follow',
+		id: 'tour_s5_fisqua',
+		match: COLLECTION,
+		target: 'fisqua-estado',
+		side: 'bottom',
+		where: 'tour_s5_where_vol'
+	},
+	EXPORT_FROM_VOLUMES
 ];
 
 /** The tour's steps for the unit's state and the user's role; the full tour while the state is not known. */
-export function tourSteps(state: UnitState | null, role: string | null | undefined = null): TourStep[] {
-  if (state?.mode === 'fisqua' && !canCreateVolumes(role, state)) return STEPS_FISQUA;
-  return projectsShownIn(state) ? TOUR_STEPS : STEPS_WITHOUT_PROJECTS;
+export function tourSteps(
+	state: UnitState | null,
+	role: string | null | undefined = null
+): TourStep[] {
+	if (state?.mode === 'fisqua' && !canCreateVolumes(role, state)) return STEPS_FISQUA;
+	return projectsShownIn(state) ? TOUR_STEPS : STEPS_WITHOUT_PROJECTS;
 }
 
 /** The steps for the unit state last read and the signed-in user. */
-export const currentTourSteps = derived([unitState, userRole], ([$state, $role]) => tourSteps($state, $role));
+export const currentTourSteps = derived([unitState, userRole], ([$state, $role]) =>
+	tourSteps($state, $role)
+);
 
 function lastIndex(): number {
-  return get(currentTourSteps).length - 1;
+	return get(currentTourSteps).length - 1;
 }
 
 /**
@@ -156,15 +187,15 @@ function lastIndex(): number {
  * projects are hidden), the first lesson after it that `next` has.
  */
 function lessonRank(lesson: TourLesson): number {
-  return TOUR_LESSONS.indexOf(lesson === 'follow' ? 'approve' : lesson);
+	return TOUR_LESSONS.indexOf(lesson === 'follow' ? 'approve' : lesson);
 }
 
 export function reconcileTourIndex(prev: TourStep[], next: TourStep[], index: number): number {
-  const was = prev[Math.min(Math.max(0, index), prev.length - 1)];
-  if (!was || next.length === 0) return 0;
-  const order = lessonRank(was.lesson);
-  const found = next.findIndex((s) => lessonRank(s.lesson) >= order);
-  return found === -1 ? next.length - 1 : found;
+	const was = prev[Math.min(Math.max(0, index), prev.length - 1)];
+	if (!was || next.length === 0) return 0;
+	const order = lessonRank(was.lesson);
+	const found = next.findIndex((s) => lessonRank(s.lesson) >= order);
+	return found === -1 ? next.length - 1 : found;
 }
 
 // ── Persistence ─────────────────────────────────────────────────────────────
@@ -178,102 +209,100 @@ export function reconcileTourIndex(prev: TourStep[], next: TourStep[], index: nu
 const KEY = STORAGE_KEYS.tourSeen;
 
 export function tourSeen(userId: number | string | null | undefined): boolean {
-  if (!browser || userId == null) return true; // not offered without a user
-  try {
-    return readStoredStrict(KEY(userId)) !== null;
-  } catch {
-    // localStorage may be unavailable (private mode, quota exceeded).
-    // Answering "already seen" keeps the tour from opening on every load.
-    return true;
-  }
+	if (!browser || userId == null) return true; // not offered without a user
+	try {
+		return readStoredStrict(KEY(userId)) !== null;
+	} catch {
+		// localStorage may be unavailable (private mode, quota exceeded).
+		// Answering "already seen" keeps the tour from opening on every load.
+		return true;
+	}
 }
 
 function markSeen(userId: number | string | null | undefined) {
-  if (!browser || userId == null) return;
-  try {
-    localStorage.setItem(KEY(userId), new Date().toISOString());
-  } catch {
-    // Without the mark the tour opens again next time; nothing else breaks.
-  }
+	if (!browser || userId == null) return;
+	try {
+		localStorage.setItem(KEY(userId), new Date().toISOString());
+	} catch {
+		// Without the mark the tour opens again next time; nothing else breaks.
+	}
 }
 
 // ── Store ───────────────────────────────────────────────────────────────────
 
 type TourState = {
-  active: boolean;
-  index: number;
+	active: boolean;
+	index: number;
 };
 
 function createTourStore() {
-  const store = writable<TourState>({ active: false, index: 0 });
-  const { subscribe, set, update } = store;
+	const store = writable<TourState>({ active: false, index: 0 });
+	const { subscribe, set, update } = store;
 
-  // The steps change with the tour open when the unit's state arrives after
-  // the tour started, or the signed-in role changes. The stored index is
-  // moved to the same lesson in the new steps, so the step shown and the
-  // index Next and Previous work from never disagree.
-  let known = get(currentTourSteps);
-  currentTourSteps.subscribe((steps) => {
-    const before = known;
-    known = steps;
-    if (steps === before) return;
-    const s = get(store);
-    if (!s.active) return;
-    const index = reconcileTourIndex(before, steps, s.index);
-    if (index !== s.index) set({ ...s, index });
-  });
+	// The steps change with the tour open when the unit's state arrives after
+	// the tour started, or the signed-in role changes. The stored index is
+	// moved to the same lesson in the new steps, so the step shown and the
+	// index Next and Previous work from never disagree.
+	let known = get(currentTourSteps);
+	currentTourSteps.subscribe((steps) => {
+		const before = known;
+		known = steps;
+		if (steps === before) return;
+		const s = get(store);
+		if (!s.active) return;
+		const index = reconcileTourIndex(before, steps, s.index);
+		if (index !== s.index) set({ ...s, index });
+	});
 
-  // A tour ends with the session that opened it: clearSession, which logout
-  // and the sign-out of a session the backend rejected both call, stops it.
-  // auth.ts cannot import this module, which imports auth.ts, so the tour
-  // watches the auth store. A change of role with the session kept (the
-  // dashboard revalidating it) leaves the tour open.
-  let hadSession = false;
-  authStore.subscribe(({ user }) => {
-    if (hadSession && !user) set({ active: false, index: 0 });
-    hadSession = !!user;
-  });
+	// A tour ends with the session that opened it: clearSession, which logout
+	// and the sign-out of a session the backend rejected both call, stops it.
+	// auth.ts cannot import this module, which imports auth.ts, so the tour
+	// watches the auth store. A change of role with the session kept (the
+	// dashboard revalidating it) leaves the tour open.
+	let hadSession = false;
+	authStore.subscribe(({ user }) => {
+		if (hadSession && !user) set({ active: false, index: 0 });
+		hadSession = !!user;
+	});
 
-  return {
-    subscribe,
+	return {
+		subscribe,
 
-    /** Opened from the help menu. Always starts at the first step. */
-    start() {
-      set({ active: true, index: 0 });
-    },
+		/** Opened from the help menu. Always starts at the first step. */
+		start() {
+			set({ active: true, index: 0 });
+		},
 
-    /**
-     * Opens the tour the first time this account signs in, and only then.
-     * Marking it seen here rather than on finishing is deliberate: someone
-     * who closes it after two seconds does not want it again on every start,
-     * and the help button reopens it at any time.
-     */
-    startIfFirstTime(userId: number | string | null | undefined) {
-      if (tourSeen(userId)) return;
-      markSeen(userId);
-      set({ active: true, index: 0 });
-    },
+		/**
+		 * Opens the tour the first time this account signs in, and only then.
+		 * Marking it seen here rather than on finishing is deliberate: someone
+		 * who closes it after two seconds does not want it again on every start,
+		 * and the help button reopens it at any time.
+		 */
+		startIfFirstTime(userId: number | string | null | undefined) {
+			if (tourSeen(userId)) return;
+			markSeen(userId);
+			set({ active: true, index: 0 });
+		},
 
-    next() {
-      update((s) =>
-        s.index >= lastIndex()
-          ? { active: false, index: 0 }
-          : { ...s, index: s.index + 1 }
-      );
-    },
+		next() {
+			update((s) =>
+				s.index >= lastIndex() ? { active: false, index: 0 } : { ...s, index: s.index + 1 }
+			);
+		},
 
-    prev() {
-      update((s) => ({ ...s, index: Math.max(0, s.index - 1) }));
-    },
+		prev() {
+			update((s) => ({ ...s, index: Math.max(0, s.index - 1) }));
+		},
 
-    goTo(index: number) {
-      update((s) => ({ ...s, index: Math.min(Math.max(0, index), lastIndex()) }));
-    },
+		goTo(index: number) {
+			update((s) => ({ ...s, index: Math.min(Math.max(0, index), lastIndex()) }));
+		},
 
-    stop() {
-      set({ active: false, index: 0 });
-    },
-  };
+		stop() {
+			set({ active: false, index: 0 });
+		}
+	};
 }
 
 export const tour = createTourStore();

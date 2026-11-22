@@ -20,7 +20,15 @@ import { resetUnit } from '$lib/unit-mode';
 import Overview from './+page.svelte';
 
 function device(index: number, over: Partial<CameraDevice> = {}): CameraDevice {
-	return { index, hardware_id: `hw${index}`, model: 'Canon PowerShot A2500', calibrated: false, role: null, role_confirmed: false, ...over };
+	return {
+		index,
+		hardware_id: `hw${index}`,
+		model: 'Canon PowerShot A2500',
+		calibrated: false,
+		role: null,
+		role_confirmed: false,
+		...over
+	};
 }
 
 const names = () => [...document.querySelectorAll('.cam-name')].map((n) => n.textContent?.trim());
@@ -61,7 +69,10 @@ describe('Overview: camera names', () => {
 
 	it('without a confirmed set-up: Camera 1 and Camera 2', async () => {
 		locale.set('en');
-		vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([device(0), device(1, { role: 'left', role_confirmed: true })]);
+		vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([
+			device(0),
+			device(1, { role: 'left', role_confirmed: true })
+		]);
 		render(Overview);
 		await expect.poll(() => names()).toEqual([en.dash_camera_n(1), en.dash_camera_n(2)]);
 		expect(names()).toEqual(['Camera 1', 'Camera 2']);
@@ -69,7 +80,9 @@ describe('Overview: camera names', () => {
 
 	it('a camera not detected is named by its number in the hint', async () => {
 		locale.set('es');
-		vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([device(0, { role: 'right', role_confirmed: true })]);
+		vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([
+			device(0, { role: 'right', role_confirmed: true })
+		]);
 		render(Overview);
 		await expect.poll(() => hint()).toContain(es.dash_camera_missing_hint(es.dash_camera_n(2)));
 		expect(names()).toEqual(['Cámara 1', 'Cámara 2']);

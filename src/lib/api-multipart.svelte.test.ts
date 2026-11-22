@@ -14,7 +14,10 @@ import { authStore } from './stores/auth';
 
 function respondJson(body: unknown) {
 	return vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-		new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+		new Response(JSON.stringify(body), {
+			status: 200,
+			headers: { 'Content-Type': 'application/json' }
+		})
 	);
 }
 
@@ -27,7 +30,9 @@ describe('apiRequest with a FormData body', () => {
 	it('sends the FormData as the body, with the session and without a JSON Content-Type', async () => {
 		authStore.setSession({ id: 1, username: 'op', email: null, role: 'operator', is_active: true });
 		const fetchSpy = respondJson({ listId: 'x' });
-		const file = new File(['{"contract":"fisqua-captua-exchange"}'], 'lista.json', { type: 'application/json' });
+		const file = new File(['{"contract":"fisqua-captua-exchange"}'], 'lista.json', {
+			type: 'application/json'
+		});
 
 		await importsApi.importList(file);
 
@@ -48,14 +53,22 @@ describe('apiRequest with a FormData body', () => {
 	});
 
 	it('leaves a JSON request with its Content-Type, and setDone returns the new mark', async () => {
-		authStore.setSession({ id: 1, username: 'rev', email: null, role: 'reviewer', is_active: true });
+		authStore.setSession({
+			id: 1,
+			username: 'rev',
+			email: null,
+			role: 'reviewer',
+			is_active: true
+		});
 		const mark = { by: 'rev', at: '2026-10-28T12:00:00' };
 		const fetchSpy = respondJson({ doneMark: mark });
 
 		expect(await importsApi.setDone('0b9c1d5e-0000-4000-8000-000000000001', 3, true)).toEqual(mark);
 
 		const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-		expect(url.endsWith('/imports/digitisation-lists/0b9c1d5e-0000-4000-8000-000000000001/items/3/done')).toBe(true);
+		expect(
+			url.endsWith('/imports/digitisation-lists/0b9c1d5e-0000-4000-8000-000000000001/items/3/done')
+		).toBe(true);
 		expect(init.method).toBe('PUT');
 		expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
 		expect(init.body).toBe('{"done":true}');

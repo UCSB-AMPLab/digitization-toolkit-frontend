@@ -8,7 +8,13 @@ import { render } from 'vitest-browser-svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { collectionsApi, ApiError, type FreePlan, type OffsiteJobStatus, type VolumeOffsiteState } from '$lib/api';
+import {
+	collectionsApi,
+	ApiError,
+	type FreePlan,
+	type OffsiteJobStatus,
+	type VolumeOffsiteState
+} from '$lib/api';
 import VolumeOffsiteActions from './VolumeOffsiteActions.svelte';
 import { es } from '$lib/i18n/es';
 
@@ -77,47 +83,75 @@ describe('VolumeOffsiteActions', () => {
 
 	it('shows no button when there is nothing to free or restore', async () => {
 		const screen = mount(state({ verified: 6, pending: 4, received: false }));
-		await expect.element(screen.getByRole('button', { name: 'Espacio en la tarjeta' })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Espacio en la tarjeta' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('offers freeing a received volume, and restoring only once files are freed', async () => {
 		const screen = mount(state());
 		await openMenu(screen);
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' })).toBeVisible();
-		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).not.toBeInTheDocument();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' }))
+			.toBeVisible();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('without restore (an operator): offers freeing only, and no button when only restoring is on offer', async () => {
 		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000 }), false);
 		await openMenu(screen);
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' })).toBeVisible();
-		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).not.toBeInTheDocument();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' }))
+			.toBeVisible();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' }))
+			.not.toBeInTheDocument();
 		await dialog.getByRole('button', { name: 'Cerrar' }).click();
 		screen.unmount();
 
 		const freedOnly = mount(state({ freed_files: 10, freed_bytes: 300_000_000 }), false);
-		await expect.element(freedOnly.getByRole('button', { name: 'Espacio en la tarjeta' })).not.toBeInTheDocument();
+		await expect
+			.element(freedOnly.getByRole('button', { name: 'Espacio en la tarjeta' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('on a unit that cannot restore (restorable false), no restore is offered even to an administrator (NEH-380)', async () => {
-		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000, restorable: false }), true);
+		const screen = mount(
+			state({ freed_files: 4, freed_bytes: 120_000_000, restorable: false }),
+			true
+		);
 		await openMenu(screen);
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' })).toBeVisible();
-		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).not.toBeInTheDocument();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' }))
+			.toBeVisible();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' }))
+			.not.toBeInTheDocument();
 		screen.unmount();
-		const freedOnly = mount(state({ freed_files: 10, freed_bytes: 300_000_000, restorable: false }), true);
-		await expect.element(freedOnly.getByRole('button', { name: 'Espacio en la tarjeta' })).not.toBeInTheDocument();
+		const freedOnly = mount(
+			state({ freed_files: 10, freed_bytes: 300_000_000, restorable: false }),
+			true
+		);
+		await expect
+			.element(freedOnly.getByRole('button', { name: 'Espacio en la tarjeta' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('with restore (an administrator): offers both once files are freed', async () => {
 		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000 }), true);
 		await openMenu(screen);
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' })).toBeVisible();
-		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).toBeVisible();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' }))
+			.toBeVisible();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' }))
+			.toBeVisible();
 	});
 
 	it('opened for a volume with no button of its own (the Storage list): the same dialog, freeing only', async () => {
@@ -131,11 +165,17 @@ describe('VolumeOffsiteActions', () => {
 			onChanged,
 			onClosed
 		});
-		await expect.element(screen.getByRole('button', { name: 'Espacio en la tarjeta' })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Espacio en la tarjeta' }))
+			.not.toBeInTheDocument();
 		screen.component.open();
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByRole('heading', { name: 'Espacio en la tarjeta' })).toBeVisible();
-		await expect.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' })).not.toBeInTheDocument();
+		await expect
+			.element(dialog.getByRole('heading', { name: 'Espacio en la tarjeta' }))
+			.toBeVisible();
+		await expect
+			.element(dialog.getByRole('button', { name: 'Restaurar en la tarjeta' }))
+			.not.toBeInTheDocument();
 		await dialog.getByRole('button', { name: 'Liberar espacio en la tarjeta' }).click();
 		await expect.element(dialog.getByText('¿Liberar espacio en la tarjeta?')).toBeVisible();
 		expect(planSpy).toHaveBeenCalledWith(7);
@@ -160,10 +200,18 @@ describe('VolumeOffsiteActions', () => {
 				? 'este equipo no puede leerla'
 				: 'Más adelante, un administrador puede restaurar estos archivos';
 			await expect.element(dialog.getByText(other, { exact: false })).not.toBeInTheDocument();
-			await expect.element(dialog.getByText('Un administrador puede restaurar el volumen más adelante', { exact: false })).not.toBeInTheDocument();
+			await expect
+				.element(
+					dialog.getByText('Un administrador puede restaurar el volumen más adelante', {
+						exact: false
+					})
+				)
+				.not.toBeInTheDocument();
 			// The line comes before the confirm button.
 			const p = shown.element();
-			const confirm = dialog.getByRole('button', { name: 'Liberar espacio', exact: true }).element();
+			const confirm = dialog
+				.getByRole('button', { name: 'Liberar espacio', exact: true })
+				.element();
 			expect(p.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 		});
 	}
@@ -176,12 +224,19 @@ describe('VolumeOffsiteActions', () => {
 		const dialog = screen.getByRole('dialog');
 		await expect.element(dialog.getByText('¿Liberar espacio en la tarjeta?')).toBeVisible();
 		await expect.element(dialog.getByText(es.offsite_free_restorable)).toBeVisible();
-		await expect.element(dialog.getByText('este equipo no puede leerla', { exact: false })).not.toBeInTheDocument();
+		await expect
+			.element(dialog.getByText('este equipo no puede leerla', { exact: false }))
+			.not.toBeInTheDocument();
 	});
 
 	it('free: shows the dry run first, frees nothing until confirmed, then polls and reports', async () => {
 		planSpy.mockResolvedValue(plan);
-		freeSpy.mockResolvedValue({ job_id: 'j1', state: 'queued', action: 'free', status_url: '/collections/7/offsite/jobs/j1' });
+		freeSpy.mockResolvedValue({
+			job_id: 'j1',
+			state: 'queued',
+			action: 'free',
+			status_url: '/collections/7/offsite/jobs/j1'
+		});
 		jobSpy.mockResolvedValue(
 			job({
 				state: 'done',
@@ -201,16 +256,30 @@ describe('VolumeOffsiteActions', () => {
 
 		const dialog = screen.getByRole('dialog');
 		await expect.element(dialog.getByText('¿Liberar espacio en la tarjeta?')).toBeVisible();
-		await expect.element(dialog.getByText('Captua quitará 9 archivos (270 MB) de la tarjeta.', { exact: false })).toBeVisible();
+		await expect
+			.element(
+				dialog.getByText('Captua quitará 9 archivos (270 MB) de la tarjeta.', { exact: false })
+			)
+			.toBeVisible();
 		await expect.element(dialog.getByText('Captua dejará 1 archivo en la tarjeta:')).toBeVisible();
-		await expect.element(dialog.getByText('1 vista previa todavía no tiene checksum SHA-256 registrado', { exact: false })).toBeVisible();
+		await expect
+			.element(
+				dialog.getByText('1 vista previa todavía no tiene checksum SHA-256 registrado', {
+					exact: false
+				})
+			)
+			.toBeVisible();
 		expect(planSpy).toHaveBeenCalledWith(7);
 		expect(freeSpy).not.toHaveBeenCalled();
 
 		await dialog.getByRole('button', { name: 'Liberar espacio', exact: true }).click();
 		expect(freeSpy).toHaveBeenCalledWith(7);
-		await expect.element(dialog.getByText('Captua terminó de liberar espacio'), { timeout: 6000 }).toBeVisible();
-		await expect.element(dialog.getByText('Captua quitó 9 archivos (270 MB) de la tarjeta.')).toBeVisible();
+		await expect
+			.element(dialog.getByText('Captua terminó de liberar espacio'), { timeout: 6000 })
+			.toBeVisible();
+		await expect
+			.element(dialog.getByText('Captua quitó 9 archivos (270 MB) de la tarjeta.'))
+			.toBeVisible();
 		expect(jobSpy).toHaveBeenCalledWith(7, 'j1', expect.any(AbortSignal));
 		expect(onChanged).toHaveBeenCalledWith(7);
 	});
@@ -220,8 +289,14 @@ describe('VolumeOffsiteActions', () => {
 		const screen = mount(state());
 		await openMenu(screen);
 		await screen.getByRole('button', { name: 'Liberar espacio en la tarjeta' }).click();
-		await expect.element(screen.getByText('Captua no encontró archivos que se puedan liberar en este volumen.')).toBeVisible();
-		await expect.element(screen.getByRole('button', { name: 'Liberar espacio', exact: true })).not.toBeInTheDocument();
+		await expect
+			.element(
+				screen.getByText('Captua no encontró archivos que se puedan liberar en este volumen.')
+			)
+			.toBeVisible();
+		await expect
+			.element(screen.getByRole('button', { name: 'Liberar espacio', exact: true }))
+			.not.toBeInTheDocument();
 	});
 
 	it('free: maps a refused dry run to its plain message', async () => {
@@ -231,14 +306,19 @@ describe('VolumeOffsiteActions', () => {
 		const screen = mount(state());
 		await openMenu(screen);
 		await screen.getByRole('button', { name: 'Liberar espacio en la tarjeta' }).click();
-		await expect.element(screen.getByRole('alert')).toHaveTextContent(
-			'Todavía hay archivos de este volumen sin verificar en la copia externa.'
-		);
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent('Todavía hay archivos de este volumen sin verificar en la copia externa.');
 		expect(screen.container.ownerDocument.body.textContent).not.toContain('offsite bucket');
 	});
 
 	it('restore: confirms with the freed count and bytes, polls, and reports what it could not restore', async () => {
-		restoreSpy.mockResolvedValue({ job_id: 'j2', state: 'queued', action: 'restore', status_url: '/collections/7/offsite/jobs/j2' });
+		restoreSpy.mockResolvedValue({
+			job_id: 'j2',
+			state: 'queued',
+			action: 'restore',
+			status_url: '/collections/7/offsite/jobs/j2'
+		});
 		jobSpy.mockResolvedValue(
 			job({
 				job_id: 'j2',
@@ -259,12 +339,20 @@ describe('VolumeOffsiteActions', () => {
 		await screen.getByRole('button', { name: 'Restaurar en la tarjeta' }).click();
 
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByText('los 4 archivos liberados (120 MB)', { exact: false })).toBeVisible();
+		await expect
+			.element(dialog.getByText('los 4 archivos liberados (120 MB)', { exact: false }))
+			.toBeVisible();
 		expect(restoreSpy).not.toHaveBeenCalled();
 		await dialog.getByRole('button', { name: 'Restaurar', exact: true }).click();
-		await expect.element(dialog.getByText('Captua terminó de restaurar el volumen'), { timeout: 6000 }).toBeVisible();
-		await expect.element(dialog.getByText('Captua restauró 3 archivos (90 MB) en la tarjeta.')).toBeVisible();
-		await expect.element(dialog.getByText('Captua no pudo traer 1 archivo de la copia externa.')).toBeVisible();
+		await expect
+			.element(dialog.getByText('Captua terminó de restaurar el volumen'), { timeout: 6000 })
+			.toBeVisible();
+		await expect
+			.element(dialog.getByText('Captua restauró 3 archivos (90 MB) en la tarjeta.'))
+			.toBeVisible();
+		await expect
+			.element(dialog.getByText('Captua no pudo traer 1 archivo de la copia externa.'))
+			.toBeVisible();
 		expect(jobSpy).toHaveBeenCalledWith(7, 'j2', expect.any(AbortSignal));
 	});
 
@@ -276,13 +364,20 @@ describe('VolumeOffsiteActions', () => {
 		await openMenu(screen);
 		await screen.getByRole('button', { name: 'Restaurar en la tarjeta' }).click();
 		await screen.getByRole('button', { name: 'Restaurar', exact: true }).click();
-		await expect.element(screen.getByRole('alert')).toHaveTextContent(
-			'Este equipo no está configurado para restaurar: necesita acceso de lectura a la copia externa. Pide a quien instaló el equipo que lo configure.'
-		);
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent(
+				'Este equipo no está configurado para restaurar: necesita acceso de lectura a la copia externa. Pide a quien instaló el equipo que lo configure.'
+			);
 	});
 
 	const runningRestore = async () => {
-		restoreSpy.mockResolvedValue({ job_id: 'j3', state: 'queued', action: 'restore', status_url: '/collections/7/offsite/jobs/j3' });
+		restoreSpy.mockResolvedValue({
+			job_id: 'j3',
+			state: 'queued',
+			action: 'restore',
+			status_url: '/collections/7/offsite/jobs/j3'
+		});
 		jobSpy.mockResolvedValue(job({ job_id: 'j3', action: 'restore', state: 'running' }));
 		const screen = mount(state({ freed_files: 4, freed_bytes: 120_000_000 }));
 		await openMenu(screen);
@@ -312,7 +407,12 @@ describe('VolumeOffsiteActions', () => {
 	});
 
 	it('closing the dialog settles a run whose poll request hangs', async () => {
-		restoreSpy.mockResolvedValue({ job_id: 'j4', state: 'queued', action: 'restore', status_url: '/collections/7/offsite/jobs/j4' });
+		restoreSpy.mockResolvedValue({
+			job_id: 'j4',
+			state: 'queued',
+			action: 'restore',
+			status_url: '/collections/7/offsite/jobs/j4'
+		});
 		let inFlight: AbortSignal | undefined;
 		jobSpy.mockImplementation((_c: number, _j: string, signal?: AbortSignal) => {
 			inFlight = signal;
@@ -331,7 +431,11 @@ describe('VolumeOffsiteActions', () => {
 	});
 
 	describe('a dry run cancelled and started again', () => {
-		const planOf = (files: number): FreePlan => ({ ...plan, would_free: { files, bytes: files * 1_000_000 }, refused: [] });
+		const planOf = (files: number): FreePlan => ({
+			...plan,
+			would_free: { files, bytes: files * 1_000_000 },
+			refused: []
+		});
 
 		// Dry run A is asked, the dialog closed and opened again, then dry run B.
 		async function twoPlans() {
@@ -356,30 +460,46 @@ describe('VolumeOffsiteActions', () => {
 			const { screen, a, b } = await twoPlans();
 			a.resolve(planOf(111));
 			await tick();
-			await expect.element(screen.getByText('Captua está revisando qué se puede liberar…')).toBeVisible();
+			await expect
+				.element(screen.getByText('Captua está revisando qué se puede liberar…'))
+				.toBeVisible();
 			b.resolve(planOf(2));
-			await expect.element(screen.getByText('Captua quitará 2 archivos (2\u00a0MB) de la tarjeta.', { exact: false })).toBeVisible();
+			await expect
+				.element(
+					screen.getByText('Captua quitará 2 archivos (2\u00a0MB) de la tarjeta.', { exact: false })
+				)
+				.toBeVisible();
 			expect(document.body.textContent).not.toContain('111 archivos');
 		});
 
 		it('shows only B when A answers last', async () => {
 			const { screen, a, b } = await twoPlans();
 			b.resolve(planOf(2));
-			await expect.element(screen.getByText('Captua quitará 2 archivos (2\u00a0MB) de la tarjeta.', { exact: false })).toBeVisible();
+			await expect
+				.element(
+					screen.getByText('Captua quitará 2 archivos (2\u00a0MB) de la tarjeta.', { exact: false })
+				)
+				.toBeVisible();
 			a.resolve(planOf(111));
 			await tick();
 			expect(document.body.textContent).not.toContain('111 archivos');
-			await expect.element(screen.getByText('Captua quitará 2 archivos', { exact: false })).toBeVisible();
+			await expect
+				.element(screen.getByText('Captua quitará 2 archivos', { exact: false }))
+				.toBeVisible();
 		});
 
 		it("never shows A's refusal over B's plan", async () => {
 			const { screen, a, b } = await twoPlans();
 			b.resolve(planOf(2));
-			await expect.element(screen.getByText('Captua quitará 2 archivos', { exact: false })).toBeVisible();
+			await expect
+				.element(screen.getByText('Captua quitará 2 archivos', { exact: false }))
+				.toBeVisible();
 			a.reject(new ApiError('down', undefined, 503));
 			await tick();
 			await expect.element(screen.getByRole('alert')).not.toBeInTheDocument();
-			await expect.element(screen.getByText('Captua quitará 2 archivos', { exact: false })).toBeVisible();
+			await expect
+				.element(screen.getByText('Captua quitará 2 archivos', { exact: false }))
+				.toBeVisible();
 		});
 
 		it('leaves the dialog closed when A answers after it was closed', async () => {

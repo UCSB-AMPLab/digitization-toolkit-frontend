@@ -15,14 +15,24 @@ import Card from '../../routes/(dashboard)/dashboard/config/CatalogueBackupCard.
 const NOW = new Date('2026-10-24T17:00:00Z');
 
 function body(fisqua: unknown) {
-	return { enabled: true, last_verified_at: '2026-10-24T15:00:00Z', object: null, detail: null, ...(fisqua === undefined ? {} : { fisqua }) };
+	return {
+		enabled: true,
+		last_verified_at: '2026-10-24T15:00:00Z',
+		object: null,
+		detail: null,
+		...(fisqua === undefined ? {} : { fisqua })
+	};
 }
 
 let fetchSpy: ReturnType<typeof vi.spyOn>;
 
 function answer(b: unknown) {
-	fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
-		new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
+	fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+		async () =>
+			new Response(JSON.stringify(b), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			})
 	);
 }
 
@@ -49,7 +59,15 @@ describe('Configuración Fisqua row', () => {
 	});
 
 	it('says Fisqua is not configured', async () => {
-		const { el } = await row(body({ configured: false, environment: null, config_error: null, last_send: null, last_poll: null }));
+		const { el } = await row(
+			body({
+				configured: false,
+				environment: null,
+				config_error: null,
+				last_send: null,
+				last_poll: null
+			})
+		);
 		expect(el!.dataset.level).toBe('off');
 		expect(el!.textContent).toContain(es.fisqua_unit_off);
 	});
@@ -60,7 +78,15 @@ describe('Configuración Fisqua row', () => {
 				configured: true,
 				environment: 'staging',
 				config_error: null,
-				last_send: { status: 'done', promoted: 0, not_exportable: 0, delivered: 2, refused: 0, failed: 1, waiting: 0 },
+				last_send: {
+					status: 'done',
+					promoted: 0,
+					not_exportable: 0,
+					delivered: 2,
+					refused: 0,
+					failed: 1,
+					waiting: 0
+				},
 				last_poll: { status: 'done', asked: 3, calls: 1, answered: 3, recovered: 0 }
 			})
 		);
@@ -78,13 +104,28 @@ describe('Configuración Fisqua row', () => {
 			body({
 				configured: true,
 				environment: 'production',
-				config_error: { at: '2026-10-24T09:30:00', status_code: 302, reason: 'redirect', config_fingerprint: 'ab12cd34' },
-				last_send: { status: 'config_error', promoted: 0, not_exportable: 0, delivered: 0, refused: 0, failed: 0, waiting: 0 },
+				config_error: {
+					at: '2026-10-24T09:30:00',
+					status_code: 302,
+					reason: 'redirect',
+					config_fingerprint: 'ab12cd34'
+				},
+				last_send: {
+					status: 'config_error',
+					promoted: 0,
+					not_exportable: 0,
+					delivered: 0,
+					refused: 0,
+					failed: 0,
+					waiting: 0
+				},
 				last_poll: { status: 'config_error', asked: 1, calls: 1, answered: 0, recovered: 0 }
 			})
 		);
 		expect(el!.dataset.level).toBe('attention');
-		expect(el!.querySelector('.offsite-unit-warning')!.textContent).toContain(es.fisqua_cfg_redirect);
+		expect(el!.querySelector('.offsite-unit-warning')!.textContent).toContain(
+			es.fisqua_cfg_redirect
+		);
 		expect(el!.textContent).toContain(es.fisqua_unit_send_config_error);
 	});
 });

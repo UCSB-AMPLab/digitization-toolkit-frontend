@@ -18,23 +18,37 @@ import '../../../../app.css';
 import UsersPage from './+page.svelte';
 
 const users = [
-	{ id: 3, username: 'jefa', email: null, role: 'admin', is_active: true, created_at: '2026-01-01T00:00:00Z' }
+	{
+		id: 3,
+		username: 'jefa',
+		email: null,
+		role: 'admin',
+		is_active: true,
+		created_at: '2026-01-01T00:00:00Z'
+	}
 ];
 
 let registers: unknown[];
 let registerAnswer: () => Response;
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 beforeEach(() => {
 	locale.set('en');
 	registers = [];
-	registerAnswer = () => json({ id: 9, username: 'nueva', email: null, role: 'reviewer', is_active: true });
+	registerAnswer = () =>
+		json({ id: 9, username: 'nueva', email: null, role: 'reviewer', is_active: true });
 	authStore.setSession({ id: 3, username: 'jefa', email: null, role: 'admin', is_active: true });
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-		const url = new URL(typeof input === 'string' ? input : (input as Request).url, 'http://localhost:8000');
+		const url = new URL(
+			typeof input === 'string' ? input : (input as Request).url,
+			'http://localhost:8000'
+		);
 		const method = (init?.method ?? 'GET').toUpperCase();
 		if (method === 'POST' && url.pathname === '/auth/register') {
 			registers.push(JSON.parse(init!.body as string));
@@ -59,7 +73,10 @@ async function create(password: string, msgs = en) {
 	await page.getByRole('button', { name: msgs.users_create_btn }).click();
 }
 
-const LOCALES: [Locale, typeof en][] = [['en', en], ['es', es]];
+const LOCALES: [Locale, typeof en][] = [
+	['en', en],
+	['es', es]
+];
 
 describe('the create-user form and the password rule', () => {
 	it('is 8 characters', () => {
@@ -76,7 +93,8 @@ describe('the create-user form and the password rule', () => {
 
 		it(`shows the shared message for the backend's password_too_short (${lang})`, async () => {
 			locale.set(lang);
-			registerAnswer = () => json({ detail: { code: 'password_too_short', message: 'x', min_length: 8 } }, 422);
+			registerAnswer = () =>
+				json({ detail: { code: 'password_too_short', message: 'x', min_length: 8 } }, 422);
 			await create('fake-pw-8', msgs);
 			await expect.element(page.getByText(msgs.common_password_too_short(8))).toBeVisible();
 			expect(registers).toHaveLength(1);

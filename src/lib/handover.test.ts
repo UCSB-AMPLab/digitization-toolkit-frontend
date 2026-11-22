@@ -1,16 +1,22 @@
 // Version: 0.3.3
 
 import { describe, expect, it } from 'vitest';
-import { handoverCounts, handoverLock, handoverOffer, missingSideCount, promoteBlockers } from './handover';
+import {
+	handoverCounts,
+	handoverLock,
+	handoverOffer,
+	missingSideCount,
+	promoteBlockers
+} from './handover';
 
 type S = 'captured' | 'in_review' | 'rejected' | 'approved' | 'excluded';
 const recs = (...statuses: S[]) => statuses.map((status) => ({ status }));
 
 describe('handoverCounts', () => {
 	it('counts each status', () => {
-		expect(handoverCounts(recs('captured', 'captured', 'in_review', 'approved', 'rejected', 'rejected'))).toEqual(
-			{ captured: 2, inReview: 1, approved: 1, rejected: 2, excluded: 0 }
-		);
+		expect(
+			handoverCounts(recs('captured', 'captured', 'in_review', 'approved', 'rejected', 'rejected'))
+		).toEqual({ captured: 2, inReview: 1, approved: 1, rejected: 2, excluded: 0 });
 	});
 });
 
@@ -20,29 +26,46 @@ describe('handoverOffer', () => {
 	});
 
 	it('offers to send the volume when nothing has been sent', () => {
-		expect(handoverOffer(handoverCounts(recs('captured', 'captured')))).toEqual({ send: 'volume', takeBack: false });
+		expect(handoverOffer(handoverCounts(recs('captured', 'captured')))).toEqual({
+			send: 'volume',
+			takeBack: false
+		});
 	});
 
 	it('offers only take-back once everything is in review', () => {
-		expect(handoverOffer(handoverCounts(recs('in_review', 'in_review')))).toEqual({ send: null, takeBack: true });
+		expect(handoverOffer(handoverCounts(recs('in_review', 'in_review')))).toEqual({
+			send: null,
+			takeBack: true
+		});
 	});
 
 	it('offers both when a record was captured after the volume was sent', () => {
-		expect(handoverOffer(handoverCounts(recs('in_review', 'captured')))).toEqual({ send: 'new', takeBack: true });
+		expect(handoverOffer(handoverCounts(recs('in_review', 'captured')))).toEqual({
+			send: 'new',
+			takeBack: true
+		});
 	});
 
 	it('names new records, without take-back, when the reviewers have ruled on everything sent', () => {
-		expect(handoverOffer(handoverCounts(recs('approved', 'rejected', 'captured')))).toEqual({ send: 'new', takeBack: false });
+		expect(handoverOffer(handoverCounts(recs('approved', 'rejected', 'captured')))).toEqual({
+			send: 'new',
+			takeBack: false
+		});
 	});
 
 	it('offers nothing when every record has been ruled on', () => {
-		expect(handoverOffer(handoverCounts(recs('approved', 'rejected')))).toEqual({ send: null, takeBack: false });
+		expect(handoverOffer(handoverCounts(recs('approved', 'rejected')))).toEqual({
+			send: null,
+			takeBack: false
+		});
 	});
 });
 
 describe('promoteBlockers', () => {
 	it('reads the ids from a refusal', () => {
-		expect(promoteBlockers({ detail: { message: 'x', blocking_record_ids: [12, 31] } })).toEqual([12, 31]);
+		expect(promoteBlockers({ detail: { message: 'x', blocking_record_ids: [12, 31] } })).toEqual([
+			12, 31
+		]);
 	});
 
 	it('returns null for an error without them', () => {
@@ -54,17 +77,27 @@ describe('promoteBlockers', () => {
 
 describe('excluded records (Fisqua contract 1.6)', () => {
 	it('are counted apart, never as rejected', () => {
-		expect(handoverCounts(recs('excluded', 'excluded', 'approved'))).toEqual(
-			{ captured: 0, inReview: 0, approved: 1, rejected: 0, excluded: 2 }
-		);
+		expect(handoverCounts(recs('excluded', 'excluded', 'approved'))).toEqual({
+			captured: 0,
+			inReview: 0,
+			approved: 1,
+			rejected: 0,
+			excluded: 2
+		});
 	});
 
 	it('do not block sending new captures, and count as already sent', () => {
-		expect(handoverOffer(handoverCounts(recs('excluded', 'captured')))).toEqual({ send: 'new', takeBack: false });
+		expect(handoverOffer(handoverCounts(recs('excluded', 'captured')))).toEqual({
+			send: 'new',
+			takeBack: false
+		});
 	});
 
 	it('offer nothing to send or take back on their own', () => {
-		expect(handoverOffer(handoverCounts(recs('excluded', 'approved')))).toEqual({ send: null, takeBack: false });
+		expect(handoverOffer(handoverCounts(recs('excluded', 'approved')))).toEqual({
+			send: null,
+			takeBack: false
+		});
 	});
 });
 
@@ -72,30 +105,54 @@ describe('records that miss a side (0.3.2)', () => {
 	const missing = (side: 'left' | 'right') => ({ status: 'captured' as const, missing_side: side });
 
 	it('are not counted as captured: a send leaves them on the unit', () => {
-		expect(handoverCounts([missing('left'), { status: 'captured' }, { status: 'approved' }])).toEqual(
-			{ captured: 1, inReview: 0, approved: 1, rejected: 0, excluded: 0 }
-		);
+		expect(
+			handoverCounts([missing('left'), { status: 'captured' }, { status: 'approved' }])
+		).toEqual({ captured: 1, inReview: 0, approved: 1, rejected: 0, excluded: 0 });
 	});
 
 	it('offer no send when they are the only captured records, since it would promote nothing', () => {
-		expect(handoverOffer(handoverCounts([missing('left'), missing('right')]))).toEqual({ send: null, takeBack: false });
-		expect(handoverOffer(handoverCounts([missing('left'), { status: 'in_review' }]))).toEqual({ send: null, takeBack: true });
+		expect(handoverOffer(handoverCounts([missing('left'), missing('right')]))).toEqual({
+			send: null,
+			takeBack: false
+		});
+		expect(handoverOffer(handoverCounts([missing('left'), { status: 'in_review' }]))).toEqual({
+			send: null,
+			takeBack: true
+		});
 	});
 
 	it('leave the send of the other captured records open', () => {
-		expect(handoverOffer(handoverCounts([missing('left'), { status: 'captured' }]))).toEqual({ send: 'volume', takeBack: false });
+		expect(handoverOffer(handoverCounts([missing('left'), { status: 'captured' }]))).toEqual({
+			send: 'volume',
+			takeBack: false
+		});
 	});
 });
 
 describe('missing records closed without capturing (NEH-317)', () => {
-	const closed = (side: 'left' | 'right' | 'both') => ({ status: 'captured' as const, missing_side: side, closed_reason: 'foliation_skip' as const });
-	const open = (side: 'left' | 'right' | 'both') => ({ status: 'captured' as const, missing_side: side, closed_reason: null });
+	const closed = (side: 'left' | 'right' | 'both') => ({
+		status: 'captured' as const,
+		missing_side: side,
+		closed_reason: 'foliation_skip' as const
+	});
+	const open = (side: 'left' | 'right' | 'both') => ({
+		status: 'captured' as const,
+		missing_side: side,
+		closed_reason: null
+	});
 
 	it('are counted as captured: a send hands them over with the volume', () => {
-		expect(handoverCounts([closed('both'), closed('left'), open('both')])).toEqual(
-			{ captured: 2, inReview: 0, approved: 0, rejected: 0, excluded: 0 }
-		);
-		expect(handoverOffer(handoverCounts([closed('both')]))).toEqual({ send: 'volume', takeBack: false });
+		expect(handoverCounts([closed('both'), closed('left'), open('both')])).toEqual({
+			captured: 2,
+			inReview: 0,
+			approved: 0,
+			rejected: 0,
+			excluded: 0
+		});
+		expect(handoverOffer(handoverCounts([closed('both')]))).toEqual({
+			send: 'volume',
+			takeBack: false
+		});
 	});
 
 	it('are not counted as missing', () => {

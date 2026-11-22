@@ -28,7 +28,10 @@ import '../../app.css';
 import LivePreview from './+page.svelte';
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function serve() {
@@ -36,7 +39,14 @@ function serve() {
 		const path = new URL(String(input), 'http://localhost').pathname;
 		if (path.endsWith('/imports/digitisation-lists')) return json([]);
 		if (path.endsWith('/collections/9')) {
-			return json({ id: 9, name: 'Tomo 6', project_id: 2, created_at: '2026-01-01T00:00:00', filename_stem: current.stem, custom_attributes: null });
+			return json({
+				id: 9,
+				name: 'Tomo 6',
+				project_id: 2,
+				created_at: '2026-01-01T00:00:00',
+				filename_stem: current.stem,
+				custom_attributes: null
+			});
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'Rionegro' });
 		if (path.includes('/cameras/capabilities')) return json({});
@@ -72,7 +82,9 @@ function fits(screen: { container: HTMLElement }, selector: string) {
 	expect(Math.abs((b.left + b.right) / 2 - (viewport.left + viewport.right) / 2)).toBeLessThan(1);
 	// Clear of the floating controls, which start 75px below the top of the
 	// feed's container.
-	const panel = (screen.container.querySelector('.floating-controls') as HTMLElement).getBoundingClientRect();
+	const panel = (
+		screen.container.querySelector('.floating-controls') as HTMLElement
+	).getBoundingClientRect();
 	expect(b.bottom > panel.top && b.right > panel.left && b.left < panel.right).toBe(false);
 }
 
@@ -83,7 +95,9 @@ async function open(mode: 'single' | 'double') {
 	if (mode === 'single') {
 		(document.querySelector('.strip-btn.toggle') as HTMLElement).click();
 		await wait(200);
-		(document.querySelectorAll('input[type=radio]')[0] as HTMLInputElement).dispatchEvent(new Event('change', { bubbles: true }));
+		(document.querySelectorAll('input[type=radio]')[0] as HTMLInputElement).dispatchEvent(
+			new Event('change', { bubbles: true })
+		);
 		await wait(200);
 		(document.querySelector('.collapse-btn') as HTMLElement).click();
 	}
@@ -109,7 +123,9 @@ describe('the capture-error banner keeps its width on a narrow feed (NEH-324)', 
 			locale.set('es');
 			current.stem = 'co-ahr-6';
 			const screen = await open(mode);
-			cameraStatus.reportFailure('La cámara 1 no respondió a tiempo. Revisa el cable USB y vuelve a intentarlo.');
+			cameraStatus.reportFailure(
+				'La cámara 1 no respondió a tiempo. Revisa el cable USB y vuelve a intentarlo.'
+			);
 			await wait(200);
 			fits(screen, '.capture-error-banner');
 		});

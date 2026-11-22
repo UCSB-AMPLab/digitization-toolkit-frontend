@@ -31,7 +31,10 @@ import Layout from './+layout.svelte';
 const children = createRawSnippet(() => ({ render: () => '<p>protected content</p>' }));
 
 function json(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 function signIn() {
@@ -40,7 +43,11 @@ function signIn() {
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const url = String(input);
 		// The backend refuses these to the testing role: a request for one fails the test.
-		for (const refused of ['/system/catalogue-backup', '/records/to-retake/count', '/records/to-retake/summary']) {
+		for (const refused of [
+			'/system/catalogue-backup',
+			'/records/to-retake/count',
+			'/records/to-retake/summary'
+		]) {
 			if (url.endsWith(refused)) return json({ detail: 'Operation not permitted' }, 403);
 		}
 		return json(user);
@@ -67,7 +74,9 @@ describe('dashboard layout for the testing role', () => {
 		const fetchSpy = signIn();
 		const screen = render(Layout, { children });
 		await expect.element(screen.getByText('protected content')).toBeVisible();
-		const labels = [...screen.container.querySelectorAll('.s-nav .s-label')].map((l) => l.textContent?.trim());
+		const labels = [...screen.container.querySelectorAll('.s-nav .s-label')].map((l) =>
+			l.textContent?.trim()
+		);
 		expect(labels).toContain('Overview');
 		expect(labels.some((l) => l === 'Projects' || l === 'Volumes')).toBe(true);
 		expect(labels).toContain('Settings');
@@ -101,10 +110,14 @@ describe('dashboard layout for the testing role', () => {
 		signIn();
 		const screen = render(Layout, { children });
 		await expect.element(screen.getByText('protected content')).toBeVisible();
-		expect(screen.container.querySelector('.user-row .testing-badge')?.textContent?.trim()).toBe('Testing');
+		expect(screen.container.querySelector('.user-row .testing-badge')?.textContent?.trim()).toBe(
+			'Testing'
+		);
 		(screen.container.querySelector('.collapse-btn') as HTMLElement).click();
 		await expect.poll(() => screen.container.querySelector('.user-row')).toBeNull();
-		expect(screen.container.querySelector('.s-footer .testing-badge')?.textContent?.trim()).toBe('Testing');
+		expect(screen.container.querySelector('.s-footer .testing-badge')?.textContent?.trim()).toBe(
+			'Testing'
+		);
 	});
 
 	it('shows no content at /dashboard/volumes and sends the role to Overview', async () => {

@@ -10,7 +10,13 @@ import { page } from 'vitest/browser';
 const pageUrl = vi.hoisted(() => ({ href: 'http://localhost/dashboard' }));
 vi.mock('$app/stores', async () => {
 	const { readable } = await import('svelte/store');
-	return { page: readable({ get url() { return new URL(pageUrl.href); } }) };
+	return {
+		page: readable({
+			get url() {
+				return new URL(pageUrl.href);
+			}
+		})
+	};
 });
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
@@ -65,7 +71,9 @@ describe('GuidedTour', () => {
 		unitState.set(state());
 		tour.start();
 		render(GuidedTour);
-		await expect.element(page.getByRole('heading', { name: es.tour_s2_vol_title })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: es.tour_s2_vol_title }))
+			.toBeInTheDocument();
 		await expect.element(page.getByText(es.tour_s2_vol_where)).toBeInTheDocument();
 		await expect.element(page.getByText('1 / 5')).toBeInTheDocument();
 	});
@@ -76,7 +84,9 @@ describe('GuidedTour', () => {
 		unitState.set(state({ mode: 'fisqua' }));
 		tour.start();
 		render(GuidedTour);
-		await expect.element(page.getByRole('heading', { name: es.tour_s2_fisqua_title })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: es.tour_s2_fisqua_title }))
+			.toBeInTheDocument();
 		await expect.element(page.getByText('1 / 5')).toBeInTheDocument();
 	});
 
@@ -91,7 +101,9 @@ describe('GuidedTour', () => {
 		await expect.element(page.getByText(es.tour_s2_fisqua_where)).toBeInTheDocument();
 		await expect.element(page.getByText('2 / 5')).toBeInTheDocument();
 		tour.goTo(3);
-		await expect.element(page.getByRole('heading', { name: es.tour_s5_fisqua_title })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: es.tour_s5_fisqua_title }))
+			.toBeInTheDocument();
 		await expect.element(page.getByText('4 / 5')).toBeInTheDocument();
 		tour.goTo(4);
 		await expect.element(page.getByRole('heading', { name: es.tour_s6_title })).toBeInTheDocument();
@@ -106,7 +118,9 @@ describe('GuidedTour', () => {
 		unitState.set(state({ mode: 'fisqua' }));
 		tour.start();
 		render(GuidedTour);
-		await expect.element(page.getByRole('heading', { name: es.tour_s2_vol_title })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: es.tour_s2_vol_title }))
+			.toBeInTheDocument();
 		await expect.element(page.getByText(es.tour_s2_vol_where)).toBeInTheDocument();
 		await expect.element(page.getByText('1 / 5')).toBeInTheDocument();
 	});
@@ -120,7 +134,9 @@ describe('GuidedTour', () => {
 		await expect.element(page.getByRole('heading', { name: es.tour_s2_title })).toBeInTheDocument();
 		await expect.element(page.getByText('2 / 6')).toBeInTheDocument();
 		unitState.set(state());
-		await expect.element(page.getByRole('heading', { name: es.tour_s2_vol_title })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: es.tour_s2_vol_title }))
+			.toBeInTheDocument();
 		await expect.element(page.getByText(es.tour_s2_vol_where)).toBeInTheDocument();
 		await expect.element(page.getByText('1 / 5')).toBeInTheDocument();
 	});
@@ -133,15 +149,39 @@ describe('GuidedTour', () => {
 describe('GuidedTour on the follow step, with the Fisqua line', () => {
 	const MID = '7f0c1f9e-2b1a-4f3e-9a51-3d1f0a2b9c11';
 	const refused: VolumeOffsiteState = {
-		collection_id: 7, filename_stem: 'co-ahrb-aht-003', uploadable: true, total: 10, verified: 10, pending: 0,
-		refused: 0, last_verified_at: null, received: true, refusals: [], freed_files: 0, freed_bytes: 0,
+		collection_id: 7,
+		filename_stem: 'co-ahrb-aht-003',
+		uploadable: true,
+		total: 10,
+		verified: 10,
+		pending: 0,
+		refused: 0,
+		last_verified_at: null,
+		received: true,
+		refusals: [],
+		freed_files: 0,
+		freed_bytes: 0,
 		fisqua: {
-			environment: 'production', config_error: null, status: null,
-			outbox: [{
-				manifest_id: MID, stem: 'co-ahrb-aht-003', state: 'refused', created_at: '2026-10-24T14:30:00', attempts: 1,
-				next_attempt_at: null, last_attempt_at: '2026-10-24T14:31:00', last_error: null, refusal: 'fisqua',
-				problems: [{ rule: 'run-started', message: 'x' }], response: null, external_id: null, delivered_at: null
-			}]
+			environment: 'production',
+			config_error: null,
+			status: null,
+			outbox: [
+				{
+					manifest_id: MID,
+					stem: 'co-ahrb-aht-003',
+					state: 'refused',
+					created_at: '2026-10-24T14:30:00',
+					attempts: 1,
+					next_attempt_at: null,
+					last_attempt_at: '2026-10-24T14:31:00',
+					last_error: null,
+					refusal: 'fisqua',
+					problems: [{ rule: 'run-started', message: 'x' }],
+					response: null,
+					external_id: null,
+					delivered_at: null
+				}
+			]
 		}
 	} as unknown as VolumeOffsiteState;
 
@@ -157,7 +197,9 @@ describe('GuidedTour on the follow step, with the Fisqua line', () => {
 		tour.start();
 		tour.goTo(3);
 		render(GuidedTour);
-		await expect.element(page.getByRole('heading', { name: es.tour_s5_fisqua_title })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: es.tour_s5_fisqua_title }))
+			.toBeInTheDocument();
 		await expect.poll(() => document.querySelector('.tour-spot')).not.toBeNull();
 		return line.container.querySelector('button[data-fisqua]') as HTMLButtonElement;
 	}
@@ -170,7 +212,9 @@ describe('GuidedTour on the follow step, with the Fisqua line', () => {
 		expect(document.querySelector('.tour-spot')).toBeNull();
 		trigger.click();
 		await expect.poll(() => document.querySelector('.fisqua-panel')).toBeNull();
-		await expect.element(page.getByRole('heading', { name: es.tour_s5_fisqua_title })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: es.tour_s5_fisqua_title }))
+			.toBeInTheDocument();
 		expect(get(tour)).toEqual({ active: true, index: 3 });
 	});
 
@@ -183,6 +227,8 @@ describe('GuidedTour on the follow step, with the Fisqua line', () => {
 		await userEvent.keyboard('{Escape}');
 		await expect.poll(() => document.querySelector('.fisqua-panel')).toBeNull();
 		expect(get(tour).active).toBe(true);
-		await expect.element(page.getByRole('heading', { name: es.tour_s5_fisqua_title })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: es.tour_s5_fisqua_title }))
+			.toBeInTheDocument();
 	});
 });

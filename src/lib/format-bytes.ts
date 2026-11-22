@@ -17,7 +17,10 @@ const grouping = { es: 'min2' as unknown as boolean, en: true };
 const tags = { es: 'es-CO', en: 'en-US' };
 
 function formatter(locale: ByteLocale, digits: number): Intl.NumberFormat {
-	return new Intl.NumberFormat(tags[locale], { maximumFractionDigits: digits, useGrouping: grouping[locale] });
+	return new Intl.NumberFormat(tags[locale], {
+		maximumFractionDigits: digits,
+		useGrouping: grouping[locale]
+	});
 }
 
 const formatters: Record<ByteLocale, [Intl.NumberFormat, Intl.NumberFormat]> = {

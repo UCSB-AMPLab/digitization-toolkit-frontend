@@ -14,11 +14,24 @@ const pageUrl = vi.hoisted(() => ({ href: 'http://localhost/dashboard/volumes' }
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/stores', async () => {
 	const { readable } = await import('svelte/store');
-	return { page: readable({ get url() { return new URL(pageUrl.href); } }) };
+	return {
+		page: readable({
+			get url() {
+				return new URL(pageUrl.href);
+			}
+		})
+	};
 });
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { activityApi, collectionsApi, recordsApi, systemApi, type Collection, type StatusCounts } from '$lib/api';
+import {
+	activityApi,
+	collectionsApi,
+	recordsApi,
+	systemApi,
+	type Collection,
+	type StatusCounts
+} from '$lib/api';
 import { authStore, type UserRole } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { es } from '$lib/i18n/es';
@@ -36,15 +49,29 @@ function vol(id: number, name: string, extra: Partial<Collection> = {}): Collect
 }
 
 const volumes = [
-	vol(90, 'Tomo 090', { filename_stem: 'co-ahr-not-t090', record_count: 412, external_id: 'co-ahr-not-t090' }),
+	vol(90, 'Tomo 090', {
+		filename_stem: 'co-ahr-not-t090',
+		record_count: 412,
+		external_id: 'co-ahr-not-t090'
+	}),
 	vol(93, 'Tomo 093', { filename_stem: 'co-ahr-not-t093', record_count: 388, project_id: 2 }),
-	vol(97, 'Tomo 097', { filename_stem: 'co-ahr-not-t097', record_count: 64, archival_metadata: { signatura: 'CO.AHR.NOT.97' } }),
+	vol(97, 'Tomo 097', {
+		filename_stem: 'co-ahr-not-t097',
+		record_count: 64,
+		archival_metadata: { signatura: 'CO.AHR.NOT.97' }
+	}),
 	// A sub-volume belongs to its parent, not to the list.
 	vol(99, 'Sub-volumen', { project_id: null, parent_collection_id: 90 })
 ];
 
 function unit(mode: string) {
-	return { mode, projectsEnabled: false, projectsShown: false, defaultProjectId: 1, prerequisites: { backup: [], fisqua: [] } };
+	return {
+		mode,
+		projectsEnabled: false,
+		projectsShown: false,
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
 }
 
 function signIn(role: UserRole) {
@@ -52,7 +79,9 @@ function signIn(role: UserRole) {
 }
 
 function names(screen: { container: HTMLElement }) {
-	return [...screen.container.querySelectorAll('tbody tr .vol-name')].map((el) => el.textContent?.trim());
+	return [...screen.container.querySelectorAll('tbody tr .vol-name')].map((el) =>
+		el.textContent?.trim()
+	);
 }
 
 beforeEach(() => {
@@ -84,7 +113,11 @@ describe('Volúmenes', () => {
 		await expect.element(row.getByText('co-ahr-not-t097')).toBeInTheDocument();
 		await expect.element(row.getByText('64', { exact: true })).toBeInTheDocument();
 		await expect.element(row.getByText(es.dash_stage_recapture)).toBeInTheDocument();
-		await expect.element(page.getByRole('row').filter({ hasText: 'Tomo 093' }).getByText(es.dash_stage_review)).toBeInTheDocument();
+		await expect
+			.element(
+				page.getByRole('row').filter({ hasText: 'Tomo 093' }).getByText(es.dash_stage_review)
+			)
+			.toBeInTheDocument();
 		await expect.element(page.getByText(es.vols_count(3))).toBeInTheDocument();
 	});
 
@@ -105,15 +138,23 @@ describe('Volúmenes', () => {
 	it('filters by stage', async () => {
 		const screen = render(Volumes);
 		await expect.poll(() => names(screen)).toHaveLength(3);
-		await userEvent.selectOptions(page.getByRole('combobox', { name: es.vols_stage_label }), es.dash_stage_approved);
+		await userEvent.selectOptions(
+			page.getByRole('combobox', { name: es.vols_stage_label }),
+			es.dash_stage_approved
+		);
 		await expect.poll(() => names(screen)).toEqual(['Tomo 090']);
-		await userEvent.selectOptions(page.getByRole('combobox', { name: es.vols_stage_label }), es.vols_stage_all);
+		await userEvent.selectOptions(
+			page.getByRole('combobox', { name: es.vols_stage_label }),
+			es.vols_stage_all
+		);
 		await expect.poll(() => names(screen)).toHaveLength(3);
 	});
 
 	it('opens the volume page of a row, in its own project', async () => {
 		render(Volumes);
-		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 093' }).getByText('Tomo 093'));
+		await userEvent.click(
+			page.getByRole('row').filter({ hasText: 'Tomo 093' }).getByText('Tomo 093')
+		);
 		expect(gotoMock).toHaveBeenCalledWith('/dashboard/projects/2/collections/93');
 	});
 
@@ -129,14 +170,19 @@ describe('Volúmenes', () => {
 		await userEvent.click(dialog.getByRole('button', { name: es.pd_create_btn }));
 		await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1));
 		expect(create.mock.calls[0][0]).not.toHaveProperty('project_id');
-		expect(create.mock.calls[0][0]).toMatchObject({ name: 'Tomo 100', filename_stem: 'co-ahr-not-t100' });
+		expect(create.mock.calls[0][0]).toMatchObject({
+			name: 'Tomo 100',
+			filename_stem: 'co-ahr-not-t100'
+		});
 		await vi.waitFor(() => expect(collectionsApi.listAll).toHaveBeenCalledTimes(2));
 	});
 
 	it('gives an operator Nuevo volumen outside Fisqua mode only', async () => {
 		signIn('operator');
 		const screen = render(Volumes);
-		await expect.element(page.getByRole('button', { name: es.pd_new_collection })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('button', { name: es.pd_new_collection }))
+			.toBeInTheDocument();
 		await vi.waitFor(() => expect(get(unitState)?.mode).toBe('backup'));
 		screen.unmount();
 		resetUnit();
@@ -144,7 +190,9 @@ describe('Volúmenes', () => {
 		const again = render(Volumes);
 		await expect.poll(() => names(again)).toHaveLength(3);
 		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalledTimes(2));
-		await expect.element(page.getByRole('button', { name: es.pd_new_collection })).not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('button', { name: es.pd_new_collection }))
+			.not.toBeInTheDocument();
 	});
 
 	it('opens the edit form of the volume named by ?editVolume', async () => {
@@ -162,7 +210,9 @@ describe('Volúmenes', () => {
 		render(Volumes);
 		const dialog = page.getByRole('dialog');
 		await expect.element(dialog.getByText(es.pd_modal_edit_title)).toBeInTheDocument();
-		await expect.element(dialog.getByLabelText(es.pd_field_stem_fisqua)).toHaveAttribute('readonly');
+		await expect
+			.element(dialog.getByLabelText(es.pd_field_stem_fisqua))
+			.toHaveAttribute('readonly');
 		await expect.element(dialog.getByText(es.pd_fisqua_codes_readonly)).toBeInTheDocument();
 	});
 
@@ -175,9 +225,15 @@ describe('Volúmenes', () => {
 	});
 
 	it('goes to Proyectos while projects are shown', async () => {
-		vi.mocked(systemApi.unit).mockResolvedValue({ ...unit('offline'), projectsEnabled: true, projectsShown: true } as never);
+		vi.mocked(systemApi.unit).mockResolvedValue({
+			...unit('offline'),
+			projectsEnabled: true,
+			projectsShown: true
+		} as never);
 		render(Volumes);
-		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard/projects', { replaceState: true }));
+		await vi.waitFor(() =>
+			expect(gotoMock).toHaveBeenCalledWith('/dashboard/projects', { replaceState: true })
+		);
 	});
 
 	it('stays on Volúmenes when the unit’s state cannot be read', async () => {
@@ -208,7 +264,9 @@ describe('Volúmenes', () => {
 			const row = page.getByRole('row').filter({ hasText: 'Tomo 097' });
 			await userEvent.click(row.getByTitle(es.common_actions));
 			await expect.element(page.getByRole('button', { name: es.common_edit })).toBeInTheDocument();
-			await expect.element(page.getByRole('button', { name: es.common_delete })).toBeInTheDocument();
+			await expect
+				.element(page.getByRole('button', { name: es.common_delete }))
+				.toBeInTheDocument();
 		});
 	}
 
@@ -222,12 +280,16 @@ describe('Volúmenes', () => {
 	it('opens a row’s form from Edit, and saves it', async () => {
 		const update = vi.spyOn(collectionsApi, 'update').mockResolvedValue(volumes[2]);
 		render(Volumes);
-		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		await userEvent.click(
+			page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions)
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_edit }));
 		const dialog = page.getByRole('dialog');
 		await expect.element(dialog.getByPlaceholder(es.pd_ph_title)).toHaveValue('Tomo 097');
 		await userEvent.click(dialog.getByRole('button', { name: es.common_save_changes }));
-		await vi.waitFor(() => expect(update).toHaveBeenCalledWith(97, expect.objectContaining({ name: 'Tomo 097' })));
+		await vi.waitFor(() =>
+			expect(update).toHaveBeenCalledWith(97, expect.objectContaining({ name: 'Tomo 097' }))
+		);
 	});
 
 	it('opens Edit for an operator in Fisqua mode with the stem read-only', async () => {
@@ -235,20 +297,30 @@ describe('Volúmenes', () => {
 		vi.mocked(systemApi.unit).mockResolvedValue(unit('fisqua') as never);
 		render(Volumes);
 		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
-		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		await userEvent.click(
+			page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions)
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_edit }));
-		await expect.element(page.getByRole('dialog').getByLabelText(es.pd_field_stem_fisqua)).toHaveAttribute('readonly');
+		await expect
+			.element(page.getByRole('dialog').getByLabelText(es.pd_field_stem_fisqua))
+			.toHaveAttribute('readonly');
 	});
 
 	it('deletes an empty volume after the confirmation, as the project page does', async () => {
 		vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
 		const del = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();
 		render(Volumes);
-		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		await userEvent.click(
+			page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions)
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
 		const dialog = page.getByRole('dialog');
-		await expect.element(dialog.getByText(es.pd_delete_collection_title, { exact: true }).first()).toBeInTheDocument();
-		await expect.element(dialog.getByText(es.common_irreversible, { exact: false })).toBeInTheDocument();
+		await expect
+			.element(dialog.getByText(es.pd_delete_collection_title, { exact: true }).first())
+			.toBeInTheDocument();
+		await expect
+			.element(dialog.getByText(es.common_irreversible, { exact: false }))
+			.toBeInTheDocument();
 		expect(del).not.toHaveBeenCalled();
 		await userEvent.click(dialog.getByRole('button', { name: es.pd_delete_collection_title }));
 		await vi.waitFor(() => expect(del).toHaveBeenCalledWith(97));
@@ -258,16 +330,22 @@ describe('Volúmenes', () => {
 	it('offers every other listed volume as a target for a volume with records alone in its project, then moves and deletes', async () => {
 		// Tomo 093 is the only volume of project 2.
 		vi.spyOn(recordsApi, 'count').mockResolvedValue(388);
-		const move = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 388, target_collection_id: 90 });
+		const move = vi
+			.spyOn(collectionsApi, 'moveRecords')
+			.mockResolvedValue({ moved: 388, target_collection_id: 90 });
 		vi.spyOn(collectionsApi, 'get').mockResolvedValue(volumes[1]);
 		const del = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();
 		render(Volumes);
-		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 093' }).getByTitle(es.common_actions));
+		await userEvent.click(
+			page.getByRole('row').filter({ hasText: 'Tomo 093' }).getByTitle(es.common_actions)
+		);
 		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
 		const dialog = page.getByRole('dialog');
 		const select = dialog.getByLabelText(es.pd_move_label);
 		await expect.element(select).toBeInTheDocument();
-		const options = [...(select.element() as HTMLSelectElement).options].filter((o) => o.value).map((o) => o.textContent?.trim());
+		const options = [...(select.element() as HTMLSelectElement).options]
+			.filter((o) => o.value)
+			.map((o) => o.textContent?.trim());
 		expect(options).toEqual(['Tomo 090', 'Tomo 097']);
 		await userEvent.selectOptions(select, 'Tomo 090');
 		await userEvent.click(dialog.getByRole('button', { name: es.proj_move_and_delete }));
@@ -279,7 +357,9 @@ describe('Volúmenes', () => {
 	it('keeps the last row’s open menu visible: no ancestor clips it', async () => {
 		const screen = render(Volumes);
 		await expect.poll(() => names(screen)).toHaveLength(3);
-		await userEvent.click(page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions));
+		await userEvent.click(
+			page.getByRole('row').filter({ hasText: 'Tomo 097' }).getByTitle(es.common_actions)
+		);
 		const menu = screen.container.querySelector('.action-menu') as HTMLElement;
 		expect(menu).not.toBeNull();
 		for (let el = menu.parentElement; el && el !== screen.container; el = el.parentElement) {
@@ -289,10 +369,14 @@ describe('Volúmenes', () => {
 	});
 
 	it('gives a volume without a stem the shortcut to its form', async () => {
-		vi.mocked(collectionsApi.listAll).mockResolvedValue([vol(98, 'Tomo 098', { filename_stem: null })]);
+		vi.mocked(collectionsApi.listAll).mockResolvedValue([
+			vol(98, 'Tomo 098', { filename_stem: null })
+		]);
 		render(Volumes);
 		await userEvent.click(page.getByRole('button', { name: es.pd_no_stem_badge }));
-		await expect.element(page.getByRole('dialog').getByText(es.pd_modal_edit_title)).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('dialog').getByText(es.pd_modal_edit_title))
+			.toBeInTheDocument();
 	});
 
 	it('gives a reviewer no Nuevo volumen', async () => {

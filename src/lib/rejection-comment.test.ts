@@ -1,7 +1,11 @@
 // Version: 0.1.0-beta
 
 import { describe, expect, it } from 'vitest';
-import { REJECTION_COMMENT_MAX_LENGTH, isCommentTooLong, showsCommentCount } from './rejection-comment';
+import {
+	REJECTION_COMMENT_MAX_LENGTH,
+	isCommentTooLong,
+	showsCommentCount
+} from './rejection-comment';
 
 class ApiError extends Error {
 	detail?: unknown;
@@ -36,13 +40,23 @@ describe('rejection comment', () => {
 	});
 
 	it("recognises the backend's 422 for a comment that is too long", () => {
-		expect(isCommentTooLong(new ApiError(JSON.stringify(tooLongDetail), tooLongDetail, 422))).toBe(true);
-		expect(isCommentTooLong(new ApiError('A rejection comment can be at most 2,000 characters long.', 'raw', 422))).toBe(true);
+		expect(isCommentTooLong(new ApiError(JSON.stringify(tooLongDetail), tooLongDetail, 422))).toBe(
+			true
+		);
+		expect(
+			isCommentTooLong(
+				new ApiError('A rejection comment can be at most 2,000 characters long.', 'raw', 422)
+			)
+		).toBe(true);
 	});
 
 	it('does not take other refusals for it', () => {
-		const otherNeedsNote = [{ type: 'value_error', loc: ['body'], msg: 'Value error, other needs a comment' }];
-		expect(isCommentTooLong(new ApiError(JSON.stringify(otherNeedsNote), otherNeedsNote, 422))).toBe(false);
+		const otherNeedsNote = [
+			{ type: 'value_error', loc: ['body'], msg: 'Value error, other needs a comment' }
+		];
+		expect(
+			isCommentTooLong(new ApiError(JSON.stringify(otherNeedsNote), otherNeedsNote, 422))
+		).toBe(false);
 		expect(isCommentTooLong(new ApiError('x', tooLongDetail, 409))).toBe(false);
 		expect(isCommentTooLong(new Error('Failed to fetch'))).toBe(false);
 		expect(isCommentTooLong(null)).toBe(false);

@@ -37,7 +37,10 @@ function iface(over: Partial<NetworkInterface> = {}): NetworkInterface {
 	};
 }
 
-function status(interfaces: NetworkInterface[], problems: NetworkStatus['problems'] = []): NetworkStatus {
+function status(
+	interfaces: NetworkInterface[],
+	problems: NetworkStatus['problems'] = []
+): NetworkStatus {
 	return {
 		hostname: 'captua',
 		wifiDevice: 'wlan0',
@@ -48,7 +51,10 @@ function status(interfaces: NetworkInterface[], problems: NetworkStatus['problem
 }
 
 function json(code: number, body: unknown) {
-	return new Response(JSON.stringify(body), { status: code, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status: code,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 /** Counts GET /network/status and answers with `answer()`. */
@@ -130,7 +136,12 @@ describe('the poller', () => {
 		const stop = watchNetworkStatus();
 		await vi.waitFor(() => expect(get(networkState).status).not.toBeNull());
 
-		answer = json(503, { detail: { message: 'NetworkManager is not answering.', problems: [{ code: 'network_manager_unavailable' }] } });
+		answer = json(503, {
+			detail: {
+				message: 'NetworkManager is not answering.',
+				problems: [{ code: 'network_manager_unavailable' }]
+			}
+		});
 		await vi.advanceTimersByTimeAsync(NETWORK_POLL_MS);
 		await vi.waitFor(() => expect(get(networkState).error).toBe('service_unavailable'));
 		expect(get(networkState).status).not.toBeNull();
@@ -165,7 +176,15 @@ describe('networkIndicator', () => {
 	});
 
 	it('is Network problem when a connected interface has a problem', () => {
-		const wifi = iface({ device: 'wlan0', type: 'wifi', ssid: 'Library-Guest', signal: 81, ipv4: [], gateway: null, dns: [] });
+		const wifi = iface({
+			device: 'wlan0',
+			type: 'wifi',
+			ssid: 'Library-Guest',
+			signal: 81,
+			ipv4: [],
+			gateway: null,
+			dns: []
+		});
 		const view = networkIndicator(status([wifi], [{ code: 'no_address', device: 'wlan0' }]));
 		expect(view.state).toBe('problem');
 		expect(view.name).toBe('Library-Guest');
@@ -174,7 +193,9 @@ describe('networkIndicator', () => {
 	it('is Offline when nothing is connected', () => {
 		const cable = iface({ state: 'unavailable', ipv4: [] });
 		const wifi = iface({ device: 'wlan0', type: 'wifi', state: 'disconnected', ipv4: [] });
-		expect(networkIndicator(status([cable, wifi], [{ code: 'no_connection', device: null }]))).toEqual({
+		expect(
+			networkIndicator(status([cable, wifi], [{ code: 'no_connection', device: null }]))
+		).toEqual({
 			state: 'offline',
 			via: null,
 			name: null,
@@ -186,14 +207,18 @@ describe('networkIndicator', () => {
 describe('a read that never answers (NEH-253 fix round)', () => {
 	it('is aborted after 5 s, counts as a failed read, and does not block the next read', async () => {
 		vi.useRealTimers();
-		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date'] });
+		vi.useFakeTimers({
+			toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date']
+		});
 		let hang = true;
 		const calls: string[] = [];
 		vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
 			calls.push(String(input));
 			if (!hang) return Promise.resolve(json(200, status([iface()])));
 			return new Promise((_, reject) => {
-				init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+				init?.signal?.addEventListener('abort', () =>
+					reject(new DOMException('Aborted', 'AbortError'))
+				);
 			});
 		});
 		const stop = watchNetworkStatus();
@@ -217,7 +242,9 @@ describe('a read that never answers (NEH-253 fix round)', () => {
 describe('failed reads and the last good read', () => {
 	it('counts consecutive failures and keeps the time of the last good read', async () => {
 		let code = 200;
-		serveStatus(() => (code === 200 ? json(200, status([iface()])) : json(code, { detail: 'boom' })));
+		serveStatus(() =>
+			code === 200 ? json(200, status([iface()])) : json(code, { detail: 'boom' })
+		);
 		await refreshNetworkStatus();
 		const goodAt = get(networkState).lastReadAt;
 		expect(goodAt).toBe(Date.now());
@@ -263,25 +290,52 @@ describe('releasing a reader', () => {
 
 describe('networkIndicator: which interface it names (fix round)', () => {
 	const cable = iface();
-	const wifiOn = iface({ device: 'wlan0', type: 'wifi', ssid: 'Archive-Office', signal: 72, ipv4: ['10.0.4.117/24'] });
+	const wifiOn = iface({
+		device: 'wlan0',
+		type: 'wifi',
+		ssid: 'Archive-Office',
+		signal: 72,
+		ipv4: ['10.0.4.117/24']
+	});
 
 	it('names the cable when only the cable has a problem', () => {
-		expect(networkIndicator(status([cable, wifiOn], [{ code: 'no_dns', device: 'eth0' }]))).toEqual({
-			state: 'problem', via: 'ethernet', name: '192.168.10.42', signal: null
-		});
+		expect(networkIndicator(status([cable, wifiOn], [{ code: 'no_dns', device: 'eth0' }]))).toEqual(
+			{
+				state: 'problem',
+				via: 'ethernet',
+				name: '192.168.10.42',
+				signal: null
+			}
+		);
 	});
 
 	it('names the Wi-Fi network when only the Wi-Fi has a problem', () => {
-		expect(networkIndicator(status([cable, wifiOn], [{ code: 'no_gateway', device: 'wlan0' }]))).toEqual({
-			state: 'problem', via: 'wifi', name: 'Archive-Office', signal: 72
+		expect(
+			networkIndicator(status([cable, wifiOn], [{ code: 'no_gateway', device: 'wlan0' }]))
+		).toEqual({
+			state: 'problem',
+			via: 'wifi',
+			name: 'Archive-Office',
+			signal: 72
 		});
 	});
 
 	it('is Connecting when nothing is connected and an interface is connecting', () => {
-		const connecting = iface({ device: 'wlan0', type: 'wifi', state: 'connecting', ssid: null, signal: null, connection: 'eduroam', ipv4: [] });
+		const connecting = iface({
+			device: 'wlan0',
+			type: 'wifi',
+			state: 'connecting',
+			ssid: null,
+			signal: null,
+			connection: 'eduroam',
+			ipv4: []
+		});
 		const off = iface({ state: 'unavailable', ipv4: [] });
 		expect(networkIndicator(status([off, connecting]))).toEqual({
-			state: 'connecting', via: 'wifi', name: 'eduroam', signal: null
+			state: 'connecting',
+			via: 'wifi',
+			name: 'eduroam',
+			signal: null
 		});
 	});
 

@@ -27,12 +27,24 @@
 //
 // Version: 0.3.1
 
-import type { ImportReject, QueueItem, QueueList, QueueRetake, RecordToRetake, StatusCounts } from '$lib/api';
+import type {
+	ImportReject,
+	QueueItem,
+	QueueList,
+	QueueRetake,
+	RecordToRetake,
+	StatusCounts
+} from '$lib/api';
 import { placeVolume } from '$lib/pipeline';
 
 // The action values a list may carry on an item (an additive field the
 // contract ignores). Another value is shown as the file gives it.
-export const QUEUE_ACTIONS = ['spot-recapture', 'full-rescan', 'full-digitisation', 'complete'] as const;
+export const QUEUE_ACTIONS = [
+	'spot-recapture',
+	'full-rescan',
+	'full-digitisation',
+	'complete'
+] as const;
 export type QueueAction = (typeof QUEUE_ACTIONS)[number];
 
 export function isQueueAction(value: unknown): value is QueueAction {
@@ -95,7 +107,10 @@ export interface CaptureInstruction {
  * an item for the volume, so that the caller can fall back to the volume's
  * own custom_attributes.
  */
-export function instructionForVolume(lists: QueueList[], collectionId: number): CaptureInstruction | null | undefined {
+export function instructionForVolume(
+	lists: QueueList[],
+	collectionId: number
+): CaptureInstruction | null | undefined {
 	let suppressed = false;
 	for (const list of lists) {
 		// A withdrawn item, or one whose volume a withdrawn entry hid, gives
@@ -118,7 +133,9 @@ export function instructionForVolume(lists: QueueList[], collectionId: number): 
  * `custom_attributes` (JSON text) under `fisqua`. Null when there are no
  * notes, or the attributes cannot be read.
  */
-export function captureInstruction(customAttributes: string | null | undefined): CaptureInstruction | null {
+export function captureInstruction(
+	customAttributes: string | null | undefined
+): CaptureInstruction | null {
 	if (!customAttributes) return null;
 	let parsed: unknown;
 	try {
@@ -170,7 +187,11 @@ export function isItemShown(item: QueueItem): boolean {
  * The items a user sees: an operator, those assigned to them and the
  * unassigned ones; anyone else, every item.
  */
-export function itemsForUser(items: QueueItem[], role: string | null, username: string | null): QueueItem[] {
+export function itemsForUser(
+	items: QueueItem[],
+	role: string | null,
+	username: string | null
+): QueueItem[] {
 	if (role !== 'operator') return items;
 	return items.filter((i) => i.assignee == null || (username !== null && i.assignee === username));
 }
@@ -178,7 +199,11 @@ export function itemsForUser(items: QueueItem[], role: string | null, username: 
 export type AssigneeFilter = 'mine' | 'unassigned' | 'everyone';
 
 /** The admin's filter: the items assigned to `username`, the unassigned ones, or every item. */
-export function filterByAssignee(items: QueueItem[], filter: AssigneeFilter, username: string | null): QueueItem[] {
+export function filterByAssignee(
+	items: QueueItem[],
+	filter: AssigneeFilter,
+	username: string | null
+): QueueItem[] {
 	if (filter === 'mine') return items.filter((i) => username !== null && i.assignee === username);
 	if (filter === 'unassigned') return items.filter((i) => i.assignee == null);
 	return items;
@@ -200,16 +225,28 @@ export interface RetakePair {
  * other records found there, then those not found, both in the entry's
  * order.
  */
-export function retakePairs(retakes: QueueRetake[] | undefined, rows: RecordToRetake[]): RetakePair[] {
+export function retakePairs(
+	retakes: QueueRetake[] | undefined,
+	rows: RecordToRetake[]
+): RetakePair[] {
 	const byId = new Map(rows.map((r) => [r.recordId, r]));
 	const pairs = (retakes ?? []).map((r) => {
 		const row = byId.get(r.captuaRecordId);
-		return { recordId: r.captuaRecordId, title: row?.title ?? null, sequence: row?.sequence ?? null, pairId: r.pairId, side: r.side };
+		return {
+			recordId: r.captuaRecordId,
+			title: row?.title ?? null,
+			sequence: row?.sequence ?? null,
+			pairId: r.pairId,
+			side: r.side
+		};
 	});
 	const rank = (p: RetakePair) => (p.sequence !== null ? 0 : p.title !== null ? 1 : 2);
 	return pairs
 		.map((p, index) => ({ p, index }))
-		.sort((a, b) => rank(a.p) - rank(b.p) || (a.p.sequence ?? 0) - (b.p.sequence ?? 0) || a.index - b.index)
+		.sort(
+			(a, b) =>
+				rank(a.p) - rank(b.p) || (a.p.sequence ?? 0) - (b.p.sequence ?? 0) || a.index - b.index
+		)
 		.map(({ p }) => p);
 }
 
@@ -244,7 +281,10 @@ function hasRetakes(item: QueueItem, retakeVolumes?: ReadonlySet<number>): boole
  * pages waiting to be recaptured stays in section 2 even when it is marked
  * done, since those retakes are still owed; any other done item is in none.
  */
-export function sectionOf(item: QueueItem, retakeVolumes?: ReadonlySet<number>): QueueSectionKey | null {
+export function sectionOf(
+	item: QueueItem,
+	retakeVolumes?: ReadonlySet<number>
+): QueueSectionKey | null {
 	if (hasRetakes(item, retakeVolumes)) return 'rework';
 	return isItemDone(item) ? null : workOf(item, retakeVolumes);
 }
@@ -262,7 +302,10 @@ export interface QueueSection {
  * sections left out; and the other done items apart, in list order, shown
  * below the sections.
  */
-export function queueSections(items: QueueItem[], retakeVolumes?: ReadonlySet<number>): { sections: QueueSection[]; done: QueueItem[] } {
+export function queueSections(
+	items: QueueItem[],
+	retakeVolumes?: ReadonlySet<number>
+): { sections: QueueSection[]; done: QueueItem[] } {
 	const byKey = new Map<QueueSectionKey, QueueItem[]>(SECTION_ORDER.map((k) => [k, []]));
 	const done: QueueItem[] = [];
 	for (const item of items) {
@@ -271,8 +314,15 @@ export function queueSections(items: QueueItem[], retakeVolumes?: ReadonlySet<nu
 		else byKey.get(key)!.push(item);
 	}
 	const rework = byKey.get('rework')!;
-	byKey.set('rework', [...rework.filter((i) => hasRetakes(i, retakeVolumes)), ...rework.filter((i) => !hasRetakes(i, retakeVolumes))]);
-	const sections = SECTION_ORDER.filter((k) => byKey.get(k)!.length > 0).map((key, index) => ({ key, ordinal: index + 1, items: byKey.get(key)! }));
+	byKey.set('rework', [
+		...rework.filter((i) => hasRetakes(i, retakeVolumes)),
+		...rework.filter((i) => !hasRetakes(i, retakeVolumes))
+	]);
+	const sections = SECTION_ORDER.filter((k) => byKey.get(k)!.length > 0).map((key, index) => ({
+		key,
+		ordinal: index + 1,
+		items: byKey.get(key)!
+	}));
 	return { sections, done };
 }
 
@@ -283,7 +333,10 @@ export function queueSections(items: QueueItem[], retakeVolumes?: ReadonlySet<nu
  * the capture link needs both. `retakeVolumes` are the volumes with pages
  * waiting to be recaptured (0.2.0).
  */
-export function nextItemPosition(items: QueueItem[], retakeVolumes?: ReadonlySet<number>): number | null {
+export function nextItemPosition(
+	items: QueueItem[],
+	retakeVolumes?: ReadonlySet<number>
+): number | null {
 	const capturable = (i: QueueItem) => i.collectionId != null && i.projectId != null;
 	for (const section of queueSections(items, retakeVolumes).sections) {
 		const next = section.items.find(capturable);
@@ -298,6 +351,10 @@ export function nextItemPosition(items: QueueItem[], retakeVolumes?: ReadonlySet
  * since the backend lets a full rescan start in any turn. A done item is
  * locked as its work would be.
  */
-export function isLockedForTurn(item: QueueItem, retakeVolumes: ReadonlySet<number> | undefined, turnState: string | null | undefined): boolean {
+export function isLockedForTurn(
+	item: QueueItem,
+	retakeVolumes: ReadonlySet<number> | undefined,
+	turnState: string | null | undefined
+): boolean {
 	return turnState === 'recaptures' && workOf(item, retakeVolumes) === 'new';
 }

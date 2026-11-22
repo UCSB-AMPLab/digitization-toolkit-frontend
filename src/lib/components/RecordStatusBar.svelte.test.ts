@@ -11,7 +11,10 @@ import { en } from '$lib/i18n/en';
 import RecordStatusBar from './RecordStatusBar.svelte';
 
 const make = (status: ApiRecord['status'], n: number, from: number) =>
-	Array.from({ length: n }, (_, i) => ({ id: from + i, status, images: [] }) as unknown as ApiRecord);
+	Array.from(
+		{ length: n },
+		(_, i) => ({ id: from + i, status, images: [] }) as unknown as ApiRecord
+	);
 
 function records(captured: number, approved: number, excluded = 0): ApiRecord[] {
 	return [
@@ -27,14 +30,20 @@ describe('RecordStatusBar counts', () => {
 	it('writes 1786 and 12.345 in Spanish', async () => {
 		locale.set('es');
 		render(RecordStatusBar, { records: records(1786, 10559) });
-		await expect.element(page.getByText(`${es.status_captured_plural}: 1786 / 12.345`)).toBeInTheDocument();
-		await expect.element(page.getByText(`${es.status_approved_plural}: 10.559 / 12.345`)).toBeInTheDocument();
+		await expect
+			.element(page.getByText(`${es.status_captured_plural}: 1786 / 12.345`))
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByText(`${es.status_approved_plural}: 10.559 / 12.345`))
+			.toBeInTheDocument();
 	});
 
 	it('writes 1,786 and 12,345 in English', async () => {
 		locale.set('en');
 		render(RecordStatusBar, { records: records(1786, 10559) });
-		await expect.element(page.getByText(`${en.status_captured_plural}: 1,786 / 12,345`)).toBeInTheDocument();
+		await expect
+			.element(page.getByText(`${en.status_captured_plural}: 1,786 / 12,345`))
+			.toBeInTheDocument();
 	});
 });
 

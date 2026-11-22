@@ -14,7 +14,12 @@
 	// Version: 0.1.0-beta
 	import { m, locale } from '$lib/i18n';
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
-	import { classifySnapshot, dayRelation, formatBackupDate, type BackupLevel } from '$lib/catalogue-backup';
+	import {
+		classifySnapshot,
+		dayRelation,
+		formatBackupDate,
+		type BackupLevel
+	} from '$lib/catalogue-backup';
 
 	let { expanded = true, href = null }: { expanded?: boolean; href?: string | null } = $props();
 
@@ -33,11 +38,29 @@
 				return { level, text: $m.backup_ind_unknown };
 			case 'overdue':
 				if (!verifiedAt) return { level, text: $m.backup_ind_never };
-				return { level, text: $m.backup_ind_stale(dayRelation(verifiedAt, now), formatBackupDate(verifiedAt, now, $locale)) };
+				return {
+					level,
+					text: $m.backup_ind_stale(
+						dayRelation(verifiedAt, now),
+						formatBackupDate(verifiedAt, now, $locale)
+					)
+				};
 			case 'late':
-				return { level, text: $m.backup_ind_stale(dayRelation(verifiedAt!, now), formatBackupDate(verifiedAt!, now, $locale)) };
+				return {
+					level,
+					text: $m.backup_ind_stale(
+						dayRelation(verifiedAt!, now),
+						formatBackupDate(verifiedAt!, now, $locale)
+					)
+				};
 			case 'current':
-				return { level, text: $m.backup_ind_current(dayRelation(verifiedAt!, now), formatBackupDate(verifiedAt!, now, $locale)) };
+				return {
+					level,
+					text: $m.backup_ind_current(
+						dayRelation(verifiedAt!, now),
+						formatBackupDate(verifiedAt!, now, $locale)
+					)
+				};
 		}
 	});
 </script>

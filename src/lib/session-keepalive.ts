@@ -118,8 +118,10 @@ export function startSessionKeepalive(options: SessionKeepaliveOptions): () => v
 	};
 
 	const listenerOptions: AddEventListenerOptions = { capture: true, passive: true };
-	for (const type of SESSION_ACTIVITY_EVENTS) target.addEventListener(type, onInput, listenerOptions);
+	for (const type of SESSION_ACTIVITY_EVENTS)
+		target.addEventListener(type, onInput, listenerOptions);
 	return () => {
-		for (const type of SESSION_ACTIVITY_EVENTS) target.removeEventListener(type, onInput, listenerOptions);
+		for (const type of SESSION_ACTIVITY_EVENTS)
+			target.removeEventListener(type, onInput, listenerOptions);
 	};
 }

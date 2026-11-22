@@ -16,5 +16,9 @@ export function passwordTooShort(password: string): boolean {
 /** Whether a failed request is the backend's `password_too_short` refusal. */
 export function isPasswordTooShortRefusal(error: unknown): boolean {
 	const detail = (error as { detail?: unknown } | null)?.detail;
-	return typeof detail === 'object' && detail !== null && (detail as { code?: unknown }).code === 'password_too_short';
+	return (
+		typeof detail === 'object' &&
+		detail !== null &&
+		(detail as { code?: unknown }).code === 'password_too_short'
+	);
 }

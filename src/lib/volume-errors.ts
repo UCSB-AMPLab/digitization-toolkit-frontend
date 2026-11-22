@@ -64,7 +64,9 @@ export function fisquaVolumeRefusal(error: unknown): FisquaVolumeRefusal | null 
 	const d = e.detail as { code?: unknown; referenceCode?: unknown };
 	if (typeof d.code !== 'string' || FISQUA_REFUSALS[d.code] !== e.status) return null;
 	if (d.code === 'unknown_reference_code') {
-		return typeof d.referenceCode === 'string' ? { code: d.code, referenceCode: d.referenceCode } : null;
+		return typeof d.referenceCode === 'string'
+			? { code: d.code, referenceCode: d.referenceCode }
+			: null;
 	}
 	return { code: d.code as Exclude<FisquaVolumeRefusal['code'], 'unknown_reference_code'> };
 }
@@ -72,11 +74,16 @@ export function fisquaVolumeRefusal(error: unknown): FisquaVolumeRefusal | null 
 /** The message for a Fisqua-mode refusal. */
 export function fisquaRefusalText(refusal: FisquaVolumeRefusal, msgs: Messages): string {
 	switch (refusal.code) {
-		case 'volumes_from_fisqua': return msgs.pd_err_volumes_from_fisqua;
-		case 'unknown_reference_code': return msgs.pd_err_unknown_reference_code(refusal.referenceCode);
-		case 'stem_required': return msgs.pd_err_stem_required_fisqua;
-		case 'fisqua_no_lookup': return msgs.pd_fisqua_no_lookup_title;
-		case 'fisqua_unreachable': return msgs.pd_fisqua_unreachable_title;
+		case 'volumes_from_fisqua':
+			return msgs.pd_err_volumes_from_fisqua;
+		case 'unknown_reference_code':
+			return msgs.pd_err_unknown_reference_code(refusal.referenceCode);
+		case 'stem_required':
+			return msgs.pd_err_stem_required_fisqua;
+		case 'fisqua_no_lookup':
+			return msgs.pd_fisqua_no_lookup_title;
+		case 'fisqua_unreachable':
+			return msgs.pd_fisqua_unreachable_title;
 	}
 }
 
@@ -88,7 +95,8 @@ export function volumeSaveErrorText(error: unknown, msgs: Messages, role?: strin
 	const fisqua = fisquaVolumeRefusal(error);
 	if (fisqua) return fisquaRefusalText(fisqua, msgs);
 	const differs = referenceCodeDiffers(error);
-	if (differs) return msgs.pd_err_stem_differs_from_reference_code(differs.externalId, differs.stem);
+	if (differs)
+		return msgs.pd_err_stem_differs_from_reference_code(differs.externalId, differs.stem);
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
 	const hold = fileHoldText(error, msgs);
@@ -115,7 +123,10 @@ export function volumeSaveErrorText(error: unknown, msgs: Messages, role?: strin
 export function isKeptMoveRefusal(error: unknown): boolean {
 	if (typeof error !== 'object' || error === null) return false;
 	const e = error as { status?: unknown; detail?: unknown };
-	const code = typeof e.detail === 'object' && e.detail !== null ? (e.detail as { code?: unknown }).code : undefined;
+	const code =
+		typeof e.detail === 'object' && e.detail !== null
+			? (e.detail as { code?: unknown }).code
+			: undefined;
 	return e.status === 409 && code === 'kept_on_unit_move';
 }
 
@@ -164,7 +175,11 @@ export function moveBlockedCount(error: unknown): number | null {
 }
 
 /** The message for a failed delete (or the move of records before it), for the signed-in `role`. */
-export function volumeDeleteErrorText(error: unknown, msgs: Messages, role?: string | null): string {
+export function volumeDeleteErrorText(
+	error: unknown,
+	msgs: Messages,
+	role?: string | null
+): string {
 	const testing = testingRefusalText(error, msgs, role);
 	if (testing) return testing;
 	if (isKeptMoveRefusal(error)) return msgs.pd_err_move_kept_line;
@@ -178,7 +193,8 @@ export function volumeDeleteErrorText(error: unknown, msgs: Messages, role?: str
 	if (blocked !== null) return msgs.pd_err_move_under_review(blocked);
 	if (isNotEmptyRefusal(error)) {
 		const counts = notEmptyCounts(error);
-		if (counts && counts.records === 0 && counts.subVolumes > 0) return msgs.pd_err_delete_has_subvolumes;
+		if (counts && counts.records === 0 && counts.subVolumes > 0)
+			return msgs.pd_err_delete_has_subvolumes;
 		return msgs.pd_err_delete_not_empty;
 	}
 	return msgs.pd_err_delete_collection;
