@@ -6,7 +6,8 @@
 // role, and a section asked for that the role may not open (by URL or by
 // state) resolves to Network, so a non-admin never renders an admin section.
 // The testing role (NEH-391) sees what every non-admin sees, plus Power, so it
-// can shut the unit down or restart it.
+// can shut the unit down or restart it. Cameras (NEH-252) is opened by every
+// other role; only the administrator gets its controls (CameraKindCard).
 // The backend enforces the same roles on every route these sections use.
 //
 // Version: 0.3.0
@@ -29,6 +30,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
 	{ id: 'testing', labelKey: 'config_section_testing', unit: true },
 	{ id: 'storage', labelKey: 'config_section_storage', unit: true },
 	{ id: 'offsite-copy', labelKey: 'backup_section_title', unit: true },
+	{ id: 'cameras', labelKey: 'config_section_cameras', unit: true },
 	{ id: 'diagnostics', labelKey: 'config_section_diagnostics', unit: true },
 	{ id: 'maintenance', labelKey: 'config_section_maintenance', unit: true },
 	{ id: 'power', labelKey: 'config_section_power', unit: true }
@@ -39,7 +41,11 @@ export const DEFAULT_SECTION = 'network';
 export function sectionsFor(role: string | null | undefined): SettingsSection[] {
 	if (inTestingSpace(role)) return SETTINGS_SECTIONS.filter((s) => !s.unit || s.id === 'power');
 	return SETTINGS_SECTIONS.filter(
-		(s) => !s.unit || opensUnitSettings(role) || (s.id === 'storage' && canFreeVolumes(role))
+		(s) =>
+			!s.unit ||
+			opensUnitSettings(role) ||
+			s.id === 'cameras' ||
+			(s.id === 'storage' && canFreeVolumes(role))
 	);
 }
 

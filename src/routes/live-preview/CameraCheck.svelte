@@ -861,7 +861,8 @@
      (the image viewer's 200, the Refocus dialog's too). */
 	.ck-view {
 		position: fixed;
-		inset: 0;
+		/* Below the banner for a unit that is not answering, while it shows. */
+		inset: var(--banner-h, 0px) 0 0 0;
 		z-index: 150;
 		display: flex;
 		flex-direction: column;

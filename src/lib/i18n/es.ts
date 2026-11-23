@@ -339,8 +339,82 @@ export const es = {
 	config_err_restore: 'Error al restaurar.',
 	config_camera_backend: 'Sistema de captura',
 	config_camera_backend_desc:
-		'Qué sistema de captura está activo en este equipo. Se define al instalarlo; cambiarlo exige reconfigurar el equipo.',
+		'El controlador de cámara que Captua usa en este equipo. Un administrador elige el tipo de cámara en Configuración › Cámaras.',
 	config_camera_backend_unknown: 'No disponible',
+	// NEH-186: el aviso mientras el equipo no responde (UnitNotAnswering).
+	unit_not_answering: 'El equipo no responde. Puede que lo que ves en pantalla no esté al día.',
+	unit_not_answering_reload: 'Recargar',
+	// NEH-252/348: el tipo de cámara que usa el equipo (Configuración >
+	// Cámaras, Diagnóstico y el panel de cámaras de la pantalla de captura).
+	// Los nombres de los controladores (picamera2, gphoto2, chdk) solo
+	// aparecen en Diagnóstico, junto a estos.
+	config_section_cameras: 'Cámaras',
+	camera_kind_picamera2: 'Cámaras Pi',
+	camera_kind_gphoto2: 'Cámaras DSLR de Canon',
+	camera_kind_chdk: 'Cámaras Canon A2500 (CHDK)',
+	camera_kind_count_picamera2: (n: number) => (n === 1 ? '1 cámara Pi' : `${n} cámaras Pi`),
+	camera_kind_count_gphoto2: (n: number) =>
+		n === 1 ? '1 cámara DSLR de Canon' : `${n} cámaras DSLR de Canon`,
+	camera_kind_count_chdk: (n: number) =>
+		n === 1 ? '1 cámara Canon A2500 (CHDK)' : `${n} cámaras Canon A2500 (CHDK)`,
+	camera_kind_mismatch: (set: string, connected: string, n: number) =>
+		`Este equipo está configurado para ${set.charAt(0).toLowerCase()}${set.slice(1)}, pero hay ${connected} ${n === 1 ? 'conectada' : 'conectadas'}.`,
+	camera_kind_no_driver: (connected: string, n: number) =>
+		`Hay ${connected} ${n === 1 ? 'conectada' : 'conectadas'}, pero este equipo no tiene el controlador para ese tipo de cámara.`,
+	camera_kind_mixed: (parts: string[]) =>
+		`Hay conectadas cámaras de ${parts.length === 2 ? 'dos' : 'tres'} tipos: ${
+			parts.length === 2
+				? `${parts[0]} y ${parts[1]}`
+				: `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`
+		}. Captua usa un solo tipo a la vez.`,
+	camera_kind_notice_link: 'Elige el tipo de cámara en Configuración',
+	camera_kind_notice_tell_admin: 'Avisa al administrador.',
+	camera_kind_desc:
+		'Qué tipo de cámara usa Captua en este equipo y qué cámaras están conectadas ahora.',
+	camera_kind_in_use: 'En uso',
+	camera_kind_source_stored: 'Un administrador eligió este tipo.',
+	camera_kind_source_environment: 'La configuración de instalación del equipo indica este tipo.',
+	camera_kind_source_detected:
+		'Captua eligió este tipo según las cámaras que estaban conectadas en el último inicio.',
+	camera_kind_source_last_used:
+		'En el último inicio, Captua no pudo deducir de las cámaras conectadas qué tipo usar, así que siguió con el que usaba antes.',
+	camera_kind_source_default:
+		'En el último inicio, Captua no pudo deducir de las cámaras conectadas qué tipo usar, y no había usado ninguno antes, así que usa cámaras Pi.',
+	camera_kind_connected: 'Conectadas ahora',
+	camera_kind_count_unknown: 'no se sabe',
+	camera_kind_err_load:
+		'Captua no pudo consultar qué tipo de cámara usa este equipo. Vuelve a intentarlo en un momento.',
+	camera_kind_choose_legend: 'Tipo de cámara',
+	camera_kind_follow: 'Según las cámaras conectadas',
+	camera_kind_follow_desc:
+		'En cada inicio, Captua usa el tipo de las cámaras que estén conectadas en ese momento.',
+	camera_kind_lacks_driver: 'Este equipo no tiene el controlador para estas cámaras.',
+	camera_kind_confirm_title: '¿Reiniciar Captua?',
+	camera_kind_confirm_body:
+		'Para aplicar el cambio hay que reiniciar Captua. Nadie podrá capturar durante alrededor de un minuto.',
+	camera_kind_confirm_btn: 'Reiniciar Captua',
+	camera_kind_pending: (name: string) =>
+		`Hay un reinicio pendiente. Después del reinicio, Captua usará ${name.charAt(0).toLowerCase()}${name.slice(1)}.`,
+	camera_kind_pending_follow:
+		'Hay un reinicio pendiente. Después del reinicio, Captua usará el tipo de las cámaras que estén conectadas.',
+	camera_kind_restart_now: 'Reiniciar ahora',
+	camera_kind_restart_needed:
+		'El cambio quedó guardado, pero no se pudo reiniciar Captua. Reinicia el equipo para aplicarlo.',
+	camera_kind_refused_busy_capturing:
+		'Hay una captura en curso. Vuelve a intentarlo cuando termine.',
+	camera_kind_refused_offsite_job_running:
+		'Se está liberando o restaurando un volumen. Vuelve a intentarlo cuando termine.',
+	camera_kind_refused_backend_restarting:
+		'Hay un reinicio de Captua en curso. Vuelve a intentarlo en un minuto.',
+	camera_kind_refused_driver_unavailable: 'Este equipo no tiene el controlador para estas cámaras.',
+	camera_kind_refused_other: 'Captua no pudo guardar el cambio. Vuelve a intentarlo en un momento.',
+	diag_camera_kind: 'Tipo de cámara en uso',
+	diag_camera_kind_source: 'Por qué',
+	diag_camera_kind_stored: 'Opción guardada',
+	diag_camera_kind_stored_none: 'Ninguna: Captua usa el tipo de las cámaras conectadas',
+	diag_camera_kind_connected: 'Cámaras conectadas',
+	diag_camera_kind_available: 'Controladores de cámara instalados en este equipo',
+	diag_camera_kind_available_none: 'Ninguno',
 	config_section_diagnostics: 'Diagnóstico',
 	// Not "registro": in this interface a registro is a record.
 	config_system_logs: 'Actividad del sistema',

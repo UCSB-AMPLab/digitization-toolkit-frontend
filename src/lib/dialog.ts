@@ -107,6 +107,21 @@ export function toBody(node: HTMLElement) {
 // Refocus dialog, NEH-339), only the most recently opened one handles Tab,
 // as `dismissible` does with Escape; the one underneath takes it back once
 // the top one has gone.
+// Controls marked `data-always-reachable` (the Reload button of the banner
+// for a unit that is not answering) stay in every trap's Tab order, before
+// the dialog's first control: Tab from the dialog's last control goes to the
+// first of them, Tab from the last of them goes to the dialog's first
+// control, and Shift+Tab the other way round. Without such a control on the
+// page the trap behaves exactly as before.
+const ALWAYS_REACHABLE = '[data-always-reachable]';
+
+/** The enabled controls on the page marked `data-always-reachable`, in page order. */
+export function alwaysReachable(): HTMLElement[] {
+	return [...document.querySelectorAll<HTMLElement>(ALWAYS_REACHABLE)].filter(
+		(el) => el.isConnected && !(el as HTMLButtonElement).disabled
+	);
+}
+
 const FOCUSABLE =
 	'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])';
 
@@ -137,21 +152,31 @@ export function trapFocus(node: HTMLElement) {
 	function onKeydown(event: KeyboardEvent) {
 		if (event.key !== 'Tab' || traps[traps.length - 1] !== node) return;
 		const list = items();
+		const active = document.activeElement;
+		const extra = alwaysReachable().filter((el) => !node.contains(el));
 		if (list.length === 0) {
 			event.preventDefault();
-			node.focus();
+			const at = extra.indexOf(active as HTMLElement);
+			const next = at === -1 ? extra[0] : extra[at + 1];
+			(next ?? node).focus();
 			return;
 		}
 		const first = list[0];
 		const last = list[list.length - 1];
-		const active = document.activeElement;
+		const at = extra.indexOf(active as HTMLElement);
+		if (at !== -1) {
+			event.preventDefault();
+			if (event.shiftKey) (at > 0 ? extra[at - 1] : last).focus();
+			else (at < extra.length - 1 ? extra[at + 1] : first).focus();
+			return;
+		}
 		const outside = !node.contains(active);
 		if (event.shiftKey && (active === first || active === node || outside)) {
 			event.preventDefault();
-			last.focus();
+			(extra.length > 0 && !outside ? extra[extra.length - 1] : last).focus();
 		} else if (!event.shiftKey && (active === last || outside)) {
 			event.preventDefault();
-			first.focus();
+			(extra.length > 0 && !outside ? extra[0] : first).focus();
 		}
 	}
 	// On the window, so that a focus that has escaped is brought back too.
