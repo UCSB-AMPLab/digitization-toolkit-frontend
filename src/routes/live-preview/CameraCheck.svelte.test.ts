@@ -240,6 +240,15 @@ describe('CameraCheck: at rest and closing', () => {
 		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
+	it('says what a correct pair looks like, beside the two test captures (NEH-389)', async () => {
+		renderCheck();
+		await settle();
+		const hint = [...view()!.querySelectorAll('.sf-body *')].find(
+			(el) => el.textContent?.trim() === en.camcheck_right_page_hint
+		);
+		expect(hint).toBeTruthy();
+	});
+
 	it('Escape closes it too', async () => {
 		const { onClose } = renderCheck();
 		await settle();
@@ -1013,6 +1022,20 @@ describe('CameraCheck: "Change which camera is which" (NEH-343)', () => {
 		await click(en.camwhich_open, details);
 		expect(onChangeRoles).toHaveBeenCalledTimes(1);
 		expect(document.querySelector('[role="dialog"][aria-labelledby="cd-title"]')).toBeNull();
+	});
+
+	it('the main view offers it too, with no dialog open (NEH-389)', async () => {
+		const onChangeRoles = vi.fn();
+		render(CameraCheck, {
+			leftIndex: 0,
+			rotateDeg: { 0: 0, 1: 0 },
+			onClose: vi.fn(),
+			onChangeRoles
+		});
+		await settle();
+		expect(dialogs()).toHaveLength(1);
+		await click(en.camwhich_open, view()!);
+		expect(onChangeRoles).toHaveBeenCalledTimes(1);
 	});
 
 	it('no such button when the capture screen does not offer it', async () => {

@@ -344,6 +344,7 @@ const ENTRY_POINTS = {
 	'LiveViewport.svelte': ['the capture button', 'the capture key and pedal'],
 	'+page.svelte': [
 		'Retake and Confirm in the image window',
+		'Retake the last opening, beside the capture button (the same retake)',
 		'Capture in a placeholder',
 		'Capture another here'
 	],
@@ -395,7 +396,7 @@ describe('capture screen: one gate for starting a capture (NEH-381)', () => {
 		await settle();
 		expect(dialogs()).toHaveLength(1);
 		expect(served.captures).toHaveLength(1);
-		expect(Object.values(ENTRY_POINTS).flat()).toHaveLength(7);
+		expect(Object.values(ENTRY_POINTS).flat()).toHaveLength(8);
 	});
 
 	it('during the check of a timed-out viewport capture, every entry point is refused', async () => {
@@ -419,6 +420,33 @@ describe('capture screen: one gate for starting a capture (NEH-381)', () => {
 		expect(served.captures).toHaveLength(1);
 	});
 
+	it('during the check of a timed-out viewport capture, "Retake the last opening" sends nothing', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		// A capture confirmed: the button refers to it.
+		captureButton().click();
+		await vi.waitFor(() => expect(served.captures).toHaveLength(1));
+		const retakeLast = () => buttonIn(document, es.lv_retake_last(false));
+		await vi.waitFor(() => expect(retakeLast()?.disabled).toBe(false));
+		await viewportCaptureTimedOut();
+
+		expect(retakeLast()!.disabled).toBe(true);
+		retakeLast()!.click();
+		// Driven on to the end of the check: the capture is found and the
+		// controls are free, which comes after anything the press could start.
+		appendPair(700);
+		await vi.advanceTimersByTimeAsync(5_000);
+		await vi.waitFor(() =>
+			expect(document.querySelector('.capture-note-banner')?.textContent).toContain(
+				es.lv_capture_found
+			)
+		);
+		await vi.waitFor(() => expect(captureButton().disabled).toBe(false));
+		expect(document.querySelector('.retake-last-confirm')).toBeNull();
+		expect(served.captures).toHaveLength(2);
+	});
+
 	it('the list of entry points names every capture request the capture screen can send', () => {
 		const sources = import.meta.glob('./*.svelte', {
 			query: '?raw',
@@ -431,7 +459,8 @@ describe('capture screen: one gate for starting a capture (NEH-381)', () => {
 			if (n > 0) calls[path.replace('./', '')] = n;
 		}
 		expect(Object.keys(calls).sort()).toEqual(Object.keys(ENTRY_POINTS).sort());
-		// LiveViewport: single and dual; the page: the retake's two and Capture another here.
+		// LiveViewport: single and dual; the page: the retake's two (the image
+		// window's and "Retake the last opening") and Capture another here.
 		expect(calls).toEqual({
 			'LiveViewport.svelte': 2,
 			'+page.svelte': 3,

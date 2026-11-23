@@ -1776,6 +1776,10 @@ export interface CameraDevice {
 	// its role (false). Absent from a backend that predates it, whose
 	// `orientation` is null for a body with nothing saved.
 	orientation_saved?: boolean;
+	// The orientation the body's role expects, whatever is saved: 270 for
+	// role left, 90 for right, 90 with no role (NEH-389). Absent from a
+	// backend that predates it.
+	default_orientation?: number;
 	// Capabilities
 	has_aperture_control?: boolean;
 	supports_zoom?: boolean;
@@ -1841,6 +1845,9 @@ export interface CaptureRequest {
 	record_id?: number;
 	record_title?: string;
 	collection_id?: number;
+	// With record_id: the current images the retake replaces; the backend
+	// refuses with 409 record_changed when they are not (NEH-388).
+	expected_image_ids?: number[];
 }
 
 export interface DualCaptureRequest {
@@ -1858,6 +1865,8 @@ export interface DualCaptureRequest {
 	// Inserts the new record right after this record of the volume, moving
 	// every later record's sequence up one (NEH-316). Not with record_id.
 	afterRecordId?: number;
+	// As in CaptureRequest (NEH-388).
+	expected_image_ids?: number[];
 }
 
 export interface CaptureResponse {

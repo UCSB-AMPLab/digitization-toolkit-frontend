@@ -31,6 +31,11 @@
 	// placeholder has no panel: its two empty pages, the Closed pill, and the
 	// usual retake with its confirmation.
 	//
+	// At small heights (the unit's 800x480) the middle, from the guide bar to
+	// the images or the placeholder panel, scrolls as one, while the header
+	// and the footer with Retake stay in view; the image frames keep their
+	// minimum height there instead of being squeezed and clipped (NEH-388).
+	//
 	// NEH-381: `captureNote` is the page's line about the capture in progress
 	// (still in flight after 10 s, ended in a timeout and being checked, found
 	// by the check), shown under the header. `captureLocked` is true while the
@@ -352,172 +357,177 @@
 			</button>
 		</div>
 
-		{#if guide}{@render guide(retaking)}{/if}
+		<div class="img-viewer-middle">
+			{#if guide}{@render guide(retaking)}{/if}
 
-		{#if captureNote}
-			<div class="img-viewer-capture-note" role="status">
-				<span class="material-symbols-outlined icon-sm" aria-hidden="true">sync</span>
-				<span>{captureNote}</span>
-			</div>
-		{/if}
+			{#if captureNote}
+				<div class="img-viewer-capture-note" role="status">
+					<span class="material-symbols-outlined icon-sm" aria-hidden="true">sync</span>
+					<span>{captureNote}</span>
+				</div>
+			{/if}
 
-		<!-- Retake error; the record keeps its original images -->
-		{#if retakeError}
-			<div class="img-viewer-retake-error">
-				<span class="material-symbols-outlined icon-sm">error</span>
-				<span>{$m.lvm_retake_error(retakeError)}</span>
-			</div>
-		{/if}
+			<!-- Retake error; the record keeps its original images -->
+			{#if retakeError}
+				<div class="img-viewer-retake-error">
+					<span class="material-symbols-outlined icon-sm">error</span>
+					<span>{$m.lvm_retake_error(retakeError)}</span>
+				</div>
+			{/if}
 
-		{#if isExcluded}
-			<div class="lv-excluded">
-				<ExcludedNotice {record} />
-			</div>
-		{/if}
+			{#if isExcluded}
+				<div class="lv-excluded">
+					<ExcludedNotice {record} />
+				</div>
+			{/if}
 
-		<!-- Why the record was rejected, as on the Por recapturar page -->
-		{#if rejection}
-			<div class="lv-rejection" data-testid="lv-rejection">
-				<div class="lv-rejection-reason">
-					{#if rejectionReason}
-						<span class="status-badge status-rejected">{rejectionReason.label}</span>
-						{#if rejectionReason.gloss}<span class="lv-rejection-gloss"
-								>{rejectionReason.gloss}</span
-							>{/if}
-					{:else}
-						<span class="lv-rejection-gloss">{$m.retakes_no_reason}</span>
+			<!-- Why the record was rejected, as on the Por recapturar page -->
+			{#if rejection}
+				<div class="lv-rejection" data-testid="lv-rejection">
+					<div class="lv-rejection-reason">
+						{#if rejectionReason}
+							<span class="status-badge status-rejected">{rejectionReason.label}</span>
+							{#if rejectionReason.gloss}<span class="lv-rejection-gloss"
+									>{rejectionReason.gloss}</span
+								>{/if}
+						{:else}
+							<span class="lv-rejection-gloss">{$m.retakes_no_reason}</span>
+						{/if}
+					</div>
+					{#if rejection.comment}
+						<p class="lv-rejection-comment">
+							<span class="visually-hidden">{$m.retakes_comment_label}:</span
+							>{' '}{rejection.comment}
+						</p>
+					{/if}
+					{#if rejection.rejected_at}
+						{@const when = formatWhen(rejection.rejected_at)}
+						<time
+							class="lv-rejection-when"
+							datetime={parseApiDate(rejection.rejected_at).toISOString()}
+						>
+							{rejection.rejected_by
+								? $m.retakes_rejected_by(rejection.rejected_by, when)
+								: $m.retakes_rejected_on(when)}
+						</time>
 					{/if}
 				</div>
-				{#if rejection.comment}
-					<p class="lv-rejection-comment">
-						<span class="visually-hidden">{$m.retakes_comment_label}:</span>{' '}{rejection.comment}
-					</p>
-				{/if}
-				{#if rejection.rejected_at}
-					{@const when = formatWhen(rejection.rejected_at)}
-					<time
-						class="lv-rejection-when"
-						datetime={parseApiDate(rejection.rejected_at).toISOString()}
-					>
-						{rejection.rejected_by
-							? $m.retakes_rejected_by(rejection.rejected_by, when)
-							: $m.retakes_rejected_on(when)}
-					</time>
-				{/if}
-			</div>
-		{/if}
+			{/if}
 
-		{#if isPlaceholder && placeholder}
-			{@render placeholder(retaking)}
-		{:else}
-			<div class="img-viewer-images">
-				{#if missingSide === 'left' || missingSide === 'both'}
-					<div class="img-viewer-frame" data-missing-side="left"><MissingPage side="left" /></div>
-				{/if}
-				{#each images as img, i (img.id)}
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div
-						class="img-viewer-frame"
-						class:lv-pannable={fullSize}
-						class:dragging={dragIndex === i}
-						bind:clientWidth={frameW[i]}
-						bind:clientHeight={frameH[i]}
-						onpointerdown={(e) => handlePointerDown(e, i)}
-						onpointermove={(e) => handlePointerMove(e, i)}
-						onpointerup={endDrag}
-						onpointercancel={endDrag}
-						onlostpointercapture={endDrag}
-					>
-						{#if cameraMode === 'double' && img.role && img.role !== 'single'}
-							<!-- Role `left` is the even/verso page, photographed by the right
+			{#if isPlaceholder && placeholder}
+				{@render placeholder(retaking)}
+			{:else}
+				<div class="img-viewer-images">
+					{#if missingSide === 'left' || missingSide === 'both'}
+						<div class="img-viewer-frame" data-missing-side="left"><MissingPage side="left" /></div>
+					{/if}
+					{#each images as img, i (img.id)}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div
+							class="img-viewer-frame"
+							class:lv-pannable={fullSize}
+							class:dragging={dragIndex === i}
+							bind:clientWidth={frameW[i]}
+							bind:clientHeight={frameH[i]}
+							onpointerdown={(e) => handlePointerDown(e, i)}
+							onpointermove={(e) => handlePointerMove(e, i)}
+							onpointerup={endDrag}
+							onpointercancel={endDrag}
+							onlostpointercapture={endDrag}
+						>
+							{#if cameraMode === 'double' && img.role && img.role !== 'single'}
+								<!-- Role `left` is the even/verso page, photographed by the right
                  camera; role `right` the odd/recto page, by the left camera. -->
-							<span
-								class="img-viewer-badge"
-								aria-hidden="true"
-								title={img.role === 'left' ? $m.cam_page_even : $m.cam_page_odd}
-							>
-								<span class="material-symbols-outlined badge-cam" aria-hidden="true"
-									>photo_camera</span
-								><span class="badge-letter"
-									>{img.role === 'left' ? $m.badge_cam_right : $m.badge_cam_left}</span
-								><span class="page-term badge-term"
-									>{img.role === 'left' ? $m.page_term_even : $m.page_term_odd}</span
+								<span
+									class="img-viewer-badge"
+									aria-hidden="true"
+									title={img.role === 'left' ? $m.cam_page_even : $m.cam_page_odd}
 								>
-							</span>
-						{/if}
+									<span class="material-symbols-outlined badge-cam" aria-hidden="true"
+										>photo_camera</span
+									><span class="badge-letter"
+										>{img.role === 'left' ? $m.badge_cam_right : $m.badge_cam_left}</span
+									><span class="page-term badge-term"
+										>{img.role === 'left' ? $m.page_term_even : $m.page_term_odd}</span
+									>
+								</span>
+							{/if}
 
-						{#if fullSize}
-							<!-- NEH-139: a RAW image is shown through its JPEG preview or its
+							{#if fullSize}
+								<!-- NEH-139: a RAW image is shown through its JPEG preview or its
                  thumbnail, never as a broken image; a freed master gets the
                  calm notice (NEH-248) -->
-							<RecordImageDisplay image={img} {restorable}>
-								{#snippet children(src, onerror)}
-									<img
-										{src}
-										{onerror}
-										alt={imageAlt(img)}
-										class="img-viewer-img"
-										draggable="false"
-										bind:naturalWidth={naturalW[i]}
-										bind:naturalHeight={naturalH[i]}
-										style={frameImageStyle(i)}
-									/>
-								{/snippet}
-							</RecordImageDisplay>
-							<div class="lv-zoom-controls">
-								<button
-									class="lv-zoom-btn"
-									onclick={(e) => {
-										e.stopPropagation();
-										handleFit();
-									}}
-									title={$m.col_fit_screen}
-									aria-label={$m.col_fit_screen_aria}
-								>
-									<span class="material-symbols-outlined icon-sm" aria-hidden="true"
-										>fit_screen</span
+								<RecordImageDisplay image={img} {restorable}>
+									{#snippet children(src, onerror)}
+										<img
+											{src}
+											{onerror}
+											alt={imageAlt(img)}
+											class="img-viewer-img"
+											draggable="false"
+											bind:naturalWidth={naturalW[i]}
+											bind:naturalHeight={naturalH[i]}
+											style={frameImageStyle(i)}
+										/>
+									{/snippet}
+								</RecordImageDisplay>
+								<div class="lv-zoom-controls">
+									<button
+										class="lv-zoom-btn"
+										onclick={(e) => {
+											e.stopPropagation();
+											handleFit();
+										}}
+										title={$m.col_fit_screen}
+										aria-label={$m.col_fit_screen_aria}
 									>
-								</button>
-								<button
-									class="lv-zoom-btn"
-									onclick={(e) => {
-										e.stopPropagation();
-										handleActualSize();
-									}}
-									title={$m.col_zoom_actual}
-									aria-label={$m.col_zoom_actual_aria}
+										<span class="material-symbols-outlined icon-sm" aria-hidden="true"
+											>fit_screen</span
+										>
+									</button>
+									<button
+										class="lv-zoom-btn"
+										onclick={(e) => {
+											e.stopPropagation();
+											handleActualSize();
+										}}
+										title={$m.col_zoom_actual}
+										aria-label={$m.col_zoom_actual_aria}
+									>
+										<span class="lv-one-to-one-glyph">1:1</span>
+									</button>
+								</div>
+							{:else if thumbFailed[img.id]}
+								<span style="--c: var(--color-light-grey)" class="material-symbols-outlined icon-lg"
+									>image_not_supported</span
 								>
-									<span class="lv-one-to-one-glyph">1:1</span>
-								</button>
-							</div>
-						{:else if thumbFailed[img.id]}
+							{:else}
+								<img
+									src={recordsApi.getImageThumbnailUrl(img.id)}
+									onerror={() => (thumbFailed[img.id] = true)}
+									alt={imageAlt(img)}
+									class="img-viewer-img lv-thumb-img"
+									draggable="false"
+								/>
+							{/if}
+						</div>
+					{/each}
+					{#if missingSide === 'right' || missingSide === 'both'}
+						<div class="img-viewer-frame" data-missing-side="right">
+							<MissingPage side="right" />
+						</div>
+					{/if}
+
+					{#if images.length === 0 && missingSide !== 'both'}
+						<div class="img-viewer-frame">
 							<span style="--c: var(--color-light-grey)" class="material-symbols-outlined icon-lg"
 								>image_not_supported</span
 							>
-						{:else}
-							<img
-								src={recordsApi.getImageThumbnailUrl(img.id)}
-								onerror={() => (thumbFailed[img.id] = true)}
-								alt={imageAlt(img)}
-								class="img-viewer-img lv-thumb-img"
-								draggable="false"
-							/>
-						{/if}
-					</div>
-				{/each}
-				{#if missingSide === 'right' || missingSide === 'both'}
-					<div class="img-viewer-frame" data-missing-side="right"><MissingPage side="right" /></div>
-				{/if}
-
-				{#if images.length === 0 && missingSide !== 'both'}
-					<div class="img-viewer-frame">
-						<span style="--c: var(--color-light-grey)" class="material-symbols-outlined icon-lg"
-							>image_not_supported</span
-						>
-					</div>
-				{/if}
-			</div>
-		{/if}
+						</div>
+					{/if}
+				</div>
+			{/if}
+		</div>
 
 		<div class="img-viewer-footer">
 			{#if retaking}
@@ -576,6 +586,20 @@
 </div>
 
 <style>
+	/* Everything between the header and the footer: one column that scrolls. */
+	.img-viewer-middle {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
+	/* The frames keep their 200px (app.css) plus the box's padding. */
+	.img-viewer-middle > .img-viewer-images {
+		flex: 1 0 auto;
+		min-height: calc(200px + 1.5rem);
+	}
 	/* The line about the capture in progress: the retake error's shape, in neutral colours. */
 	.img-viewer-capture-note {
 		display: flex;
@@ -640,8 +664,6 @@
 		gap: 4px;
 		padding: 8px 16px;
 		flex-shrink: 0;
-		max-height: 30vh;
-		overflow-y: auto;
 	}
 	.lv-rejection-reason {
 		display: flex;

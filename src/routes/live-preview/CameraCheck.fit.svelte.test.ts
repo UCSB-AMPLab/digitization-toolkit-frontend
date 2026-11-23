@@ -3,8 +3,9 @@
 // chips and the way back on one row; the foot keeps the note and the button
 // on one row; the captures are turned 90° and 270°; the check column fits in
 // the fullest state of each unit (a CHDK pair adjusted separately with the
-// steps apart, a DSLR pair whose focal lengths differ); every button is at
-// least 44px tall. At 1280x800 the same.
+// steps apart, a DSLR pair whose focal lengths differ), with the way to the
+// camera step and the line on what a correct pair looks like (NEH-389);
+// every button is at least 44px tall. At 1280x800 the same.
 //
 // Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -152,7 +153,8 @@ for (const [w, h] of [
 					projectName: 'Rionegro',
 					collectionName: 'Tomo 6',
 					rotateDeg: { 0: 90, 1: 270 },
-					onClose: vi.fn()
+					onClose: vi.fn(),
+					onChangeRoles: vi.fn()
 				});
 				await settle();
 				button(msgs.camcheck_take).click();
@@ -187,7 +189,8 @@ for (const [w, h] of [
 					projectName: 'Rionegro',
 					collectionName: 'Tomo 6',
 					rotateDeg: { 0: 90, 1: 270 },
-					onClose: vi.fn()
+					onClose: vi.fn(),
+					onChangeRoles: vi.fn()
 				});
 				await settle();
 				button(msgs.camcheck_take).click();
@@ -221,7 +224,8 @@ for (const [w, h] of [
 					projectName: 'Rionegro',
 					collectionName: 'Tomo 6',
 					rotateDeg: { 0: 90, 1: 270 },
-					onClose: vi.fn()
+					onClose: vi.fn(),
+					onChangeRoles: vi.fn()
 				});
 				await settle();
 				button(msgs.camcheck_take).click();

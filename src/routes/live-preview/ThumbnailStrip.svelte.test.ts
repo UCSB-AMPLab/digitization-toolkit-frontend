@@ -97,3 +97,46 @@ describe('single mode', () => {
 		expect(screen.container.querySelector('img')?.getAttribute('alt')).toBe('Folio 12');
 	});
 });
+
+// NEH-388: one line over the strip says a thumbnail opens the record to see
+// it or retake it, and each thumbnail's name says so too.
+describe('what a thumbnail does', () => {
+	for (const [lang, msgs] of [
+		['en', en],
+		['es', es]
+	] as const) {
+		for (const mode of ['double', 'single'] as const) {
+			it(`${lang}, ${mode} mode: the line and the thumbnail's name`, async () => {
+				locale.set(lang);
+				const single = mode === 'single';
+				const screen = render(ThumbnailStrip, {
+					records: [pairRecord()],
+					selectedRecordId: null,
+					cameraMode: mode,
+					onSelect: vi.fn()
+				});
+				await expect.element(screen.getByText(msgs.lv_thumb_hint(single))).toBeVisible();
+				await expect
+					.element(
+						screen.getByRole('button', {
+							name: msgs.lv_thumb_name('Folio 12', single),
+							exact: true
+						})
+					)
+					.toBeVisible();
+			});
+		}
+	}
+
+	it('an empty strip has no such line', async () => {
+		locale.set('es');
+		const screen = render(ThumbnailStrip, {
+			records: [],
+			selectedRecordId: null,
+			cameraMode: 'double',
+			onSelect: vi.fn()
+		});
+		await expect.element(screen.getByText(es.lv_thumb_empty)).toBeVisible();
+		expect(screen.container.textContent).not.toContain(es.lv_thumb_hint(false));
+	});
+});

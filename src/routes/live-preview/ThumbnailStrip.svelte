@@ -16,6 +16,11 @@
 	// `disabled` (NEH-381): while a capture is in flight or being checked, no
 	// thumbnail can be activated, by pointer or keyboard.
 	//
+	// NEH-388: one line over the thumbnails says that pressing one shows the
+	// record and lets the operator retake it, and each thumbnail's accessible
+	// name says it too (the record's title, then what pressing does); the
+	// pictures keep their alt with the camera and the page.
+	//
 	// Version: 0.3.0
 
 	import { recordsApi, type Record, type RecordImage } from '$lib/api';
@@ -121,6 +126,9 @@
 </script>
 
 <div class="thumbnail-strip">
+	{#if thumbGroups.length > 0}
+		<p class="strip-hint">{$m.lv_thumb_hint(cameraMode !== 'double')}</p>
+	{/if}
 	<div class="strip-scroll">
 		{#if thumbGroups.length === 0}
 			<div class="empty-state">
@@ -147,6 +155,10 @@
 					class="thumbnail-item"
 					class:selected={isSelected}
 					{disabled}
+					aria-label={$m.lv_thumb_name(
+						group.record.title || `Cap. ${String(i + 1).padStart(3, '0')}`,
+						cameraMode !== 'double'
+					)}
 					onclick={() => onSelect(group.record)}
 				>
 					<!-- The halves of the folio, together. The selection frame goes here
@@ -229,6 +241,18 @@
 		overflow: hidden;
 		z-index: 20;
 		flex-shrink: 0;
+	}
+
+	/* One line, so that the thumbnails keep most of the strip's 140px. */
+	.strip-hint {
+		flex-shrink: 0;
+		margin: 0 4px 2px;
+		font-size: 11px;
+		line-height: 1.3;
+		color: var(--color-light-grey);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	/* 18px between folios against the 4px of `--pair-gap`: the difference does
