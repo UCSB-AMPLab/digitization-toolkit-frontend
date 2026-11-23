@@ -1174,6 +1174,19 @@ export const en: Messages = {
 		'The camera did not answer in time. The capture may have been saved: wait while Captua checks.',
 	lv_capture_found: 'The capture was saved.',
 	lv_capture_not_saved: 'No capture was saved. Check the camera and capture again.',
+	lv_capture_unknown: (attempt: 'new' | 'retake' | 'another', single: boolean) =>
+		'Captua could not find out whether the capture was saved. ' +
+		(attempt === 'new'
+			? single
+				? 'Check the last image in the volume before you capture again.'
+				: 'Check the last opening in the volume before you capture again.'
+			: attempt === 'retake'
+				? single
+					? 'Check this image before you capture it again.'
+					: 'Check this opening before you capture it again.'
+				: single
+					? 'Check the images around this one before you capture again.'
+					: 'Check the openings around this one before you capture again.'),
 	lv_records_unread: "Captua could not load this volume's records, so capture is not possible yet.",
 	lv_needs_stem: 'This volume needs a stem before you can capture into it.',
 	lv_needs_stem_link: 'Assign the stem',

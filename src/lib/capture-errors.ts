@@ -21,9 +21,10 @@
 //   turns into a CaptureFailed carrying the backend's `error`: a camera that
 //   is not connected, or the text of whatever failed during the capture.
 // A request that ended in a timeout is not a failure the backend reported:
-// the capture screen checks whether the capture was saved (capture-check.ts),
-// and only a capture still missing after that check reaches this file, as a
-// CaptureNotSaved.
+// the capture screen asks the backend for the capture's id (capture-check.ts),
+// and only what that check ends in reaches this file: a CaptureNotSaved when
+// the backend says nothing was saved, a CaptureOutcomeUnknown when the check
+// could not learn it.
 //
 // The backend texts are matched exactly or by their fixed start, so a change
 // on the backend falls through to the generic message instead of being shown
@@ -91,14 +92,56 @@ export class CaptureFailed extends Error {
 }
 
 /**
- * A capture whose request ended in a timeout and that did not appear in the
- * volume's records within the check's window (capture-check.ts).
+ * A capture whose request ended in a timeout, and whose id the backend
+ * neither runs nor holds (capture-check.ts).
  */
 export class CaptureNotSaved extends Error {
 	constructor() {
 		super('No capture was saved');
 		this.name = 'CaptureNotSaved';
 	}
+}
+
+/**
+ * A capture whose request ended in a timeout, and whose outcome the check
+ * could not learn: the backend could not be asked, has no route to ask, or
+ * still ran the capture when the check gave up (capture-check.ts).
+ */
+export class CaptureOutcomeUnknown extends Error {
+	// What the attempt was, and whether in single-camera mode: the message
+	// names what to check.
+	attempt: 'new' | 'retake' | 'another';
+	single: boolean;
+	// Each place that shows this message registers how to remove it
+	// (whenFound); the background asks run them once the capture is found
+	// stored (markFound). Each removes the message only while that place still
+	// shows this attempt's message.
+	private clears: (() => void)[] = [];
+	private found = false;
+	constructor(attempt: 'new' | 'retake' | 'another', single: boolean) {
+		super('Whether the capture was saved is unknown');
+		this.name = 'CaptureOutcomeUnknown';
+		this.attempt = attempt;
+		this.single = single;
+	}
+	whenFound(clear: () => void): void {
+		if (this.found) clear();
+		else this.clears.push(clear);
+	}
+	markFound(): void {
+		if (this.found) return;
+		this.found = true;
+		const clears = this.clears;
+		this.clears = [];
+		for (const clear of clears) clear();
+	}
+}
+
+/** The CaptureOutcomeUnknown an error is, or was made from (its `cause`), or null. */
+export function unknownOutcomeOf(error: unknown): CaptureOutcomeUnknown | null {
+	if (error instanceof CaptureOutcomeUnknown) return error;
+	const cause = (error as { cause?: unknown } | null)?.cause;
+	return cause instanceof CaptureOutcomeUnknown ? cause : null;
 }
 
 function statusOf(error: unknown): unknown {
@@ -137,6 +180,20 @@ export function isRecordChanged(error: unknown): boolean {
 	);
 }
 
+/**
+ * Whether a capture was refused with the backend's 409 `capture_abandoned`:
+ * a lookup of its id had answered not found and closed it (capture-check.ts).
+ */
+function isCaptureAbandoned(error: unknown): boolean {
+	if (statusOf(error) !== 409) return false;
+	const detail = (error as { detail?: unknown }).detail;
+	return (
+		typeof detail === 'object' &&
+		detail !== null &&
+		(detail as { code?: unknown }).code === 'capture_abandoned'
+	);
+}
+
 /** Whether a capture was refused with the backend's 409 for a volume without a stem. */
 export function isStemRequired(error: unknown): boolean {
 	return isConflict(error) && error instanceof Error && error.message === STEM_REQUIRED_DETAIL;
@@ -145,6 +202,10 @@ export function isStemRequired(error: unknown): boolean {
 /** The catalogue message for a failed capture or retake, for the signed-in `role`. */
 export function captureErrorText(error: unknown, msgs: Messages, role?: string | null): string {
 	if (error instanceof CaptureNotSaved) return msgs.lv_capture_not_saved;
+	if (error instanceof CaptureOutcomeUnknown)
+		return msgs.lv_capture_unknown(error.attempt, error.single);
+	// A request whose id a lookup had already closed (NEH-401): nothing was saved.
+	if (isCaptureAbandoned(error)) return msgs.lv_capture_not_saved;
 	if (error instanceof CaptureFailed) {
 		const camera = error.backendError?.match(CAMERA_NOT_CONNECTED);
 		if (camera) return msgs.lv_err_camera_not_connected(Number(camera[1]));

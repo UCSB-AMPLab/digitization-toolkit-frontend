@@ -122,18 +122,18 @@
 	//
 	// A capture that ends in a timeout (NEH-381), from a retake, a
 	// placeholder's fill or "Capture another here", is not reported as failed:
-	// the backend may have stored it (src/lib/capture-check.ts). The modal
-	// says the capture may have been saved and stays locked, its capture still
-	// running, while the page reads the records again every 5 s
-	// (pageCapture). Found, the screen goes on as after a successful capture;
-	// not found by a read that succeeded 180 s or more after the check began,
-	// the modal shows that no capture was saved, as it shows a failure.
-	// LiveViewport checks its own captures the same way, with the page's
-	// baseline and read.
+	// the backend may have stored it (src/lib/capture-check.ts). Every capture
+	// request carries a fresh client_capture_id (NEH-401). The modal says the
+	// capture may have been saved and stays locked, its capture still
+	// running, while the page asks the backend for that id every 5 s
+	// (pageCapture). Stored, the screen goes on as after a successful capture;
+	// not saved, the modal shows that no capture was saved, as it shows a
+	// failure; and when the check cannot learn the outcome, it says so.
+	// LiveViewport checks its own captures the same way.
 	//
-	// The baseline is what the screen knows the server holds (`known`,
-	// createKnownRecords): the last successful read of the records plus every
-	// record and image a capture answer has confirmed since. One gate
+	// The records the screen knows the volume holds (`known`,
+	// createKnownRecords) are those of every successful read of the records
+	// plus every record a capture answer has confirmed since. One gate
 	// (`captureGate`, createCaptureGate) is held while any capture is in
 	// flight or being checked; every entry point asks it: LiveViewport's
 	// button and capture key take it, a capture made here takes it
@@ -216,12 +216,19 @@
 		settlePendingRotations
 	} from '$lib/camera-orientation';
 	import { isConflict, needsStem } from '$lib/volume-stem';
-	import { CaptureFailed, captureErrorText, isRecordChanged } from '$lib/capture-errors';
+	import {
+		CaptureFailed,
+		captureErrorText,
+		isRecordChanged,
+		unknownOutcomeOf
+	} from '$lib/capture-errors';
 	import {
 		createCaptureGate,
 		createKnownRecords,
+		createReconciler,
 		mayReport,
-		runPageCapture
+		runPageCapture,
+		type CaptureAttempt
 	} from '$lib/capture-check';
 	import type { CaptureNotice } from '$lib/stores/cameras';
 	import {
@@ -558,7 +565,7 @@
 	function openRecord(record: ApiRecord) {
 		// A new record in the modal: no after-panel of the one before.
 		filled = null;
-		anotherError = null;
+		showAnotherError(null);
 		refreshFailed = false;
 		refreshing = false;
 		cameraMode = record.capture_mode === 'dual' ? 'double' : 'single';
@@ -646,6 +653,13 @@
 	let filled = $state<{ holeId: number; lastId: number } | null>(null);
 	let anotherBusy = $state(false);
 	let anotherError = $state<string | null>(null);
+	// The error anotherError shows; set together through showAnotherError, so
+	// that a capture found stored later removes its own message only (NEH-401).
+	let anotherErrorFrom: unknown = null;
+	function showAnotherError(message: string | null, from: unknown = null) {
+		anotherError = message;
+		anotherErrorFrom = from;
+	}
 	let closingPlaceholder = $state(false);
 	// The records could not be read again after a fill or an insertion: the
 	// panel cannot say where the next opening goes, so "Capture another here"
@@ -701,6 +715,10 @@
 	let captureLocked = $derived(captureBusy || !baselineReady);
 	let pageCheckController: AbortController | null = null;
 	let cancelSlow: (() => void) | null = null;
+	// The background asks for captures of this screen whose outcome is
+	// unknown (NEH-401), LiveViewport's included: stopped when the screen goes
+	// or the volume changes.
+	const reconciler = createReconciler();
 	// Whether the notice in the shared camera status is this page's.
 	let ownsNotice = false;
 	function notice(value: CaptureNotice | null) {
@@ -712,6 +730,7 @@
 		destroyed = true;
 		pageCheckController?.abort();
 		cancelSlow?.();
+		reconciler.stopAll();
 		if (ownsNotice) cameraStatus.reportNotice(null);
 	});
 	let seenCollectionId = untrack(() => collectionId);
@@ -722,6 +741,7 @@
 		untrack(() => {
 			pageCheckController?.abort();
 			cancelSlow?.();
+			reconciler.stopAll();
 			if (ownsNotice) notice(null);
 			leaveVolume();
 		});
@@ -745,7 +765,7 @@
 		guidePaused = false;
 		guideNextFolios = null;
 		filled = null;
-		anotherError = null;
+		showAnotherError(null);
 		closingPlaceholder = false;
 		refreshFailed = false;
 		refreshing = false;
@@ -831,7 +851,9 @@
 				if (mayReport(captureGate, ticket, current))
 					cameraStatus.reportFailure($m.lv_records_unread);
 			} else if (mayReport(captureGate, ticket, current)) {
-				cameraStatus.reportFailure(error instanceof Error ? error.message : String(error));
+				const unknown = unknownOutcomeOf(error);
+				cameraStatus.reportFailure(error instanceof Error ? error.message : String(error), unknown);
+				unknown?.whenFound(() => cameraStatus.clearFailure(unknown));
 			}
 		}
 	}
@@ -1052,7 +1074,7 @@
 			// Released whatever happened, a failed reload included.
 			leaving = false;
 			filled = null;
-			anotherError = null;
+			showAnotherError(null);
 			refreshFailed = false;
 			refreshing = false;
 		}
@@ -1064,41 +1086,57 @@
 		const start = filled;
 		if (!start || anotherBusy || leaving || refreshFailed || refreshing || captureLocked) return;
 		if (volumeNeedsStem) {
-			anotherError = $m.lv_needs_stem;
+			showAnotherError($m.lv_needs_stem);
 			return;
 		}
 		if (captureHeld) {
-			anotherError = $m.camwhich_needed;
+			showAnotherError($m.camwhich_needed);
 			return;
 		}
 		anotherBusy = true;
-		anotherError = null;
+		showAnotherError(null);
 		try {
 			// The same fields as LiveViewport's capture, inserted after the record filled last.
-			const sent = await pageCapture(null, [start.lastId], () =>
-				camerasApi.captureDual({
-					project_name: projectName,
-					collection_id: collectionId ?? undefined,
-					record_title: defaultRecordTitle(),
-					afterRecordId: start.lastId,
-					left_camera_index: leftCameraIndex,
-					rotate_deg_cam0: rotateDeg[0] ?? 0,
-					rotate_deg_cam1: rotateDeg[1] ?? 0
-				})
+			const sent = await pageCapture(
+				null,
+				[start.lastId],
+				'another',
+				false,
+				(clientCaptureId) =>
+					camerasApi.captureDual({
+						client_capture_id: clientCaptureId,
+						project_name: projectName,
+						collection_id: collectionId ?? undefined,
+						record_title: defaultRecordTitle(),
+						afterRecordId: start.lastId,
+						left_camera_index: leftCameraIndex,
+						rotate_deg_cam0: rotateDeg[0] ?? 0,
+						rotate_deg_cam1: rotateDeg[1] ?? 0
+					}),
+				{
+					stored: async (result) => {
+						const recordId = result.record_id;
+						pageCaptures += 1;
+						noteFocusActivity();
+						// Only if the panel is still where the capture started: the
+						// next insertion goes after the record just stored.
+						if (recordId != null && filled === start) {
+							filled = { holeId: start.holeId, lastId: recordId };
+							await refreshAfterFill();
+						}
+					},
+					// The panel stays where it is.
+					next: async () => {}
+				}
 			);
 			if (sent === null) return;
-			if ('result' in sent && !sent.result.success) throw new CaptureFailed(sent.result.error);
-			const recordId = 'result' in sent ? sent.result.record_id : sent.found.id;
-			pageCaptures += 1;
-			noteFocusActivity();
-			// Only if the screen is still where the capture started.
-			if (recordId != null && filled === start) {
-				filled = { holeId: start.holeId, lastId: recordId };
-				await refreshAfterFill();
-			}
+			if (!sent.result.success) throw new CaptureFailed(sent.result.error);
 		} catch (error) {
 			console.error('[LivePreview] Error capturing another opening:', error);
-			anotherError = captureErrorText(error, $m, $userRole);
+			showAnotherError(captureErrorText(error, $m, $userRole), error);
+			unknownOutcomeOf(error)?.whenFound(() => {
+				if (anotherErrorFrom === error) showAnotherError(null);
+			});
 		} finally {
 			anotherBusy = false;
 		}
@@ -1299,34 +1337,71 @@
 		}
 	}
 
-	// The read of the records a check makes (NEH-381): null when it failed.
-	async function readForCheck(): Promise<ApiRecord[] | null> {
-		return (await loadRecords()) ? records : null;
+	// The read of the records after a capture whose outcome is unknown, and
+	// after the background asks find it (NEH-401). The screen captures only
+	// over records it has read since then: a read that fails puts the volume
+	// back where it was before its first successful read, with
+	// lv_records_unread and its Retry, and the gate starting no capture
+	// (known.ready), until a read succeeds.
+	async function rereadAfterUnknown(): Promise<boolean> {
+		const volume = collectionId;
+		const ok = await loadRecords();
+		if (!ok && volumeChosen && collectionId === volume) {
+			known.reset();
+			baselineReady = false;
+			recordsUnread = true;
+		}
+		return ok;
 	}
+
 	const viewportCheck = {
-		snapshot: () => known.snapshot(),
 		confirmed: (
 			recordId: number | null | undefined,
 			imageIds: readonly number[] | null | undefined
 		) => {
-			known.confirmed(recordId, imageIds);
+			known.confirmed(recordId);
 			if (recordId != null) setLastRecord(recordId, imageIds);
 		},
-		read: readForCheck
+		reread: rereadAfterUnknown
 	};
 
 	// Sends a capture made here (a retake, a fill, "Capture another here")
 	// through runPageCapture (src/lib/capture-check.ts), which says what it
 	// resolves and when it sends nothing. `target` is the record it captures
 	// into, null for a new one; `names` are the records the request names
-	// (its record_id, its afterRecordId).
+	// (its record_id, its afterRecordId). `send` puts the id it is given in
+	// the request as its client_capture_id. `attempt` and `single` name what
+	// the operator is told to check when the outcome is unknown.
+	// What follows a stored capture comes in two parts, given by the caller:
+	// `after.stored`, what is now true (the counters, the cursor, the records
+	// read again), and `after.next`, where the screen goes next (a window
+	// closed or replaced, the guide moved on, a navigation, the placeholder
+	// panel's question). After the request's answer, or the check, both run,
+	// in that order, awaited, their errors the caller's. A capture the
+	// background asks find later runs `stored` only, after the records are
+	// read again, and only while mayReport allows it (after a newer capture
+	// the records are read again and nothing else); minutes later the
+	// operator decides where to go, and the "capture was saved" notice tells
+	// them. Its "could not find out" message goes wherever it still shows:
+	// each place that shows it registers how (CaptureOutcomeUnknown.whenFound).
 	async function pageCapture(
 		target: number | null,
 		names: number[],
-		send: () => Promise<CaptureResponse>,
+		attempt: CaptureAttempt,
+		single: boolean,
+		send: (clientCaptureId: string) => Promise<CaptureResponse>,
+		after: {
+			stored: (result: CaptureResponse) => Promise<void>;
+			next: (result: CaptureResponse) => Promise<void>;
+		},
 		precheck?: () => Promise<void>
-	): Promise<{ result: CaptureResponse } | { found: ApiRecord } | null> {
+	): Promise<{ result: CaptureResponse } | null> {
 		const volume = collectionId;
+		const stored = async (result: CaptureResponse) => {
+			// A capture this volume confirmed is the last one (NEH-388).
+			setLastRecord(target ?? result.record_id ?? null, result.image_ids);
+			await after.stored(result);
+		};
 		const sent = await runPageCapture({
 			gate: captureGate,
 			known,
@@ -1334,21 +1409,32 @@
 			names,
 			current: () => !destroyed && collectionId === volume,
 			send,
-			read: readForCheck,
+			lookup: (id) => camerasApi.captureRequest(id),
 			notice,
 			onCapturing: (capturing) => (pageCapturing = capturing),
 			onCheck: (controller) => (pageCheckController = controller),
 			onSlowTimer: (cancel) => (cancelSlow = cancel),
-			precheck
+			precheck,
+			attempt,
+			single,
+			reread: rereadAfterUnknown,
+			reconciler,
+			onReconciled: (answer, may) => {
+				void (async () => {
+					await rereadAfterUnknown();
+					if (!may()) return;
+					await stored(answer);
+					// The notice takes the banner's place: not over a failure written since.
+					if (may() && !$cameraStatus.captureError) notice('found');
+				})().catch((error) =>
+					console.error('[LivePreview] Error completing a capture found later:', error)
+				);
+			}
 		});
-		// A capture this volume confirmed is the last one (NEH-388).
-		if (sent && 'found' in sent)
-			setLastRecord(
-				sent.found.id,
-				(sent.found.images ?? []).map((img) => img.id)
-			);
-		else if (sent && sent.result.success)
-			setLastRecord(target ?? sent.result.record_id ?? null, sent.result.image_ids);
+		if (sent && sent.result.success) {
+			await stored(sent.result);
+			await after.next(sent.result);
+		}
 		return sent;
 	}
 
@@ -1430,7 +1516,8 @@
 			console.error('[LivePreview] Error during retake:', error);
 			if (isConflict(error) && (await recheckStem())) throw new Error($m.lv_needs_stem);
 			// The backend's text is English; the modal shows the catalogue's.
-			throw new Error(captureErrorText(error, $m, $userRole));
+			// The cause lets the window remove the message once the capture is found.
+			throw new Error(captureErrorText(error, $m, $userRole), { cause: error });
 		}
 	}
 
@@ -1445,12 +1532,16 @@
 		// A placeholder is a whole opening, closed or not: only a dual capture
 		// fills it. An open one gets the after-panel.
 		const hole = isOpenPlaceholder(record);
+		const dual = cameraMode === 'double' || record.missing_side === 'both';
 		const sent = await pageCapture(
 			record.id,
 			[record.id],
-			() =>
-				cameraMode === 'double' || record.missing_side === 'both'
+			'retake',
+			!dual,
+			(clientCaptureId) =>
+				dual
 					? camerasApi.captureDual({
+							client_capture_id: clientCaptureId,
 							project_name: projectName,
 							collection_id: collectionId ?? undefined,
 							record_id: record.id,
@@ -1461,6 +1552,7 @@
 							rotate_deg_cam1: rotateDeg[1] ?? 0
 						})
 					: camerasApi.capture({
+							client_capture_id: clientCaptureId,
 							project_name: projectName,
 							camera_index: 0,
 							collection_id: collectionId ?? undefined,
@@ -1468,16 +1560,32 @@
 							expected_image_ids: expectedImageIds?.(),
 							rotate_deg: rotateDeg[0] ?? 0
 						}),
+			{
+				stored: () => retakeStored(fromViewport),
+				next: () => retakeNext(record, hole, fromViewport)
+			},
 			precheck
 		);
 		if (sent === null) return;
 
-		if ('result' in sent && !sent.result.success) {
+		if (!sent.result.success) {
 			throw new CaptureFailed(sent.result.error);
 		}
+	}
+
+	// What is true once a retake or a placeholder's fill is stored
+	// (pageCapture's `after.stored`): the counters, and for "Retake the last
+	// opening" the records and the turn read again.
+	async function retakeStored(fromViewport: boolean) {
 		pageCaptures += 1;
 		noteFocusActivity();
+		if (fromViewport) await Promise.all([loadRecords(), loadRetakeSummary()]);
+	}
 
+	// Where the screen goes after a retake or a placeholder's fill whose
+	// request was answered (pageCapture's `after.next`); never after one the
+	// background asks find later.
+	async function retakeNext(record: ApiRecord, hole: boolean, fromViewport: boolean) {
 		// A placeholder filled: the modal stays, and asks whether another
 		// opening is missing there (NEH-317).
 		if (hole) {
@@ -1489,11 +1597,8 @@
 			return;
 		}
 
-		// From the viewport: the records and the turn again, here.
-		if (fromViewport) {
-			await Promise.all([loadRecords(), loadRetakeSummary()]);
-			return;
-		}
+		// From the viewport: the screen stays as it is.
+		if (fromViewport) return;
 
 		// In the guide, the next rejected record opens instead (0.2.0).
 		// The modal stays open, its retake still running, until the next state
@@ -1748,6 +1853,7 @@
 					retakeLastId={lastRecord?.id ?? null}
 					captureBusy={captureLocked}
 					captureCheck={viewportCheck}
+					captureReconciler={reconciler}
 					onRefocus={dslrUnit
 						? () => {
 								if (!viewportCapturing && !pageCapturing && !captureBusy) refocusOpen = true;

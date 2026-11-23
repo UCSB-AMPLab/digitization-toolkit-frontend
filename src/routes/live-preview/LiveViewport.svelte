@@ -21,14 +21,15 @@
 	// A capture still in flight after 10 s gets a line saying the unit is still
 	// working on it. A capture request that ends in a timeout (nginx's 504 or
 	// the request layer's TimeoutError) is not reported as failed: the capture
-	// may have been stored (src/lib/capture-check.ts). The viewport says so and
-	// checks: the button and the capture key stay locked, and the page's
-	// `captureCheck` reads the volume's records every 5 s, until a record that
-	// was not there before the request shows up (then everything happens as
-	// after a successful capture, and the line says it was saved), or until a
-	// read that succeeded 180 s or more after the check began has not found it
-	// (then the error banner says no capture was saved, and the controls are
-	// free). Unmounting, or another
+	// may have been stored (src/lib/capture-check.ts). Each capture request
+	// carries a fresh client_capture_id (NEH-401). The viewport says the
+	// capture may have been saved and checks: the button and the capture key
+	// stay locked, and the viewport asks the backend for that id every 5 s,
+	// until the capture is stored (then everything happens as after a
+	// successful capture, and the line says it was saved), or the backend no
+	// longer knows the id (then the error banner says no capture was saved),
+	// or the check cannot learn the outcome (then the banner says so); in
+	// both of the last two the controls are free. Unmounting, or another
 	// volume, stops the check. The page's `captureGate` is the one gate for
 	// starting any capture on the screen: this viewport takes it for its
 	// request and its check, and takes no capture while anything else holds it
@@ -93,16 +94,24 @@
 	} from '$lib/no-frame-run';
 	import { defaultRecordTitle } from '$lib/record-title';
 	import { isConflict } from '$lib/volume-stem';
-	import { CaptureFailed, CaptureNotSaved, captureErrorText } from '$lib/capture-errors';
 	import {
-		checkForCapture,
+		CaptureFailed,
+		CaptureNotSaved,
+		CaptureOutcomeUnknown,
+		captureErrorText
+	} from '$lib/capture-errors';
+	import {
+		checkCaptureRequest,
 		createCaptureGate,
+		createReconciler,
+		isCaptureAbandoned,
+		isCaptureInProgress,
 		isCaptureTimeout,
 		mayReport,
+		newClientCaptureId,
 		whenSlow,
-		type CaptureBefore,
 		type CaptureGate,
-		type RecordLike
+		type Reconciler
 	} from '$lib/capture-check';
 	import type { CaptureNotice } from '$lib/stores/cameras';
 	import { userRole } from '$lib/stores/auth';
@@ -136,6 +145,7 @@
 		swapLocked = false,
 		captureCheck,
 		captureGate,
+		captureReconciler,
 		captureBusy = false,
 		setupView = false,
 		retakeLast,
@@ -193,22 +203,24 @@
 		// NEH-343: the saved camera roles decide left and right (the page sets
 		// `swapped` from them), so the swap control is not shown.
 		swapLocked?: boolean;
-		// NEH-381: what the page knows the server holds (`snapshot`, the
-		// baseline of a capture), where a capture answer is added to it
-		// (`confirmed`), and the page's read of the records, for the check after
-		// a capture that ended in a timeout. `read` resolves null when the read
-		// failed. Without it a timeout is reported as a failed capture.
+		// NEH-381: where the page learns of a capture the backend stored
+		// (`confirmed`), from the request's answer or from the check after a
+		// timeout. `imageIds` are in camera order.
+		// `reread` reads the volume's records again, when a check ends as
+		// unknown and when the background asks find the capture.
 		captureCheck?: {
-			snapshot: () => CaptureBefore;
 			confirmed: (
 				recordId: number | null | undefined,
 				imageIds: readonly number[] | null | undefined
 			) => void;
-			read: () => Promise<readonly RecordLike[] | null>;
+			reread?: () => Promise<unknown>;
 		};
 		// The page's one gate for starting a capture; without it the viewport
 		// has a gate of its own.
 		captureGate?: CaptureGate;
+		// The page's background asks for captures whose outcome is unknown
+		// (NEH-401); without it the viewport has its own.
+		captureReconciler?: Reconciler;
 		// True while the gate is held, by this viewport or by the page: the
 		// button and the capture key take no capture.
 		captureBusy?: boolean;
@@ -1055,6 +1067,7 @@
 		destroyed = true;
 		checkController?.abort();
 		cancelSlow?.();
+		stopOwnAsks();
 		if (ownsNotice) cameraStatus.reportNotice(null);
 		if (previewInterval) clearInterval(previewInterval);
 		if (capabilitiesTimer) clearTimeout(capabilitiesTimer);
@@ -1115,6 +1128,13 @@
 	}
 
 	const gate: CaptureGate = untrack(() => captureGate) ?? createCaptureGate();
+	const reconciler: Reconciler = untrack(() => captureReconciler) ?? createReconciler();
+	// This viewport's background asks: stopped on unmount and when the volume changes.
+	const ownAsks = new Set<() => void>();
+	function stopOwnAsks() {
+		for (const stop of ownAsks) stop();
+		ownAsks.clear();
+	}
 
 	// The check of a capture that ended in a timeout, and the still-working
 	// timer of the request in flight: both stop on unmount and when the volume
@@ -1130,6 +1150,7 @@
 		untrack(() => {
 			checkController?.abort();
 			cancelSlow?.();
+			stopOwnAsks();
 			if (ownsNotice) notice(null);
 			// The last capture shown belongs to the old volume.
 			pageCaptured();
@@ -1144,13 +1165,21 @@
 		cameraStatus.reportNotice(value);
 	}
 
-	// What follows a capture the backend stored: the flash, the cleared
-	// banner, the page's read of the records, and in last-pair mode the
-	// capture's images. `imageIds` are in camera order (camera 0, then 1).
-	// `may` is the capture's mayReport (src/lib/capture-check.ts): the banner
-	// is written only while it is still the latest capture and the viewport is
-	// on its volume, mounted (NEH-388).
-	function captureStored(imageIds: number[], may: () => boolean) {
+	// What is true once the backend has stored a capture, however the screen
+	// learnt it (the request's answer, the check after a timeout, the
+	// background asks): the page told of the record and its images
+	// (`confirmed`, which makes it the last record), the flash, the banner
+	// cleared (`clearBanner`), the page's read of the records, and in
+	// last-pair mode the capture's images. The viewport has nothing more to
+	// do after a capture: it opens, closes and navigates nothing. `imageIds`
+	// are in camera order (camera 0, then 1). `may` is the capture's
+	// mayReport (src/lib/capture-check.ts) (NEH-388).
+	function captureStored(
+		recordId: number | null | undefined,
+		imageIds: number[],
+		clearBanner: () => void
+	) {
+		captureCheck?.confirmed(recordId, imageIds);
 		// The flash fires only once the backend has confirmed the capture: it
 		// is the only success signal the operator sees, and if it always fired,
 		// a failed capture would look identical to a good one and the page
@@ -1160,39 +1189,36 @@
 			captureFlash = false;
 		}, 150);
 
-		if (may()) cameraStatus.reportSuccess();
+		clearBanner();
 		onCaptureDone();
 		// Not awaited: the thumbnails must not hold up the next capture.
 		lastCaptureIds = imageIds;
 		if (lastPair) showCapturedPair(imageIds);
 	}
 
-	// The image ids of a record found by the check, in camera order, as the
-	// capture's answer would have given them: in a pair, the camera that took
-	// the left page (`left`, from the request) has the image whose role is left.
-	function imageIdsInCameraOrder(record: RecordLike, dual: boolean, left: number): number[] {
-		const images = (record.images ?? []) as readonly { id: number; role?: string | null }[];
-		if (!dual) return images.slice(0, 1).map((img) => img.id);
-		const byRole = (role: string) => images.find((img) => img.role === role)?.id;
-		const leftId = byRole('left');
-		const rightId = byRole('right');
-		if (leftId === undefined || rightId === undefined) return images.map((img) => img.id);
-		return left === 0 ? [leftId, rightId] : [rightId, leftId];
-	}
-
-	// A capture whose request ended in a timeout: the controls stay locked
-	// (isCapturing) while the records are read again.
+	// A capture whose request ended in a timeout, or in a 409
+	// capture_in_progress: the controls stay locked (isCapturing) while the
+	// backend is asked for `id`. A stored answer is the request's own answer,
+	// image ids in camera order. An unknown outcome reads the records again
+	// before the controls are free, and, while asking again can still learn
+	// it, the reconciler goes on asking in the background: a capture found
+	// then removes this attempt's message wherever it still shows, and goes
+	// through captureStored, as a success does, while mayReport allows it;
+	// after a newer capture it only reads the records again.
 	async function checkTimedOut(
-		before: CaptureBefore,
+		id: string,
 		dual: boolean,
-		left: number,
-		may: () => boolean
+		may: () => boolean,
+		current: () => boolean
 	) {
-		const check = captureCheck!;
 		const controller = new AbortController();
 		checkController = controller;
 		notice('maybe_saved');
-		const outcome = await checkForCapture({ before, read: check.read, signal: controller.signal });
+		const outcome = await checkCaptureRequest({
+			id,
+			lookup: (key) => camerasApi.captureRequest(key),
+			signal: controller.signal
+		});
 		if (checkController === controller) checkController = null;
 		if (outcome.kind === 'stopped') return;
 		if (!may()) return;
@@ -1201,9 +1227,43 @@
 			cameraStatus.reportFailure(captureErrorText(new CaptureNotSaved(), $m, $userRole));
 			return;
 		}
-		const ids = imageIdsInCameraOrder(outcome.record, dual, left);
-		check.confirmed(outcome.record.id, ids);
-		captureStored(ids, may);
+		if (outcome.kind === 'unknown') {
+			notice(null);
+			await captureCheck?.reread?.();
+			if (!may()) return;
+			const error = new CaptureOutcomeUnknown('new', !dual);
+			cameraStatus.reportFailure(captureErrorText(error, $m, $userRole), error);
+			error.whenFound(() => cameraStatus.clearFailure(error));
+			if (outcome.retry) {
+				const stop = reconciler.start({
+					id,
+					lookup: (key) => camerasApi.captureRequest(key),
+					onStored: (answer) => {
+						ownAsks.delete(stop);
+						if (!current()) return;
+						// This attempt's message goes wherever it still shows.
+						error.markFound();
+						// A newer capture has started since: it owns the last
+						// record, the panes and the banner; only the records
+						// are read again.
+						if (!may()) {
+							void captureCheck?.reread?.();
+							return;
+						}
+						captureStored(answer.record_id, answer.image_ids ?? [], () => {});
+						// The notice takes the banner's place: not over a failure
+						// written since.
+						if (!$cameraStatus.captureError) notice('found');
+					}
+				});
+				ownAsks.add(stop);
+			}
+			return;
+		}
+		const { record_id, image_ids } = outcome.answer;
+		captureStored(record_id, image_ids ?? [], () => {
+			if (may()) cameraStatus.reportSuccess();
+		});
 		notice('found');
 	}
 
@@ -1218,7 +1278,8 @@
 		const current = () => !destroyed && collectionId === volume;
 		// Asked after the last await before every write to the banner.
 		const may = () => mayReport(gate, ticket, current);
-		const before = captureCheck ? captureCheck.snapshot() : null;
+		// One id per attempt: the request and the check after a timeout name it.
+		const clientCaptureId = newClientCaptureId();
 		const dual = cameraMode === 'double';
 		const left = leftIdx;
 		notice(null);
@@ -1229,6 +1290,7 @@
 
 		try {
 			const payload = {
+				client_capture_id: clientCaptureId,
 				project_name: projectName,
 				collection_id: collectionId || undefined,
 				record_title: defaultRecordTitle()
@@ -1264,13 +1326,20 @@
 				throw new CaptureFailed(result.error);
 			}
 
-			captureCheck?.confirmed(result.record_id, result.image_ids);
-			captureStored(result.image_ids ?? [], may);
+			captureStored(result.record_id, result.image_ids ?? [], () => {
+				if (may()) cameraStatus.reportSuccess();
+			});
 		} catch (error) {
 			console.error('[LiveViewport] Capture error:', error);
 			if (!current()) return;
-			if (before && captureCheck && isCaptureTimeout(error)) {
-				await checkTimedOut(before, dual, left, may);
+			if (isCaptureTimeout(error) || isCaptureInProgress(error)) {
+				await checkTimedOut(clientCaptureId, dual, may, current);
+				return;
+			}
+			// The id was closed before this request reached the backend: nothing
+			// was saved for this attempt; the next press takes a new id.
+			if (isCaptureAbandoned(error)) {
+				if (may()) cameraStatus.reportFailure(captureErrorText(error, $m, $userRole));
 				return;
 			}
 			if (isConflict(error) && onStemRefused && (await onStemRefused())) {
