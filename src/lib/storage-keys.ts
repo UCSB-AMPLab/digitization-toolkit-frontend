@@ -18,7 +18,11 @@ export const STORAGE_KEYS = {
 	inProgressView: `${PREFIX}dashboard_in_progress_view`,
 	tourSeen: (userId: number | string) => `${PREFIX}tour_visto:${userId}`,
 	// NEH-339: the time (ms since the epoch) of the user's last focus check or capture.
-	focusCheck: (userId: number | string) => `${PREFIX}focus_check:${userId}`
+	focusCheck: (userId: number | string) => `${PREFIX}focus_check:${userId}`,
+	// NEH-225: whether the capture screen's camera panel is open ('true' or
+	// 'false'), and the names of its open sections (a JSON array).
+	cameraPanelOpen: `${PREFIX}camera_panel_open`,
+	cameraPanelSections: `${PREFIX}camera_panel_sections`
 } as const;
 
 function legacyName(key: string): string {

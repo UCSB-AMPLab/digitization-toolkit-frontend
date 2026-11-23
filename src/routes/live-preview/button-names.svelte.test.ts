@@ -15,6 +15,7 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 import { camerasApi, recordsApi, type CameraDevice, type Record as ApiRecord } from '$lib/api';
 import { locale } from '$lib/i18n';
 import { cameraStatus } from '$lib/stores/cameras';
+import { STORAGE_KEYS } from '$lib/storage-keys';
 import CameraControls from './CameraControls.svelte';
 import LiveViewport from './LiveViewport.svelte';
 import ImageViewerModal from './ImageViewerModal.svelte';
@@ -130,6 +131,8 @@ describe('live-preview buttons have accessible names (NEH-256)', () => {
 			locale.set(lang);
 			const seen = { total: 0 };
 			for (const cameraMode of ['single', 'double'] as const) {
+				// The panel is remembered open (NEH-225); each mount starts collapsed.
+				localStorage.removeItem(STORAGE_KEYS.cameraPanelOpen);
 				const screen = render(CameraControls, {
 					cameraMode,
 					shutterSpeed: '1/125s',

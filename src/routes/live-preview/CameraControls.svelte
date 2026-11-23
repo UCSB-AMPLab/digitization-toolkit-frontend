@@ -25,6 +25,7 @@
 	import { histogramStore } from '$lib/stores/histogram';
 	import { describeFocusMode } from '$lib/focus-mode';
 	import { loadCameraKind } from '$lib/camera-kind';
+	import { STORAGE_KEYS, readStored, writeStored } from '$lib/storage-keys';
 
 	let {
 		cameraMode,
@@ -94,8 +95,15 @@
 		return cameraRefresh.read(listDevices);
 	}
 
-	// Collapsed by default, for the 7" screen.
-	let sidebarOpen = $state(false);
+	// Collapsed by default, for the 7" screen. Whether the panel is open, and
+	// which sections are open (openSections), are kept in this browser's
+	// storage (NEH-225); with nothing stored, or storage unavailable, the
+	// defaults hold. readStored and writeStored catch storage failures.
+	let sidebarOpen = $state(readStored(STORAGE_KEYS.cameraPanelOpen) === 'true');
+	function setSidebarOpen(open: boolean) {
+		sidebarOpen = open;
+		writeStored(STORAGE_KEYS.cameraPanelOpen, String(open));
+	}
 
 	// Lens position in dioptres: 0 = infinity, 10 = 10 cm.
 	let lensPosition = $state(0);
@@ -175,7 +183,21 @@
 			: `${$m.cam_fallback_name} ${selectedCameraIndex}`
 	);
 
-	let openSections = $state(['basic', 'focus', 'settings', 'histogram']);
+	// A stored name that is not one of SECTIONS is dropped. A section the
+	// cameras connected do not show keeps its place in the list.
+	const SECTIONS = ['basic', 'focus', 'settings', 'histogram'];
+	function storedSections(): string[] {
+		const raw = readStored(STORAGE_KEYS.cameraPanelSections);
+		if (raw === null) return [...SECTIONS];
+		try {
+			const parsed: unknown = JSON.parse(raw);
+			if (!Array.isArray(parsed)) return [...SECTIONS];
+			return SECTIONS.filter((s) => parsed.includes(s));
+		} catch {
+			return [...SECTIONS];
+		}
+	}
+	let openSections = $state(storedSections());
 
 	let showCameraDropdown = $state(false);
 
@@ -319,6 +341,7 @@
 		openSections = openSections.includes(section)
 			? openSections.filter((s) => s !== section)
 			: [...openSections, section];
+		writeStored(STORAGE_KEYS.cameraPanelSections, JSON.stringify(openSections));
 	}
 
 	function showFocusResult(ok: boolean, msg: string) {
@@ -700,7 +723,7 @@
 		<div class="icon-strip">
 			<button
 				class="strip-btn toggle"
-				onclick={() => (sidebarOpen = true)}
+				onclick={() => setSidebarOpen(true)}
 				aria-label={$m.cam_panel_expand_aria}
 			>
 				<svg
@@ -724,7 +747,7 @@
 				<h2 class="panel-title">{$m.cam_panel_title}</h2>
 				<button
 					class="collapse-btn"
-					onclick={() => (sidebarOpen = false)}
+					onclick={() => setSidebarOpen(false)}
 					aria-label={$m.cam_panel_collapse}
 				>
 					<svg

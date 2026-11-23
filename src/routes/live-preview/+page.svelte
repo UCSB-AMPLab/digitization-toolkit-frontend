@@ -284,7 +284,23 @@
 	// page does not navigate anywhere.
 	let cameFromRecapture = $state(false);
 
+	// NEH-225: a volume opens in the mode of its last record in sequence, read
+	// from the first successful read of its records (modeFromRecords); an empty
+	// volume, or a last record without a usable capture_mode, opens in
+	// two-camera mode. After that first read only the radios and an opened
+	// retake (openRecord) set it, so no later read overrides the operator's
+	// choice. Another volume clears `modeSet` (leaveVolume).
 	let cameraMode = $state<'single' | 'double'>('double');
+	let modeSet = false;
+	function modeFromRecords(list: readonly ApiRecord[]): 'single' | 'double' {
+		let last: ApiRecord | undefined;
+		for (const r of list) if (!last || (r.sequence ?? 0) >= (last.sequence ?? 0)) last = r;
+		return last?.capture_mode === 'single' ? 'single' : 'double';
+	}
+	function chooseMode(mode: 'single' | 'double') {
+		modeSet = true;
+		cameraMode = mode;
+	}
 
 	// How many roles saves the page has taken in (see applyDevices). Not
 	// reactive: nothing renders from it.
@@ -568,7 +584,7 @@
 		showAnotherError(null);
 		refreshFailed = false;
 		refreshing = false;
-		cameraMode = record.capture_mode === 'dual' ? 'double' : 'single';
+		chooseMode(record.capture_mode === 'dual' ? 'double' : 'single');
 		selectedRecordId = record.id;
 		inspectedRecord = record;
 	}
@@ -753,6 +769,7 @@
 	// until that read succeeds the gate starts no capture.
 	function leaveVolume() {
 		known.reset();
+		modeSet = false;
 		baselineReady = false;
 		recordsUnread = false;
 		records = [];
@@ -819,7 +836,7 @@
 		const record = lastRecord;
 		if (!record) return;
 		const kept = lastImageIds;
-		const single = cameraMode !== 'double';
+		const single = record.capture_mode !== 'dual';
 		// The capture's number once the gate let it in; before that, the
 		// number of the latest capture, for a refusal made before the gate.
 		let ticket = captureGate.serial();
@@ -1305,6 +1322,7 @@
 			if (volume !== collectionId) return false;
 			records = data;
 			known.listed(data);
+			if (!modeSet) chooseMode(modeFromRecords(data));
 			// A last record whose capture answer gave no image ids takes them from here.
 			if (lastRecordId !== null && lastImageIds === null) {
 				const last = data.find((r) => r.id === lastRecordId);
@@ -1529,10 +1547,12 @@
 		precheck?: () => Promise<void>,
 		expectedImageIds?: () => number[] | undefined
 	) {
-		// A placeholder is a whole opening, closed or not: only a dual capture
-		// fills it. An open one gets the after-panel.
+		// A retake is sent in the mode of the record retaken, whatever the screen
+		// shows (the backend refuses another mode). A placeholder is a whole
+		// opening, closed or not: only a dual capture fills it. An open one gets
+		// the after-panel.
 		const hole = isOpenPlaceholder(record);
-		const dual = cameraMode === 'double' || record.missing_side === 'both';
+		const dual = record.capture_mode === 'dual' || record.missing_side === 'both';
 		const sent = await pageCapture(
 			record.id,
 			[record.id],
@@ -1808,7 +1828,7 @@
 				{shutterSpeed}
 				{iso}
 				{aperture}
-				onCameraModeChange={(m) => (cameraMode = m)}
+				onCameraModeChange={chooseMode}
 				onShutterSpeedChange={(v) => (shutterSpeed = v)}
 				onIsoChange={(v) => (iso = v)}
 				onApertureChange={(v) => (aperture = v)}
@@ -1911,6 +1931,8 @@
 								filled = null;
 								refreshFailed = false;
 								refreshing = false;
+								// The screen follows the record opened, as in openRecord.
+								chooseMode(record.capture_mode === 'dual' ? 'double' : 'single');
 								selectedRecordId = record.id;
 								inspectedRecord = record;
 							}}
