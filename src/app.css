@@ -1230,7 +1230,8 @@ div {
 	display: flex;
 	flex-direction: column;
 	width: 100vw;
-	height: 100vh;
+	/* Less the banner for a unit that is not answering, while it shows. */
+	height: calc(100vh - var(--banner-h, 0px));
 	background-color: var(--color-bg);
 	overflow: hidden;
 	/* No scrolling — the interface has to fit the screen exactly */

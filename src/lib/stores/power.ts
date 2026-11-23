@@ -21,3 +21,22 @@ export function holdPowerControlOpen(): () => void {
 		open.update((n) => n - 1);
 	};
 }
+
+// How many restarts are being awaited: PowerControl's reboot, and the
+// restart it waits for on behalf of another request (the camera kind's,
+// awaitRestart). The banner for a unit that is not answering stays away
+// meanwhile, since the restart overlay already says the unit is restarting.
+const awaiting = writable(0);
+
+export const restartAwaited = derived(awaiting, (n) => n > 0);
+
+// Counts one restart as awaited until the returned function is called.
+export function holdRestartAwaited(): () => void {
+	awaiting.update((n) => n + 1);
+	let released = false;
+	return () => {
+		if (released) return;
+		released = true;
+		awaiting.update((n) => n - 1);
+	};
+}

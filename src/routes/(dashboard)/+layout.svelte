@@ -560,7 +560,7 @@
 		justify-content: center;
 		gap: 14px;
 		width: 100vw;
-		height: 100vh;
+		height: calc(100vh - var(--banner-h, 0px));
 		background-color: var(--color-bg);
 	}
 
@@ -598,7 +598,8 @@
 	.shell {
 		display: flex;
 		width: 100vw;
-		height: 100vh;
+		/* Less the banner for a unit that is not answering, while it shows. */
+		height: calc(100vh - var(--banner-h, 0px));
 		background-color: var(--color-bg);
 		overflow: hidden;
 	}
@@ -614,7 +615,7 @@
 		overflow: hidden;
 		border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
 		margin: 10px 0 10px 10px;
-		height: calc(100vh - 20px);
+		height: calc(100vh - 20px - var(--banner-h, 0px));
 		box-shadow: var(--shadow-md);
 		z-index: 20;
 	}

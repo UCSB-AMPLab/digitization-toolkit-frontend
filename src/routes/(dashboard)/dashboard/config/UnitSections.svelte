@@ -6,7 +6,9 @@
 	// (usage, primary path, external drive), the catalogue's off-site copy, diagnostics, maintenance, and power. They act
 	// on the appliance through the backend. The page renders this component
 	// for administrators, for the testing role, which opens Power only, and
-	// for the operator, which opens Storage only (NEH-380), with the section
+	// for the operator, which opens Storage (NEH-380) and Cameras, and for the
+	// reviewer, which opens Cameras (NEH-252: the kind of camera, its controls
+	// the administrator's only, CameraKindCard), with the section
 	// to show; the content of each section is as it was when they all shared
 	// one page. In Storage, everyone who opens it sees the usage figure, the
 	// space Captua keeps for its own work and the list of volumes that can be
@@ -23,6 +25,8 @@
 	import FisquaLinkCard from './FisquaLinkCard.svelte';
 	import TestingSpaceCard from './TestingSpaceCard.svelte';
 	import FreeableVolumes from './FreeableVolumes.svelte';
+	import CameraKindCard from './CameraKindCard.svelte';
+	import CameraKindDiagnostics from './CameraKindDiagnostics.svelte';
 
 	let {
 		section,
@@ -648,6 +652,16 @@
 	</div>
 {/if}
 
+{#if section === 'cameras'}
+	<!-- The kind of camera the unit drives (NEH-252, NEH-348): every role but
+       the testing account opens it; only the administrator gets the
+       controls (CameraKindCard). -->
+	<div class="config-section" id="cameras">
+		<h2 class="section-title">{$m.config_section_cameras}</h2>
+		<CameraKindCard />
+	</div>
+{/if}
+
 {#if section === 'diagnostics'}
 	<div class="config-section">
 		<h2 class="section-title">{$m.config_section_diagnostics}</h2>
@@ -659,6 +673,8 @@
 				</div>
 				<code class="inline-code">{cameraBackend ?? $m.config_camera_backend_unknown}</code>
 			</div>
+
+			<CameraKindDiagnostics />
 
 			<div class="section-divider"></div>
 

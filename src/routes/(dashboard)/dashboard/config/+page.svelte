@@ -28,10 +28,19 @@
 	import CaptureKeySection from './CaptureKeySection.svelte';
 	import { resolveSection, sectionInUrl, sectionsFor } from './settings-sections';
 	import { opensUnitSettings } from '$lib/unit-mode';
+	import { onMount } from 'svelte';
+	import { cameraKind, loadCameraKind } from '$lib/camera-kind';
 
 	let role = $derived($authStore.user?.role ?? null);
 	let isAdmin = $derived(opensUnitSettings(role));
-	let sections = $derived(sectionsFor(role));
+	// Cameras (NEH-252) is left out once the backend says it has no such
+	// route (404); until the first answer, and after a failed read, it is
+	// listed, so that it does not appear late on every current backend.
+	let kindAbsent = $derived($cameraKind.status === 'absent');
+	let sections = $derived(sectionsFor(role).filter((s) => !(kindAbsent && s.id === 'cameras')));
+	onMount(() => {
+		loadCameraKind();
+	});
 	let general = $derived(sections.filter((s) => !s.unit));
 	let unitSections = $derived(sections.filter((s) => s.unit));
 
@@ -42,7 +51,7 @@
 	// once.
 	let chosen = $derived<string | null>(sectionInUrl($page.url));
 
-	let current = $derived(resolveSection(chosen, role));
+	let current = $derived(resolveSection(kindAbsent && chosen === 'cameras' ? null : chosen, role));
 
 	let nav = $state<HTMLElement | null>(null);
 

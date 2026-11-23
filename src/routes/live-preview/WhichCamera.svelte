@@ -51,6 +51,8 @@
 	import { dismissible, toBody, trapFocus } from '$lib/dialog';
 	import { PairPanZoom } from '$lib/pair-pan-zoom.svelte';
 	import PageCameraLabel from '$lib/components/PageCameraLabel.svelte';
+	import CameraKindNotice from '$lib/components/CameraKindNotice.svelte';
+	import { loadCameraKind } from '$lib/camera-kind';
 
 	let {
 		setup,
@@ -163,6 +165,8 @@
 		const seq = ++deviceSeq;
 		try {
 			const list = await camerasApi.rescan();
+			// The cameras connected may now be of another kind (NEH-252).
+			loadCameraKind({ fresh: true });
 			if (destroyed) return;
 			listed(seq, list);
 		} catch (err) {
@@ -412,6 +416,9 @@
 
 	<div class="sf">
 		<div class="sf-body">
+			<!-- Cameras of another kind than the unit is set for (NEH-252): this
+			     step covers the capture screen, whose own notice is under it. -->
+			<CameraKindNotice />
 			{#if devicesFailed && devices === null}
 				<div class="id-head">
 					<div class="action-notice is-error" role="alert">
@@ -555,7 +562,8 @@
      (150), its dialogs (200, 210), the Refocus dialog, the dropdowns (999). */
 	.id-view {
 		position: fixed;
-		inset: 0;
+		/* Below the banner for a unit that is not answering, while it shows. */
+		inset: var(--banner-h, 0px) 0 0 0;
 		z-index: 1000;
 		display: flex;
 		flex-direction: column;

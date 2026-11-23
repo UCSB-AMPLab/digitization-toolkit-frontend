@@ -8,6 +8,8 @@
 // The testing role (NEH-391) sees what every non-admin sees, plus Power, so it
 // can shut the unit down or restart it. Capture key, the unit's key for
 // starting a capture (NEH-336), is the administrator's and the operator's.
+// Cameras (NEH-252) is opened by every other role; only the administrator
+// gets its controls (CameraKindCard).
 // The backend enforces the same roles on every route these sections use.
 //
 // Version: 0.3.0
@@ -36,6 +38,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
 	{ id: 'storage', labelKey: 'config_section_storage', unit: true },
 	{ id: 'capture-key', labelKey: 'config_section_capture_key', unit: true },
 	{ id: 'offsite-copy', labelKey: 'backup_section_title', unit: true },
+	{ id: 'cameras', labelKey: 'config_section_cameras', unit: true },
 	{ id: 'diagnostics', labelKey: 'config_section_diagnostics', unit: true },
 	{ id: 'maintenance', labelKey: 'config_section_maintenance', unit: true },
 	{ id: 'power', labelKey: 'config_section_power', unit: true }
@@ -49,6 +52,7 @@ export function sectionsFor(role: string | null | undefined): SettingsSection[] 
 		(s) =>
 			!s.unit ||
 			opensUnitSettings(role) ||
+			s.id === 'cameras' ||
 			(s.id === 'storage' && canFreeVolumes(role)) ||
 			(s.id === 'capture-key' && canSetCaptureKey(role))
 	);

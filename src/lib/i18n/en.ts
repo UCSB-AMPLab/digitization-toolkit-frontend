@@ -328,8 +328,78 @@ export const en: Messages = {
 	config_err_restore: 'Could not restore default storage.',
 	config_camera_backend: 'Capture system',
 	config_camera_backend_desc:
-		'Which capture system is active on this unit. It is set at install time; changing it requires reconfiguring the unit.',
+		'The camera driver Captua is using on this unit. An administrator chooses the kind of camera in Settings › Cameras.',
 	config_camera_backend_unknown: 'Unavailable',
+	// NEH-186: the banner while the unit is not answering (UnitNotAnswering).
+	unit_not_answering: 'This unit is not answering. What is on screen may be out of date.',
+	unit_not_answering_reload: 'Reload',
+	// NEH-252/348: the kind of camera the unit drives (Settings > Cameras,
+	// Diagnostics, the capture screen's camera panel). Driver names
+	// (picamera2, gphoto2, chdk) appear only in Diagnostics, beside these.
+	config_section_cameras: 'Cameras',
+	camera_kind_picamera2: 'Pi cameras',
+	camera_kind_gphoto2: 'Canon DSLR cameras',
+	camera_kind_chdk: 'Canon A2500 cameras (CHDK)',
+	camera_kind_count_picamera2: (n: number) => (n === 1 ? '1 Pi camera' : `${n} Pi cameras`),
+	camera_kind_count_gphoto2: (n: number) =>
+		n === 1 ? '1 Canon DSLR camera' : `${n} Canon DSLR cameras`,
+	camera_kind_count_chdk: (n: number) =>
+		n === 1 ? '1 Canon A2500 camera (CHDK)' : `${n} Canon A2500 cameras (CHDK)`,
+	camera_kind_mismatch: (set: string, connected: string, n: number) =>
+		`This unit is set for ${set}, and ${connected} ${n === 1 ? 'is' : 'are'} connected.`,
+	camera_kind_no_driver: (connected: string, n: number) =>
+		`${connected} ${n === 1 ? 'is' : 'are'} connected, and this unit lacks the driver for ${n === 1 ? 'it' : 'them'}.`,
+	camera_kind_mixed: (parts: string[]) =>
+		`Cameras of ${parts.length === 2 ? 'two' : 'three'} kinds are connected: ${
+			parts.length === 2
+				? `${parts[0]} and ${parts[1]}`
+				: `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+		}. Captua uses one kind at a time.`,
+	camera_kind_notice_link: 'Choose the kind of camera in Settings',
+	camera_kind_notice_tell_admin: 'Tell the administrator.',
+	camera_kind_desc:
+		'Which kind of camera Captua uses on this unit, and which cameras are connected now.',
+	camera_kind_in_use: 'In use',
+	camera_kind_source_stored: 'An administrator chose this kind.',
+	camera_kind_source_environment: "The unit's installation settings name this kind.",
+	camera_kind_source_detected:
+		'Captua chose this kind from the cameras that were connected at the last start.',
+	camera_kind_source_last_used:
+		'At the last start, Captua could not tell from the connected cameras which kind to use, so it kept the kind it used before.',
+	camera_kind_source_default:
+		'At the last start, Captua could not tell from the connected cameras which kind to use, and had used none before, so it uses Pi cameras.',
+	camera_kind_connected: 'Connected now',
+	camera_kind_count_unknown: 'not known',
+	camera_kind_err_load:
+		'Captua could not read which kind of camera this unit uses. Try again in a moment.',
+	camera_kind_choose_legend: 'Kind of camera',
+	camera_kind_follow: 'By the cameras that are connected',
+	camera_kind_follow_desc: 'At each start, Captua uses the kind of the cameras connected then.',
+	camera_kind_lacks_driver: 'This unit lacks the driver for these cameras.',
+	camera_kind_confirm_title: 'Restart Captua?',
+	camera_kind_confirm_body:
+		'Captua has to be restarted to apply the change. No one can capture for about a minute.',
+	camera_kind_confirm_btn: 'Restart Captua',
+	camera_kind_pending: (name: string) => `A restart is pending. After it, Captua will use ${name}.`,
+	camera_kind_pending_follow:
+		'A restart is pending. After it, Captua will use the kind of the cameras that are connected.',
+	camera_kind_restart_now: 'Restart now',
+	camera_kind_restart_needed:
+		'The change is saved, but Captua could not be restarted. Restart the unit to apply it.',
+	camera_kind_refused_busy_capturing: 'A capture is in progress. Try again when it ends.',
+	camera_kind_refused_offsite_job_running:
+		'A volume is being freed or restored. Try again when that ends.',
+	camera_kind_refused_backend_restarting:
+		'A restart of Captua is in progress. Try again in a minute.',
+	camera_kind_refused_driver_unavailable: 'This unit lacks the driver for these cameras.',
+	camera_kind_refused_other: 'Captua could not save the change. Try again in a moment.',
+	diag_camera_kind: 'Camera kind in effect',
+	diag_camera_kind_source: 'Why',
+	diag_camera_kind_stored: 'Stored choice',
+	diag_camera_kind_stored_none: 'None: Captua uses the kind of the cameras that are connected',
+	diag_camera_kind_connected: 'Connected cameras',
+	diag_camera_kind_available: 'Camera drivers installed on this unit',
+	diag_camera_kind_available_none: 'None',
 	config_section_diagnostics: 'Diagnostics',
 	config_system_logs: 'System activity',
 	config_system_logs_desc: 'Recent activity — last hour',
