@@ -2621,6 +2621,88 @@ export const importsApi = {
 export const healthApi = {
 	async check(): Promise<{ status: string }> {
 		return apiRequest<{ status: string }>('/health', { timeoutMs: HEALTH_REQUEST_TIMEOUT_MS });
+	},
+
+	/**
+	 * GET /health for the watcher of the root layout (NEH-186): `ok` for a
+	 * healthy answer; `update` for the update page's own answer, a 503 whose
+	 * JSON body has `status: "unavailable"` (scripts/update-page/serve.py in
+	 * the superproject); `unreachable` for everything else, no answer, a
+	 * timeout or an abort included. Never rejects.
+	 */
+	async probe(signal: AbortSignal): Promise<'ok' | 'update' | 'unreachable'> {
+		try {
+			return await withTimeLimit({ timeoutMs: HEALTH_REQUEST_TIMEOUT_MS, signal }, async (init) => {
+				const response = await fetch(`${getApiBase()}/health`, sessionRequestInit(init));
+				if (response.ok) return 'ok';
+				if (response.status !== 503) return 'unreachable';
+				const body: unknown = await response.json().catch(() => null);
+				return body &&
+					typeof body === 'object' &&
+					(body as { status?: unknown }).status === 'unavailable'
+					? 'update'
+					: 'unreachable';
+			});
+		} catch {
+			return 'unreachable';
+		}
+	}
+};
+
+// =============================================================================
+// Camera kind API (NEH-252, NEH-348)
+// =============================================================================
+
+/** The kinds of camera the unit can drive, by their driver names. */
+export type CameraKindName = 'picamera2' | 'gphoto2' | 'chdk';
+
+/**
+ * GET /system/camera-kind (every signed-in role, the testing account
+ * included), answered even when no camera driver can be built. GET
+ * /cameras/capabilities carries the same keys after its flags. A null count
+ * is one that could not be measured. `configured` is the kind in effect,
+ * which a CAMERA_BACKEND set in the environment can name outside the three
+ * (`subprocess` counts as Pi cameras).
+ */
+export interface CameraKindWire {
+	configured: string;
+	source: string;
+	stored: CameraKindName | null;
+	pending_restart: boolean;
+	detected: CameraKindName | null;
+	connected: { [K in CameraKindName]: number | null };
+	available: { [K in CameraKindName]: boolean };
+	mixed: boolean;
+	mismatch: boolean;
+}
+
+/** The answer to PUT and DELETE /system/camera-kind; `kind` is null after a DELETE. */
+export interface CameraKindChange {
+	kind: CameraKindName | null;
+	configured: string;
+	restart: 'restarting' | 'restart_needed' | 'not_needed';
+}
+
+export const cameraKindApi = {
+	async get(): Promise<CameraKindWire> {
+		return apiRequest<CameraKindWire>('/system/camera-kind');
+	},
+
+	/**
+	 * Store the kind (admin). A refusal is a 409 whose detail is {code,
+	 * message}: busy_capturing, offsite_job_running, backend_restarting or
+	 * driver_unavailable.
+	 */
+	async set(kind: CameraKindName): Promise<CameraKindChange> {
+		return apiRequest<CameraKindChange>('/system/camera-kind', {
+			method: 'PUT',
+			body: JSON.stringify({ kind })
+		});
+	},
+
+	/** Clear the stored kind, so the unit follows the cameras connected (admin); same refusals. */
+	async clear(): Promise<CameraKindChange> {
+		return apiRequest<CameraKindChange>('/system/camera-kind', { method: 'DELETE' });
 	}
 };
 

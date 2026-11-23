@@ -24,6 +24,7 @@
 	import { wbSamplingStore } from '$lib/stores/wbSampling';
 	import { histogramStore } from '$lib/stores/histogram';
 	import { describeFocusMode } from '$lib/focus-mode';
+	import { loadCameraKind } from '$lib/camera-kind';
 
 	let {
 		cameraMode,
@@ -644,6 +645,8 @@
 			await cameraRefresh.reconnect(() => stamped(() => camerasApi.rescan()));
 			rescanError = null;
 			onRescan?.();
+			// The cameras connected may now be of another kind (NEH-252).
+			loadCameraKind({ fresh: true });
 			// Reconnecting is the remedy the failure message offers, so the
 			// capabilities are asked for again once the cameras are back.
 			await loadCapabilities();

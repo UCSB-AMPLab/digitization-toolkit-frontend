@@ -250,6 +250,8 @@
 	import RefocusModal from './RefocusModal.svelte';
 	import CameraCheck from './CameraCheck.svelte';
 	import WhichCamera from './WhichCamera.svelte';
+	import CameraKindNotice from '$lib/components/CameraKindNotice.svelte';
+	import { loadCameraKind } from '$lib/camera-kind';
 	import { hardwareKey, leftIndexFromRoles } from '$lib/camera-roles';
 	import { dialogOpen } from '$lib/dialog';
 	import MissingPage from '$lib/components/MissingPage.svelte';
@@ -1150,6 +1152,8 @@
 
 	onMount(async () => {
 		ensureUnit();
+		// The kind of camera, read again on every visit (NEH-252).
+		loadCameraKind();
 		// The capture screen is for admin and operator only. A reviewer cannot
 		// trigger captures or delete (the backend answers 403 in
 		// cameras.py/records.py), and this route sits outside the (dashboard)
@@ -1572,6 +1576,12 @@
 		onCheckCameras={openCameraCheck}
 		checkCamerasDisabled={pageCapturing || viewportCapturing || captureBusy}
 	/>
+
+	<!-- Cameras of another kind than the unit is set for (NEH-252): in the
+	     page flow under the top bar, so it shows with the camera panel
+	     collapsed and in every state of the screen; nothing when there is
+	     nothing to say. -->
+	<CameraKindNotice band />
 
 	<CaptureInstruction {instruction} />
 

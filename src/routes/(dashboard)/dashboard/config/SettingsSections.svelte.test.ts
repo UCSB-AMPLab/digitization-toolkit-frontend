@@ -25,6 +25,7 @@ import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { resetNetworkStatus } from '$lib/stores/network';
 import { resetUnit } from '$lib/unit-mode';
+import { resetCameraKind } from '$lib/camera-kind';
 import '../../../../app.css';
 import ConfigPage from './+page.svelte';
 
@@ -39,9 +40,12 @@ function signIn(role: UserRole) {
 }
 
 /** Network routes answer 501 (a development machine); everything else a 500. */
-function serve() {
+function serve(kindStatus = 500) {
 	return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const url = String(input instanceof Request ? input.url : input);
+		if (url.endsWith('/system/camera-kind')) {
+			return new Response(JSON.stringify({ detail: 'Not Found' }), { status: kindStatus });
+		}
 		if (url.includes('/network/')) {
 			return new Response(
 				JSON.stringify({ detail: 'Network settings are not available on this device.' }),
@@ -84,6 +88,7 @@ const ADMIN_SECTIONS = [
 	en.config_section_testing,
 	en.config_section_storage,
 	en.backup_section_title,
+	en.config_section_cameras,
 	en.config_section_diagnostics,
 	en.config_section_maintenance,
 	en.config_section_power
@@ -99,6 +104,7 @@ afterEach(() => {
 	authStore.clearSession();
 	resetNetworkStatus();
 	resetUnit();
+	resetCameraKind();
 });
 
 describe('Settings sections', () => {
@@ -117,24 +123,52 @@ describe('Settings sections', () => {
 			.toBeVisible();
 	});
 
-	it('the reviewer sees Network and Language only', async () => {
+	it('leaves Cameras out, in the list and by URL, for a backend without the camera-kind route (NEH-252)', async () => {
+		const fetchSpy = serve(404);
+		signIn('admin');
+		at('?section=cameras');
+		const { container } = render(ConfigPage);
+		await expect
+			.poll(() => fetchSpy.mock.calls.some(([u]) => String(u).endsWith('/system/camera-kind')))
+			.toBe(true);
+		await expect
+			.poll(() => sectionNames(container))
+			.toEqual([
+				en.config_section_network,
+				en.config_section_language,
+				...ADMIN_SECTIONS.filter((n) => n !== en.config_section_cameras)
+			]);
+		await expect
+			.element(browserPage.getByRole('heading', { name: en.config_section_network, level: 2 }))
+			.toBeVisible();
+		expect(container.querySelector('.config-section#cameras')).toBeNull();
+	});
+
+	it('the reviewer sees Network, Language and, in the Unit group, Cameras only (NEH-252)', async () => {
 		serve();
 		signIn('reviewer');
 		const { container } = render(ConfigPage);
 		await expect
 			.poll(() => sectionNames(container))
-			.toEqual([en.config_section_network, en.config_section_language]);
-		expect(container.querySelector('.settings-group')).toBeNull();
+			.toEqual([en.config_section_network, en.config_section_language, en.config_section_cameras]);
+		expect(container.querySelector('.settings-group')?.textContent?.trim()).toBe(
+			en.config_group_unit
+		);
 		expect(container.textContent).toContain(en.config_subtitle_personal);
 	});
 
-	it('the operator sees Network, Language and, in the Unit group, Storage only (NEH-380)', async () => {
+	it('the operator sees Network, Language and, in the Unit group, Storage (NEH-380) and Cameras (NEH-252)', async () => {
 		serve();
 		signIn('operator');
 		const { container } = render(ConfigPage);
 		await expect
 			.poll(() => sectionNames(container))
-			.toEqual([en.config_section_network, en.config_section_language, en.config_section_storage]);
+			.toEqual([
+				en.config_section_network,
+				en.config_section_language,
+				en.config_section_storage,
+				en.config_section_cameras
+			]);
 		expect(container.querySelector('.settings-group')?.textContent?.trim()).toBe(
 			en.config_group_unit
 		);
@@ -185,7 +219,14 @@ describe('Settings sections', () => {
 	it('the testing role asking for an admin section by URL gets Network', async () => {
 		serve();
 		signIn('testing');
-		for (const id of ['storage', 'diagnostics', 'unit-mode', 'offsite-copy', 'maintenance']) {
+		for (const id of [
+			'storage',
+			'diagnostics',
+			'unit-mode',
+			'offsite-copy',
+			'maintenance',
+			'cameras'
+		]) {
 			at(`?section=${id}`);
 			const { container, unmount } = render(ConfigPage);
 			await expect

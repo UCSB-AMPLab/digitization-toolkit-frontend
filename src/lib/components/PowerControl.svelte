@@ -23,7 +23,7 @@
 	import { m } from '$lib/i18n';
 	import { systemApi, healthApi, PowerControlError, type PowerAction } from '$lib/api';
 	import { dismissible, toBody } from '$lib/dialog';
-	import { holdPowerControlOpen } from '$lib/stores/power';
+	import { holdPowerControlOpen, holdRestartAwaited } from '$lib/stores/power';
 
 	let { onError }: { onError?: (message: string | null) => void } = $props();
 
@@ -36,6 +36,13 @@
 	$effect(() => {
 		if (pendingAction === null && error === null && phase === 'idle') return;
 		return holdPowerControlOpen();
+	});
+
+	// While a restart is awaited, the banner for a unit that is not answering
+	// stays away: the overlay below says the unit is restarting.
+	$effect(() => {
+		if (phase !== 'reboot') return;
+		return holdRestartAwaited();
 	});
 
 	let confirmTitle = $derived(
@@ -85,6 +92,15 @@
 			sending = false;
 			pendingAction = null;
 		}
+	}
+
+	// A restart another request started (the camera kind's PUT or DELETE
+	// answering `restarting`): the same blocking state and wait as a reboot.
+	export function awaitRestart() {
+		if (phase !== 'idle') return;
+		pendingAction = null;
+		phase = 'reboot';
+		pollForRecovery();
 	}
 
 	// After a reboot the backend goes down and comes back. Once /health
