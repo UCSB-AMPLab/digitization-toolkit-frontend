@@ -48,6 +48,7 @@
 	import type { Snippet } from 'svelte';
 	import { recordsApi, type Record as ApiRecord, type RecordRejection } from '$lib/api';
 	import { m, locale } from '$lib/i18n';
+	import { unknownOutcomeOf } from '$lib/capture-errors';
 	import { formatApiDate } from '$lib/format-date';
 	import { parseApiDate } from '$lib/pipeline';
 	import { rejectionReasonText } from '$lib/rejectionReasons';
@@ -151,12 +152,16 @@
 	// in view if the capture fails.
 	let retaking = $state(false);
 	let retakeError = $state<string | null>(null);
+	// The error retakeError shows: a capture whose outcome was unknown and
+	// that is found stored later removes its own message only (NEH-401).
+	let retakeErrorFrom: unknown = null;
 
 	async function confirmAndRetake() {
 		confirmRetake = false;
 		if (isExcluded || captureLocked) return;
 		retaking = true;
 		retakeError = null;
+		retakeErrorFrom = null;
 		try {
 			// `onRetake` throws if the capture fails, and the record keeps its
 			// images. The frontend never deletes the previous images; the backend
@@ -165,6 +170,12 @@
 			// On success the parent has already closed the modal (`inspectedRecord = null`).
 		} catch (err) {
 			retakeError = err instanceof Error ? err.message : String(err);
+			retakeErrorFrom = err;
+			unknownOutcomeOf(err)?.whenFound(() => {
+				if (retakeErrorFrom !== err) return;
+				retakeError = null;
+				retakeErrorFrom = null;
+			});
 		} finally {
 			retaking = false;
 		}

@@ -1,7 +1,7 @@
 // NEH-381, the capture screen as a whole:
-// - what the screen knows the server holds: a capture the backend confirmed
-//   counts as known even when the read of the records after it failed, so a
-//   later capture that ends in a timeout is not "found" in it;
+// - a capture that ends in a timeout is found by its own client_capture_id
+//   (NEH-401): a record that appears in the volume meanwhile is not taken
+//   for it;
 // - one gate for starting a capture: while a capture is in flight or being
 //   checked, no entry point sends another and no thumbnail opens or
 //   replaces the image window;
@@ -141,6 +141,10 @@ const served = {
 	held: null as null | Promise<Response>,
 	// The next records reads answer through these, once each, in order.
 	recordsNext: [] as (() => Promise<Response>)[],
+	// The ids GET /cameras/capture-requests/{id} was asked for, and what it
+	// answers: the next of `lookups`, or in progress once they run out.
+	asked: [] as string[],
+	lookups: [] as (() => Response | Promise<Response>)[],
 	recordReads: 0,
 	capabilities: {} as Record<string, unknown>
 };
@@ -156,6 +160,19 @@ function appendPair(id: number): Rec {
 	const r = pair(id, Math.max(0, ...served.records.map((x) => x.sequence)) + 1);
 	served.records.push(r);
 	return r;
+}
+
+// The lookup's answer for a stored capture of `r`, as its capture request was answered.
+function storedBody(r: Rec) {
+	return json({
+		success: true,
+		record_id: r.id,
+		image_ids: r.images.map((i) => i.id),
+		timing: null,
+		error: null,
+		replayed: true,
+		in_progress: false
+	});
 }
 
 function serve() {
@@ -179,6 +196,11 @@ function serve() {
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
 		if (path.endsWith('/cameras/capabilities')) return json(served.capabilities);
+		const lookup = path.match(/\/cameras\/capture-requests\/([^/]+)$/);
+		if (lookup) {
+			served.asked.push(lookup[1]);
+			return (served.lookups.shift() ?? (() => json({ in_progress: true })))();
+		}
 		if (path.endsWith('/records/')) {
 			served.recordReads++;
 			const next = served.recordsNext.shift();
@@ -218,6 +240,8 @@ beforeEach(() => {
 	served.held = null;
 	served.recordsNext = [];
 	served.recordReads = 0;
+	served.asked = [];
+	served.lookups = [];
 	served.capabilities = {};
 	cameraStatus.reportSuccess();
 	authStore.setSession({
@@ -276,7 +300,7 @@ async function retakeTimedOut(screen: ReturnType<typeof render>) {
 	const dialog = screen.getByRole('dialog');
 	await dialog.getByRole('button', { name: es.lvm_retake }).click();
 	await expect.element(dialog.getByRole('button', { name: es.common_confirm })).toBeVisible();
-	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
 	const answer = holdNextCapture();
 	buttonIn(document, es.common_confirm)!.click();
 	await settle();
@@ -288,7 +312,7 @@ async function retakeTimedOut(screen: ReturnType<typeof render>) {
 
 // A capture from the viewport whose request ends in nginx's 504 at 120 s.
 async function viewportCaptureTimedOut() {
-	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
 	const answer = holdNextCapture();
 	press();
 	await settle();
@@ -300,39 +324,171 @@ async function viewportCaptureTimedOut() {
 	);
 }
 
-describe('capture screen: what the screen knows the server holds (NEH-381)', () => {
-	it('a capture confirmed while its records read failed is not taken for the next capture that times out', async () => {
+describe('capture screen: a capture that ends in a timeout is found by its id (NEH-401)', () => {
+	it('a record another screen adds during the check is not taken for the capture; the stored answer is', async () => {
 		serve();
 		render(LivePreview);
 		await screenReady();
 
-		// Capture A succeeds; the read of the records after it fails.
-		served.recordsNext = [async () => json({ detail: 'down' }, 500)];
-		press();
-		await vi.waitFor(() => expect(served.captures).toHaveLength(1));
-		await vi.waitFor(() => expect(served.recordReads).toBeGreaterThanOrEqual(2));
-		await settle();
-		const a = served.records[served.records.length - 1];
-		expect(stripSources().some((src) => src.includes(`/records/images/${a.images[0].id}/`))).toBe(
-			false
-		);
-
-		// Capture B times out; the first read shows A, not B.
 		await viewportCaptureTimedOut();
+		const id = served.captures[0].body.client_capture_id as string;
+		// Another screen adds a record; the volume's records are read again.
+		appendPair(800);
 		await advance(5_000);
+		expect(served.asked).toEqual([id]);
 		expect(document.querySelector('.capture-note-banner')?.textContent).toContain(
 			es.lv_capture_maybe_saved
 		);
 		expect(captureButton().disabled).toBe(true);
 
-		// B is stored: the next read finds it.
-		appendPair(700);
+		// The backend stores the capture under its id.
+		const b = appendPair(700);
+		served.lookups = [() => storedBody(b)];
 		await advance(5_000);
+		expect(served.asked).toEqual([id, id]);
 		expect(document.querySelector('.capture-note-banner')?.textContent).toContain(
 			es.lv_capture_found
 		);
 		expect(captureButton().disabled).toBe(false);
+		expect(served.captures).toHaveLength(1);
+	});
+});
+
+describe('capture screen: a capture whose outcome is unknown (NEH-401)', () => {
+	const note = () => document.querySelector('.capture-note-banner')?.textContent ?? '';
+	const errorBanner = () => document.querySelector('.capture-error-banner')?.textContent ?? '';
+	const failed = () => json({ detail: 'down' }, 500);
+
+	it('the backend commits while the asks fail: after the unknown verdict the strip shows the new record', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		await viewportCaptureTimedOut();
+		// The capture is committed; every ask of the check fails.
+		const b = appendPair(700);
+		served.lookups = Array.from({ length: 36 }, () => failed);
+		await advance(180_000);
+		expect(errorBanner()).toContain(es.lv_capture_unknown('new', false));
+		expect(errorBanner()).not.toContain(es.lv_capture_not_saved);
+		await vi.waitFor(() => expect(thumb(b.title)).toBeTruthy());
+		expect(captureButton().disabled).toBe(false);
+	});
+
+	it('stored two minutes after the unknown verdict: the strip and "Retake the last opening" follow it without a reload', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		await viewportCaptureTimedOut();
+		const id = served.captures[0].body.client_capture_id as string;
+		served.lookups = Array.from({ length: 36 }, () => failed);
+		await advance(180_000);
+		expect(errorBanner()).toContain(es.lv_capture_unknown('new', false));
+		expect(buttonIn(document, es.lv_retake_last(false))).toBeUndefined();
+
+		// Two minutes later the backend stores it; the next background ask finds it.
+		await advance(105_000);
+		const b = appendPair(700);
+		served.lookups = [() => storedBody(b)];
+		await advance(15_000);
+		expect(served.asked.every((x) => x === id)).toBe(true);
+		await vi.waitFor(() => expect(thumb(b.title)).toBeTruthy());
+		expect(note()).toContain(es.lv_capture_found);
+		expect(errorBanner()).toBe('');
+		await vi.waitFor(() => expect(buttonIn(document, es.lv_retake_last(false))).toBeTruthy());
+		const asks = served.asked.length;
+		await advance(120_000);
+		expect(served.asked).toHaveLength(asks);
+	});
+
+	it('the re-read after the unknown verdict fails: capture is blocked, with both messages shown', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		await viewportCaptureTimedOut();
+		const b = appendPair(700);
+		served.lookups = Array.from({ length: 36 }, () => failed);
+		served.recordsNext = [async () => failed()];
+		const reads = served.recordReads;
+		await advance(180_000);
+		expect(served.recordReads).toBe(reads + 1);
+		expect(errorBanner()).toContain(es.lv_capture_unknown('new', false));
+		expect(document.querySelector('.lv-records-unread')?.textContent).toContain(
+			es.lv_records_unread
+		);
+		expect(thumb(b.title)).toBeUndefined();
+		expect(captureButton().disabled).toBe(true);
+		captureButton().click();
+		press();
+		await settle();
+		expect(served.captures).toHaveLength(1);
+	});
+
+	it('blocked after a failed re-read: Retry reads the records, the strip is current and capture is possible again', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		await viewportCaptureTimedOut();
+		const b = appendPair(700);
+		served.lookups = Array.from({ length: 36 }, () => failed);
+		served.recordsNext = [async () => failed()];
+		await advance(180_000);
+		expect(captureButton().disabled).toBe(true);
+		const retry = [
+			...document.querySelectorAll<HTMLButtonElement>('.lv-records-unread button')
+		].find((x) => words(x) === es.common_retry)!;
+		retry.click();
+		await settle();
+		await vi.waitFor(() => expect(thumb(b.title)).toBeTruthy());
+		expect(document.querySelector('.lv-records-unread')).toBeNull();
+		expect(captureButton().disabled).toBe(false);
+		press();
+		await settle();
 		expect(served.captures).toHaveLength(2);
+	});
+
+	it('A unknown, B then succeeds, A found later: the records refresh, but "Retake the last opening" still sends B', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		await viewportCaptureTimedOut();
+		served.lookups = Array.from({ length: 36 }, () => failed);
+		await advance(180_000);
+		expect(errorBanner()).toContain(es.lv_capture_unknown('new', false));
+
+		// B: a capture that succeeds.
+		press();
+		await vi.waitFor(() => expect(served.captures).toHaveLength(2));
+		const bRecord = served.records[served.records.length - 1];
+		await vi.waitFor(() => expect(thumb(bRecord.title)).toBeTruthy());
+		await vi.waitFor(() => expect(buttonIn(document, es.lv_retake_last(false))).toBeTruthy());
+
+		// A: stored after all, found by the background asks.
+		const a = appendPair(700);
+		served.lookups = [() => storedBody(a)];
+		await advance(15_000);
+		await vi.waitFor(() => expect(thumb(a.title)).toBeTruthy());
+		expect(note()).not.toContain(es.lv_capture_found);
+
+		buttonIn(document, es.lv_retake_last(false))!.click();
+		await vi.waitFor(() => expect(document.querySelector('.retake-last-confirm')).not.toBeNull());
+		buttonIn(document.querySelector('.retake-last-confirm'), es.common_confirm)!.click();
+		await vi.waitFor(() => expect(served.captures).toHaveLength(3));
+		expect(served.captures[2].body.record_id).toBe(bRecord.id);
+	});
+
+	it('leaving the volume stops the background asks', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		await viewportCaptureTimedOut();
+		served.lookups = Array.from({ length: 36 }, () => failed);
+		await advance(180_000);
+		await advance(15_000);
+		const asks = served.asked.length;
+		current.set('http://localhost/live-preview?projectId=2&collectionId=10');
+		await settle();
+		await advance(600_000);
+		expect(served.asked).toHaveLength(asks);
 	});
 });
 
@@ -435,7 +591,8 @@ describe('capture screen: one gate for starting a capture (NEH-381)', () => {
 		retakeLast()!.click();
 		// Driven on to the end of the check: the capture is found and the
 		// controls are free, which comes after anything the press could start.
-		appendPair(700);
+		const b = appendPair(700);
+		served.lookups = [() => storedBody(b)];
 		await vi.advanceTimersByTimeAsync(5_000);
 		await vi.waitFor(() =>
 			expect(document.querySelector('.capture-note-banner')?.textContent).toContain(
@@ -479,7 +636,7 @@ describe('capture screen: a request and a read belong to the volume they began i
 		const dialog = screen.getByRole('dialog');
 		await dialog.getByRole('button', { name: es.lvm_retake }).click();
 		await expect.element(dialog.getByRole('button', { name: es.common_confirm })).toBeVisible();
-		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
 		const answer = holdNextCapture();
 		buttonIn(document, es.common_confirm)!.click();
 		await settle();
@@ -490,37 +647,41 @@ describe('capture screen: a request and a read belong to the volume they began i
 		await advance(60_000);
 		answer(gatewayTimeout());
 		await settle();
-		const reads = served.recordReads;
 		expect(dialogText()).not.toContain(es.lv_capture_maybe_saved);
 		expect(document.querySelector('.capture-note-banner')).toBeNull();
 		await advance(30_000);
-		expect(served.recordReads).toBe(reads);
+		expect(served.asked).toEqual([]);
 		// The new volume's records are on screen, and nothing is locked.
 		expect(thumb('Par 97')).toBeUndefined();
 		expect(thumb('Folio 1')?.disabled).toBe(false);
 		expect(captureButton().disabled).toBe(false);
 	});
 
-	it("an aborted check's late read of the old volume is not put on screen", async () => {
+	it("an aborted check's late answer for the old volume is not put on screen", async () => {
 		serve();
 		const screen = render(LivePreview);
 		await screenReady();
 		await retakeTimedOut(screen);
 
-		// The first read of the check stays unanswered; the volume changes meanwhile.
-		let answerRead!: () => void;
-		served.recordsNext = [
-			() => new Promise<Response>((r) => (answerRead = () => r(json(served.records))))
+		// The first ask of the check stays unanswered; the volume changes meanwhile.
+		let answerAsk!: () => void;
+		const target = served.records.find((r) => r.id === 41)!;
+		served.lookups = [
+			() => new Promise<Response>((r) => (answerAsk = () => r(storedBody(target))))
 		];
 		await advance(5_000);
+		expect(served.asked).toHaveLength(1);
 		current.set('http://localhost/live-preview?projectId=2&collectionId=10');
 		await settle();
 		// The backend stored the retake meanwhile; the late answer carries it.
-		const target = served.records.find((r) => r.id === 41)!;
 		target.images = [img(9990, 41, 'left'), img(9991, 41, 'right')];
-		answerRead();
+		answerAsk();
 		await settle();
 		expect(stripSources().some((src) => src.includes('/records/images/9990/'))).toBe(false);
+		expect(dialogText()).not.toContain(es.lv_capture_found);
+		expect(document.querySelector('.capture-note-banner')).toBeNull();
+		await vi.waitFor(() => expect(thumb('Folio 1')).toBeTruthy());
+		expect(served.asked).toHaveLength(1);
 	});
 
 	it('the screen gone before 10 s: the still-working timer writes nothing into the shared camera status', async () => {
@@ -531,7 +692,7 @@ describe('capture screen: a request and a read belong to the volume they began i
 		const dialog = screen.getByRole('dialog');
 		await dialog.getByRole('button', { name: es.lvm_retake }).click();
 		await expect.element(dialog.getByRole('button', { name: es.common_confirm })).toBeVisible();
-		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
 		holdNextCapture();
 		buttonIn(document, es.common_confirm)!.click();
 		await settle();

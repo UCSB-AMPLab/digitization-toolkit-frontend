@@ -1187,6 +1187,21 @@ export const es = {
 		'La cámara no respondió a tiempo. Puede que la captura se haya guardado: espera mientras Captua lo comprueba.',
 	lv_capture_found: 'La captura se guardó.',
 	lv_capture_not_saved: 'No se guardó ninguna captura. Revisa la cámara y vuelve a capturar.',
+	// A capture whose outcome the check could not learn: what to check
+	// depends on the attempt (capture-check.ts CaptureAttempt) and the mode.
+	lv_capture_unknown: (attempt: 'new' | 'retake' | 'another', single: boolean): string =>
+		'Captua no pudo comprobar si la captura se guardó. ' +
+		(attempt === 'new'
+			? single
+				? 'Revisa la última imagen del volumen antes de volver a capturar.'
+				: 'Revisa el último par de páginas del volumen antes de volver a capturar.'
+			: attempt === 'retake'
+				? single
+					? 'Revisa esta imagen antes de volver a capturarla.'
+					: 'Revisa este par de páginas antes de volver a capturarlo.'
+				: single
+					? 'Revisa las imágenes alrededor de esta antes de volver a capturar.'
+					: 'Revisa los pares de páginas alrededor de este antes de volver a capturar.'),
 	lv_records_unread:
 		'Captua no pudo cargar los registros de este volumen, así que todavía no se puede capturar.',
 	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
