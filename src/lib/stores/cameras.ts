@@ -21,16 +21,27 @@ const initialState: CameraStatusState = {
 
 function createCameraStatusStore() {
 	const { subscribe, set, update } = writable<CameraStatusState>(initialState);
+	// Whose failure is shown, when its writer named one: clearFailure removes
+	// it only while it is still that writer's (NEH-401).
+	let owner: unknown = null;
 
 	return {
 		subscribe,
 		/** Call after a capture succeeds — clears any previous error and notice. */
 		reportSuccess() {
+			owner = null;
 			set(initialState);
 		},
-		/** Call after a capture fails — marks the status bar red. */
-		reportFailure(message: string) {
+		/** Call after a capture fails — marks the status bar red. `by` names whose failure it is. */
+		reportFailure(message: string, by: unknown = null) {
+			owner = by;
 			update((s) => ({ ...s, captureError: true, errorMessage: message }));
+		},
+		/** Removes the failure shown, only while it is still the one `by` reported. */
+		clearFailure(by: unknown) {
+			if (by === null || owner !== by) return;
+			owner = null;
+			update((s) => ({ ...s, captureError: false, errorMessage: null }));
 		},
 		/** Sets, or with null clears, what is said about the capture in progress. */
 		reportNotice(notice: CaptureNotice | null) {

@@ -1,9 +1,15 @@
 // Version: 0.3.0
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { es } from './i18n/es';
 import { en } from './i18n/en';
-import { CaptureFailed, CaptureNotSaved, captureErrorText, isStemRequired } from './capture-errors';
+import {
+	CaptureFailed,
+	CaptureNotSaved,
+	CaptureOutcomeUnknown,
+	captureErrorText,
+	isStemRequired
+} from './capture-errors';
 
 // A stand-in for api.ts's ApiError, as in volume-stem.test.ts.
 class ApiError extends Error {
@@ -58,6 +64,81 @@ describe('captureErrorText', () => {
 	it('a capture the check after a timeout did not find: the not-saved message (NEH-381)', () => {
 		expect(captureErrorText(new CaptureNotSaved(), es)).toBe(es.lv_capture_not_saved);
 		expect(captureErrorText(new CaptureNotSaved(), en)).toBe(en.lv_capture_not_saved);
+	});
+
+	it('a capture whose fate the check could not learn: the unknown message, never not saved (NEH-401)', () => {
+		for (const attempt of ['new', 'retake', 'another'] as const) {
+			for (const single of [true, false]) {
+				const error = new CaptureOutcomeUnknown(attempt, single);
+				expect(captureErrorText(error, es)).toBe(es.lv_capture_unknown(attempt, single));
+				expect(captureErrorText(error, en)).toBe(en.lv_capture_unknown(attempt, single));
+				expect(en.lv_capture_unknown(attempt, single)).not.toBe(en.lv_capture_not_saved);
+			}
+		}
+	});
+
+	it('an unknown outcome found later runs the clears registered by the places that show it, once', () => {
+		const error = new CaptureOutcomeUnknown('new', false);
+		const a = vi.fn();
+		const b = vi.fn();
+		error.whenFound(a);
+		error.whenFound(b);
+		expect(a).not.toHaveBeenCalled();
+		error.markFound();
+		error.markFound();
+		expect(a).toHaveBeenCalledTimes(1);
+		expect(b).toHaveBeenCalledTimes(1);
+		// A place registered after it was found clears at once.
+		const late = vi.fn();
+		error.whenFound(late);
+		expect(late).toHaveBeenCalledTimes(1);
+	});
+
+	it('the unknown message names what to check, by the kind of attempt and the mode', () => {
+		const start = 'Captua could not find out whether the capture was saved. ';
+		expect(en.lv_capture_unknown('new', false)).toBe(
+			start + 'Check the last opening in the volume before you capture again.'
+		);
+		expect(en.lv_capture_unknown('new', true)).toBe(
+			start + 'Check the last image in the volume before you capture again.'
+		);
+		expect(en.lv_capture_unknown('retake', false)).toBe(
+			start + 'Check this opening before you capture it again.'
+		);
+		expect(en.lv_capture_unknown('retake', true)).toBe(
+			start + 'Check this image before you capture it again.'
+		);
+		expect(en.lv_capture_unknown('another', false)).toBe(
+			start + 'Check the openings around this one before you capture again.'
+		);
+		expect(en.lv_capture_unknown('another', true)).toBe(
+			start + 'Check the images around this one before you capture again.'
+		);
+		expect(es.lv_capture_unknown('new', false)).toBe(
+			'Captua no pudo comprobar si la captura se guardó. Revisa el último par de páginas del volumen antes de volver a capturar.'
+		);
+		const all = (['new', 'retake', 'another'] as const).flatMap((a) =>
+			[true, false].map((single) => es.lv_capture_unknown(a, single))
+		);
+		expect(new Set(all).size).toBe(6);
+	});
+
+	it('a 409 capture_abandoned: the not-saved message (NEH-401)', () => {
+		const abandoned = new ApiError('x', { code: 'capture_abandoned', message: 'x' }, 409);
+		expect(captureErrorText(abandoned, en)).toBe(en.lv_capture_not_saved);
+		expect(captureErrorText(abandoned, es)).toBe(es.lv_capture_not_saved);
+	});
+
+	it("the backend's refusals of a capture id: the generic message (NEH-401)", () => {
+		for (const code of ['client_capture_id_in_use', 'capture_no_longer_stored']) {
+			const refusal = new ApiError(
+				'This capture id was already used.',
+				{ code, message: 'x' },
+				409
+			);
+			expect(captureErrorText(refusal, en)).toBe(en.lv_capture_error);
+			expect(captureErrorText(refusal, es)).toBe(es.lv_capture_error);
+		}
 	});
 
 	it('uses the catalogue of the language asked for', () => {

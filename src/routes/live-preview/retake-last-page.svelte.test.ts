@@ -5,10 +5,13 @@
 // or in a status other than captured or rejected). Pressing it asks for
 // confirmation in place; Confirm retakes the record through the image
 // window's path (`record_id`). The capture key and the pedal never press it
-// or confirm it, and take no capture while its confirmation shows.
+// or confirm it, and take no capture while its confirmation shows. Its
+// request carries a fresh client_capture_id, and one that ends in a timeout
+// is checked by asking the backend for that id (NEH-401).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
+import { tick } from 'svelte';
 
 const current = vi.hoisted(() => {
 	const subs = new Set<(v: { url: URL }) => void>();
@@ -121,7 +124,11 @@ const served = {
 	// The next capture fails with this backend status and detail.
 	failNext: null as null | { status: number; detail: unknown },
 	// The next answer to a capture into a record leaves out its image ids.
-	noImageIdsNext: false
+	noImageIdsNext: false,
+	// The ids GET /cameras/capture-requests/{id} was asked for, and what it
+	// answers: the next of `lookups`, or in progress once they run out.
+	asked: [] as string[],
+	lookups: [] as (() => Response)[]
 };
 
 // What the backend commits for a new capture at the end of the volume.
@@ -157,6 +164,11 @@ function serve() {
 		}
 		if (path.endsWith('/projects/2')) return json({ id: 2, name: 'AHR' });
 		if (path.endsWith('/cameras/capabilities')) return json(served.capabilities);
+		const lookup = path.match(/\/cameras\/capture-requests\/([^/]+)$/);
+		if (lookup) {
+			served.asked.push(lookup[1]);
+			return (served.lookups.shift() ?? (() => json({ in_progress: true })))();
+		}
 		if (path.endsWith('/records/')) {
 			served.recordReads++;
 			const next = served.recordsNext.shift();
@@ -210,6 +222,8 @@ beforeEach(() => {
 	served.summaryReads = 0;
 	served.failNext = null;
 	served.noImageIdsNext = false;
+	served.asked = [];
+	served.lookups = [];
 	cameraStatus.reportSuccess();
 	authStore.setSession({
 		id: 1,
@@ -222,6 +236,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	vi.useRealTimers();
 	vi.restoreAllMocks();
 	authStore.clearSession();
 	cameraStatus.reportSuccess();
@@ -534,5 +549,107 @@ describe('Retake the last opening: the backend refuses a changed record (NEH-388
 		await vi.waitFor(() => expect(served.captures).toHaveLength(3));
 		expect(served.captures[2].body.record_id).toBe(added.id);
 		expect(served.captures[2].body.expected_image_ids).toEqual(current);
+	});
+});
+
+describe('Retake the last opening that ends in a timeout (NEH-401)', () => {
+	// Captured before any test fakes timers.
+	const realSetTimeout = globalThis.setTimeout.bind(globalThis);
+	async function settle() {
+		for (let i = 0; i < 6; i++) {
+			await tick();
+			await new Promise((r) => realSetTimeout(r, 10));
+		}
+	}
+	async function advance(ms: number) {
+		await vi.advanceTimersByTimeAsync(ms);
+		await settle();
+	}
+	const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+	const note = () => {
+		const el = document.querySelector('.capture-note-banner');
+		return el ? words(el) : '';
+	};
+
+	// A capture confirmed, then its retake confirmed and answered with nginx's 504 at 120 s.
+	async function retakeLastTimedOut(): Promise<{ added: Rec; id: string; replaced: number[] }> {
+		const added = await captureOne();
+		await openConfirm();
+		const replaced = added.images.map((i) => i.id).sort((a, b) => a - b);
+		let answer!: (r: Response) => void;
+		served.held = new Promise((r) => (answer = r));
+		buttonIn(confirmBox(), es.common_confirm)!.click();
+		await vi.waitFor(() => expect(served.captures).toHaveLength(2));
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
+		await advance(120_000);
+		answer(
+			new Response('<html><head><title>504 Gateway Time-out</title></head></html>', {
+				status: 504,
+				headers: { 'Content-Type': 'text/html' }
+			})
+		);
+		await settle();
+		expect(note()).toBe(es.lv_capture_maybe_saved);
+		const body = served.captures[1].body;
+		expect(body.record_id).toBe(added.id);
+		// The id goes with the request, beside the images it replaces.
+		expect(body.expected_image_ids).toEqual(replaced);
+		const id = body.client_capture_id as string;
+		expect(id).toMatch(UUID);
+		expect(id).not.toBe(served.captures[0].body.client_capture_id);
+		return { added, id, replaced };
+	}
+
+	it('stored at the first ask: a successful retake, with no second capture', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		const { added, id } = await retakeLastTimedOut();
+		expect(captureButton().disabled).toBe(true);
+		const target = served.records.find((r) => r.id === added.id)!;
+		target.images = [img(7000, added.id, 'left'), img(7001, added.id, 'right')];
+		served.lookups = [
+			() =>
+				json({
+					success: true,
+					record_id: added.id,
+					image_ids: [7000, 7001],
+					timing: null,
+					error: null,
+					replayed: true,
+					in_progress: false
+				})
+		];
+		await advance(5_000);
+		expect(served.asked).toEqual([id]);
+		// As after the request's own success: no notice left, no failure.
+		expect(note()).toBe('');
+		expect(banner()).toBe('');
+		expect(captureButton().disabled).toBe(false);
+		expect(served.captures).toHaveLength(2);
+	});
+
+	it('the backend no longer knows the id: the banner says nothing was saved', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		const { id } = await retakeLastTimedOut();
+		served.lookups = [() => json({ detail: { code: 'not_found', message: 'Not found.' } }, 404)];
+		await advance(5_000);
+		expect(served.asked).toEqual([id]);
+		expect(banner()).toBe(es.lv_capture_not_saved);
+		expect(captureButton().disabled).toBe(false);
+		expect(served.captures).toHaveLength(2);
+	});
+
+	it('a backend without the lookup route: the banner says the outcome is unknown, never not saved', async () => {
+		serve();
+		render(LivePreview);
+		await screenReady();
+		await retakeLastTimedOut();
+		served.lookups = [() => json({ detail: 'Not Found' }, 404)];
+		await advance(5_000);
+		expect(banner()).toBe(es.lv_capture_unknown('retake', false));
+		expect(captureButton().disabled).toBe(false);
 	});
 });
