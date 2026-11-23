@@ -169,7 +169,7 @@ export const SLOW_REQUEST_TIMEOUT_MS = 150_000;
 // waits for that lock while a capture holds it; behind nginx such a request
 // is answered with a 504 at 120 s, a capture at 300 s, the same moment as
 // this limit. Either timeout of a capture sends the capture screen into its
-// check of the records (src/lib/capture-check.ts). For the other camera
+// check of the capture's id (src/lib/capture-check.ts). For the other camera
 // requests this limit exists only to free the screen when nothing answers
 // at all.
 export const CAMERA_REQUEST_TIMEOUT_MS = 300_000;
@@ -1848,6 +1848,10 @@ export interface CaptureRequest {
 	// With record_id: the current images the retake replaces; the backend
 	// refuses with 409 record_changed when they are not (NEH-388).
 	expected_image_ids?: number[];
+	// The capture's own id, a lower-case UUID, fresh for each attempt
+	// (NEH-401, src/lib/capture-check.ts): the backend stores it with the
+	// capture, and camerasApi.captureRequest asks for it.
+	client_capture_id?: string;
 }
 
 export interface DualCaptureRequest {
@@ -1867,6 +1871,8 @@ export interface DualCaptureRequest {
 	afterRecordId?: number;
 	// As in CaptureRequest (NEH-388).
 	expected_image_ids?: number[];
+	// As in CaptureRequest (NEH-401).
+	client_capture_id?: string;
 }
 
 export interface CaptureResponse {
@@ -1877,7 +1883,17 @@ export interface CaptureResponse {
 	image_ids?: number[];
 	timing?: any;
 	error?: string;
+	// True when the answer is the capture stored earlier under the request's
+	// client_capture_id, not a new picture.
+	replayed?: boolean | null;
 }
+
+// GET /cameras/capture-requests/{id} (NEH-401): the capture stored under the
+// id, as a capture request is answered, or `in_progress` while a request with
+// the id is still running. Neither is a 404 with detail code `not_found`.
+export type CaptureRequestState =
+	| (CaptureResponse & { in_progress: false })
+	| { in_progress: true };
 
 // Result of camerasApi.testCapture(): the raw image plus the two timing/size
 // headers the backend attaches (NEH-166). A missing header comes back as
@@ -2044,6 +2060,17 @@ export const camerasApi = {
 			bytes: parseNumericHeader(headers.get('X-Capture-Bytes')),
 			focalLength: focal !== null && focal > 0 ? focal : null
 		};
+	},
+
+	/**
+	 * The state of a capture sent with `clientCaptureId` (NEH-401): stored,
+	 * or still running. A 404 whose detail code is `not_found` means neither;
+	 * a 404 without it, a backend that has no such route.
+	 */
+	async captureRequest(clientCaptureId: string): Promise<CaptureRequestState> {
+		return apiRequest<CaptureRequestState>(
+			`/cameras/capture-requests/${encodeURIComponent(clientCaptureId)}`
+		);
 	},
 
 	/**

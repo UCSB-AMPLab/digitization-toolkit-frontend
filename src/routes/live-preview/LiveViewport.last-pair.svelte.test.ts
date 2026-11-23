@@ -14,7 +14,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import '../../app.css';
 
 import LiveViewport from './LiveViewport.svelte';
-import { camerasApi, type CameraCapabilities, type CaptureResponse } from '$lib/api';
+import { ApiError, camerasApi, type CameraCapabilities, type CaptureResponse } from '$lib/api';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { clearChord } from '$lib/capture-key';
@@ -388,6 +388,68 @@ describe('LiveViewport — last pair, no continuous preview (NEH-334)', () => {
 		expect(paneSource(screen.container, 1)).toBe(en.lv_last_capture);
 		// No live frame is asked for after the capture.
 		expect(previewCalls.length).toBe(2);
+	});
+
+	it('a capture whose outcome was unknown, found later by the background asks: its pair replaces the previous one (NEH-401)', async () => {
+		capsWith(false);
+		stubFetch({
+			preview: { 0: { w: 400, h: 300 }, 1: { w: 300, h: 400 } },
+			thumbs: {
+				11: { w: 222, h: 300 },
+				12: { w: 233, h: 300 },
+				21: { w: 244, h: 300 },
+				22: { w: 255, h: 300 }
+			}
+		});
+		let rejectA!: (e: unknown) => void;
+		const dualSpy = vi
+			.spyOn(camerasApi, 'captureDual')
+			.mockResolvedValueOnce({ success: true, record_id: 5, image_ids: [11, 12] })
+			.mockReturnValueOnce(new Promise<CaptureResponse>((_, no) => (rejectA = no)));
+		const answers: unknown[] = [new TypeError('Failed to fetch')];
+		vi.spyOn(camerasApi, 'captureRequest').mockImplementation(async () => {
+			const next = answers[0];
+			if (next instanceof Error) throw next;
+			return next as Awaited<ReturnType<typeof camerasApi.captureRequest>>;
+		});
+		const screen = renderViewport(baseProps({ cameraMode: 'double' }));
+		await waitForPane(screen.container, 0, 400);
+		await userEvent.click(page.getByRole('button', { name: en.lv_capture_btn, exact: true }));
+		await waitForPane(screen.container, 0, 222);
+		await waitForPane(screen.container, 1, 233);
+
+		// Capture A: a 504, then asks that fail for 180 s.
+		vi.useRealTimers();
+		vi.useFakeTimers({
+			toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date', 'performance']
+		});
+		(
+			page.getByRole('button', { name: en.lv_capture_btn, exact: true }).element() as HTMLElement
+		).click();
+		await settle();
+		expect(dualSpy).toHaveBeenCalledTimes(2);
+		rejectA(new ApiError('HTTP 504', undefined, 504));
+		await settle();
+		await vi.advanceTimersByTimeAsync(180_000);
+		await settle();
+		expect(screen.container.textContent).toContain(en.lv_capture_unknown('new', false));
+		// The background ask finds A stored.
+		answers[0] = {
+			success: true,
+			record_id: 6,
+			image_ids: [21, 22],
+			timing: null,
+			error: null,
+			replayed: true,
+			in_progress: false
+		};
+		await vi.advanceTimersByTimeAsync(15_000);
+		await settle();
+		vi.useRealTimers();
+		await waitForPane(screen.container, 0, 244);
+		await waitForPane(screen.container, 1, 255);
+		expect(paneSource(screen.container, 0)).toBe(en.lv_last_capture);
+		expect(screen.container.textContent).toContain(en.lv_capture_found);
 	});
 
 	it('swapped: camera 1 takes the left page, and its image shows in the left pane', async () => {

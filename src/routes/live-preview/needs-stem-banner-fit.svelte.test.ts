@@ -23,6 +23,8 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
+import { en } from '$lib/i18n/en';
+import { es } from '$lib/i18n/es';
 import { cameraStatus } from '$lib/stores/cameras';
 import '../../app.css';
 import LivePreview from './+page.svelte';
@@ -88,8 +90,8 @@ function fits(screen: { container: HTMLElement }, selector: string) {
 	expect(b.bottom > panel.top && b.right > panel.left && b.left < panel.right).toBe(false);
 }
 
-async function open(mode: 'single' | 'double') {
-	await browserPage.viewport(800, 480);
+async function open(mode: 'single' | 'double', [width, height] = [800, 480]) {
+	await browserPage.viewport(width, height);
 	const screen = render(LivePreview);
 	await expect.element(screen.getByRole('button', { name: /^(Capture|Capturar)$/ })).toBeVisible();
 	if (mode === 'single') {
@@ -129,5 +131,45 @@ describe('the capture-error banner keeps its width on a narrow feed (NEH-324)', 
 			await wait(200);
 			fits(screen, '.capture-error-banner');
 		});
+	}
+});
+
+describe('the capture-error banner holds the unknown outcome of a timed-out capture (NEH-401)', () => {
+	for (const size of [
+		[800, 480],
+		[1280, 800]
+	] as const) {
+		for (const lang of ['es', 'en'] as const) {
+			for (const mode of ['single', 'double'] as const) {
+				it(`${lang}, ${mode} mode, ${size[0]}x${size[1]}, every kind of attempt`, async () => {
+					locale.set(lang);
+					current.stem = 'co-ahr-6';
+					const screen = await open(mode, [...size]);
+					for (const attempt of ['new', 'retake', 'another'] as const) {
+						cameraStatus.reportSuccess();
+						const text = (lang === 'es' ? es : en).lv_capture_unknown(attempt, mode === 'single');
+						cameraStatus.reportFailure(text);
+						await vi.waitFor(() =>
+							expect(
+								screen.container.querySelector('.capture-error-banner')?.textContent
+							).toContain(text)
+						);
+						await vi.waitFor(() =>
+							expect(screen.container.querySelector('.capture-error-banner')).not.toBeNull()
+						);
+						fits(screen, '.capture-error-banner');
+						// Inside the feed, whole.
+						const feed = (
+							screen.container.querySelector('.camera-viewport') as HTMLElement
+						).getBoundingClientRect();
+						const b = (
+							screen.container.querySelector('.capture-error-banner') as HTMLElement
+						).getBoundingClientRect();
+						expect(b.top).toBeGreaterThanOrEqual(feed.top);
+						expect(b.bottom).toBeLessThanOrEqual(feed.bottom);
+					}
+				});
+			}
+		}
 	}
 });
