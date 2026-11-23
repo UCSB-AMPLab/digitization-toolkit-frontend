@@ -30,7 +30,7 @@ import {
 	readFocusActivity,
 	recordFocusActivity
 } from '$lib/focus-check';
-import { clearChord, readChords, DEFAULT_CHORDS } from '$lib/capture-key';
+import { clearChord } from '$lib/capture-key';
 import '../../app.css';
 import GuidedTour from '$lib/components/GuidedTour.svelte';
 import { tour } from '$lib/tour';
@@ -483,8 +483,7 @@ describe('the check waits for any open dialog (NEH-339)', () => {
 	const makeDue = () => setStaleActivity();
 
 	for (const [name, label, titleId] of [
-		['grid settings', en.lv_grid_settings, 'grid-modal-title'],
-		['capture key', en.lv_capture_key_settings, 'capture-key-modal-title']
+		['grid settings', en.lv_grid_settings, 'grid-modal-title']
 	] as const) {
 		it(`does not open over LiveViewport's ${name} dialog, and opens once it closes if still due`, async () => {
 			recordFocusActivity(USER, Date.now() - MIN);
@@ -519,50 +518,6 @@ describe('the check waits for any open dialog (NEH-339)', () => {
 			expect(refocusDialog()).toBeNull();
 		});
 	}
-
-	it('a key pressed in the focus check does not reassign the pedal, even while LiveViewport is learning one', async () => {
-		recordFocusActivity(USER, Date.now() - MIN);
-		serve(true);
-		render(LivePreview);
-		await expect.poll(() => refocusButton()).not.toBeNull();
-		floatButton(en.lv_capture_key_settings)!.click();
-		await expect.poll(() => modalByTitle('capture-key-modal-title')).not.toBeNull();
-		const learn = [
-			...modalByTitle('capture-key-modal-title')!.querySelectorAll<HTMLButtonElement>('button')
-		].find((b) => b.textContent?.trim() === en.lv_capture_key_learn)!;
-		learn.click();
-		await expect
-			.poll(() => document.querySelector('.capture-key-status')?.textContent)
-			.toBe(en.lv_capture_key_learning);
-
-		// The focus check over the learning dialog: its button, under the backdrop.
-		refocusButton()!.click();
-		await expect.poll(() => refocusDialog()).not.toBeNull();
-		const key = new KeyboardEvent('keydown', {
-			key: 'x',
-			code: 'KeyX',
-			bubbles: true,
-			cancelable: true
-		});
-		document.body.dispatchEvent(key);
-		document.body.dispatchEvent(
-			new KeyboardEvent('keyup', { key: 'x', code: 'KeyX', bubbles: true })
-		);
-		await settle();
-		expect(readChords()).toEqual(DEFAULT_CHORDS);
-		expect(key.defaultPrevented).toBe(false);
-		expect(document.querySelector('.capture-key-status')?.textContent).toBe(
-			en.lv_capture_key_learning
-		);
-
-		// Once the check has closed, the learning dialog takes the next key.
-		skip();
-		await expect.poll(() => refocusDialog()).toBeNull();
-		document.body.dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', bubbles: true, cancelable: true })
-		);
-		await expect.poll(() => readChords()[0]?.key).toBe('x');
-	});
 
 	// The guided tour is not a dialog: it stays out of the registry, so the
 	// capture key captures while its box is shown.

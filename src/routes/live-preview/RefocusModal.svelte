@@ -47,7 +47,8 @@
 	import { m } from '$lib/i18n';
 	import { describeFocusMode, type FocusModeKind } from '$lib/focus-mode';
 	import { describeCaptureFailure } from '$lib/capture-outcome';
-	import { ownsEvent, readChords } from '$lib/capture-key';
+	import { ownsEvent, readChords, type CaptureChord } from '$lib/capture-key';
+	import { watchCaptureChords } from '$lib/capture-key-unit';
 	import {
 		CONTINUE_ANYWAY_AFTER,
 		FOCUS_POLL_MS,
@@ -271,7 +272,10 @@
 	// (its otherModalOpen), so it never starts a real capture. Under a dialog
 	// opened over this one (the set-up step, NEH-343) they do nothing here and
 	// the key is left to that dialog (dialogsAbove, src/lib/dialog.ts).
-	const chords = readChords();
+	// The unit's key (Settings > Capture key), or both defaults: the cached copy
+	// first, then the unit's, read again at mount (src/lib/capture-key-unit.ts).
+	let chords = $state<readonly CaptureChord[]>(readChords());
+	$effect(() => watchCaptureChords((c) => (chords = c)));
 	let backdropEl = $state<HTMLElement | null>(null);
 	const isCaptureKey = (event: KeyboardEvent) =>
 		ownsEvent(event, { chords, modalOpen: false, activeElement: document.activeElement });

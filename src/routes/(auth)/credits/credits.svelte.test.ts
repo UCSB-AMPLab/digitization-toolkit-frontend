@@ -5,6 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 const { goto } = vi.hoisted(() => ({ goto: vi.fn() }));
 vi.mock('$app/navigation', () => ({ goto }));
+const pageStore = vi.hoisted(() => ({ value: null as unknown }));
+vi.mock('$app/stores', async () => {
+	const { writable } = await import('svelte/store');
+	const store = writable({ url: new URL('http://localhost/credits') });
+	pageStore.value = store;
+	return { page: store };
+});
 
 import Page from './+page.svelte';
 
@@ -59,10 +66,23 @@ describe('credits page', () => {
 		}
 	});
 
-	it('links back to the welcome screen', async () => {
+	it('links back to the login page when opened from it', async () => {
+		(pageStore.value as { set: (v: { url: URL }) => void }).set({
+			url: new URL('http://localhost/credits?from=login')
+		});
 		const screen = await render(Page);
 		await expect
 			.element(screen.getByRole('link', { name: 'Back / Volver' }))
-			.toHaveAttribute('href', '/welcome');
+			.toHaveAttribute('href', '/login');
+		(pageStore.value as { set: (v: { url: URL }) => void }).set({
+			url: new URL('http://localhost/credits')
+		});
+	});
+
+	it('links back to the first-run wizard otherwise', async () => {
+		const screen = await render(Page);
+		await expect
+			.element(screen.getByRole('link', { name: 'Back / Volver' }))
+			.toHaveAttribute('href', '/setup');
 	});
 });

@@ -1,9 +1,10 @@
 // Keyboard trigger for capture (NEH-228). A USB digitization foot pedal acts
 // as a keyboard that sends a single key. Two keys work with no setup: the
 // space bar, for an ordinary keyboard, and b, the key the project's foot
-// pedal (RDing FootSwitch1F1) sends. An operator with another device assigns
-// its key by pressing it once, and the browser stores it. From then on only
-// that key triggers a capture. Letter case is ignored when keys are compared,
+// pedal (RDing FootSwitch1F1) sends. An administrator or operator with
+// another device assigns its key in Settings > Capture key by pressing it
+// once, and the unit stores it (NEH-336; the unit's value is read and written
+// in capture-key-unit.ts). From then on only that key triggers a capture. Letter case is ignored when keys are compared,
 // so Caps Lock on the unit's keyboard does not disable the pedal.
 //
 // No Svelte imports and no direct `window` references — everything comes in
@@ -196,15 +197,19 @@ export function learnFromEvent(event: KeyboardEvent): LearnResult {
 	return { ok: true, chord: chordFromEvent(event) };
 }
 
-// Persistence: a single localStorage key, as stores/auth.ts keeps the user —
-// guarded by SvelteKit's `browser` flag and try/catch so that missing or
-// throwing storage (private mode, quota) yields the defaults instead of
-// breaking the page. A well-formed value whose key is not bindable
-// (isBindableChord) falls back to the defaults just like a malformed one;
-// otherwise no key could trigger a capture. One chord is stored; with none
-// stored, both default chords apply.
+// Storage. The unit holds the capture key (GET /system/unit, captureKey);
+// this browser keeps the last value it read only as a cache, so that the
+// capture screen has the key from its first paint (readChords, writeChord,
+// clearChord). The key a browser assigned before the unit held one is read
+// only to carry it over to the unit once (readLegacyChord, clearLegacyChord)
+// and is never a source for capture. Reads are guarded by SvelteKit's
+// `browser` flag and try/catch, so missing or throwing storage (private mode,
+// quota) yields the defaults instead of breaking the page. A well-formed value
+// whose key is not bindable (isBindableChord) counts as no value; otherwise no
+// key could trigger a capture. With no value, both default chords apply.
 
-const STORAGE_KEY = STORAGE_KEYS.captureChord;
+const CACHE_KEY = STORAGE_KEYS.unitCaptureChord;
+const LEGACY_KEY = STORAGE_KEYS.captureChord;
 
 function isValidChord(value: unknown): value is CaptureChord {
 	if (!value || typeof value !== 'object') return false;
@@ -218,27 +223,52 @@ function isValidChord(value: unknown): value is CaptureChord {
 	);
 }
 
-export function readChords(): readonly CaptureChord[] {
-	if (!browser) return DEFAULT_CHORDS;
+/** A bindable chord read from data (storage, an API answer), or null for anything else. */
+export function readChordValue(value: unknown): CaptureChord | null {
+	if (!isValidChord(value) || !isBindableChord(value)) return null;
+	const { key, ctrl, alt, meta, shift } = value;
+	return { key, ctrl, alt, meta, shift };
+}
+
+/** Whether `chord` is one of the two keys that work with no setup. */
+export function isDefaultChord(chord: CaptureChord): boolean {
+	return DEFAULT_CHORDS.some((d) => chordsMatch(chord, d));
+}
+
+function readStoredChord(name: string): CaptureChord | null {
+	if (!browser) return null;
 	try {
-		const raw = readStored(STORAGE_KEY);
-		if (!raw) return DEFAULT_CHORDS;
-		const parsed = JSON.parse(raw);
-		if (!isValidChord(parsed) || !isBindableChord(parsed)) return DEFAULT_CHORDS;
-		return [parsed];
+		const raw = readStored(name);
+		return raw ? readChordValue(JSON.parse(raw)) : null;
 	} catch {
-		return DEFAULT_CHORDS;
+		return null;
 	}
+}
+
+/** The chords from the cache of the unit's key: the cached one, or the defaults. */
+export function readChords(): readonly CaptureChord[] {
+	const cached = readStoredChord(CACHE_KEY);
+	return cached ? [cached] : DEFAULT_CHORDS;
 }
 
 export function writeChord(chord: CaptureChord): void {
 	if (!browser) return;
-	// Storage may be unavailable (private mode, quota exceeded): the chord is
-	// then kept only in memory for this session, without breaking the page.
-	writeStored(STORAGE_KEY, JSON.stringify(chord));
+	// Storage may be unavailable (private mode, quota exceeded): the next
+	// page then paints with the defaults until the unit answers.
+	writeStored(CACHE_KEY, JSON.stringify(chord));
 }
 
 export function clearChord(): void {
 	if (!browser) return;
-	removeStored(STORAGE_KEY);
+	removeStored(CACHE_KEY);
+}
+
+/** The key this browser assigned before the unit held one, or null. */
+export function readLegacyChord(): CaptureChord | null {
+	return readStoredChord(LEGACY_KEY);
+}
+
+export function clearLegacyChord(): void {
+	if (!browser) return;
+	removeStored(LEGACY_KEY);
 }

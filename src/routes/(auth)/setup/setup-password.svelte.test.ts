@@ -9,6 +9,11 @@ import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+// The account step of the first-run wizard.
+vi.mock('$app/stores', async () => {
+	const { readable } = await import('svelte/store');
+	return { page: readable({ url: new URL('http://localhost/setup?step=account') }) };
+});
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { authStore } from '$lib/stores/auth';
@@ -49,6 +54,7 @@ afterEach(() => vi.restoreAllMocks());
 
 async function submit(password: string) {
 	render(SetupPage);
+	await expect.element(page.getByLabelText(en.common_username_label)).toBeVisible();
 	await userEvent.fill(page.getByLabelText(en.common_username_label), 'primera');
 	await userEvent.fill(page.getByLabelText(en.common_password_label, { exact: true }), password);
 	await userEvent.fill(page.getByLabelText(en.common_confirm_password, { exact: true }), password);

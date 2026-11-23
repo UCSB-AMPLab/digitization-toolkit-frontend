@@ -252,14 +252,14 @@ describe('live-preview buttons have accessible names (NEH-256)', () => {
 			await wait(150);
 			audit(`${cameraMode} viewport`, seen);
 			// Open the floating panel, then each of its buttons in turn: the grid
-			// and capture-key buttons open the two modals.
+			// button opens the panel's one modal.
 			if (
 				document.body.querySelector('.float-btn-toggle')?.getAttribute('aria-expanded') !== 'true'
 			) {
 				await click('.float-btn-toggle');
 			}
 			const floats = [...document.body.querySelectorAll<HTMLElement>('.float-btn')];
-			expect(floats.length).toBeGreaterThan(5);
+			expect(floats.length).toBeGreaterThan(4);
 			let modals = 0;
 			for (const f of floats) {
 				if (f.classList.contains('float-btn-toggle')) continue;
@@ -273,7 +273,7 @@ describe('live-preview buttons have accessible names (NEH-256)', () => {
 					await tick();
 				}
 			}
-			expect(modals, 'both modals were opened').toBe(2);
+			expect(modals, 'the grid modal was opened').toBe(1);
 			screen.unmount();
 		}
 		expect(seen.total).toBeGreaterThan(10);

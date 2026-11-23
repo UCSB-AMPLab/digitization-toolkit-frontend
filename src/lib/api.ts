@@ -458,6 +458,8 @@ export interface RegisterData {
 	username: string;
 	email: string | null;
 	password: string;
+	/** The first account only: the unit's language, which the account takes as its own too. */
+	default_language?: 'es' | 'en';
 }
 
 export interface LoginData {
@@ -472,6 +474,19 @@ export interface User {
 	role: 'admin' | 'operator' | 'reviewer' | 'testing';
 	is_active: boolean;
 	created_at?: string;
+	/** The person's own language; null until they choose one (NEH-336). */
+	language?: 'es' | 'en' | null;
+}
+
+/**
+ * GET /auth/setup/status. `local` is true only for a request from the unit
+ * itself to the backend's own address, never through nginx (src/lib/first-run.ts).
+ */
+export interface SetupStatus {
+	needs_setup: boolean;
+	local?: boolean;
+	/** The unit's language: the sign-in page's, and the language before anyone chooses one. */
+	default_language?: 'es' | 'en';
 }
 
 // Alias used by usersApi — same shape as what /auth/users returns
@@ -492,8 +507,8 @@ export const authApi = {
 	 * Check whether initial setup is needed (no users exist yet).
 	 * Safe to call without authentication.
 	 */
-	async setupStatus(): Promise<{ needs_setup: boolean }> {
-		return apiRequest<{ needs_setup: boolean }>('/auth/setup/status');
+	async setupStatus(signal?: AbortSignal): Promise<SetupStatus> {
+		return apiRequest<SetupStatus>('/auth/setup/status', signal ? { signal } : {});
 	},
 
 	/**
@@ -590,6 +605,14 @@ export const usersApi = {
 	 */
 	async me(): Promise<User> {
 		return apiRequest<User>('/users/me');
+	},
+
+	/** Store the signed-in person's own language (any role); returns the user. */
+	async setMyLanguage(language: 'es' | 'en'): Promise<User> {
+		return apiRequest<User>('/users/me/language', {
+			method: 'PUT',
+			body: JSON.stringify({ language })
+		});
 	},
 
 	/** List all users. Requires an admin session. */
@@ -3075,6 +3098,16 @@ export interface UnitSettings {
 	prerequisites: { backup: string[]; fisqua: string[] };
 	/** The volumes Captua keeps on the unit (NEH-320); absent from an older backend. */
 	keptVolumes?: KeptVolume[];
+	/** The unit's language, the sign-in page's (NEH-336). */
+	defaultLanguage?: 'es' | 'en';
+	/** The unit's capture key (NEH-336); null for the built-in default. */
+	captureKey?: {
+		key: string;
+		ctrl: boolean;
+		alt: boolean;
+		meta: boolean;
+		shift: boolean;
+	} | null;
 }
 
 /** A volume Captua keeps on the unit: `files` is the count it would copy offsite. */
@@ -3197,17 +3230,30 @@ export const systemApi = {
 	 * given are sent; the backend refuses any other key (422). A refused
 	 * switch is a 409 whose detail is {message, problems: [{code, message}]};
 	 * leaving offline mode with kept volumes and no `keptVolumes` is such a 409
-	 * with the problem `kept_volumes_decision`.
+	 * with the problem `kept_volumes_decision`. `defaultLanguage` sets the
+	 * unit's language (NEH-336).
 	 */
 	async setUnit(body: {
 		mode?: UnitSettings['mode'];
 		projectsEnabled?: boolean;
 		keptVolumes?: KeptVolumesDecision;
+		defaultLanguage?: 'es' | 'en';
 	}): Promise<UnitSettings> {
 		return apiRequest<UnitSettings>('/system/unit', {
 			method: 'PUT',
 			body: JSON.stringify(body),
 			timeoutMs: SLOW_REQUEST_TIMEOUT_MS
+		});
+	},
+
+	/**
+	 * Set the unit's capture key, or null for the built-in default (admin and
+	 * operator; reviewer and testing get a 403). Returns the whole unit body.
+	 */
+	async setCaptureKey(chord: UnitSettings['captureKey']): Promise<UnitSettings> {
+		return apiRequest<UnitSettings>('/system/unit/capture-key', {
+			method: 'PUT',
+			body: JSON.stringify({ capture_key: chord ?? null })
 		});
 	},
 

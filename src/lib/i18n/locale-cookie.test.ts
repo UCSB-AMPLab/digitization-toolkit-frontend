@@ -1,9 +1,23 @@
 // Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
-import { LEGACY_LOCALE_COOKIE, LOCALE_COOKIE, localeCookies, localeFromCookies } from './index';
+import {
+	cookieLocale,
+	LEGACY_LOCALE_COOKIE,
+	LOCALE_COOKIE,
+	localeCookies,
+	localeFromCookies
+} from './index';
 
 const jar = (values: Record<string, string>) => (name: string) => values[name];
+
+describe('cookieLocale', () => {
+	it("is null with no usable cookie, so the server can use the unit's language", () => {
+		expect(cookieLocale(jar({}))).toBeNull();
+		expect(cookieLocale(jar({ [LOCALE_COOKIE]: 'fr' }))).toBeNull();
+		expect(cookieLocale(jar({ [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe('en');
+	});
+});
 
 describe('localeFromCookies', () => {
 	it('reads the current cookie', () => {

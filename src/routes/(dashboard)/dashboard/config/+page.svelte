@@ -20,21 +20,16 @@
 
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
+	import { m } from '$lib/i18n';
 	import { authStore } from '$lib/stores/auth';
 	import NetworkSection from './NetworkSection.svelte';
 	import UnitSections from './UnitSections.svelte';
+	import LanguageSection from './LanguageSection.svelte';
+	import CaptureKeySection from './CaptureKeySection.svelte';
 	import { resolveSection, sectionInUrl, sectionsFor } from './settings-sections';
 	import { opensUnitSettings } from '$lib/unit-mode';
 	import { onMount } from 'svelte';
 	import { cameraKind, loadCameraKind } from '$lib/camera-kind';
-
-	// Available languages. The catalogue lives in `$lib/i18n`; this list only
-	// names them for the selector.
-	const LANGUAGES: { code: Locale; label: string }[] = [
-		{ code: 'es', label: 'Español' },
-		{ code: 'en', label: 'English' }
-	];
 
 	let role = $derived($authStore.user?.role ?? null);
 	let isAdmin = $derived(opensUnitSettings(role));
@@ -118,33 +113,11 @@
 			{#if current.id === 'network'}
 				<NetworkSection {role} />
 			{:else if current.id === 'language'}
-				<!-- Language is a personal preference; `setLanguage` writes a cookie
-             and reloads: it does not touch the session. -->
-				<div class="config-section">
-					<h2 class="section-title">{$m.config_section_language}</h2>
-					<div class="config-card">
-						<div class="config-row">
-							<div class="row-info">
-								<span class="row-label">{$m.config_language_label}</span>
-								<span class="row-desc">{$m.config_language_desc}</span>
-							</div>
-
-							<div class="lang-options" role="group" aria-label={$m.config_language_label}>
-								{#each LANGUAGES as lang}
-									<button
-										type="button"
-										class="lang-option"
-										class:active={$locale === lang.code}
-										aria-pressed={$locale === lang.code}
-										onclick={() => setLanguage(lang.code)}
-									>
-										{lang.label}
-									</button>
-								{/each}
-							</div>
-						</div>
-					</div>
-				</div>
+				<!-- My language, and for an administrator the unit's (NEH-336). -->
+				<LanguageSection {role} />
+			{:else if current.id === 'capture-key'}
+				<!-- The unit's capture key: administrator and operator (NEH-336). -->
+				<CaptureKeySection />
 			{:else if current.unit}
 				<!-- `current` is one of the role's sections (resolveSection). -->
 				<UnitSections section={current.id} canManageDrives={isAdmin} />
@@ -307,81 +280,5 @@
 		.page-header {
 			margin-bottom: 14px;
 		}
-	}
-
-	.config-section {
-		margin-bottom: 32px;
-	}
-
-	.section-title {
-		font-size: var(--text-h3);
-		font-weight: var(--fw-bold);
-		color: var(--color-light);
-		margin: 0 0 14px;
-	}
-
-	.config-card {
-		background-color: var(--color-surface);
-		border: 1px solid var(--border-color);
-		border-radius: var(--radius-xl);
-		overflow: hidden;
-	}
-
-	.config-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 18px 20px;
-		gap: 20px;
-	}
-
-	.row-info {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-		min-width: 0;
-	}
-
-	.row-label {
-		font-size: var(--text-base);
-		color: var(--color-light);
-		font-weight: var(--fw-medium);
-	}
-	.row-desc {
-		font-size: var(--text-sm);
-		color: var(--color-light-grey);
-	}
-
-	/* Language selector: toggle buttons, not a dropdown — two options fit on
-     screen, so the current one can be read without opening anything. */
-	.lang-options {
-		display: flex;
-		gap: 8px;
-		flex-shrink: 0;
-	}
-
-	.lang-option {
-		padding: 8px 16px;
-		min-height: var(--touch-target-min);
-		border-radius: var(--radius-md);
-		border: var(--border-width) solid var(--border-color);
-		background-color: transparent;
-		font-family: var(--font-family);
-		font-size: var(--text-sm);
-		font-weight: var(--fw-medium);
-		color: var(--color-light-grey);
-		cursor: pointer;
-		white-space: nowrap;
-		transition:
-			color var(--transition-base),
-			border-color var(--transition-base);
-	}
-	.lang-option:hover {
-		color: var(--color-light);
-	}
-	.lang-option.active {
-		border-color: var(--color-light);
-		color: var(--color-light);
-		font-weight: var(--fw-bold);
 	}
 </style>

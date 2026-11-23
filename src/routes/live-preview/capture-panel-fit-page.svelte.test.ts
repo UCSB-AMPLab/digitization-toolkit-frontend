@@ -125,7 +125,7 @@ describe('floating controls fit the viewport (NEH-323)', () => {
 		it(`at 800x480, ${mode} mode: every button lies inside the viewport, 44px tall`, async () => {
 			const screen = await open(mode, 800, 480);
 			const { outer, buttons } = boxes(screen);
-			expect(buttons.length).toBe(mode === 'double' ? 7 : 6);
+			expect(buttons.length).toBe(mode === 'double' ? 6 : 5);
 			const outside = buttons
 				.filter(
 					({ r }) =>
@@ -143,15 +143,14 @@ describe('floating controls fit the viewport (NEH-323)', () => {
 			const screen = await open(mode, 800, 480);
 			const { panel, buttons } = boxes(screen);
 			const labels = buttons.map((b) => b.label);
-			expect(labels.slice(0, 6)).toEqual([
+			expect(labels.slice(0, 5)).toEqual([
 				'Hide controls',
 				'Zoom in',
 				'Zoom out',
 				'Fit to screen',
-				'Grid settings',
-				'Capture pedal and key'
+				'Grid settings'
 			]);
-			if (mode === 'double') expect(labels[6]).toBe('Swap the pages of the two cameras');
+			if (mode === 'double') expect(labels[5]).toBe('Swap the pages of the two cameras');
 			expect(panel.querySelector('.float-divider')).toBeNull();
 			// The toggle stays on the panel's right edge, which stays at the viewport's.
 			const toggle = buttons[0].r;

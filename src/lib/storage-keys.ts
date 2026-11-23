@@ -9,7 +9,11 @@ const PREFIX = 'captua_';
 const LEGACY_PREFIX = 'dtk_';
 
 export const STORAGE_KEYS = {
+	// The capture key a browser assigned before the unit held it (NEH-228);
+	// read once to carry it over to the unit (NEH-336).
 	captureChord: `${PREFIX}capture_chord`,
+	// The last capture key read from the unit: a cache for the first paint.
+	unitCaptureChord: `${PREFIX}unit_capture_chord`,
 	activityView: `${PREFIX}activity_view`,
 	inProgressView: `${PREFIX}dashboard_in_progress_view`,
 	tourSeen: (userId: number | string) => `${PREFIX}tour_visto:${userId}`,

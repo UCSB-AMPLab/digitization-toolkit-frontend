@@ -48,6 +48,7 @@
 		unitState
 	} from '$lib/unit-mode';
 	import TestingBadge from '$lib/components/TestingBadge.svelte';
+	import { carryOverCaptureKey } from '$lib/capture-key-unit';
 
 	let { children } = $props();
 
@@ -108,6 +109,8 @@
 				// Refresh the user in the store (the role may have changed on the
 				// backend since the last login) before rendering.
 				authStore.setSession(outcome.user);
+				// A capture key this browser assigned before the unit held one (NEH-336).
+				void carryOverCaptureKey(outcome.user.role);
 			} else {
 				// `apiRequest` ends the session on a 401 but not on a 403. If
 				// the session stayed set, /login would redirect back here and the

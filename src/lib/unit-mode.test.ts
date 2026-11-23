@@ -59,6 +59,12 @@ describe('readUnitState', () => {
 		expect(readUnitState({ id: 1, username: 'admin' })).toBeNull();
 	});
 
+	it("reads the unit's language, and leaves it out when absent or of another value (NEH-336)", () => {
+		expect(readUnitState({ ...body, defaultLanguage: 'en' })?.defaultLanguage).toBe('en');
+		expect(readUnitState(body)?.defaultLanguage).toBeUndefined();
+		expect(readUnitState({ ...body, defaultLanguage: 'pt' })?.defaultLanguage).toBeUndefined();
+	});
+
 	it('takes a missing default project and prerequisites as none', () => {
 		const rest: { [k: string]: unknown } = { ...body };
 		delete rest.defaultProjectId;

@@ -14,7 +14,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import { activityApi, type Collection, type Project } from '$lib/api';
 import { locale } from '$lib/i18n';
 import { es } from '$lib/i18n/es';
-import { keepUnitState, resetUnit } from '$lib/unit-mode';
+import { resetUnit, writeUnit } from '$lib/unit-mode';
 import InProgress from './InProgress.svelte';
 
 const VIEW_KEY = 'captua_dashboard_in_progress_view';
@@ -59,7 +59,7 @@ afterEach(() => {
 
 describe('InProgress and hidden projects', () => {
 	it('shows no project, in the table or on the board, while projects are hidden', async () => {
-		keepUnitState(unit(false));
+		await writeUnit(async () => unit(false));
 		const screen = render(InProgress, { collections, projects });
 		await expect.element(page.getByText('Tomo 1').first()).toBeInTheDocument();
 		expect(screen.container.textContent).not.toContain('Fondo Rionegro');
@@ -75,7 +75,7 @@ describe('InProgress and hidden projects', () => {
 	});
 
 	it('keeps the project column and its link while projects are shown', async () => {
-		keepUnitState(unit(true));
+		await writeUnit(async () => unit(true));
 		const screen = render(InProgress, { collections, projects });
 		await expect.element(page.getByText('Fondo Rionegro')).toBeInTheDocument();
 		expect(screen.container.querySelector('a[href="/dashboard/projects/1"]')).not.toBeNull();
