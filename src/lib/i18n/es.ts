@@ -1205,6 +1205,29 @@ export const es = {
 	lv_preview_failed:
 		'No se pudo obtener la previsualización. Presiona "Actualizar previsualización" para intentar de nuevo.',
 	lv_thumb_empty: 'Sin capturas aún — usa el botón de captura',
+	// NEH-388: the line over the strip and each thumbnail's name; `single`
+	// when the screen captures with one camera, so a record is one image.
+	lv_thumb_hint: (single: boolean): string =>
+		single
+			? 'Presiona una miniatura para ver la imagen o volver a capturarla.'
+			: 'Presiona una miniatura para ver el par de páginas o volver a capturarlo.',
+	lv_thumb_name: (title: string, single: boolean): string =>
+		single
+			? `${title}: ver la imagen o volver a capturarla`
+			: `${title}: ver el par de páginas o volver a capturarlo`,
+	// NEH-388: beside the capture button, the record captured or retaken last on this screen.
+	lv_retake_last: (single: boolean): string =>
+		single ? 'Volver a capturar la última imagen' : 'Volver a capturar el último par',
+	// That record was changed on another screen between the capture and Confirm.
+	lv_retake_last_changed: (single: boolean): string =>
+		single
+			? 'Captua no hizo la captura: la última imagen se modificó en otra pantalla.'
+			: 'Captua no hizo la captura: el último par de páginas se modificó en otra pantalla.',
+	// NEH-351: the capture screen opened with no volume.
+	lv_setup_no_volume: 'Para capturar imágenes, primero elige un volumen.',
+	// NEH-389: a turn left a camera 180° from the default of its page.
+	lv_upside_down:
+		'Una imagen al revés suele indicar que las páginas de las dos cámaras están intercambiadas. Revisa qué página fotografía cada cámara.',
 	// NEH-339: the focus check of a DSLR unit, opened with "Reenfocar" or
 	// by itself at the start of a session or after a break.
 	focus_refocus: 'Reenfocar',
@@ -1324,6 +1347,9 @@ export const es = {
 	camcheck_full_size_aria: (side: 'left' | 'right') =>
 		`${side === 'left' ? 'Cámara derecha · par/verso' : 'Cámara izquierda · impar/recto'}: tamaño real (1:1)`,
 	camcheck_discarded: 'Captua no guarda las capturas de prueba en el volumen.',
+	// NEH-389: what a correct pair looks like, beside the two test captures.
+	camcheck_right_page_hint:
+		'La imagen marcada impar/recto debe mostrar la página que queda a la derecha en el volumen abierto.',
 	camcheck_take: 'Hacer capturas de prueba',
 	camcheck_viewer_title: 'Capturas de prueba en tamaño real',
 	camcheck_viewer_hint:

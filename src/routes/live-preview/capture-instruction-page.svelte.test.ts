@@ -246,7 +246,9 @@ describe('capture page instruction', () => {
 		await toggle.click();
 		await expect.element(screen.getByRole('button', { name: 'Mostrar menos' })).toBeVisible();
 
-		const capture = screen.getByRole('button', { name: 'Capturar' }).element() as HTMLElement;
+		const capture = screen
+			.getByRole('button', { name: 'Capturar', exact: true })
+			.element() as HTMLElement;
 		const box = capture.getBoundingClientRect();
 		const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
 		expect(hit && capture.contains(hit)).toBe(true);

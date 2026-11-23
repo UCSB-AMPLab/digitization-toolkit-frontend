@@ -152,10 +152,30 @@ export function createKnownRecords(): KnownRecords {
  * while `ready()` says the baseline is incomplete (KnownRecords.ready). A test
  * capture ('test') saves nothing, so it needs no baseline. Releasing twice
  * does nothing. `onChange` gets the new state, for what the screen disables.
+ *
+ * serial() counts the captures the gate has let in ('capture' only), one
+ * counter for every capture path of the screen: a capture reads it right
+ * after acquiring, and what it writes to the screen's error banner on
+ * completing it writes only while serial() still gives that number, so a
+ * capture that completes after a later one has started leaves the banner to
+ * the later one (NEH-388).
  */
 export interface CaptureGate {
 	isBusy(): boolean;
 	acquire(kind?: 'capture' | 'test'): (() => void) | null;
+	serial(): number;
+}
+
+/**
+ * Whether a capture may write to the screen's banner now (its success, its
+ * not-saved, its failure, a refusal): only while it is still the latest
+ * capture started (`ticket`, the gate's serial() when it was let in) and the
+ * screen is still on the volume it began in, mounted (`current`). Every write
+ * site asks this after its last await, so neither condition is checked
+ * without the other (NEH-388).
+ */
+export function mayReport(gate: CaptureGate, ticket: number, current: () => boolean): boolean {
+	return gate.serial() === ticket && current();
 }
 
 export function createCaptureGate(
@@ -163,12 +183,15 @@ export function createCaptureGate(
 	ready: () => boolean = () => true
 ): CaptureGate {
 	let busy = false;
+	let started = 0;
 	return {
 		isBusy: () => busy,
+		serial: () => started,
 		acquire(kind = 'capture') {
 			if (busy) return null;
 			if (kind === 'capture' && !ready()) return null;
 			busy = true;
+			if (kind === 'capture') started += 1;
 			onChange?.(true);
 			let released = false;
 			return () => {
@@ -300,13 +323,18 @@ export interface PageCaptureOptions<A extends CaptureAnswer, R extends RecordLik
 	onCheck: (controller: AbortController | null) => void;
 	// Cancels the still-working timer while the request is in flight, null after.
 	onSlowTimer?: (cancel: (() => void) | null) => void;
+	// Runs once the gate is held, before anything is sent; an error it throws
+	// sends nothing and is thrown on (NEH-388).
+	precheck?: () => Promise<void>;
 }
 
 /**
  * A capture made by the page (a retake, a fill, "Capture another here").
  * Sends nothing, and resolves null, when a record it names is not among the
  * known records, or the gate refuses (held, or no successful read of the
- * volume yet). Otherwise it holds the gate from the request to the end of
+ * volume yet), or when `precheck`, run once the gate is held, leaves
+ * `current()` false; a `precheck` that throws sends nothing either, and its
+ * error is thrown on. Otherwise it holds the gate from the request to the end of
  * any check, and resolves the request's answer (added to what is known when
  * it succeeded); for a request that ended in a timeout, the record the
  * check found (added too); null, with nothing shown, when the answer
@@ -320,6 +348,18 @@ export async function runPageCapture<A extends CaptureAnswer, R extends RecordLi
 	if (o.names.some((id) => !o.known.hasRecord(id))) return null;
 	const release = o.gate.acquire();
 	if (!release) return null;
+	if (o.precheck) {
+		try {
+			await o.precheck();
+		} catch (error) {
+			release();
+			throw error;
+		}
+		if (!o.current()) {
+			release();
+			return null;
+		}
+	}
 	const before = o.known.snapshot(o.target);
 	o.onCapturing(true);
 	o.notice(null);

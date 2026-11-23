@@ -26,6 +26,8 @@ import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import { cameraStatus } from '$lib/stores/cameras';
 import { clearChord, writeChord } from '$lib/capture-key';
+import { createCaptureGate } from '$lib/capture-check';
+import { get } from 'svelte/store';
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -954,4 +956,67 @@ describe('LiveViewport — pane names', () => {
 		renderViewport(baseProps({ cameraMode: 'single', swapLocked: true }));
 		await expect.poll(() => noSignal()).toEqual([es.lv_no_signal]);
 	});
+});
+
+// NEH-388: "Retake the last opening" names what it retakes by the mode on
+// screen: a pair of pages with two cameras, an image with one.
+describe('LiveViewport — the retake button names the mode', () => {
+	for (const [lang, msgs] of [
+		['en', en],
+		['es', es]
+	] as const) {
+		for (const mode of ['double', 'single'] as const) {
+			it(`${lang}, ${mode}`, async () => {
+				locale.set(lang);
+				vi.stubGlobal(
+					'fetch',
+					vi.fn(async () => new Response(null, { status: 404 }))
+				);
+				render(LiveViewport, {
+					props: baseProps({ cameraMode: mode, retakeLast: vi.fn(async () => {}), retakeLastId: 5 })
+				});
+				await expect
+					.element(
+						page.getByRole('button', {
+							name: msgs.lv_retake_last(mode === 'single'),
+							exact: true
+						})
+					)
+					.toBeVisible();
+				vi.unstubAllGlobals();
+			});
+		}
+	}
+});
+
+// NEH-388: a capture refused with a 409 asks the page to read the volume's
+// stem again; when the screen leaves the volume, or goes, during that read,
+// the capture writes nothing to the banner once the read answers. The gate
+// is free again only after the capture's last write would have been made.
+describe('LiveViewport — a 409 whose stem re-read outlives the volume', () => {
+	for (const how of ['another volume', 'the viewport gone'] as const) {
+		it(`${how}: nothing is written to the banner`, async () => {
+			locale.set('es');
+			cameraStatus.reportSuccess();
+			vi.spyOn(camerasApi, 'capture').mockRejectedValue(
+				new ApiError('Captures must go into a volume.', undefined, 409)
+			);
+			let answerStem!: (refused: boolean) => void;
+			const onStemRefused = vi.fn(() => new Promise<boolean>((resolve) => (answerStem = resolve)));
+			const captureGate = createCaptureGate();
+			stubPreviewFetch({});
+			const screen = renderViewport(baseProps({ onStemRefused, captureGate }));
+
+			window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+			await expect.poll(() => onStemRefused.mock.calls.length).toBe(1);
+			expect(captureGate.isBusy()).toBe(true);
+			if (how === 'another volume') await screen.rerender({ collectionId: 2 });
+			else screen.unmount();
+			answerStem(false);
+			// The gate is released after the capture's last write.
+			await expect.poll(() => captureGate.isBusy()).toBe(false);
+			expect(get(cameraStatus).captureError).toBe(false);
+			expect(get(cameraStatus).errorMessage).toBeNull();
+		});
+	}
 });

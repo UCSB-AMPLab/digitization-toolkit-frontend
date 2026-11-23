@@ -1,7 +1,9 @@
 <script lang="ts">
 	// The overview page at /dashboard, one page for every role: KPIs, the
 	// volumes in progress and the activity calendar for all of them, plus the
-	// camera test panel for admin and operator (`canSeeCameras`). The camera
+	// camera test panel for admin and operator (`canSeeCameras`), with "Check
+	// cameras", which opens the capture screen with no volume and its camera
+	// check open (/live-preview?check=1, NEH-351). The camera
 	// panel polls still frames from `/cameras/preview/{index}`; every camera
 	// status write goes through `applyCameraSides` so that a reconnect and a
 	// late preview cannot overwrite each other. While recaptures are pending
@@ -548,7 +550,14 @@
 
 		{#if canSeeCameras}
 			<div class="section">
-				<h2 class="section-title">{$m.dash_test_cameras}</h2>
+				<div class="section-head">
+					<h2 class="section-title">{$m.dash_test_cameras}</h2>
+					<!-- NEH-351: the capture screen with no volume, the camera check open. -->
+					<a class="btn btn-secondary" href="/live-preview?check=1">
+						<span class="material-symbols-outlined icon-sm" aria-hidden="true">photo_camera</span>
+						{$m.camcheck_open}
+					</a>
+				</div>
 
 				<div class="cameras-layout">
 					{#each ['left', 'right'] as const as side}
@@ -867,6 +876,13 @@
 		font-weight: var(--fw-bold);
 		color: var(--color-light);
 		margin: 0 0 20px;
+	}
+	.section-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px 16px;
 	}
 
 	.cameras-layout {

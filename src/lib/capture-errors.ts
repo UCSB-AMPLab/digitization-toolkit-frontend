@@ -122,6 +122,21 @@ function isStorageReserve(error: unknown): boolean {
 	);
 }
 
+/**
+ * Whether a retake was refused with the backend's 409 `record_changed`: the
+ * images it named as the ones it replaces are no longer the record's current
+ * images (NEH-388). Matched on the status and the code.
+ */
+export function isRecordChanged(error: unknown): boolean {
+	if (statusOf(error) !== 409) return false;
+	const detail = (error as { detail?: unknown }).detail;
+	return (
+		typeof detail === 'object' &&
+		detail !== null &&
+		(detail as { code?: unknown }).code === 'record_changed'
+	);
+}
+
 /** Whether a capture was refused with the backend's 409 for a volume without a stem. */
 export function isStemRequired(error: unknown): boolean {
 	return isConflict(error) && error instanceof Error && error.message === STEM_REQUIRED_DETAIL;

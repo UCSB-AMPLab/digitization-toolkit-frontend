@@ -37,9 +37,22 @@
 	// starts no check, the still-working timer is cancelled, and the last
 	// capture shown in last-pair mode goes.
 	//
+	// "Retake the last opening" (NEH-388) sits to the left of the capture
+	// button, past "Refocus" when there is one: the page passes `retakeLast` while it has a
+	// record this screen captured or retook last that the backend would retake.
+	// Pressing it shows the confirmation in its place; Confirm calls
+	// `retakeLast`, which retakes through the image window's path and its
+	// gate. The capture key and the pedal never press it or confirm it, and
+	// take no capture while the confirmation shows. Its width is what the
+	// board leaves beside the buttons around the capture button.
+	//
+	// In the page's set-up view (`setupView`, no volume chosen, NEH-351) the
+	// previews and their controls work, and there is no capture button; the
+	// capture key takes no capture (`captureReady` is false without a volume).
+	//
 	// Version: 0.3.0
 
-	import { onMount, onDestroy, untrack } from 'svelte';
+	import { onMount, onDestroy, tick, untrack } from 'svelte';
 	import { m } from '$lib/i18n';
 	import { browser } from '$app/environment';
 	import {
@@ -85,6 +98,7 @@
 		checkForCapture,
 		createCaptureGate,
 		isCaptureTimeout,
+		mayReport,
 		whenSlow,
 		type CaptureBefore,
 		type CaptureGate,
@@ -122,7 +136,10 @@
 		swapLocked = false,
 		captureCheck,
 		captureGate,
-		captureBusy = false
+		captureBusy = false,
+		setupView = false,
+		retakeLast,
+		retakeLastId = null
 	}: {
 		cameraMode: 'single' | 'double';
 		shutterSpeed: string;
@@ -195,6 +212,12 @@
 		// True while the gate is held, by this viewport or by the page: the
 		// button and the capture key take no capture.
 		captureBusy?: boolean;
+		// The page has no volume (NEH-351): no capture button.
+		setupView?: boolean;
+		// NEH-388: retakes the record captured or retaken last here; absent
+		// while there is none the backend would retake. `retakeLastId` names it.
+		retakeLast?: () => Promise<void>;
+		retakeLastId?: number | null;
 	} = $props();
 
 	// The rotate buttons are shown only with onRotateDegChange: the testing
@@ -326,6 +349,52 @@
 	// Ready, with a stem, and nothing blocking capture (NEH-343): the only
 	// state that enables the capture button and the capture key.
 	const canCapture = $derived(captureReady && !needsStem && !captureBlocked && !captureBusy);
+
+	// NEH-388: the confirmation of "Retake the last opening" is showing. It
+	// goes when the record it names changes or the button goes.
+	let retakeConfirming = $state(false);
+	let retakeConfirmFor: number | null = null;
+	$effect(() => {
+		const id = retakeLast ? retakeLastId : null;
+		if (id !== retakeConfirmFor) {
+			retakeConfirmFor = id;
+			retakeConfirming = false;
+		}
+	});
+	let retakeCancelBtn = $state<HTMLButtonElement | undefined>();
+	let retakeLastBtn = $state<HTMLButtonElement | undefined>();
+	let captureBtn = $state<HTMLButtonElement | undefined>();
+	// Room beside the capture button (60px), its 16px gap, "Refocus" (44px
+	// and its 16px gap) when there is one, and 12px to the board's edge.
+	let retakeWidth = $derived(
+		Math.max(0, Math.min(280, boardW / 2 - 30 - 16 - (onRefocus ? 60 : 0) - 12))
+	);
+
+	async function askRetakeLast() {
+		if (!retakeLast || isCapturing || !canCapture) return;
+		retakeConfirming = true;
+		await tick();
+		retakeCancelBtn?.focus();
+	}
+
+	async function cancelRetakeLast() {
+		retakeConfirming = false;
+		await tick();
+		retakeLastBtn?.focus();
+	}
+
+	// Confirm takes its own button away; once the retake has settled, sent,
+	// refused or failed, focus goes to the button if it still shows, else to
+	// the capture button.
+	async function confirmRetakeLast() {
+		retakeConfirming = false;
+		if (!retakeLast || isCapturing || !canCapture) return;
+		await retakeLast();
+		await tick();
+		if (destroyed) return;
+		if (retakeLastBtn?.isConnected) retakeLastBtn.focus();
+		else captureBtn?.focus();
+	}
 
 	// Its rect turns pointer positions into guide percentages.
 	let viewportEl = $state<HTMLElement | null>(null);
@@ -1078,7 +1147,10 @@
 	// What follows a capture the backend stored: the flash, the cleared
 	// banner, the page's read of the records, and in last-pair mode the
 	// capture's images. `imageIds` are in camera order (camera 0, then 1).
-	function captureStored(imageIds: number[]) {
+	// `may` is the capture's mayReport (src/lib/capture-check.ts): the banner
+	// is written only while it is still the latest capture and the viewport is
+	// on its volume, mounted (NEH-388).
+	function captureStored(imageIds: number[], may: () => boolean) {
 		// The flash fires only once the backend has confirmed the capture: it
 		// is the only success signal the operator sees, and if it always fired,
 		// a failed capture would look identical to a good one and the page
@@ -1088,7 +1160,7 @@
 			captureFlash = false;
 		}, 150);
 
-		cameraStatus.reportSuccess();
+		if (may()) cameraStatus.reportSuccess();
 		onCaptureDone();
 		// Not awaited: the thumbnails must not hold up the next capture.
 		lastCaptureIds = imageIds;
@@ -1110,7 +1182,12 @@
 
 	// A capture whose request ended in a timeout: the controls stay locked
 	// (isCapturing) while the records are read again.
-	async function checkTimedOut(before: CaptureBefore, dual: boolean, left: number) {
+	async function checkTimedOut(
+		before: CaptureBefore,
+		dual: boolean,
+		left: number,
+		may: () => boolean
+	) {
 		const check = captureCheck!;
 		const controller = new AbortController();
 		checkController = controller;
@@ -1118,6 +1195,7 @@
 		const outcome = await checkForCapture({ before, read: check.read, signal: controller.signal });
 		if (checkController === controller) checkController = null;
 		if (outcome.kind === 'stopped') return;
+		if (!may()) return;
 		if (outcome.kind === 'not-saved') {
 			notice(null);
 			cameraStatus.reportFailure(captureErrorText(new CaptureNotSaved(), $m, $userRole));
@@ -1125,7 +1203,7 @@
 		}
 		const ids = imageIdsInCameraOrder(outcome.record, dual, left);
 		check.confirmed(outcome.record.id, ids);
-		captureStored(ids);
+		captureStored(ids, may);
 		notice('found');
 	}
 
@@ -1133,16 +1211,19 @@
 		if (isCapturing || !canCapture) return;
 		const release = gate.acquire();
 		if (!release) return;
+		const ticket = gate.serial();
 		isCapturing = true;
 		const volume = collectionId;
 		// Still on the volume the request began in, with the viewport mounted.
 		const current = () => !destroyed && collectionId === volume;
+		// Asked after the last await before every write to the banner.
+		const may = () => mayReport(gate, ticket, current);
 		const before = captureCheck ? captureCheck.snapshot() : null;
 		const dual = cameraMode === 'double';
 		const left = leftIdx;
 		notice(null);
 		const stopSlow = whenSlow(() => {
-			if (current()) notice('still_working');
+			if (may()) notice('still_working');
 		});
 		cancelSlow = stopSlow;
 
@@ -1172,7 +1253,7 @@
 			} finally {
 				stopSlow();
 				if (cancelSlow === stopSlow) cancelSlow = null;
-				if (current()) notice(null);
+				if (may()) notice(null);
 			}
 			// The answer belongs to the volume the request began in.
 			if (!current()) return;
@@ -1184,12 +1265,12 @@
 			}
 
 			captureCheck?.confirmed(result.record_id, result.image_ids);
-			captureStored(result.image_ids ?? []);
+			captureStored(result.image_ids ?? [], may);
 		} catch (error) {
 			console.error('[LiveViewport] Capture error:', error);
 			if (!current()) return;
 			if (before && captureCheck && isCaptureTimeout(error)) {
-				await checkTimedOut(before, dual, left);
+				await checkTimedOut(before, dual, left, may);
 				return;
 			}
 			if (isConflict(error) && onStemRefused && (await onStemRefused())) {
@@ -1198,8 +1279,9 @@
 				return;
 			}
 			// Every backend error is English; the operator sees the catalogue's
-			// message for it, and the console has the original.
-			cameraStatus.reportFailure(captureErrorText(error, $m, $userRole));
+			// message for it, and the console has the original. The stem re-read
+			// above may have outlived the volume or the viewport.
+			if (may()) cameraStatus.reportFailure(captureErrorText(error, $m, $userRole));
 		} finally {
 			isCapturing = false;
 			release();
@@ -1255,7 +1337,7 @@
 				...ctx,
 				keyHeld: chordHeld,
 				capturing: isCapturing,
-				ready: canCapture
+				ready: canCapture && !retakeConfirming
 			})
 		) {
 			chordHeld = true;
@@ -1887,19 +1969,22 @@
 			{/if}
 		</div>
 
-		<div class="capture-btn-wrapper">
-			<button
-				class="capture-btn"
-				class:capturing={isCapturing}
-				onclick={handleCapture}
-				disabled={isCapturing || !canCapture}
-				title={!captureReady ? $m.lv_capture_not_ready : needsStem ? $m.lv_needs_stem : undefined}
-				aria-label={$m.lv_capture_btn}
-			>
-				<div class="capture-ring outer"></div>
-				<div class="capture-ring middle"></div>
-				<div class="capture-circle"></div>
-			</button>
+		<div class="capture-btn-wrapper" class:setup-view={setupView}>
+			{#if !setupView}
+				<button
+					class="capture-btn"
+					bind:this={captureBtn}
+					class:capturing={isCapturing}
+					onclick={handleCapture}
+					disabled={isCapturing || !canCapture}
+					title={!captureReady ? $m.lv_capture_not_ready : needsStem ? $m.lv_needs_stem : undefined}
+					aria-label={$m.lv_capture_btn}
+				>
+					<div class="capture-ring outer"></div>
+					<div class="capture-ring middle"></div>
+					<div class="capture-circle"></div>
+				</button>
+			{/if}
 			{#if lastPair && framesAvailable}
 				<!-- NEH-334: one live frame from each camera, never a capture. It sits
              beside the capture button, smaller and in the panel's colours. -->
@@ -1914,6 +1999,44 @@
 						>refresh</span
 					>
 				</button>
+			{/if}
+			{#if retakeLast && !setupView}
+				{#if retakeConfirming}
+					<div
+						class="retake-last-confirm"
+						style={`width: ${retakeWidth}px; max-height: ${Math.max(0, boardH - 32)}px; right: calc(100% + ${onRefocus ? 76 : 16}px);`}
+						role="group"
+						aria-labelledby="retake-last-q"
+					>
+						<p id="retake-last-q" class="retake-last-q">{$m.lvm_retake_confirm}</p>
+						<div class="retake-last-btns">
+							<button
+								class="btn btn-secondary"
+								bind:this={retakeCancelBtn}
+								onclick={cancelRetakeLast}>{$m.common_cancel}</button
+							>
+							<button
+								class="btn btn-danger"
+								onclick={confirmRetakeLast}
+								disabled={isCapturing || !canCapture}
+							>
+								<span class="material-symbols-outlined icon-sm" aria-hidden="true">check</span>
+								{$m.common_confirm}
+							</button>
+						</div>
+					</div>
+				{:else}
+					<button
+						class="retake-last-btn"
+						bind:this={retakeLastBtn}
+						style={`max-width: ${retakeWidth}px; right: calc(100% + ${onRefocus ? 76 : 16}px);`}
+						onclick={askRetakeLast}
+						disabled={isCapturing || !canCapture}
+					>
+						<span class="material-symbols-outlined icon-sm" aria-hidden="true">refresh</span>
+						<span>{$m.lv_retake_last(cameraMode !== 'double')}</span>
+					</button>
+				{/if}
 			{/if}
 			{#if onRefocus}
 				<!-- NEH-339: the focus check, on the other side of the capture button,
@@ -2538,6 +2661,12 @@
 		z-index: 50;
 	}
 
+	/* Without the capture button the two buttons beside it keep their places. */
+	.capture-btn-wrapper.setup-view {
+		width: 60px;
+		height: 60px;
+	}
+
 	.capture-btn {
 		position: relative;
 		width: 60px;
@@ -2596,6 +2725,62 @@
 	.refocus-btn:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	/* NEH-388: "Retake the last opening" and its confirmation, left of the
+     capture button (past "Refocus"), bottom-aligned with it; the inline
+     style sets the width the board leaves and the offset. */
+	.retake-last-btn {
+		position: absolute;
+		bottom: 8px;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-height: var(--touch-target-min);
+		width: max-content;
+		padding: 6px 12px;
+		background-color: rgba(26, 24, 21, 0.9);
+		border: 1px solid rgba(90, 140, 98, 0.3);
+		border-radius: var(--radius-xl);
+		font-family: var(--font-family);
+		font-size: var(--text-sm);
+		line-height: 1.25;
+		text-align: left;
+		color: var(--color-light);
+		cursor: pointer;
+	}
+	.retake-last-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.retake-last-confirm {
+		position: absolute;
+		bottom: 0;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 8px;
+		overflow-y: auto;
+		background-color: rgba(26, 24, 21, 0.95);
+		border: 1px solid var(--color-highlight);
+		border-radius: var(--radius-md);
+	}
+	.retake-last-q {
+		margin: 0;
+		font-size: var(--text-sm);
+		line-height: 1.35;
+		color: var(--color-light);
+	}
+	.retake-last-btns {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.retake-last-btns .btn {
+		flex: 1 1 auto;
+		min-height: var(--touch-target-min);
+		justify-content: center;
 	}
 
 	.capture-ring {

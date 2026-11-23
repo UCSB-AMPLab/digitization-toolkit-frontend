@@ -410,3 +410,84 @@ describe("runPageCapture: the page's capture refuses on its own (NEH-381)", () =
 		expect(appearedRecord(d.known.snapshot(1), [rec(1, [11])])).toBeNull();
 	});
 });
+
+describe('the gate counts the captures started (NEH-388)', () => {
+	it('each capture it lets in takes the next number; a test capture or a refusal takes none', () => {
+		const gate = createCaptureGate();
+		expect(gate.serial()).toBe(0);
+		const first = gate.acquire()!;
+		expect(gate.serial()).toBe(1);
+		expect(gate.acquire()).toBeNull();
+		expect(gate.serial()).toBe(1);
+		first();
+		gate.acquire('test')!();
+		expect(gate.serial()).toBe(1);
+		gate.acquire()!();
+		expect(gate.serial()).toBe(2);
+	});
+});
+
+describe('runPageCapture: a check before sending, inside the gate (NEH-388)', () => {
+	function opts(over: Partial<Parameters<typeof runPageCapture>[0]> = {}) {
+		const known = createKnownRecords();
+		known.listed([rec(1, [10])]);
+		const gate = createCaptureGate(undefined, () => known.ready);
+		const send = vi.fn(async () => ({ success: true, record_id: 1, image_ids: [11] }));
+		return {
+			gate,
+			send,
+			o: {
+				gate,
+				known,
+				target: 1,
+				names: [1],
+				current: () => true,
+				send,
+				read: async () => null,
+				notice: vi.fn(),
+				onCapturing: vi.fn(),
+				onCheck: vi.fn(),
+				...over
+			}
+		};
+	}
+
+	it('runs with the gate held, and then sends', async () => {
+		const d = opts();
+		const seen: boolean[] = [];
+		await runPageCapture({ ...d.o, precheck: async () => void seen.push(d.gate.isBusy()) });
+		expect(seen).toEqual([true]);
+		expect(d.send).toHaveBeenCalledTimes(1);
+	});
+
+	it('a check that throws sends nothing, releases the gate and passes the error on', async () => {
+		const d = opts();
+		const refused = new Error('changed');
+		await expect(
+			runPageCapture({
+				...d.o,
+				precheck: async () => {
+					throw refused;
+				}
+			})
+		).rejects.toBe(refused);
+		expect(d.send).not.toHaveBeenCalled();
+		expect(d.gate.isBusy()).toBe(false);
+	});
+
+	it('the screen gone during the check: nothing is sent', async () => {
+		const d = opts();
+		let here = true;
+		await expect(
+			runPageCapture({
+				...d.o,
+				current: () => here,
+				precheck: async () => {
+					here = false;
+				}
+			})
+		).resolves.toBeNull();
+		expect(d.send).not.toHaveBeenCalled();
+		expect(d.gate.isBusy()).toBe(false);
+	});
+});

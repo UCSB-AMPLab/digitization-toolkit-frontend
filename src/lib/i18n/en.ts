@@ -1139,6 +1139,21 @@ export const en: Messages = {
 	lv_preview_unsaved: 'Preview (not saved)',
 	lv_preview_failed: 'Could not get a preview. Press "Refresh preview" to try again.',
 	lv_thumb_empty: 'No captures yet — use the capture button',
+	lv_thumb_hint: (single: boolean) =>
+		single
+			? 'Press a thumbnail to see the image or retake it.'
+			: 'Press a thumbnail to see the opening or retake it.',
+	lv_thumb_name: (title: string, single: boolean) =>
+		single ? `${title}: see the image or retake it` : `${title}: see the opening or retake it`,
+	lv_retake_last: (single: boolean) =>
+		single ? 'Retake the last image' : 'Retake the last opening',
+	lv_retake_last_changed: (single: boolean) =>
+		single
+			? 'That image was changed on another screen. Nothing was captured.'
+			: 'That opening was changed on another screen. Nothing was captured.',
+	lv_setup_no_volume: 'To capture images, choose a volume first.',
+	lv_upside_down:
+		"An upside-down image usually means the two cameras' pages are swapped. Check which page each camera photographs.",
 	// NEH-339: the focus check of a DSLR unit.
 	focus_refocus: 'Refocus',
 	focus_title: 'Check focus',
@@ -1251,6 +1266,8 @@ export const en: Messages = {
 	camcheck_full_size_aria: (side: 'left' | 'right') =>
 		`${side === 'left' ? 'Right camera · even/verso' : 'Left camera · odd/recto'}: actual size (1:1)`,
 	camcheck_discarded: 'Captua does not save test captures to the volume.',
+	camcheck_right_page_hint:
+		'The image labelled odd/recto must show the page on the right of the open volume.',
 	camcheck_take: 'Take test captures',
 	camcheck_viewer_title: 'Test captures at full size',
 	camcheck_viewer_hint: 'Drag a capture to move both. Check that the text is sharp on both pages.',

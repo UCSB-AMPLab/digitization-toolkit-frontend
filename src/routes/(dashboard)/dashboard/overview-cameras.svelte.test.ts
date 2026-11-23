@@ -88,3 +88,35 @@ describe('Overview: camera names', () => {
 		expect(names()).toEqual(['Cámara 1', 'Cámara 2']);
 	});
 });
+
+// NEH-351: the camera section links to the capture screen's set-up view with
+// the camera check open, for admin and operator; a reviewer has no camera
+// section, and the testing account has an Overview of its own.
+describe('Overview: Check cameras', () => {
+	const link = () =>
+		[...document.querySelectorAll<HTMLAnchorElement>('a')].find((a) =>
+			a.textContent?.trim().endsWith(es.camcheck_open)
+		);
+
+	for (const role of ['admin', 'operator'] as const) {
+		it(`${role}: the camera section links to the camera check with no volume`, async () => {
+			locale.set('es');
+			authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
+			vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([device(0), device(1)]);
+			render(Overview);
+			await expect.poll(() => link()?.getAttribute('href')).toBe('/live-preview?check=1');
+		});
+	}
+
+	for (const role of ['reviewer', 'testing'] as const) {
+		it(`${role}: no link to the camera check`, async () => {
+			locale.set('es');
+			authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
+			vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([device(0), device(1)]);
+			render(Overview);
+			await expect.poll(() => document.querySelector('.page') !== null).toBe(true);
+			await expect.poll(() => document.querySelector('h1, h2') !== null).toBe(true);
+			expect(link()).toBeUndefined();
+		});
+	}
+});

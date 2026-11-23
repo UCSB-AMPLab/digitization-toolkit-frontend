@@ -46,9 +46,12 @@
 	//   both. A camera missing from the device list is one
 	//   Captua cannot reach.
 	//
-	// - Which camera is which (NEH-343): the camera details offer "Change
-	//   which camera is which" when the capture screen passes onChangeRoles;
-	//   the capture screen then opens that step over the check. While any
+	// - Which camera is which (NEH-343): the camera details, and the foot of
+	//   the main view (NEH-389), offer "Change which camera is which" when the
+	//   capture screen passes onChangeRoles; the capture screen then opens
+	//   that step over the check. Above the check column a line says what a
+	//   correct pair looks like: the image labelled odd/recto is the
+	//   right-hand page of the open volume. While any
 	//   dialog is open over the check (the step, the camera details, the
 	//   viewer, the Refocus dialog), the capture key takes no test captures
 	//   here (dialogsAbove, src/lib/dialog.ts).
@@ -641,6 +644,7 @@
 			</div>
 
 			<div class="ck-col">
+				<p class="sf-small ck-correct">{$m.camcheck_right_page_hint}</p>
 				{#if devicesFailed}
 					<div class="action-notice is-error" role="alert">
 						<span class="material-symbols-outlined" aria-hidden="true">error</span>
@@ -779,6 +783,11 @@
 		<div class="sf-foot">
 			<span class="sf-small">{$m.camcheck_discarded}</span>
 			<span class="ck-spacer"></span>
+			{#if onChangeRoles}
+				<button class="btn btn-ghost" onclick={changeRoles} disabled={operating}
+					>{$m.camwhich_open}</button
+				>
+			{/if}
 			<button class="btn btn-primary" onclick={takePictures} disabled={operating}>
 				<span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>
 				<span>{$m.camcheck_take}</span>
@@ -1043,6 +1052,10 @@
 		font-size: var(--text-sm);
 		color: var(--color-light-grey);
 		line-height: 1.4;
+	}
+	/* What a correct pair looks like, in the text colour: it is an instruction. */
+	.ck-correct {
+		color: var(--color-light);
 	}
 	.sf-board {
 		position: relative;

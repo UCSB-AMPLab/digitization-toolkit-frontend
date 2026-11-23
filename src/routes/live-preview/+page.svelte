@@ -153,6 +153,27 @@
 	// one (leaveVolume) and reads the new one's records; a request that names a
 	// record the current volume's known records lack is not sent.
 	//
+	// An upside-down camera (NEH-389): a turn through handleRotateDegChange,
+	// the one writer every rotation control calls, that leaves a camera's
+	// orientation 180° from its role's default (`default_orientation` in the
+	// device rows), while the saved roles decide the pages (rolesLeft), marks
+	// that camera; the notice under the viewer shows while a marked camera is
+	// still 180° off, says the cameras may be stored the wrong way round, and
+	// opens the camera step. "Close" clears the marks; the next such turn
+	// marks again. It holds no capture. Without `default_orientation` (an
+	// older backend) nothing is marked; the testing account turns nothing.
+	//
+	// "Retake the last opening" (NEH-388): the page keeps the record captured
+	// or retaken last on this screen (`lastRecordId`): set by every capture
+	// answer or check that confirmed a record in this volume (LiveViewport's,
+	// through captureCheck.confirmed, and the page's own, through
+	// pageCapture), cleared by another volume. LiveViewport shows the button
+	// beside the capture button while that record is among the volume's
+	// records in a status the backend retakes (captured or rejected), is not
+	// an open placeholder, and was captured in the mode on screen. Its
+	// Confirm goes through handleRetake and retake, the image window's path,
+	// with the same gate and timeout check; it stays on this screen afterwards.
+	//
 	// Version: 0.3.0
 
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
@@ -195,8 +216,13 @@
 		settlePendingRotations
 	} from '$lib/camera-orientation';
 	import { isConflict, needsStem } from '$lib/volume-stem';
-	import { CaptureFailed, captureErrorText } from '$lib/capture-errors';
-	import { createCaptureGate, createKnownRecords, runPageCapture } from '$lib/capture-check';
+	import { CaptureFailed, captureErrorText, isRecordChanged } from '$lib/capture-errors';
+	import {
+		createCaptureGate,
+		createKnownRecords,
+		mayReport,
+		runPageCapture
+	} from '$lib/capture-check';
 	import type { CaptureNotice } from '$lib/stores/cameras';
 	import {
 		captureInstruction,
@@ -236,6 +262,14 @@
 	// directly, so the operator does not have to find it again in the
 	// thumbnail strip.
 	let recordId = $derived(Number($page.url.searchParams.get('recordId')) || 0);
+	// NEH-351: opened without a volume (the Overview's "Check cameras", or a
+	// bare /live-preview), the screen is a set-up view: the previews, "Check
+	// cameras" and the camera step work as with a volume, and nothing that
+	// captures into a volume is on screen or sent. Every request that names
+	// the volume or the project waits on `volumeChosen`.
+	let volumeChosen = $derived(projectId > 0 && collectionId > 0);
+	// `check=1` opens the camera check on arrival (the Overview's link).
+	let checkOnArrival = untrack(() => $page.url.searchParams.get('check') === '1');
 	// A successful retake that came from that flow returns to Book view instead
 	// of staying on /live-preview. A retake started from a thumbnail on this
 	// page does not navigate anywhere.
@@ -335,6 +369,27 @@
 		if (!canSaveRotation(device) || device.hardware_id !== orientationFailed[cam]) return;
 		saveOrientation(cam, device.hardware_id, rotateDeg[cam] ?? 0);
 	}
+
+	// NEH-389: the cameras a turn left 180° from their role's default.
+	let upsideDownCams = $state<number[]>([]);
+	function upsideDown(cam: number, deg: number): boolean {
+		if (!canSetUp || rolesLeft === null) return false;
+		const expected = devices.find((d) => d.index === cam)?.default_orientation;
+		if (typeof expected !== 'number') return false;
+		return (((deg - expected) % 360) + 360) % 360 === 180;
+	}
+	function markUpsideDown(cam: number, deg: number) {
+		const others = upsideDownCams.filter((c) => c !== cam);
+		upsideDownCams = upsideDown(cam, deg) ? [...others, cam] : others;
+	}
+	let upsideDownShown = $derived(
+		upsideDownCams.some((cam) => upsideDown(cam, rotateDeg[cam] ?? 0))
+	);
+	// A mark goes once its camera is other than 180° off, however it got there.
+	$effect(() => {
+		const kept = upsideDownCams.filter((cam) => upsideDown(cam, rotateDeg[cam] ?? 0));
+		if (kept.length !== upsideDownCams.length) upsideDownCams = kept;
+	});
 
 	// The camera's name inside the notice's sentence, from the same facts as
 	// the label under its picture (LiveViewport's paneLabel): with the roles
@@ -450,7 +505,7 @@
 	// never reads the summary, so the block panel, the unlock band and the
 	// guide never appear for it.
 	async function loadRetakeSummary(): Promise<boolean> {
-		if (!takesPartInWorkflow($userRole)) return false;
+		if (!takesPartInWorkflow($userRole) || !volumeChosen) return false;
 		return (await readSummary()).ok;
 	}
 
@@ -693,9 +748,91 @@
 		refreshFailed = false;
 		refreshing = false;
 		leaving = false;
-		if (collectionId) void loadRecords();
+		setLastRecord(null);
+		if (volumeChosen) void loadRecords();
 	}
 	let leftCameraIndex = $derived(swapped ? 1 : 0);
+
+	// NEH-388: the record captured or retaken last on this screen, in this
+	// volume, and the ids of its current images as the capture answer (or,
+	// without them, the first read after it) gave them, sorted. Not reactive.
+	let lastRecordId = $state<number | null>(null);
+	let lastImageIds: number[] | null = null;
+	function setLastRecord(id: number | null, imageIds?: readonly number[] | null) {
+		lastRecordId = id;
+		lastImageIds = id !== null && imageIds ? [...imageIds].sort((a, b) => a - b) : null;
+	}
+	function currentImageIds(record: ApiRecord): number[] {
+		return (record.images ?? []).map((img) => img.id).sort((a, b) => a - b);
+	}
+	// The statuses in which the backend accepts a retake (cameras.py).
+	const RETAKE_STATUSES = ['captured', 'rejected'];
+	function retakeable(record: ApiRecord | undefined): record is ApiRecord {
+		if (!record || !RETAKE_STATUSES.includes(record.status) || isOpenPlaceholder(record))
+			return false;
+		// The backend refuses a retake in the other mode (lv_err_retake_mode).
+		return (record.capture_mode === 'dual') === (cameraMode === 'double');
+	}
+	let lastRecord = $derived.by(() => {
+		const record = lastRecordId === null ? undefined : records.find((r) => r.id === lastRecordId);
+		return retakeable(record) ? record : null;
+	});
+
+	// The record named by Confirm changed on another screen, or the records
+	// could not be read again to tell (retakeLastRecord).
+	class LastRecordChanged extends Error {}
+	class LastRecordUnread extends Error {}
+
+	// "Retake the last opening": the image window's retake, from the viewport.
+	// With the gate held, the volume's records are read again first, and the
+	// retake is sent only when the record is still listed and retakeable, and
+	// holds the same current images as when this screen captured it; with no
+	// ids known then (an answer without them, and no read since), that read
+	// gives them. The retake names those images (`expected_image_ids`), and the
+	// backend refuses it with 409 record_changed when another screen has
+	// retaken the record meanwhile. Changed either way, nothing is sent or
+	// stored and the button goes. Every write to the viewport's banner is made
+	// after the last await before it, and only while mayReport says so.
+	async function retakeLastRecord() {
+		const record = lastRecord;
+		if (!record) return;
+		const kept = lastImageIds;
+		const single = cameraMode !== 'double';
+		// The capture's number once the gate let it in; before that, the
+		// number of the latest capture, for a refusal made before the gate.
+		let ticket = captureGate.serial();
+		let sending = false;
+		let expected: number[] | undefined;
+		const volume = collectionId;
+		const current = () => !destroyed && collectionId === volume;
+		const precheck = async () => {
+			sending = true;
+			ticket = captureGate.serial();
+			if (!(await loadRecords())) throw new LastRecordUnread();
+			const fresh = records.find((r) => r.id === record.id);
+			if (!retakeable(fresh)) throw new LastRecordChanged();
+			const now = currentImageIds(fresh);
+			if (kept !== null && now.join(',') !== kept.join(',')) throw new LastRecordChanged();
+			expected = now;
+		};
+		try {
+			await handleRetake(record, true, precheck, () => expected);
+			// The gate refused it (held meanwhile): nothing happened to report.
+			if (sending && mayReport(captureGate, ticket, current)) cameraStatus.reportSuccess();
+		} catch (error) {
+			if (error instanceof LastRecordChanged || isRecordChanged(error)) {
+				if (lastRecordId === record.id) setLastRecord(null);
+				if (isRecordChanged(error)) await loadRecords();
+				if (mayReport(captureGate, ticket, current))
+					cameraStatus.reportFailure($m.lv_retake_last_changed(single));
+			} else if (error instanceof LastRecordUnread) {
+				if (mayReport(captureGate, ticket, current))
+					cameraStatus.reportFailure($m.lv_records_unread);
+			} else if (mayReport(captureGate, ticket, current)) {
+				cameraStatus.reportFailure(error instanceof Error ? error.message : String(error));
+			}
+		}
+	}
 
 	// ---------------------------------------------------------------------------
 	// The focus check (NEH-339)
@@ -1024,6 +1161,8 @@
 			return;
 		}
 
+		if (checkOnArrival) openCameraCheck();
+
 		// Not one of `tasks`: nothing waits for the focus check.
 		camerasApi
 			.getCapabilities()
@@ -1034,7 +1173,7 @@
 
 		const tasks: Promise<void>[] = [];
 
-		if (projectId) {
+		if (volumeChosen) {
 			tasks.push(
 				projectsApi
 					.get(projectId)
@@ -1045,7 +1184,7 @@
 			);
 		}
 
-		if (collectionId) {
+		if (volumeChosen) {
 			tasks.push(loadRecords().then(() => {}));
 			tasks.push(
 				collectionsApi
@@ -1076,7 +1215,7 @@
 		}
 
 		// Not one of `tasks` either: the retake modal must not wait for it.
-		const summaryLoad = collectionId ? loadRetakeSummary() : Promise.resolve(false);
+		const summaryLoad = volumeChosen ? loadRetakeSummary() : Promise.resolve(false);
 
 		await Promise.all(tasks);
 
@@ -1124,6 +1263,11 @@
 			if (volume !== collectionId) return false;
 			records = data;
 			known.listed(data);
+			// A last record whose capture answer gave no image ids takes them from here.
+			if (lastRecordId !== null && lastImageIds === null) {
+				const last = data.find((r) => r.id === lastRecordId);
+				if (last) lastImageIds = currentImageIds(last);
+			}
 			baselineReady = true;
 			recordsLoaded = true;
 			if (data.length > 0 && !selectedRecordId) {
@@ -1134,6 +1278,9 @@
 		(error) => console.error('[LivePreview] Error loading records:', error)
 	);
 	async function loadRecords(): Promise<boolean> {
+		// Without a volume there are no records to read (NEH-351): a list with
+		// no collection_id would be every volume's.
+		if (!volumeChosen) return false;
 		loadsInFlight++;
 		isLoading = true;
 		try {
@@ -1157,7 +1304,10 @@
 		confirmed: (
 			recordId: number | null | undefined,
 			imageIds: readonly number[] | null | undefined
-		) => known.confirmed(recordId, imageIds),
+		) => {
+			known.confirmed(recordId, imageIds);
+			if (recordId != null) setLastRecord(recordId, imageIds);
+		},
 		read: readForCheck
 	};
 
@@ -1169,10 +1319,11 @@
 	async function pageCapture(
 		target: number | null,
 		names: number[],
-		send: () => Promise<CaptureResponse>
+		send: () => Promise<CaptureResponse>,
+		precheck?: () => Promise<void>
 	): Promise<{ result: CaptureResponse } | { found: ApiRecord } | null> {
 		const volume = collectionId;
-		return runPageCapture({
+		const sent = await runPageCapture({
 			gate: captureGate,
 			known,
 			target,
@@ -1183,8 +1334,18 @@
 			notice,
 			onCapturing: (capturing) => (pageCapturing = capturing),
 			onCheck: (controller) => (pageCheckController = controller),
-			onSlowTimer: (cancel) => (cancelSlow = cancel)
+			onSlowTimer: (cancel) => (cancelSlow = cancel),
+			precheck
 		});
+		// A capture this volume confirmed is the last one (NEH-388).
+		if (sent && 'found' in sent)
+			setLastRecord(
+				sent.found.id,
+				(sent.found.images ?? []).map((img) => img.id)
+			);
+		else if (sent && sent.result.success)
+			setLastRecord(target ?? sent.result.record_id ?? null, sent.result.image_ids);
+		return sent;
 	}
 
 	// The line the modal shows about the capture in progress.
@@ -1198,6 +1359,13 @@
 	// Captures are reviewed in the volume view.
 	function handleGoToReview() {
 		goto(`/dashboard/projects/${projectId}/collections/${collectionId}`);
+	}
+
+	// "Check cameras" in the top bar, and `check=1` on arrival.
+	function openCameraCheck() {
+		if (viewportCapturing || pageCapturing || captureBusy) return;
+		cameraCheckOpen = true;
+		void checkSetup();
 	}
 
 	async function handleCaptureDone() {
@@ -1217,6 +1385,7 @@
 	// no stem. Resolves true when that is why the backend refused. The turn is
 	// read again too, as a 409 may be the recapture turn's.
 	async function recheckStem(): Promise<boolean> {
+		if (!volumeChosen) return false;
 		loadRetakeSummary();
 		try {
 			const c = await collectionsApi.get(collectionId);
@@ -1233,13 +1402,27 @@
 	// `is_current=false` instead of deleting them, so they remain available
 	// for audit through `GET /records/{id}/rejections`. The frontend must NOT
 	// delete them itself (NEH-209).
-	async function handleRetake(record: ApiRecord) {
+	// `fromViewport`: "Retake the last opening" (NEH-388), which has no window
+	// to close and stays on this screen; its `precheck` runs with the gate
+	// held, before anything is sent, and its errors are thrown on as they are.
+	async function handleRetake(
+		record: ApiRecord,
+		fromViewport = false,
+		precheck?: () => Promise<void>,
+		expectedImageIds?: () => number[] | undefined
+	) {
 		// The modal shows a thrown error's message; this one is the catalogue's.
 		if (volumeNeedsStem) throw new Error($m.lv_needs_stem);
 		if (captureHeld) throw new Error($m.camwhich_needed);
 		try {
-			await retake(record);
+			await retake(record, fromViewport, precheck, expectedImageIds);
 		} catch (error) {
+			if (
+				error instanceof LastRecordChanged ||
+				error instanceof LastRecordUnread ||
+				(fromViewport && isRecordChanged(error))
+			)
+				throw error;
 			console.error('[LivePreview] Error during retake:', error);
 			if (isConflict(error) && (await recheckStem())) throw new Error($m.lv_needs_stem);
 			// The backend's text is English; the modal shows the catalogue's.
@@ -1247,28 +1430,41 @@
 		}
 	}
 
-	async function retake(record: ApiRecord) {
+	// `expectedImageIds`, read when the request is sent, names the images a
+	// retake from the viewport replaces (NEH-388).
+	async function retake(
+		record: ApiRecord,
+		fromViewport = false,
+		precheck?: () => Promise<void>,
+		expectedImageIds?: () => number[] | undefined
+	) {
 		// A placeholder is a whole opening, closed or not: only a dual capture
 		// fills it. An open one gets the after-panel.
 		const hole = isOpenPlaceholder(record);
-		const sent = await pageCapture(record.id, [record.id], () =>
-			cameraMode === 'double' || record.missing_side === 'both'
-				? camerasApi.captureDual({
-						project_name: projectName,
-						collection_id: collectionId ?? undefined,
-						record_id: record.id,
-						// The roles of the new images: the same camera on the left as in the viewport.
-						left_camera_index: leftCameraIndex,
-						rotate_deg_cam0: rotateDeg[0] ?? 0,
-						rotate_deg_cam1: rotateDeg[1] ?? 0
-					})
-				: camerasApi.capture({
-						project_name: projectName,
-						camera_index: 0,
-						collection_id: collectionId ?? undefined,
-						record_id: record.id,
-						rotate_deg: rotateDeg[0] ?? 0
-					})
+		const sent = await pageCapture(
+			record.id,
+			[record.id],
+			() =>
+				cameraMode === 'double' || record.missing_side === 'both'
+					? camerasApi.captureDual({
+							project_name: projectName,
+							collection_id: collectionId ?? undefined,
+							record_id: record.id,
+							expected_image_ids: expectedImageIds?.(),
+							// The roles of the new images: the same camera on the left as in the viewport.
+							left_camera_index: leftCameraIndex,
+							rotate_deg_cam0: rotateDeg[0] ?? 0,
+							rotate_deg_cam1: rotateDeg[1] ?? 0
+						})
+					: camerasApi.capture({
+							project_name: projectName,
+							camera_index: 0,
+							collection_id: collectionId ?? undefined,
+							record_id: record.id,
+							expected_image_ids: expectedImageIds?.(),
+							rotate_deg: rotateDeg[0] ?? 0
+						}),
+			precheck
 		);
 		if (sent === null) return;
 
@@ -1286,6 +1482,12 @@
 				filled = { holeId: record.id, lastId: record.id };
 				await refreshAfterFill();
 			}
+			return;
+		}
+
+		// From the viewport: the records and the turn again, here.
+		if (fromViewport) {
+			await Promise.all([loadRecords(), loadRetakeSummary()]);
 			return;
 		}
 
@@ -1344,6 +1546,7 @@
 			rotateDeg = { ...rotateDeg, [cam]: deg };
 			return;
 		}
+		markUpsideDown(cam, deg);
 		const device = devices.find((d) => d.index === cam);
 		if (!canSaveRotation(device)) {
 			rotateDeg = { ...rotateDeg, [cam]: deg };
@@ -1365,12 +1568,8 @@
 		{collectionName}
 		testing={inTestingSpace($userRole)}
 		onBack={handleBack}
-		onGoToReview={takesPartInWorkflow($userRole) ? handleGoToReview : undefined}
-		onCheckCameras={() => {
-			if (viewportCapturing || pageCapturing || captureBusy) return;
-			cameraCheckOpen = true;
-			void checkSetup();
-		}}
+		onGoToReview={takesPartInWorkflow($userRole) && volumeChosen ? handleGoToReview : undefined}
+		onCheckCameras={openCameraCheck}
 		checkCamerasDisabled={pageCapturing || viewportCapturing || captureBusy}
 	/>
 
@@ -1534,6 +1733,9 @@
 					{pageCaptures}
 					{pageCapturing}
 					{captureGate}
+					setupView={!volumeChosen}
+					retakeLast={lastRecord ? retakeLastRecord : undefined}
+					retakeLastId={lastRecord?.id ?? null}
 					captureBusy={captureLocked}
 					captureCheck={viewportCheck}
 					onRefocus={dslrUnit
@@ -1556,6 +1758,18 @@
 					</div>
 				{/each}
 
+				{#if upsideDownShown}
+					<div class="lv-orientation-failed lv-upside-down" role="status">
+						<p class="lv-upside-down-text">{$m.lv_upside_down}</p>
+						<button class="btn btn-secondary" onclick={() => (whichByHand = true)}
+							>{$m.camwhich_open}</button
+						>
+						<button class="btn btn-ghost" onclick={() => (upsideDownCams = [])}
+							>{$m.common_close}</button
+						>
+					</div>
+				{/if}
+
 				{#if recordsUnread}
 					<div class="lv-orientation-failed lv-records-unread" role="alert">
 						<p class="ph-error">{$m.lv_records_unread}</p>
@@ -1567,22 +1781,26 @@
 					</div>
 				{/if}
 
-				<div class="thumbnail-area">
-					<ThumbnailStrip
-						{records}
-						{selectedRecordId}
-						{cameraMode}
-						disabled={captureBusy}
-						onSelect={(record) => {
-							if (captureBusy) return;
-							filled = null;
-							refreshFailed = false;
-							refreshing = false;
-							selectedRecordId = record.id;
-							inspectedRecord = record;
-						}}
-					/>
-				</div>
+				{#if !volumeChosen}
+					<p class="setup-view-note" role="status">{$m.lv_setup_no_volume}</p>
+				{:else}
+					<div class="thumbnail-area">
+						<ThumbnailStrip
+							{records}
+							{selectedRecordId}
+							{cameraMode}
+							disabled={captureBusy}
+							onSelect={(record) => {
+								if (captureBusy) return;
+								filled = null;
+								refreshFailed = false;
+								refreshing = false;
+								selectedRecordId = record.id;
+								inspectedRecord = record;
+							}}
+						/>
+					</div>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -2081,6 +2299,16 @@
 		font-size: var(--text-sm);
 		color: var(--color-error);
 	}
+	/* NEH-351: the set-up view's line, where the thumbnail strip goes. */
+	.setup-view-note {
+		flex-shrink: 0;
+		margin: 0;
+		padding: 12px 16px;
+		border-top: 1px solid var(--border-color);
+		font-size: var(--text-base);
+		line-height: 1.4;
+		color: var(--color-light);
+	}
 	/* A failed orientation save, under the viewer. */
 	.lv-orientation-failed {
 		flex-shrink: 0;
@@ -2090,6 +2318,17 @@
 		padding: 8px 12px;
 		border-left: 3px solid var(--color-error);
 		background-color: var(--color-surface-alt);
+	}
+	.lv-upside-down {
+		flex-wrap: wrap;
+		border-left-color: var(--color-warning);
+	}
+	.lv-upside-down-text {
+		flex: 1 1 16rem;
+		margin: 0;
+		font-size: var(--text-sm);
+		line-height: 1.4;
+		color: var(--color-light);
 	}
 	.lv-orientation-failed .ph-error {
 		flex: 1;
