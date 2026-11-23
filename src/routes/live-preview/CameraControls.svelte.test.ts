@@ -12,6 +12,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import { ApiError, camerasApi, type CameraCapabilities, type CameraDevice } from '$lib/api';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
+import { STORAGE_KEYS } from '$lib/storage-keys';
 import CameraControls from './CameraControls.svelte';
 
 const leftCamera: CameraDevice = {
@@ -292,6 +293,8 @@ describe('CameraControls — capture format', () => {
 		expect(chdk.screen.getByText(en.cam_dslr_note_p3).elements()).toHaveLength(0);
 		chdk.screen.unmount();
 		vi.restoreAllMocks();
+		// The panel is remembered open (NEH-225); the second mount starts collapsed.
+		localStorage.removeItem(STORAGE_KEYS.cameraPanelOpen);
 
 		const t7 = await openPanel(t7Capabilities, 'RAW+JPEG');
 		await expect.element(t7.screen.getByText(en.cam_format_note_raw_dslr)).toBeVisible();
