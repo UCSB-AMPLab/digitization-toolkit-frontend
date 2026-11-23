@@ -70,7 +70,8 @@
 	import { camerasApi, type CameraCapabilities, type CameraDevice } from '$lib/api';
 	import { m } from '$lib/i18n';
 	import { describeCaptureFailure } from '$lib/capture-outcome';
-	import { ownsEvent, readChords } from '$lib/capture-key';
+	import { ownsEvent, readChords, type CaptureChord } from '$lib/capture-key';
+	import { watchCaptureChords } from '$lib/capture-key-unit';
 	import { focalMismatch } from '$lib/focus-check';
 	import { clampStep, stepRange, zoomFailureDetail } from '$lib/zoom-steps';
 	import { dialogsAbove, dismissible, toBody, trapFocus } from '$lib/dialog';
@@ -411,7 +412,10 @@
 	// The capture key and the pedal take the test captures. While something is
 	// open over the check, they are that dialog's. LiveViewport ignores them
 	// while the check is open (its otherModalOpen).
-	const chords = readChords();
+	// The unit's key (Settings > Capture key), or both defaults: the cached copy
+	// first, then the unit's, read again at mount (src/lib/capture-key-unit.ts).
+	let chords = $state<readonly CaptureChord[]>(readChords());
+	$effect(() => watchCaptureChords((c) => (chords = c)));
 	// The whole assigned chord, modifiers included, as in the Refocus dialog.
 	const isCaptureKey = (event: KeyboardEvent) =>
 		ownsEvent(event, { chords, modalOpen: false, activeElement: document.activeElement });

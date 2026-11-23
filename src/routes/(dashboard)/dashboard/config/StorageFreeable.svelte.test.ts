@@ -203,7 +203,8 @@ describe('Settings > Storage per role (NEH-380)', () => {
 		expect(names).toEqual([
 			en.config_section_network,
 			en.config_section_language,
-			en.config_section_storage
+			en.config_section_storage,
+			en.config_section_capture_key
 		]);
 		await expect
 			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())

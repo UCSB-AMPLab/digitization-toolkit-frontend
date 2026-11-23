@@ -33,7 +33,7 @@
 	import {
 		UNIT_MODES,
 		ensureUnit,
-		keepUnitState,
+		writeUnit,
 		keptDecisionNeeded,
 		modeLabel,
 		modeRefusal,
@@ -113,7 +113,7 @@
 		changedElsewhere = false;
 		refusal = null;
 		try {
-			keepUnitState(await systemApi.setUnit(body));
+			await writeUnit(() => systemApi.setUnit(body));
 		} catch (err) {
 			console.error('[UnitMode] Change refused:', err);
 			const codes = modeRefusal(err);

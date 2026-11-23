@@ -4,9 +4,11 @@
 //
 // `unitState` holds the last state read: null until it is read, and when it
 // cannot be read. It is read once per session (ensureUnit) and again after
-// a change (reloadUnit, or keepUnitState with the PUT's answer); any change of
-// signed-in user (a logout, a login as someone else) forgets it and drops a
-// read still in flight, and the next ensureUnit reads it for the new session.
+// a change (reloadUnit, or writeUnit with the PUT's answer); every read and
+// write goes through one serial queue (below). Any change of signed-in user
+// (a logout, a login as someone else) forgets it, drops the queued items and
+// ignores the answer in flight, and the next ensureUnit reads it for the new
+// session.
 // The session itself is an httpOnly cookie no script can read (NEH-61), so
 // the user's id in the auth store marks the session. A read that
 // fails after one succeeded keeps the known state; only the first read of a
@@ -20,7 +22,8 @@
 // Version: 0.3.0
 
 import { get, writable } from 'svelte/store';
-import type { Messages } from './i18n';
+import type { Locale, Messages } from './i18n';
+import { readChordValue, type CaptureChord } from './capture-key';
 
 export const UNIT_MODES = ['offline', 'backup', 'fisqua'] as const;
 export type UnitMode = (typeof UNIT_MODES)[number];
@@ -36,6 +39,11 @@ export interface UnitState {
 	prerequisites: { backup: string[]; fisqua: string[] };
 	// The volumes Captua keeps on the unit (NEH-320); empty from an older backend.
 	keptVolumes: KeptVolume[];
+	// The unit's language (NEH-336): the sign-in page's. Absent from an older backend.
+	defaultLanguage?: Locale;
+	// The unit's capture key (NEH-336); null for the built-in default. Absent
+	// from an older backend, which leaves the key to each browser.
+	captureKey?: CaptureChord | null;
 }
 
 export interface KeptVolume {
@@ -82,7 +90,11 @@ export function readUnitState(data: unknown): UnitState | null {
 		projectsShown: d.projectsShown,
 		defaultProjectId: typeof d.defaultProjectId === 'number' ? d.defaultProjectId : null,
 		prerequisites: { backup: codes(pre.backup), fisqua: codes(pre.fisqua) },
-		keptVolumes: keptList(d.keptVolumes)
+		keptVolumes: keptList(d.keptVolumes),
+		...(d.defaultLanguage === 'es' || d.defaultLanguage === 'en'
+			? { defaultLanguage: d.defaultLanguage }
+			: {}),
+		...('captureKey' in d ? { captureKey: readChordValue(d.captureKey) } : {})
 	};
 }
 
@@ -126,16 +138,85 @@ export function unitChangeBody(
 export const unitState = writable<UnitState | null>(null);
 
 // The signed-in user's id last seen (null for no session, undefined before
-// the auth store is watched), the id the state belongs to, and the read in
-// flight.
+// the auth store is watched) and the id the state belongs to.
 type SessionKey = number | null;
 const UNKNOWN_SESSION = Symbol('unknown session');
 let observed: SessionKey | undefined = undefined;
 let readFor: SessionKey | typeof UNKNOWN_SESSION = null;
-let pending: Promise<UnitState | null> | null = null;
 let watching = false;
-// Raised by resetUnit, so a read that started before it is not kept.
+// Raised by resetUnit: an item queued before it does not start, and the
+// answer of the one in flight then is not applied.
 let generation = 0;
+
+// ---------------------------------------------------------------------------
+// The queue
+//
+// Requests about the unit's state never overlap in this browser. Every read
+// of GET /system/unit and every write that changes it (the unit's mode, its
+// language, its capture key, and the capture key's carry-over as a whole) is
+// an item of this one serial queue. An item starts only when the one before
+// it has settled, answered or failed, and its answer is applied when it
+// arrives. Because no two are in flight together, an answer can never be
+// older than the state it replaces.
+//
+// A read asked for while another read waits in the queue, not yet started,
+// shares it; a read asked for after a write was queued runs after that
+// write. A failed item rejects for its caller (a read resolves with the state
+// known) and the queue goes on. Each request is bounded by the API's own time
+// limit (src/lib/api.ts: REQUEST_TIMEOUT_MS, 60 s, for a read and for PUT
+// /system/unit/capture-key; SLOW_REQUEST_TIMEOUT_MS, 150 s, for PUT
+// /system/unit), so a stalled item holds the queue for at most that; the
+// carry-over, a read and a write, for at most 120 s. A change of signed-in
+// user (resetUnit) drops the items not yet started and ignores the answer of
+// the one in flight.
+// ---------------------------------------------------------------------------
+
+let tail: Promise<unknown> = Promise.resolve();
+// The read queued and not yet started, which a new read shares.
+let waitingRead: Promise<UnitState | null> | null = null;
+// The read queued or in flight, which ensureUnit waits for.
+let queuedRead: Promise<UnitState | null> | null = null;
+
+/** Thrown to the caller of an item dropped by a change of signed-in user. */
+export class UnitQueueReset extends Error {
+	constructor() {
+		super('The signed-in user changed');
+		this.name = 'UnitQueueReset';
+	}
+}
+
+/**
+ * What an item may do with an answer: `keep` applies a state (the GET or PUT
+ * body) unless the signed-in user changed since the item was queued.
+ */
+export interface UnitItem {
+	keep(data: unknown): UnitState | null;
+}
+
+/** Queue an item; it runs once every item before it has settled. */
+export function queueUnitItem<T>(run: (item: UnitItem) => Promise<T>): Promise<T> {
+	const queuedIn = generation;
+	const item: UnitItem = {
+		keep(data) {
+			if (queuedIn !== generation) return null;
+			const state = readUnitState(data);
+			if (state) {
+				readFor = observed === undefined ? UNKNOWN_SESSION : observed;
+				unitState.set(state);
+			}
+			return state;
+		}
+	};
+	const result = tail.then(() => {
+		if (queuedIn !== generation) throw new UnitQueueReset();
+		return run(item);
+	});
+	tail = result.catch(() => undefined);
+	// A read asked for from now on runs after this item; queueRead sets it
+	// back for a read item.
+	waitingRead = null;
+	return result;
+}
 
 function sessionKeyOf(user: { id: number } | null): SessionKey {
 	return user ? user.id : null;
@@ -157,20 +238,28 @@ async function currentSession(): Promise<SessionKey> {
 	return sessionKeyOf(authStore.getUser());
 }
 
-async function read(session: SessionKey): Promise<UnitState | null> {
-	const { systemApi } = await import('./api');
-	const startedIn = generation;
-	let state: UnitState | null = null;
-	try {
-		state = readUnitState(await systemApi.unit());
-	} catch (err) {
-		console.error('[Unit] Error reading the unit mode:', err);
-	}
-	if (startedIn !== generation) return get(unitState);
-	if (!state) return get(unitState);
-	readFor = session;
-	unitState.set(state);
-	return state;
+// A read item: the state read, or the state known when the read fails.
+function queueRead(): Promise<UnitState | null> {
+	if (waitingRead) return waitingRead;
+	const mine: Promise<UnitState | null> = queueUnitItem(async (item) => {
+		if (waitingRead === mine) waitingRead = null;
+		await currentSession();
+		const { systemApi } = await import('./api');
+		try {
+			return item.keep(await systemApi.unit()) ?? get(unitState);
+		} catch (err) {
+			console.error('[Unit] Error reading the unit mode:', err);
+			return get(unitState);
+		}
+	})
+		.catch(() => get(unitState))
+		.finally(() => {
+			if (queuedRead === mine) queuedRead = null;
+			if (waitingRead === mine) waitingRead = null;
+		});
+	waitingRead = mine;
+	queuedRead = mine;
+	return mine;
 }
 
 /** The unit's state, read once per session. */
@@ -178,34 +267,28 @@ export async function ensureUnit(): Promise<UnitState | null> {
 	const session = await currentSession();
 	const known = get(unitState);
 	if (known && (readFor === session || readFor === UNKNOWN_SESSION)) return known;
-	if (!pending) {
-		const p: Promise<UnitState | null> = read(session).finally(() => {
-			if (pending === p) pending = null;
-		});
-		pending = p;
-	}
-	return pending;
+	return queuedRead ?? queueRead();
 }
 
 /** Read the unit's state again (after a change, or a refusal that says it changed). */
-export async function reloadUnit(): Promise<UnitState | null> {
-	return read(await currentSession());
+export function reloadUnit(): Promise<UnitState | null> {
+	return queueRead();
 }
 
-/** Keep the state a PUT /system/unit answered. */
-export function keepUnitState(data: unknown): UnitState | null {
-	const state = readUnitState(data);
-	if (state) {
-		readFor = observed === undefined ? UNKNOWN_SESSION : observed;
-		unitState.set(state);
-	}
-	return state;
+/**
+ * Send a write whose answer is the unit's state (PUT /system/unit, PUT
+ * /system/unit/capture-key) as an item of the queue; its answer becomes the
+ * state. A refusal or failure rejects for the caller.
+ */
+export function writeUnit(request: () => Promise<unknown>): Promise<UnitState | null> {
+	return queueUnitItem(async (item) => item.keep(await request()));
 }
 
 /** Forget the state, so the next ensureUnit reads it again. */
 export function resetUnit(): void {
 	generation += 1;
-	pending = null;
+	waitingRead = null;
+	queuedRead = null;
 	readFor = null;
 	unitState.set(null);
 }
@@ -381,6 +464,11 @@ export function canManageOffsite(role: string | null | undefined): boolean {
  * list of volumes that can be freed: admin and operator (NEH-380).
  */
 export function canFreeVolumes(role: string | null | undefined): boolean {
+	return role === 'admin' || role === 'operator';
+}
+
+/** Set the unit's capture key (NEH-336): admin and operator. */
+export function canSetCaptureKey(role: string | null | undefined): boolean {
 	return role === 'admin' || role === 'operator';
 }
 

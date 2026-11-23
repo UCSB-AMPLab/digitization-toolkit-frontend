@@ -83,6 +83,7 @@ const ADMIN_SECTIONS = [
 	en.fisqua_link_title,
 	en.config_section_testing,
 	en.config_section_storage,
+	en.config_section_capture_key,
 	en.backup_section_title,
 	en.config_section_diagnostics,
 	en.config_section_maintenance,
@@ -128,13 +129,18 @@ describe('Settings sections', () => {
 		expect(container.textContent).toContain(en.config_subtitle_personal);
 	});
 
-	it('the operator sees Network, Language and, in the Unit group, Storage only (NEH-380)', async () => {
+	it('the operator sees Network, Language and, in the Unit group, Storage (NEH-380) and Capture key (NEH-336)', async () => {
 		serve();
 		signIn('operator');
 		const { container } = render(ConfigPage);
 		await expect
 			.poll(() => sectionNames(container))
-			.toEqual([en.config_section_network, en.config_section_language, en.config_section_storage]);
+			.toEqual([
+				en.config_section_network,
+				en.config_section_language,
+				en.config_section_storage,
+				en.config_section_capture_key
+			]);
 		expect(container.querySelector('.settings-group')?.textContent?.trim()).toBe(
 			en.config_group_unit
 		);
@@ -347,7 +353,7 @@ describe('Settings sections', () => {
 			.element(browserPage.getByRole('heading', { name: en.config_section_language, level: 2 }))
 			.toBeVisible();
 		await expect
-			.element(browserPage.getByRole('group', { name: en.config_language_label }))
+			.element(browserPage.getByRole('group', { name: en.config_language_mine_label }))
 			.toBeVisible();
 		await expect.element(browserPage.getByRole('button', { name: 'Español' })).toBeVisible();
 	});

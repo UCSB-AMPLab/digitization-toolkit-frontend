@@ -21,6 +21,10 @@ import {
 	learnFromEvent,
 	ownsEvent,
 	readChords,
+	readChordValue,
+	readLegacyChord,
+	clearLegacyChord,
+	isDefaultChord,
 	shouldTrigger,
 	writeChord,
 	type CaptureChord,
@@ -376,6 +380,12 @@ describe('learnFromEvent', () => {
 	});
 });
 
+// NEH-336: the unit holds the capture key. This browser keeps the last key
+// it read from the unit only as a cache for a fast first paint
+// (readChords/writeChord/clearChord, `captua_unit_capture_chord`). The key a
+// browser assigned before the unit held one, under `captua_capture_chord`, is read only to
+// carry it over to the unit once (readLegacyChord, clearLegacyChord), and is
+// never a source for capture.
 describe('storage: readChord / writeChord / clearChord', () => {
 	let store: Record<string, string>;
 
@@ -418,17 +428,17 @@ describe('storage: readChord / writeChord / clearChord', () => {
 	});
 
 	it('falls back to the default on malformed JSON', () => {
-		store['captua_capture_chord'] = '{not json';
+		store['captua_unit_capture_chord'] = '{not json';
 		expect(readChords()).toEqual(DEFAULT_CHORDS);
 	});
 
 	it('falls back to the default on a well-formed but wrong-shaped value', () => {
-		store['captua_capture_chord'] = JSON.stringify({ foo: 'bar' });
+		store['captua_unit_capture_chord'] = JSON.stringify({ foo: 'bar' });
 		expect(readChords()).toEqual(DEFAULT_CHORDS);
 	});
 
 	it('falls back to the default when the stored chord has an empty key', () => {
-		store['captua_capture_chord'] = JSON.stringify({
+		store['captua_unit_capture_chord'] = JSON.stringify({
 			key: '',
 			ctrl: false,
 			alt: false,
@@ -441,7 +451,7 @@ describe('storage: readChord / writeChord / clearChord', () => {
 	it.each(['Control', 'Alt', 'Shift', 'Meta'])(
 		'falls back to the default when the stored chord is modifier-only: %s',
 		(key) => {
-			store['captua_capture_chord'] = JSON.stringify({
+			store['captua_unit_capture_chord'] = JSON.stringify({
 				key,
 				ctrl: false,
 				alt: false,
@@ -458,7 +468,7 @@ describe('storage: readChord / writeChord / clearChord', () => {
 	it.each(['Dead', 'Unidentified'])(
 		'falls back to the default when the stored chord key is %s',
 		(key) => {
-			store['captua_capture_chord'] = JSON.stringify({
+			store['captua_unit_capture_chord'] = JSON.stringify({
 				key,
 				ctrl: false,
 				alt: false,
@@ -496,5 +506,38 @@ describe('storage: readChord / writeChord / clearChord', () => {
 		});
 		expect(() => writeChord(CHORD_A)).not.toThrow();
 		expect(() => clearChord()).not.toThrow();
+	});
+
+	it("never reads the browser's own assigned key as the capture key", () => {
+		store['captua_capture_chord'] = JSON.stringify(CHORD_A);
+		expect(readChords()).toEqual(DEFAULT_CHORDS);
+	});
+
+	it("reads the browser's own assigned key, under either name, for the carry-over", () => {
+		expect(readLegacyChord()).toBeNull();
+		store['dtk_capture_chord'] = JSON.stringify(CHORD_A);
+		expect(readLegacyChord()).toEqual(CHORD_A);
+		clearLegacyChord();
+		expect(readLegacyChord()).toBeNull();
+		expect(store['dtk_capture_chord']).toBeUndefined();
+		store['captua_capture_chord'] = JSON.stringify({ ...CHORD_A, key: 'Shift' });
+		expect(readLegacyChord()).toBeNull();
+	});
+});
+
+describe('readChordValue and isDefaultChord', () => {
+	it('reads a bindable chord and refuses anything else', () => {
+		expect(readChordValue(CHORD_A)).toEqual(CHORD_A);
+		expect(readChordValue({ ...CHORD_A, extra: 1 })).toEqual(CHORD_A);
+		expect(readChordValue(null)).toBeNull();
+		expect(readChordValue({ key: 'b' })).toBeNull();
+		expect(readChordValue({ ...CHORD_A, key: 'Dead' })).toBeNull();
+	});
+
+	it('names the two built-in keys as the default, in any letter case', () => {
+		for (const chord of DEFAULT_CHORDS) expect(isDefaultChord(chord)).toBe(true);
+		expect(isDefaultChord({ ...DEFAULT_CHORDS[1], key: 'B' })).toBe(true);
+		expect(isDefaultChord({ ...DEFAULT_CHORDS[1], ctrl: true })).toBe(false);
+		expect(isDefaultChord(CHORD_A)).toBe(false);
 	});
 });

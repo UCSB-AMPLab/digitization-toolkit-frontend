@@ -13,7 +13,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { es } from '$lib/i18n/es';
-import { keepUnitState, resetUnit } from '$lib/unit-mode';
+import { resetUnit, writeUnit } from '$lib/unit-mode';
 import Overview from './+page.svelte';
 
 function unit(projectsShown: boolean) {
@@ -39,14 +39,14 @@ afterEach(() => {
 
 describe('overview: Proyectos activos', () => {
 	it('is hidden while projects are hidden', async () => {
-		keepUnitState(unit(false));
+		await writeUnit(async () => unit(false));
 		render(Overview);
 		await expect.element(page.getByText(es.dash_kpi_total_records)).toBeInTheDocument();
 		expect(page.getByText(es.dash_kpi_active_projects).elements()).toHaveLength(0);
 	});
 
 	it('is shown while projects are shown', async () => {
-		keepUnitState(unit(true));
+		await writeUnit(async () => unit(true));
 		render(Overview);
 		await expect.element(page.getByText(es.dash_kpi_active_projects)).toBeInTheDocument();
 	});

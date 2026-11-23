@@ -47,6 +47,9 @@ export const en: Messages = {
 	login_username_placeholder: 'Enter your username',
 	login_password_placeholder: 'Enter your password',
 	login_remember_me: 'Remember me',
+	login_language_title: 'Choose your language',
+	login_language_desc:
+		'Captua uses it whenever you sign in, on any device. You can change it in Settings › Language.',
 	login_forgot_link: 'Forgot your password?',
 	login_forgot_dialog_aria: 'Password recovery',
 	login_forgot_title: 'Recover password',
@@ -252,9 +255,15 @@ export const en: Messages = {
 	// ── Settings ─────────────────────────────────────────────────────────────
 	config_subtitle: 'Digitization system settings',
 	config_section_language: 'Language',
-	config_language_label: 'Interface language',
-	config_language_desc:
-		'Changes the language across the whole app. The page reloads to apply it; your session stays open.',
+	config_section_capture_key: 'Capture key',
+	config_capture_key_error: 'Could not save the capture key. Try again.',
+	config_language_mine_label: 'Your language',
+	config_language_mine_desc:
+		'The language Captua uses for you, on any device you sign in from. Captua reloads the page to apply it; your session stays open.',
+	config_language_unit_label: "The unit's language",
+	config_language_unit_desc:
+		'The language of the sign-in page. Each person chooses their own the first time they sign in.',
+	config_language_error: 'Could not save the language. Try again.',
 	config_section_storage: 'Storage',
 	config_storage_alert_pre: 'Storage is at ',
 	config_storage_alert_post: '. Consider freeing up space or expanding capacity.',
@@ -947,7 +956,7 @@ export const en: Messages = {
 	bug_report_this: 'Report this problem',
 
 	// ── First-time setup ─────────────────────────────────────────────────────
-	setup_title: 'First-time setup',
+	setup_title: 'First-time set-up',
 	setup_subtitle: 'Create the administrator account.',
 	setup_ph_username: 'e.g. admin',
 	setup_ph_email: 'admin@example.com',
@@ -956,14 +965,29 @@ export const en: Messages = {
 	setup_submit: 'Create administrator account',
 	setup_submit_loading: 'CREATING ACCOUNT',
 	setup_creating: 'Creating account',
-	setup_success: 'Account created! Redirecting to login…',
+	setup_step: (n: number, total: number) => `Step ${n} of ${total}`,
+	setup_change_language: 'Change the language',
+	setup_not_local:
+		"Set-up is meant to be done at the unit's own screen. From another device, the bootstrap token is needed.",
+	setup_err_signin: 'The account was created, but signing in failed. Sign in on the sign-in page.',
+	setup_no_answer:
+		'Captua did not get an answer from the unit, so the account may or may not have been created.',
+	setup_check_account: 'Check whether the account was created',
+	setup_check_failed: 'Captua could not check. Try again.',
+	setup_other_account:
+		'This unit already has an account, but it is not the one you entered. Ask the person who created it to add you as a user.',
+	setup_go_to_login: 'Go to the sign-in page',
+	setup_network_title: 'Connect to a network',
+	setup_network_desc: 'Connect the unit to a network now, or later in Settings › Network.',
+	setup_network_continue: 'Continue',
+	setup_network_later: 'Set up later',
 	setup_err_exists: 'That username or email already exists',
 	setup_err_create: 'Could not create the account. Check the server connection.',
 	setup_token_label: 'Bootstrap token',
-	setup_ph_token: 'Paste the device bootstrap token',
-	setup_token_hint: 'Required on a provisioned device; leave blank in development.',
-	setup_err_token: 'Invalid or missing bootstrap token. Check the token on the device.',
-	setup_err_unavailable: 'Setup is unavailable: this unit has no bootstrap token configured.',
+	setup_ph_token: "Paste the unit's bootstrap token",
+	setup_token_hint: 'Required on a provisioned unit; leave blank in development.',
+	setup_err_token: 'Invalid or missing bootstrap token. Check the token on the unit.',
+	setup_err_unavailable: 'Set-up is unavailable: this unit has no bootstrap token configured.',
 	setup_val_username_required: 'Username is required',
 	setup_val_username_short: 'Username must be at least 3 characters',
 	setup_val_email_format: 'Invalid email format',
@@ -1085,17 +1109,17 @@ export const en: Messages = {
 	lv_guides: 'Guide lines',
 	lv_guides_desc: 'Draggable guides (red)',
 	lv_capture_key_current: (chord: string) => `Capture key: ${chord}`,
-	lv_capture_key_desc: 'The pedal or key that starts a capture on this page.',
-	lv_capture_key_learn: 'Learn from pedal',
+	lv_capture_key_desc:
+		'The pedal or key that starts a capture on the capture screen. The unit keeps it for every browser.',
+	lv_capture_key_learn: 'Press the key or pedal to assign',
 	lv_capture_key_learning: 'Press the pedal or key now…',
-	lv_capture_key_reset: 'Reset to default',
+	lv_capture_key_reset: 'Use the default',
 	lv_capture_key_note:
-		'While bound to capture, this key stops activating whatever button has focus on this page. Make sure the pedal is in ordinary single-key mode, not a macro or repeat mode.',
+		'While this key is assigned to capture, pressing it no longer activates the button selected on the capture screen. Make sure the pedal is in ordinary single-key mode, not a macro or repeat mode.',
 	lv_capture_key_modifier_only: (modifier: string) =>
 		`That device only sent ${modifier}. Press the pedal's actual key, not just a modifier.`,
 	lv_capture_key_unbindable: 'That device sent a key this page cannot bind. Try pressing it again.',
 	lv_capture_key_space: 'Space',
-	lv_capture_key_settings: 'Capture pedal and key',
 	lv_capture_error: 'Capture failed',
 	lv_capture_not_ready: 'Loading the volume…',
 	lv_capture_still_working:

@@ -58,6 +58,9 @@ export const es = {
 	login_username_placeholder: 'Ingresa tu usuario',
 	login_password_placeholder: 'Ingresa tu contraseña',
 	login_remember_me: 'Recuérdame',
+	login_language_title: 'Elige tu idioma',
+	login_language_desc:
+		'Captua te muestra la interfaz en este idioma cada vez que inicias sesión, desde cualquier dispositivo. Puedes cambiarlo en Configuración › Idioma.',
 	login_forgot_link: '¿Olvidaste tu contraseña?',
 	login_forgot_dialog_aria: 'Recuperación de contraseña',
 	login_forgot_title: 'Recuperar contraseña',
@@ -269,9 +272,15 @@ export const es = {
 	// ── Settings ─────────────────────────────────────────────────────────────
 	config_subtitle: 'Parámetros del sistema de digitalización',
 	config_section_language: 'Idioma',
-	config_language_label: 'Idioma de la interfaz',
-	config_language_desc:
-		'Cambia el idioma de toda la aplicación. La página se recarga para aplicarlo; la sesión no se cierra.',
+	config_section_capture_key: 'Tecla de captura',
+	config_capture_key_error: 'No se pudo guardar la tecla de captura. Intenta de nuevo.',
+	config_language_mine_label: 'Tu idioma',
+	config_language_mine_desc:
+		'El idioma en que Captua te muestra la interfaz, en cualquier dispositivo desde el que inicies sesión. Al cambiarlo, Captua recarga la página para aplicarlo, sin cerrar tu sesión.',
+	config_language_unit_label: 'Idioma del equipo',
+	config_language_unit_desc:
+		'El idioma de la página de inicio de sesión. Cada persona elige el suyo la primera vez que inicia sesión.',
+	config_language_error: 'No se pudo guardar el idioma. Intenta de nuevo.',
 	config_section_storage: 'Almacenamiento',
 	// Fragments around the <strong>{percentage}%</strong>
 	config_storage_alert_pre: 'El almacenamiento está al ',
@@ -994,27 +1003,43 @@ export const es = {
 	bug_report_this: 'Reportar este problema',
 
 	// ── First-time setup ─────────────────────────────────────────────────────
-	setup_title: 'Primera instalación',
-	setup_subtitle: 'Crea cuenta del administrador.',
+	setup_title: 'Configuración inicial',
+	setup_subtitle: 'Crea la cuenta del administrador.',
 	setup_ph_username: 'ej. admin',
 	setup_ph_email: 'admin@ejemplo.com',
-	setup_ph_password: 'Mínimo 8 caracteres',
+	setup_ph_password: 'Al menos 8 caracteres',
 	setup_ph_confirm: 'Repite la contraseña',
 	setup_submit: 'Crear cuenta de administrador',
 	setup_submit_loading: 'CREANDO CUENTA',
-	setup_creating: 'Creando cuenta',
-	setup_success: '¡Cuenta creada! Redirigiendo al inicio de sesión…',
-	setup_err_exists: 'Ese usuario o correo ya existe',
-	setup_err_create: 'No se pudo crear la cuenta. Verifica la conexión al servidor.',
+	setup_creating: 'Creando la cuenta…',
+	setup_step: (n: number, total: number) => `Paso ${n} de ${total}`,
+	setup_change_language: 'Cambiar el idioma',
+	setup_not_local:
+		'La configuración inicial está pensada para hacerse en la pantalla del propio equipo. Para hacerla desde otro dispositivo, necesitas el token de arranque.',
+	setup_err_signin:
+		'La cuenta quedó creada, pero Captua no pudo iniciar tu sesión. Hazlo tú desde la página de inicio de sesión.',
+	setup_no_answer:
+		'Captua no recibió respuesta del equipo, así que no sabe si la cuenta quedó creada.',
+	setup_check_account: 'Comprobar si la cuenta quedó creada',
+	setup_check_failed: 'Captua no pudo hacer la comprobación. Intenta de nuevo.',
+	setup_other_account:
+		'Este equipo ya tiene una cuenta, pero no es la que escribiste. Pídele a quien la creó que te agregue como usuario.',
+	setup_go_to_login: 'Ir a la página de inicio de sesión',
+	setup_network_title: 'Conecta el equipo a una red',
+	setup_network_desc: 'Puedes hacerlo ahora o más tarde, en Configuración › Red.',
+	setup_network_continue: 'Continuar',
+	setup_network_later: 'Configurar más tarde',
+	setup_err_exists: 'Ya hay una cuenta con ese usuario o ese correo.',
+	setup_err_create: 'No se pudo crear la cuenta. Revisa la conexión con el equipo.',
 	setup_token_label: 'Token de arranque',
-	setup_ph_token: 'Pega el token de arranque del dispositivo',
-	setup_token_hint: 'Requerido en un dispositivo aprovisionado; déjalo vacío en desarrollo.',
-	setup_err_token: 'Token de arranque inválido o faltante. Verifica el token en el dispositivo.',
+	setup_ph_token: 'Pega el token de arranque del equipo',
+	setup_token_hint: 'Es obligatorio en un equipo ya preparado; en desarrollo, déjalo vacío.',
+	setup_err_token: 'Falta el token de arranque o no es correcto. Revisa el token en el equipo.',
 	setup_err_unavailable:
-		'La instalación no está disponible: esta unidad no tiene token de arranque configurado.',
+		'La configuración inicial no está disponible: este equipo no tiene un token de arranque.',
 	setup_val_username_required: 'El nombre de usuario es obligatorio',
-	setup_val_username_short: 'El usuario debe tener al menos 3 caracteres',
-	setup_val_email_format: 'Formato de correo no válido',
+	setup_val_username_short: 'El nombre de usuario debe tener al menos 3 caracteres',
+	setup_val_email_format: 'El correo no tiene un formato válido',
 	setup_val_password_required: 'La contraseña es obligatoria',
 	setup_val_password_mismatch: 'Las contraseñas no coinciden',
 
@@ -1140,18 +1165,18 @@ export const es = {
 	lv_guides_desc: 'Guías arrastrables (rojo)',
 	// Capture key (foot pedal)
 	lv_capture_key_current: (chord: string) => `Tecla de captura: ${chord}`,
-	lv_capture_key_desc: 'El pedal o la tecla que dispara una captura en esta pantalla.',
-	lv_capture_key_learn: 'Asignar la tecla del pedal',
+	lv_capture_key_desc:
+		'El pedal o la tecla que dispara una captura en la pantalla de captura. Este ajuste es del equipo y vale en todos los navegadores.',
+	lv_capture_key_learn: 'Presiona el pedal o la tecla que quieres asignar',
 	lv_capture_key_learning: 'Presiona el pedal o la tecla ahora…',
-	lv_capture_key_reset: 'Restaurar predeterminada',
+	lv_capture_key_reset: 'Usar la tecla predeterminada',
 	lv_capture_key_note:
-		'Mientras esta tecla esté asignada a la captura, deja de activar el botón que esté seleccionado en esta pantalla. Verifica que el pedal esté en modo de tecla única, no en modo macro ni de repetición.',
+		'Mientras esta tecla esté asignada a la captura, presionarla ya no activa el botón seleccionado en la pantalla de captura. Revisa que el pedal esté en modo de tecla única, no en modo macro ni de repetición.',
 	lv_capture_key_modifier_only: (modifier: string) =>
-		`El dispositivo solo envió ${modifier}. Presiona la tecla del pedal, no solo un modificador.`,
+		`El dispositivo solo envió ${modifier}. Presiona la tecla del pedal, no solo una tecla modificadora.`,
 	lv_capture_key_unbindable:
 		'El dispositivo envió una tecla que no se puede asignar a la captura. Intenta de nuevo.',
 	lv_capture_key_space: 'Espacio',
-	lv_capture_key_settings: 'Pedal y tecla de captura',
 	lv_capture_error: 'Error al capturar',
 	lv_capture_not_ready: 'Cargando el volumen…',
 	// A capture still in flight after 10 s, and one whose request ended in a

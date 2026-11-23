@@ -1,9 +1,12 @@
 <script lang="ts">
-	// Public credits page. Like /welcome it sits in the (auth) group, which has
-	// no session guard, so it opens before anyone has signed in.
+	// Public credits page, linked from the first-run wizard's first step and
+	// from the login page's footer (`?from=login`); "Back" returns there. Like
+	// the wizard (/setup), it it sits in the (auth) group, which has no session guard, so
+	// it opens before anyone has signed in.
 	//
 	// Version: 0.3.0
 
+	import { page } from '$app/stores';
 	import nehSeal from '$lib/assets/neh-preferred-seal-white.png';
 	import amplUcsb from '$lib/assets/ampl-ucsb-white.png';
 	import utHistory from '$lib/assets/ut-history.svg';
@@ -15,8 +18,10 @@
 	import qr from '$lib/assets/qr-digitization-toolkit.svg';
 
 	// The credit text is English whatever the interface language, like the
-	// start labels on /welcome. Logos that are not white already are inverted
+	// start labels of the first-run wizard. Logos that are not white already are inverted
 	// by `dark` so all five read the same on the dark ground.
+	let back = $derived($page.url.searchParams.get('from') === 'login' ? '/login' : '/setup');
+
 	const LOGOS: { src: string; alt: string; width: number; dark: boolean }[] = [
 		{ src: nehSeal, alt: 'National Endowment for the Humanities', width: 150, dark: false },
 		{
@@ -43,7 +48,7 @@
 <div class="page">
 	<div class="top">
 		<h1>Credits<span lang="es" class="es"> / Créditos</span></h1>
-		<a href="/welcome" class="btn">Back / <span lang="es">Volver</span></a>
+		<a href={back} class="btn">Back / <span lang="es">Volver</span></a>
 	</div>
 
 	<div class="main">

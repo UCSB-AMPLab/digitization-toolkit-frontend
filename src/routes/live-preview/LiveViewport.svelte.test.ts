@@ -25,7 +25,8 @@ import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import { cameraStatus } from '$lib/stores/cameras';
-import { clearChord, writeChord } from '$lib/capture-key';
+import { clearChord, readChords, writeChord } from '$lib/capture-key';
+import { resetUnit } from '$lib/unit-mode';
 import { createCaptureGate } from '$lib/capture-check';
 import { get } from 'svelte/store';
 
@@ -645,163 +646,65 @@ describe('LiveViewport — a volume without a stem', () => {
 	});
 });
 
-// NEH-323: the capture key has its own button and dialog, apart from the
-// grid and guides.
-describe('LiveViewport — capture key button and dialog (NEH-323)', () => {
+// NEH-336: the capture key is the unit's, assigned in Settings > Capture key.
+// The capture screen has no control for it; it captures with the unit's key.
+describe('LiveViewport — the capture key is assigned in Settings (NEH-336)', () => {
 	beforeEach(() => {
 		locale.set('en');
-		stubPreviewFetch({});
+		resetUnit();
 	});
 	afterEach(() => {
+		resetUnit();
 		clearChord();
 	});
 
-	const keyButton = () => page.getByRole('button', { name: en.lv_capture_key_settings });
-	const gridButton = () => page.getByRole('button', { name: en.lv_grid_settings });
-	const dialog = () => document.querySelector('[role="dialog"]') as HTMLElement | null;
-	const dialogText = () => dialog()?.textContent ?? '';
-
-	it('has a button labelled for the capture key that opens its dialog', async () => {
+	it('has no capture-key button or dialog', async () => {
+		stubPreviewFetch({});
 		renderViewport(baseProps());
-		await expect.element(keyButton()).toBeVisible();
-		expect(keyButton().element().getAttribute('title')).toBe(en.lv_capture_key_settings);
-		expect(dialog()).toBeNull();
-		await userEvent.click(keyButton());
-		await expect.poll(() => dialogText()).toContain(en.lv_capture_key_settings);
-		expect(dialog()?.getAttribute('aria-modal')).toBe('true');
-		expect(dialog()?.getAttribute('aria-labelledby')).toBeTruthy();
-	});
-
-	it('sits directly after the grid button', async () => {
-		renderViewport(baseProps());
-		const grid = gridButton().element();
-		expect(grid.nextElementSibling).toBe(keyButton().element());
-	});
-
-	it('the dialog holds the learn and reset buttons and the note', async () => {
-		renderViewport(baseProps());
-		await userEvent.click(keyButton());
-		await expect.element(page.getByRole('button', { name: en.lv_capture_key_learn })).toBeVisible();
-		await expect.element(page.getByRole('button', { name: en.lv_capture_key_reset })).toBeVisible();
-		expect(dialogText()).toContain(en.lv_capture_key_note);
-	});
-
-	it('shows both default keys', async () => {
-		renderViewport(baseProps());
-		await userEvent.click(keyButton());
-		await expect
-			.poll(() => dialogText())
-			.toContain(en.lv_capture_key_current(`${en.lv_capture_key_space} / b`));
-	});
-
-	it('learning a key replaces both defaults, and reset restores both', async () => {
-		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-		renderViewport(baseProps());
-		await userEvent.click(keyButton());
-		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
-		window.dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'x', code: 'KeyX', cancelable: true })
+		await expect.element(page.getByRole('button', { name: en.lv_grid_settings })).toBeVisible();
+		const icons = [...document.querySelectorAll('.float-btn .material-symbols-outlined')].map(
+			(el) => el.textContent?.trim()
 		);
-		await expect.poll(() => dialogText()).toContain(en.lv_capture_key_current('x'));
-		expect(dialogText()).not.toContain('/ b');
+		expect(icons).not.toContain('keyboard');
+		expect(document.querySelector('#capture-key-modal-title')).toBeNull();
+		expect(document.body.textContent).not.toContain(en.lv_capture_key_learn);
+	});
 
-		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_reset }));
+	it("captures with the unit's key, and no longer with the defaults", async () => {
+		stubPreviewFetch({});
+		const preview = globalThis.fetch as unknown as (input: RequestInfo | URL) => Promise<Response>;
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (input: RequestInfo | URL) => {
+				const url =
+					typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+				if (new URL(url).pathname === '/system/unit')
+					return new Response(
+						JSON.stringify({
+							mode: 'offline',
+							projectsEnabled: true,
+							projectsShown: true,
+							defaultProjectId: null,
+							prerequisites: { backup: [], fisqua: [] },
+							captureKey: { key: 'F7', ctrl: false, alt: false, meta: false, shift: false }
+						}),
+						{ status: 200, headers: { 'Content-Type': 'application/json' } }
+					);
+				return preview(input);
+			})
+		);
+		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
+		renderViewport(baseProps());
 		await expect
-			.poll(() => dialogText())
-			.toContain(en.lv_capture_key_current(`${en.lv_capture_key_space} / b`));
-
-		// The dialog is open, so close it, then both defaults capture again.
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
-		await expect.poll(() => dialog()).toBeNull();
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB' }));
+			.poll(() => readChords())
+			.toEqual([{ key: 'F7', ctrl: false, alt: false, meta: false, shift: false }]);
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F7', code: 'F7', cancelable: true }));
 		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'b', code: 'KeyB' }));
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
-		await expect.poll(() => captureSpy.mock.calls.length).toBe(2);
-	});
-
-	it('the grid dialog no longer holds them', async () => {
-		renderViewport(baseProps());
-		await userEvent.click(gridButton());
-		await expect.poll(() => dialogText()).toContain(en.lv_grid_modal_title);
-		expect(dialogText()).not.toContain(en.lv_capture_key_learn);
-		expect(dialogText()).not.toContain(en.lv_capture_key_reset);
-		expect(dialogText()).not.toContain(en.lv_capture_key_note);
-		expect(dialog()?.querySelector('.capture-key-row')).toBeNull();
-	});
-
-	it('Escape closes the dialog when no key is being learned', async () => {
-		renderViewport(baseProps());
-		await userEvent.click(keyButton());
-		await expect.poll(() => dialog()).not.toBeNull();
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
-		await expect.poll(() => dialog()).toBeNull();
-	});
-
-	it('Escape does not close the dialog while a key is being learned', async () => {
-		renderViewport(baseProps());
-		await userEvent.click(keyButton());
-		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
-		await expect.element(page.getByText(en.lv_capture_key_learning)).toBeVisible();
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
-		await tick();
-		expect(dialog()).not.toBeNull();
-	});
-
-	it('closing with Close stops learning', async () => {
-		renderViewport(baseProps());
-		await userEvent.click(keyButton());
-		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
-		await userEvent.click(page.getByRole('button', { name: en.common_close }));
-		await expect.poll(() => dialog()).toBeNull();
-		// Learning is over: a key now neither re-binds nor is swallowed by it.
-		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-		await expect.poll(() => captureSpy.mock.calls.length).toBe(1);
-	});
-
-	it('closing by the backdrop stops learning', async () => {
-		renderViewport(baseProps());
-		await userEvent.click(keyButton());
-		await userEvent.click(page.getByRole('button', { name: en.lv_capture_key_learn }));
-		(document.querySelector('.modal-backdrop') as HTMLElement).click();
-		await expect.poll(() => dialog()).toBeNull();
-		await userEvent.click(keyButton());
-		await expect.element(page.getByRole('button', { name: en.lv_capture_key_learn })).toBeVisible();
-		expect(dialogText()).not.toContain(en.lv_capture_key_learning);
-	});
-
-	it('with the dialog open the capture key does not trigger a capture', async () => {
-		const captureSpy = vi.spyOn(camerasApi, 'capture').mockResolvedValue({ success: true });
-		renderViewport(baseProps());
-		await userEvent.click(keyButton());
-		await expect.poll(() => dialog()).not.toBeNull();
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-		await tick();
-		await new Promise((r) => setTimeout(r, 100));
-		expect(captureSpy).not.toHaveBeenCalled();
-	});
-
-	it('at 800x480 the button is visible and the dialog fits with its Close button', async () => {
-		await page.viewport(800, 480);
-		const target = document.createElement('div');
-		target.style.cssText = 'width: 800px; height: 480px; display: flex;';
-		document.body.appendChild(target);
-		render(LiveViewport, { target, props: baseProps() });
-		await expect.element(keyButton()).toBeVisible();
-		const b = keyButton().element().getBoundingClientRect();
-		expect(b.bottom).toBeLessThanOrEqual(480);
-		await userEvent.click(keyButton());
-		await expect.poll(() => dialog()).not.toBeNull();
-		const card = dialog()!.getBoundingClientRect();
-		const close = page
-			.getByRole('button', { name: en.common_close })
-			.element()
-			.getBoundingClientRect();
-		expect(card.top).toBeGreaterThanOrEqual(0);
-		expect(card.bottom).toBeLessThanOrEqual(480);
-		expect(close.bottom).toBeLessThanOrEqual(480);
-		expect(close.right).toBeLessThanOrEqual(800);
+		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'F7', code: 'F7' }));
+		const space = new KeyboardEvent('keydown', { key: ' ', code: 'Space', cancelable: true });
+		window.dispatchEvent(space);
+		expect(space.defaultPrevented).toBe(false);
+		expect(captureSpy).toHaveBeenCalledTimes(1);
 	});
 });
 

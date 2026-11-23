@@ -74,17 +74,13 @@
 		panelGrowFactor
 	} from '$lib/viewport-aspect';
 	import {
-		DEFAULT_CHORDS,
-		describeChords,
-		learnFromEvent,
 		ownsEvent,
 		readChords,
 		shouldTrigger,
-		writeChord,
-		clearChord as clearStoredChord,
 		type CaptureChord,
 		type OwnsEventContext
 	} from '$lib/capture-key';
+	import { watchCaptureChords } from '$lib/capture-key-unit';
 	import {
 		createNoFrameRun,
 		LAST_PAIR_NO_FRAME_ANSWERS,
@@ -246,22 +242,22 @@
 	let showGrid = $state(false);
 	let showGuides = $state(true);
 	let showGridModal = $state(false);
-	let showCaptureKeyModal = $state(false);
-	// The two dialogs' backdrops: any open dialog outside them is not this
+	// The grid dialog's backdrop: any open dialog outside it is not this
 	// component's (NEH-339).
 	let gridBackdrop = $state<HTMLElement | null>(null);
-	let captureKeyBackdrop = $state<HTMLElement | null>(null);
 
 	// ---------------------------------------------------------------------------
 	// CAPTURE KEY (NEH-228)
 	// A USB digitization pedal behaves as a keyboard that sends a single key,
-	// different for each device. Instead of manual configuration, the operator
-	// assigns it by pressing the pedal once in the control in the grid settings
-	// modal, and the key is stored in that browser. With nothing stored, the
-	// space bar (an ordinary keyboard) and b (the project's foot pedal) both
-	// trigger a capture; once a key is stored, only that key does.
+	// different for each device. The unit stores the key, assigned in
+	// Settings > Capture key (NEH-336, src/lib/capture-key-unit.ts). With none
+	// stored, the space bar (an ordinary keyboard) and b (the project's foot
+	// pedal) both trigger a capture; once a key is stored, only that key does.
 	// ---------------------------------------------------------------------------
+	// The unit's key (Settings > Capture key), or both defaults: the cached copy
+	// first, then the unit's, read again at mount (src/lib/capture-key-unit.ts).
 	let chords = $state<readonly CaptureChord[]>(readChords());
+	$effect(() => watchCaptureChords((c) => (chords = c)));
 
 	// Held-key latch: set when a key press starts a capture and released on the
 	// matching keyup. If the keyup never arrives (the window lost focus in the
@@ -287,24 +283,11 @@
 	// early.
 	let heldCode = $state<string | null>(null);
 
-	// While `learning` is true, the window's next keydown does not start a
-	// capture — it goes to `learnFromEvent` instead.
-	let learning = $state(false);
-	// A bare modifier (Control/Alt/Shift/Meta) arrived while the key was being
-	// assigned, and the key that completes the combination is still expected.
-	// If the modifier is released with nothing else arriving, keyup reports a
-	// device that sends only the modifier, instead of staying in "assigning"
-	// forever.
-	let pendingModifier = $state<'Control' | 'Alt' | 'Shift' | 'Meta' | null>(null);
-	let learnMessage = $state<string | null>(null);
-
-	// Any modal takes the keyboard away from capture. The grid settings and
-	// capture key modals are local; the image-inspection modal lives in the
+	// Any modal takes the keyboard away from capture. The grid settings
+	// modal is local; the image-inspection modal lives in the
 	// page (+page.svelte) and arrives as a prop; the power confirmation,
 	// opened from the top bar's avatar menu, is reported through a store.
-	let modalOpen = $derived(
-		showGridModal || showCaptureKeyModal || otherModalOpen || $powerControlOpen
-	);
+	let modalOpen = $derived(showGridModal || otherModalOpen || $powerControlOpen);
 
 	// The floating controls are one column while it fits under the panel's
 	// top offset; on a shorter viewport (the unit's 800x480 leaves this one
@@ -1314,18 +1297,13 @@
 	}
 
 	// A dialog that is not this component's (the focus check, the page's
-	// viewer, the power confirmation) has the keyboard: no capture, and no
-	// capture key learnt from a key pressed in it (NEH-339).
+	// viewer, the power confirmation) has the keyboard: no capture (NEH-339).
 	function foreignDialogOpen(): boolean {
-		return openDialogsOutside([gridBackdrop, captureKeyBackdrop]) > 0;
+		return openDialogsOutside([gridBackdrop]) > 0;
 	}
 
 	function handleWindowKeydown(event: KeyboardEvent) {
 		if (foreignDialogOpen()) return;
-		if (learning) {
-			handleLearnKeydown(event);
-			return;
-		}
 		const ctx = ownsEventContext();
 		if (!ownsEvent(event, ctx)) return;
 		// Whenever the event belongs to capture, not only when it actually
@@ -1351,17 +1329,6 @@
 	}
 
 	function handleWindowKeyup(event: KeyboardEvent) {
-		if (learning) {
-			if (foreignDialogOpen()) return;
-			// The device sent only a modifier and is now releasing it with no
-			// other key having arrived with it: tell the operator instead of
-			// leaving the control in "assigning" forever.
-			if (pendingModifier && event.key === pendingModifier) {
-				learnMessage = $m.lv_capture_key_modifier_only(pendingModifier);
-				pendingModifier = null;
-			}
-			return;
-		}
 		// Compared against the physical `code` that set the latch, not the
 		// chord's key; the latch also clears when either side lacks a usable
 		// `code`. See the comments on `chordHeld` and `heldCode` above.
@@ -1370,56 +1337,8 @@
 		}
 	}
 
-	function handleLearnKeydown(event: KeyboardEvent) {
-		event.preventDefault();
-		const result = learnFromEvent(event);
-		if (result.ok) {
-			chords = [result.chord];
-			writeChord(result.chord);
-			learning = false;
-			pendingModifier = null;
-			learnMessage = null;
-			return;
-		}
-		if (result.reason === 'modifier-only') {
-			pendingModifier = result.modifier;
-			learnMessage = null;
-			return;
-		}
-		// 'unbindable': Dead, Unidentified, or an event in the middle of IME
-		// composition.
-		learnMessage = $m.lv_capture_key_unbindable;
-	}
-
-	function startLearningChord() {
-		learning = true;
-		pendingModifier = null;
-		learnMessage = null;
-	}
-
-	// Cancelling is always a visible button, never a key — otherwise a pedal
-	// that sends Escape could never be assigned.
-	function cancelLearningChord() {
-		learning = false;
-		pendingModifier = null;
-		learnMessage = null;
-	}
-
-	function resetChord() {
-		clearStoredChord();
-		chords = DEFAULT_CHORDS;
-		cancelLearningChord();
-	}
-
 	function closeGridModal() {
 		showGridModal = false;
-	}
-
-	function closeCaptureKeyModal() {
-		showCaptureKeyModal = false;
-		// Closing the dialog in the middle of an assignment must not leave the
-		// window's next keydown captured by a control that is no longer visible.
-		cancelLearningChord();
 	}
 
 	// What a pane's picture and its "No signal" call the camera. Once the
@@ -1942,16 +1861,6 @@
 						<rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
 					</svg>
 				</button>
-				<button
-					class="float-btn"
-					onclick={() => (showCaptureKeyModal = true)}
-					aria-label={$m.lv_capture_key_settings}
-					title={$m.lv_capture_key_settings}
-				>
-					<span class="material-symbols-outlined" style="font-size:22px" aria-hidden="true"
-						>keyboard</span
-					>
-				</button>
 				{#if cameraMode === 'double' && !swapLocked}
 					{#if panelOneColumn}<div class="float-divider"></div>{/if}
 					<button
@@ -2119,60 +2028,6 @@
 			</div>
 			<div class="modal-actions">
 				<button class="modal-btn confirm" onclick={closeGridModal}>{$m.common_close}</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-{#if showCaptureKeyModal}
-	<!-- No Escape while a key is being assigned: a pedal may send Escape. -->
-	<div
-		class="modal-backdrop"
-		bind:this={captureKeyBackdrop}
-		use:dismissible={{ onDismiss: closeCaptureKeyModal, escape: !learning }}
-	>
-		<div
-			class="modal-card dialog-fit"
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="capture-key-modal-title"
-		>
-			<h3 class="modal-title" id="capture-key-modal-title">{$m.lv_capture_key_settings}</h3>
-			<div class="modal-body">
-				<!-- NEH-228: the capture key — assigned once and stored in this
-             browser. -->
-				<div class="modal-toggle-row capture-key-row">
-					<div>
-						<p class="modal-toggle-title">
-							{$m.lv_capture_key_current(describeChords(chords, $m.lv_capture_key_space))}
-						</p>
-						<p class="modal-toggle-sub">{$m.lv_capture_key_desc}</p>
-					</div>
-					<div class="capture-key-buttons">
-						{#if learning}
-							<button class="capture-key-btn" onclick={cancelLearningChord}
-								>{$m.common_cancel}</button
-							>
-						{:else}
-							<button class="capture-key-btn" onclick={startLearningChord}
-								>{$m.lv_capture_key_learn}</button
-							>
-						{/if}
-						<button class="capture-key-btn" onclick={resetChord}>{$m.lv_capture_key_reset}</button>
-					</div>
-				</div>
-				{#if learning}
-					<p class="modal-toggle-sub capture-key-status" role="status">
-						{$m.lv_capture_key_learning}
-					</p>
-				{/if}
-				{#if learnMessage}
-					<p class="modal-toggle-sub capture-key-status" role="alert">{learnMessage}</p>
-				{/if}
-				<p class="modal-toggle-sub capture-key-note">{$m.lv_capture_key_note}</p>
-			</div>
-			<div class="modal-actions">
-				<button class="modal-btn confirm" onclick={closeCaptureKeyModal}>{$m.common_close}</button>
 			</div>
 		</div>
 	</div>
@@ -2933,40 +2788,6 @@
 	.toggle-thumb.on {
 		transform: translateX(24px);
 		background-color: white;
-	}
-
-	/* NEH-228: the capture key row — like .modal-toggle-row, but with two
-     buttons instead of a toggle on the right. */
-	.capture-key-buttons {
-		display: flex;
-		gap: 8px;
-		flex-shrink: 0;
-	}
-
-	.capture-key-btn {
-		padding: 8px 12px;
-		font-family: var(--font-family);
-		font-size: var(--text-sm);
-		font-weight: var(--fw-semibold);
-		border-radius: var(--radius-md);
-		border: 1px solid var(--border-color);
-		background-color: var(--color-surface-alt);
-		color: var(--color-light);
-		cursor: pointer;
-		transition: background-color var(--transition-fast);
-		white-space: nowrap;
-	}
-
-	.capture-key-btn:hover {
-		background-color: rgba(255, 255, 255, 0.05);
-	}
-
-	.capture-key-status {
-		color: var(--color-primary);
-	}
-
-	.capture-key-note {
-		margin-top: -8px;
 	}
 
 	.modal-actions {

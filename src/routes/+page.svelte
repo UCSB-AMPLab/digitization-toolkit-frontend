@@ -1,7 +1,8 @@
 <script lang="ts">
 	// Root route: it only redirects and renders nothing. A stored user goes to
 	// `/dashboard`, whose layout validates the session cookie against
-	// `/users/me`; no stored user goes to `/welcome`.
+	// `/users/me`; no stored user goes to `/login`, which sends a unit with no
+	// account yet to the first-run wizard (`/setup`).
 	//
 	// Version: 0.3.0
 
@@ -13,7 +14,7 @@
 		if (authStore.getUser()) {
 			goto('/dashboard');
 		} else {
-			goto('/welcome');
+			goto('/login');
 		}
 	}
 </script>

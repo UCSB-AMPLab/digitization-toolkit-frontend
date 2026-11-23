@@ -6,13 +6,19 @@
 // role, and a section asked for that the role may not open (by URL or by
 // state) resolves to Network, so a non-admin never renders an admin section.
 // The testing role (NEH-391) sees what every non-admin sees, plus Power, so it
-// can shut the unit down or restart it.
+// can shut the unit down or restart it. Capture key, the unit's key for
+// starting a capture (NEH-336), is the administrator's and the operator's.
 // The backend enforces the same roles on every route these sections use.
 //
 // Version: 0.3.0
 
 import type { StringMessageKey } from '$lib/i18n';
-import { canFreeVolumes, inTestingSpace, opensUnitSettings } from '$lib/unit-mode';
+import {
+	canFreeVolumes,
+	canSetCaptureKey,
+	inTestingSpace,
+	opensUnitSettings
+} from '$lib/unit-mode';
 
 export interface SettingsSection {
 	id: string;
@@ -28,6 +34,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
 	{ id: 'fisqua-link', labelKey: 'fisqua_link_title', unit: true },
 	{ id: 'testing', labelKey: 'config_section_testing', unit: true },
 	{ id: 'storage', labelKey: 'config_section_storage', unit: true },
+	{ id: 'capture-key', labelKey: 'config_section_capture_key', unit: true },
 	{ id: 'offsite-copy', labelKey: 'backup_section_title', unit: true },
 	{ id: 'diagnostics', labelKey: 'config_section_diagnostics', unit: true },
 	{ id: 'maintenance', labelKey: 'config_section_maintenance', unit: true },
@@ -39,7 +46,11 @@ export const DEFAULT_SECTION = 'network';
 export function sectionsFor(role: string | null | undefined): SettingsSection[] {
 	if (inTestingSpace(role)) return SETTINGS_SECTIONS.filter((s) => !s.unit || s.id === 'power');
 	return SETTINGS_SECTIONS.filter(
-		(s) => !s.unit || opensUnitSettings(role) || (s.id === 'storage' && canFreeVolumes(role))
+		(s) =>
+			!s.unit ||
+			opensUnitSettings(role) ||
+			(s.id === 'storage' && canFreeVolumes(role)) ||
+			(s.id === 'capture-key' && canSetCaptureKey(role))
 	);
 }
 

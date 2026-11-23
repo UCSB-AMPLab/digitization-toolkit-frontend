@@ -34,6 +34,8 @@ export interface AuthUser {
 	email: string | null;
 	role: UserRole;
 	is_active: boolean;
+	/** The person's own language; null until they choose one (NEH-336). */
+	language?: 'es' | 'en' | null;
 }
 
 interface AuthState {
@@ -104,6 +106,19 @@ function createAuthStore() {
 				}
 			}
 			set({ user: null });
+		},
+
+		// Whether this browser kept the signed-in user, read back from storage,
+		// so that a full reload finds the session's user again.
+		isStored(): boolean {
+			const user = get({ subscribe }).user;
+			if (!browser || !user) return false;
+			try {
+				const kept = JSON.parse(localStorage.getItem(AUTH_USER_KEY) ?? 'null');
+				return kept?.id === user.id;
+			} catch {
+				return false;
+			}
 		},
 
 		// For use outside Svelte components.

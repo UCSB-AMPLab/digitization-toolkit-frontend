@@ -1,47 +1,137 @@
 <script lang="ts">
-	// First-run setup: creates the first administrator through
-	// `POST /auth/register`, sending the device bootstrap token as
-	// `X-Bootstrap-Token` when one is entered (outside development the backend
-	// requires it). The page redirects to `/login` when `/auth/setup/status`
-	// reports that setup is not needed or cannot be reached, and after the
-	// account is created.
+	// The first-run wizard (NEH-336), shown while `/auth/setup/status` says the
+	// unit needs setting up; otherwise, or when the status cannot be read, the
+	// page goes to `/login`. `/welcome` and the login page lead here on a unit
+	// with no account. Three steps:
 	//
-	// Version: 0.3.0
+	// 1. Language: one button per language, each in its own. `setLanguage`
+	//    writes the cookie and loads `/setup?step=account`, so the rest of the
+	//    wizard renders in that language from the server on.
+	// 2. Administrator account. At the unit's own screen (the backend, asked
+	//    directly at its own address, says the request is local; see
+	//    $lib/first-run) the account is created there, with no token. From
+	//    anywhere else, or when the direct call fails, the form asks for the
+	//    bootstrap token, says that set-up is meant to be done at the unit's
+	//    screen, and posts through the API. The language of step 1 goes with
+	//    the registration as the unit's default. The new administrator is then
+	//    signed in with the same credentials. Once the registration has been
+	//    sent, no status answer moves the wizard: the status request still in
+	//    flight is aborted and its answer ignored, and only the wizard's own
+	//    steps decide where it goes.
+	//    A registration that ends in anything but a success or a refusal about
+	//    the fields (a 4xx about them, or the token's or set-up's refusal) may
+	//    or may not have created the account: no answer in time
+	//    (REGISTER_TIMEOUT_MS direct, the API's own limit otherwise), a network
+	//    error, a 5xx, or a 401 or 403 that means an account now exists. The
+	//    wizard then says neither "failed" nor "created": it reads the status.
+	//    With no account the form comes back. With one, it signs in with the
+	//    username and password just entered: a success means the account is
+	//    this person's, and the wizard goes on as after a registration; a
+	//    refused sign-in means it is someone else's, and the wizard says so and
+	//    links to the sign-in page. When the status cannot be read, the wizard
+	//    says it got no answer and offers to check again.
+	//    Every request the wizard starts is aborted when it is destroyed, and
+	//    no answer moves it afterwards.
+	// 3. Network: Settings > Network, with Continue and Set up later; both go
+	//    to the Overview.
+	//
+	// Keyboard and mouse only. Fits 800x480.
 
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
+	import { pageLife, type Operation } from '$lib/page-life';
 	import { goto } from '$app/navigation';
-	import { authApi } from '$lib/api';
-	import { m } from '$lib/i18n';
+	import { page } from '$app/stores';
+	import { authApi, usersApi } from '$lib/api';
+	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
+	import { authStore, isUserRole } from '$lib/stores/auth';
 	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
+	import PasswordField from '$lib/components/PasswordField.svelte';
+	import NetworkSection from '../../(dashboard)/dashboard/config/NetworkSection.svelte';
+	import nehSeal from '$lib/assets/neh-preferred-seal-white.png';
 	import { normalizeEmail, emailFormatError } from '$lib/email-field';
+	import {
+		directBackendBase,
+		isLocalUnit,
+		registerAtUnit,
+		FirstRunTimeout,
+		REGISTER_TIMEOUT_MS
+	} from '$lib/first-run';
 	import {
 		PASSWORD_MIN_LENGTH,
 		passwordTooShort,
 		isPasswordTooShortRefusal
 	} from '$lib/password-rule';
 
+	type Step = 'language' | 'account' | 'network';
+	const STEPS = 3;
+
+	let step = $state<Step>(
+		untrack(() => ($page.url.searchParams.get('step') === 'account' ? 'account' : 'language'))
+	);
+
+	// Each label is in its own language whatever the current one is.
+	const STARTS: { code: Locale; greeting: string; label: string }[] = [
+		{ code: 'en', greeting: 'Hello!', label: 'Get started in English' },
+		{ code: 'es', greeting: '¡Hola!', label: 'Empezar en español' }
+	];
+
+	// null until the direct status call has answered or failed.
+	let local = $state<boolean | null>(null);
+	let directBase: string | null = null;
+
 	let username = $state('');
 	let email = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
 	let bootstrapToken = $state('');
-	let showPassword = $state(false);
-	let showConfirmPassword = $state(false);
 
-	let isLoading = $state(false);
+	// One busy state for every request the wizard makes: the registration,
+	// the status reads, the sign-in and its /users/me. While it is set, every
+	// field and button of the account step is disabled and a submit is ignored.
+	let busy = $state(false);
 	let errorMessage = $state('');
-	let successMessage = $state('');
+	// The account exists but signing in with it failed.
+	let signInFailed = $state(false);
+	// An account exists and the sign-in with what was entered was refused.
+	let otherAccount = $state(false);
+	// The status could not be read after an uncertain registration.
+	let noAnswer = $state(false);
+	let checkFailed = $state(false);
+	let leaving = false;
 
-	onMount(async () => {
-		try {
-			const { needs_setup } = await authApi.setupStatus();
-			if (!needs_setup) {
+	// Each request's answer acts only while its operation is current
+	// ($lib/page-life): the wizard is mounted and, for the first status check,
+	// no registration has started. The registration and everything after it is
+	// one operation of the kind 'account'.
+	const life = pageLife();
+	// The username of the uncertain registration, for the check.
+	let pendingName = '';
+
+	onMount(() => {
+		const first = life.begin('first');
+		authApi
+			.setupStatus(first.signal)
+			.then(({ needs_setup }) => {
+				if (!first.current()) return;
+				if (!needs_setup) goto('/login');
+			})
+			.catch(() => {
+				if (!first.current()) return;
 				goto('/login');
-			}
-		} catch {
-			goto('/login');
-		}
+			});
+		directBase = directBackendBase(window.location.hostname);
+		const localCheck = life.begin('local');
+		isLocalUnit(directBase).then((answer) => {
+			if (localCheck.current()) local = answer;
+		});
 	});
+
+	function chooseLanguage(code: Locale) {
+		if (leaving) return;
+		leaving = true;
+		// The page is left for good: the server renders the next step in `code`.
+		setLanguage(code, '/setup?step=account');
+	}
 
 	function validate(): string {
 		if (!username.trim()) return $m.setup_val_username_required;
@@ -53,442 +143,643 @@
 		return '';
 	}
 
-	async function handleSubmit() {
-		errorMessage = '';
-		successMessage = '';
+	function refusalMessage(err: unknown): string {
+		const status = (err as { status?: number } | null)?.status;
+		const detail = String((err as { message?: string } | null)?.message ?? '').toLowerCase();
+		if (isPasswordTooShortRefusal(err)) return $m.common_password_too_short(PASSWORD_MIN_LENGTH);
+		if (detail.includes('already')) return $m.setup_err_exists;
+		if (detail.includes('no bootstrap token configured') || detail.includes('setup is unavailable'))
+			return $m.setup_err_unavailable;
+		if (status === 401 || detail.includes('bootstrap token')) return $m.setup_err_token;
+		return $m.setup_err_create;
+	}
 
-		const validationError = validate();
-		if (validationError) {
-			errorMessage = validationError;
+	// Signs in with what was entered; false when the operation went stale on
+	// the way, in which case nothing was set.
+	async function signIn(name: string, op: Operation): Promise<boolean> {
+		await authApi.login({ username: name, password });
+		if (!op.current()) return false;
+		const user = await usersApi.me();
+		if (!op.current()) return false;
+		if (!isUserRole(user.role)) {
+			await authApi.logout();
+			throw new Error('unknown role');
+		}
+		authStore.setSession(user, { signIn: true });
+		return true;
+	}
+
+	async function handleSubmit() {
+		if (busy || local === null) return;
+		errorMessage = '';
+		const invalid = validate();
+		if (invalid) {
+			errorMessage = invalid;
 			return;
 		}
-
-		isLoading = true;
+		const account = {
+			username: username.trim(),
+			email: normalizeEmail(email),
+			password,
+			default_language: $locale
+		};
+		life.stop('first');
+		const op = life.begin('account');
+		busy = true;
 		try {
-			await authApi.register(
-				{
-					username: username.trim(),
-					email: normalizeEmail(email),
-					password
-				},
-				bootstrapToken.trim() || undefined
-			);
-			successMessage = $m.setup_success;
-			setTimeout(() => goto('/login'), 1500);
-		} catch (err: any) {
-			const status = err?.status;
-			const detail = (err?.message || '').toLowerCase();
-			if (isPasswordTooShortRefusal(err)) {
-				errorMessage = $m.common_password_too_short(PASSWORD_MIN_LENGTH);
-			} else if (detail.includes('already')) {
-				errorMessage = $m.setup_err_exists;
-			} else if (
-				detail.includes('no bootstrap token configured') ||
-				detail.includes('setup is unavailable')
-			) {
-				errorMessage = $m.setup_err_unavailable;
-			} else if (status === 401 || detail.includes('bootstrap token')) {
-				errorMessage = $m.setup_err_token;
-			} else {
-				errorMessage = $m.setup_err_create;
+			try {
+				if (local && directBase)
+					await registerAtUnit(directBase, account, fetch, REGISTER_TIMEOUT_MS);
+				else await authApi.register(account, bootstrapToken.trim() || undefined);
+			} catch (err) {
+				if (!op.current()) return;
+				if (isFieldRefusal(err)) errorMessage = refusalMessage(err);
+				else await settleUncertain(account.username, op);
+				return;
+			}
+			if (!op.current()) return;
+			try {
+				if (!(await signIn(account.username, op))) return;
+				step = 'network';
+			} catch {
+				if (!op.current()) return;
+				signInFailed = true;
 			}
 		} finally {
-			isLoading = false;
+			if (op.current()) busy = false;
 		}
 	}
 
-	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Enter' && !isLoading) {
-			handleSubmit();
+	// A refusal the backend made about what was entered, or the token's or
+	// set-up's refusal: the account was not created. A 401 or 403 that is not
+	// the token's means an account now exists (only an administrator creates
+	// accounts then); anything else with no such answer is uncertain.
+	function isFieldRefusal(err: unknown): boolean {
+		if (err instanceof FirstRunTimeout) return false;
+		const status = (err as { status?: unknown } | null)?.status;
+		if (typeof status !== 'number') return false;
+		const detail = String((err as { message?: string } | null)?.message ?? '').toLowerCase();
+		if (detail.includes('bootstrap token') || detail.includes('setup is unavailable')) return true;
+		if (status === 401 || status === 403) return false;
+		return status >= 400 && status < 500;
+	}
+
+	// After an uncertain registration (see the header): the status decides.
+	// The sign-in here is one ordinary attempt, which counts against the
+	// backend's sign-in lockout like any other; it is made once for each
+	// registration outcome or press of the check button, and never repeated
+	// by itself.
+	async function settleUncertain(name: string, op: Operation, again = false) {
+		pendingName = name;
+		let needsSetup: boolean;
+		try {
+			({ needs_setup: needsSetup } = await authApi.setupStatus(op.signal));
+		} catch {
+			if (!op.current()) return;
+			noAnswer = true;
+			checkFailed = again;
+			return;
 		}
+		if (!op.current()) return;
+		noAnswer = false;
+		checkFailed = false;
+		if (needsSetup) return;
+		try {
+			if (!(await signIn(name, op))) return;
+			step = 'network';
+		} catch (err) {
+			if (!op.current()) return;
+			if ((err as { status?: unknown } | null)?.status === 401) otherAccount = true;
+			else noAnswer = true;
+		}
+	}
+
+	async function checkAccount() {
+		if (busy) return;
+		const op = life.begin('account');
+		busy = true;
+		try {
+			await settleUncertain(pendingName, op, true);
+		} finally {
+			if (op.current()) busy = false;
+		}
+	}
+
+	// The fields are not in a <form>: Enter in a field submits, Enter on a
+	// button presses that button.
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key !== 'Enter' || busy || noAnswer) return;
+		const target = event.target as HTMLElement | null;
+		if (target?.tagName === 'BUTTON') return;
+		handleSubmit();
+	}
+
+	function finish() {
+		goto('/dashboard');
 	}
 </script>
 
-<div class="setup-wrapper" onkeydown={handleKeydown} role="main">
-	<div class="setup-card" class:is-loading={isLoading}>
-		<div class="card-logo-area">
+{#if step === 'language'}
+	<div class="splash">
+		<div class="main">
 			<div class="header">
-				<div class="card-logo-area">
-					<CaptuaLogo class="brand-logo-xl" />
-				</div>
+				<!-- The logo is the page's heading. Stacked on screens 600px tall
+				     or more, side by side on the 800x480 screen; the hidden one is
+				     display: none, so only one is announced. -->
+				<h1 class="logo-heading">
+					<span class="logo-stacked">
+						<CaptuaLogo
+							wordmark="descriptor"
+							weight="thin"
+							layout="stacked"
+							class="brand-logo-stacked"
+						/>
+					</span>
+					<span class="logo-beside">
+						<CaptuaLogo wordmark="descriptor" weight="thin" class="brand-logo-xl" />
+					</span>
+				</h1>
 			</div>
-			<p class="setup-title">{$m.setup_title}</p>
-			<p class="setup-subtitle">{$m.setup_subtitle}</p>
+
+			<!-- One column per language: the greeting over its button, a group
+			     named by its greeting. -->
+			<div class="starts">
+				{#each STARTS as start (start.code)}
+					<div class="start" lang={start.code} role="group" aria-labelledby="greeting-{start.code}">
+						<h2 class="title" id="greeting-{start.code}">{start.greeting}</h2>
+						<button class="btn" lang={start.code} onclick={() => chooseLanguage(start.code)}>
+							{start.label}
+						</button>
+					</div>
+				{/each}
+			</div>
 		</div>
 
-		<div class="form-area">
-			<div class="field-group">
-				<label class="field-label" for="su-username">{$m.common_username_label}</label>
-				<div class="input-wrapper">
-					<svg
-						class="input-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-						<circle cx="12" cy="7" r="4" />
-					</svg>
-					<input
-						id="su-username"
-						type="text"
-						class="input"
-						class:input-error={errorMessage}
-						placeholder={$m.setup_ph_username}
-						bind:value={username}
-						disabled={isLoading}
-						autocomplete="username"
-						autocapitalize="none"
-						autocorrect="off"
-					/>
-				</div>
-			</div>
-
-			<div class="field-group">
-				<label class="field-label" for="su-email">{$m.common_email}</label>
-				<div class="input-wrapper">
-					<svg
-						class="input-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-						<polyline points="22,6 12,13 2,6" />
-					</svg>
-					<input
-						id="su-email"
-						type="email"
-						class="input"
-						class:input-error={errorMessage}
-						placeholder={$m.setup_ph_email}
-						bind:value={email}
-						disabled={isLoading}
-						autocomplete="email"
-					/>
-				</div>
-			</div>
-
-			<div class="field-group">
-				<label class="field-label" for="su-password">{$m.common_password_label}</label>
-				<div class="input-wrapper">
-					<svg
-						class="input-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-						<path d="M7 11V7a5 5 0 0 1 10 0v4" />
-					</svg>
-					<input
-						id="su-password"
-						type={showPassword ? 'text' : 'password'}
-						class="input input-with-action"
-						class:input-error={errorMessage}
-						placeholder={$m.setup_ph_password}
-						bind:value={password}
-						disabled={isLoading}
-						autocomplete="new-password"
-					/>
-					<button
-						type="button"
-						class="input-action-btn"
-						onclick={() => (showPassword = !showPassword)}
-						aria-label={showPassword ? $m.common_hide_password : $m.common_show_password}
-					>
-						{#if showPassword}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path
-									d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
-								/>
-								<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-								<line x1="1" y1="1" x2="23" y2="23" />
-							</svg>
-						{:else}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-								<circle cx="12" cy="12" r="3" />
-							</svg>
-						{/if}
-					</button>
-				</div>
-				<span class="setup-hint">{$m.setup_ph_password}</span>
-			</div>
-
-			<div class="field-group">
-				<label class="field-label" for="su-confirm">{$m.common_confirm_password}</label>
-				<div class="input-wrapper">
-					<svg
-						class="input-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-						<path d="M7 11V7a5 5 0 0 1 10 0v4" />
-					</svg>
-					<input
-						id="su-confirm"
-						type={showConfirmPassword ? 'text' : 'password'}
-						class="input input-with-action"
-						class:input-error={errorMessage}
-						placeholder={$m.setup_ph_confirm}
-						bind:value={confirmPassword}
-						disabled={isLoading}
-						autocomplete="new-password"
-					/>
-					<button
-						type="button"
-						class="input-action-btn"
-						onclick={() => (showConfirmPassword = !showConfirmPassword)}
-						aria-label={showConfirmPassword ? $m.common_hide_password : $m.common_show_password}
-					>
-						{#if showConfirmPassword}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path
-									d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
-								/>
-								<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-								<line x1="1" y1="1" x2="23" y2="23" />
-							</svg>
-						{:else}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-								<circle cx="12" cy="12" r="3" />
-							</svg>
-						{/if}
-					</button>
-				</div>
-			</div>
-
-			<!-- FIELD: Bootstrap token. Required on provisioned devices -->
-			<div class="field-group">
-				<label class="field-label" for="su-token">{$m.setup_token_label}</label>
-				<div class="input-wrapper">
-					<svg
-						class="input-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-						<path d="M7 11V7a5 5 0 0 1 10 0v4" />
-					</svg>
-					<input
-						id="su-token"
-						type="text"
-						class="input"
-						placeholder={$m.setup_ph_token}
-						bind:value={bootstrapToken}
-						disabled={isLoading}
-						autocomplete="off"
-						autocapitalize="none"
-						autocorrect="off"
-						spellcheck="false"
-					/>
-				</div>
-				<span class="setup-hint">{$m.setup_token_hint}</span>
-			</div>
-
-			{#if errorMessage}
-				<div class="alert alert-error" role="alert" aria-live="polite">
-					<svg
-						class="alert-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<circle cx="12" cy="12" r="10" />
-						<line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-					</svg>
-					<span>{errorMessage}</span>
-				</div>
-			{/if}
-
-			{#if successMessage}
-				<div class="alert alert-success" role="status" aria-live="polite">
-					<svg
-						class="alert-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-						<polyline points="22 4 12 14.01 9 11.01" />
-					</svg>
-					<span>{successMessage}</span>
-				</div>
-			{/if}
-
-			<button
-				type="button"
-				class="btn-login"
-				onclick={handleSubmit}
-				disabled={isLoading}
-				aria-busy={isLoading}
-			>
-				{isLoading ? $m.setup_submit_loading : $m.setup_submit}
-			</button>
-		</div>
-		<!-- /.form-area -->
-
-		{#if isLoading}
-			<div class="loading-overlay" aria-label={$m.common_loading} role="status">
-				<div class="spinner"></div>
-				<p class="loading-text">{$m.setup_creating}</p>
-			</div>
-		{/if}
+		<!-- The credit is English whatever the interface language, like the
+		     start labels; "Credits / Créditos" is bilingual for the same reason. -->
+		<footer class="credit">
+			<img src={nehSeal} alt="National Endowment for the Humanities" class="seal" />
+			<p lang="en">
+				Captua is developed at the Archives, Memory, and Preservation Lab of the University of
+				California, Santa Barbara, and at the University of Texas at Austin. It has been made
+				possible in part by a major grant from the National Endowment for the Humanities: Democracy
+				demands wisdom (NEH Award HAA-304052-25).
+			</p>
+			<a href="/credits" class="credits-link">Credits / <span lang="es">Créditos</span></a>
+		</footer>
 	</div>
-	<!-- /.setup-card -->
-</div>
+{:else if step === 'account'}
+	<div class="wizard" onkeydown={handleKeydown} role="main">
+		<div class="card" class:is-loading={busy}>
+			<header class="card-head">
+				<CaptuaLogo class="head-logo" />
+				<div class="head-text">
+					<p class="step">{$m.setup_step(2, STEPS)}</p>
+					<h1 class="card-title">{$m.setup_title}</h1>
+					<p class="card-subtitle">{$m.setup_subtitle}</p>
+				</div>
+			</header>
 
-<!-- /.setup-wrapper -->
+			{#if signInFailed || otherAccount}
+				<div class="alert alert-error" role="alert">
+					{otherAccount ? $m.setup_other_account : $m.setup_err_signin}
+				</div>
+				<div class="actions">
+					<button type="button" class="btn-primary" onclick={() => goto('/login')} disabled={busy}>
+						{$m.setup_go_to_login}
+					</button>
+				</div>
+			{:else if noAnswer}
+				<div class="alert alert-error" role="alert">{$m.setup_no_answer}</div>
+				{#if checkFailed}
+					<p class="checking" role="status">{$m.setup_check_failed}</p>
+				{/if}
+				<div class="actions">
+					<button
+						type="button"
+						class="btn-primary"
+						onclick={checkAccount}
+						disabled={busy}
+						aria-busy={busy}
+					>
+						{$m.setup_check_account}
+					</button>
+				</div>
+			{:else if local === null}
+				<p class="checking" role="status">{$m.common_loading}…</p>
+			{:else}
+				<div class="fields">
+					<div class="field">
+						<label class="field-label" for="su-username">{$m.common_username_label}</label>
+						<input
+							id="su-username"
+							type="text"
+							class="field-input"
+							placeholder={$m.setup_ph_username}
+							bind:value={username}
+							disabled={busy}
+							autocomplete="username"
+							autocapitalize="none"
+							autocorrect="off"
+							spellcheck="false"
+						/>
+					</div>
+					<div class="field">
+						<label class="field-label" for="su-email">{$m.common_email}</label>
+						<input
+							id="su-email"
+							type="email"
+							class="field-input"
+							placeholder={$m.setup_ph_email}
+							bind:value={email}
+							disabled={busy}
+							autocomplete="email"
+						/>
+					</div>
+					<div class="field">
+						<PasswordField
+							id="su-password"
+							label={$m.common_password_label}
+							bind:value={password}
+							autocomplete="new-password"
+							disabled={busy}
+						/>
+						<span class="hint">{$m.setup_ph_password}</span>
+					</div>
+					<div class="field">
+						<PasswordField
+							id="su-confirm"
+							label={$m.common_confirm_password}
+							bind:value={confirmPassword}
+							autocomplete="new-password"
+							disabled={busy}
+						/>
+					</div>
+					{#if !local}
+						<div class="field">
+							<label class="field-label" for="su-token">{$m.setup_token_label}</label>
+							<input
+								id="su-token"
+								type="text"
+								class="field-input"
+								placeholder={$m.setup_ph_token}
+								bind:value={bootstrapToken}
+								disabled={busy}
+								autocomplete="off"
+								autocapitalize="none"
+								autocorrect="off"
+								spellcheck="false"
+							/>
+						</div>
+						<!-- Beside the token field, which it explains. -->
+						<p class="note">{$m.setup_not_local}</p>
+					{/if}
+				</div>
+
+				{#if errorMessage}
+					<div class="alert alert-error" role="alert">{errorMessage}</div>
+				{/if}
+
+				<div class="actions">
+					<button
+						type="button"
+						class="btn-secondary"
+						onclick={() => (step = 'language')}
+						disabled={busy}>{$m.setup_change_language}</button
+					>
+					<button
+						type="button"
+						class="btn-primary"
+						onclick={handleSubmit}
+						disabled={busy}
+						aria-busy={busy}
+					>
+						{busy ? $m.setup_creating : $m.setup_submit}
+					</button>
+				</div>
+			{/if}
+		</div>
+	</div>
+{:else}
+	<div class="network-step">
+		<header class="network-head">
+			<p class="step">{$m.setup_step(3, STEPS)}</p>
+			<h1 class="card-title">{$m.setup_network_title}</h1>
+			<p class="card-subtitle">{$m.setup_network_desc}</p>
+		</header>
+		<div class="network-body">
+			<NetworkSection role="admin" />
+		</div>
+		<footer class="network-foot">
+			<button type="button" class="btn-secondary" onclick={finish}>{$m.setup_network_later}</button>
+			<button type="button" class="btn-primary" onclick={finish}>{$m.setup_network_continue}</button
+			>
+		</footer>
+	</div>
+{/if}
 
 <style>
-	.setup-wrapper {
+	/* Step 1: the splash, as the welcome screen had it. */
+	.splash {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		min-height: 100vh;
+		background-color: var(--color-bg);
+	}
+
+	.main {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.credit {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		box-sizing: border-box;
+		width: 100%;
+		padding: 8px 24px;
+		border-top: 1px solid var(--border-color);
+	}
+
+	.seal {
+		height: 52px;
+		width: auto;
+		flex: none;
+	}
+
+	.credit p {
+		flex: 1;
+		margin: 0;
+		font-family: var(--font-family);
+		font-size: 11px;
+		line-height: 1.45;
+		color: var(--color-light-grey);
+	}
+
+	.credits-link {
+		flex: none;
+		display: inline-flex;
+		align-items: center;
+		min-height: var(--touch-target-min);
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		color: var(--color-secondary);
+	}
+
+	@media (max-width: 639px) {
+		.credit {
+			flex-direction: column;
+			gap: 8px;
+			padding: 16px 16px 8px;
+			text-align: center;
+		}
+
+		.credit p {
+			flex: none;
+		}
+
+		.seal {
+			height: 72px;
+		}
+
+		.main {
+			padding: 0 16px;
+		}
+	}
+
+	.logo-heading > .logo-stacked {
+		display: none;
+	}
+
+	@media (min-height: 600px) {
+		.logo-heading > .logo-stacked {
+			display: block;
+		}
+		.logo-heading > .logo-beside {
+			display: none;
+		}
+	}
+
+	.header {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		margin-bottom: 24px;
+	}
+
+	.title {
+		font-family: var(--font-family);
+		font-size: var(--text-h2);
+		font-weight: var(--fw-bold);
+		color: var(--color-light);
+		margin: 0 0 24px;
+		text-align: center;
+	}
+
+	.starts {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 16px;
+	}
+
+	.start {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.logo-heading {
+		margin: 0;
+		font-size: inherit;
+	}
+
+	.logo-heading > span {
+		display: block;
+	}
+
+	.btn {
+		font-family: var(--font-family);
+		font-size: var(--text-base);
+		font-weight: var(--fw-semibold);
+		color: var(--color-secondary);
+		background: transparent;
+		border: 1.5px solid var(--color-secondary);
+		border-radius: var(--radius-md);
+		padding: 10px 24px;
+		min-height: var(--touch-target-min);
+		cursor: pointer;
+		transition: background-color var(--transition-base);
+	}
+
+	.btn:hover {
+		background-color: rgba(150, 177, 240, 0.1);
+	}
+	.btn:active {
+		transform: scale(0.97);
+	}
+
+	/* Step 2: the account form, two fields a row from 600px wide. */
+	.wizard {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		min-height: 100vh;
+		box-sizing: border-box;
 		background-color: var(--color-bg);
-		padding: 24px 16px;
+		padding: 12px 16px;
 	}
 
-	.setup-card {
-		position: relative;
+	.card {
 		width: 100%;
-		max-width: 370px;
+		max-width: 640px;
+		box-sizing: border-box;
 		background-color: var(--color-surface);
 		border-radius: var(--radius-xl);
-		overflow: hidden;
 		box-shadow: var(--shadow-lg);
+		padding: 16px 24px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
 
-	.setup-card.is-loading .form-area {
+	/* The unit's 800x480 screen: the form from another device, with the
+	   token field and its note, still fits. */
+	@media (max-height: 520px) {
+		.wizard {
+			padding: 8px 16px;
+		}
+		.card {
+			padding: 12px 20px;
+			gap: 10px;
+		}
+	}
+
+	.card.is-loading .fields {
 		pointer-events: none;
 		opacity: 0.5;
 	}
 
-	.card-logo-area {
+	.card-head {
 		display: flex;
-		flex-direction: column;
 		align-items: center;
-		gap: 10px;
-		padding: 32px 24px 0;
+		gap: 20px;
 	}
 
-	.setup-title {
+	.card-head :global(.head-logo) {
+		width: 150px;
+		height: auto;
+		flex: none;
+	}
+
+	.head-text {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+
+	.step {
+		margin: 0;
+		font-size: 11px;
+		font-weight: var(--fw-bold);
+		color: var(--color-light-grey);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.card-title {
+		margin: 0;
 		font-size: var(--text-h5);
 		font-weight: var(--fw-bold);
 		color: var(--color-light);
-		margin: 0;
-		text-align: center;
 	}
 
-	.setup-subtitle {
+	.card-subtitle {
+		margin: 0;
 		font-size: var(--text-sm);
 		color: var(--color-light-grey);
+		line-height: 1.4;
+	}
+
+	.note {
 		margin: 0;
-		text-align: center;
-		line-height: 1.5;
+		align-self: end;
+		padding: 6px 10px;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border-color);
+		background-color: var(--color-surface-alt);
+		font-size: 12px;
+		color: var(--color-light);
+		line-height: 1.35;
 	}
 
-	.form-area {
-		padding: 28px 24px 20px;
-		display: flex;
-		flex-direction: column;
-		gap: 14px;
+	.checking {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
 	}
 
-	.field-group {
+	.fields {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 10px 16px;
+	}
+
+	@media (min-width: 600px) {
+		.fields {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	.field {
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
+		min-width: 0;
 	}
 
+	/* The look of PasswordField's label and input, so the four fields match. */
 	.field-label {
+		font-size: 11px;
+		font-weight: var(--fw-bold);
+		color: var(--color-light-grey);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.field-input {
+		font-family: var(--font-family);
 		font-size: var(--text-sm);
-		font-weight: var(--fw-medium);
-		color: var(--color-light-grey);
-	}
-
-	.setup-hint {
-		font-size: var(--text-sm);
-		color: var(--color-light-grey);
-		opacity: 0.75;
-	}
-
-	.input-wrapper {
-		position: relative;
-		display: flex;
-		align-items: center;
-	}
-
-	.input-icon {
-		position: absolute;
-		left: 12px;
-		width: 18px;
-		height: 18px;
-		color: var(--color-light-grey);
-		pointer-events: none;
-	}
-
-	.input-wrapper .input {
-		padding-left: 40px;
-		background-color: var(--color-surface-alt);
-		border-color: #323a31;
-	}
-
-	.input-wrapper .input:focus {
-		border-color: var(--color-primary);
-		outline: none;
-	}
-
-	.input-with-action {
-		padding-right: 44px;
-	}
-
-	.input-action-btn {
-		position: absolute;
-		right: 10px;
-		width: 32px;
-		height: 32px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: none;
-		border: none;
-		cursor: pointer;
-		color: var(--color-light-grey);
-		border-radius: var(--radius-sm);
-		transition: color var(--transition-fast);
-	}
-
-	.input-action-btn:hover {
 		color: var(--color-light);
-	}
-	.input-action-btn svg {
-		width: 18px;
-		height: 18px;
+		background-color: var(--color-surface);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		padding: 9px 12px;
+		outline: none;
+		min-height: var(--touch-target-min);
+		width: 100%;
+		box-sizing: border-box;
+		transition: border-color var(--transition-base);
 	}
 
-	.input-error {
-		border-color: var(--color-error) !important;
+	.field-input:focus {
+		border-color: var(--color-primary);
+	}
+
+	.hint {
+		font-size: 11px;
+		color: var(--color-light-grey);
 	}
 
 	.alert {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 10px 14px;
+		padding: 8px 12px;
 		border-radius: var(--radius-md);
 		font-size: var(--text-sm);
 		font-weight: var(--fw-medium);
@@ -500,80 +791,79 @@
 		color: var(--color-error);
 	}
 
-	.alert-success {
-		background-color: var(--color-success-bg);
-		border: 1px solid var(--color-success);
-		color: var(--color-success);
+	.actions {
+		display: flex;
+		justify-content: flex-end;
+		flex-wrap: wrap;
+		gap: 12px;
 	}
 
-	.alert-icon {
-		width: 18px;
-		height: 18px;
-		flex-shrink: 0;
-	}
-
-	.btn-login {
-		width: 100%;
+	.btn-primary,
+	.btn-secondary {
 		font-family: var(--font-family);
 		font-size: var(--text-base);
 		font-weight: var(--fw-semibold);
+		border-radius: var(--radius-md);
+		padding: 10px 20px;
+		min-height: var(--touch-target-min);
+		cursor: pointer;
+		transition: background-color var(--transition-base);
+	}
+
+	.btn-primary {
 		color: var(--color-light);
 		background-color: var(--color-primary);
 		border: none;
-		border-radius: var(--radius-md);
-		padding: 14px;
-		min-height: var(--touch-target-lg);
-		cursor: pointer;
-		transition:
-			background-color var(--transition-base),
-			opacity var(--transition-base);
 	}
-
-	.btn-login:hover:not(:disabled) {
+	.btn-primary:hover:not(:disabled) {
 		background-color: var(--color-primary-hover);
 	}
-	.btn-login:active:not(:disabled) {
-		transform: scale(0.98);
+
+	.btn-secondary {
+		color: var(--color-light);
+		background-color: transparent;
+		border: 1px solid var(--border-color);
 	}
-	.btn-login:disabled {
+	.btn-secondary:hover:not(:disabled) {
+		background-color: rgba(255, 255, 255, 0.05);
+	}
+
+	.btn-primary:disabled,
+	.btn-secondary:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
-		letter-spacing: 0.08em;
 	}
 
-	.loading-overlay {
-		position: absolute;
-		inset: 0;
-		background-color: rgba(19, 17, 16, 0.65);
+	/* Step 3: the network section scrolls between a fixed head and foot. */
+	.network-step {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 14px;
-		border-radius: var(--radius-xl);
-		z-index: 10;
-		backdrop-filter: blur(2px);
+		height: 100vh;
+		box-sizing: border-box;
+		background-color: var(--color-bg);
 	}
 
-	.spinner {
-		width: 48px;
-		height: 48px;
-		border: 3px solid var(--border-color);
-		border-top-color: var(--color-light);
-		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
+	.network-head {
+		flex: none;
+		padding: 12px 24px 8px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
 	}
 
-	.loading-text {
-		font-size: var(--text-base);
-		font-weight: var(--fw-medium);
-		color: var(--color-light);
-		margin: 0;
+	.network-body {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		padding: 8px 24px;
 	}
 
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
+	.network-foot {
+		flex: none;
+		display: flex;
+		justify-content: flex-end;
+		gap: 12px;
+		padding: 10px 24px;
+		border-top: 1px solid var(--border-color);
 	}
 </style>

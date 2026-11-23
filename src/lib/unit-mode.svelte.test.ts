@@ -12,7 +12,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { AuthError, collectionsApi, systemApi } from './api';
 import { authStore, type AuthUser } from './stores/auth';
-import { ensureUnit, keepUnitState, reloadUnit, unitState } from './unit-mode';
+import { ensureUnit, reloadUnit, unitState, writeUnit } from './unit-mode';
 
 const admin: AuthUser = { id: 1, username: 'admin1', email: null, role: 'admin', is_active: true };
 
@@ -170,7 +170,7 @@ describe('the unit store', () => {
 		const spy = vi
 			.spyOn(systemApi, 'unit')
 			.mockResolvedValue({ ...unit, mode: 'offline' } as never);
-		keepUnitState(unit);
+		await writeUnit(async () => unit);
 		expect((await ensureUnit())?.mode).toBe('backup');
 		expect(spy).not.toHaveBeenCalled();
 		// A new session forgets it.
