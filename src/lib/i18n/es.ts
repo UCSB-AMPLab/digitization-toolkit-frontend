@@ -341,6 +341,9 @@ export const es = {
 	config_camera_backend_desc:
 		'El controlador de cámara que Captua usa en este equipo. Un administrador elige el tipo de cámara en Configuración › Cámaras.',
 	config_camera_backend_unknown: 'No disponible',
+	// NEH-186: el aviso mientras el equipo no responde (UnitNotAnswering).
+	unit_not_answering: 'El equipo no responde. Puede que lo que ves en pantalla no esté al día.',
+	unit_not_answering_reload: 'Recargar',
 	// NEH-252/348: el tipo de cámara que usa el equipo (Configuración >
 	// Cámaras, Diagnóstico y el panel de cámaras de la pantalla de captura).
 	// Los nombres de los controladores (picamera2, gphoto2, chdk) solo

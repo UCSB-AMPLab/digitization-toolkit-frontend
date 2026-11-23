@@ -321,6 +321,9 @@ export const en: Messages = {
 	config_camera_backend_desc:
 		'The camera driver Captua is using on this unit. An administrator chooses the kind of camera in Settings › Cameras.',
 	config_camera_backend_unknown: 'Unavailable',
+	// NEH-186: the banner while the unit is not answering (UnitNotAnswering).
+	unit_not_answering: 'This unit is not answering. What is on screen may be out of date.',
+	unit_not_answering_reload: 'Reload',
 	// NEH-252/348: the kind of camera the unit drives (Settings > Cameras,
 	// Diagnostics, the capture screen's camera panel). Driver names
 	// (picamera2, gphoto2, chdk) appear only in Diagnostics, beside these.

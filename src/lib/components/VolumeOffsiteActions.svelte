@@ -32,7 +32,7 @@
 		type VolumeOffsiteState
 	} from '$lib/api';
 	import { m } from '$lib/i18n';
-	import { dismissible } from '$lib/dialog';
+	import { alwaysReachable, dismissible } from '$lib/dialog';
 	import {
 		OFFSITE_POLL_INTERVAL_MS,
 		offsiteActionErrorText,
@@ -187,20 +187,33 @@
 		// Keep Tab inside the dialog, as HandoverControls does.
 		if (e.key === 'Tab' && cardEl) {
 			const items = [...cardEl.querySelectorAll<HTMLElement>('button:not(:disabled)')];
+			// The banner's Reload stays reachable, before the first button (lib/dialog.ts),
+			// also while every button of the dialog is disabled.
+			const extra = alwaysReachable().filter((el) => !cardEl!.contains(el));
 			if (items.length === 0) {
 				e.preventDefault();
-				cardEl.focus();
+				const here = extra.indexOf(document.activeElement as HTMLElement);
+				const next = here === -1 ? extra[0] : extra[here + 1];
+				(next ?? cardEl).focus();
 				return;
 			}
 			const first = items[0];
 			const last = items[items.length - 1];
 			const active = document.activeElement;
-			if (e.shiftKey && (active === first || active === cardEl || !cardEl.contains(active))) {
+			const at = extra.indexOf(active as HTMLElement);
+			if (at !== -1) {
 				e.preventDefault();
-				last.focus();
-			} else if (!e.shiftKey && (active === last || !cardEl.contains(active))) {
+				if (e.shiftKey) (at > 0 ? extra[at - 1] : last).focus();
+				else (at < extra.length - 1 ? extra[at + 1] : first).focus();
+				return;
+			}
+			const outside = !cardEl.contains(active);
+			if (e.shiftKey && (active === first || active === cardEl || outside)) {
 				e.preventDefault();
-				first.focus();
+				(extra.length > 0 && !outside ? extra[extra.length - 1] : last).focus();
+			} else if (!e.shiftKey && (active === last || outside)) {
+				e.preventDefault();
+				(extra.length > 0 && !outside ? extra[0] : first).focus();
 			}
 		}
 	}
