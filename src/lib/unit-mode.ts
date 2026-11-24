@@ -44,6 +44,9 @@ export interface UnitState {
 	// The unit's capture key (NEH-336); null for the built-in default. Absent
 	// from an older backend, which leaves the key to each browser.
 	captureKey?: CaptureChord | null;
+	// Whether operators are asked for colour card shots (NEH-340). Absent from
+	// an older backend.
+	colourCardShots?: boolean;
 }
 
 export interface KeptVolume {
@@ -94,7 +97,8 @@ export function readUnitState(data: unknown): UnitState | null {
 		...(d.defaultLanguage === 'es' || d.defaultLanguage === 'en'
 			? { defaultLanguage: d.defaultLanguage }
 			: {}),
-		...('captureKey' in d ? { captureKey: readChordValue(d.captureKey) } : {})
+		...('captureKey' in d ? { captureKey: readChordValue(d.captureKey) } : {}),
+		...(typeof d.colourCardShots === 'boolean' ? { colourCardShots: d.colourCardShots } : {})
 	};
 }
 

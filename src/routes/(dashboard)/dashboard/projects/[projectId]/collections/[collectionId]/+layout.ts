@@ -21,6 +21,8 @@ export const load: LayoutLoad = async ({ params }) => {
 		projectName: project?.name ?? '—',
 		collectionName: collection?.name ?? '—',
 		collectionTestingExpiresAt: collection?.testing_expires_at ?? null,
-		collectionTesting: collection?.testing === true
+		collectionTesting: collection?.testing === true,
+		// The volume's colour card summary (NEH-340), for its flag in the top bar.
+		collectionColourCard: collection?.colour_card ?? null
 	};
 };

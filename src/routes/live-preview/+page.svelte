@@ -174,6 +174,18 @@
 	// Confirm goes through handleRetake and retake, the image window's path,
 	// with the same gate and timeout check; it stays on this screen afterwards.
 	//
+	// Colour card shots (NEH-340): once the camera set-up is known and needs
+	// nothing, the page reads whether the volume is asked for colour card
+	// shots (ColourCardCheck, colour-card-check.svelte.ts), holding capture
+	// until that read has settled, and opens ColourCardStep over the screen
+	// when it is; capture stays held (captureBlocked, otherModalOpen, and the
+	// retake and placeholder paths) until the step is answered. The state is
+	// read again when the camera panel is closed, when the camera check or
+	// the Refocus dialog closes, and when the tab comes back into view: the
+	// places where exposure or zoom can have changed. Nothing is read for the
+	// testing account, a testing volume, a volume without a stem or with the
+	// unit's setting off.
+	//
 	// Version: 0.3.0
 
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
@@ -228,7 +240,8 @@
 		createReconciler,
 		mayReport,
 		runPageCapture,
-		type CaptureAttempt
+		type CaptureAttempt,
+		type CaptureGate
 	} from '$lib/capture-check';
 	import type { CaptureNotice } from '$lib/stores/cameras';
 	import {
@@ -263,6 +276,8 @@
 	import { dialogOpen } from '$lib/dialog';
 	import MissingPage from '$lib/components/MissingPage.svelte';
 	import CloseMissingDialog from '$lib/components/CloseMissingDialog.svelte';
+	import ColourCardStep from './ColourCardStep.svelte';
+	import { ColourCardCheck } from './colour-card-check.svelte';
 
 	let projectId = $derived(Number($page.url.searchParams.get('projectId')) || 0);
 	let collectionId = $derived(Number($page.url.searchParams.get('collectionId')) || 0);
@@ -291,7 +306,11 @@
 	// retake (openRecord) set it, so no later read overrides the operator's
 	// choice. Another volume clears `modeSet` (leaveVolume).
 	let cameraMode = $state<'single' | 'double'>('double');
-	let modeSet = false;
+	let modeSet = $state(false);
+	// The arrival's `recordId`, if any, has been opened (or is not among the
+	// records): until then the colour card check waits, as the record sets
+	// the mode (NEH-340).
+	let arrivalSettled = $state(untrack(() => !$page.url.searchParams.get('recordId')));
 	function modeFromRecords(list: readonly ApiRecord[]): 'single' | 'double' {
 		let last: ApiRecord | undefined;
 		for (const r of list) if (!last || (r.sequence ?? 0) >= (last.sequence ?? 0)) last = r;
@@ -729,6 +748,61 @@
 	);
 	// Capture controls are usable only with the gate free and the baseline read.
 	let captureLocked = $derived(captureBusy || !baselineReady);
+
+	// Colour card shots (NEH-340). Whether the volume is a testing volume,
+	// once the volume has been read (or its read failed): until then, the
+	// check holds.
+	let collectionKnown = $state(false);
+	let collectionTesting = $state(false);
+	// Set by the step while it is mounted: a shot in flight (LiveViewport asks
+	// for no preview frame), and any of its requests in flight. The page
+	// clears both whenever the step is removed, for any reason.
+	let colourCardShooting = $state(false);
+	let colourCardStepBusy = $state(false);
+	// The step's requests take the capture gate through this, so that the
+	// step's own hold does not count as the gate being held by a capture.
+	let stepHoldsGate = $state(false);
+	const stepGate: CaptureGate = {
+		isBusy: () => captureGate.isBusy(),
+		serial: () => captureGate.serial(),
+		acquire(kind) {
+			const release = captureGate.acquire(kind);
+			if (!release) return null;
+			stepHoldsGate = true;
+			return () => {
+				stepHoldsGate = false;
+				release();
+			};
+		}
+	};
+	// Whether the volume can be asked at all, the unit's setting aside; and
+	// with the setting as last read (each read reads it afresh first).
+	let colourCardEligible = $derived(
+		volumeChosen &&
+			takesPartInWorkflow($userRole) &&
+			!(collectionKnown && (collectionTesting || volumeNeedsStem))
+	);
+	// The unit's setting as the store holds it now (on while not known).
+	let colourCardSettingOn = $derived($unitState?.colourCardShots !== false);
+	let colourCardAsks = $derived(colourCardEligible && colourCardSettingOn);
+	// The rule (colour-card-check.svelte.ts owns `need`, the verdict of the
+	// latest stamped evidence, and `firstPending`, the first check of the
+	// visit within its bound):
+	// - capture is held while the volume is eligible and either the first
+	//   check is pending, or the setting is on and `need` is true; a capture
+	//   in flight finishes as usual;
+	// - the step is shown while the volume is eligible, the camera set-up
+	//   needs nothing, and either the setting is on with `need` true and the
+	//   capture gate free (the step's own hold of it aside), or the step has
+	//   a request in flight;
+	// - the setting seen off, in the store, from anyone's read, is evidence
+	//   of "not needed" stamped then; seen on again, a read is requested;
+	// - a read may start only while every input below allows it, and the
+	//   one effect after it is the only thing that tells the check so.
+	const colourCard = new ColourCardCheck({
+		collectionId: () => collectionId,
+		asks: () => colourCardAsks && collectionKnown
+	});
 	let pageCheckController: AbortController | null = null;
 	let cancelSlow: (() => void) | null = null;
 	// The background asks for captures of this screen whose outcome is
@@ -747,6 +821,7 @@
 		pageCheckController?.abort();
 		cancelSlow?.();
 		reconciler.stopAll();
+		colourCard.destroy();
 		if (ownsNotice) cameraStatus.reportNotice(null);
 	});
 	let seenCollectionId = untrack(() => collectionId);
@@ -788,6 +863,7 @@
 		refreshing = false;
 		leaving = false;
 		setLastRecord(null);
+		colourCard.reset();
 		if (volumeChosen) void loadRecords();
 	}
 	let leftCameraIndex = $derived(swapped ? 1 : 0);
@@ -907,6 +983,54 @@
 	// The bodies of the last device listing, to ask again when they change.
 	let lastHardwareKey: string | null = null;
 
+	// Colour card shots (NEH-340): when the check may read, and what is held
+	// and shown (the rule is stated where `colourCard` is created).
+	let colourCardMayRead = $derived(
+		colourCardEligible &&
+			collectionKnown &&
+			modeSet &&
+			arrivalSettled &&
+			!recordsUnread &&
+			setupAnswered &&
+			!setupNeeded &&
+			!whichByHand &&
+			!cameraCheckOpen &&
+			!captureBusy
+	);
+	$effect(() => {
+		const may = colourCardMayRead;
+		untrack(() => colourCard.update(may));
+	});
+	let colourCardHeld = $derived(
+		colourCardEligible && (colourCard.firstPending || (colourCardSettingOn && colourCard.need))
+	);
+	let colourCardShown = $derived(
+		volumeChosen &&
+			colourCardEligible &&
+			!setupNeeded &&
+			((colourCardSettingOn && colourCard.need && (!captureBusy || stepHoldsGate)) ||
+				colourCardStepBusy)
+	);
+	// The setting as the store holds it: off clears the verdict, on asks again.
+	let settingSeen: boolean | null = null;
+	$effect(() => {
+		const on = colourCardSettingOn;
+		untrack(() => {
+			if (settingSeen !== null && on !== settingSeen) {
+				if (on) colourCard.request();
+				else colourCard.evidence({ at: colourCard.stamp(), need: false });
+			}
+			settingSeen = on;
+		});
+	});
+	$effect(() => {
+		if (colourCardShown) return;
+		untrack(() => {
+			colourCardShooting = false;
+			colourCardStepBusy = false;
+		});
+	});
+
 	const readSetup = newestOnly(
 		() => camerasApi.getSetup(),
 		(setup) => {
@@ -989,6 +1113,7 @@
 	function closeRefocus() {
 		refocusOpen = false;
 		noteFocusActivity();
+		colourCard.request();
 	}
 
 	// On the first settle, once the capabilities report DSLR settings, and
@@ -1005,6 +1130,7 @@
 			if (document.visibilityState === 'visible') {
 				askForFocusIfDue();
 				void checkSetup();
+				colourCard.request();
 			}
 		};
 		document.addEventListener('visibilitychange', onVisibility);
@@ -1108,6 +1234,10 @@
 		}
 		if (captureHeld) {
 			showAnotherError($m.camwhich_needed);
+			return;
+		}
+		if (colourCardHeld) {
+			showAnotherError($m.cc_needed);
 			return;
 		}
 		anotherBusy = true;
@@ -1251,9 +1381,11 @@
 					.then((c) => {
 						collectionName = c.name;
 						volumeNeedsStem = needsStem(c);
+						collectionTesting = c.testing === true;
 						attributesInstruction = captureInstruction(c.custom_attributes);
 					})
 					.catch((e) => console.error('[LivePreview] Error loading volume:', e))
+					.finally(() => (collectionKnown = true))
 			);
 			// Not one of `tasks`: the band can arrive late, and the retake modal
 			// below (NEH-209) must never wait for the lists.
@@ -1288,6 +1420,7 @@
 			if (target) {
 				openRecord(target);
 				cameFromRecapture = true;
+				arrivalSettled = true;
 				// A record the summary lists as pending starts the guide through the
 				// volume's others, in the summary's order. Without the summary the
 				// modal opens as a single retake.
@@ -1301,6 +1434,8 @@
 				}
 			}
 		}
+		// An arrival record not among the records sets no mode.
+		arrivalSettled = true;
 		// The recapture turn decides whether the block panel shows.
 		await summaryLoad;
 		screenSettled = true;
@@ -1322,7 +1457,9 @@
 			if (volume !== collectionId) return false;
 			records = data;
 			known.listed(data);
-			if (!modeSet) chooseMode(modeFromRecords(data));
+			if (!modeSet) {
+				chooseMode(modeFromRecords(data));
+			}
 			// A last record whose capture answer gave no image ids takes them from here.
 			if (lastRecordId !== null && lastImageIds === null) {
 				const last = data.find((r) => r.id === lastRecordId);
@@ -1522,6 +1659,7 @@
 		// The modal shows a thrown error's message; this one is the catalogue's.
 		if (volumeNeedsStem) throw new Error($m.lv_needs_stem);
 		if (captureHeld) throw new Error($m.camwhich_needed);
+		if (colourCardHeld) throw new Error($m.cc_needed);
 		try {
 			await retake(record, fromViewport, precheck, expectedImageIds);
 		} catch (error) {
@@ -1838,6 +1976,8 @@
 				onRotateDegChange={canSetUp ? handleRotateDegChange : undefined}
 				{rotateDeg}
 				onRescan={() => void checkSetup()}
+				onSettingsClosed={() => colourCard.request()}
+				onSettingsWritten={() => colourCard.request()}
 				setupControls={canSetUp}
 			/>
 
@@ -1858,15 +1998,16 @@
 						refocusOpen ||
 						cameraCheckOpen ||
 						setupNeeded ||
-						whichByHand}
-					captureBlocked={captureHeld}
+						whichByHand ||
+						colourCardShown}
+					captureBlocked={captureHeld || colourCardHeld}
 					swapLocked={rolesLeft !== null}
 					needsStem={volumeNeedsStem}
 					{stemFormHref}
 					{stemNote}
 					onStemRefused={recheckStem}
 					{pageCaptures}
-					{pageCapturing}
+					pageCapturing={pageCapturing || colourCardShooting}
 					{captureGate}
 					setupView={!volumeChosen}
 					retakeLast={lastRecord ? retakeLastRecord : undefined}
@@ -2105,11 +2246,15 @@
 		{rotateDeg}
 		onRotateDegChange={canSetUp ? handleRotateDegChange : undefined}
 		{savingOrientation}
-		onClose={() => (cameraCheckOpen = false)}
+		onClose={() => {
+			cameraCheckOpen = false;
+			colourCard.request();
+		}}
 		onRefocusClosed={noteFocusActivity}
 		onChangeRoles={canSetUp ? () => (whichByHand = true) : undefined}
 		zoomControls={canSetUp}
 		{captureGate}
+		onSettingsWritten={() => colourCard.request()}
 	/>
 {/if}
 
@@ -2128,6 +2273,27 @@
 		onLeave={handleBack}
 		onDevices={applyDevices}
 	/>
+{/if}
+
+{#if colourCardShown}
+	{#key collectionId}
+		<ColourCardStep
+			{collectionId}
+			captureMode={cameraMode === 'double' ? 'dual' : 'single'}
+			leftIndex={leftCameraIndex}
+			reason={colourCard.state?.reason ?? null}
+			cameraName={orientationCameraName}
+			projectName={projectsShownIn($unitState) ? projectName : ''}
+			{collectionName}
+			captureGate={stepGate}
+			stamp={() => colourCard.stamp()}
+			onEvidence={(item) => colourCard.evidence(item)}
+			need={() => colourCard.need}
+			onLeave={handleBack}
+			onBusy={(busy) => (colourCardShooting = busy)}
+			onWorking={(busy) => (colourCardStepBusy = busy)}
+		/>
+	{/key}
 {/if}
 
 {#if closingPlaceholder && inspectedRecord}
