@@ -103,6 +103,37 @@ afterEach(() => {
 	resetUnit();
 });
 
+describe('Volúmenes: colour card shots (NEH-340)', () => {
+	it('flags a volume asked for shots whose shots are not all there, as the "No stem" flag is drawn', async () => {
+		vi.spyOn(collectionsApi, 'listAll').mockResolvedValue([
+			vol(90, 'Tomo 090', {
+				filename_stem: 'a',
+				colour_card: { enabled: true, status: 'none', sets: 0 }
+			}),
+			vol(93, 'Tomo 093', {
+				filename_stem: 'b',
+				colour_card: { enabled: true, status: 'skipped', sets: 1 }
+			}),
+			vol(97, 'Tomo 097', {
+				filename_stem: 'c',
+				colour_card: { enabled: true, status: 'present', sets: 1 }
+			}),
+			vol(98, 'Tomo 098', { filename_stem: 'd', colour_card: { enabled: false } })
+		]);
+		const screen = render(Volumes);
+		await expect.poll(() => names(screen)).toHaveLength(4);
+		const flagOf = (name: string) =>
+			[...screen.container.querySelectorAll('tbody tr')]
+				.find((tr) => tr.querySelector('.vol-name')?.textContent?.trim() === name)
+				?.querySelector('[data-colour-card-flag]')
+				?.textContent?.trim() ?? null;
+		expect(flagOf('Tomo 090')).toBe(es.cc_flag_none);
+		expect(flagOf('Tomo 093')).toBe(es.cc_flag_skipped);
+		expect(flagOf('Tomo 097')).toBeNull();
+		expect(flagOf('Tomo 098')).toBeNull();
+	});
+});
+
 describe('Volúmenes', () => {
 	it('lists every top-level volume, whatever its project, with records and stage', async () => {
 		const screen = render(Volumes);

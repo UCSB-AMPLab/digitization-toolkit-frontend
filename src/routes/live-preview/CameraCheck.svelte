@@ -92,7 +92,8 @@
 		onRefocusClosed,
 		onChangeRoles,
 		zoomControls = true,
-		captureGate
+		captureGate,
+		onSettingsWritten
 	}: {
 		// The camera that takes the left page: 1 when the viewport is swapped.
 		leftIndex?: number;
@@ -112,6 +113,9 @@
 		zoomControls?: boolean;
 		// The capture screen's one gate; without it the check has one of its own.
 		captureGate?: CaptureGate;
+		// A zoom step write has settled, confirmed or refused (NEH-340: the
+		// capture screen asks again whether colour card shots are needed).
+		onSettingsWritten?: () => void;
 	} = $props();
 
 	const gate: CaptureGate = untrack(() => captureGate) ?? createCaptureGate();
@@ -297,6 +301,8 @@
 			console.error('[CameraCheck] Zoom step refused:', cam, err);
 			zoomError = $m.camcheck_zoom_failed(side, zoomFailureDetail(err));
 			return false;
+		} finally {
+			onSettingsWritten?.();
 		}
 	}
 

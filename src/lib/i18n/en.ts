@@ -2603,6 +2603,73 @@ export const en: Messages = {
 	network_not_received_title: 'The unit did not receive the request',
 	network_not_received_body: 'Press "Retry" to send it again.',
 
+	// ── Colour card shots (NEH-340) ──────────────────────────────────────────
+	cc_title: 'Colour card',
+	cc_heading: 'Take the colour card shots',
+	cc_reason_start:
+		'This volume has no pages yet. Before capturing the first, take a shot of the colour card with each camera.',
+	cc_reason_begun_without:
+		'This volume already has pages, but no colour card shots. Take them now with each camera.',
+	cc_reason_settings_changed:
+		'The camera settings were changed after the last colour card shots. Take them again with each camera.',
+	cc_how:
+		'Place the card under each camera, under the same light as the pages, and take a shot of it.',
+	cc_take: 'Take shot',
+	cc_take_again: 'Take again',
+	cc_taking: 'Taking the shot…',
+	cc_no_shot: 'No shot yet',
+	cc_shot_raw: 'The shot was saved. It is a RAW file and cannot be shown here.',
+	cc_shot_unshown: 'The shot was saved, but Captua could not show it here.',
+	cc_shot_alt: (camera: string) => `Colour card shot from ${camera}`,
+	cc_continue: 'Continue',
+	cc_skip: 'Skip',
+	cc_skip_title: 'Skip the colour card shots?',
+	cc_skip_body: 'Captua will put a mark on this volume saying that it has no colour card shots.',
+	cc_skip_confirm: 'Skip the shots',
+	cc_opening: 'Captua is preparing the colour card shots…',
+	cc_needed: 'Take or skip the colour card shots before capturing.',
+	cc_err_camera_busy: 'This camera is taking another shot. Wait a moment and try again.',
+	cc_err_not_connected: (camera: string) =>
+		`Captua cannot reach ${camera}. Check its cable and try again.`,
+	cc_err_capture_failed: (camera: string) =>
+		`No shot was taken with ${camera}. Try that camera again.`,
+	cc_err_set_gone:
+		'These colour card shots were already taken or skipped on another screen. This screen now shows what the unit holds.',
+	cc_err_shots_missing: 'Before you continue, take a shot with each camera.',
+	cc_err_volume_gone: 'This volume is no longer on the unit.',
+	cc_err_timeout:
+		'Captua did not get the result of the shot in time. This screen now shows what the unit holds.',
+	cc_err_unread: 'Captua could not read the colour card shots of this volume.',
+	cc_err_failed: 'The request did not go through. Try again.',
+	cc_err_busy: 'Wait for the capture in progress to finish, then try again.',
+	cc_flag_none: 'No colour card shots',
+	cc_flag_skipped: 'Colour card shots skipped',
+	cc_flag_title:
+		'Captua sends this volume to Fisqua with a mark saying that it has no colour card shots.',
+	cc_sets_open: 'Colour card shots',
+	cc_sets_title: 'Colour card shots',
+	cc_sets_empty: 'This volume has no colour card shots.',
+	cc_set_heading: (n: number, date: string) => `Set ${n} · ${date}`,
+	cc_set_by: (name: string) => `By ${name}`,
+	cc_outcome_taken: 'Taken',
+	cc_outcome_skipped: 'Skipped',
+	cc_outcome_open: 'Not finished',
+	cc_shot_camera: (n: number) => `Camera ${n}`,
+	cc_delivery_sent: 'Sent offsite',
+	cc_delivery_waiting: 'Waiting to be sent offsite',
+	cc_delivery_waiting_because: (reason: string) => `Waiting to be sent offsite: ${reason}`,
+	cc_delivery_undeliverable: (reason: string) => `Cannot be sent offsite: ${reason}`,
+	cc_reason_staging_failed: 'a file could not be prepared for the upload',
+	cc_reason_file_unstable: 'a file was still being written',
+	cc_reason_listed_without_sha1: 'the offsite copy lists a file without a checksum to compare',
+	cc_reason_unverified: 'the copy of a file could not be checked yet',
+	cc_reason_file_missing: 'a shot file is missing on the unit',
+	cc_reason_upload_refused: 'the offsite copy refused a shot',
+	cc_setting_label: 'Ask for colour card shots',
+	cc_setting_desc:
+		'When this is on, the capture screen asks for a shot of the colour card with each camera at the start of each volume and whenever the camera settings are changed. Captua sends volumes captured while it is off to Fisqua with a mark saying that they have no colour card shots.',
+	cc_setting_error: 'Captua could not save the change. Try again.',
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
 	api_request_failed: 'Request failed'

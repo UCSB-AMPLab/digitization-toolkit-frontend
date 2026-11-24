@@ -2772,6 +2772,78 @@ export const es = {
 	network_not_received_title: 'El equipo no recibió la solicitud',
 	network_not_received_body: 'Presiona "Reintentar" para enviarla de nuevo.',
 
+	// ── Colour card shots (NEH-340) ──────────────────────────────────────────
+	cc_title: 'Carta de color',
+	cc_heading: 'Toma las fotos de la carta de color',
+	cc_reason_start:
+		'Este volumen todavía no tiene páginas. Antes de capturar la primera, toma una foto de la carta de color con cada cámara.',
+	cc_reason_begun_without:
+		'Este volumen ya tiene páginas, pero no tiene fotos de la carta de color. Tómalas ahora con cada cámara.',
+	cc_reason_settings_changed:
+		'Después de las últimas fotos de la carta de color se cambió la configuración de las cámaras. Tómalas de nuevo con cada cámara.',
+	cc_how:
+		'Pon la carta bajo cada cámara, con la misma luz que usas para las páginas, y tómale una foto.',
+	cc_take: 'Tomar foto',
+	cc_take_again: 'Tomar de nuevo',
+	cc_taking: 'Tomando la foto…',
+	cc_no_shot: 'Todavía no hay foto',
+	cc_shot_raw: 'La foto quedó guardada. Es un archivo RAW y no se puede mostrar aquí.',
+	cc_shot_unshown: 'La foto quedó guardada, pero Captua no pudo mostrarla aquí.',
+	cc_shot_alt: (camera: string) => `Foto de la carta de color tomada con ${camera}`,
+	cc_continue: 'Continuar',
+	cc_skip: 'Omitir',
+	cc_skip_title: '¿Omitir las fotos de la carta de color?',
+	cc_skip_body:
+		'Captua le pondrá a este volumen una marca que indica que no tiene fotos de la carta de color.',
+	cc_skip_confirm: 'Omitir las fotos',
+	cc_opening: 'Captua está preparando las fotos de la carta de color…',
+	cc_needed: 'Toma u omite las fotos de la carta de color antes de capturar.',
+	cc_err_camera_busy:
+		'Esta cámara está tomando otra foto. Espera un momento y vuelve a intentarlo.',
+	cc_err_not_connected: (camera: string) =>
+		`Captua no puede comunicarse con ${camera}. Revisa el cable de la cámara y vuelve a intentarlo.`,
+	cc_err_capture_failed: (camera: string) =>
+		`No se tomó ninguna foto con ${camera}. Vuelve a intentarlo con esa cámara.`,
+	cc_err_set_gone:
+		'En otra pantalla ya se tomaron u omitieron estas fotos de la carta de color. Esta pantalla muestra ahora lo que hay en el equipo.',
+	cc_err_shots_missing: 'Antes de continuar, toma una foto con cada cámara.',
+	cc_err_volume_gone: 'Este volumen ya no está en el equipo.',
+	cc_err_timeout:
+		'Captua no recibió a tiempo el resultado de la foto. Esta pantalla muestra ahora lo que hay en el equipo.',
+	cc_err_unread: 'Captua no pudo leer las fotos de la carta de color de este volumen.',
+	cc_err_failed: 'La solicitud no se completó. Vuelve a intentarlo.',
+	cc_err_busy: 'Espera a que termine la captura en curso y vuelve a intentarlo.',
+	cc_flag_none: 'Sin fotos de la carta de color',
+	cc_flag_skipped: 'Fotos de la carta de color omitidas',
+	cc_flag_title:
+		'Captua envía este volumen a Fisqua con una marca que indica que no tiene fotos de la carta de color.',
+	cc_sets_open: 'Fotos de la carta de color',
+	cc_sets_title: 'Fotos de la carta de color',
+	cc_sets_empty: 'Este volumen no tiene fotos de la carta de color.',
+	cc_set_heading: (n: number, date: string) => `Grupo ${n} · ${date}`,
+	cc_set_by: (name: string) => `Por ${name}`,
+	cc_outcome_taken: 'Tomadas',
+	cc_outcome_skipped: 'Omitidas',
+	cc_outcome_open: 'Sin terminar',
+	cc_shot_camera: (n: number) => `Cámara ${n}`,
+	cc_delivery_sent: 'Enviadas a la copia externa',
+	cc_delivery_waiting: 'Pendientes de envío a la copia externa',
+	cc_delivery_waiting_because: (reason: string) =>
+		`Pendientes de envío a la copia externa: ${reason}`,
+	cc_delivery_undeliverable: (reason: string) =>
+		`No se pueden enviar a la copia externa: ${reason}`,
+	cc_reason_staging_failed: 'Captua no pudo preparar un archivo para el envío',
+	cc_reason_file_unstable: 'un archivo todavía se estaba escribiendo',
+	cc_reason_listed_without_sha1:
+		'un archivo aparece en la copia externa sin checksum para compararlo',
+	cc_reason_unverified: 'todavía no se pudo verificar la copia de un archivo',
+	cc_reason_file_missing: 'falta en el equipo un archivo de las fotos',
+	cc_reason_upload_refused: 'la copia externa rechazó una de las fotos',
+	cc_setting_label: 'Pedir fotos de la carta de color',
+	cc_setting_desc:
+		'Con esta opción activada, la pantalla de captura pide una foto de la carta de color con cada cámara al empezar cada volumen y cada vez que se cambia la configuración de las cámaras. Captua envía a Fisqua los volúmenes que se capturen con la opción desactivada, con una marca que indica que no tienen fotos de la carta de color.',
+	cc_setting_error: 'Captua no pudo guardar el cambio. Vuelve a intentarlo.',
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',
 	api_request_failed: 'Error en la solicitud'

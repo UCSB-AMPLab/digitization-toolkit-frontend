@@ -6,6 +6,15 @@ import { env } from '$env/dynamic/public';
 import { get } from 'svelte/store';
 import { resolveApiBase } from './api-base';
 import { readPairingStatus, type PairingStatus } from './fisqua-pairing';
+import {
+	readColourCardSet,
+	readColourCardState,
+	shotImageUrl as colourCardShotUrl,
+	type ColourCardSet,
+	type ColourCardShot,
+	type ColourCardState,
+	type ColourCardSummary
+} from './colour-card';
 import { m } from './i18n';
 import { authStore } from './stores/auth';
 import { sessionRenewals } from './session-keepalive';
@@ -836,6 +845,10 @@ export interface Collection {
 	// it is set, the instant after which the backend may remove it.
 	testing?: boolean;
 	testing_expires_at?: string | null;
+	// Read-only (NEH-340): the volume's colour card shots, from the database
+	// alone; {enabled: false} while the unit does not ask for them or in a
+	// testing volume. Absent from an older backend.
+	colour_card?: ColourCardSummary | null;
 }
 
 export interface CollectionWithChildren extends Collection {
@@ -3108,6 +3121,8 @@ export interface UnitSettings {
 		meta: boolean;
 		shift: boolean;
 	} | null;
+	/** Whether operators are asked for colour card shots (NEH-340); absent from an older backend. */
+	colourCardShots?: boolean;
 }
 
 /** A volume Captua keeps on the unit: `files` is the count it would copy offsite. */
@@ -3238,6 +3253,7 @@ export const systemApi = {
 		projectsEnabled?: boolean;
 		keptVolumes?: KeptVolumesDecision;
 		defaultLanguage?: 'es' | 'en';
+		colourCardShots?: boolean;
 	}): Promise<UnitSettings> {
 		return apiRequest<UnitSettings>('/system/unit', {
 			method: 'PUT',
@@ -3646,5 +3662,107 @@ export const networkApi = {
 		await bounded(NETWORK_LIMITS_MS.forget, signal, (s) =>
 			apiRequest<void>(force ? `${path}?force=true` : path, { method: 'DELETE', signal: s })
 		);
+	}
+};
+
+// ---------------------------------------------------------------------------
+// Colour card shots (NEH-340, app/api/colour_card.py)
+// ---------------------------------------------------------------------------
+// Administrator and operator. Every request that may touch a camera (the
+// state read with the cameras, opening a set and skipping, which record the
+// cameras' settings, and a shot) has the camera routes' time limit; the
+// others the catalogue's. An answer of another shape is an error.
+
+/** The body of POST .../sets and .../skip: the cameras that take a shot. */
+export interface ColourCardSetRequest {
+	capture_mode?: 'single' | 'dual';
+	camera_index?: number;
+}
+
+function colourCardAnswer<T>(value: T | null): T {
+	if (value === null) throw new ApiError(get(m).api_request_failed);
+	return value;
+}
+
+export const colourCardApi = {
+	/** Whether the volume is asked for shots now, its status and its sets; `readCameras` reads the cameras' settings. */
+	async state(
+		collectionId: number,
+		{ readCameras }: { readCameras: boolean },
+		signal?: AbortSignal
+	): Promise<ColourCardState> {
+		const raw = await apiRequest<unknown>(
+			`/collections/${collectionId}/colour-card${readCameras ? '?read_cameras=1' : ''}`,
+			{ signal, timeoutMs: readCameras ? CAMERA_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS }
+		);
+		return colourCardAnswer(readColourCardState(raw));
+	},
+
+	/** Open a set (the volume's open set if it has one). */
+	async openSet(
+		collectionId: number,
+		body: ColourCardSetRequest,
+		signal?: AbortSignal
+	): Promise<ColourCardSet> {
+		const raw = await apiRequest<unknown>(`/collections/${collectionId}/colour-card/sets`, {
+			method: 'POST',
+			body: JSON.stringify(body),
+			signal,
+			timeoutMs: CAMERA_REQUEST_TIMEOUT_MS
+		});
+		return colourCardAnswer(readColourCardSet(raw));
+	},
+
+	/** Photograph the card with one camera of an open set; a second shot replaces the first. */
+	async takeShot(
+		collectionId: number,
+		setId: number,
+		cameraIndex: number,
+		signal?: AbortSignal
+	): Promise<ColourCardShot> {
+		const raw = await apiRequest<unknown>(
+			`/collections/${collectionId}/colour-card/sets/${setId}/shots`,
+			{
+				method: 'POST',
+				body: JSON.stringify({ camera_index: cameraIndex }),
+				signal,
+				timeoutMs: CAMERA_REQUEST_TIMEOUT_MS
+			}
+		);
+		const set = readColourCardSet({ id: setId, shots: [raw] });
+		return colourCardAnswer(set?.shots[0] ?? null);
+	},
+
+	/** Mark the set taken; refused until every camera of its mode has a shot. */
+	async complete(
+		collectionId: number,
+		setId: number,
+		signal?: AbortSignal
+	): Promise<ColourCardSet> {
+		const raw = await apiRequest<unknown>(
+			`/collections/${collectionId}/colour-card/sets/${setId}/complete`,
+			{ method: 'POST', signal }
+		);
+		return colourCardAnswer(readColourCardSet(raw));
+	},
+
+	/** Record a skipped request: the open set, or a new set with the cameras' current settings. */
+	async skip(
+		collectionId: number,
+		body: ColourCardSetRequest,
+		signal?: AbortSignal
+	): Promise<ColourCardSet> {
+		const raw = await apiRequest<unknown>(`/collections/${collectionId}/colour-card/skip`, {
+			method: 'POST',
+			body: JSON.stringify(body),
+			signal,
+			timeoutMs: CAMERA_REQUEST_TIMEOUT_MS
+		});
+		return colourCardAnswer(readColourCardSet(raw));
+	},
+
+	/** The address of a shot's image as a browser shows it (GET .../shots/{id}/preview). */
+	shotImageUrl(_collectionId: number, shot: ColourCardShot): string {
+		return colourCardShotUrl(getApiBase(), shot);
 	}
 };

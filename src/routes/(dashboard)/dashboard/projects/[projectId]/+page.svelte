@@ -59,6 +59,7 @@
 	import VolumeRowMenu from './VolumeRowMenu.svelte';
 	import VolumeDeleteModal from './VolumeDeleteModal.svelte';
 	import { dismissible } from '$lib/dialog';
+	import ColourCardFlag from '$lib/components/ColourCardFlag.svelte';
 	import { placeVolume, stageBadgeStyle, type PipelineStage } from '$lib/pipeline';
 
 	let projectId = $derived(Number($page.params.projectId) || 0);
@@ -509,6 +510,7 @@
 														>
 													{/if}
 												{/if}
+												<ColourCardFlag summary={col.colour_card} />
 											</p>
 											<!-- Only a signatura the volume has: no code is built from the project's or the row number. -->
 											{#if col.archival_metadata?.signatura}

@@ -26,6 +26,7 @@
 	import TestingSpaceCard from './TestingSpaceCard.svelte';
 	import FreeableVolumes from './FreeableVolumes.svelte';
 	import CameraKindCard from './CameraKindCard.svelte';
+	import ColourCardSetting from './ColourCardSetting.svelte';
 	import CameraKindDiagnostics from './CameraKindDiagnostics.svelte';
 
 	let {
@@ -659,6 +660,8 @@
 	<div class="config-section" id="cameras">
 		<h2 class="section-title">{$m.config_section_cameras}</h2>
 		<CameraKindCard />
+		<!-- Whether operators are asked for colour card shots (NEH-340): the administrator's. -->
+		<ColourCardSetting />
 	</div>
 {/if}
 

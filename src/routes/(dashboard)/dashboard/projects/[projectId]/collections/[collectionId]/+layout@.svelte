@@ -22,11 +22,13 @@
 	import VolumeOffsiteIndicator from '$lib/components/VolumeOffsiteIndicator.svelte';
 	import VolumeOffsiteActions from '$lib/components/VolumeOffsiteActions.svelte';
 	import VolumeKeptActions from '$lib/components/VolumeKeptActions.svelte';
+	import VolumeColourCard from '$lib/components/VolumeColourCard.svelte';
 	import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
 	import type { VolumeOffsiteState } from '$lib/api';
 	import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
 	import {
 		canCapture,
+		canEditVolumes,
 		canFreeVolumes,
 		canManageOffsite,
 		canRestoreVolumes,
@@ -138,6 +140,15 @@
 					{/if}
 					<span class="bc-sep">/</span>
 					<span class="bc-item bc-collection">{collectionName}</span>
+					<!-- The volume's colour card shots (NEH-340): its flag, and for
+					     admin and operator the list of its sets. -->
+					{#key collectionId}
+						<VolumeColourCard
+							{collectionId}
+							summary={($page.data as any).collectionColourCard}
+							canOpen={canEditVolumes($authStore.user?.role)}
+						/>
+					{/key}
 				</nav>
 				{#if showsOffsite}
 					<VolumeOffsiteIndicator {collectionId} refresh={offsiteRefresh} onState={offsiteRead} />

@@ -38,6 +38,7 @@
 	import { PIPELINE_STAGES, placeVolume, stageBadgeStyle, type PipelineStage } from '$lib/pipeline';
 	import { canCreateVolumes, ensureUnit, projectsShownIn, unitState } from '$lib/unit-mode';
 	import { needsStem } from '$lib/volume-stem';
+	import ColourCardFlag from '$lib/components/ColourCardFlag.svelte';
 	import VolumeFormModal from '../projects/[projectId]/VolumeFormModal.svelte';
 	import VolumeRowMenu from '../projects/[projectId]/VolumeRowMenu.svelte';
 	import VolumeDeleteModal from '../projects/[projectId]/VolumeDeleteModal.svelte';
@@ -244,6 +245,7 @@
 										>
 									{/if}
 								{/if}
+								<ColourCardFlag summary={volume.colour_card} />
 							</td>
 							<td><span class="vol-stem">{volume.filename_stem ?? '—'}</span></td>
 							<td class="text-right">{formatCount(volume.record_count ?? 0, $locale)}</td>

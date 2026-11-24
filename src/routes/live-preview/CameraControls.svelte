@@ -41,6 +41,8 @@
 		onRotateDegChange,
 		rotateDeg = {},
 		onRescan,
+		onSettingsClosed,
+		onSettingsWritten,
 		setupControls = true
 	}: {
 		cameraMode: 'single' | 'double';
@@ -61,6 +63,13 @@
 		// Called after "Reconnect cameras" has rescanned and the devices are
 		// published (NEH-343: the page asks again which camera is which).
 		onRescan?: () => void;
+		// The panel was closed: exposure, format or zoom may have changed
+		// (NEH-340: the page asks again whether colour card shots are needed).
+		onSettingsClosed?: () => void;
+		// A write of DSLR settings (ISO, shutter speed, aperture, format) has
+		// settled, applied or refused (NEH-340: the page asks again whether
+		// colour card shots are needed, once the camera has the new values).
+		onSettingsWritten?: () => void;
 		// Reconnect, Basic (orientation, exposure, format), Focus (focus and
 		// zoom) and Colour and exposure, which save on the unit: false for the
 		// testing account (NEH-391), which keeps the camera mode, the camera
@@ -714,6 +723,8 @@
 			await camerasApi.applyDSLRSettings(selectedCameraIndex, settings);
 		} catch {
 			// Fail silently; the camera may be unavailable.
+		} finally {
+			onSettingsWritten?.();
 		}
 	}
 </script>
@@ -747,7 +758,10 @@
 				<h2 class="panel-title">{$m.cam_panel_title}</h2>
 				<button
 					class="collapse-btn"
-					onclick={() => setSidebarOpen(false)}
+					onclick={() => {
+						setSidebarOpen(false);
+						onSettingsClosed?.();
+					}}
 					aria-label={$m.cam_panel_collapse}
 				>
 					<svg
