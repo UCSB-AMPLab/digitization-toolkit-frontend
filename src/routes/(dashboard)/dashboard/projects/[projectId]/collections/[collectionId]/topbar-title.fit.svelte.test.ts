@@ -6,7 +6,9 @@
 // overlaps another or is clipped, each is at least 44 px tall, nothing
 // wraps to a second line, the title keeps at least its minimum width when
 // it is shortened, and the full title stays in the element (its text, its
-// `title`) and the element can take keyboard focus.
+// `title`) and the element can take keyboard focus. With the offsite copy
+// line and the Fisqua line both under the breadcrumb, the same holds, and
+// every status line is inside the bar.
 //
 // Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -46,8 +48,9 @@ const records = [1, 2, 3].map((id) => ({
 	images: [{ id: id * 10, record_id: id, filename: `p${id}.jpg`, format: 'jpg', is_current: true }]
 }));
 
-function offsite(received: boolean) {
+function offsite(received: boolean, fisqua: unknown = undefined) {
 	return {
+		...(fisqua === undefined ? {} : { fisqua }),
 		collection_id: 7,
 		filename_stem: 'volumen-prueba-12',
 		uploadable: true,
@@ -55,7 +58,7 @@ function offsite(received: boolean) {
 		verified: received ? 6 : 0,
 		pending: received ? 0 : 6,
 		refused: 0,
-		last_verified_at: null,
+		last_verified_at: received && fisqua !== undefined ? '2026-11-24T09:30:00' : null,
 		received,
 		refusals: [],
 		freed_files: 0,
@@ -64,7 +67,7 @@ function offsite(received: boolean) {
 	};
 }
 
-function stubFetch(received: boolean) {
+function stubFetch(received: boolean, fisqua: unknown = undefined) {
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const url = new URL(String(input instanceof Request ? input.url : input), 'http://localhost');
 		const json = (body: unknown) =>
@@ -73,7 +76,7 @@ function stubFetch(received: boolean) {
 				headers: { 'Content-Type': 'application/json' }
 			});
 		const p = url.pathname;
-		if (p.endsWith('/collections/7/offsite')) return json(offsite(received));
+		if (p.endsWith('/collections/7/offsite')) return json(offsite(received, fisqua));
 		if (p.endsWith('/records/count')) return json({ count: 3 });
 		if (p.endsWith('/records/')) return json(records);
 		if (p.includes('/annotations')) return json([]);
@@ -83,6 +86,7 @@ function stubFetch(received: boolean) {
 				headers: { 'Content-Type': 'image/jpeg' }
 			});
 		if (p.endsWith('/system/unit')) return json({ mode: 'fisqua' });
+		if (p.endsWith('/system/adoption')) return json({ unfinished: null, running: null });
 		return json({});
 	});
 }
@@ -123,6 +127,109 @@ function titleOf(n: number): string {
 // The shortest the volume title gets (`.bc-collection` in +layout@.svelte).
 const TITLE_MIN_PX = 48;
 
+// Fisqua configured, the volume never sent: the bar's second status line.
+const NOT_SENT = { environment: 'production', config_error: null, outbox: [], status: null };
+
+async function checkBar(
+	w: number,
+	h: number,
+	lang: string,
+	msgs: typeof en,
+	received: boolean,
+	n: number,
+	fisqua: unknown = undefined
+) {
+	await browserPage.viewport(w, h);
+	locale.set(lang as Locale);
+	nav.data = { ...nav.data, collectionName: titleOf(n) };
+	stubFetch(received, fisqua);
+	render(VolumePageHost);
+	const bar = () => document.querySelector<HTMLElement>('.topbar')!;
+	await expect.poll(() => document.querySelector('.topbar .handover-btn')).not.toBeNull();
+	await expect
+		.poll(() =>
+			[...bar().querySelectorAll('button')].some((b) =>
+				b.textContent?.includes(msgs.col_live_preview)
+			)
+		)
+		.toBe(true);
+	await expect
+		.poll(() => bar().querySelector(received ? '.offsite-manage-btn' : '.kept-btn'))
+		.not.toBeNull();
+	await expect.poll(() => bar().querySelector('.vcc-open')).not.toBeNull();
+
+	const b = bar();
+	const barBox = box(b);
+	expect(b.scrollWidth).toBeLessThanOrEqual(b.clientWidth + 1);
+	expect(b.scrollHeight).toBeLessThanOrEqual(b.clientHeight + 1);
+	expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(w);
+
+	const fixed = [
+		'.vcc-open',
+		received ? '.offsite-manage-btn' : '.kept-btn',
+		'.handover-btn',
+		'.btn-camera',
+		'.user-avatar'
+	].map((sel) => b.querySelector<HTMLElement>(sel)!);
+	const widths = fixed.map((c) => `${c.className.split(' ')[0]}=${box(c).width.toFixed(1)}`);
+	for (const c of fixed) {
+		const r = box(c);
+		const what = `${c.className} ${widths.join(' ')}`;
+		expect(r.height, what).toBeGreaterThanOrEqual(44);
+		expect(r.left, what).toBeGreaterThanOrEqual(barBox.left - 0.5);
+		expect(r.right, what).toBeLessThanOrEqual(barBox.right + 0.5);
+		expect(c.scrollWidth, what).toBeLessThanOrEqual(c.clientWidth + 1);
+	}
+
+	const title = b.querySelector<HTMLElement>('.bc-collection')!;
+	const sep = b.querySelector<HTMLElement>('.bc-sep')!;
+	const parts = [
+		...fixed,
+		b.querySelector<HTMLElement>('.btn-back')!,
+		b.querySelector<HTMLElement>('.bc-project')!,
+		sep,
+		title
+	];
+	for (let i = 0; i < parts.length; i++)
+		for (let j = i + 1; j < parts.length; j++)
+			expect(
+				overlap(box(parts[i]), box(parts[j])),
+				`${parts[i].className} / ${parts[j].className} ${widths.join(' ')}`
+			).toBe(false);
+
+	// One line: the title is as tall as the separator beside it.
+	expect(box(title).height).toBeLessThanOrEqual(box(sep).height + 1);
+	// The full title, for pointer, keyboard and assistive technology.
+	expect(title.textContent).toBe(titleOf(n));
+	expect(title.getAttribute('title')).toBe(titleOf(n));
+	expect(title.tabIndex).toBe(0);
+	// Shortened, it still shows a few characters and the ellipsis.
+	if (title.scrollWidth > title.clientWidth + 1) {
+		expect(getComputedStyle(title).textOverflow).toBe('ellipsis');
+		expect(box(title).width).toBeGreaterThanOrEqual(TITLE_MIN_PX - 0.5);
+	}
+
+	// Every status line under the breadcrumb, and its text, inside the bar.
+	const barCs = getComputedStyle(b);
+	const top = barBox.top + parseFloat(barCs.borderTopWidth);
+	const bottom = barBox.bottom - parseFloat(barCs.borderBottomWidth);
+	const lines = [
+		...b.querySelectorAll<HTMLElement>(
+			'.topbar-title .breadcrumb, .topbar-title .offsite-indicator, .topbar-title .offsite-indicator-text'
+		)
+	].filter((el) => box(el).height > 0);
+	for (const line of lines) {
+		const r = box(line);
+		const what = `${line.className} [${r.top.toFixed(1)}, ${r.bottom.toFixed(1)}] in bar [${top.toFixed(1)}, ${bottom.toFixed(1)}]`;
+		expect(r.top, what).toBeGreaterThanOrEqual(top - 0.5);
+		expect(r.bottom, what).toBeLessThanOrEqual(bottom + 0.5);
+	}
+	if (fisqua !== undefined) {
+		expect(lines.length).toBeGreaterThanOrEqual(5);
+		expect(b.querySelector('[data-fisqua]')?.textContent).toContain(msgs.fisqua_out_none);
+	}
+}
+
 for (const [w, h] of [
 	[800, 480],
 	[1280, 800]
@@ -133,80 +240,13 @@ for (const [w, h] of [
 	] as const) {
 		for (const received of [false, true]) {
 			for (const n of [1, 9, 18, 36, 70]) {
-				it(`at ${w}x${h}, ${lang}, ${received ? 'received offsite' : 'not yet copied'}, a title of ${n}`, async () => {
-					await browserPage.viewport(w, h);
-					locale.set(lang as Locale);
-					nav.data = { ...nav.data, collectionName: titleOf(n) };
-					stubFetch(received);
-					render(VolumePageHost);
-					const bar = () => document.querySelector<HTMLElement>('.topbar')!;
-					await expect.poll(() => document.querySelector('.topbar .handover-btn')).not.toBeNull();
-					await expect
-						.poll(() =>
-							[...bar().querySelectorAll('button')].some((b) =>
-								b.textContent?.includes(msgs.col_live_preview)
-							)
-						)
-						.toBe(true);
-					await expect
-						.poll(() => bar().querySelector(received ? '.offsite-manage-btn' : '.kept-btn'))
-						.not.toBeNull();
-					await expect.poll(() => bar().querySelector('.vcc-open')).not.toBeNull();
-
-					const b = bar();
-					const barBox = box(b);
-					expect(b.scrollWidth).toBeLessThanOrEqual(b.clientWidth + 1);
-					expect(b.scrollHeight).toBeLessThanOrEqual(b.clientHeight + 1);
-					expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(w);
-
-					const fixed = [
-						'.vcc-open',
-						received ? '.offsite-manage-btn' : '.kept-btn',
-						'.handover-btn',
-						'.btn-camera',
-						'.user-avatar'
-					].map((sel) => b.querySelector<HTMLElement>(sel)!);
-					const widths = fixed.map(
-						(c) => `${c.className.split(' ')[0]}=${box(c).width.toFixed(1)}`
-					);
-					for (const c of fixed) {
-						const r = box(c);
-						const what = `${c.className} ${widths.join(' ')}`;
-						expect(r.height, what).toBeGreaterThanOrEqual(44);
-						expect(r.left, what).toBeGreaterThanOrEqual(barBox.left - 0.5);
-						expect(r.right, what).toBeLessThanOrEqual(barBox.right + 0.5);
-						expect(c.scrollWidth, what).toBeLessThanOrEqual(c.clientWidth + 1);
-					}
-
-					const title = b.querySelector<HTMLElement>('.bc-collection')!;
-					const sep = b.querySelector<HTMLElement>('.bc-sep')!;
-					const parts = [
-						...fixed,
-						b.querySelector<HTMLElement>('.btn-back')!,
-						b.querySelector<HTMLElement>('.bc-project')!,
-						sep,
-						title
-					];
-					for (let i = 0; i < parts.length; i++)
-						for (let j = i + 1; j < parts.length; j++)
-							expect(
-								overlap(box(parts[i]), box(parts[j])),
-								`${parts[i].className} / ${parts[j].className} ${widths.join(' ')}`
-							).toBe(false);
-
-					// One line: the title is as tall as the separator beside it.
-					expect(box(title).height).toBeLessThanOrEqual(box(sep).height + 1);
-					// The full title, for pointer, keyboard and assistive technology.
-					expect(title.textContent).toBe(titleOf(n));
-					expect(title.getAttribute('title')).toBe(titleOf(n));
-					expect(title.tabIndex).toBe(0);
-					// Shortened, it still shows a few characters and the ellipsis.
-					if (title.scrollWidth > title.clientWidth + 1) {
-						expect(getComputedStyle(title).textOverflow).toBe('ellipsis');
-						expect(box(title).width).toBeGreaterThanOrEqual(TITLE_MIN_PX - 0.5);
-					}
-				});
+				it(`at ${w}x${h}, ${lang}, ${received ? 'received offsite' : 'not yet copied'}, a title of ${n}`, () =>
+					checkBar(w, h, lang, msgs, received, n));
 			}
+		}
+		for (const n of [18, 70]) {
+			it(`at ${w}x${h}, ${lang}, a copy complete and not yet sent to Fisqua (two status lines), a title of ${n}`, () =>
+				checkBar(w, h, lang, msgs, true, n, NOT_SENT));
 		}
 	}
 }

@@ -241,7 +241,7 @@ describe('moving between volumes', () => {
 					source: { id: 7, name: 'A', filename_stem: 'a' },
 					target: { id: 20, name: 'Destino', filename_stem: 't' },
 					state: 'blocked',
-					reason: 'files_at_neither',
+					reason: 'file_at_neither_path',
 					missing: [],
 					repair_available: true,
 					repair_refusal: null
@@ -255,7 +255,11 @@ describe('moving between volumes', () => {
 			);
 			await expect
 				.poll(() => document.querySelector('[role="dialog"]')?.textContent)
-				.toContain(es.adopt_failed_pending);
+				.toContain(es.adopt_err_unfinished);
+			// Recovery could not settle it, so the dialog does not say to restart.
+			expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain(
+				es.adopt_failed_pending_do
+			);
 			await expect.poll(() => buttonNamed(es.common_close)).toBeTruthy();
 			buttonNamed(es.common_close)!.click();
 			await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();

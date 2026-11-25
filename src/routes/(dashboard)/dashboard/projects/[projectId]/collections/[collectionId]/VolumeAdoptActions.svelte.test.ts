@@ -2,7 +2,10 @@
 // an empty volume from Fisqua. The button, the three steps (choose, plan,
 // result), a refused plan, a plan answer that arrives too late, a refused
 // POST, both failures, the result with and without the last step left, and
-// the offer to delete the emptied volume. Fixtures are shaped as
+// the offer to delete the emptied volume. A move left half done says to
+// restart the unit only when no recovery has tried it (or the report cannot
+// be read); one recovery could not settle says so, and one a recovery is
+// settling now stays working. Fixtures are shaped as
 // AdoptPlanRead and AdoptResultRead in app/schemas/collection.py.
 //
 // Version: 0.3.0
@@ -120,6 +123,7 @@ describe('VolumeAdoptActions', () => {
 	let listSpy: ReturnType<typeof vi.spyOn>;
 	let planSpy: ReturnType<typeof vi.spyOn>;
 	let adoptSpy: ReturnType<typeof vi.spyOn>;
+	let reportSpy: ReturnType<typeof vi.spyOn>;
 	let onAdopted: ReturnType<typeof vi.fn<(sourceId: number, target: string) => void>>;
 
 	beforeEach(() => {
@@ -128,6 +132,10 @@ describe('VolumeAdoptActions', () => {
 		listSpy = vi.spyOn(collectionsApi, 'listAll').mockResolvedValue(LIST);
 		planSpy = vi.spyOn(collectionsApi, 'planAdoptInto').mockResolvedValue(plan());
 		adoptSpy = vi.spyOn(collectionsApi, 'adoptInto').mockResolvedValue(result());
+		// GET /system/adoption: unreadable unless a test answers it.
+		reportSpy = vi
+			.spyOn(systemApi, 'getUnfinishedAdoption')
+			.mockRejectedValue(new TypeError('Failed to fetch'));
 		onAdopted = vi.fn<(sourceId: number, target: string) => void>();
 		vi.mocked(goto).mockClear();
 	});
@@ -382,6 +390,14 @@ describe('VolumeAdoptActions', () => {
 	] as const) {
 		it(`a failure after the move began (restored ${restored}) says what was left`, async () => {
 			adoptSpy.mockRejectedValue(refusal(500, { message: 'English', restored }));
+			// Not restored: the page asks the unit by the move's id, which has the failure recorded.
+			if (!restored)
+				vi.spyOn(systemApi, 'getAdoptionRequest').mockResolvedValue({
+					...base,
+					state: 'failed',
+					message: 'E',
+					restored: false
+				} as never);
 			mount();
 			await openAndChoose();
 			await expect.poll(() => button(es.adopt_plan_confirm)?.disabled).toBe(false);
@@ -664,6 +680,194 @@ describe('VolumeAdoptActions', () => {
 			const halfMoved = label.startsWith('failed, not') || label.startsWith('interrupted');
 			expect(onUnfinished).toHaveBeenCalledTimes(halfMoved ? 1 : 0);
 			expect(sessionStorage.getItem('captua-adoption-request:7')).toBeNull();
+		});
+	}
+
+	// GET /system/adoption (app/core/adopt_repair.py report) for a move left half done.
+	const halfMoved = (over: Record<string, unknown> = {}, running: unknown = null) => ({
+		unfinished: {
+			source: { id: 7, name: SOURCE, filename_stem: 'src' },
+			target: { id: 20, name: T1, filename_stem: 'volumen-prueba-007' },
+			state: 'blocked',
+			reason: 'file_at_neither_path',
+			missing: [],
+			repair_available: true,
+			repair_refusal: null,
+			run_id: 'run-1',
+			...over
+		},
+		running
+	});
+	const recoveryRunning = {
+		request_id: null,
+		kind: 'recovery',
+		started_at: '2026-11-24T10:00:00',
+		source: null,
+		target: null
+	};
+	const interrupted = { ...base, state: 'interrupted', journal_kept: true };
+	const failedHalf = { ...base, state: 'failed', message: 'E', restored: false };
+
+	for (const [how, setUp] of [
+		[
+			'a lookup answers interrupted',
+			() => {
+				adoptSpy.mockRejectedValue(lost());
+				vi.spyOn(systemApi, 'getAdoptionRequest').mockResolvedValue(interrupted as never);
+			}
+		],
+		[
+			'a lookup answers failed, not restored',
+			() => {
+				adoptSpy.mockRejectedValue(lost());
+				vi.spyOn(systemApi, 'getAdoptionRequest').mockResolvedValue(failedHalf as never);
+			}
+		],
+		[
+			'the POST fails, not restored',
+			() => {
+				adoptSpy.mockRejectedValue(refusal(500, { message: 'English', restored: false }));
+				// The unit records the failure under the move's id (adoption_requests.end).
+				vi.spyOn(systemApi, 'getAdoptionRequest').mockResolvedValue(failedHalf as never);
+			}
+		]
+	] as const) {
+		it(`${how}, and recovery could not settle it: the unfinished move, no restart`, async () => {
+			setUp();
+			reportSpy.mockResolvedValue(halfMoved() as never);
+			const onUnfinished = vi.fn();
+			mount({ onUnfinished });
+			await confirmMove();
+			await expect.poll(() => text()).toContain(es.adopt_err_unfinished);
+			expect(text()).toContain(es.adopt_err_unfinished_do);
+			expect(text()).not.toContain(es.adopt_failed_pending);
+			expect(text()).not.toContain(es.adopt_failed_pending_do);
+			expect(reportSpy).toHaveBeenCalledTimes(1);
+			expect(onUnfinished).toHaveBeenCalledTimes(1);
+			expect(button(es.common_close)).not.toBeNull();
+			expect(sessionStorage.getItem('captua-adoption-request:7')).toBeNull();
+		});
+
+		it(`${how}, and no recovery has tried it: restart`, async () => {
+			setUp();
+			reportSpy.mockResolvedValue(halfMoved({ reason: 'recovery_not_run' }) as never);
+			mount();
+			await confirmMove();
+			await expect.poll(() => text()).toContain(es.adopt_failed_pending);
+			expect(text()).toContain(es.adopt_failed_pending_do);
+			expect(text()).not.toContain(es.adopt_err_unfinished);
+			expect(reportSpy).toHaveBeenCalledTimes(1);
+		});
+
+		it(`${how}, and the report cannot be read: restart`, async () => {
+			setUp();
+			mount();
+			await confirmMove();
+			await expect.poll(() => text()).toContain(es.adopt_failed_pending);
+			expect(text()).toContain(es.adopt_failed_pending_do);
+			expect(reportSpy).toHaveBeenCalledTimes(1);
+		});
+
+		it(`${how}, while a recovery runs: still working, asked again, then the unfinished move`, async () => {
+			const scheduler = manual();
+			setUp();
+			reportSpy
+				.mockResolvedValueOnce(halfMoved({ state: 'recovering' }, recoveryRunning) as never)
+				.mockResolvedValue(halfMoved() as never);
+			mount({ scheduler });
+			await confirmMove();
+			await expect.poll(() => reportSpy.mock.calls.length).toBe(1);
+			await expect.poll(() => scheduler.pending()).toBe(1);
+			expect(dialog()!.querySelector('.spinner')).not.toBeNull();
+			expect(text()).not.toContain(es.adopt_failed_pending);
+			expect(text()).not.toContain(es.adopt_err_unfinished);
+			scheduler.fire();
+			await expect.poll(() => text()).toContain(es.adopt_err_unfinished);
+			expect(text()).not.toContain(es.adopt_failed_pending_do);
+			expect(reportSpy).toHaveBeenCalledTimes(2);
+		});
+	}
+
+	// A failure the unit recorded as not restored, then settled by a repair or a restart: the
+	// recorded row never changes, so the source volume's own field says which way it went.
+	for (const [how, setUp] of [
+		[
+			'a lookup answers failed, not restored',
+			() => {
+				adoptSpy.mockRejectedValue(lost());
+				vi.spyOn(systemApi, 'getAdoptionRequest').mockResolvedValue(failedHalf as never);
+			}
+		],
+		[
+			'the POST fails, not restored',
+			() => {
+				adoptSpy.mockRejectedValue(refusal(500, { message: 'English', restored: false }));
+				vi.spyOn(systemApi, 'getAdoptionRequest').mockResolvedValue(failedHalf as never);
+			}
+		]
+	] as const) {
+		async function workingThenSettled(scheduler: ReturnType<typeof manual>) {
+			reportSpy
+				.mockResolvedValueOnce(halfMoved({ state: 'recovering' }, recoveryRunning) as never)
+				.mockResolvedValue({ unfinished: null, running: null } as never);
+			await confirmMove();
+			await expect.poll(() => reportSpy.mock.calls.length).toBe(1);
+			await expect.poll(() => scheduler.pending()).toBe(1);
+			// Working: the move's id is kept, so Close and a reload resume it.
+			expect(sessionStorage.getItem('captua-adoption-request:7')).toContain(sentId());
+			expect(text()).not.toContain(es.adopt_failed_pending_do);
+			scheduler.fire();
+			await expect.poll(() => reportSpy.mock.calls.length).toBe(2);
+		}
+
+		it(`${how}, working, then settled with the captures moved: the result, with the delete offer`, async () => {
+			const scheduler = manual();
+			setUp();
+			const volumeSpy = vi.spyOn(collectionsApi, 'get').mockResolvedValue(
+				vol({
+					id: 7,
+					name: SOURCE,
+					external_id: null,
+					captures_adopted_at: '2026-11-25T10:00:00'
+				})
+			);
+			mount({ scheduler });
+			await workingThenSettled(scheduler);
+			await expect.poll(() => text()).toContain(es.adopt_done_heading);
+			expect(volumeSpy).toHaveBeenCalledWith(7);
+			expect(text()).not.toContain(es.adopt_done_summary(7, 14, 2, SOURCE, T1));
+			expect(button(es.adopt_done_delete(SOURCE))).not.toBeNull();
+			expect(onAdopted).toHaveBeenCalledWith(7, T1);
+			expect(text()).not.toContain(es.adopt_failed_pending_do);
+			expect(sessionStorage.getItem('captua-adoption-request:7')).toBeNull();
+		});
+
+		it(`${how}, working, then settled with the captures where they were: left as it was`, async () => {
+			const scheduler = manual();
+			setUp();
+			vi.spyOn(collectionsApi, 'get').mockResolvedValue(
+				vol({ id: 7, name: SOURCE, external_id: null, captures_adopted_at: null })
+			);
+			mount({ scheduler });
+			await workingThenSettled(scheduler);
+			await expect.poll(() => text()).toContain(es.adopt_failed_restored);
+			expect(text()).toContain(es.adopt_failed_restored_do);
+			expect(text()).not.toContain(es.adopt_failed_pending_do);
+			expect(onAdopted).not.toHaveBeenCalled();
+			expect(sessionStorage.getItem('captua-adoption-request:7')).toBeNull();
+		});
+
+		it(`${how}, working, then settled and the volume cannot be read: working, with Retry`, async () => {
+			const scheduler = manual();
+			setUp();
+			vi.spyOn(collectionsApi, 'get').mockRejectedValue(lost());
+			mount({ scheduler });
+			await workingThenSettled(scheduler);
+			await expect.poll(() => button(es.common_retry)).not.toBeNull();
+			expect(text()).not.toContain(es.adopt_failed_pending_do);
+			expect(text()).not.toContain(es.adopt_failed_restored);
+			expect(text()).not.toContain(es.adopt_done_heading);
+			expect(sessionStorage.getItem('captua-adoption-request:7')).toContain(sentId());
 		});
 	}
 

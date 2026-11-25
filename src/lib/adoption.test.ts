@@ -14,6 +14,7 @@ import {
 	isAdoptedAway,
 	isAdoptResult,
 	newNames,
+	halfMovedAdvice,
 	noRepairLines,
 	readUnfinished,
 	refusalLines,
@@ -233,7 +234,7 @@ function blocked(over: Record<string, unknown> = {}) {
 			source: { id: 1, name: S, filename_stem: 'src' },
 			target: { id: 2, name: T, filename_stem: 'tgt' },
 			state: 'blocked',
-			reason: 'files_at_neither',
+			reason: 'file_at_neither_path',
 			message: 'English',
 			missing: [
 				{
@@ -269,6 +270,7 @@ describe('readUnfinished', () => {
 			source: S,
 			target: T,
 			state: 'blocked',
+			reason: 'file_at_neither_path',
 			missing: ['src-img_0003_c1.cr2'],
 			repairAvailable: true,
 			repairRefusal: null,
@@ -311,6 +313,62 @@ describe('readUnfinished', () => {
 	});
 });
 
+describe('halfMovedAdvice: what the dialog says of a move left half done', () => {
+	const running = {
+		request_id: null,
+		kind: 'recovery',
+		started_at: '2026-11-24T10:00:00',
+		source: null,
+		target: null
+	};
+
+	it('a journal recovery could not clear: the unfinished move, not a restart', () => {
+		expect(halfMovedAdvice(reportRead(blocked()))).toBe('blocked');
+		expect(halfMovedAdvice(reportRead(blocked({ reason: 'recovery_failed' })))).toBe('blocked');
+	});
+
+	it('a journal no recovery has tried, or a report that cannot be read: restart', () => {
+		expect(halfMovedAdvice(reportRead(blocked({ reason: 'recovery_not_run' })))).toBe('restart');
+		expect(halfMovedAdvice({ kind: 'failed' })).toBe('restart');
+		expect(halfMovedAdvice({ kind: 'failed', refused: 403 })).toBe('restart');
+	});
+
+	it('a recovery or a move running now: still working', () => {
+		expect(halfMovedAdvice(reportRead(blocked({ state: 'recovering' })))).toBe('working');
+		expect(halfMovedAdvice(reportRead({ ...blocked(), running }))).toBe('working');
+		expect(halfMovedAdvice(reportRead({ unfinished: null, running }))).toBe('working');
+	});
+
+	// Every reason a blocked report carries, as the backend defines them at origin/dev:
+	// app/core/adopt_journal.py (journal_unreadable, recovery_failed, records_split,
+	// image_rows_contradict, colour_card_rows_contradict, file_at_both_paths,
+	// file_at_neither_path) and app/core/adopt_repair.py (recovery_not_run,
+	// storage_not_active). Its `recovering` reason comes only with the `recovering` state.
+	it.each([
+		['journal_unreadable', 'blocked'],
+		['recovery_failed', 'blocked'],
+		['records_split', 'blocked'],
+		['image_rows_contradict', 'blocked'],
+		['colour_card_rows_contradict', 'blocked'],
+		['file_at_both_paths', 'blocked'],
+		['file_at_neither_path', 'blocked'],
+		['storage_not_active', 'blocked'],
+		['recovery_not_run', 'restart']
+	] as const)('a blocked report with reason %s: %s', (reason, advice) => {
+		expect(halfMovedAdvice(reportRead(blocked({ reason })))).toBe(advice);
+	});
+
+	it('the recovering state, with its reason: working', () => {
+		expect(
+			halfMovedAdvice(reportRead(blocked({ state: 'recovering', reason: 'recovering' })))
+		).toBe('working');
+	});
+
+	it('nothing unfinished and nothing running: settled since', () => {
+		expect(halfMovedAdvice(reportRead({ unfinished: null, running: null }))).toBe('settled');
+	});
+});
+
 describe('noRepairLines', () => {
 	const u = (refusal: string, missing: unknown[] = []) =>
 		readUnfinished(blocked({ repair_available: false, repair_refusal: refusal, missing }))!;
@@ -329,7 +387,7 @@ describe('noRepairLines', () => {
 		'no_read_remote',
 		'storage_not_active',
 		'storage_unusable',
-		'files_at_both',
+		'file_at_both_paths',
 		'volume_held'
 	])('%s: whom to ask', (refusal) => {
 		expect(noRepairLines(u(refusal), es)).toEqual([es.unsettled_no_repair]);
@@ -409,7 +467,7 @@ describe('repair outcomes', () => {
 		for (const e of [
 			err(409, { code: 'repair_unavailable', message: 'E' }),
 			err(503, { code: 'repair_copy_failed', message: 'E' }),
-			err(409, { code: 'repair_not_possible', reason: 'files_at_both', message: 'E' })
+			err(409, { code: 'repair_not_possible', reason: 'file_at_both_paths', message: 'E' })
 		]) {
 			const outcome = repairOutcomeOf(e);
 			expect(outcome.done).toBe(false);

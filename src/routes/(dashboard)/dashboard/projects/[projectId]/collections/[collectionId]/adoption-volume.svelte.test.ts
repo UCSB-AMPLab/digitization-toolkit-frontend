@@ -54,7 +54,7 @@ const REPORT = {
 		source: { id: 7, name: 'Ensayo', filename_stem: 'src' },
 		target: { id: 8, name: 'Volumen 007', filename_stem: 'tgt' },
 		state: 'blocked',
-		reason: 'files_at_neither',
+		reason: 'file_at_neither_path',
 		missing: [],
 		repair_available: false,
 		repair_refusal: 'no_read_remote'
