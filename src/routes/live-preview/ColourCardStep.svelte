@@ -170,6 +170,10 @@
 				gone = true;
 				error = $m.cc_err_volume_gone;
 				return;
+			case 'adopted_away':
+				gone = true;
+				error = $m.adopt_closed_refusal;
+				return;
 			case 'set_gone':
 				error = $m.cc_err_set_gone;
 				void readAgain();

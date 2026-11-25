@@ -173,6 +173,8 @@ describe('colourCardRefusal', () => {
 		expect(code(409, 'stem_required')).toBe('stem');
 		expect(code(507, 'storage_reserve')).toBe('storage');
 		expect(code(503, 'backend_restarting')).toBe('restarting');
+		// A volume whose captures a move took into another volume (NEH-419).
+		expect(code(409, 'captures_adopted_away')).toBe('adopted_away');
 	});
 
 	it('a 404 without a code is the volume deleted meanwhile', () => {

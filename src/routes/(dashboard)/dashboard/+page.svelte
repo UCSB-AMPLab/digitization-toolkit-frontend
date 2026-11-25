@@ -32,6 +32,10 @@
 	// their notice in place of the other camera notices, and then the camera
 	// block offers no Reconnect: the cameras are there, of the wrong kind.
 	//
+	// Among the notices of "Needs attention", right above the storage notice,
+	// an administrator sees a move of captures the unit could not settle
+	// (NEH-420, AdoptionNotice).
+	//
 	// Each figure reads on its own; one that fails shows a dash and a line
 	// saying it could not be loaded, and the rest of the page is unaffected.
 	// While the unit hides projects (NEH-313) the "Proyectos activos" figure
@@ -73,6 +77,7 @@
 	import InProgress from './InProgress.svelte';
 	import ActivityCalendar from './ActivityCalendar.svelte';
 	import StorageAlert from './StorageAlert.svelte';
+	import AdoptionNotice from '$lib/components/AdoptionNotice.svelte';
 	import RetakeBand from './RetakeBand.svelte';
 	import AttentionNotice from './AttentionNotice.svelte';
 
@@ -413,6 +418,8 @@
 								</div>
 							</AttentionNotice>
 						{/if}
+						<!-- A move of captures the unit could not settle (NEH-420): administrators only. -->
+						<AdoptionNotice />
 						<StorageAlert />
 						<RetakeBand summary={retakeSummary} canRetake={canSeeCameras} />
 					</div>

@@ -186,6 +186,7 @@ export type ColourCardRefusal =
 	| 'storage'
 	| 'restarting'
 	| 'volume_gone'
+	| 'adopted_away'
 	| 'timeout'
 	| 'failed';
 
@@ -218,6 +219,9 @@ export function colourCardRefusal(error: unknown): ColourCardRefusal {
 			return 'storage';
 		case 'backend_restarting':
 			return 'restarting';
+		// A volume whose captures a move took into another volume (NEH-419).
+		case 'captures_adopted_away':
+			return 'adopted_away';
 	}
 	if (status === 404 && code === null) return 'volume_gone';
 	return 'failed';

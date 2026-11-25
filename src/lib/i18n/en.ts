@@ -13,6 +13,11 @@ import { formatBytes } from '../format-bytes';
 const ORDINALS_EN = ['First', 'Second', 'Third'];
 const ordinalEn = (n: number) => ORDINALS_EN[n - 1] ?? String(n);
 
+// Counts of the adoption messages (NEH-419), singular and plural.
+const adoptRecordsEn = (n: number) => (n === 1 ? '1 record' : `${formatCount(n, 'en')} records`);
+const adoptImagesEn = (n: number) => (n === 1 ? '1 image' : `${formatCount(n, 'en')} images`);
+const adoptGroupsEn = (n: number) => (n === 1 ? '1 group' : `${formatCount(n, 'en')} groups`);
+
 export const en: Messages = {
 	// ── Common (shared across screens) ───────────────────────────────────────
 	common_username_label: 'Username',
@@ -2674,6 +2679,175 @@ export const en: Messages = {
 	cc_setting_desc:
 		'When this is on, the capture screen asks for a shot of the colour card with each camera at the start of each volume and whenever the camera settings are changed. Captua sends volumes captured while it is off to Fisqua with a mark saying that they have no colour card shots.',
 	cc_setting_error: 'Captua could not save the change. Try again.',
+
+	// ── Moving a hand-made volume's captures into a volume from Fisqua (NEH-419),
+	// and a move the unit could not settle (NEH-420) ─────────────────────────
+	adopt_action: 'Move the captures into a volume from Fisqua',
+	adopt_action_desc:
+		'Use this when the captures were taken in this volume, made by hand, and Fisqua later assigned the volume they belong to. Captua moves the captures into that volume and gives them its file names.',
+	adopt_target_heading: 'Choose the volume from Fisqua',
+	adopt_target_desc:
+		'Captua lists the volumes that Fisqua assigned, that are empty, and that Captua does not keep only on this unit.',
+	adopt_target_empty: 'There is no empty volume from Fisqua to move these captures into.',
+	adopt_plan_heading: 'What Captua will do',
+	adopt_plan_summary: (
+		records: number,
+		images: number,
+		sets: number,
+		source: string,
+		target: string
+	): string =>
+		`Captua will move ${adoptRecordsEn(records)}, with ${adoptImagesEn(images)} and ${adoptGroupsEn(sets)} of color card shots, from ${source} to ${target}.`,
+	adopt_plan_summary_no_sets: (
+		records: number,
+		images: number,
+		source: string,
+		target: string
+	): string =>
+		`Captua will move ${adoptRecordsEn(records)}, with ${adoptImagesEn(images)}, from ${source} to ${target}.`,
+	adopt_plan_new_names: 'New file names',
+	adopt_plan_next:
+		'Captua will rename the files on this unit and upload them to the offsite copy again under the new names.',
+	adopt_plan_old_copies:
+		'The files already stored offsite under the old names will stay there until someone deletes them by hand.',
+	adopt_plan_confirm: 'Move the captures',
+	adopt_refused_title: 'Captua cannot move these captures',
+	adopt_refused_unchanged: 'Captua changed nothing.',
+	adopt_err_unfinished:
+		'Some captures on this unit were left half moved: Captua stopped before it finished and could not put them back where they were. Until that is repaired, Captua moves no other captures.',
+	adopt_err_unfinished_do: 'The Overview shows what to do.',
+	adopt_err_volume_gone: (name: string): string => `${name} is no longer on this unit.`,
+	adopt_err_same_volume: 'The volume you chose is this same volume.',
+	adopt_err_same_volume_do: 'Choose another volume.',
+	adopt_err_testing: (name: string): string =>
+		`${name} is a testing volume, and Captua moves no captures between testing volumes and real ones.`,
+	adopt_err_source_no_stem: (source: string): string => `${source} has no file name stem.`,
+	adopt_err_target_no_stem: (target: string): string =>
+		`${target} has no file name stem, so Captua cannot give the captures their new names.`,
+	adopt_err_target_no_stem_do: 'Give it its stem: its Fisqua reference code.',
+	adopt_err_target_not_assigned: (target: string): string =>
+		`${target} has no Fisqua reference code, so Fisqua did not assign it.`,
+	adopt_err_target_not_assigned_do: "Choose a volume from Fisqua's queue.",
+	adopt_err_target_withdrawn: (target: string): string =>
+		`Fisqua withdrew ${target} from its queue.`,
+	adopt_err_sent: (name: string): string =>
+		`Captua has already sent ${name} to Fisqua, or has it waiting to be sent.`,
+	adopt_err_kept: (name: string): string =>
+		`Captua keeps ${name} only on this unit, so it never copies its files offsite.`,
+	adopt_err_kept_do: 'Include it in the current mode first.',
+	adopt_err_sub_volumes: (source: string): string => `${source} contains other volumes.`,
+	adopt_err_no_images: (source: string): string => `${source} has no images to move.`,
+	adopt_err_open_set: (source: string): string =>
+		`A group of color card shots in ${source} is not finished.`,
+	adopt_err_open_set_do: (source: string): string =>
+		`Take or skip the color card shots of ${source} first.`,
+	adopt_err_target_not_empty: (target: string): string =>
+		`${target} is not empty: it has records, images or groups of color card shots, taken or skipped, or captures were taken in it before.`,
+	adopt_err_target_not_empty_do: 'Choose an empty volume.',
+	adopt_err_target_names_held: (target: string): string =>
+		`The offsite copy already holds files under ${target}'s file names, so Captua cannot upload the captures under those names.`,
+	adopt_err_offsite_config:
+		'The offsite copy of the image files is not configured correctly on this unit.',
+	adopt_err_offsite_config_do: 'Ask whoever installed the unit.',
+	adopt_err_storage:
+		'Captua cannot write to the storage where it keeps the images, so it cannot rename the files.',
+	adopt_err_outside_storage: (name: string): string =>
+		`Some files of ${name} have a path outside the unit's storage, so Captua cannot move them.`,
+	adopt_err_handed_over: (source: string): string =>
+		`Some records of ${source} are no longer in Captured: they were sent for review, or have been reviewed.`,
+	adopt_err_handed_over_do:
+		'If they are in review, first withdraw the volume with "Withdraw from review".',
+	adopt_err_freed: (source: string): string =>
+		`Some files of ${source} are stored offsite and are not on the SD card.`,
+	adopt_err_freed_do: 'Restore the volume first from "Space on the SD card".',
+	adopt_err_outside_own_folder: (source: string): string =>
+		`Some files of ${source} are not in the volume's own folder.`,
+	adopt_err_file_missing: (source: string): string =>
+		`Some files of the images or color card shots of ${source} are not on this unit.`,
+	adopt_err_not_verified: (source: string): string =>
+		`Not every file of ${source} is verified in the offsite copy yet.`,
+	adopt_err_not_verified_do: 'Wait for Captua to finish copying them, then try again.',
+	adopt_err_capture_list: (source: string, target: string): string =>
+		`Captua's list of the captures of ${source} does not match the volume's files, so Captua cannot carry it over to ${target}.`,
+	adopt_err_names: (source: string): string =>
+		`Some files of ${source} have names that do not follow the volume's file names, so Captua cannot give them new names.`,
+	adopt_err_thumbnail_shared: (source: string): string =>
+		`Two images of ${source} share one thumbnail, so Captua cannot move it for both.`,
+	adopt_err_unowned_files: (source: string): string =>
+		`The folders of ${source} hold files that belong to none of its images or color card shots.`,
+	adopt_err_name_taken:
+		'Some of the new file names are already taken, on this unit or in the offsite copy.',
+	adopt_err_volume_held:
+		'Captua is exporting one of these volumes, copying it to a USB drive, or preparing its files for the offsite copy.',
+	adopt_err_volume_held_do: 'Wait until it finishes, then try again.',
+	adopt_done_heading: 'Captua moved the captures',
+	adopt_done_summary: (
+		records: number,
+		images: number,
+		sets: number,
+		source: string,
+		target: string
+	): string =>
+		`Captua moved ${adoptRecordsEn(records)}, with ${adoptImagesEn(images)} and ${adoptGroupsEn(sets)} of color card shots, from ${source} to ${target}.`,
+	adopt_done_summary_no_sets: (
+		records: number,
+		images: number,
+		source: string,
+		target: string
+	): string =>
+		`Captua moved ${adoptRecordsEn(records)}, with ${adoptImagesEn(images)}, from ${source} to ${target}.`,
+	adopt_done_uploading:
+		'Captua is uploading the files to the offsite copy again, under their new names.',
+	adopt_done_delete: (source: string): string => `Delete ${source}`,
+	adopt_done_delete_desc: (source: string, target: string): string =>
+		`${source} is now empty. If you delete it, nothing is lost: the captures are in ${target}.`,
+	adopt_closed_line: (target: string): string =>
+		`Captua moved this volume's captures into ${target}. No new captures can be taken in it, and it can be deleted.`,
+	adopt_closed_refusal:
+		"Captua moved this volume's captures into another volume, so nothing more can be captured in it.",
+	unsettled_heading: 'Captua did not finish moving some captures',
+	unsettled_what: (source: string, target: string): string =>
+		`Captua stopped while it was moving the captures from ${source} to ${target}, and it could not finish moving them or put them back in ${source}.`,
+	unsettled_missing: (name: string): string => `This file is missing on the unit: ${name}`,
+	unsettled_blocked: (source: string, target: string): string =>
+		`Until this is repaired, no one can capture or make changes in ${source} or ${target}. Other volumes are not affected.`,
+	unsettled_repair: 'Repair',
+	unsettled_repair_desc:
+		'Captua brings the file back from the offsite copy, checks it, and then finishes moving the captures or puts them back where they were.',
+	unsettled_repairing: 'Captua is repairing the captures that were left half moved…',
+	unsettled_done_finished: (target: string): string =>
+		`Captua repaired the problem and finished moving the captures: they are in ${target}.`,
+	unsettled_done_undone: (source: string): string =>
+		`Captua repaired the problem and put the captures back in ${source}.`,
+	unsettled_err_mismatch: (name: string): string =>
+		`Captua could not repair the problem: the file ${name} in the offsite copy does not match its checksum.`,
+	unsettled_err_absent: (name: string): string =>
+		`Captua could not repair the problem: ${name} is not in the offsite copy.`,
+	unsettled_err_never_copied: (name: string): string =>
+		`Captua could not repair the problem: it never uploaded ${name} to the offsite copy.`,
+	unsettled_no_repair:
+		'Captua cannot repair the problem from here. Ask whoever installed the unit.',
+	unsettled_operator:
+		'No one can work in this volume for now. Captua has told the administrators what to do.',
+	adopt_err_in_progress: 'Captua is already moving the captures of another volume on this unit.',
+	adopt_err_in_progress_do: 'Wait until it finishes, then try again.',
+	adopt_err_listing:
+		'Captua could not check the offsite copy, so it cannot tell whether the new file names are already in use there.',
+	adopt_err_listing_do: "Check the unit's internet connection and try again.",
+	adopt_err_records_changed: (source: string): string =>
+		`Records were added to ${source} while Captua was preparing to move its captures.`,
+	adopt_err_records_changed_do: (source: string): string =>
+		`Try again when no one is capturing in ${source}.`,
+	adopt_failed_restored: 'Captua could not move the captures and left everything as it was.',
+	adopt_failed_restored_do: 'Try again. If it happens again, ask whoever installed the unit.',
+	adopt_failed_pending:
+		'Captua stopped while it was moving the captures, and they were left half moved. When the unit starts again, Captua will finish moving them or put them back where they were.',
+	adopt_failed_pending_do: 'Restart the unit.',
+	adopt_done_pending:
+		'Captua moved the captures. One last step is left, and Captua will do it when the unit starts again.',
+	adopt_plan_project: (source: string, target: string): string =>
+		`${source} and ${target} are in different projects. The records will move to the project of ${target}.`,
+	adopt_err_ask_installer: 'Ask whoever installed the unit.',
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
