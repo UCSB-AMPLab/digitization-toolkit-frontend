@@ -210,15 +210,35 @@
 {/snippet}
 
 {#snippet body(u: UnfinishedAdoption)}
-	<p class="notice-title">{$m.unsettled_heading}</p>
-	{#if u.source !== null && u.target !== null}
-		<p class="notice-body">{$m.unsettled_what(u.source, u.target)}</p>
-	{/if}
-	{#each u.missing as name (name)}
-		<p class="notice-body">{$m.unsettled_missing(name)}</p>
-	{/each}
-	{#if u.source !== null && u.target !== null}
-		<p class="notice-body">{$m.unsettled_blocked(u.source, u.target)}</p>
+	{@const repairOffered = !working && u.repairAvailable && readError !== 'refused'}
+	{#if onVolume}
+		<!-- On a volume's page the strip is short: the heading with Repair beside it, the
+		     missing files, then the rest, read on in the strip's own scroll. -->
+		<div class="notice-head">
+			<p class="notice-title">{$m.unsettled_heading}</p>
+			{#if repairOffered}
+				<button type="button" class="btn btn-primary" onclick={repair}>{$m.unsettled_repair}</button
+				>
+			{/if}
+		</div>
+		{#each u.missing as name (name)}
+			<p class="notice-body">{$m.unsettled_missing(name)}</p>
+		{/each}
+		{#if u.source !== null && u.target !== null}
+			<p class="notice-body">{$m.unsettled_what(u.source, u.target)}</p>
+			<p class="notice-body">{$m.unsettled_blocked(u.source, u.target)}</p>
+		{/if}
+	{:else}
+		<p class="notice-title">{$m.unsettled_heading}</p>
+		{#if u.source !== null && u.target !== null}
+			<p class="notice-body">{$m.unsettled_what(u.source, u.target)}</p>
+		{/if}
+		{#each u.missing as name (name)}
+			<p class="notice-body">{$m.unsettled_missing(name)}</p>
+		{/each}
+		{#if u.source !== null && u.target !== null}
+			<p class="notice-body">{$m.unsettled_blocked(u.source, u.target)}</p>
+		{/if}
 	{/if}
 	{#if working}
 		<p class="notice-body notice-working">
@@ -229,14 +249,17 @@
 		{#if failure}
 			<p class="notice-body notice-fail" role="alert">{failureText}</p>
 		{/if}
-		{#if u.repairAvailable && readError !== 'refused'}
+		{#if repairOffered}
 			{#if !failure}
 				<p class="notice-meta">{$m.unsettled_repair_desc}</p>
 			{/if}
-			<div class="notice-actions">
-				<button type="button" class="btn btn-primary" onclick={repair}>{$m.unsettled_repair}</button
-				>
-			</div>
+			{#if !onVolume}
+				<div class="notice-actions">
+					<button type="button" class="btn btn-primary" onclick={repair}
+						>{$m.unsettled_repair}</button
+					>
+				</div>
+			{/if}
 		{:else}
 			{#each blockedLines.filter((l) => l !== failureText) as text (text)}
 				<p class="notice-body">{text}</p>
@@ -380,6 +403,22 @@
 		margin-top: 4px;
 	}
 	.notice-actions .btn {
+		min-height: var(--touch-target-min);
+	}
+	/* On a volume's page: the heading, and Repair beside it while the width allows. */
+	.notice-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 4px 12px;
+	}
+	.notice-head .notice-title {
+		flex: 1 1 200px;
+		min-width: 0;
+	}
+	.notice-head .btn {
+		flex-shrink: 0;
 		min-height: var(--touch-target-min);
 	}
 </style>

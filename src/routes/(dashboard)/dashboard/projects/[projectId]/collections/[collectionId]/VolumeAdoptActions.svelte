@@ -49,6 +49,19 @@
 	// dialog closed or not; a lookup that fails offers Retry and Close in the
 	// dialog, never a second move.
 	//
+	// A move the unit left half done (a lookup's `interrupted`, or a failure
+	// with `restored: false`, from the POST or a lookup) keeps its id like any
+	// unresolved one, and is told from one read of GET /system/adoption,
+	// through the same reader (halfMovedAdvice): a move recovery could not
+	// settle is said as such, and the Overview says what to do; one a recovery
+	// or a move is settling now stays working and is asked again; one no
+	// recovery has tried, or a report that cannot be read, is settled by a
+	// restart, and the dialog says so. A recorded failure the report no longer
+	// shows was settled since (a repair, a restart), and its row never changes:
+	// the source volume's `captures_adopted_at`, written in the move's own
+	// commit, says whether the captures moved; while that read fails the
+	// dialog stays working with Retry.
+	//
 	// The delete offer opens the volumes list's delete dialog
 	// (VolumeDeleteModal) for the emptied volume, with the focus trapped in it
 	// and starting on its Cancel; once the volume is deleted the page goes to
@@ -77,9 +90,13 @@
 		adoptFailureOf,
 		isAdoptResult,
 		newNames,
+		halfMovedAdvice,
 		readStoredRequest,
 		refusalLines,
+		reportRead,
+		reportReadError,
 		requestStateOf,
+		type ReportRead,
 		type AppliedSummary,
 		type RequestState
 	} from '$lib/adoption';
@@ -131,7 +148,8 @@
 		| { kind: 'checking'; target: Target; plan: AdoptPlan | null; retry: boolean }
 		// `summary` null: the move landed, and the unit's record has no counts.
 		| { kind: 'done'; target: Target; summary: AppliedSummary | null }
-		| { kind: 'failed'; restored: boolean | null };
+		// `blocked`: left half done, and recovery could not settle it (halfMovedAdvice).
+		| { kind: 'failed'; restored: boolean | null; blocked?: boolean };
 
 	let step = $state<Step | null>(null);
 	let chosen = $state<number | null>(null);
@@ -312,7 +330,9 @@
 		step = null;
 		tick().then(() => {
 			if (destroyed || generation !== planGeneration || step || deleting) return;
-			if (buttonEl?.isConnected) buttonEl.focus();
+			// Not scrolled into view: the strip under the bar stays at its top, where the
+			// notice of a move left half done starts.
+			if (buttonEl?.isConnected) buttonEl.focus({ preventScroll: true });
 			else focusAfter?.();
 		});
 	}
@@ -368,11 +388,11 @@
 			if (failure.kind === 'refused') {
 				settled(forId);
 				step = { kind: 'refused', target, codes: failure.codes };
-			} else if (failure.kind === 'failed') {
+			} else if (failure.kind === 'failed' && failure.restored) {
 				settled(forId);
-				step = { kind: 'failed', restored: failure.restored };
-				if (!failure.restored) onUnfinished?.(forId);
+				step = { kind: 'failed', restored: true };
 			} else {
+				// Left half done, or an answer the page cannot read: the id is kept and the unit is asked.
 				ask(plan);
 			}
 		}
@@ -443,10 +463,23 @@
 				return;
 			case 'failed':
 			case 'interrupted': {
-				const restored = state.kind === 'failed' && state.restored;
+				if (state.kind === 'failed' && state.restored) {
+					settled(p.forId);
+					if (open) step = { kind: 'failed', restored: true };
+					return;
+				}
+				const advice = await adviceNow();
+				if (!current()) return;
+				// Running now, or (for `interrupted`, whose row the unit settles) settled since: asked again.
+				if (advice === 'working' || (advice === 'settled' && state.kind === 'interrupted')) {
+					if (showing())
+						step = { kind: 'checking', target: p.target, plan: shownPlan, retry: false };
+					return;
+				}
+				if (advice === 'settled') return settledWhichWay(p, current);
 				settled(p.forId);
-				if (open) step = { kind: 'failed', restored };
-				if (!restored) onUnfinished?.(p.forId);
+				if (showing()) step = { kind: 'failed', restored: false, blocked: advice === 'blocked' };
+				onUnfinished?.(p.forId);
 				return;
 			}
 			default:
@@ -455,6 +488,41 @@
 				settled(p.forId);
 				if (open) step = { kind: 'failed', restored: true };
 		}
+	}
+
+	/** What the dialog says of a move left half done, from one read of the report. */
+	async function adviceNow() {
+		let read: ReportRead;
+		try {
+			read = reportRead(await systemApi.getUnfinishedAdoption());
+		} catch (err) {
+			read = reportReadError(err);
+		}
+		return halfMovedAdvice(read);
+	}
+
+	/**
+	 * A recorded failure the report no longer shows: settled since. The source
+	 * volume says which way (see the header); the reader's read, so serialized.
+	 */
+	async function settledWhichWay(p: Pending, current: () => boolean) {
+		let moved: boolean;
+		try {
+			moved = !!(await collectionsApi.get(p.forId)).captures_adopted_at;
+		} catch (err) {
+			console.error('[VolumeAdopt] Could not read the volume after the move was settled:', err);
+			if (current() && showing())
+				step = { kind: 'checking', target: p.target, plan: shownPlan, retry: true };
+			return;
+		}
+		if (!current()) return;
+		const open = showing();
+		settled(p.forId);
+		if (moved) {
+			unavailable = true;
+			if (open) step = { kind: 'done', target: p.target, summary: null };
+			onAdopted(p.forId, p.target.name);
+		} else if (open) step = { kind: 'failed', restored: true };
 	}
 
 	function retry() {
@@ -755,6 +823,9 @@
 				</h3>
 				{#if step.restored === null}
 					<p class="offsite-dialog-body" role="alert">{$m.api_request_failed}</p>
+				{:else if step.blocked}
+					<p class="offsite-dialog-body" role="alert">{$m.adopt_err_unfinished}</p>
+					<p class="offsite-dialog-body">{$m.adopt_err_unfinished_do}</p>
 				{:else}
 					<p class="offsite-dialog-body" role="alert">
 						{step.restored ? $m.adopt_failed_restored : $m.adopt_failed_pending}

@@ -305,6 +305,11 @@ export interface UnfinishedAdoption {
 	target: string | null;
 	/** `recovering`: the move or its recovery is running now; `blocked`: it stopped and stays. */
 	state: 'recovering' | 'blocked';
+	/**
+	 * Why a blocked journal stays (app/core/adopt_repair.py): `recovery_not_run` when no
+	 * recovery has run since the move stopped; a recovery's code otherwise.
+	 */
+	reason: string | null;
 	/** The files at neither their old nor their new path. */
 	missing: string[];
 	repairAvailable: boolean;
@@ -337,6 +342,7 @@ export function readUnfinished(raw: unknown): UnfinishedAdoption | null {
 		source: nameOf(u.source),
 		target: nameOf(u.target),
 		state: u.state,
+		reason: typeof u.reason === 'string' ? u.reason : null,
 		missing: missing.map(name).filter((n): n is string => n !== null),
 		// Without an identity the backend cannot protect a repair from a replaced journal.
 		repairAvailable:
@@ -401,6 +407,23 @@ export function reportRead(raw: unknown): ReportRead {
 	if (raw.unfinished === null) return { kind: 'none', running: runningOf(raw) };
 	const u = readUnfinished(raw);
 	return u ? { kind: 'report', u, running: runningOf(raw) } : { kind: 'failed' };
+}
+
+/**
+ * What the move dialog says of a move the unit left half done (a lookup's
+ * `interrupted`, or a failure with `restored: false`), from a read of the
+ * report: `blocked`, recovery has run and could not settle it (the notice's
+ * Repair, or whom to ask); `working`, a recovery or a move holds the lock
+ * now, so the outcome is still coming; `restart`, no recovery has tried it,
+ * or the report could not be read, so a restart is what settles it;
+ * `settled`, nothing is unfinished or running any more.
+ */
+export function halfMovedAdvice(read: ReportRead): 'blocked' | 'working' | 'restart' | 'settled' {
+	if (read.kind === 'failed') return 'restart';
+	if (read.running !== null) return 'working';
+	if (read.kind === 'none') return 'settled';
+	if (read.u.state === 'recovering') return 'working';
+	return read.u.reason === 'recovery_not_run' ? 'restart' : 'blocked';
 }
 
 export interface NoticeReadInputs {

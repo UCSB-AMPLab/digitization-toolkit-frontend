@@ -49,7 +49,7 @@ function report(over: Record<string, unknown> = {}): UnfinishedAdoptionReport {
 			target: { id: 2, name: T, filename_stem: 'tgt' },
 			run_id: 'run-1',
 			state: 'blocked',
-			reason: 'files_at_neither',
+			reason: 'file_at_neither_path',
 			missing: [
 				{ kind: 'master', name: FILE, repairable: true, why_not: null, needs_storage: true }
 			],

@@ -181,7 +181,7 @@ for (const [w, h] of [
 							source: { id: 7, name: SOURCE, filename_stem: 'src' },
 							target: { id: 20, name: TARGET, filename_stem: 'volumen-prueba-007' },
 							state: 'blocked',
-							reason: 'files_at_neither',
+							reason: 'file_at_neither_path',
 							missing: [1, 2, 3].map((i) => ({
 								kind: 'master',
 								name: `volumen-de-prueba-de-origen-largo-img_000${i}_c1.cr2`,

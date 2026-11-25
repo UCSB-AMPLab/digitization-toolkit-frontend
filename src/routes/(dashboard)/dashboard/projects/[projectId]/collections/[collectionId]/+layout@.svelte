@@ -337,12 +337,15 @@
 	}
 
 	/* ── TOPBAR ── */
+	/* At least 72px; taller when the title column holds the breadcrumb and two
+	   status lines (the offsite copy line and the Fisqua line), so neither is
+	   clipped or drawn over what is under the bar. */
 	.topbar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0 16px;
-		height: 72px;
+		padding: 2px 16px;
+		min-height: 72px;
 		flex-shrink: 0;
 		/* Same background and border as the Live Preview top bar. */
 		background-color: var(--color-surface-alt);
@@ -482,7 +485,10 @@
 		max-height: 40vh;
 		overflow-y: auto;
 	}
-	.volume-notices:has(> *) {
+	/* Its children come from AdoptionNotice and VolumeAdoptActions as well as
+	   from this file, so the child selector is global: scoped, it would match
+	   only this file's own elements. */
+	.volume-notices:has(> :global(*)) {
 		padding: 8px 16px;
 		border-bottom: var(--border-width) solid var(--border-color);
 	}
