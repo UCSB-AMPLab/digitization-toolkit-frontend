@@ -115,7 +115,8 @@
 
 <style>
 	.kept-btn {
-		min-height: 36px;
+		min-height: var(--touch-target-min);
+		flex-shrink: 0;
 		padding: 0 12px;
 		font-size: var(--text-sm);
 		white-space: nowrap;

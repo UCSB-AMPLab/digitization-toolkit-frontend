@@ -139,7 +139,13 @@
 						<a class="bc-item bc-project bc-link" href="/dashboard/volumes">{$m.nav_volumes}</a>
 					{/if}
 					<span class="bc-sep">/</span>
-					<span class="bc-item bc-collection">{collectionName}</span>
+					<!-- Shortened with an ellipsis when the bar is narrow (NEH-421): the full title is
+					     its text (read by assistive technology), its `title` (pointer), and is shown
+					     whole while it has keyboard focus. -->
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<span class="bc-item bc-collection" title={collectionName} tabindex="0"
+						>{collectionName}</span
+					>
 					<!-- The volume's colour card shots (NEH-340): its flag, and for
 					     admin and operator the list of its sets. -->
 					{#key collectionId}
@@ -239,10 +245,21 @@
 		border-bottom: 2px solid var(--color-primary);
 	}
 
+	/* The title column is the only part of the bar that gives way (NEH-421):
+	   every control keeps its width, and the project, then the volume title,
+	   shorten on one line. */
 	.topbar-left {
 		display: flex;
 		align-items: center;
 		gap: 12px;
+		min-width: 0;
+		flex: 1 1 auto;
+	}
+	.topbar-left > :global(*) {
+		flex-shrink: 0;
+	}
+	.topbar-left > .topbar-title {
+		flex: 0 1 auto;
 		min-width: 0;
 	}
 
@@ -256,6 +273,7 @@
 	}
 
 	.topbar-right {
+		flex-shrink: 0;
 		display: flex;
 		align-items: center;
 		gap: 10px;
@@ -303,15 +321,43 @@
 	.breadcrumb {
 		display: flex;
 		align-items: center;
+		flex-wrap: nowrap;
 		gap: 6px;
+		min-width: 0;
 		font-size: 13px;
+	}
+	.breadcrumb > :global(*) {
+		flex-shrink: 0;
 	}
 	.bc-item {
 		color: var(--color-light-grey);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	/* The project gives way first, down to its ellipsis. */
+	.breadcrumb > .bc-project {
+		flex: 0 1000 auto;
+		min-width: 1.5em;
+	}
+	/* Then the volume title, down to a few characters and the ellipsis. */
+	.breadcrumb > .bc-collection {
+		flex: 0 1 auto;
+		min-width: 48px;
 	}
 	.bc-collection {
 		color: var(--color-light);
 		font-weight: var(--fw-bold);
+	}
+	/* With keyboard focus the whole title shows, over what is beside it. */
+	.bc-collection:focus-visible {
+		position: relative;
+		z-index: 2;
+		overflow: visible;
+		text-overflow: clip;
+		background-color: var(--color-surface-alt);
+		outline: 2px solid var(--color-primary);
+		outline-offset: 2px;
 	}
 	.bc-sep {
 		color: var(--color-light-grey);
