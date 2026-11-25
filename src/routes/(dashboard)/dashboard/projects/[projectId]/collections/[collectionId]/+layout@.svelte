@@ -11,9 +11,18 @@
 	// under the breadcrumb, the date Captua removes the volume; it has no
 	// offsite copy line, which the backend refuses it, so nothing polls for it.
 	//
+	// For an administrator, a volume made by hand has the action that moves
+	// its captures into a volume from Fisqua (NEH-419, VolumeAdoptActions):
+	// its explanation and its button in the strip under the bar, where the
+	// width allows them beside the bar's other controls. A volume whose captures a move
+	// took is closed: the line under the bar says so, and the Capture button
+	// is not offered. A volume an unsettled move names (NEH-420) has the
+	// notice under the bar (AdoptionNotice): the administrator's with
+	// Repair, one line for the other roles.
+	//
 	// Version: 0.3.0
 
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
@@ -23,6 +32,8 @@
 	import VolumeOffsiteActions from '$lib/components/VolumeOffsiteActions.svelte';
 	import VolumeKeptActions from '$lib/components/VolumeKeptActions.svelte';
 	import VolumeColourCard from '$lib/components/VolumeColourCard.svelte';
+	import AdoptionNotice from '$lib/components/AdoptionNotice.svelte';
+	import VolumeAdoptActions, { hasStoredRequest } from './VolumeAdoptActions.svelte';
 	import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
 	import type { VolumeOffsiteState } from '$lib/api';
 	import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
@@ -64,7 +75,52 @@
 		return unsub;
 	});
 
-	let canOpenCamera = $derived(canCapture(currentUser?.role));
+	// The move of captures (NEH-419, NEH-420), from the volume read in +layout.ts.
+	type AdoptionFields = {
+		external_id: string | null;
+		captures_adopted_at: string | null;
+		adoption_unfinished: boolean;
+		testing: boolean;
+	};
+	let adoption = $derived<AdoptionFields>(
+		($page.data as any).collectionAdoption ?? {
+			external_id: null,
+			captures_adopted_at: null,
+			adoption_unfinished: false,
+			testing: false
+		}
+	);
+	// The target of a move made on this page, for the volume it was made on:
+	// the volume is closed from then on, and the line can name the target.
+	let movedInto = $state<{ forId: number; target: string } | null>(null);
+	let movedHere = $derived(movedInto?.forId === collectionId ? movedInto.target : null);
+	let closed = $derived(!!adoption.captures_adopted_at || movedHere !== null);
+	// A move of this volume whose outcome was not known when the page was
+	// entered: its id in the session is settled whatever the volume's own
+	// reads answer (the volume may be gone), so the strip mounts for it too.
+	let storedHere = $derived.by(() => {
+		const forId = collectionId;
+		return untrack(() => hasStoredRequest(forId));
+	});
+	// A move this page saw left half done, for the volume it was made on: the notice shows.
+	let leftUnfinished = $state<number | null>(null);
+	let unfinishedHere = $derived(adoption.adoption_unfinished || leftUnfinished === collectionId);
+	let backEl = $state<HTMLButtonElement | null>(null);
+	// The strip's own move of this volume whose outcome is not known yet: it shows the working row.
+	let pendingFor = $state<number | null>(null);
+	let pendingHere = $derived(pendingFor === collectionId);
+
+	// Each callback names the volume it is for; one for a volume no longer shown changes nothing.
+	function adopted(sourceId: number, target: string) {
+		if (sourceId !== collectionId) return;
+		movedInto = { forId: sourceId, target };
+		topbarSlot.reloadRecords?.();
+	}
+	function unfinished(sourceId: number) {
+		if (sourceId === collectionId) leftUnfinished = sourceId;
+	}
+
+	let canOpenCamera = $derived(canCapture(currentUser?.role) && !closed);
 	// The offsite copy line: not for the testing account. Read from the store,
 	// so the line is never mounted for it before the subscription runs.
 	// Nothing is mounted for it while the signed-in role is not known.
@@ -83,6 +139,7 @@
 	// dialog is not closed under the admin; it is matched to the volume shown.
 	let offsiteState = $state<VolumeOffsiteState | null>(null);
 	let offsiteRefresh = $state(0);
+	let offsiteHere = $derived(!!offsiteState && offsiteState.collection_id === collectionId);
 	// What the line last read as freed. When it changes on the volume shown, a
 	// free or a restore has moved files, whether or not its dialog was still
 	// open, so the page reloads the records and their freed state.
@@ -123,6 +180,7 @@
 	<div class="topbar">
 		<div class="topbar-left">
 			<button
+				bind:this={backEl}
 				class="btn-back"
 				onclick={() => goto(volumeBackPath($unitState, projectId))}
 				aria-label={projectsShownIn($unitState) ? $m.col_back_to_project : $m.col_back_to_volumes}
@@ -139,7 +197,13 @@
 						<a class="bc-item bc-project bc-link" href="/dashboard/volumes">{$m.nav_volumes}</a>
 					{/if}
 					<span class="bc-sep">/</span>
-					<span class="bc-item bc-collection">{collectionName}</span>
+					<!-- Shortened with an ellipsis when the bar is narrow (NEH-421): the full title is
+					     its text (read by assistive technology), its `title` (pointer), and is shown
+					     whole while it has keyboard focus. -->
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<span class="bc-item bc-collection" title={collectionName} tabindex="0"
+						>{collectionName}</span
+					>
 					<!-- The volume's colour card shots (NEH-340): its flag, and for
 					     admin and operator the list of its sets. -->
 					{#key collectionId}
@@ -210,6 +274,52 @@
 		</div>
 	</div>
 
+	<!-- The strip under the bar (NEH-419, NEH-420); its padding and border only while it holds something. -->
+	<div class="volume-notices">
+		{#if isAdmin || unfinishedHere}
+			<!-- Keyed: a notice is read again for each volume shown. An administrator's reads the
+			     report on every volume page: an unfinished move that names this volume, or a move of
+			     it that is running, shows. Other roles get one line on an affected volume. -->
+			{#key collectionId}
+				<AdoptionNotice
+					onVolume
+					volumeId={collectionId}
+					named={unfinishedHere}
+					quietRunning={pendingHere}
+				/>
+			{/key}
+		{/if}
+		{#if closed}
+			<p class="volume-line">
+				{movedHere !== null ? $m.adopt_closed_line(movedHere) : $m.adopt_closed_refusal}
+			</p>
+		{/if}
+		{#if isAdmin && canFree && (offsiteHere || storedHere)}
+			<!-- Move a hand-made volume's captures into a volume from Fisqua (NEH-419): its
+			     explanation and its button, which do not fit beside the bar's controls at 800 px.
+			     Mounted after the move too, so its result stays open. -->
+			{#key collectionId}
+				<VolumeAdoptActions
+					{collectionId}
+					{collectionName}
+					volume={{
+						external_id: adoption.external_id,
+						// Not known until the offsite line has answered: counted as kept, so no move is offered.
+						kept_on_unit: offsiteHere ? offsiteState?.kept_on_unit === true : true,
+						captures_adopted_at: closed ? (adoption.captures_adopted_at ?? 'closed') : null,
+						testing: adoption.testing
+					}}
+					onAdopted={adopted}
+					onUnfinished={unfinished}
+					onPending={(sourceId, waiting) => {
+						if (sourceId === collectionId) pendingFor = waiting ? sourceId : null;
+					}}
+					focusAfter={() => backEl?.focus()}
+				/>
+			{/key}
+		{/if}
+	</div>
+
 	<div class="gallery-content">
 		{@render children?.()}
 	</div>
@@ -239,10 +349,21 @@
 		border-bottom: 2px solid var(--color-primary);
 	}
 
+	/* The title column is the only part of the bar that gives way (NEH-421):
+	   every control keeps its width, and the project, then the volume title,
+	   shorten on one line. */
 	.topbar-left {
 		display: flex;
 		align-items: center;
 		gap: 12px;
+		min-width: 0;
+		flex: 1 1 auto;
+	}
+	.topbar-left > :global(*) {
+		flex-shrink: 0;
+	}
+	.topbar-left > .topbar-title {
+		flex: 0 1 auto;
 		min-width: 0;
 	}
 
@@ -256,6 +377,7 @@
 	}
 
 	.topbar-right {
+		flex-shrink: 0;
 		display: flex;
 		align-items: center;
 		gap: 10px;
@@ -303,15 +425,43 @@
 	.breadcrumb {
 		display: flex;
 		align-items: center;
+		flex-wrap: nowrap;
 		gap: 6px;
+		min-width: 0;
 		font-size: 13px;
+	}
+	.breadcrumb > :global(*) {
+		flex-shrink: 0;
 	}
 	.bc-item {
 		color: var(--color-light-grey);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	/* The project gives way first, down to its ellipsis. */
+	.breadcrumb > .bc-project {
+		flex: 0 1000 auto;
+		min-width: 1.5em;
+	}
+	/* Then the volume title, down to a few characters and the ellipsis. */
+	.breadcrumb > .bc-collection {
+		flex: 0 1 auto;
+		min-width: 48px;
 	}
 	.bc-collection {
 		color: var(--color-light);
 		font-weight: var(--fw-bold);
+	}
+	/* With keyboard focus the whole title shows, over what is beside it. */
+	.bc-collection:focus-visible {
+		position: relative;
+		z-index: 2;
+		overflow: visible;
+		text-overflow: clip;
+		background-color: var(--color-surface-alt);
+		outline: 2px solid var(--color-primary);
+		outline-offset: 2px;
 	}
 	.bc-sep {
 		color: var(--color-light-grey);
@@ -322,6 +472,25 @@
 	.bc-link:hover {
 		color: var(--color-light);
 		text-decoration: underline;
+	}
+
+	.volume-notices {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		flex-shrink: 0;
+		max-height: 40vh;
+		overflow-y: auto;
+	}
+	.volume-notices:has(> *) {
+		padding: 8px 16px;
+		border-bottom: var(--border-width) solid var(--border-color);
+	}
+	.volume-line {
+		margin: 0;
+		font-size: var(--text-sm);
+		line-height: 1.5;
+		color: var(--color-light);
 	}
 
 	.gallery-content {

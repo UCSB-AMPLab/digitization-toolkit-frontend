@@ -239,6 +239,18 @@ describe('captureErrorText: the storage reserve (NEH-380)', () => {
 	});
 });
 
+describe('captureErrorText: a volume closed by a move of its captures (NEH-419)', () => {
+	it('says the captures went into another volume, in both languages, for every role', () => {
+		const refusal = () =>
+			new ApiError('English', { code: 'captures_adopted_away', message: 'English' }, 409);
+		for (const msgs of [es, en]) {
+			for (const role of ['admin', 'operator']) {
+				expect(captureErrorText(refusal(), msgs, role)).toBe(msgs.adopt_closed_refusal);
+			}
+		}
+	});
+});
+
 describe('isStemRequired', () => {
 	it('recognises the no-stem 409 by its exact text', () => {
 		expect(isStemRequired(new ApiError(NO_STEM, undefined, 409))).toBe(true);

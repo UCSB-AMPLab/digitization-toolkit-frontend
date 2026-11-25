@@ -12,6 +12,7 @@ import type { Messages } from './i18n';
 import { FILENAME_STEM_MAX_LENGTH, stemConflict, stemConflictText } from './volume-stem';
 import { fileHoldText, storedOffsiteCount } from './volume-refusals';
 import { testingRefusalText } from './testing-space';
+import { isAdoptedAway } from './adoption';
 
 // Constraint names app/core/db_errors.py reports in a 409's `constraint`.
 function constraintOf(error: unknown): unknown {
@@ -183,6 +184,8 @@ export function volumeDeleteErrorText(
 	const testing = testingRefusalText(error, msgs, role);
 	if (testing) return testing;
 	if (isKeptMoveRefusal(error)) return msgs.pd_err_move_kept_line;
+	// Records moved into a volume whose captures a move took into another (NEH-419).
+	if (isAdoptedAway(error)) return msgs.adopt_closed_refusal;
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
 	const stored = storedOffsiteCount(error);

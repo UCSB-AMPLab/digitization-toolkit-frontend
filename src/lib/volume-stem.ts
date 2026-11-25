@@ -127,7 +127,13 @@ export function needsStem(volume: { filename_stem?: string | null } | null | und
  * Whether the delete flow must refuse this volume before doing anything:
  * the backend refuses to delete a volume whose stem is reserved, so moving
  * its records out first would leave them moved and the volume still there.
+ * A volume whose captures a move took into another volume (NEH-419,
+ * `captures_adopted_at`) is the backend's one exception
+ * (Collection.deletable_after_adoption): it decides, and a refusal comes
+ * back as the 409 for a reserved stem.
  */
-export function deleteRefused(volume: { stem_reserved?: boolean } | null | undefined): boolean {
-	return !!volume?.stem_reserved;
+export function deleteRefused(
+	volume: { stem_reserved?: boolean; captures_adopted_at?: string | null } | null | undefined
+): boolean {
+	return !!volume?.stem_reserved && !volume.captures_adopted_at;
 }

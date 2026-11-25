@@ -101,6 +101,14 @@ describe('volumeSaveErrorText', () => {
 	});
 });
 
+describe('volumeDeleteErrorText: records moved into a volume closed by a move (NEH-419)', () => {
+	it('says the captures of that volume went into another volume', () => {
+		const err = new ApiError('English', { code: 'captures_adopted_away', message: 'English' }, 409);
+		expect(volumeDeleteErrorText(err, es)).toBe(es.adopt_closed_refusal);
+		expect(volumeDeleteErrorText(err, en)).toBe(en.adopt_closed_refusal);
+	});
+});
+
 describe('volumeDeleteErrorText', () => {
 	it('maps the non-empty refusal', () => {
 		const err = new ApiError(notEmpty, undefined, 409);

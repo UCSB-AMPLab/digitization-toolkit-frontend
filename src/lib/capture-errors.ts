@@ -16,7 +16,9 @@
 //   (and, from 0.2.0, the 409 with code `recapture_turn` for a capture that
 //   would start an empty volume during the retake turn, in recapture-turn.ts),
 //   and the 507 with code `storage_reserve` for a capture below the space
-//   Captua keeps for its own work (app/core/storage_override.py);
+//   Captua keeps for its own work (app/core/storage_override.py), and the
+//   409 `captures_adopted_away` for a volume a move of captures closed
+//   (app/core/adopt_journal.py, NEH-419);
 // - a request answered 200 with `success: false`, which the capture screen
 //   turns into a CaptureFailed carrying the backend's `error`: a camera that
 //   is not connected, or the text of whatever failed during the capture.
@@ -38,6 +40,7 @@ import { isConflict, isVolumeRequired, isWrongRetakeVolume } from './volume-stem
 import { isRecaptureTurnRefusal } from './recapture-turn';
 import { testingRefusalText } from './testing-space';
 import { canFreeVolumes } from './unit-mode';
+import { isAdoptedAway } from './adoption';
 
 // STEM_REQUIRED_DETAIL in app/core/volume_stem.py.
 const STEM_REQUIRED_DETAIL =
@@ -222,6 +225,8 @@ export function captureErrorText(error: unknown, msgs: Messages, role?: string |
 	if (isStorageReserve(error)) {
 		return canFreeVolumes(role) ? msgs.lv_err_storage_reserve_free : msgs.lv_err_storage_reserve;
 	}
+	// A volume whose captures a move took into another volume (NEH-419) takes no capture.
+	if (isAdoptedAway(error)) return msgs.adopt_closed_refusal;
 	// The recapture turn's 409 (0.2.0) carries a code: matched on it, not on its text.
 	if (isRecaptureTurnRefusal(error)) return msgs.err_recapture_turn;
 	if (isVolumeRequired(error)) return msgs.lv_err_no_volume;

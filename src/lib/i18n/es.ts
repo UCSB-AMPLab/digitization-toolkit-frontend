@@ -22,6 +22,12 @@ import { formatBytes } from '../format-bytes';
 const ORDINALS_ES = ['Primero', 'Segundo', 'Tercero'];
 const ordinalEs = (n: number) => ORDINALS_ES[n - 1] ?? String(n);
 
+// Counts of the adoption messages (NEH-419), singular and plural.
+const adoptRecordsEs = (n: number) =>
+	n === 1 ? '1 registro' : `${formatCount(n, 'es')} registros`;
+const adoptImagesEs = (n: number) => (n === 1 ? '1 imagen' : `${formatCount(n, 'es')} imágenes`);
+const adoptGroupsEs = (n: number) => (n === 1 ? '1 grupo' : `${formatCount(n, 'es')} grupos`);
+
 export const es = {
 	// ── Common (shared across screens) ───────────────────────────────────────
 	common_username_label: 'Usuario',
@@ -2848,6 +2854,176 @@ export const es = {
 	cc_setting_desc:
 		'Con esta opción activada, la pantalla de captura pide una foto de la carta de color con cada cámara al empezar cada volumen y cada vez que se cambia la configuración de las cámaras. Captua envía a Fisqua los volúmenes que se capturen con la opción desactivada, con una marca que indica que no tienen fotos de la carta de color.',
 	cc_setting_error: 'Captua no pudo guardar el cambio. Vuelve a intentarlo.',
+
+	// ── Moving a hand-made volume's captures into a volume from Fisqua (NEH-419),
+	// and a move the unit could not settle (NEH-420) ─────────────────────────
+	adopt_action: 'Mover las capturas a un volumen de Fisqua',
+	adopt_action_desc:
+		'Usa esta opción si las capturas se tomaron en este volumen, creado a mano, y después Fisqua asignó el volumen al que pertenecen. Captua las mueve a ese volumen y les pone los nombres de archivo que le corresponden.',
+	adopt_target_heading: 'Elige el volumen de Fisqua',
+	adopt_target_desc:
+		'Captua muestra los volúmenes vacíos que asignó Fisqua, excepto los que guarda solo en este equipo.',
+	adopt_target_empty:
+		'No hay ningún volumen de Fisqua vacío al que se puedan mover estas capturas.',
+	adopt_plan_heading: 'Lo que Captua va a hacer',
+	adopt_plan_summary: (
+		records: number,
+		images: number,
+		sets: number,
+		source: string,
+		target: string
+	): string =>
+		`Captua moverá ${adoptRecordsEs(records)}, con ${adoptImagesEs(images)} y ${adoptGroupsEs(sets)} de fotos de la carta de color, de ${source} a ${target}.`,
+	adopt_plan_summary_no_sets: (
+		records: number,
+		images: number,
+		source: string,
+		target: string
+	): string =>
+		`Captua moverá ${adoptRecordsEs(records)}, con ${adoptImagesEs(images)}, de ${source} a ${target}.`,
+	adopt_plan_new_names: 'Nombres de archivo nuevos',
+	adopt_plan_next:
+		'Captua les cambiará el nombre a los archivos en este equipo y los volverá a subir a la copia externa con los nombres nuevos.',
+	adopt_plan_old_copies:
+		'Los archivos que ya están en la copia externa con los nombres anteriores seguirán allí hasta que alguien los elimine a mano.',
+	adopt_plan_confirm: 'Mover las capturas',
+	adopt_refused_title: 'Captua no puede mover estas capturas',
+	adopt_refused_unchanged: 'Captua no cambió nada.',
+	adopt_err_unfinished:
+		'En este equipo hay capturas que quedaron a medio mover: Captua se detuvo antes de terminar y no pudo devolverlas a donde estaban. Mientras eso no se repare, Captua no mueve más capturas.',
+	adopt_err_unfinished_do: 'En Resumen aparece lo que hay que hacer.',
+	adopt_err_volume_gone: (name: string): string => `${name} ya no está en este equipo.`,
+	adopt_err_same_volume: 'El volumen que elegiste es este mismo.',
+	adopt_err_same_volume_do: 'Elige otro volumen.',
+	adopt_err_testing: (name: string): string =>
+		`${name} es un volumen de prueba, y Captua no mueve capturas entre volúmenes de prueba y volúmenes reales.`,
+	adopt_err_source_no_stem: (source: string): string => `${source} no tiene raíz.`,
+	adopt_err_target_no_stem: (target: string): string =>
+		`${target} no tiene raíz, así que Captua no puede ponerles a las capturas sus nombres nuevos.`,
+	adopt_err_target_no_stem_do: 'Asígnale como raíz su código de referencia en Fisqua.',
+	adopt_err_target_not_assigned: (target: string): string =>
+		`${target} no tiene código de referencia en Fisqua, así que no lo asignó Fisqua.`,
+	adopt_err_target_not_assigned_do: 'Elige un volumen de la cola de Fisqua.',
+	adopt_err_target_withdrawn: (target: string): string => `Fisqua retiró ${target} de la cola.`,
+	adopt_err_sent: (name: string): string =>
+		`Captua ya envió ${name} a Fisqua o lo tiene pendiente de envío.`,
+	adopt_err_kept: (name: string): string =>
+		`Captua guarda ${name} solo en este equipo, así que nunca sube sus archivos a la copia externa.`,
+	adopt_err_kept_do: 'Inclúyelo primero en el modo actual.',
+	adopt_err_sub_volumes: (source: string): string => `${source} contiene otros volúmenes.`,
+	adopt_err_no_images: (source: string): string => `${source} no tiene imágenes para mover.`,
+	adopt_err_open_set: (source: string): string =>
+		`En ${source} hay un grupo de fotos de la carta de color sin terminar.`,
+	adopt_err_open_set_do: (source: string): string =>
+		`Primero toma u omite las fotos de la carta de color de ${source}.`,
+	adopt_err_target_not_empty: (target: string): string =>
+		`${target} no está vacío: tiene registros, imágenes o grupos de fotos de la carta de color, tomados u omitidos, o ya se capturó en él.`,
+	adopt_err_target_not_empty_do: 'Elige un volumen vacío.',
+	adopt_err_target_names_held: (target: string): string =>
+		`En la copia externa ya hay archivos con los nombres de archivo de ${target}, así que Captua no puede subir las capturas con esos nombres.`,
+	adopt_err_offsite_config:
+		'La copia externa de los archivos de imagen no está bien configurada en este equipo.',
+	adopt_err_offsite_config_do: 'Pregúntale a quien instaló el equipo.',
+	adopt_err_storage:
+		'Captua no puede escribir en el almacenamiento donde guarda las imágenes, así que no puede cambiarles el nombre a los archivos.',
+	adopt_err_outside_storage: (name: string): string =>
+		`Algunos archivos de ${name} tienen una ruta fuera del almacenamiento del equipo, así que Captua no puede moverlos.`,
+	adopt_err_handed_over: (source: string): string =>
+		`Algunos registros de ${source} ya no están en estado Capturado: se enviaron a revisión o ya se revisaron.`,
+	adopt_err_handed_over_do:
+		'Si están en revisión, primero retira el volumen con "Retirar de revisión".',
+	adopt_err_freed: (source: string): string =>
+		`Algunos archivos de ${source} están guardados en la copia externa y ya no están en la tarjeta.`,
+	adopt_err_freed_do: 'Primero restaura el volumen desde "Espacio en la tarjeta".',
+	adopt_err_outside_own_folder: (source: string): string =>
+		`Algunos archivos de ${source} no están en la carpeta propia del volumen.`,
+	adopt_err_file_missing: (source: string): string =>
+		`Faltan en este equipo algunos archivos de las imágenes o de las fotos de la carta de color de ${source}.`,
+	adopt_err_not_verified: (source: string): string =>
+		`Todavía hay archivos de ${source} sin verificar en la copia externa.`,
+	adopt_err_not_verified_do: 'Espera a que Captua termine de copiarlos y vuelve a intentarlo.',
+	adopt_err_capture_list: (source: string, target: string): string =>
+		`La lista que Captua tiene de las capturas de ${source} no coincide con los archivos del volumen, así que Captua no puede pasarla a ${target}.`,
+	adopt_err_names: (source: string): string =>
+		`Algunos archivos de ${source} tienen nombres que no corresponden a los nombres de archivo del volumen, así que Captua no puede ponerles nombres nuevos.`,
+	adopt_err_thumbnail_shared: (source: string): string =>
+		`Dos imágenes de ${source} comparten una miniatura, así que Captua no puede mover esa miniatura con las dos imágenes.`,
+	adopt_err_unowned_files: (source: string): string =>
+		`En las carpetas de ${source} hay archivos que no son de ninguna de sus imágenes ni de sus fotos de la carta de color.`,
+	adopt_err_name_taken:
+		'Algunos de los nombres de archivo nuevos ya están en uso en este equipo o en la copia externa.',
+	adopt_err_volume_held:
+		'Captua está exportando uno de estos volúmenes, copiándolo a una memoria USB o preparando sus archivos para la copia externa.',
+	adopt_err_volume_held_do: 'Espera a que termine y vuelve a intentarlo.',
+	adopt_done_heading: 'Captua movió las capturas',
+	adopt_done_summary: (
+		records: number,
+		images: number,
+		sets: number,
+		source: string,
+		target: string
+	): string =>
+		`Captua movió ${adoptRecordsEs(records)}, con ${adoptImagesEs(images)} y ${adoptGroupsEs(sets)} de fotos de la carta de color, de ${source} a ${target}.`,
+	adopt_done_summary_no_sets: (
+		records: number,
+		images: number,
+		source: string,
+		target: string
+	): string =>
+		`Captua movió ${adoptRecordsEs(records)}, con ${adoptImagesEs(images)}, de ${source} a ${target}.`,
+	adopt_done_uploading:
+		'Captua está volviendo a subir los archivos a la copia externa con sus nombres nuevos.',
+	adopt_done_delete: (source: string): string => `Eliminar ${source}`,
+	adopt_done_delete_desc: (source: string, target: string): string =>
+		`${source} quedó vacío. Si lo eliminas, no se pierde nada: las capturas están en ${target}.`,
+	adopt_closed_line: (target: string): string =>
+		`Captua movió las capturas de este volumen a ${target}. En este volumen ya no se pueden tomar capturas nuevas. Se puede eliminar.`,
+	adopt_closed_refusal:
+		'Captua movió las capturas de este volumen a otro volumen, así que en este ya no se puede capturar nada más.',
+	unsettled_heading: 'Captua no terminó de mover unas capturas',
+	unsettled_what: (source: string, target: string): string =>
+		`Captua se detuvo mientras movía las capturas de ${source} a ${target} y no pudo terminar de moverlas ni devolverlas a ${source}.`,
+	unsettled_missing: (name: string): string => `Falta este archivo en el equipo: ${name}`,
+	unsettled_blocked: (source: string, target: string): string =>
+		`Hasta que esto se repare, nadie puede capturar ni hacer cambios en ${source} ni en ${target}. Esto no afecta a los demás volúmenes.`,
+	unsettled_repair: 'Reparar',
+	unsettled_repair_desc:
+		'Captua trae el archivo de la copia externa, lo comprueba y después termina de mover las capturas o las devuelve a donde estaban.',
+	unsettled_repairing: 'Captua está reparando las capturas que quedaron a medio mover…',
+	unsettled_done_finished: (target: string): string =>
+		`Captua reparó el problema y terminó de mover las capturas: ya están en ${target}.`,
+	unsettled_done_undone: (source: string): string =>
+		`Captua reparó el problema y devolvió las capturas a ${source}.`,
+	unsettled_err_mismatch: (name: string): string =>
+		`Captua no pudo reparar el problema: el archivo ${name} de la copia externa no coincide con su checksum.`,
+	unsettled_err_absent: (name: string): string =>
+		`Captua no pudo reparar el problema: ${name} no está en la copia externa.`,
+	unsettled_err_never_copied: (name: string): string =>
+		`Captua no pudo reparar el problema: nunca subió ${name} a la copia externa.`,
+	unsettled_no_repair:
+		'Captua no puede reparar el problema desde aquí. Pregúntale a quien instaló el equipo.',
+	unsettled_operator:
+		'Por ahora no se puede trabajar en este volumen. Captua ya les indicó a los administradores qué hacer.',
+	adopt_err_in_progress: 'Captua ya está moviendo las capturas de otro volumen en este equipo.',
+	adopt_err_in_progress_do: 'Espera a que termine y vuelve a intentarlo.',
+	adopt_err_listing:
+		'Captua no pudo consultar la copia externa, así que no puede saber si los nombres de archivo nuevos ya están en uso allí.',
+	adopt_err_listing_do: 'Revisa la conexión a internet del equipo y vuelve a intentarlo.',
+	adopt_err_records_changed: (source: string): string =>
+		`Mientras Captua se preparaba para mover las capturas de ${source}, se agregaron registros a ese volumen.`,
+	adopt_err_records_changed_do: (source: string): string =>
+		`Vuelve a intentarlo cuando nadie esté capturando en ${source}.`,
+	adopt_failed_restored: 'Captua no pudo mover las capturas y dejó todo como estaba.',
+	adopt_failed_restored_do:
+		'Vuelve a intentarlo. Si pasa otra vez, pregúntale a quien instaló el equipo.',
+	adopt_failed_pending:
+		'Captua se detuvo mientras movía las capturas, y quedaron a medio mover. Al arrancar de nuevo el equipo, Captua terminará de moverlas o las devolverá a donde estaban.',
+	adopt_failed_pending_do: 'Reinicia el equipo.',
+	adopt_done_pending:
+		'Captua movió las capturas. Le falta un último paso, que hará al arrancar de nuevo el equipo.',
+	adopt_plan_project: (source: string, target: string): string =>
+		`${source} y ${target} están en proyectos distintos. Los registros pasarán al proyecto de ${target}.`,
+	adopt_err_ask_installer: 'Pregúntale a quien instaló el equipo.',
 
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',

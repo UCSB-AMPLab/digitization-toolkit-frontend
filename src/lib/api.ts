@@ -849,6 +849,14 @@ export interface Collection {
 	// alone; {enabled: false} while the unit does not ask for them or in a
 	// testing volume. Absent from an older backend.
 	colour_card?: ColourCardSummary | null;
+	// Read-only (NEH-419): when an adoption moved the volume's captures into
+	// another volume, which closes it to captures and new records; null
+	// otherwise. Absent from an older backend.
+	captures_adopted_at?: string | null;
+	// Read-only (NEH-420): whether an unfinished adoption's journal names the
+	// volume, which refuses most changes to it. Set by the list and the
+	// detail reads only.
+	adoption_unfinished?: boolean;
 }
 
 export interface CollectionWithChildren extends Collection {
@@ -1098,6 +1106,34 @@ export const collectionsApi = {
 		return apiRequest(`/collections/${collectionId}/images/renumber`, {
 			method: 'POST',
 			timeoutMs: SLOW_REQUEST_TIMEOUT_MS
+		});
+	},
+
+	/**
+	 * Dry run of moving the source volume's captures into the target
+	 * (NEH-419); admin only. Changes nothing and calls no bucket; a refusal is
+	 * in the plan (`may_adopt` false, `refusals`), not an error.
+	 */
+	async planAdoptInto(sourceId: number, targetId: number): Promise<AdoptPlan> {
+		return apiRequest<AdoptPlan>(`/collections/${sourceId}/adopt-into/${targetId}`, {
+			timeoutMs: SLOW_REQUEST_TIMEOUT_MS
+		});
+	},
+
+	/**
+	 * Move the source volume's captures into the target (NEH-419); admin only.
+	 * 409 or 503 with `detail.codes` when refused (nothing changed); 500 with
+	 * `detail.restored` when it failed after it began to move files
+	 * (app/api/collections.py adopt_into). Read by adoptFailureOf in adoption.ts.
+	 * `requestId`: the page's id for the move, a UUID (newClientCaptureId).
+	 */
+	async adoptInto(sourceId: number, targetId: number, requestId: string): Promise<AdoptResult> {
+		return apiRequest<AdoptResult>(`/collections/${sourceId}/adopt-into/${targetId}`, {
+			method: 'POST',
+			timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
+			// The page's id for this move (app/core/adoption_requests.py): a second POST with it
+			// never starts a second move, and GET /system/adoption/requests/{id} answers its outcome.
+			body: JSON.stringify({ client_request_id: requestId })
 		});
 	},
 
@@ -3038,6 +3074,100 @@ export interface OffsiteFileEntry {
 }
 
 /** GET /collections/{id}/offsite/free: plan_free in app/core/offsite_free.py. */
+// Moving a hand-made volume's captures into a volume from Fisqua (NEH-419):
+// the dry run, GET /collections/{source}/adopt-into/{target} (AdoptPlanRead
+// in app/schemas/collection.py), with the fields the dialog reads.
+export interface AdoptPlan {
+	source_id: number;
+	target_id: number;
+	may_adopt: boolean;
+	// Refusal codes in order (app/core/adopt_captures.py REFUSAL_CODES), with details per code.
+	refusals: string[];
+	details: { [code: string]: unknown };
+	source_stem?: string | null;
+	target_stem?: string | null;
+	project_changes: boolean;
+	records: number;
+	images_current: number;
+	images_superseded: number;
+	// Every image of the source, current and superseded; `renames` holds the first `limit` (50).
+	renames_count: number;
+	renames_truncated: boolean;
+	renames: { image_id: number; old_name: string; new_name: string }[];
+	colour_card_set_ids: number[];
+	shot_renames: { shot_id: number; old_name: string; new_name: string }[];
+}
+
+// What a POST of the adoption did (AdoptResultRead). `target_lines_pending`
+// or `recovery_pending`: a last step is left for the next start.
+export interface AdoptResult {
+	source_id: number;
+	target_id: number;
+	records: number;
+	images: number;
+	files_renamed: number;
+	colour_card_sets: number;
+	colour_card_shots: number;
+	target_lines_pending: boolean;
+	recovery_pending: boolean;
+}
+
+// GET /system/adoption (app/core/adopt_repair.py report): the adoption whose
+// journal is still on the unit, or null, and `running`: what holds the
+// adoption lock now (an adoption from the moment it takes the lock, a
+// recovery or a repair), or null. Admin only.
+export interface UnfinishedAdoptionReport {
+	running?: null | {
+		request_id: string | null;
+		kind: string | null;
+		started_at: string | null;
+		source: { id: number; name: string; filename_stem: string | null } | null;
+		target: { id: number; name: string; filename_stem: string | null } | null;
+	};
+	unfinished: null | {
+		// The journal's own run id, which the repair names.
+		run_id?: string | null;
+		source: { id: number; name: string; filename_stem: string | null } | null;
+		target: { id: number; name: string; filename_stem: string | null } | null;
+		state: 'recovering' | 'blocked';
+		reason: string;
+		missing: {
+			kind: string;
+			name: string;
+			repairable: boolean;
+			why_not: string | null;
+			needs_storage: boolean;
+		}[];
+		repair_available: boolean;
+		repair_refusal: string | null;
+	};
+}
+
+// POST /system/adoption/repair: how the recovery that the repair ran again ended.
+export interface AdoptionRepairAnswer {
+	result: 'finished' | 'reverted' | 'unfinished';
+	reason?: string | null;
+	code?: string | null;
+	// The volumes of the journal the repair read.
+	source?: { id: number; name: string; filename_stem: string | null } | null;
+	target?: { id: number; name: string; filename_stem: string | null } | null;
+}
+
+// GET /system/adoption/requests/{id} (app/core/adoption_requests.py state_of).
+export interface AdoptionRequestState {
+	state: 'running' | 'busy' | 'applied' | 'refused' | 'failed' | 'reverted' | 'interrupted';
+	source_id?: number;
+	target_id?: number;
+	started_at?: string | null;
+	ended_at?: string | null;
+	result?: Partial<AdoptResult> | null;
+	status?: number;
+	detail?: unknown;
+	message?: string | null;
+	restored?: boolean | null;
+	journal_kept?: boolean | null;
+}
+
 export interface FreePlan {
 	collection_id: number;
 	filename_stem: string;
@@ -3335,6 +3465,36 @@ export const systemApi = {
 
 	async getStorage(): Promise<StorageInfo> {
 		return apiRequest<StorageInfo>('/system/storage');
+	},
+
+	/** The adoption the unit could not settle, or `{unfinished: null}` (NEH-420). Admin only: 403 otherwise. */
+	async getUnfinishedAdoption(): Promise<UnfinishedAdoptionReport> {
+		return apiRequest<UnfinishedAdoptionReport>('/system/adoption');
+	},
+
+	/**
+	 * Fetch the files the unfinished adoption lacks and run its recovery
+	 * again (NEH-420); admin only. 409 or 503 with `detail.code` when it
+	 * changed nothing (app/core/adopt_repair.py). Read by repairOutcomeOf in adoption.ts.
+	 */
+	async repairAdoption(runId: string | null): Promise<AdoptionRepairAnswer> {
+		return apiRequest<AdoptionRepairAnswer>('/system/adoption/repair', {
+			method: 'POST',
+			timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
+			// The run id of the report read just before: another unfinished move is refused, 409 `journal_changed`.
+			body: JSON.stringify(runId === null ? {} : { run_id: runId })
+		});
+	},
+
+	/**
+	 * What became of the move the page sent with `requestId` (NEH-419); admin
+	 * only. `state`: running, busy, applied, refused, failed, reverted or
+	 * interrupted; 404 with `state: "closed"` for an id the unit never saw,
+	 * which it then never runs (app/core/adoption_requests.py). Read by
+	 * requestStateOf in adoption.ts.
+	 */
+	async getAdoptionRequest(requestId: string): Promise<AdoptionRequestState> {
+		return apiRequest<AdoptionRequestState>(`/system/adoption/requests/${requestId}`);
 	},
 
 	/** The real volumes that can be freed, largest first (NEH-380). Admin and operator. */

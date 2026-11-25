@@ -151,6 +151,13 @@ describe('isConflict, needsStem and deleteRefused', () => {
 		expect(deleteRefused({})).toBe(false);
 		expect(deleteRefused(null)).toBe(false);
 	});
+
+	it('lets a volume whose captures were moved into another go to the backend, which deletes it (NEH-419)', () => {
+		expect(deleteRefused({ stem_reserved: true, captures_adopted_at: '2026-11-24T10:00:00' })).toBe(
+			false
+		);
+		expect(deleteRefused({ stem_reserved: true, captures_adopted_at: null })).toBe(true);
+	});
 });
 
 describe('isVolumeRequired', () => {
