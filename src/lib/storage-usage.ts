@@ -4,8 +4,10 @@
 // filesystem where captures are written: the external drive when a storage
 // override is active, the unit's own card otherwise.
 //
-// The reading is the Configuration page's: used over total, in binary GB, the
-// percentage rounded and capped at 100, the alert from 85%. `used_bytes`
+// The reading is the Configuration page's: used over total (held in GiB),
+// the percentage rounded and capped at 100, the alert from 85%. Every screen
+// writes the figures with storageSize: decimal units, as formatBytes writes
+// every size in the interface, so a disk reads the same everywhere. `used_bytes`
 // counts allocated blocks and `free_bytes` only the blocks open to ordinary
 // users, so the blocks a filesystem reserves for root are in neither; on such
 // a drive the percentage stays a few points below 100 when it is full.
@@ -19,6 +21,7 @@
 // Version: 0.3.0
 
 import type { StorageInfo } from './api';
+import { formatBytes } from './format-bytes';
 
 /** Percent; the Configuration page applies the same threshold. */
 export const STORAGE_ALERT_THRESHOLD = 85;
@@ -63,8 +66,7 @@ export function reserveGB(bytes: number): string {
 	return String(Math.round(bytes / 10 ** 9));
 }
 
-/** A size in GB as the storage rows show it: "512 GB", or "1.2 TB" from 1000 GB. */
-export function formatStorage(gb: number): string {
-	if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
-	return `${gb.toFixed(0)} GB`;
+/** A figure of StorageUsage (GiB) written as formatBytes writes sizes: "500 GB", "54,8 GB". */
+export function storageSize(gib: number, locale: 'es' | 'en'): string {
+	return formatBytes(gib * GIB, locale);
 }

@@ -1,7 +1,7 @@
 // Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
-import { formatStorage, reserveGB, storageUsage, STORAGE_ALERT_THRESHOLD } from './storage-usage';
+import { reserveGB, storageSize, storageUsage, STORAGE_ALERT_THRESHOLD } from './storage-usage';
 import type { StorageInfo } from './api';
 
 const GIB = 1024 ** 3;
@@ -115,9 +115,11 @@ describe('reserveGB', () => {
 	});
 });
 
-describe('formatStorage', () => {
-	it('writes GB below 1000 and TB from it', () => {
-		expect(formatStorage(512)).toBe('512 GB');
-		expect(formatStorage(1228.8)).toBe('1.2 TB');
+describe('storageSize', () => {
+	it('writes a figure in GiB as formatBytes writes its bytes, in decimal units', () => {
+		expect(storageSize(466, 'es')).toBe('500\u00a0GB');
+		expect(storageSize(51, 'en')).toBe('54.8\u00a0GB');
+		expect(storageSize(51, 'es')).toBe('54,8\u00a0GB');
+		expect(storageSize(1000, 'en')).toBe('1.1\u00a0TB');
 	});
 });

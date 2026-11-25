@@ -30,7 +30,7 @@
 		gap: 7px;
 		width: 100%;
 		padding: 8px 10px;
-		min-height: 40px;
+		min-height: var(--touch-target-min);
 		border-radius: var(--radius-md);
 		background: none;
 		border: 1px solid var(--border-color);

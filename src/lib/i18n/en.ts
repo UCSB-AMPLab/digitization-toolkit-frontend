@@ -172,17 +172,21 @@ export const en: Messages = {
 	// ── Dashboard (overview) ─────────────────────────────────────────────────
 	dash_greeting: (name: string) => `Hello, ${name}!`,
 	dash_greeting_fallback: 'there',
-	dash_subtitle_admin: 'Admin panel — System overview',
-	dash_subtitle_operator: 'Operator panel — Your assigned projects',
-	dash_subtitle_reviewer: 'Review panel — volumes awaiting review',
+	dash_subtitle_cameras: 'The state of the unit, the volumes in progress, and activity.',
+	// For a role without the camera block (the reviewer).
+	dash_subtitle_no_cameras: 'Volumes in progress and activity.',
+	dash_attention_title: 'Needs attention',
 	dash_storage_alert_p1: 'Storage is at ',
 	dash_storage_alert_p2: (used: string, total: string) => ` (${used} / ${total}). See `,
 	dash_storage_alert_p3: ' to free up space.',
 	dash_storage_alert_ask_admin: (used: string, total: string) =>
 		` (${used} / ${total}). Ask an administrator or an operator to free up space.`,
+	// After the storage sentence, admin and operator: the total of GET /system/storage/freeable.
+	dash_storage_can_free: (bytes: number) => `You can free ${formatBytes(bytes, 'en')}.`,
 	dash_kpi_active_projects: 'Active projects',
 	dash_kpi_collections: 'Volumes',
 	dash_kpi_total_records: 'Total records',
+	dash_kpi_failed: 'Could not load this figure.',
 	dash_in_progress: 'Digitizations in progress',
 	dash_col_volume: 'Volume',
 	dash_col_project: 'Project',
@@ -203,26 +207,27 @@ export const en: Messages = {
 	dash_stage_approved: 'Approved',
 	dash_stage_approved_desc: 'Volumes with every record approved, ready to export.',
 	dash_progress_load_error: "Could not load the volumes' progress",
-	dash_test_cameras: 'Test cameras',
 	// The camera by its confirmed role (`left` is the right camera), and by
 	// its number when no role is confirmed.
 	dash_camera_left: 'Right camera',
 	dash_camera_right: 'Left camera',
 	dash_camera_n: (n: number) => `Camera ${n}`,
-	dash_camera_not_active: 'Not active',
-	dash_camera_stop: 'Stop',
-	dash_camera_test: 'Test',
-	dash_camera_focus: 'Focus',
-	dash_camera_capture_ok: 'Test capture taken',
-	dash_camera_capture_took: (s: string) => `in ${s}s`,
-	dash_camera_capture_error: 'Test capture failed',
 	dash_camera_capture_not_connected: 'the camera is not connected',
 	dash_camera_capture_timeout: 'the camera did not deliver the image in time',
-	dash_camera_focus_error: 'Could not focus',
-	dash_camera_preview_error: 'Could not show the live preview',
-	dash_two_cameras: '2 cameras',
 	dash_camera_missing_hint: (side: string) =>
 		`${side}: not detected. Half-press its shutter button to wake it, or reseat its USB cable, then press "Reconnect cameras".`,
+	dash_camera_missing_title: 'Captua cannot detect one of the cameras.',
+	dash_cameras_none_title: 'Captua cannot detect either camera.',
+	dash_cameras_none_hint:
+		'Check that both cameras are switched on and connected, then press "Reconnect cameras".',
+	// A listed camera the unit cannot capture with (the device list's `error`).
+	dash_camera_unusable_badge: 'Cannot capture',
+	dash_camera_unusable_title: 'Captua cannot capture with one of the cameras.',
+	dash_camera_unusable_title_both: 'Captua cannot capture with either camera.',
+	dash_camera_unusable_body:
+		'The camera is connected, but Captua cannot capture with it. To see why, press "Check cameras".',
+	dash_camera_unusable_body_both:
+		'Both cameras are connected, but Captua cannot capture with them. To see why, press "Check cameras".',
 	dash_camera_reconnect: 'Reconnect cameras',
 	dash_camera_reconnect_error: 'Could not reconnect',
 

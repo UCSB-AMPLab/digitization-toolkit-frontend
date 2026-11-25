@@ -13,6 +13,11 @@
 	//
 	// While the unit hides projects (NEH-313) neither view names a project:
 	// the table drops its Proyecto column and the board its project line.
+	//
+	// The table flags a volume without its colour card shots (ColourCardFlag),
+	// on a line of its own under the name; the board does not. Capture
+	// buttons are for the roles that can capture (`canCapture`); Review is
+	// for every role.
 	// ============================================================================
 	//
 	// Version: 0.3.0
@@ -39,8 +44,13 @@
 		type PipelineStage
 	} from '$lib/pipeline';
 	import { projectsShownIn, unitState } from '$lib/unit-mode';
+	import ColourCardFlag from '$lib/components/ColourCardFlag.svelte';
 
-	let { collections, projects }: { collections: Collection[]; projects: Project[] } = $props();
+	let {
+		collections,
+		projects,
+		canCapture = true
+	}: { collections: Collection[]; projects: Project[]; canCapture?: boolean } = $props();
 
 	let showProjects = $derived(projectsShownIn($unitState));
 
@@ -97,6 +107,7 @@
 		signatura: string;
 		projectName: string;
 		lastActivity: string;
+		colourCard: Collection['colour_card'];
 	};
 
 	// A volume is "in progress" when it has records: last_activity_at is null
@@ -115,7 +126,8 @@
 				// exactly the problem in NEH-138.
 				signatura: (c.archival_metadata?.signatura as string | undefined) ?? '',
 				projectName: projectNameById.get(c.project_id as number) ?? '',
-				lastActivity: c.last_activity_at as string
+				lastActivity: c.last_activity_at as string,
+				colourCard: c.colour_card
 			}))
 	);
 
@@ -258,6 +270,7 @@
 							<a class="ip-volume" href={volumeUrl(row.projectId, row.collectionId)}>
 								<span class="ip-volume-name">{row.volumeName}</span>
 								{#if row.signatura}<span class="ip-signatura">{row.signatura}</span>{/if}
+								<ColourCardFlag summary={row.colourCard} />
 							</a>
 
 							{#if showProjects}
@@ -278,15 +291,19 @@
 							<span class="ip-date">{formatDate(row.lastActivity)}</span>
 
 							<div class="ip-actions">
-								<button
-									class="btn ip-btn ip-btn-capture"
-									onclick={() => goto(captureUrl(row.projectId, row.collectionId))}
-								>
-									<span class="material-symbols-outlined" style="font-size:18px" aria-hidden="true"
-										>photo_camera</span
+								{#if canCapture}
+									<button
+										class="btn ip-btn ip-btn-capture"
+										onclick={() => goto(captureUrl(row.projectId, row.collectionId))}
 									>
-									<span>{$m.col_live_preview}</span>
-								</button>
+										<span
+											class="material-symbols-outlined"
+											style="font-size:18px"
+											aria-hidden="true">photo_camera</span
+										>
+										<span>{$m.col_live_preview}</span>
+									</button>
+								{/if}
 
 								<button
 									class="btn ip-btn ip-btn-review"
@@ -344,7 +361,7 @@
 										{/if}
 									</div>
 
-									{#if stage === 'capture' || stage === 'recapture'}
+									{#if canCapture && (stage === 'capture' || stage === 'recapture')}
 										<button
 											class="btn ip-btn ip-btn-capture card-btn"
 											aria-describedby="card-{card.collection_id}"
@@ -384,9 +401,10 @@
 {/if}
 
 <style>
-	/* Same values as .section / .section-title on the dashboard page. */
+	/* Same values as .section-title on the dashboard page; the page's
+	   columns space the blocks. */
 	.section {
-		margin-bottom: 36px;
+		min-width: 0;
 	}
 	.section-title {
 		font-size: var(--text-h3);
@@ -401,7 +419,7 @@
 		justify-content: space-between;
 		flex-wrap: wrap;
 		gap: 12px 16px;
-		margin-bottom: 20px;
+		margin-bottom: 16px;
 	}
 
 	/* ── View switch ── */
@@ -585,6 +603,14 @@
 		align-items: flex-start;
 		justify-content: center;
 		gap: 2px;
+	}
+	/* The colour card flag takes a line of its own under the name and the stem. */
+	.in-progress .ip-volume :global(.cc-flag) {
+		margin-left: 0;
+		margin-top: 2px;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.ip-volume-name {
 		color: var(--color-light);
