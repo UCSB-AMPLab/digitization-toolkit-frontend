@@ -520,14 +520,18 @@ describe('Overview: the camera rows and the camera notice read one state', () =>
 			{ name: es.dash_camera_left, badge: 'OK' }
 		]);
 		expect(served.rescan).toHaveBeenCalledTimes(1);
-		expect(served.listDevices).toHaveBeenCalledTimes(1);
+		// One camera is not a complete list: the first read and its four
+		// retries (NEH-422); the complete answer of the reconnect reads nothing more.
+		expect(served.listDevices).toHaveBeenCalledTimes(5);
 	});
 
 	it('a reconnect that finds none turns the one-camera notice into the no-camera notice', async () => {
 		signIn('admin');
-		serveOverview('camera', { rescan: [] });
+		const served = serveOverview('camera', { rescan: [] });
 		render(Overview);
 		await expect.poll(() => notices().length).toBe(1);
+		// An empty list is read again (NEH-422); the unit still lists none.
+		served.listDevices.mockResolvedValue([]);
 		const blockReconnect = [...camBlock()!.querySelectorAll('button')].find(
 			(b) => text(b) === es.dash_camera_reconnect
 		)!;

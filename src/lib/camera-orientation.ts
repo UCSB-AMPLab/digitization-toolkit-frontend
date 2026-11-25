@@ -1,6 +1,7 @@
 // Version: 0.3.0
 
 import type { CameraDevice } from './api';
+import { browserScheduler, type Scheduler } from './repeat-read';
 
 // Default clockwise capture rotation (degrees). Most digitisation rigs use
 // vertical (portrait) orientation, so this mirrors the historical hardcoded
@@ -41,6 +42,23 @@ export function isDeviceListComplete(
 		required.every((index) => devices.some((d) => d.index === index)) &&
 		!devices.some((d) => isPlaceholderHardwareId(d.hardware_id))
 	);
+}
+
+// How long a screen waits before each further read of a device list that is
+// not complete yet (see isDeviceListComplete); after the last one it shows
+// what the list says.
+export const DEVICE_RETRY_DELAYS_MS: readonly number[] = [1000, 2000, 4000, 8000];
+
+// The timers the Overview's device-list reads wait on. Tests replace it so
+// that they fire the waits by hand.
+let deviceRetryScheduler: Scheduler = browserScheduler;
+
+export function getDeviceRetryScheduler(): Scheduler {
+	return deviceRetryScheduler;
+}
+
+export function setDeviceRetryScheduler(scheduler: Scheduler = browserScheduler): void {
+	deviceRetryScheduler = scheduler;
 }
 
 /**

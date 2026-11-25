@@ -2,7 +2,9 @@
 // all in order; with notices; with notices and nothing to free; one camera
 // not answering; no camera; cameras of another kind; figures not loaded.
 // `serveOverview` answers every call the page makes through the API
-// objects, and every other request with a 500. Used by tests only.
+// objects, and every other request with a 500, and sets the scheduler the
+// page's device-list retries wait on: by default one that runs each wait at
+// once, or a test's `manualScheduler`. Used by tests only.
 
 import { vi } from 'vitest';
 import {
@@ -19,6 +21,8 @@ import {
 } from '$lib/api';
 import { authStore } from '$lib/stores/auth';
 import { writeUnit } from '$lib/unit-mode';
+import { setDeviceRetryScheduler } from '$lib/camera-orientation';
+import type { Scheduler } from '$lib/repeat-read';
 
 export type OverviewState =
 	| 'ok'
@@ -212,6 +216,60 @@ export function hideProjects() {
 	}));
 }
 
+interface Timer {
+	fn: () => void;
+	ms: number;
+	live: boolean;
+}
+
+/** Runs each wait at once (in a microtask), so a device list that is not
+ * complete is read again with no time passing. */
+export const immediateScheduler: Scheduler = {
+	setTimeout(fn) {
+		const timer = { live: true };
+		queueMicrotask(() => {
+			if (timer.live) fn();
+		});
+		return timer;
+	},
+	clearTimeout(handle) {
+		if (handle) (handle as { live: boolean }).live = false;
+	}
+};
+
+/** A scheduler whose waits the test fires by hand. */
+export function manualScheduler() {
+	const timers: Timer[] = [];
+	const scheduler: Scheduler = {
+		setTimeout(fn, ms) {
+			const timer = { fn, ms, live: true };
+			timers.push(timer);
+			return timer;
+		},
+		clearTimeout(handle) {
+			if (handle) (handle as Timer).live = false;
+		}
+	};
+	return {
+		scheduler,
+		/** The delays of the waits armed and not yet fired or cleared. */
+		armed: () => timers.filter((t) => t.live).map((t) => t.ms),
+		/** Every delay ever armed, in order. */
+		history: () => timers.map((t) => t.ms),
+		/** Fire the one armed wait. */
+		fire() {
+			const live = timers.filter((t) => t.live);
+			if (live.length !== 1) throw new Error(`${live.length} waits armed, not one`);
+			live[0].live = false;
+			live[0].fn();
+		},
+		/** Run every callback ever armed, cleared ones too. */
+		fireAll() {
+			for (const t of timers) t.fn();
+		}
+	};
+}
+
 export interface Served {
 	listDevices: ReturnType<typeof vi.fn>;
 	rescan: ReturnType<typeof vi.fn>;
@@ -226,8 +284,10 @@ export function serveOverview(
 		devices?: CameraDevice[];
 		rescan?: CameraDevice[];
 		freeable?: unknown;
+		scheduler?: Scheduler;
 	} = {}
 ): Served {
+	setDeviceRetryScheduler(over.scheduler ?? immediateScheduler);
 	const notices = state === 'notices' || state === 'storage0';
 	const devices =
 		over.devices ??

@@ -17,7 +17,16 @@ import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import { resetUnit } from '$lib/unit-mode';
+import { cameraKindApi } from '$lib/api';
 import Overview from './+page.svelte';
+import {
+	BOTH,
+	immediateScheduler,
+	manualScheduler,
+	serveOverview,
+	signIn
+} from './overview-fixtures';
+import { setDeviceRetryScheduler } from '$lib/camera-orientation';
 
 function device(index: number, over: Partial<CameraDevice> = {}): CameraDevice {
 	return {
@@ -39,6 +48,7 @@ const hint = () =>
 beforeEach(() => {
 	authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
+	setDeviceRetryScheduler(immediateScheduler);
 });
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -121,4 +131,218 @@ describe('Overview: Check cameras', () => {
 			expect(link()).toBeUndefined();
 		});
 	}
+});
+
+// NEH-422: right after a start the unit can answer the first device request
+// before it has found or identified both cameras (an empty list, bodies at
+// temporary indices, a placeholder id, a failed request). Such a list is not
+// evidence that a camera is missing: the rows stay at "—", no notice and no
+// Reconnect show, and the page reads the list again after 1, 2, 4 and 8 s,
+// stopping at the first complete list. After the last read the page shows
+// what that list says.
+describe('Overview: a device list that is not complete yet', () => {
+	const rows = () =>
+		[...document.querySelectorAll('[data-camera-row]')].map((r) =>
+			r.querySelector('.cam-badge')?.textContent?.replace(/\s+/g, ' ').trim()
+		);
+	const notices = () => document.querySelectorAll('[data-attention-notice]').length;
+	const reconnects = () =>
+		[...document.querySelectorAll('button')].filter(
+			(b) => b.textContent?.trim() === es.dash_camera_reconnect
+		);
+	const title = () =>
+		document.querySelector('[data-attention-notice] .notice-title')?.textContent?.trim() ?? '';
+	const LATE = [device(2), device(3)];
+
+	function setUp(first: () => Promise<CameraDevice[]>) {
+		locale.set('es');
+		signIn('admin');
+		const timers = manualScheduler();
+		const served = serveOverview('ok', { scheduler: timers.scheduler });
+		served.listDevices.mockImplementationOnce(first);
+		return { timers, served };
+	}
+
+	// The page has had the first answer and armed its first wait.
+	async function waiting(timers: ReturnType<typeof manualScheduler>, ms: number) {
+		await expect.poll(() => timers.armed()).toEqual([ms]);
+	}
+
+	async function notCompleteThenComplete(first: () => Promise<CameraDevice[]>) {
+		const { timers, served } = setUp(first);
+		render(Overview);
+		await waiting(timers, 1000);
+		expect(rows()).toEqual(['—', '—']);
+		expect(notices()).toBe(0);
+		expect(reconnects()).toHaveLength(0);
+		expect(served.listDevices).toHaveBeenCalledTimes(1);
+		timers.fire();
+		await expect.poll(rows).toEqual(['OK', 'OK']);
+		expect(served.listDevices).toHaveBeenCalledTimes(2);
+		expect(timers.armed()).toEqual([]);
+		expect(notices()).toBe(0);
+	}
+
+	it('both bodies at indices 2 and 3, then at 0 and 1: no notice until OK, one more read', async () => {
+		await notCompleteThenComplete(async () => LATE);
+	});
+
+	it('an empty list, then a complete one', async () => {
+		await notCompleteThenComplete(async () => []);
+	});
+
+	it('a failed request, then a complete list', async () => {
+		await notCompleteThenComplete(async () => {
+			throw new Error('down');
+		});
+	});
+
+	it('a placeholder id, then a complete list', async () => {
+		await notCompleteThenComplete(async () => [
+			device(0, { hardware_id: 'Canon_PowerShot_A2500_idx0' }),
+			device(1)
+		]);
+	});
+
+	it('a complete first list: nothing is read again', async () => {
+		const { timers, served } = setUp(async () => BOTH);
+		render(Overview);
+		await expect.poll(rows).toEqual(['OK', 'OK']);
+		await expect.poll(() => vi.mocked(cameraKindApi.get).mock.settledResults.length).toBe(1);
+		expect(timers.history()).toEqual([]);
+		expect(served.listDevices).toHaveBeenCalledTimes(1);
+	});
+
+	it('never complete: exactly four more reads, then the notice the last list calls for', async () => {
+		const { timers, served } = setUp(async () => []);
+		served.listDevices
+			.mockResolvedValueOnce(LATE)
+			.mockRejectedValueOnce(new Error('down'))
+			.mockResolvedValueOnce([])
+			.mockResolvedValueOnce([device(0)]);
+		render(Overview);
+		for (const [i, ms] of [1000, 2000, 4000, 8000].entries()) {
+			await waiting(timers, ms);
+			expect(served.listDevices).toHaveBeenCalledTimes(i + 1);
+			expect(notices()).toBe(0);
+			expect(rows()).toEqual(['—', '—']);
+			timers.fire();
+		}
+		await expect.poll(title).toBe(es.dash_camera_missing_title);
+		expect(rows()).toEqual(['OK', es.camera_not_detected]);
+		expect(served.listDevices).toHaveBeenCalledTimes(5);
+		expect(timers.history()).toEqual([1000, 2000, 4000, 8000]);
+		expect(timers.armed()).toEqual([]);
+	});
+
+	it('never answering: after the last retry, the notice for no camera', async () => {
+		const { timers, served } = setUp(async () => {
+			throw new Error('down');
+		});
+		served.listDevices.mockRejectedValue(new Error('down'));
+		render(Overview);
+		for (const ms of [1000, 2000, 4000, 8000]) {
+			await waiting(timers, ms);
+			expect(notices()).toBe(0);
+			timers.fire();
+		}
+		await expect.poll(title).toBe(es.dash_cameras_none_title);
+		expect(served.listDevices).toHaveBeenCalledTimes(5);
+		expect(reconnects()).toHaveLength(2);
+	});
+
+	it('a reconnect starts a fresh sequence, from the first delay, reading the device list', async () => {
+		const { timers, served } = setUp(async () => []);
+		served.listDevices.mockResolvedValue([]);
+		render(Overview);
+		for (const ms of [1000, 2000, 4000, 8000]) {
+			await waiting(timers, ms);
+			timers.fire();
+		}
+		await expect.poll(title).toBe(es.dash_cameras_none_title);
+		served.rescan.mockResolvedValueOnce(LATE);
+		served.listDevices.mockResolvedValueOnce(BOTH);
+		reconnects()[0].click();
+		await waiting(timers, 1000);
+		expect(served.rescan).toHaveBeenCalledTimes(1);
+		expect(rows()).toEqual(['—', '—']);
+		expect(notices()).toBe(0);
+		timers.fire();
+		await expect.poll(rows).toEqual(['OK', 'OK']);
+		expect(served.rescan).toHaveBeenCalledTimes(1);
+		expect(served.listDevices).toHaveBeenCalledTimes(6);
+		expect(timers.armed()).toEqual([]);
+	});
+
+	it('after a reconnect, no wait of the sequence before it reads again', async () => {
+		// No Reconnect shows while a list is not complete, so this reconnect
+		// is the one the end of a sequence offers; the earlier sequence's
+		// callbacks are then run by hand, and none of them may read.
+		const { timers, served } = setUp(async () => [device(0)]);
+		served.listDevices.mockResolvedValue([device(0)]);
+		render(Overview);
+		for (const ms of [1000, 2000, 4000, 8000]) {
+			await waiting(timers, ms);
+			timers.fire();
+		}
+		await expect.poll(title).toBe(es.dash_camera_missing_title);
+		let finish!: (v: CameraDevice[]) => void;
+		served.rescan.mockImplementationOnce(() => new Promise((r) => (finish = r)));
+		reconnects()[0].click();
+		await expect.poll(() => served.rescan.mock.calls.length).toBe(1);
+		finish(BOTH);
+		await expect.poll(rows).toEqual(['OK', 'OK']);
+		timers.fireAll();
+		await expect.poll(() => vi.mocked(cameraKindApi.get).mock.settledResults.length).toBe(2);
+		expect(served.listDevices).toHaveBeenCalledTimes(5);
+		expect(rows()).toEqual(['OK', 'OK']);
+	});
+
+	it('destroyed during the sequence: the wait is cleared and nothing more is requested', async () => {
+		const { timers, served } = setUp(async () => LATE);
+		const screen = render(Overview);
+		await waiting(timers, 1000);
+		screen.unmount();
+		expect(timers.armed()).toEqual([]);
+		timers.fireAll();
+		// A later point the forbidden read would have preceded: another page's
+		// first read resolves after it.
+		const other = render(Overview);
+		await expect.poll(() => served.listDevices.mock.calls.length).toBe(2);
+		other.unmount();
+		expect(served.listDevices).toHaveBeenCalledTimes(2);
+	});
+
+	it('the document hidden: the read waits until it is visible again', async () => {
+		const { timers, served } = setUp(async () => LATE);
+		let state: DocumentVisibilityState = 'visible';
+		const vis = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => state);
+		render(Overview);
+		await waiting(timers, 1000);
+		state = 'hidden';
+		document.dispatchEvent(new Event('visibilitychange'));
+		// A read starts within the timer's callback, so a read that did not
+		// wait would already have been asked for here.
+		timers.fire();
+		expect(served.listDevices).toHaveBeenCalledTimes(1);
+		expect(rows()).toEqual(['—', '—']);
+		state = 'visible';
+		document.dispatchEvent(new Event('visibilitychange'));
+		await expect.poll(rows).toEqual(['OK', 'OK']);
+		expect(served.listDevices).toHaveBeenCalledTimes(2);
+		vis.mockRestore();
+	});
+
+	it('a reviewer makes no camera request', async () => {
+		locale.set('es');
+		signIn('reviewer');
+		const timers = manualScheduler();
+		const served = serveOverview('ok', { scheduler: timers.scheduler });
+		served.listDevices.mockResolvedValue(LATE);
+		render(Overview);
+		await expect.poll(() => document.querySelector('.kpi-number')?.textContent).not.toBe('—');
+		expect(served.listDevices).not.toHaveBeenCalled();
+		expect(served.rescan).not.toHaveBeenCalled();
+		expect(timers.history()).toEqual([]);
+	});
 });
