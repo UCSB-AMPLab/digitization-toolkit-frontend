@@ -19,12 +19,12 @@ describe('Fisqua mode: the read-only stem of an operator', () => {
 describe('Scanner only mode: the catalogue copy (NEH-319)', () => {
 	it('says where the catalogue is kept', () => {
 		expect(es.backup_ind_local).toBe('Catálogo solo en el escáner');
-		expect(en.backup_ind_local).toBe('Catalogue on the scanner only');
+		expect(en.backup_ind_local).toBe('Catalog on the scanner only');
 		expect(es.backup_cfg_local).toBe(
 			'En el modo actual, Captua guarda el catálogo solo en este equipo.'
 		);
 		expect(en.backup_cfg_local).toBe(
-			'In the current mode, Captua keeps the catalogue only on this scanner.'
+			'In the current mode, Captua keeps the catalog only on this scanner.'
 		);
 	});
 
@@ -33,13 +33,13 @@ describe('Scanner only mode: the catalogue copy (NEH-319)', () => {
 			'Una vez al día, Captua copia el catálogo al destino que se configuró al instalar el equipo y verifica que la copia está completa.'
 		);
 		expect(en.backup_section_desc).toBe(
-			'Once a day, Captua copies the catalogue to the destination configured when the scanner was installed, and verifies that the copy is complete.'
+			'Once a day, Captua copies the catalog to the destination configured when the scanner was installed, and verifies that the copy is complete.'
 		);
 		expect(es.backup_section_catalogue).toBe(
 			'El catálogo es la base de datos que relaciona cada imagen con su proyecto, su volumen y el lugar que ocupa en él.'
 		);
 		expect(en.backup_section_catalogue).toBe(
-			'The catalogue is the database that links each image to its project, its volume and its place in that volume.'
+			'The catalog is the database that links each image to its project, its volume and its place in that volume.'
 		);
 	});
 

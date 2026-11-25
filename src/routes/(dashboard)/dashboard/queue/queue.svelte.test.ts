@@ -1277,13 +1277,13 @@ describe('Cola: the Fisqua queue (contract 1.7)', () => {
 		await expect
 			.element(
 				first.getByText(
-					'Volumes with page pairs to recapture, then the ones to digitise again in full.'
+					'Volumes with page pairs to recapture, then the ones to digitize again in full.'
 				)
 			)
 			.toBeVisible();
 		const then = screen.getByRole('region', { name: 'Second: new material' });
 		expect(titles(then.element())).toEqual(['Tomo A', 'Tomo C']);
-		await expect.element(then.getByText('Volumes never digitised before.')).toBeVisible();
+		await expect.element(then.getByText('Volumes never digitized before.')).toBeVisible();
 		await expect
 			.element(then.getByText('To start a new volume, first finish the retakes of one volume.'))
 			.toBeVisible();

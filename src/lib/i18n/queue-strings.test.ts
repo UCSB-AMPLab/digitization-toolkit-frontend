@@ -29,9 +29,9 @@ describe('Cola section headings', () => {
 		expect(en.section_new_title(3)).toBe('Third: new material');
 		expect(en.section_progress_sub).toBe('Volumes whose capture has already started on this unit.');
 		expect(en.section_rework_sub).toBe(
-			'Volumes with page pairs to recapture, then the ones to digitise again in full.'
+			'Volumes with page pairs to recapture, then the ones to digitize again in full.'
 		);
-		expect(en.section_new_sub).toBe('Volumes never digitised before.');
+		expect(en.section_new_sub).toBe('Volumes never digitized before.');
 	});
 });
 
