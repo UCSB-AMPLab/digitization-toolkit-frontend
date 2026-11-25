@@ -25,6 +25,18 @@
 	// which keeps an earlier screen's report, is never read here. Until the
 	// refresh's kind answer is in, no camera notice shows.
 	//
+	// Right after a start the unit can answer before it has found or
+	// identified both cameras: an empty list, bodies at temporary indices, a
+	// placeholder id, or a failed request (NEH-422). Such a list is not
+	// evidence that a camera is missing. While a refresh's list is not
+	// complete for two cameras (`isDeviceListComplete`; the Overview always
+	// has the two rows, indices 0 and 1) the rows stay at "—", no camera notice
+	// and no Reconnect show, and the same refresh reads GET /cameras/devices
+	// again after each of DEVICE_RETRY_DELAYS_MS, waiting while the document is
+	// hidden, and stops at the first complete list. After the last read it
+	// shows what that list says. A reconnect or a new mount starts a fresh
+	// sequence; leaving the page ends it.
+	//
 	// A camera counts as OK only when the unit can capture with it: a listed
 	// device that carries an `error` (two bodies on one parity, a body with no
 	// identity) is shown as unavailable, with a notice that sends to the
@@ -48,7 +60,7 @@
 	//
 	// Version: 0.3.0
 
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { authStore } from '$lib/stores/auth';
 	import {
 		camerasApi,
@@ -73,6 +85,11 @@
 	import { m, locale } from '$lib/i18n';
 	import { formatCount } from '$lib/format-count';
 	import { sidesFromDevices } from '$lib/camera-sides';
+	import {
+		DEVICE_RETRY_DELAYS_MS,
+		getDeviceRetryScheduler,
+		isDeviceListComplete
+	} from '$lib/camera-orientation';
 	import { kindNotice, noticeText, readCameraKind, type CameraKindReport } from '$lib/camera-kind';
 	import InProgress from './InProgress.svelte';
 	import ActivityCalendar from './ActivityCalendar.svelte';
@@ -148,6 +165,11 @@
 		return { left: state('left', 0), right: state('right', 1) };
 	}
 
+	const NOT_KNOWN: Sides = {
+		left: { status: 'unknown', model: null, role: null },
+		right: { status: 'unknown', model: null, role: null }
+	};
+
 	const NONE_LISTED: Sides = {
 		left: { status: 'not-found', model: null, role: null },
 		right: { status: 'not-found', model: null, role: null }
@@ -161,14 +183,55 @@
 		}
 	}
 
-	// One refresh: the devices from `list`, then the kind. A failed list that
-	// is not a dead session reads as no camera listed; `list` rejecting with
-	// `keepOnFailure` (a failed reconnect) leaves the view as it was.
+	// The armed wait of the refresh on screen, and the listener of a wait
+	// that fell due while the document was hidden.
+	let retryTimer: unknown = null;
+	let retryOnVisible: (() => void) | null = null;
+
+	function cancelRetry() {
+		if (retryTimer !== null) getDeviceRetryScheduler().clearTimeout(retryTimer);
+		retryTimer = null;
+		if (retryOnVisible) document.removeEventListener('visibilitychange', retryOnVisible);
+		retryOnVisible = null;
+	}
+
+	// One read of the device list at a time: the next is armed only after
+	// this one has answered.
+	function retryAfter(gen: number, attempt: number) {
+		retryTimer = getDeviceRetryScheduler().setTimeout(() => {
+			retryTimer = null;
+			if (gen !== refreshGen) return;
+			const read = () => void readDevices(gen, attempt + 1, () => camerasApi.listDevices());
+			if (document.visibilityState !== 'hidden') return read();
+			retryOnVisible = () => {
+				if (document.visibilityState === 'hidden') return;
+				cancelRetry();
+				if (gen === refreshGen) read();
+			};
+			document.addEventListener('visibilitychange', retryOnVisible);
+		}, DEVICE_RETRY_DELAYS_MS[attempt]);
+	}
+
+	// One refresh: the devices from `list`, then the kind; a list that is
+	// not complete is read again (see the header). A failed list that is not
+	// a dead session counts as not complete, and after the last read as no
+	// camera listed; `list` rejecting with `keepOnFailure` (a failed
+	// reconnect) leaves the view as it was.
 	async function refreshCameras(list: () => Promise<CameraDevice[]>, keepOnFailure = false) {
 		const gen = ++refreshGen;
-		let sides: Sides;
+		cancelRetry();
+		await readDevices(gen, 0, list, keepOnFailure);
+	}
+
+	async function readDevices(
+		gen: number,
+		attempt: number,
+		list: () => Promise<CameraDevice[]>,
+		keepOnFailure = false
+	) {
+		let devices: CameraDevice[] | null;
 		try {
-			sides = sidesOf(await list());
+			devices = await list();
 		} catch (err) {
 			if (gen !== refreshGen) return;
 			if (keepOnFailure) {
@@ -179,14 +242,26 @@
 			}
 			// A dead login is not a hardware failure; apiRequest redirects (NEH-64).
 			if (err instanceof AuthError && err.status === 401) return;
-			sides = NONE_LISTED;
+			devices = null;
 		}
 		if (gen !== refreshGen) return;
+		const complete = devices !== null && isDeviceListComplete(devices, 'double');
+		if (!complete && attempt < DEVICE_RETRY_DELAYS_MS.length) {
+			view = { sides: NOT_KNOWN, kind: null, settled: false };
+			retryAfter(gen, attempt);
+			return;
+		}
+		const sides = devices ? sidesOf(devices) : NONE_LISTED;
 		view = { sides, kind: null, settled: false };
 		const kind = await readKind();
 		if (gen !== refreshGen) return;
 		view = { sides, kind, settled: true };
 	}
+
+	onDestroy(() => {
+		refreshGen++;
+		cancelRetry();
+	});
 
 	// A row names its camera from the confirmed set-up: role `right` (the
 	// odd/recto page) is the left camera, role `left` the right camera.

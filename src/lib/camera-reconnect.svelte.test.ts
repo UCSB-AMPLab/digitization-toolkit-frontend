@@ -18,6 +18,8 @@ import Dashboard from '../routes/(dashboard)/dashboard/+page.svelte';
 import CameraControls from '../routes/live-preview/CameraControls.svelte';
 import { camerasApi, projectsApi, collectionsApi, recordsApi, type CameraDevice } from './api';
 import { locale } from './i18n';
+import { setDeviceRetryScheduler } from './camera-orientation';
+import { immediateScheduler } from '../routes/(dashboard)/dashboard/overview-fixtures';
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
@@ -39,8 +41,12 @@ beforeEach(() => {
 	vi.spyOn(collectionsApi, 'count').mockResolvedValue(0);
 	vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
 	vi.spyOn(camerasApi, 'getCapabilities').mockRejectedValue(new Error('not needed'));
+	// The Overview reads an empty device list again before it shows the
+	// no-camera notice (NEH-422); here those reads take no time.
+	setDeviceRetryScheduler(immediateScheduler);
 });
 afterEach(() => {
+	setDeviceRetryScheduler();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
