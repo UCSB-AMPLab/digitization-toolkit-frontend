@@ -46,180 +46,24 @@ afterEach(() => {
 });
 
 describe('reconnect screen wiring', () => {
-	it.each(['initial-first', 'reconnect-first'])(
-		'dashboard retains the successful reconnect: %s',
-		async (order) => {
-			const initial = deferred<CameraDevice[]>();
-			const rescan = deferred<CameraDevice[]>();
-			vi.spyOn(camerasApi, 'listDevices').mockReturnValue(initial.promise);
-			vi.spyOn(camerasApi, 'rescan').mockReturnValue(rescan.promise);
-			const screen = render(Dashboard);
-			await screen.getByRole('button', { name: 'Reconnect cameras' }).click();
-			if (order === 'initial-first') {
-				initial.resolve([]);
-				await tick();
-			}
-			rescan.resolve(devices);
-			await expect.element(screen.getByText('Recovered right', { exact: true })).toBeVisible();
-			if (order === 'reconnect-first') {
-				initial.resolve([]);
-				await initial.promise;
-				await tick();
-			}
-			await expect.element(screen.getByText('Recovered left', { exact: true })).toBeVisible();
-			await expect.element(screen.getByText('Recovered right', { exact: true })).toBeVisible();
-		}
-	);
-
-	it.each(['preview-first', 'reconnect-first'])(
-		'dashboard ignores a 404 from during reconnect: %s',
-		async (order) => {
-			vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
-			const rescan = deferred<CameraDevice[]>();
-			vi.spyOn(camerasApi, 'rescan').mockReturnValue(rescan.promise);
-			const preview = deferred<Response>();
-			vi.stubGlobal(
-				'fetch',
-				vi.fn(() => preview.promise)
-			);
-			const screen = render(Dashboard);
-			await expect.element(screen.getByText('Recovered left', { exact: true })).toBeVisible();
-			await screen.getByRole('button', { name: 'Reconnect cameras' }).click();
-			await screen.getByRole('button', { name: /Camera 1/ }).click();
-			await screen.getByRole('button', { name: 'Test', exact: true }).click();
-			expect(fetch).toHaveBeenCalled();
-			if (order === 'preview-first') {
-				preview.resolve(new Response('', { status: 404 }));
-				await tick();
-			}
-			rescan.resolve(devices);
-			await expect.element(screen.getByRole('button', { name: 'Reconnect cameras' })).toBeEnabled();
-			if (order === 'reconnect-first') {
-				preview.resolve(new Response('', { status: 404 }));
-				await preview.promise;
-				await tick();
-			}
-			await expect
-				.element(screen.getByRole('button', { name: /Camera 1/ }))
-				.toHaveTextContent('OK');
-		}
-	);
-
-	it('a one-side 404 leaves the other side unknown', async () => {
-		vi.spyOn(camerasApi, 'listDevices').mockReturnValue(new Promise(() => {}));
-		vi.stubGlobal(
-			'fetch',
-			vi.fn(async () => new Response('', { status: 404 }))
-		);
-		const screen = render(Dashboard);
-		await screen.getByRole('button', { name: /Camera 1/ }).click();
-		await screen.getByRole('button', { name: 'Test', exact: true }).click();
-		expect(fetch).toHaveBeenCalled();
-		await expect
-			.element(screen.getByRole('button', { name: /Camera 1/ }))
-			.toHaveTextContent('Not detected');
-		await expect
-			.element(screen.getByRole('button', { name: /Camera 2/ }))
-			.not.toHaveTextContent('Not detected');
-	});
-
-	it('an accepted preview 404 survives the initial list; a fresh list fills the other side', async () => {
-		const initial = deferred<CameraDevice[]>();
-		const fresh = deferred<CameraDevice[]>();
-		const list = vi
-			.spyOn(camerasApi, 'listDevices')
-			.mockReturnValueOnce(initial.promise)
-			.mockReturnValueOnce(fresh.promise);
-		vi.stubGlobal(
-			'fetch',
-			vi.fn(async () => new Response('', { status: 404 }))
-		);
-		const screen = render(Dashboard);
-		const left = screen.getByRole('button', { name: /Camera 1/ });
-		await left.click();
-		await screen.getByRole('button', { name: 'Test', exact: true }).click();
-		await expect.element(left).toHaveTextContent('Not detected');
-		initial.resolve(devices);
-		await expect.poll(() => list.mock.calls.length).toBe(2);
-		await expect.element(left).toHaveTextContent('Not detected');
-		fresh.resolve([devices[1]]);
-		await expect.element(screen.getByText('Recovered right', { exact: true })).toBeVisible();
-		await expect.element(left).toHaveTextContent('Not detected');
-		await expect.element(screen.getByRole('button', { name: 'Test', exact: true })).toBeVisible();
-	});
-
+	// The Overview keeps only the reconnect of its camera block (NEH-350): the
+	// preview, Focus and test capture went to the camera check, with their
+	// tests. With no camera listed, the notice and the block each have a
+	// Reconnect; the block's states a failure under its buttons.
 	it('dashboard reports reconnect failure and permits a retry', async () => {
 		vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([]);
 		vi.spyOn(camerasApi, 'rescan')
 			.mockRejectedValueOnce(new Error('USB unavailable'))
 			.mockResolvedValueOnce(devices);
 		const screen = render(Dashboard);
-		const reconnect = screen.getByRole('button', { name: 'Reconnect cameras' });
+		const block = screen.getByRole('region', { name: 'Cameras' });
+		const reconnect = block.getByRole('button', { name: 'Reconnect cameras' });
 		await reconnect.click();
-		await expect.element(screen.getByRole('status')).toHaveTextContent('USB unavailable');
+		await expect.element(block.getByRole('status')).toHaveTextContent('USB unavailable');
 		await expect.element(reconnect).toBeEnabled();
 		await reconnect.click();
 		await expect.element(screen.getByText('Recovered left', { exact: true })).toBeVisible();
-		await expect.element(screen.getByRole('status')).not.toBeInTheDocument();
-	});
-
-	it('dashboard reports a failed focus on the camera status line', async () => {
-		vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
-		vi.spyOn(camerasApi, 'calibrate').mockRejectedValue(new Error('Capture system not available'));
-		const screen = render(Dashboard);
-		await screen.getByRole('button', { name: /Camera 1/ }).click();
-		await screen.getByRole('button', { name: 'Focus', exact: true }).click();
-		await expect.element(screen.getByRole('status')).toHaveTextContent('Could not focus');
-	});
-
-	it('dashboard ignores a preview failure requested during reconnect', async () => {
-		vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
-		const rescan = deferred<CameraDevice[]>();
-		vi.spyOn(camerasApi, 'rescan').mockReturnValue(rescan.promise);
-		const preview = deferred<Response>();
-		vi.stubGlobal(
-			'fetch',
-			vi.fn(() => preview.promise)
-		);
-		const screen = render(Dashboard);
-		await expect.element(screen.getByText('Recovered left', { exact: true })).toBeVisible();
-		await screen.getByRole('button', { name: 'Reconnect cameras' }).click();
-		await screen.getByRole('button', { name: /Camera 1/ }).click();
-		await screen.getByRole('button', { name: 'Test', exact: true }).click();
-		rescan.resolve(devices);
-		await expect.element(screen.getByRole('button', { name: 'Reconnect cameras' })).toBeEnabled();
-		preview.resolve(new Response('', { status: 503 }));
-		await preview.promise;
-		await tick();
-		// Well inside the 2.5 s poll, so no fresh request has answered yet.
-		await new Promise((r) => setTimeout(r, 100));
-		expect(screen.getByText('Could not show the live preview').elements()).toHaveLength(0);
-	});
-
-	it('a focus failure after a failed test capture replaces it on the status line', async () => {
-		vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
-		vi.spyOn(camerasApi, 'testCapture').mockRejectedValue(new Error('boom'));
-		vi.spyOn(camerasApi, 'calibrate').mockRejectedValue(new Error('Capture system not available'));
-		const screen = render(Dashboard);
-		await screen.getByRole('button', { name: /Camera 1/ }).click();
-		await screen.getByRole('button', { name: 'Capture', exact: true }).click();
-		await expect.element(screen.getByRole('status')).toHaveTextContent('Test capture failed');
-		await screen.getByRole('button', { name: 'Focus', exact: true }).click();
-		await expect.element(screen.getByRole('status')).toHaveTextContent('Could not focus');
-	});
-
-	it('dashboard reports a failed preview and clears it when a frame arrives', async () => {
-		vi.spyOn(camerasApi, 'listDevices').mockResolvedValue(devices);
-		const fetchMock = vi.fn(async () => new Response('', { status: 503 }));
-		vi.stubGlobal('fetch', fetchMock);
-		const screen = render(Dashboard);
-		await screen.getByRole('button', { name: /Camera 1/ }).click();
-		await screen.getByRole('button', { name: 'Test', exact: true }).click();
-		await expect
-			.element(screen.getByRole('status'))
-			.toHaveTextContent('Could not show the live preview');
-		await screen.getByRole('button', { name: 'Stop', exact: true }).click();
-		await expect.element(screen.getByRole('status')).not.toBeInTheDocument();
+		await expect.element(block.getByRole('status')).not.toBeInTheDocument();
 	});
 
 	it.each(['initial-first', 'reconnect-first'])(

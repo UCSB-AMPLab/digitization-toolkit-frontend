@@ -1,7 +1,7 @@
-// NEH-379: the Overview's camera panels name each camera from the confirmed
+// NEH-379: the Overview's camera rows name each camera from the confirmed
 // set-up, which the device list carries per camera: the camera with role
 // `right` (the odd/recto page) is the left camera, the one with role `left`
-// the right camera. Without a confirmed set-up the panels say "Camera 1"
+// the right camera. Without a confirmed set-up the rows say "Camera 1"
 // and "Camera 2", by index.
 //
 // Version: 0.3.0
@@ -32,7 +32,9 @@ function device(index: number, over: Partial<CameraDevice> = {}): CameraDevice {
 }
 
 const names = () => [...document.querySelectorAll('.cam-name')].map((n) => n.textContent?.trim());
-const hint = () => document.querySelector('.cam-hint')?.textContent ?? '';
+// The missing-camera notice's sentence, in "Needs attention".
+const hint = () =>
+	document.querySelector('[data-attention-notice] .notice-body')?.textContent ?? '';
 
 beforeEach(() => {
 	authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
@@ -89,9 +91,9 @@ describe('Overview: camera names', () => {
 	});
 });
 
-// NEH-351: the camera section links to the capture screen's set-up view with
+// NEH-351: the camera block links to the capture screen's set-up view with
 // the camera check open, for admin and operator; a reviewer has no camera
-// section, and the testing account has an Overview of its own.
+// block, and the testing account has an Overview of its own.
 describe('Overview: Check cameras', () => {
 	const link = () =>
 		[...document.querySelectorAll<HTMLAnchorElement>('a')].find((a) =>
@@ -99,7 +101,7 @@ describe('Overview: Check cameras', () => {
 		);
 
 	for (const role of ['admin', 'operator'] as const) {
-		it(`${role}: the camera section links to the camera check with no volume`, async () => {
+		it(`${role}: the camera block links to the camera check with no volume`, async () => {
 			locale.set('es');
 			authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
 			vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([device(0), device(1)]);

@@ -214,7 +214,6 @@
 
 <style>
 	.activity {
-		margin-bottom: 36px;
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
@@ -250,7 +249,7 @@
 		border: 1px solid var(--border-color);
 	}
 	.act-switch button {
-		min-height: 36px;
+		min-height: var(--touch-target-min);
 		padding: 0 16px;
 		border: none;
 		border-radius: var(--radius-full);

@@ -63,24 +63,25 @@ describe('Overview, testing account', () => {
 		await expect
 			.element(page.getByRole('link', { name: en.testing_overview_go }))
 			.toHaveAttribute('href', '/dashboard/projects');
-		await new Promise((r) => setTimeout(r, 150));
+		// The counts are drawn from the last requests this Overview makes; every
+		// request made on mount was recorded before they could be.
 		expect(rec.refusedList()).toEqual([]);
 		expect(screen.container.querySelector('.kpi-grid')).toBeNull();
-		expect(screen.container.textContent).not.toContain(en.dash_test_cameras);
-		expect(screen.container.textContent).not.toContain(en.dash_subtitle_reviewer);
+		expect(screen.container.querySelector('[data-camera-block]')).toBeNull();
+		expect(screen.container.textContent).not.toContain(en.dash_subtitle_no_cameras);
 		expect(screen.container.querySelector('[role="alert"]')).toBeNull();
 	});
 });
 
 describe('Overview, operator, unchanged', () => {
-	it('reads the retake summary, storage and activity and shows the camera panels', async () => {
+	it('reads the retake summary, storage and activity and shows the camera block', async () => {
 		authStore.setSession({ id: 5, username: 'op', email: null, role: 'operator', is_active: true });
 		serve();
 		const screen = render(Overview);
 		await expect.poll(() => rec.to('GET /records/to-retake/summary').length).toBe(1);
 		await expect.poll(() => rec.to('GET /system/storage').length).toBeGreaterThan(0);
 		await expect.poll(() => rec.to('GET /activity/daily').length).toBeGreaterThan(0);
-		await expect.poll(() => screen.container.textContent).toContain(en.dash_test_cameras);
+		await expect.poll(() => screen.container.textContent).toContain(en.camcheck_details_title);
 		expect(screen.container.textContent).not.toContain(en.testing_overview_title);
 	});
 });

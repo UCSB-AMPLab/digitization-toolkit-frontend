@@ -48,8 +48,8 @@
 	} from '$lib/api';
 	// The overview's banner reads the figures the same way and uses the same threshold.
 	import {
-		formatStorage,
 		reserveGB,
+		storageSize,
 		storageUsage,
 		STORAGE_ALERT_THRESHOLD
 	} from '$lib/storage-usage';
@@ -392,7 +392,7 @@
 					<span class="row-value muted">{$m.common_loading_ellipsis}</span>
 				{:else if usage}
 					<span class="row-value" class:alert-text={storageAlert} data-storage-used>
-						{formatStorage(usage.usedGB)} / {formatStorage(usage.totalGB)}
+						{storageSize(usage.usedGB, $locale)} / {storageSize(usage.totalGB, $locale)}
 					</span>
 				{:else}
 					<span class="row-value muted" data-storage-used>—</span>

@@ -1836,6 +1836,10 @@ export interface CameraDevice {
 	role_confirmed?: boolean;
 	role_guess?: CameraRole | null;
 	role_guess_source?: string | null;
+	// Why this body may not capture, in the backend's English (two bodies on
+	// one parity, a body with no identity); null when it is ready. Absent
+	// from a backend that predates it.
+	error?: string | null;
 }
 
 // NEH-342: the page a camera photographs.

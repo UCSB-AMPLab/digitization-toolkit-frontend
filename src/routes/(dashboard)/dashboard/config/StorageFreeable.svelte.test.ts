@@ -209,7 +209,7 @@ describe('Settings > Storage per role (NEH-380)', () => {
 		]);
 		await expect
 			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
-			.toBe('40 GB / 100 GB');
+			.toBe('42.9\u00a0GB / 107\u00a0GB');
 		await expect.poll(() => rows(container)).toEqual(['Tomo grande', 'Tomo chico']);
 		expect(container.textContent).toContain(en.config_storage_reserve('2'));
 		expect(container.textContent).not.toContain(en.config_storage_primary);
@@ -309,7 +309,7 @@ describe('the list of volumes that can be freed (NEH-380)', () => {
 		await expect.poll(() => rows(container)).toEqual(['Tomo grande', 'Tomo chico']);
 		await expect
 			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
-			.toBe('90 GB / 100 GB');
+			.toBe('96.6\u00a0GB / 107\u00a0GB');
 
 		await browserPage
 			.getByRole('button', { name: en.config_freeable_free_aria('Tomo grande') })
@@ -329,7 +329,7 @@ describe('the list of volumes that can be freed (NEH-380)', () => {
 		await expect.poll(() => rows(container)).toEqual(['Tomo chico']);
 		await expect
 			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
-			.toBe('87 GB / 100 GB');
+			.toBe('93.4\u00a0GB / 107\u00a0GB');
 		// The dialog with the job's result stays open while the list changes under it.
 		await expect.element(dialog.getByText(en.offsite_free_done_title)).toBeVisible();
 		expect(served.calls.filter((c) => c === 'GET /system/storage/freeable')).toHaveLength(2);
@@ -369,7 +369,7 @@ describe('the section watches a free it started (NEH-380)', () => {
 			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim(), {
 				timeout: 15000
 			})
-			.toBe('87 GB / 100 GB');
+			.toBe('93.4\u00a0GB / 107\u00a0GB');
 		// The re-read came after the job's end was read.
 		const lastJob = served.calls.lastIndexOf('GET /collections/11/offsite/jobs/j1');
 		const lastList = served.calls.lastIndexOf('GET /system/storage/freeable');
@@ -396,11 +396,11 @@ describe('the section watches a free it started (NEH-380)', () => {
 			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim(), {
 				timeout: 15000
 			})
-			.toBe('87 GB / 100 GB');
+			.toBe('93.4\u00a0GB / 107\u00a0GB');
 		releaseFirst(json(200, storage(90, 100)));
 		await new Promise((r) => setTimeout(r, 200));
 		expect(container.querySelector('[data-storage-used]')?.textContent?.trim()).toBe(
-			'87 GB / 100 GB'
+			'93.4\u00a0GB / 107\u00a0GB'
 		);
 	}, 30000);
 });
@@ -465,7 +465,7 @@ describe('the section knows the work in progress from the unit (NEH-380)', () =>
 			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim(), {
 				timeout: 20000
 			})
-			.toBe('87 GB / 100 GB');
+			.toBe('93.4\u00a0GB / 107\u00a0GB');
 	}, 40000);
 
 	it('coming back after the job ended: the list and usage are read fresh', async () => {
@@ -482,7 +482,7 @@ describe('the section knows the work in progress from the unit (NEH-380)', () =>
 		const { container } = render(ConfigPage);
 		await expect
 			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
-			.toBe('90 GB / 100 GB');
+			.toBe('96.6\u00a0GB / 107\u00a0GB');
 		at('diagnostics');
 		await expect
 			.element(browserPage.getByRole('heading', { name: en.config_section_diagnostics, level: 2 }))
@@ -493,6 +493,6 @@ describe('the section knows the work in progress from the unit (NEH-380)', () =>
 		await expect.poll(() => rows(container)).toEqual(['Tomo chico']);
 		await expect
 			.poll(() => container.querySelector('[data-storage-used]')?.textContent?.trim())
-			.toBe('87 GB / 100 GB');
+			.toBe('93.4\u00a0GB / 107\u00a0GB');
 	}, 30000);
 });

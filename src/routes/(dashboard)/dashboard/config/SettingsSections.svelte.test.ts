@@ -279,7 +279,7 @@ describe('Settings sections', () => {
 			.poll(() =>
 				container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()
 			)
-			.toBe('40 GB / 100 GB');
+			.toBe('42.9 GB / 107 GB');
 		const calls = (suffix: string) =>
 			fetchSpy.mock.calls.filter(([input]) =>
 				String(input instanceof Request ? input.url : input).endsWith(suffix)
@@ -294,7 +294,7 @@ describe('Settings sections', () => {
 			.poll(() =>
 				container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()
 			)
-			.toBe('40 GB / 100 GB');
+			.toBe('42.9 GB / 107 GB');
 		// Read afresh on return (NEH-380): the section shows what the unit holds now.
 		await expect.poll(() => calls('/system/storage')).toBe(2);
 		expect(calls('/cameras/capabilities')).toBe(1);
@@ -316,7 +316,7 @@ describe('Settings sections', () => {
 			.poll(() =>
 				container.querySelector('[data-storage-used]')?.textContent?.replace(/\s+/g, ' ').trim()
 			)
-			.toBe('40 GB / 100 GB');
+			.toBe('42.9 GB / 107 GB');
 		expect(calls('/system/storage')).toBe(1);
 		expect(calls('/cameras/capabilities')).toBe(1);
 	});

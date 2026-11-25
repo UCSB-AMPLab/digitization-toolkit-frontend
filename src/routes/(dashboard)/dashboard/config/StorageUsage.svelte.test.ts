@@ -19,6 +19,7 @@ vi.mock('$app/stores', async () => {
 });
 
 import { authStore } from '$lib/stores/auth';
+import { locale } from '$lib/i18n';
 import ConfigPage from './+page.svelte';
 
 const GIB = 1024 ** 3;
@@ -68,10 +69,12 @@ afterEach(() => {
 
 describe('Configuración storage usage', () => {
 	it('shows the reported figures, the bar and the alert at 85%', async () => {
+		locale.set('en');
 		serve(json(200, storage(51, 60)));
 		const { container } = render(ConfigPage);
 		const row = await usageRow(container);
-		expect(row.textContent).toContain('51 GB / 60 GB');
+		// Decimal units, as the Overview's storage notice writes the same disk.
+		expect(row.textContent).toContain('54.8\u00a0GB / 64.4\u00a0GB');
 		expect(container.querySelector('.storage-bar-fill')).not.toBeNull();
 		expect(container.querySelector('.storage-alert')?.textContent).toContain('85%');
 	});
@@ -84,7 +87,7 @@ describe('Configuración storage usage', () => {
 		expect(container.querySelector('.storage-bar-fill')).toBeNull();
 		expect(container.querySelector('.storage-alert')).toBeNull();
 		expect(container.textContent).not.toContain('NaN');
-		expect(container.textContent).not.toContain('0 GB / 0 GB');
+		expect(container.textContent).not.toContain('0\u00a0B / 0\u00a0B');
 	});
 
 	it('shows no figures, no bar and no alert when the request fails', async () => {
@@ -95,6 +98,6 @@ describe('Configuración storage usage', () => {
 		expect(container.querySelector('.storage-bar-fill')).toBeNull();
 		expect(container.querySelector('.storage-alert')).toBeNull();
 		expect(container.textContent).not.toContain('NaN');
-		expect(container.textContent).not.toContain('0 GB / 0 GB');
+		expect(container.textContent).not.toContain('0\u00a0B / 0\u00a0B');
 	});
 });
