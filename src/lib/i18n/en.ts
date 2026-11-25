@@ -1093,8 +1093,8 @@ export const en: Messages = {
 		'How the page is oriented, how much light comes in, and the format it is saved in.',
 	cam_section_focus: 'Focus',
 	cam_section_focus_info: 'Adjust so the image comes out sharp.',
-	cam_section_settings: 'Colour and exposure',
-	cam_section_settings_info: 'Adjust so the document looks the colour it really is.',
+	cam_section_settings: 'Color and exposure',
+	cam_section_settings_info: 'Adjust so the document looks the color it really is.',
 	cam_live_controls_unavailable: 'Appear when a connected camera supports them.',
 	cam_capabilities_failed:
 		'The capture system is not available, so these controls cannot be shown. Press "Reconnect cameras"; if nothing changes, restart the unit.',
@@ -1225,8 +1225,8 @@ export const en: Messages = {
 	lv_needs_stem: 'This volume needs a stem before you can capture into it.',
 	lv_needs_stem_link: 'Assign the stem',
 	lv_err_no_volume: 'Choose a volume before capturing',
-	lv_err_volume_not_found: 'This volume is no longer in the catalogue',
-	lv_err_record_not_found: 'This record is no longer in the catalogue',
+	lv_err_volume_not_found: 'This volume is no longer in the catalog',
+	lv_err_record_not_found: 'This record is no longer in the catalog',
 	lv_err_retake_volume: 'A record can be retaken only in its own volume',
 	lv_err_retake_mode: (mode: 'single' | 'dual') =>
 		mode === 'dual'
@@ -1384,7 +1384,7 @@ export const en: Messages = {
 		`${side === 'left' ? 'Right camera · even/verso' : 'Left camera · odd/recto'}: actual size (1:1)`,
 	camcheck_discarded: 'Captua does not save test captures to the volume.',
 	camcheck_right_page_hint:
-		'The image labelled odd/recto must show the page on the right of the open volume.',
+		'The image labeled odd/recto must show the page on the right of the open volume.',
 	camcheck_take: 'Take test captures',
 	camcheck_viewer_title: 'Test captures at full size',
 	camcheck_viewer_hint: 'Drag a capture to move both. Check that the text is sharp on both pages.',
@@ -1453,21 +1453,21 @@ export const en: Messages = {
 	// ── Offsite catalogue copy (NEH-266) ─────────────────────────────────────
 	backup_ind_current: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
 		day === 'today'
-			? 'Catalogue copied today'
+			? 'Catalog copied today'
 			: day === 'yesterday'
-				? 'Catalogue copied yesterday'
-				: `Catalogue copied on ${date}`,
+				? 'Catalog copied yesterday'
+				: `Catalog copied on ${date}`,
 	backup_ind_stale: (day: 'today' | 'yesterday' | 'earlier', date: string) =>
-		day === 'yesterday' ? 'No catalogue copy since yesterday' : `No catalogue copy since ${date}`,
-	backup_ind_never: 'No verified catalogue copy',
+		day === 'yesterday' ? 'No catalog copy since yesterday' : `No catalog copy since ${date}`,
+	backup_ind_never: 'No verified catalog copy',
 	backup_ind_off: 'Offsite copy not configured',
-	backup_ind_local: 'Catalogue on the scanner only',
+	backup_ind_local: 'Catalog on the scanner only',
 	backup_ind_unknown: 'Could not check the state of the offsite copy',
 	backup_section_title: 'Offsite copy',
 	backup_section_desc:
-		'Once a day, Captua copies the catalogue to the destination configured when the scanner was installed, and verifies that the copy is complete.',
+		'Once a day, Captua copies the catalog to the destination configured when the scanner was installed, and verifies that the copy is complete.',
 	backup_section_catalogue:
-		'The catalogue is the database that links each image to its project, its volume and its place in that volume.',
+		'The catalog is the database that links each image to its project, its volume and its place in that volume.',
 	backup_section_scope: 'This copy does not include the image files.',
 	backup_cfg_current: (day: 'today' | 'yesterday' | 'earlier', date: string, time: string) => {
 		if (day === 'today') return `Copy verified today at ${time}.`;
@@ -1481,7 +1481,7 @@ export const en: Messages = {
 	backup_cfg_never: 'No copy has been verified yet.',
 	backup_cfg_retry: 'While the scanner is on, Captua retries the copy from time to time.',
 	backup_cfg_off: 'The offsite copy is not configured on this scanner.',
-	backup_cfg_local: 'In the current mode, Captua keeps the catalogue only on this scanner.',
+	backup_cfg_local: 'In the current mode, Captua keeps the catalog only on this scanner.',
 	backup_cfg_unknown: 'Could not check the state of the offsite copy.',
 	backup_cfg_last_file: 'File of the last copy',
 	backup_cfg_locked: 'This is set up when the scanner is installed and cannot be changed here.',
@@ -1634,7 +1634,7 @@ export const en: Messages = {
 	fisqua_cfg_token:
 		'Fisqua does not accept the token configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct CAPTUA_FISQUA_TOKEN and restart Captua.',
 	fisqua_cfg_not_found:
-		'Fisqua does not recognise the address configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct CAPTUA_FISQUA_ENV, CAPTUA_FISQUA_BASE_URL or CAPTUA_OFFSITE_TENANT and restart Captua.',
+		'Fisqua does not recognize the address configured on this scanner, so Captua has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct CAPTUA_FISQUA_ENV, CAPTUA_FISQUA_BASE_URL or CAPTUA_OFFSITE_TENANT and restart Captua.',
 	fisqua_cfg_redirect:
 		'The Fisqua address configured on this scanner redirects to another address. Captua does not follow it, so that the token is not sent elsewhere, and has stopped sending volumes to Fisqua and checking their status. Ask whoever manages the scanner to correct CAPTUA_FISQUA_ENV or CAPTUA_FISQUA_BASE_URL and restart Captua.',
 	fisqua_cfg_version:
@@ -1820,16 +1820,16 @@ export const en: Messages = {
 		n === 1 ? '1 file, for another reason.' : `${formatCount(n, 'en')} files, for other reasons.`,
 
 	// ── Cola: imported digitisation lists (0.2.0) ────────────────────────────
-	queue_title: 'Digitisation queue',
-	queue_subtitle: "The items of the imported digitisation lists, in the list's order.",
+	queue_title: 'Digitization queue',
+	queue_subtitle: "The items of the imported digitization lists, in the list's order.",
 	queue_import: 'Import list',
 	queue_importing: 'Importing…',
-	queue_import_file_label: 'Digitisation list file',
+	queue_import_file_label: 'Digitization list file',
 	queue_list_label: 'List',
 	queue_list_option: (name: string, date: string) => `${name}, imported ${date}`,
 	queue_imported_at: (date: string) => `Imported ${date}`,
 	queue_empty:
-		'No lists have been imported yet. Import a digitisation list to see its items here in order.',
+		'No lists have been imported yet. Import a digitization list to see its items here in order.',
 	queue_list_file_missing:
 		"Captua has no copy of this list's file, so it cannot show the list's items. Import the file again to see them.",
 	queue_load_error: 'The queue could not be loaded.',
@@ -1837,7 +1837,7 @@ export const en: Messages = {
 	queue_filter_all: 'All',
 	queue_action_spot_recapture: 'Spot recapture',
 	queue_action_full_rescan: 'Full rescan',
-	queue_action_full_digitisation: 'Full digitisation',
+	queue_action_full_digitisation: 'Full digitization',
 	queue_action_complete: 'Completion',
 	queue_next: 'Next',
 	queue_done: 'Finished',
@@ -1904,7 +1904,7 @@ export const en: Messages = {
 	queue_import_err_list_reused:
 		'A list with this id was already imported from a different file, or Captua could not check the earlier import, so Captua did not import this one.',
 	queue_import_err_too_large: 'The file is larger than 10 MB.',
-	queue_import_err_refused: 'The file is not a digitisation list Captua can import.',
+	queue_import_err_refused: 'The file is not a digitization list Captua can import.',
 	queue_import_err_busy: 'Captua could not import the list just now. Try again.',
 	queue_import_err_other: 'Captua could not import the list.',
 	// ── The Fisqua queue in Cola (contract 1.7) ──────────────────────────────
@@ -2044,9 +2044,9 @@ export const en: Messages = {
 	section_progress_sub: 'Volumes whose capture has already started on this unit.',
 	section_rework_title: (n: number) => `${ordinalEn(n)}: recaptures and rescans`,
 	section_rework_sub:
-		'Volumes with page pairs to recapture, then the ones to digitise again in full.',
+		'Volumes with page pairs to recapture, then the ones to digitize again in full.',
 	section_new_title: (n: number) => `${ordinalEn(n)}: new material`,
-	section_new_sub: 'Volumes never digitised before.',
+	section_new_sub: 'Volumes never digitized before.',
 	q_new_locked: 'To start a new volume, first finish the retakes of one volume.',
 	turn_recap_title: 'Retake turn',
 	turn_recap_body: 'Finish the retakes of one volume and you can start a new one.',
@@ -2100,9 +2100,9 @@ export const en: Messages = {
 		'Decides what leaves this unit and where its volumes come from. Changing it moves no volume or record.',
 	unit_mode_legend: 'Mode',
 	unit_mode_offline_desc:
-		'Captua keeps the images and the catalogue only on this unit. Volumes are created here.',
+		'Captua keeps the images and the catalog only on this unit. Volumes are created here.',
 	unit_mode_backup_desc:
-		'Images and the catalogue are copied to the bucket. Volumes are created here.',
+		'Images and the catalog are copied to the bucket. Volumes are created here.',
 	unit_mode_fisqua_desc:
 		"Volumes come from Fisqua's queue. Handovers, status and review decisions go over the link. Operators can't create volumes; an administrator can, and each change is logged.",
 	unit_current: 'Current mode',
@@ -2119,7 +2119,7 @@ export const en: Messages = {
 	unit_problem_offsite_not_configured:
 		'The offsite copy of the images is not configured on this unit. It is set when the unit is provisioned.',
 	unit_problem_catalogue_dump_not_configured:
-		"The catalogue's offsite copy is not configured or has no encryption key. It is set when the unit is provisioned.",
+		"The catalog's offsite copy is not configured or has no encryption key. It is set when the unit is provisioned.",
 	unit_problem_fisqua_not_configured:
 		'The link to Fisqua is not configured on this unit. It is set when the unit is provisioned.',
 	unit_problem_fisqua_unreachable:
@@ -2128,7 +2128,7 @@ export const en: Messages = {
 		'The offsite copy is on hold on this unit, so nothing can be sent to Fisqua until the hold is lifted.',
 	unit_problem_mode_changed:
 		"Someone else changed the unit's settings meanwhile. Captua has read them again: check the mode and try again.",
-	unit_problem_other: "Captua couldn't change the mode, for a reason it doesn't recognise.",
+	unit_problem_other: "Captua couldn't change the mode, for a reason it doesn't recognize.",
 	// Leaving "Scanner only" with volumes Captua keeps on the unit (NEH-320).
 	unit_problem_kept_volumes_decision:
 		'Captua keeps volumes made in "Scanner only" mode on this unit. Choose whether Captua includes them or keeps them here.',
@@ -2136,7 +2136,7 @@ export const en: Messages = {
 	unit_kept_body: (label: string) =>
 		`Captua keeps these volumes, made in "Scanner only" mode, on this unit. Choose whether Captua includes them in "${label}" mode or keeps them here.`,
 	unit_kept_catalogue:
-		'If you choose to keep them here, Captua copies their records with the catalogue and keeps their images only on this unit.',
+		'If you choose to keep them here, Captua copies their records with the catalog and keeps their images only on this unit.',
 	unit_kept_files: (n: number) => (n === 1 ? '1 file' : `${formatCount(n, 'en')} files`),
 	unit_kept_include: 'Include them',
 	unit_kept_keep: 'Keep them here',
@@ -2370,7 +2370,7 @@ export const en: Messages = {
 	fisqua_link_cannot_pair: 'This Fisqua cannot link units by code. Ask whoever installed the unit.',
 	fisqua_link_lost:
 		'Fisqua issued the link, but it did not reach this unit. Get a new code and approve it again.',
-	fisqua_link_unknown: 'Fisqua does not recognise this code. Get a new code.',
+	fisqua_link_unknown: 'Fisqua does not recognize this code. Get a new code.',
 	fisqua_link_wrong_env: 'Fisqua answered from a different environment. Captua changed nothing.',
 	fisqua_link_other_workspace: (tenant: string | null) =>
 		`${tenant ? `This unit is linked to ${tenant}.` : 'This unit is already linked to a workspace.'} A linked unit can only be linked again to the workspace it already has. To move it to another workspace, ask whoever installed the unit.`,
@@ -2412,7 +2412,7 @@ export const en: Messages = {
 	fisqua_link_shutting_down:
 		'Captua was shutting down and changed nothing. Get a new code once it is running again.',
 	fisqua_link_cancel_failed: 'Captua could not cancel the code. Try again.',
-	fisqua_link_generic: 'Captua could not link the unit, for a reason it does not recognise.',
+	fisqua_link_generic: 'Captua could not link the unit, for a reason it does not recognize.',
 	fisqua_link_err_read:
 		'Captua could not read the state of the link. It tries again every few seconds.',
 	// ── Settings sections and Network (NEH-253) ─────────────────────────────
@@ -2614,14 +2614,14 @@ export const en: Messages = {
 	network_not_received_body: 'Press "Retry" to send it again.',
 
 	// ── Colour card shots (NEH-340) ──────────────────────────────────────────
-	cc_title: 'Colour card',
-	cc_heading: 'Take the colour card shots',
+	cc_title: 'Color card',
+	cc_heading: 'Take the color card shots',
 	cc_reason_start:
-		'This volume has no pages yet. Before capturing the first, take a shot of the colour card with each camera.',
+		'This volume has no pages yet. Before capturing the first, take a shot of the color card with each camera.',
 	cc_reason_begun_without:
-		'This volume already has pages, but no colour card shots. Take them now with each camera.',
+		'This volume already has pages, but no color card shots. Take them now with each camera.',
 	cc_reason_settings_changed:
-		'The camera settings were changed after the last colour card shots. Take them again with each camera.',
+		'The camera settings were changed after the last color card shots. Take them again with each camera.',
 	cc_how:
 		'Place the card under each camera, under the same light as the pages, and take a shot of it.',
 	cc_take: 'Take shot',
@@ -2630,35 +2630,35 @@ export const en: Messages = {
 	cc_no_shot: 'No shot yet',
 	cc_shot_raw: 'The shot was saved. It is a RAW file and cannot be shown here.',
 	cc_shot_unshown: 'The shot was saved, but Captua could not show it here.',
-	cc_shot_alt: (camera: string) => `Colour card shot from ${camera}`,
+	cc_shot_alt: (camera: string) => `Color card shot from ${camera}`,
 	cc_continue: 'Continue',
 	cc_skip: 'Skip',
-	cc_skip_title: 'Skip the colour card shots?',
-	cc_skip_body: 'Captua will put a mark on this volume saying that it has no colour card shots.',
+	cc_skip_title: 'Skip the color card shots?',
+	cc_skip_body: 'Captua will put a mark on this volume saying that it has no color card shots.',
 	cc_skip_confirm: 'Skip the shots',
-	cc_opening: 'Captua is preparing the colour card shots…',
-	cc_needed: 'Take or skip the colour card shots before capturing.',
+	cc_opening: 'Captua is preparing the color card shots…',
+	cc_needed: 'Take or skip the color card shots before capturing.',
 	cc_err_camera_busy: 'This camera is taking another shot. Wait a moment and try again.',
 	cc_err_not_connected: (camera: string) =>
 		`Captua cannot reach ${camera}. Check its cable and try again.`,
 	cc_err_capture_failed: (camera: string) =>
 		`No shot was taken with ${camera}. Try that camera again.`,
 	cc_err_set_gone:
-		'These colour card shots were already taken or skipped on another screen. This screen now shows what the unit holds.',
+		'These color card shots were already taken or skipped on another screen. This screen now shows what the unit holds.',
 	cc_err_shots_missing: 'Before you continue, take a shot with each camera.',
 	cc_err_volume_gone: 'This volume is no longer on the unit.',
 	cc_err_timeout:
 		'Captua did not get the result of the shot in time. This screen now shows what the unit holds.',
-	cc_err_unread: 'Captua could not read the colour card shots of this volume.',
+	cc_err_unread: 'Captua could not read the color card shots of this volume.',
 	cc_err_failed: 'The request did not go through. Try again.',
 	cc_err_busy: 'Wait for the capture in progress to finish, then try again.',
-	cc_flag_none: 'No colour card shots',
-	cc_flag_skipped: 'Colour card shots skipped',
+	cc_flag_none: 'No color card shots',
+	cc_flag_skipped: 'Color card shots skipped',
 	cc_flag_title:
-		'Captua sends this volume to Fisqua with a mark saying that it has no colour card shots.',
-	cc_sets_open: 'Colour card shots',
-	cc_sets_title: 'Colour card shots',
-	cc_sets_empty: 'This volume has no colour card shots.',
+		'Captua sends this volume to Fisqua with a mark saying that it has no color card shots.',
+	cc_sets_open: 'Color card shots',
+	cc_sets_title: 'Color card shots',
+	cc_sets_empty: 'This volume has no color card shots.',
 	cc_set_heading: (n: number, date: string) => `Set ${n} · ${date}`,
 	cc_set_by: (name: string) => `By ${name}`,
 	cc_outcome_taken: 'Taken',
@@ -2675,9 +2675,9 @@ export const en: Messages = {
 	cc_reason_unverified: 'the copy of a file could not be checked yet',
 	cc_reason_file_missing: 'a shot file is missing on the unit',
 	cc_reason_upload_refused: 'the offsite copy refused a shot',
-	cc_setting_label: 'Ask for colour card shots',
+	cc_setting_label: 'Ask for color card shots',
 	cc_setting_desc:
-		'When this is on, the capture screen asks for a shot of the colour card with each camera at the start of each volume and whenever the camera settings are changed. Captua sends volumes captured while it is off to Fisqua with a mark saying that they have no colour card shots.',
+		'When this is on, the capture screen asks for a shot of the color card with each camera at the start of each volume and whenever the camera settings are changed. Captua sends volumes captured while it is off to Fisqua with a mark saying that they have no color card shots.',
 	cc_setting_error: 'Captua could not save the change. Try again.',
 
 	// ── Moving a hand-made volume's captures into a volume from Fisqua (NEH-419),
