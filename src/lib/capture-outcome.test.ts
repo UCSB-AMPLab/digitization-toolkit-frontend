@@ -1,7 +1,11 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
-import { describeCaptureFailure, describeCaptureOutcome, describeTestCapture } from './capture-outcome';
+import {
+	describeCaptureFailure,
+	describeCaptureOutcome,
+	describeTestCapture
+} from './capture-outcome';
 import { es } from './i18n/es';
 import { en } from './i18n/en';
 
@@ -11,13 +15,17 @@ describe('describeCaptureOutcome', () => {
 	});
 
 	it('reports the backend error detail when success is false', () => {
-		expect(describeCaptureOutcome({ success: false, error: 'Camera 0 is not connected' })).toEqual(
-			{ kind: 'error', detail: 'Camera 0 is not connected' }
-		);
+		expect(describeCaptureOutcome({ success: false, error: 'Camera 0 is not connected' })).toEqual({
+			kind: 'error',
+			detail: 'Camera 0 is not connected'
+		});
 	});
 
 	it('reports an error with no detail when the backend gives none', () => {
-		expect(describeCaptureOutcome({ success: false })).toEqual({ kind: 'error', detail: undefined });
+		expect(describeCaptureOutcome({ success: false })).toEqual({
+			kind: 'error',
+			detail: undefined
+		});
 	});
 });
 
@@ -62,7 +70,9 @@ describe('describeCaptureFailure', () => {
 			kind: 'error',
 			detail: es.dash_camera_capture_not_connected
 		});
-		expect(describeCaptureFailure(new ApiError('DSLR capture failed: no image after 12s', 504), en)).toEqual({
+		expect(
+			describeCaptureFailure(new ApiError('DSLR capture failed: no image after 12s', 504), en)
+		).toEqual({
 			kind: 'error',
 			detail: en.dash_camera_capture_timeout
 		});

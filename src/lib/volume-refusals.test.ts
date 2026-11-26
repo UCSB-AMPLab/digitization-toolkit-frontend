@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
@@ -7,6 +7,7 @@ import {
 	fileHoldText,
 	isReorderStale,
 	isVolumeBusy,
+	excludedRefusalText,
 	renumberErrorText,
 	reorderErrorText,
 	storedOffsiteCount
@@ -28,13 +29,16 @@ class ApiError extends Error {
 // app/core/image_upload.py, app/api/collections.py and app/api/projects.py send them.
 const REORDER_IDS = 'ordered_ids must name every record of the volume exactly once.';
 const VOLUME_CHANGED = 'The volume changed while it was being renumbered. Try again.';
-const FILES_BEING_READ = 'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.';
-const EXPORT_RUNNING = 'An export of this collection is running. Wait for it to finish, then try again.';
+const FILES_BEING_READ =
+	'Captua is preparing a file of this volume for the offsite copy. Try again in a moment.';
+const EXPORT_RUNNING =
+	'An export of this collection is running. Wait for it to finish, then try again.';
 const EXPORT_IN_SUBTREE =
 	'An export of this collection, or of a collection inside it, is running. Wait for it to finish, then try again.';
 const EXPORT_IN_PROJECT =
 	'An export of a collection in this project is running. Wait for it to finish, then try again.';
-const FILES_CHANGING = 'The files of this collection are being moved or renamed. Try the export again in a moment.';
+const FILES_CHANGING =
+	'The files of this collection are being moved or renamed. Try the export again in a moment.';
 const STORED_OFFSITE =
 	"This record's files are already stored offsite under this volume, so it cannot be moved to another volume.";
 const storedOffsiteMove = (ids: number[]) =>
@@ -70,11 +74,17 @@ describe('reorderErrorText', () => {
 
 describe('renumberErrorText', () => {
 	it('maps the 409 of a volume that kept changing', () => {
-		expect(renumberErrorText(new ApiError(VOLUME_CHANGED, VOLUME_CHANGED, 409), es)).toBe(es.vol_err_volume_busy);
+		expect(renumberErrorText(new ApiError(VOLUME_CHANGED, VOLUME_CHANGED, 409), es)).toBe(
+			es.vol_err_volume_busy
+		);
 	});
 
 	it('gives anything else a whole sentence with no backend text in it', () => {
-		const failed = new ApiError('The database update failed, so no record was renumbered. Please retry', undefined, 500);
+		const failed = new ApiError(
+			'The database update failed, so no record was renumbered. Please retry',
+			undefined,
+			500
+		);
 		expect(renumberErrorText(failed, es)).toBe(es.col_renumber_error);
 		expect(renumberErrorText(new Error('Failed to fetch'), en)).toBe(en.col_renumber_error);
 		expect(typeof es.col_renumber_error).toBe('string');
@@ -83,15 +93,21 @@ describe('renumberErrorText', () => {
 
 describe('fileHoldText', () => {
 	it('maps each hold 409 to its message', () => {
-		expect(fileHoldText(new ApiError(FILES_BEING_READ, FILES_BEING_READ, 409), es)).toBe(es.vol_err_files_being_read);
-		expect(fileHoldText(new ApiError(EXPORT_RUNNING, EXPORT_RUNNING, 409), es)).toBe(es.vol_err_export_running);
+		expect(fileHoldText(new ApiError(FILES_BEING_READ, FILES_BEING_READ, 409), es)).toBe(
+			es.vol_err_files_being_read
+		);
+		expect(fileHoldText(new ApiError(EXPORT_RUNNING, EXPORT_RUNNING, 409), es)).toBe(
+			es.vol_err_export_running
+		);
 		expect(fileHoldText(new ApiError(EXPORT_IN_SUBTREE, EXPORT_IN_SUBTREE, 409), es)).toBe(
 			es.vol_err_export_in_subtree
 		);
 		expect(fileHoldText(new ApiError(EXPORT_IN_PROJECT, EXPORT_IN_PROJECT, 409), es)).toBe(
 			es.vol_err_export_in_project
 		);
-		expect(fileHoldText(new ApiError(FILES_CHANGING, FILES_CHANGING, 409), es)).toBe(es.vol_err_files_changing);
+		expect(fileHoldText(new ApiError(FILES_CHANGING, FILES_CHANGING, 409), es)).toBe(
+			es.vol_err_files_changing
+		);
 	});
 
 	it('words the files-being-read refusal for a project when asked to', () => {
@@ -120,13 +136,53 @@ describe('storedOffsiteCount', () => {
 	});
 
 	it('is null for the handed-over refusal, which carries blocking_record_ids too', () => {
-		const message = 'Cannot move: 2 record(s) have been handed over for review: [4, 5]. Take this collection back first.';
-		expect(storedOffsiteCount(new ApiError(message, { message, blocking_record_ids: [4, 5] }, 409))).toBeNull();
+		const message =
+			'Cannot move: 2 record(s) have been handed over for review: [4, 5]. Take this collection back first.';
+		expect(
+			storedOffsiteCount(new ApiError(message, { message, blocking_record_ids: [4, 5] }, 409))
+		).toBeNull();
 	});
 
 	it('is null for anything else', () => {
 		expect(storedOffsiteCount(new ApiError(STORED_OFFSITE, STORED_OFFSITE, 422))).toBeNull();
 		expect(storedOffsiteCount(new Error(STORED_OFFSITE))).toBeNull();
 		expect(storedOffsiteCount('boom')).toBeNull();
+	});
+});
+
+// The 409s for a record Fisqua excluded (contract 1.6), as app/api/records.py
+// sends them: an upload, refused for every role, and a delete of the record or
+// of one of its images, refused for every role but admin.
+const UPLOAD_EXCLUDED =
+	"Cannot add an image to a record with status 'excluded': Fisqua excluded it from the volume.";
+const DELETE_RECORD_EXCLUDED =
+	"Cannot delete a record with status 'excluded': Fisqua excluded it from the volume, and only an admin can delete it.";
+const DELETE_IMAGE_EXCLUDED =
+	"Cannot delete an image from a record with status 'excluded': Fisqua excluded it from the volume, and only an admin can delete it.";
+
+describe('excludedRefusalText', () => {
+	it('maps the upload 409 to err_upload_excluded', () => {
+		expect(excludedRefusalText(new ApiError(UPLOAD_EXCLUDED, undefined, 409), es)).toBe(
+			es.err_upload_excluded
+		);
+		expect(excludedRefusalText(new ApiError(UPLOAD_EXCLUDED, undefined, 409), en)).toBe(
+			en.err_upload_excluded
+		);
+	});
+
+	it('maps both delete 409s to err_delete_excluded', () => {
+		expect(excludedRefusalText(new ApiError(DELETE_RECORD_EXCLUDED, undefined, 409), es)).toBe(
+			es.err_delete_excluded
+		);
+		expect(excludedRefusalText(new ApiError(DELETE_IMAGE_EXCLUDED, undefined, 409), en)).toBe(
+			en.err_delete_excluded
+		);
+	});
+
+	it('leaves the other delete 409 and other statuses alone', () => {
+		const locked = "Cannot delete a record with status 'approved'. Move it to 'rejected' first.";
+		expect(excludedRefusalText(new ApiError(locked, undefined, 409), es)).toBeNull();
+		expect(excludedRefusalText(new ApiError(UPLOAD_EXCLUDED, undefined, 422), es)).toBeNull();
+		expect(excludedRefusalText(new Error(UPLOAD_EXCLUDED), es)).toBeNull();
 	});
 });

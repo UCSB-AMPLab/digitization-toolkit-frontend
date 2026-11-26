@@ -2,23 +2,42 @@
 	// Login page. Before it opens a session it validates the role that
 	// `/users/me` returns (NEH-117), and it tells bad credentials, a login
 	// lockout and an unreachable backend apart so each gets its own message.
-	// The footer shows whether the backend answers and holds the language selector.
+	// The footer shows whether the backend answers.
+	// The page has no language picker: it is shown in the unit's language
+	// (hooks.server.ts renders it so; on a client-side visit, after a sign-out,
+	// the store is set from `/auth/setup/status`). A unit with no account yet
+	// goes to the first-run wizard. After sign-in, a person's stored language
+	// is written to the cookie, and the dashboard is loaded in it; a person with
+	// none is asked once, on this page, and the choice is stored with
+	// PUT /users/me/language (NEH-336). A failure to store it does not hold the
+	// sign-in back: the person goes on in the language chosen and is asked
+	// again at the next sign-in. Once a sign-in has started, the unit's
+	// language is never applied: its request is aborted and its answer
+	// ignored, also after the page is gone. The dashboard is loaded anew in
+	// the person's language only when this browser kept the signed-in user
+	// (read back from storage); otherwise a reload would arrive with no
+	// session, so the cookie and the language are set and the page goes on
+	// without a reload. The footer links to the credits page.
+	// After a person's own password change the app ends the session and opens
+	// this page with loginNotice set: the confirmation is shown above the form,
+	// as a status region, and the notice is cleared when the page is left, so
+	// it is shown for that one visit.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { authApi, healthApi, usersApi, tokenStore } from '$lib/api';
+	import { authApi, healthApi, usersApi } from '$lib/api';
 	import { classifyLoginError, lockoutMinutes, retryAfterOf } from '$lib/login-error';
 	import { authStore, isUserRole } from '$lib/stores/auth';
-	import { m, locale, setLanguage, type Locale } from '$lib/i18n';
-	import logoEs from '$lib/assets/captua-logo-descrp-light-esp.svg';
-	import logoEn from '$lib/assets/captua-logo-descrp-light-eng.svg';
-	import favicon from '$lib/assets/favicon.svg';
-
-	// the descriptor in the logo is baked into the SVG, so the asset
-	// itself has to follow the locale.
-	let logo = $derived($locale === 'en' ? logoEn : logoEs);
+	import { get } from 'svelte/store';
+	import { m, locale, storeLanguage, isLocale, type Locale } from '$lib/i18n';
+	import { switchLanguage } from '$lib/language-switch';
+	import { pageLife } from '$lib/page-life';
+	import { dismissible } from '$lib/dialog';
+	import { loginNotice } from '$lib/stores/login-notice';
+	// The logo's descriptor follows the locale inside CaptuaLogo.
+	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 
 	let username = $state('');
 	let password = $state('');
@@ -30,12 +49,21 @@
 
 	let showForgotPopup = $state(false);
 
-	// The labels stay in their own language rather than being translated. PT
-	// is left out until `$lib/i18n` has a `pt.ts` catalogue.
-	const languages: { code: Locale; label: string }[] = [
-		{ code: 'es', label: 'ES' },
-		{ code: 'en', label: 'EN' }
+	// The question for a person with no language yet. Each name is in its own
+	// language, whatever the page's.
+	const LANGUAGES: { code: Locale; label: string }[] = [
+		{ code: 'es', label: 'Español' },
+		{ code: 'en', label: 'English' }
 	];
+	let askLanguage = $state(false);
+	let savingLanguage = $state(false);
+
+	// Each request's answer acts only while its operation is current
+	// ($lib/page-life): the page is mounted and no newer one of its kind has
+	// started. A sign-in stops the unit's status read.
+	const life = pageLife();
+
+	onDestroy(() => loginNotice.set(null));
 
 	onMount(async () => {
 		// A signed-in user has no reason to see the login form.
@@ -43,14 +71,65 @@
 			goto('/');
 			return;
 		}
+		void followUnit();
 		await checkConnection();
 	});
 
+	// A unit with no account goes to the wizard; otherwise the page takes the
+	// unit's language. A failed read changes nothing.
+	async function followUnit() {
+		const op = life.begin('unit');
+		try {
+			const status = await authApi.setupStatus(op.signal);
+			if (!op.current()) return;
+			if (status.needs_setup) {
+				goto('/setup');
+				return;
+			}
+			const unitLanguage = status.default_language;
+			if (isLocale(unitLanguage) && unitLanguage !== get(locale)) {
+				locale.set(unitLanguage);
+				document.documentElement.lang = unitLanguage;
+			}
+		} catch {
+			// The page stays in the language the server rendered.
+		}
+	}
+
+	// Into the dashboard in `language`: the cookie is written, and the page
+	// is loaded anew when it is not the language already shown.
+	function enterIn(language: Locale) {
+		if (language !== get(locale)) {
+			switchLanguage(language, '/dashboard');
+			return;
+		}
+		storeLanguage(language);
+		goto('/dashboard');
+	}
+
+	async function chooseLanguage(language: Locale) {
+		if (savingLanguage) return;
+		const op = life.begin('language');
+		savingLanguage = true;
+		try {
+			const user = await usersApi.setMyLanguage(language);
+			if (!op.current()) return;
+			if (isUserRole(user?.role)) authStore.setSession(user);
+		} catch (error) {
+			if (!op.current()) return;
+			console.error('[Login] Could not store the language:', error);
+		}
+		enterIn(language);
+	}
+
 	async function checkConnection() {
+		const op = life.begin('health');
 		try {
 			await healthApi.check();
+			if (!op.current()) return;
 			isConnected = true;
 		} catch {
+			if (!op.current()) return;
 			isConnected = false;
 		}
 	}
@@ -64,48 +143,52 @@
 		}
 
 		isLoading = true;
+		life.stop('unit');
+		const op = life.begin('signin');
 
 		// Flipped once /auth/login returns 200, so a later failure can't be
 		// reported as a bad password.
 		let credentialsChecked = false;
 
 		try {
-			const authResponse = await authApi.login({
+			// The backend answers with the httpOnly session cookie, which no
+			// script reads; the browser sends it with every request after this.
+			await authApi.login({
 				username: username.trim(),
 				password
 			});
+			if (!op.current()) return;
 			credentialsChecked = true;
 
 			// The role `/users/me` returns has to be in `USER_ROLES`
 			// (stores/auth.ts). If the backend adds roles, that list is the only
 			// place to add them — the role check below validates against it.
-			//
-			// `usersApi.me()` goes through `apiRequest`, which builds the
-			// Authorization header from `tokenStore`, so the new token has to be
-			// stored first for this call to pick it up.
-			tokenStore.set(authResponse.access_token);
 			const userData = await usersApi.me();
+			if (!op.current()) return;
 
 			// Validate the role before opening a session. Without this check, a
 			// role the frontend does not know gets in anyway and ends up deciding
 			// navigation and camera permissions (NEH-117).
 			//
-			// The session has to be cleared: the token is already in localStorage
-			// so that `/users/me` could be called, and `authStore` reads its
-			// initial state from there — leaving it in place means a reload shows
-			// a half-open session. `clearSession` also removes any `auth_user`
-			// left over from an earlier session.
+			// The session has to be closed: the backend has already set the
+			// cookie, and leaving it means a half-open session with a role the
+			// app does not handle. `authApi.logout()` asks the backend to clear
+			// the cookie and also removes any `auth_user` left over from an
+			// earlier session.
 			if (!isUserRole(userData.role)) {
-				authStore.clearSession();
+				await authApi.logout();
+				if (!op.current()) return;
 				console.error('[Login] Unrecognized role:', userData.role);
 				errorMessage = $m.login_error_unknown_role;
 				return;
 			}
 
-			authStore.setSession(authResponse.access_token, userData);
+			authStore.setSession(userData, { signIn: true });
 
-			goto('/dashboard');
+			if (isLocale(userData.language)) enterIn(userData.language);
+			else askLanguage = true;
 		} catch (error) {
+			if (!op.current()) return;
 			// Bad credentials, a lockout and an unreachable backend each get their
 			// own message. The credentials message stays generic, and it does not
 			// cover connection failures.
@@ -117,9 +200,7 @@
 				// how long in Retry-After (seconds).
 				const minutes = lockoutMinutes(retryAfterOf(error));
 				errorMessage =
-					minutes === null
-						? $m.login_error_locked_out_unknown
-						: $m.login_error_locked_out(minutes);
+					minutes === null ? $m.login_error_locked_out_unknown : $m.login_error_locked_out(minutes);
 			} else {
 				errorMessage = $m.login_error_backend_unavailable;
 				// Keep the footer's connection dot consistent with the message.
@@ -127,7 +208,7 @@
 			}
 			console.error('[Login] Error:', error);
 		} finally {
-			isLoading = false;
+			if (op.current()) isLoading = false;
 		}
 	}
 
@@ -139,21 +220,9 @@
 		showForgotPopup = false;
 	}
 
-	function handleBackdropClick(event: MouseEvent) {
-		// Clicks inside the modal content bubble up to the backdrop too; only a
-		// click on the backdrop itself closes the popup.
-		if ((event.target as HTMLElement).classList.contains('popup-backdrop')) {
-			closeForgotPopup();
-		}
-	}
-
 	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && showForgotPopup) {
-			closeForgotPopup();
-			return;
-		}
 		// The fields are not in a <form>, so Enter submits here, while the popup is closed.
-		if (event.key === 'Enter' && !isLoading && !showForgotPopup) {
+		if (event.key === 'Enter' && !isLoading && !showForgotPopup && !askLanguage) {
 			handleLogin();
 		}
 	}
@@ -161,170 +230,170 @@
 	function togglePassword() {
 		showPassword = !showPassword;
 	}
-
-	// `setLanguage` in `$lib/i18n` switches the language: it writes the
-	// `captua_locale` cookie and reloads the page so that SSR renders the new one.
 </script>
 
 <div class="login-wrapper" onkeydown={handleKeydown} role="main">
 	<div class="login-card" class:is-loading={isLoading}>
 		<div class="card-logo-area">
-			<img src={logo} alt="Captua" class="brand-logo" />
+			<CaptuaLogo wordmark="descriptor" class="brand-logo" />
 		</div>
 
-		<div class="form-area">
-			<div class="field-group">
-				<label class="field-label" for="username">{$m.common_username_label}</label>
-				<div class="input-wrapper">
-					<svg
-						class="input-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-						<circle cx="12" cy="7" r="4" />
-					</svg>
-					<input
-						id="username"
-						type="text"
-						class="input"
-						class:input-error={errorMessage}
-						placeholder={$m.login_username_placeholder}
-						bind:value={username}
-						disabled={isLoading}
-						autocomplete="username"
-						autocapitalize="none"
-						autocorrect="off"
-					/>
+		{#if $loginNotice === 'password_changed'}
+			<div class="notice" role="status">
+				<p class="notice-title">{$m.account_password_done_title}</p>
+				<p class="notice-text">{$m.account_password_done}</p>
+			</div>
+		{/if}
+
+		{#if askLanguage}
+			<div class="form-area language-question">
+				<h1 class="question-title">{$m.login_language_title}</h1>
+				<p class="question-text">{$m.login_language_desc}</p>
+				<div class="question-options">
+					{#each LANGUAGES as lang (lang.code)}
+						<button
+							type="button"
+							class="btn-login"
+							lang={lang.code}
+							onclick={() => chooseLanguage(lang.code)}
+							disabled={savingLanguage}
+						>
+							{lang.label}
+						</button>
+					{/each}
 				</div>
 			</div>
+		{:else}
+			<div class="form-area">
+				<div class="field-group">
+					<label class="field-label" for="username">{$m.common_username_label}</label>
+					<div class="input-wrapper">
+						<svg
+							class="input-icon"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+							<circle cx="12" cy="7" r="4" />
+						</svg>
+						<input
+							id="username"
+							type="text"
+							class="input"
+							class:input-error={errorMessage}
+							placeholder={$m.login_username_placeholder}
+							bind:value={username}
+							disabled={isLoading}
+							autocomplete="username"
+							autocapitalize="none"
+							autocorrect="off"
+						/>
+					</div>
+				</div>
 
-			<div class="field-group">
-				<label class="field-label" for="password">{$m.common_password_label}</label>
-				<div class="input-wrapper">
-					<svg
-						class="input-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-						<path d="M7 11V7a5 5 0 0 1 10 0v4" />
-					</svg>
-					<input
-						id="password"
-						type={showPassword ? 'text' : 'password'}
-						class="input input-with-action"
-						class:input-error={errorMessage}
-						placeholder={$m.login_password_placeholder}
-						bind:value={password}
-						disabled={isLoading}
-						autocomplete="current-password"
-					/>
+				<div class="field-group">
+					<label class="field-label" for="password">{$m.common_password_label}</label>
+					<div class="input-wrapper">
+						<svg
+							class="input-icon"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+							<path d="M7 11V7a5 5 0 0 1 10 0v4" />
+						</svg>
+						<input
+							id="password"
+							type={showPassword ? 'text' : 'password'}
+							class="input input-with-action"
+							class:input-error={errorMessage}
+							placeholder={$m.login_password_placeholder}
+							bind:value={password}
+							disabled={isLoading}
+							autocomplete="current-password"
+						/>
+						<button
+							type="button"
+							class="input-action-btn"
+							onclick={togglePassword}
+							aria-label={showPassword ? $m.common_hide_password : $m.common_show_password}
+						>
+							{#if showPassword}
+								<!-- Crossed-out eye: the password is visible -->
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path
+										d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
+									/>
+									<path
+										d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+									/>
+									<line x1="1" y1="1" x2="23" y2="23" />
+								</svg>
+							{:else}
+								<!-- Open eye: the password is hidden -->
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+									<circle cx="12" cy="12" r="3" />
+								</svg>
+							{/if}
+						</button>
+					</div>
+				</div>
+
+				<div class="row-options">
 					<button
 						type="button"
-						class="input-action-btn"
-						onclick={togglePassword}
-						aria-label={showPassword ? $m.common_hide_password : $m.common_show_password}
+						class="forgot-link"
+						onclick={handleForgotPassword}
+						disabled={isLoading}
 					>
-						{#if showPassword}
-							<!-- Crossed-out eye: the password is visible -->
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path
-									d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
-								/>
-								<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-								<line x1="1" y1="1" x2="23" y2="23" />
-							</svg>
-						{:else}
-							<!-- Open eye: the password is hidden -->
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-								<circle cx="12" cy="12" r="3" />
-							</svg>
-						{/if}
+						{$m.login_forgot_link}
 					</button>
 				</div>
-			</div>
 
-			<div class="row-options">
+				{#if errorMessage}
+					<div class="alert alert-error" role="alert" aria-live="polite">
+						<svg
+							class="alert-icon"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<circle cx="12" cy="12" r="10" />
+							<line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+						</svg>
+						<span>{errorMessage}</span>
+					</div>
+				{/if}
+
 				<button
 					type="button"
-					class="forgot-link"
-					onclick={handleForgotPassword}
+					class="btn-login"
+					onclick={handleLogin}
 					disabled={isLoading}
+					aria-busy={isLoading}
 				>
-					{$m.login_forgot_link}
+					<!-- The loading label is uppercase in the i18n catalogues, as in the design -->
+					{isLoading ? $m.login_submit_loading : $m.login_submit}
 				</button>
 			</div>
-
-			{#if errorMessage}
-				<div class="alert alert-error" role="alert" aria-live="polite">
-					<svg
-						class="alert-icon"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<circle cx="12" cy="12" r="10" />
-						<line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-					</svg>
-					<span>{errorMessage}</span>
-				</div>
-			{/if}
-
-			<button
-				type="button"
-				class="btn-login"
-				onclick={handleLogin}
-				disabled={isLoading}
-				aria-busy={isLoading}
-			>
-				<!-- The loading label is uppercase in the i18n catalogues, as in the design -->
-				{isLoading ? $m.login_submit_loading : $m.login_submit}
-			</button>
-		</div>
-		<!-- /form-area -->
+			<!-- /form-area -->
+		{/if}
 
 		<div class="card-footer">
 			<div class="connection-status">
 				<span class="status-dot" class:success={isConnected} class:error={!isConnected}></span>
 				<span class="status-text">{isConnected ? $m.login_connected : $m.login_offline}</span>
 			</div>
-
-			<!-- `setLanguage` writes the locale cookie and reloads (see `$lib/i18n`) -->
-			<div class="lang-selector">
-				<svg
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					class="globe-icon"
-				>
-					<circle cx="12" cy="12" r="10" />
-					<line x1="2" y1="12" x2="22" y2="12" />
-					<path
-						d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
-					/>
-				</svg>
-				{#each languages as lang, i}
-					<button
-						type="button"
-						class="lang-btn"
-						class:active={$locale === lang.code}
-						onclick={() => setLanguage(lang.code)}
-					>
-						{lang.label}
-					</button>
-					{#if i < languages.length - 1}
-						<span class="lang-sep">|</span>
-					{/if}
-				{/each}
-			</div>
+			<!-- Bilingual whatever the page's language, as in the first-run wizard. -->
+			<a href="/credits?from=login" class="credits-link"
+				>Credits / <span lang="es">Créditos</span></a
+			>
 		</div>
 
 		{#if isLoading}
@@ -340,11 +409,9 @@
 
 <!-- The popup closes on its Close button, Escape, or a click outside the modal. -->
 {#if showForgotPopup}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="popup-backdrop"
-		onclick={handleBackdropClick}
+		use:dismissible={{ onDismiss: closeForgotPopup }}
 		role="dialog"
 		aria-modal="true"
 		aria-label={$m.login_forgot_dialog_aria}
@@ -406,14 +473,6 @@
 		align-items: center;
 		gap: 10px;
 		padding: 32px 24px 0;
-	}
-
-	.brand-logo {
-		width: 100%;
-		max-width: 224px;
-		height: auto;
-		display: block;
-		margin: 0 auto;
 	}
 
 	.form-area {
@@ -502,7 +561,6 @@
 		gap: 8px;
 	}
 
-
 	.forgot-link {
 		background: none;
 		border: none;
@@ -521,6 +579,25 @@
 	.forgot-link:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;
+	}
+
+	.notice {
+		margin: 0 0 16px;
+		padding: 12px 14px;
+		border: 1px solid rgba(90, 140, 98, 0.4);
+		border-radius: var(--radius-md);
+		background-color: rgba(90, 140, 98, 0.08);
+		color: var(--color-light);
+		font-size: var(--text-sm);
+		line-height: 1.4;
+	}
+	.notice-title {
+		margin: 0 0 4px;
+		font-weight: var(--fw-bold);
+	}
+	.notice-text {
+		margin: 0;
+		color: var(--color-light-grey);
 	}
 
 	.alert {
@@ -584,6 +661,15 @@
 		min-height: 44px;
 	}
 
+	.credits-link {
+		display: inline-flex;
+		align-items: center;
+		min-height: var(--touch-target-min);
+		font-size: var(--text-sm);
+		font-weight: var(--fw-bold);
+		color: var(--color-secondary);
+	}
+
 	.connection-status {
 		display: flex;
 		align-items: center;
@@ -608,48 +694,28 @@
 		color: var(--color-light-grey);
 	}
 
-	.lang-selector {
-		display: flex;
-		align-items: center;
-		gap: 4px;
+	/* The question for a person with no language yet. */
+	.language-question {
+		gap: 10px;
 	}
-
-	.globe-icon {
-		width: 16px;
-		height: 16px;
-		color: var(--color-light-grey);
-		margin-right: 4px;
-	}
-
-	.lang-btn {
-		background: none;
-		border: none;
-		font-family: var(--font-family);
-		font-size: var(--text-sm);
-		font-weight: var(--fw-medium);
-		color: var(--color-light-grey);
-		cursor: pointer;
-		padding: 2px 4px;
-		min-width: var(--touch-target-min);
-		min-height: var(--touch-target-min);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: var(--radius-sm);
-		transition: color var(--transition-fast);
-	}
-
-	.lang-btn.active {
-		color: var(--color-light);
+	.question-title {
+		margin: 0;
+		font-size: var(--text-h5);
 		font-weight: var(--fw-bold);
-	}
-	.lang-btn:hover {
 		color: var(--color-light);
+		text-align: center;
 	}
-	.lang-sep {
+	.question-text {
+		margin: 0;
 		font-size: var(--text-sm);
-		color: var(--border-color);
-		user-select: none;
+		color: var(--color-light-grey);
+		text-align: center;
+		line-height: 1.45;
+	}
+	.question-options {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
 	}
 
 	.loading-overlay {

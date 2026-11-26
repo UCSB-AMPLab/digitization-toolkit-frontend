@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
@@ -25,7 +25,9 @@ class ApiError extends Error {
 
 // The 409 of GET /collections/{id}/capture-manifest (app/api/collections.py):
 // detail = {message, problems: [Problem.as_dict()]} (app/core/capture_manifest.py).
-function refused(problems: { rule: string; message: string; record_ids: number[]; image_ids: number[] }[]) {
+function refused(
+	problems: { rule: string; message: string; record_ids: number[]; image_ids: number[] }[]
+) {
 	const message = 'The capture manifest cannot be exported, because Fisqua would refuse it: ...';
 	return new ApiError(message, { message, problems }, 409);
 }
@@ -45,16 +47,24 @@ describe('canDownloadCaptureManifest', () => {
 });
 
 describe('captureManifestFilename', () => {
-	const body = JSON.stringify({ generatedAt: '2026-10-24T18:03:00Z', volumes: [{ stem: 'co-agn-saa-i-1' }] });
+	const body = JSON.stringify({
+		generatedAt: '2026-10-24T18:03:00Z',
+		volumes: [{ stem: 'co-agn-saa-i-1' }]
+	});
 
 	it('takes the server filename from Content-Disposition', () => {
 		expect(
-			captureManifestFilename('attachment; filename="capture-manifest_co-agn-saa-i-1_2026-10-24.json"', body)
+			captureManifestFilename(
+				'attachment; filename="capture-manifest_co-agn-saa-i-1_2026-10-24.json"',
+				body
+			)
 		).toBe('capture-manifest_co-agn-saa-i-1_2026-10-24.json');
 	});
 
 	it('builds the same name from the body when the header cannot be read (cross-origin)', () => {
-		expect(captureManifestFilename(null, body)).toBe('capture-manifest_co-agn-saa-i-1_2026-10-24.json');
+		expect(captureManifestFilename(null, body)).toBe(
+			'capture-manifest_co-agn-saa-i-1_2026-10-24.json'
+		);
 	});
 
 	it('falls back to a plain name when neither says', () => {
@@ -63,21 +73,35 @@ describe('captureManifestFilename', () => {
 	});
 
 	it('never keeps a path from the header', () => {
-		expect(captureManifestFilename('attachment; filename="../x/evil.json"', body)).toBe('evil.json');
+		expect(captureManifestFilename('attachment; filename="../x/evil.json"', body)).toBe(
+			'evil.json'
+		);
 	});
 });
 
 describe('captureManifestRefusal', () => {
 	it('is null for anything but the 409 with problems', () => {
-		expect(captureManifestRefusal(new ApiError('Collection 9 not found', undefined, 404), en)).toBeNull();
+		expect(
+			captureManifestRefusal(new ApiError('Collection 9 not found', undefined, 404), en)
+		).toBeNull();
 		expect(captureManifestRefusal(new ApiError('x', { message: 'x' }, 409), en)).toBeNull();
 		expect(captureManifestRefusal(new Error('network'), en)).toBeNull();
 	});
 
 	it('maps each known rule to its catalogue text, never the backend English', () => {
 		const error = refused([
-			{ rule: 'records_captured', message: '2 record(s) are still captured ...', record_ids: [4, 3], image_ids: [] },
-			{ rule: 'no_project', message: 'The volume is not in a project ...', record_ids: [], image_ids: [] }
+			{
+				rule: 'records_captured',
+				message: '2 record(s) are still captured ...',
+				record_ids: [4, 3],
+				image_ids: []
+			},
+			{
+				rule: 'no_project',
+				message: 'The volume is not in a project ...',
+				record_ids: [],
+				image_ids: []
+			}
 		]);
 		const view = captureManifestRefusal(error, es)!;
 		expect(view.problems).toHaveLength(2);
@@ -90,33 +114,54 @@ describe('captureManifestRefusal', () => {
 
 	it('falls back to the generic line for a rule this build does not know', () => {
 		const view = captureManifestRefusal(
-			refused([{ rule: 'brand_new_rule', message: 'Something new.', record_ids: [7], image_ids: [] }]),
+			refused([
+				{ rule: 'brand_new_rule', message: 'Something new.', record_ids: [7], image_ids: [] }
+			]),
 			en
 		)!;
-		expect(view.problems).toEqual([{ rule: 'brand_new_rule', text: en.col_manifest_rule_other, records: en.col_manifest_records([7]) }]);
+		expect(view.problems).toEqual([
+			{
+				rule: 'brand_new_rule',
+				text: en.col_manifest_rule_other,
+				records: en.col_manifest_records([7])
+			}
+		]);
 	});
 
 	it('has a catalogue text for every rule of app/core/capture_manifest.py RULES', () => {
 		for (const rule of CAPTURE_MANIFEST_RULES) {
-			const view = captureManifestRefusal(refused([{ rule, message: 'x', record_ids: [], image_ids: [] }]), en)!;
+			const view = captureManifestRefusal(
+				refused([{ rule, message: 'x', record_ids: [], image_ids: [] }]),
+				en
+			)!;
 			expect(view.problems[0].text).not.toBe(en.col_manifest_rule_other);
 			expect(view.problems[0].text.length).toBeGreaterThan(0);
 		}
 	});
 
-	it.each([
-		['reference_code_differs', 'col_manifest_rule_reference_code_differs']
-	] as const)("has a catalogue text for the outbox's %s, in both languages", (rule, key) => {
-		for (const msgs of [en, es]) {
-			const view = captureManifestRefusal(refused([{ rule, message: 'x', record_ids: [], image_ids: [] }]), msgs)!;
-			expect(view.problems[0].text).toBe(msgs[key]);
+	it.each([['reference_code_differs', 'col_manifest_rule_reference_code_differs']] as const)(
+		"has a catalogue text for the outbox's %s, in both languages",
+		(rule, key) => {
+			for (const msgs of [en, es]) {
+				const view = captureManifestRefusal(
+					refused([{ rule, message: 'x', record_ids: [], image_ids: [] }]),
+					msgs
+				)!;
+				expect(view.problems[0].text).toBe(msgs[key]);
+			}
 		}
-	});
+	);
 
 	it('skips malformed problem entries', () => {
-		const error = new ApiError('x', { message: 'x', problems: [null, 'x', { rule: 'no_stem' }] }, 409);
+		const error = new ApiError(
+			'x',
+			{ message: 'x', problems: [null, 'x', { rule: 'no_stem' }] },
+			409
+		);
 		const view = captureManifestRefusal(error, en)!;
-		expect(view.problems).toEqual([{ rule: 'no_stem', text: en.col_manifest_rule_no_stem, records: null }]);
+		expect(view.problems).toEqual([
+			{ rule: 'no_stem', text: en.col_manifest_rule_no_stem, records: null }
+		]);
 	});
 });
 
@@ -132,13 +177,15 @@ describe('col_manifest_records', () => {
 
 describe('captureManifestErrorText', () => {
 	it('names a missing volume on 404', () => {
-		expect(captureManifestErrorText(new ApiError('Collection 9 not found', undefined, 404), es)).toBe(
-			es.col_manifest_err_not_found
-		);
+		expect(
+			captureManifestErrorText(new ApiError('Collection 9 not found', undefined, 404), es)
+		).toBe(es.col_manifest_err_not_found);
 	});
 
 	it('uses the generic text for anything else, never the backend English', () => {
-		expect(captureManifestErrorText(new ApiError('Internal Server Error', undefined, 500), en)).toBe(en.col_manifest_err);
+		expect(
+			captureManifestErrorText(new ApiError('Internal Server Error', undefined, 500), en)
+		).toBe(en.col_manifest_err);
 		expect(captureManifestErrorText(new Error('Failed to fetch'), en)).toBe(en.col_manifest_err);
 	});
 });

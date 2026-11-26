@@ -7,7 +7,7 @@
 	// "could not check" when the request failed, timed out or could not be
 	// refreshed, never a guessed state (NEH-138).
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 	import { m, locale } from '$lib/i18n';
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
 	import {
@@ -35,7 +35,9 @@
 		const { level, verifiedAt } = result;
 		const none = { retry: false, object: null };
 		if (level === 'off') return { level, headline: $m.backup_cfg_off, ...none };
-		if (level === 'unknown' || snapshot.kind !== 'loaded') return { level: 'unknown', headline: $m.backup_cfg_unknown, ...none };
+		if (level === 'local') return { level, headline: $m.backup_cfg_local, ...none };
+		if (level === 'unknown' || snapshot.kind !== 'loaded')
+			return { level: 'unknown', headline: $m.backup_cfg_unknown, ...none };
 		if (!verifiedAt) return { level, headline: $m.backup_cfg_never, ...none, retry: true };
 
 		const now = new Date(nowMs);
@@ -43,7 +45,12 @@
 		const date = formatBackupDate(verifiedAt, now, $locale);
 		const object = snapshot.status.object;
 		if (level === 'current') {
-			return { level, headline: $m.backup_cfg_current(day, date, formatBackupTime(verifiedAt, $locale)), retry: false, object };
+			return {
+				level,
+				headline: $m.backup_cfg_current(day, date, formatBackupTime(verifiedAt, $locale)),
+				retry: false,
+				object
+			};
 		}
 		return { level, headline: $m.backup_cfg_stale(day, date), retry: true, object };
 	});
@@ -65,14 +72,31 @@
 </script>
 
 <div class="backup-card">
-	<p class="desc">{$m.backup_section_desc} {$m.backup_section_scope}</p>
+	{#if view?.level === 'local'}
+		<!-- Scanner only mode (NEH-319): no daily copy to describe, only what the catalogue is. -->
+		<p class="desc">{$m.backup_section_catalogue}</p>
+	{:else}
+		<p class="desc">
+			{$m.backup_section_desc}
+			{$m.backup_section_catalogue}
+			{$m.backup_section_scope}
+		</p>
+	{/if}
 
 	{#if view === null}
 		<p class="muted">{$m.common_loading_ellipsis}</p>
 	{:else}
 		<div class="state level-{view.level}" data-level={view.level}>
-			<svg class="state-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-				stroke-width={view.level === 'current' ? 2.5 : 2.2} aria-hidden="true">
+			<svg
+				class="state-icon"
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width={view.level === 'current' ? 2.5 : 2.2}
+				aria-hidden="true"
+			>
 				{#if view.level === 'current'}
 					<path d="M20 6 9 17l-5-5" />
 				{:else if view.level === 'late'}
@@ -81,8 +105,12 @@
 					<circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
 				{:else if view.level === 'off'}
 					<circle cx="12" cy="12" r="9" /><path d="M8 12h8" />
+				{:else if view.level === 'local'}
+					<rect x="4" y="5" width="16" height="11" rx="2" /><path d="M9 20h6M12 16v4" />
 				{:else}
-					<circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" />
+					<circle cx="12" cy="12" r="9" /><path
+						d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"
+					/>
 				{/if}
 			</svg>
 			<div class="state-body">
@@ -91,7 +119,9 @@
 					<p class="retry">{$m.backup_cfg_retry}</p>
 				{/if}
 				{#if view.object}
-					<p class="fact"><span class="fact-label">{$m.backup_cfg_last_file}</span> · {view.object}</p>
+					<p class="fact">
+						<span class="fact-label">{$m.backup_cfg_last_file}</span> · {view.object}
+					</p>
 				{/if}
 			</div>
 		</div>
@@ -107,7 +137,11 @@
 	{/if}
 
 	{#if fisquaView}
-		<div class="offsite-unit level-{fisquaView.level}" data-level={fisquaView.level} data-fisqua-unit>
+		<div
+			class="offsite-unit level-{fisquaView.level}"
+			data-level={fisquaView.level}
+			data-fisqua-unit
+		>
 			<p class="offsite-unit-title">{$m.fisqua_unit_title}</p>
 			{#each fisquaView.lines as line, i (i)}
 				<p class="offsite-unit-line">{line}</p>
@@ -119,7 +153,15 @@
 	{/if}
 
 	<p class="locked">
-		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+		<svg
+			width="16"
+			height="16"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			aria-hidden="true"
+		>
 			<rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
 		</svg>
 		{$m.backup_cfg_locked}
@@ -215,6 +257,13 @@
 		--state-bg: var(--color-surface-alt-2);
 		--state-border: rgba(171, 183, 183, 0.35);
 		--state-icon: var(--color-light-grey);
+	}
+	/* The mode takes no dump (NEH-319): the page's ordinary text and border
+	   colours, without the grey of "not configured". */
+	.level-local {
+		--state-bg: transparent;
+		--state-border: var(--border-color);
+		--state-icon: var(--color-light);
 	}
 	/* Could not check: no fill, so it reads as neither a level nor "not
 	   configured". */

@@ -1,6 +1,6 @@
 // Which API base applies in the browser and in server-side rendering.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import { resolveApiBase } from './api-base';
 
@@ -17,7 +17,10 @@ describe('browser', () => {
 
 	it('ignores PUBLIC_API_BASE_SSR', () => {
 		expect(
-			resolveApiBase(true, { PUBLIC_API_BASE: '/api', PUBLIC_API_BASE_SSR: 'http://host.docker.internal:8000' })
+			resolveApiBase(true, {
+				PUBLIC_API_BASE: '/api',
+				PUBLIC_API_BASE_SSR: 'http://host.docker.internal:8000'
+			})
 		).toBe('/api');
 	});
 
@@ -29,7 +32,10 @@ describe('browser', () => {
 describe('server-side rendering', () => {
 	it('uses PUBLIC_API_BASE_SSR when set', () => {
 		expect(
-			resolveApiBase(false, { PUBLIC_API_BASE: '/api', PUBLIC_API_BASE_SSR: 'http://host.docker.internal:8000' })
+			resolveApiBase(false, {
+				PUBLIC_API_BASE: '/api',
+				PUBLIC_API_BASE_SSR: 'http://host.docker.internal:8000'
+			})
 		).toBe('http://host.docker.internal:8000');
 	});
 

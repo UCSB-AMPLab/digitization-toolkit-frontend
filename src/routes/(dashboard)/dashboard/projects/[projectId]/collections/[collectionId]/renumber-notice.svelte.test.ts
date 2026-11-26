@@ -2,12 +2,14 @@
 // the loading state. The count of renumbered records has to survive that, so
 // the page holds it and shows it once the records are back.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 
-const pageStore = vi.hoisted(() => ({ value: null as null | import('svelte/store').Writable<unknown> }));
+const pageStore = vi.hoisted(() => ({
+	value: null as null | import('svelte/store').Writable<unknown>
+}));
 
 function pageAt(collectionId: string) {
 	return {
@@ -32,10 +34,22 @@ import { es } from '$lib/i18n/es';
 import { en } from '$lib/i18n/en';
 import CollectionPage from './+page.svelte';
 
-const operator: AuthUser = { id: 2, username: 'op1', email: null, role: 'operator', is_active: true };
+const operator: AuthUser = {
+	id: 2,
+	username: 'op1',
+	email: null,
+	role: 'operator',
+	is_active: true
+};
 
 function rec(id: number, sequence: number): ApiRecord {
-	return { id, title: `Folio ${id}`, status: 'captured', sequence, images: [] } as unknown as ApiRecord;
+	return {
+		id,
+		title: `Folio ${id}`,
+		status: 'captured',
+		sequence,
+		images: []
+	} as unknown as ApiRecord;
 }
 
 const records = [rec(1, 1), rec(2, 2), rec(3, 3)];
@@ -43,7 +57,7 @@ const records = [rec(1, 1), rec(2, 2), rec(3, 3)];
 beforeEach(() => {
 	pageStore.value?.set(pageAt('7'));
 	locale.set('es');
-	authStore.setSession('tok', operator);
+	authStore.setSession(operator);
 });
 
 afterEach(() => {

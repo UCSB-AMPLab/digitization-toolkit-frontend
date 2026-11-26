@@ -11,13 +11,16 @@
 //   volume during the retake turn, and the promotion of a volume with
 //   rejected records;
 // - which volume the queue offers first, the folios a rejection comment
-//   names, and which record the guided retake opens next.
+//   names, and which record the guided retake opens next;
+// - a volume's progress, counting the records that miss a side (0.3.2),
+//   which are pending without a rejection: the guide walks them with the
+//   others, since pendingRecordIds lists them.
 //
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`), as capture-errors.ts does.
 // ============================================================================
 //
-// Version: 0.2.0
+// Version: 0.3.0
 
 import type { QueueItem, RetakeSummary, RetakeSummaryVolume } from './api';
 
@@ -37,7 +40,11 @@ function isVolume(v: unknown): v is RetakeSummaryVolume {
 		typeof x.total === 'number' &&
 		typeof x.firstPendingRecordId === 'number' &&
 		Array.isArray(x.pendingRecordIds) &&
-		x.pendingRecordIds.every((id) => typeof id === 'number')
+		x.pendingRecordIds.every((id) => typeof id === 'number') &&
+		// Absent from a backend before 0.3.2, which then has none.
+		(x.missingSideRecordIds === undefined ||
+			(Array.isArray(x.missingSideRecordIds) &&
+				x.missingSideRecordIds.every((id) => typeof id === 'number')))
 	);
 }
 
@@ -45,7 +52,12 @@ function isVolume(v: unknown): v is RetakeSummaryVolume {
 export function readRetakeSummary(data: unknown): RetakeSummary | null {
 	if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
 	const x = data as { pendingRecords?: unknown; volumes?: unknown; turn?: unknown };
-	if (typeof x.pendingRecords !== 'number' || !Array.isArray(x.volumes) || !x.volumes.every(isVolume)) return null;
+	if (
+		typeof x.pendingRecords !== 'number' ||
+		!Array.isArray(x.volumes) ||
+		!x.volumes.every(isVolume)
+	)
+		return null;
 	const turn = x.turn as { state?: unknown; unlockedBy?: unknown } | null | undefined;
 	if (!turn || typeof turn.state !== 'string' || !TURN_STATES.has(turn.state)) return null;
 	return data as RetakeSummary;
@@ -70,6 +82,26 @@ export function recapturesPendingCount(error: unknown): number | null {
 	return detail.pending;
 }
 
+export interface RetakeProgress {
+	pending: number;
+	total: number;
+	// Share of the volume's retakes already done, 0 to 100.
+	donePercent: number;
+}
+
+/**
+ * A volume's retakes for "p de t pendientes" and its bar. The backend counts
+ * a record that misses a side in `pending` and not in `total`, which counts
+ * the records ever rejected, so such records are added to the total here,
+ * and the total is never below the pending.
+ */
+export function retakeProgress(volume: RetakeSummaryVolume): RetakeProgress {
+	const pending = volume.pending;
+	const total = Math.max(pending, volume.total + (volume.missingSideRecordIds?.length ?? 0));
+	const donePercent = total > 0 ? ((total - pending) / total) * 100 : 0;
+	return { pending, total, donePercent };
+}
+
 /** The summary's volumes by collection id; empty without a summary. */
 export function retakeVolumeMap(summary: RetakeSummary | null): Map<number, RetakeSummaryVolume> {
 	return new Map((summary?.volumes ?? []).map((v) => [v.collectionId, v]));
@@ -77,10 +109,15 @@ export function retakeVolumeMap(summary: RetakeSummary | null): Map<number, Reta
 
 /**
  * The volume to retake next: the first item of the list, in list order,
- * whose volume has retakes pending, as Cola's Siguiente; without one, the
- * volume with most pending (the summary's first). Null when none is pending.
+ * whose volume has retakes pending; without one, the volume with most
+ * pending (the summary's first). Null when none is pending. Cola's
+ * Siguiente follows its own sections (0.3.1, $lib/queue), which put work in
+ * progress first, so the two can differ.
  */
-export function preferredRetakeVolume(summary: RetakeSummary | null, items: QueueItem[]): RetakeSummaryVolume | null {
+export function preferredRetakeVolume(
+	summary: RetakeSummary | null,
+	items: QueueItem[]
+): RetakeSummaryVolume | null {
 	const volumes = retakeVolumeMap(summary);
 	for (const item of items) {
 		const volume = item.collectionId != null ? volumes.get(item.collectionId) : undefined;
@@ -123,6 +160,10 @@ export function deferToBack(order: number[], id: number): number[] {
  * pending. `exceptId` leaves the open record out, to say what comes after
  * it. Null when none is.
  */
-export function guideNextId(order: number[], isPending: (id: number) => boolean, exceptId?: number): number | null {
+export function guideNextId(
+	order: number[],
+	isPending: (id: number) => boolean,
+	exceptId?: number
+): number | null {
 	return order.find((id) => id !== exceptId && isPending(id)) ?? null;
 }

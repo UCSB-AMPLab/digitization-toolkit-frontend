@@ -4,7 +4,7 @@
 //
 // No import of the catalogue index, which imports the catalogues.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { parseApiDate } from './pipeline';
 
@@ -17,6 +17,10 @@ const tags: Record<DateLocale, string> = { es: 'es-CO', en: 'en-US' };
  * string goes through parseApiDate, so a naive UTC value is shown in the
  * browser's time zone instead of being read as local time.
  */
-export function formatApiDate(iso: string, locale: DateLocale, options: Intl.DateTimeFormatOptions): string {
+export function formatApiDate(
+	iso: string,
+	locale: DateLocale,
+	options: Intl.DateTimeFormatOptions
+): string {
 	return parseApiDate(iso).toLocaleString(tags[locale], options);
 }

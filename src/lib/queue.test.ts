@@ -1,10 +1,13 @@
 // The digitisation queue's rules: which item is next, which are done, the
 // action filter, the import report's skips, and the capture instruction a
-// volume carries from its list.
+// volume carries from its list; and the Fisqua queue's (contract 1.7): the
+// list shown first, the items each user sees, and a spot recapture's pairs;
+// and Cola's three sections (0.3.1): in progress, recaptures and rescans,
+// new material, with Siguiente and the recapture turn's lock.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { describe, it, expect } from 'vitest';
-import type { QueueItem, QueueList, ImportReject, StatusCounts } from './api';
+import type { QueueItem, QueueList, ImportReject, RecordToRetake, StatusCounts } from './api';
 import {
 	QUEUE_ACTIONS,
 	isItemDone,
@@ -16,11 +19,20 @@ import {
 	captureInstruction,
 	instructionForVolume,
 	captureUrl,
-	retakeUrl
+	retakeUrl,
+	isQueueList,
+	defaultListId,
+	isItemShown,
+	itemsForUser,
+	filterByAssignee,
+	retakePairs,
+	sectionOf,
+	queueSections,
+	isLockedForTurn
 } from './queue';
 
 function counts(c: Partial<StatusCounts> = {}): StatusCounts {
-	return { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c };
+	return { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0, ...c };
 }
 
 function item(position: number, over: Partial<QueueItem> = {}): QueueItem {
@@ -42,7 +54,12 @@ function item(position: number, over: Partial<QueueItem> = {}): QueueItem {
 
 describe('QUEUE_ACTIONS', () => {
 	it('lists the four actions a list may carry', () => {
-		expect(QUEUE_ACTIONS).toEqual(['spot-recapture', 'full-rescan', 'full-digitisation', 'complete']);
+		expect(QUEUE_ACTIONS).toEqual([
+			'spot-recapture',
+			'full-rescan',
+			'full-digitisation',
+			'complete'
+		]);
 	});
 });
 
@@ -70,7 +87,9 @@ describe('isItemDone', () => {
 	it('with no action, or full-digitisation, is done when every record is approved', () => {
 		for (const action of [null, 'full-digitisation']) {
 			expect(isItemDone(item(1, { action, status: counts({ approved: 4 }) }))).toBe(true);
-			expect(isItemDone(item(1, { action, status: counts({ approved: 4, in_review: 1 }) }))).toBe(false);
+			expect(isItemDone(item(1, { action, status: counts({ approved: 4, in_review: 1 }) }))).toBe(
+				false
+			);
 			expect(isItemDone(item(1, { action, status: counts({ captured: 3 }) }))).toBe(false);
 			expect(isItemDone(item(1, { action }))).toBe(false);
 			expect(isItemDone(item(1, { action, collectionId: null, status: null }))).toBe(false);
@@ -84,7 +103,9 @@ describe('isItemDone', () => {
 	});
 
 	it('treats an action it does not know like one that recaptures: never done by records', () => {
-		expect(isItemDone(item(1, { action: 'rescan-cover', status: counts({ approved: 4 }) }))).toBe(false);
+		expect(isItemDone(item(1, { action: 'rescan-cover', status: counts({ approved: 4 }) }))).toBe(
+			false
+		);
 	});
 });
 
@@ -122,10 +143,50 @@ describe('nextItemPosition', () => {
 		expect(nextItemPosition(items, new Set())).toBe(1);
 	});
 
-	it('prefers an item with retakes even when it is marked done, but not one without a project', () => {
-		const items = [item(1), item(2, { doneMark: { by: 'a', at: null } }), item(3, { projectId: null })];
+	it('takes an item with retakes even when it is marked done, but not one without a project', () => {
+		const items = [
+			item(1),
+			item(2, { doneMark: { by: 'a', at: null } }),
+			item(3, { projectId: null })
+		];
 		expect(nextItemPosition(items, new Set([2]))).toBe(2);
 		expect(nextItemPosition(items, new Set([3]))).toBe(1);
+	});
+
+	it('never takes a done item without retakes (0.3.1)', () => {
+		const items = [item(1, { action: 'full-rescan', doneMark: { by: 'a', at: null } }), item(2)];
+		expect(nextItemPosition(items)).toBe(2);
+	});
+
+	it('takes the first in-progress item before any recapture, rescan or new volume (0.3.1)', () => {
+		const items = [
+			item(1),
+			item(2, { action: 'full-rescan' }),
+			item(3, { status: counts({ rejected: 2 }) }),
+			item(4, { action: 'spot-recapture', status: counts({ captured: 1 }) })
+		];
+		expect(nextItemPosition(items, new Set([3]))).toBe(4);
+	});
+
+	it('then the first of section 2, retakes before rescans, then the first new volume (0.3.1)', () => {
+		const items = [
+			item(1),
+			item(2, { action: 'full-rescan' }),
+			item(3, { status: counts({ rejected: 2 }) })
+		];
+		expect(nextItemPosition(items, new Set([3]))).toBe(3);
+		expect(nextItemPosition([item(1), item(2, { action: 'full-rescan' })])).toBe(2);
+		expect(nextItemPosition([item(1, { action: 'full-digitisation' })])).toBe(1);
+	});
+
+	it('skips, in every section, an item without a volume or a project (0.3.1)', () => {
+		const items = [
+			item(1, { status: counts({ captured: 1 }), projectId: null }),
+			item(2, { action: 'full-rescan', collectionId: null, status: null }),
+			item(3, { status: counts({ rejected: 1 }), projectId: null }),
+			item(4)
+		];
+		expect(nextItemPosition(items, new Set([3]))).toBe(4);
 	});
 
 	it('is null when every item is done', () => {
@@ -173,13 +234,21 @@ describe('isOnUnitReject', () => {
 
 describe('captureInstruction', () => {
 	it('reads fisqua.notes and fisqua.action', () => {
-		const attrs = JSON.stringify({ fisqua: { notes: '117r, 116v; 193r, 192v', action: 'spot-recapture' } });
-		expect(captureInstruction(attrs)).toEqual({ notes: '117r, 116v; 193r, 192v', action: 'spot-recapture' });
+		const attrs = JSON.stringify({
+			fisqua: { notes: '117r, 116v; 193r, 192v', action: 'spot-recapture' }
+		});
+		expect(captureInstruction(attrs)).toEqual({
+			notes: '117r, 116v; 193r, 192v',
+			action: 'spot-recapture'
+		});
 	});
 
 	it('gives a null action when the list gave none', () => {
 		const attrs = JSON.stringify({ fisqua: { notes: 'Desde el folio 49r hasta el final' } });
-		expect(captureInstruction(attrs)).toEqual({ notes: 'Desde el folio 49r hasta el final', action: null });
+		expect(captureInstruction(attrs)).toEqual({
+			notes: 'Desde el folio 49r hasta el final',
+			action: null
+		});
 	});
 
 	it('is null without notes, with blank notes, or with notes that are not text', () => {
@@ -206,7 +275,14 @@ describe('captureInstruction', () => {
 
 describe('instructionForVolume', () => {
 	function list(listId: string, items: QueueItem[]): QueueList {
-		return { listId, listName: listId, projectId: 1, importedAt: null, listFileMissing: false, items };
+		return {
+			listId,
+			listName: listId,
+			projectId: 1,
+			importedAt: null,
+			listFileMissing: false,
+			items
+		};
 	}
 
 	it('takes the item of the newest list (first in the response) whose volume is the open one', () => {
@@ -214,20 +290,62 @@ describe('instructionForVolume', () => {
 			list('new', [item(1, { collectionId: 9, notes: '117r, 116v', action: 'spot-recapture' })]),
 			list('old', [item(4, { collectionId: 9, notes: 'Todo el tomo', action: 'full-rescan' })])
 		];
-		expect(instructionForVolume(lists, 9)).toEqual({ notes: '117r, 116v', action: 'spot-recapture' });
+		expect(instructionForVolume(lists, 9)).toEqual({
+			notes: '117r, 116v',
+			action: 'spot-recapture'
+		});
 	});
 
 	it('looks in older lists when the newest has no item for the volume', () => {
-		const lists = [list('new', [item(1, { collectionId: 3 })]), list('old', [item(4, { collectionId: 9, notes: 'Desde 49r' })])];
+		const lists = [
+			list('new', [item(1, { collectionId: 3 })]),
+			list('old', [item(4, { collectionId: 9, notes: 'Desde 49r' })])
+		];
 		expect(instructionForVolume(lists, 9)).toEqual({ notes: 'Desde 49r', action: null });
 	});
 
 	it('gives an action without notes, and is null when the matching item has neither', () => {
-		expect(instructionForVolume([list('a', [item(1, { collectionId: 9, action: 'full-rescan' })])], 9)).toEqual({
+		expect(
+			instructionForVolume([list('a', [item(1, { collectionId: 9, action: 'full-rescan' })])], 9)
+		).toEqual({
 			notes: null,
 			action: 'full-rescan'
 		});
 		expect(instructionForVolume([list('a', [item(1, { collectionId: 9 })])], 9)).toBeNull();
+	});
+
+	it('skips a withdrawn queue item, so the next-newest list that names the volume decides', () => {
+		const lists = [
+			list('queue', [
+				item(1, { collectionId: 9, notes: '117r, 116v', action: 'spot-recapture', withdrawn: true })
+			]),
+			list('old', [item(4, { collectionId: 9, notes: 'Todo el tomo', action: 'full-rescan' })])
+		];
+		expect(instructionForVolume(lists, 9)).toEqual({
+			notes: 'Todo el tomo',
+			action: 'full-rescan'
+		});
+	});
+
+	it('is null, not undefined, when every item that names the volume is withdrawn or hidden', () => {
+		// Null keeps the caller from falling back to custom_attributes, where
+		// the backend keeps a withdrawn volume's Fisqua notes.
+		const withdrawn = [
+			list('queue', [
+				item(1, { collectionId: 9, notes: '117r', action: 'spot-recapture', withdrawn: true })
+			])
+		];
+		expect(instructionForVolume(withdrawn, 9)).toBeNull();
+		const hidden = [
+			list('queue', [item(1, { collectionId: 9, notes: '117r', withdrawn: true })]),
+			list('file', [item(2, { collectionId: 9, notes: 'Desde 49r', queueHidden: true })])
+		];
+		expect(instructionForVolume(hidden, 9)).toBeNull();
+	});
+
+	it('stays undefined when no list names the volume, with or without suppressed items of other volumes', () => {
+		const lists = [list('queue', [item(1, { collectionId: 3, notes: '117r', withdrawn: true })])];
+		expect(instructionForVolume(lists, 9)).toBeUndefined();
 	});
 
 	it('treats blank notes as none', () => {
@@ -245,5 +363,241 @@ describe('captureUrl and retakeUrl', () => {
 	it('are the capture screen, and the capture screen opened on one record', () => {
 		expect(captureUrl(2, 7)).toBe('/live-preview?projectId=2&collectionId=7');
 		expect(retakeUrl(2, 7, 41)).toBe('/live-preview?projectId=2&collectionId=7&recordId=41');
+	});
+});
+
+describe('excluded records (Fisqua contract 1.6)', () => {
+	it('count as records of the volume', () => {
+		expect(hasCapturedRecord(item(1, { status: counts({ excluded: 1 }) }))).toBe(true);
+	});
+
+	it('do not keep an item from being done once the rest is approved', () => {
+		expect(isItemDone(item(1, { status: counts({ approved: 8, excluded: 2 }) }))).toBe(true);
+	});
+
+	it('do not make an item done while other records are pending', () => {
+		expect(isItemDone(item(1, { status: counts({ rejected: 1, excluded: 2 }) }))).toBe(false);
+		expect(isItemDone(item(1, { status: counts({ in_review: 1, excluded: 2 }) }))).toBe(false);
+	});
+});
+
+describe('the Fisqua queue (contract 1.7)', () => {
+	function list(listId: string, source?: 'queue' | 'file'): QueueList {
+		return {
+			listId,
+			source,
+			listName: listId,
+			projectId: 1,
+			importedAt: null,
+			items: [],
+			listFileMissing: false
+		};
+	}
+
+	it('tells the queue from a file list, and a list from an older backend is a file list', () => {
+		expect(isQueueList(list('q', 'queue'))).toBe(true);
+		expect(isQueueList(list('f', 'file'))).toBe(false);
+		expect(isQueueList(list('old'))).toBe(false);
+		expect(isQueueList(null)).toBe(false);
+	});
+
+	it('shows the queue first when there is one, wherever it is in the lists', () => {
+		expect(defaultListId([list('f1', 'file'), list('q', 'queue'), list('f2', 'file')])).toBe('q');
+		expect(defaultListId([list('f1', 'file'), list('f2')])).toBe('f1');
+		expect(defaultListId([])).toBeNull();
+	});
+
+	it('leaves out withdrawn and hidden items, and keeps an item without the fields', () => {
+		expect(isItemShown(item(1))).toBe(true);
+		expect(isItemShown(item(1, { withdrawn: false, queueHidden: false }))).toBe(true);
+		expect(isItemShown(item(1, { withdrawn: true }))).toBe(false);
+		expect(isItemShown(item(1, { queueHidden: true }))).toBe(false);
+	});
+
+	const items = [
+		item(1, { assignee: 'ana' }),
+		item(2, { assignee: null }),
+		item(3, { assignee: 'luis' }),
+		item(4)
+	];
+	const positions = (xs: QueueItem[]) => xs.map((i) => i.position);
+
+	it('gives an operator the items assigned to them and the unassigned ones', () => {
+		expect(positions(itemsForUser(items, 'operator', 'ana'))).toEqual([1, 2, 4]);
+		expect(positions(itemsForUser(items, 'operator', 'luis'))).toEqual([2, 3, 4]);
+		expect(positions(itemsForUser(items, 'operator', null))).toEqual([2, 4]);
+	});
+
+	it('gives an admin and a reviewer every item', () => {
+		expect(positions(itemsForUser(items, 'admin', 'ana'))).toEqual([1, 2, 3, 4]);
+		expect(positions(itemsForUser(items, 'reviewer', 'ana'))).toEqual([1, 2, 3, 4]);
+	});
+
+	it('filters by Mine, Unassigned and Everyone', () => {
+		expect(positions(filterByAssignee(items, 'mine', 'luis'))).toEqual([3]);
+		expect(positions(filterByAssignee(items, 'unassigned', 'luis'))).toEqual([2, 4]);
+		expect(positions(filterByAssignee(items, 'everyone', 'luis'))).toEqual([1, 2, 3, 4]);
+		expect(positions(filterByAssignee(items, 'mine', null))).toEqual([]);
+	});
+
+	function row(recordId: number, title: string, sequence: number | null): RecordToRetake {
+		return {
+			recordId,
+			title,
+			sequence,
+			collectionId: 1,
+			projectId: 1,
+			name: null,
+			filenameStem: null,
+			reason: null,
+			comment: null,
+			rejectedBy: null,
+			rejectedAt: null,
+			pendingReason: 'rejected',
+			missingSide: null
+		};
+	}
+
+	it('names each pair from the records to retake, by sequence where known, the unknown ones after', () => {
+		const pairs = retakePairs(
+			[
+				{ captuaRecordId: 30, pairId: 'p-30', side: 'both' },
+				{ captuaRecordId: 99, pairId: null, side: 'left' },
+				{ captuaRecordId: 10, pairId: null, side: 'right' },
+				{ captuaRecordId: 20, pairId: 'p-20', side: 'both' },
+				{ captuaRecordId: 98, pairId: 'p-98', side: 'both' }
+			],
+			[row(10, 'f. 10', 10), row(30, 'f. 30', 30), row(20, 'f. 20', null)]
+		);
+		expect(pairs.map((p) => [p.recordId, p.title, p.sequence])).toEqual([
+			[10, 'f. 10', 10],
+			[30, 'f. 30', 30],
+			[20, 'f. 20', null],
+			[99, null, null],
+			[98, null, null]
+		]);
+		expect(pairs[3]).toMatchObject({ pairId: null, side: 'left' });
+	});
+
+	it('has no pairs for an item without retakes', () => {
+		expect(retakePairs(undefined, [])).toEqual([]);
+		expect(retakePairs([], [row(1, 'x', 1)])).toEqual([]);
+	});
+});
+
+describe("Cola's sections (0.3.1)", () => {
+	it('puts an item with records and no retakes in progress, whatever its action', () => {
+		for (const action of [
+			null,
+			'spot-recapture',
+			'full-rescan',
+			'full-digitisation',
+			'complete',
+			'other'
+		]) {
+			expect(sectionOf(item(1, { action, status: counts({ captured: 1 }) }))).toBe('progress');
+		}
+		// Excluded records are records of the volume too.
+		expect(sectionOf(item(1, { action: 'full-rescan', status: counts({ excluded: 1 }) }))).toBe(
+			'progress'
+		);
+	});
+
+	it('puts the items whose volume has retakes, then the rescans not in progress, in section 2', () => {
+		const items = [
+			item(1, { action: 'full-rescan' }),
+			item(2, { status: counts({ rejected: 3 }) }),
+			item(3, { action: 'full-rescan', status: counts({ approved: 1 }) }),
+			item(4, { action: 'full-rescan' }),
+			item(5, { action: 'spot-recapture', status: counts({ rejected: 1, approved: 4 }) })
+		];
+		expect(sectionOf(items[1], new Set([2]))).toBe('rework');
+		expect(sectionOf(items[0], new Set([2]))).toBe('rework');
+		const { sections } = queueSections(items, new Set([2, 5]));
+		expect(sections.map((s) => s.key)).toEqual(['progress', 'rework']);
+		expect(sections[0].items.map((i) => i.position)).toEqual([3]);
+		expect(sections[1].items.map((i) => i.position)).toEqual([2, 5, 1, 4]);
+	});
+
+	it('puts a full digitisation, and anything else not done, in new material', () => {
+		expect(sectionOf(item(1, { action: 'full-digitisation' }))).toBe('new');
+		expect(sectionOf(item(1))).toBe('new');
+		expect(
+			sectionOf(item(1, { action: 'full-digitisation', collectionId: null, status: null }))
+		).toBe('new');
+	});
+
+	it('puts done items in no section, and lists them apart in list order', () => {
+		const items = [
+			item(1, { status: counts({ approved: 2 }) }),
+			item(2, { action: 'full-rescan', doneMark: { by: 'a', at: null } }),
+			item(3, { status: counts({ rejected: 1 }), doneMark: { by: 'a', at: null } }),
+			item(4)
+		];
+		expect(sectionOf(items[0])).toBeNull();
+		expect(sectionOf(items[1])).toBeNull();
+		const { sections, done } = queueSections(items);
+		expect(sections.flatMap((s) => s.items).map((i) => i.position)).toEqual([4]);
+		expect(done.map((i) => i.position)).toEqual([1, 2, 3]);
+	});
+
+	it('keeps a done-marked item whose volume has retakes in section 2, ahead of the rescans, and as Siguiente', () => {
+		const items = [
+			item(1, { action: 'full-rescan' }),
+			item(2, { status: counts({ rejected: 1, approved: 3 }), doneMark: { by: 'a', at: null } }),
+			item(3, { status: counts({ approved: 2 }), doneMark: { by: 'a', at: null } })
+		];
+		const retakes = new Set([2]);
+		expect(sectionOf(items[1], retakes)).toBe('rework');
+		const { sections, done } = queueSections(items, retakes);
+		expect(sections.map((s) => [s.key, s.items.map((i) => i.position)])).toEqual([
+			['rework', [2, 1]]
+		]);
+		expect(done.map((i) => i.position)).toEqual([3]);
+		expect(nextItemPosition(items, retakes)).toBe(2);
+	});
+
+	it('numbers the sections shown, leaving out the empty ones', () => {
+		const onlyNew = queueSections([item(1)]);
+		expect(onlyNew.sections).toEqual([
+			{ key: 'new', ordinal: 1, items: [onlyNew.sections[0].items[0]] }
+		]);
+		const reworkAndNew = queueSections([item(1), item(2, { action: 'full-rescan' })]);
+		expect(reworkAndNew.sections.map((s) => [s.key, s.ordinal])).toEqual([
+			['rework', 1],
+			['new', 2]
+		]);
+		const all = queueSections([
+			item(1),
+			item(2, { action: 'full-rescan' }),
+			item(3, { status: counts({ captured: 1 }) })
+		]);
+		expect(all.sections.map((s) => [s.key, s.ordinal])).toEqual([
+			['progress', 1],
+			['rework', 2],
+			['new', 3]
+		]);
+		const progressAndNew = queueSections([item(1), item(3, { status: counts({ captured: 1 }) })]);
+		expect(progressAndNew.sections.map((s) => [s.key, s.ordinal])).toEqual([
+			['progress', 1],
+			['new', 2]
+		]);
+		expect(queueSections([]).sections).toEqual([]);
+		expect(queueSections([item(1, { doneMark: { by: 'a', at: null } })]).sections).toEqual([]);
+	});
+
+	it('locks new material only during the recaptures turn, and never sections 1 and 2', () => {
+		const retakes = new Set([2]);
+		const progress = item(1, { action: 'full-rescan', status: counts({ captured: 1 }) });
+		const retake = item(2, { status: counts({ rejected: 1 }) });
+		const rescan = item(3, { action: 'full-rescan' });
+		const fresh = item(4, { action: 'full-digitisation' });
+		for (const i of [progress, retake, rescan]) {
+			for (const turn of ['recaptures', 'new', 'free', null])
+				expect(isLockedForTurn(i, retakes, turn)).toBe(false);
+		}
+		expect(isLockedForTurn(fresh, retakes, 'recaptures')).toBe(true);
+		for (const turn of ['new', 'free', null])
+			expect(isLockedForTurn(fresh, retakes, turn)).toBe(false);
 	});
 });

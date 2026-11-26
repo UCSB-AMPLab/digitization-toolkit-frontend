@@ -4,8 +4,9 @@
 	//
 	// Polls GET /collections/{id}/offsite on the schedule of the catalogue
 	// backup poll, and reads the unit's image copy state from that poll's
-	// shared store, so a unit with the image copy off or misconfigured says
-	// so instead of showing every volume as pending. A failed request shows "could not
+	// shared store, so a unit with the image copy off, misconfigured, or off in
+	// the unit's mode (NEH-319) says so instead of showing every volume as
+	// pending. `mode_off`, like `off`, has no icon. A failed request shows "could not
 	// check", never a guessed state (NEH-138).
 	//
 	// A volume whose files were freed from the card says so, with the count and
@@ -14,9 +15,11 @@
 	// of them to ask again at once.
 	//
 	// The same answer carries the volume's delivery to Fisqua (`fisqua`),
-	// shown under the line by VolumeFisquaLine, with no request of its own.
+	// shown under the line by VolumeFisquaLine, with no request of its own;
+	// not for a volume Captua keeps on the unit (NEH-320), whose line,
+	// `kept`, has no icon either.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 	import { untrack } from 'svelte';
 	import { m, locale } from '$lib/i18n';
 	import { collectionsApi, AuthError } from '$lib/api';
@@ -24,6 +27,7 @@
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
 	import { POLL_INTERVAL_MS, REQUEST_TIMEOUT_MS, startPolling } from '$lib/catalogue-backup';
 	import {
+		fisquaLineOf,
 		unitUploadState,
 		volumeOffsiteView,
 		type VolumeOffsiteKind,
@@ -89,21 +93,28 @@
 
 	let fullText = $derived(
 		view
-			? [view.headline, view.freed, view.lastVerified, view.help].filter((part) => part !== null).join(' · ')
+			? [view.headline, view.freed, view.lastVerified, view.help]
+					.filter((part) => part !== null)
+					.join(' · ')
 			: ''
 	);
 	let icon = $derived(view ? icons[view.kind] : undefined);
-	let fisqua = $derived(snapshot.kind === 'loaded' ? snapshot.state.fisqua : null);
+	let fisqua = $derived(snapshot.kind === 'loaded' ? fisquaLineOf(snapshot.state) : null);
 </script>
 
 {#if view}
 	<p class="offsite-indicator offsite-{view.kind}" data-kind={view.kind} title={fullText}>
 		<span class="visually-hidden">{$m.offsite_vol_label}: </span>
 		{#if icon}
-			<span class="material-symbols-outlined offsite-indicator-icon" aria-hidden="true">{icon}</span>
+			<span class="material-symbols-outlined offsite-indicator-icon" aria-hidden="true">{icon}</span
+			>
 		{/if}
 		<span class="offsite-indicator-text">
-			{view.headline}{#if view.freed}<span class="offsite-indicator-sep"> · </span>{view.freed}{/if}{#if view.lastVerified}<span class="offsite-indicator-sep"> · </span>{view.lastVerified}{/if}
+			{view.headline}{#if view.freed}<span class="offsite-indicator-sep">
+					·
+				</span>{view.freed}{/if}{#if view.lastVerified}<span class="offsite-indicator-sep">
+					·
+				</span>{view.lastVerified}{/if}
 		</span>
 	</p>
 {/if}

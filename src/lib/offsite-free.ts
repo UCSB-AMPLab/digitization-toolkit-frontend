@@ -15,7 +15,7 @@
 // rather than being shown as the wrong one. No import of api.ts beyond types,
 // so the tests run in plain node.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 import { REQUEST_TIMEOUT_MS } from './catalogue-backup';
@@ -35,17 +35,20 @@ const NO_STEM_MESSAGE =
 	'This volume has no file name stem, so none of its files are stored offsite and none can be freed or restored.';
 const NOT_RECEIVED_MESSAGE =
 	'Not every file of this volume is verified in the offsite bucket yet, so its files cannot be freed from the card. Wait for the upload to finish.';
-const EXPORT_MESSAGE = 'An export of this volume is queued or running. Wait for it to finish, then try again.';
+const EXPORT_MESSAGE =
+	'An export of this volume is queued or running. Wait for it to finish, then try again.';
 const LISTING_MESSAGE =
 	'The offsite bucket could not be listed, so nothing could be checked against it and nothing was freed. Try again later.';
 const NO_READ_REMOTE_MESSAGE =
 	'Restore is not set up on this unit: it needs read access to the offsite bucket (CAPTUA_OFFSITE_READ_REMOTE), and none is configured.';
 const NOT_IN_OWN_FOLDER_MESSAGE =
 	"Some of this volume's files have not yet been moved into the volume's own folder, so its files cannot be freed from the card or restored. Captua moves them the next time it starts. If they are still not moved after a restart, the backend's log says why (for example, the folder already holds files that are not this volume's); once that is cleared and Captua has restarted, the volume can be freed.";
-const JOB_RUNNING_MESSAGE = 'Files of this volume are already being freed or restored. Wait for that to finish.';
+const JOB_RUNNING_MESSAGE =
+	'Files of this volume are already being freed or restored. Wait for that to finish.';
 // FREED_EXPORT_MESSAGE, with its count: the export's 409 (app/api/collections.py)
 // and the export job's failure when a free followed the request (app/core/export_service.py).
-const FREED_EXPORT = /^(\d+) file\(s\) of this volume are stored offsite and freed from the card\. Restore the volume before exporting it\.$/;
+const FREED_EXPORT =
+	/^(\d+) file\(s\) of this volume are stored offsite and freed from the card\. Restore the volume before exporting it\.$/;
 
 // app/core/export_jobs.py: the hold a free or a restore takes refuses with this too.
 const FILES_BEING_READ_MESSAGE =
@@ -105,7 +108,11 @@ function genericText(action: OffsiteAction, msgs: Messages): string {
 }
 
 /** The message for a dry run, a free or a restore the backend refused, or that failed to reach it. */
-export function offsiteActionErrorText(error: unknown, action: OffsiteAction, msgs: Messages): string {
+export function offsiteActionErrorText(
+	error: unknown,
+	action: OffsiteAction,
+	msgs: Messages
+): string {
 	const status = statusOf(error);
 	const text = error instanceof Error ? error.message : '';
 	if (status === 409) return refusalText(text, msgs) ?? genericText(action, msgs);
@@ -119,7 +126,11 @@ export function offsiteActionErrorText(error: unknown, action: OffsiteAction, ms
  * refusal checked again inside the job, or a storage root lost during a
  * restore (str() of StorageUnavailableError).
  */
-export function offsiteJobErrorText(error: string | null, action: 'free' | 'restore', msgs: Messages): string {
+export function offsiteJobErrorText(
+	error: string | null,
+	action: 'free' | 'restore',
+	msgs: Messages
+): string {
 	if (typeof error === 'string') {
 		if (error.startsWith(LISTING_MESSAGE)) return msgs.offsite_err_listing;
 		const known = refusalText(error, msgs) ?? storageText(error, msgs);
@@ -198,7 +209,9 @@ export function refusalLines(refused: OffsiteFileEntry[], msgs: Messages): strin
 			other += 1;
 		}
 	}
-	const lines = REASONS.filter((r) => counts.has(r)).map((r) => reasonText(r, counts.get(r)!, msgs));
+	const lines = REASONS.filter((r) => counts.has(r)).map((r) =>
+		reasonText(r, counts.get(r)!, msgs)
+	);
 	if (other > 0) lines.push(msgs.offsite_reason_other(other));
 	return lines;
 }
@@ -215,6 +228,40 @@ export function freedExportCount(error: unknown): number | null {
 	const match = text === null ? null : FREED_EXPORT.exec(text);
 	return match ? Number(match[1]) : null;
 }
+
+function restorableIn(detail: unknown): boolean | undefined {
+	if (typeof detail !== 'object' || detail === null) return undefined;
+	const r = (detail as { restorable?: unknown }).restorable;
+	return typeof r === 'boolean' ? r : undefined;
+}
+
+/**
+ * The message for an export refused because masters are freed from the card,
+ * or null for any other error: from the export's 409 (an ApiError, whose
+ * detail carries `restorable`) or from a failed export job (its `error`, and
+ * its `detail` as `jobDetail`). When the unit says it cannot restore
+ * (`restorable` false, NEH-380), the message says the volume cannot be
+ * exported here; otherwise, and from an older backend that does not say, it
+ * is the restore message as before.
+ */
+export function freedExportText(
+	error: unknown,
+	msgs: Messages,
+	jobDetail?: unknown
+): string | null {
+	const n = freedExportCount(error);
+	if (n === null) return null;
+	const detail = typeof error === 'string' ? jobDetail : (error as { detail?: unknown }).detail;
+	return restorableIn(detail) === false ? msgs.export_freed_no_restore : msgs.col_export_freed(n);
+}
+
+/** The message for an image ZIP that met a freed file: col_zip_freed, unless the unit says it cannot restore. */
+export function freedZipText(freed: { restorable?: boolean }, msgs: Messages): string {
+	return freed.restorable === false ? msgs.export_freed_no_restore : msgs.col_zip_freed;
+}
+
+/** How often a free or a restore job's status is asked for, by its dialog and by the Storage section's watch. */
+export const OFFSITE_POLL_INTERVAL_MS = 2000;
 
 export interface PollOptions {
 	intervalMs: number;
@@ -250,12 +297,17 @@ async function bounded<T>(
 	const timer =
 		timeoutMs === null
 			? null
-			: setTimeout(() => controller.abort(new DOMException('The request timed out', 'TimeoutError')), timeoutMs);
+			: setTimeout(
+					() => controller.abort(new DOMException('The request timed out', 'TimeoutError')),
+					timeoutMs
+				);
 	try {
 		return await Promise.race([
 			request(controller.signal),
 			new Promise<never>((_resolve, reject) =>
-				controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true })
+				controller.signal.addEventListener('abort', () => reject(controller.signal.reason), {
+					once: true
+				})
 			)
 		]);
 	} finally {
@@ -272,7 +324,13 @@ async function bounded<T>(
  */
 export async function pollOffsiteJob(
 	fetchStatus: (signal: AbortSignal) => Promise<OffsiteJobStatus>,
-	{ intervalMs, wait = sleep, signal, maxFailures = 5, requestTimeoutMs = REQUEST_TIMEOUT_MS }: PollOptions
+	{
+		intervalMs,
+		wait = sleep,
+		signal,
+		maxFailures = 5,
+		requestTimeoutMs = REQUEST_TIMEOUT_MS
+	}: PollOptions
 ): Promise<OffsiteJobStatus> {
 	let failures = 0;
 	for (;;) {
@@ -297,13 +355,15 @@ export async function pollOffsiteJob(
 /**
  * Which actions an admin is offered for the volume: freeing once every file
  * is verified offsite and some verified file is still on the card, restoring
- * once any file is freed. The backend checks again and refuses with 409.
+ * once any file is freed, unless the unit says it cannot restore
+ * (`restorable` false, NEH-380; an older backend that does not say is offered
+ * it as before). The backend checks again and refuses with 409.
  */
 export function offsiteOffer(state: VolumeOffsiteState): { free: boolean; restore: boolean } {
 	const freed = state.freed_files ?? 0;
 	return {
 		free: state.uploadable && state.received && state.verified > freed,
-		restore: state.uploadable && freed > 0
+		restore: state.uploadable && freed > 0 && state.restorable !== false
 	};
 }
 
@@ -320,7 +380,9 @@ export function planSummary(plan: FreePlan, msgs: Messages): OffsiteSummary & { 
 	const left = plan.refused.length;
 	return {
 		canFree,
-		body: canFree ? msgs.offsite_plan_will_free(plan.would_free.files, plan.would_free.bytes) : msgs.offsite_plan_nothing,
+		body: canFree
+			? msgs.offsite_plan_will_free(plan.would_free.files, plan.would_free.bytes)
+			: msgs.offsite_plan_nothing,
 		leftTitle: left > 0 ? msgs.offsite_plan_left(left) : null,
 		leftLines: refusalLines(plan.refused, msgs)
 	};
@@ -358,7 +420,11 @@ export type OffsiteOutcome =
 	| { kind: 'aborted' };
 
 function isAbort(error: unknown): boolean {
-	return typeof error === 'object' && error !== null && (error as { name?: unknown }).name === 'AbortError';
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		(error as { name?: unknown }).name === 'AbortError'
+	);
 }
 
 /**
@@ -385,11 +451,15 @@ export async function runOffsiteJob(
 	}
 	try {
 		const final = await pollOffsiteJob((signal) => getJob(started.job_id, signal), options);
-		if (final.state === 'failed') return { kind: 'error', text: offsiteJobErrorText(final.error, action, msgs) };
+		if (final.state === 'failed')
+			return { kind: 'error', text: offsiteJobErrorText(final.error, action, msgs) };
 		return { kind: 'done', result: final.result };
 	} catch (error) {
 		if (isAbort(error)) return { kind: 'aborted' };
-		return { kind: 'error', text: isJobLost(error) ? msgs.offsite_err_job_lost : msgs.offsite_err_poll };
+		return {
+			kind: 'error',
+			text: isJobLost(error) ? msgs.offsite_err_job_lost : msgs.offsite_err_poll
+		};
 	}
 }
 
@@ -401,7 +471,11 @@ export interface FreedCounts {
 }
 
 export function freedCountsOf(state: VolumeOffsiteState): FreedCounts {
-	return { collectionId: state.collection_id, files: state.freed_files ?? 0, bytes: state.freed_bytes ?? 0 };
+	return {
+		collectionId: state.collection_id,
+		files: state.freed_files ?? 0,
+		bytes: state.freed_bytes ?? 0
+	};
 }
 
 /**
@@ -411,8 +485,13 @@ export function freedCountsOf(state: VolumeOffsiteState): FreedCounts {
  * first reading of a volume, and a reading of any other volume, is never a
  * change: the page loads a volume's records when it shows it.
  */
-export function freedCountsChanged(prev: FreedCounts | null, next: FreedCounts, currentId: number): boolean {
-	if (prev === null || next.collectionId !== currentId || prev.collectionId !== next.collectionId) return false;
+export function freedCountsChanged(
+	prev: FreedCounts | null,
+	next: FreedCounts,
+	currentId: number
+): boolean {
+	if (prev === null || next.collectionId !== currentId || prev.collectionId !== next.collectionId)
+		return false;
 	return prev.files !== next.files || prev.bytes !== next.bytes;
 }
 

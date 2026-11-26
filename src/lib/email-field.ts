@@ -2,7 +2,7 @@
 // email field is optional across setup and user forms. A value that is
 // given still has to look like an email.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -11,8 +11,8 @@ const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * or null when nothing was entered.
  */
 export function normalizeEmail(raw: string): string | null {
-  const trimmed = raw.trim();
-  return trimmed === '' ? null : trimmed;
+	const trimmed = raw.trim();
+	return trimmed === '' ? null : trimmed;
 }
 
 /**
@@ -20,7 +20,7 @@ export function normalizeEmail(raw: string): string | null {
  * empty value is not an error — the field is optional.
  */
 export function emailFormatError(raw: string): boolean {
-  const trimmed = raw.trim();
-  if (trimmed === '') return false;
-  return !EMAIL_FORMAT.test(trimmed);
+	const trimmed = raw.trim();
+	if (trimmed === '') return false;
+	return !EMAIL_FORMAT.test(trimmed);
 }

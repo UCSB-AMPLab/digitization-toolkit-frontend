@@ -1,17 +1,25 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
 import { en } from './i18n/en';
 import { formatBackupDate, formatBackupTime } from './catalogue-backup';
 import { unitFisquaView, volumeFisquaView } from './fisqua-state';
-import type { FisquaOutboxEntry, FisquaVolumeStatus, UnitFisquaSummary, VolumeFisquaState } from '$lib/api';
+import type {
+	FisquaOutboxEntry,
+	FisquaVolumeStatus,
+	UnitFisquaSummary,
+	VolumeFisquaState
+} from '$lib/api';
 
 // Noon local time, so "today" does not depend on the host's zone.
 const NOW = new Date(2026, 9, 24, 12, 0, 0);
 // The backend sends naive UTC (DateTime columns, no zone).
 function naiveUtc(d: Date): string {
-	return d.toISOString().replace('Z', '').replace(/\.\d{3}$/, '');
+	return d
+		.toISOString()
+		.replace('Z', '')
+		.replace(/\.\d{3}$/, '');
 }
 const TODAY_1405 = new Date(2026, 9, 24, 14, 5, 0);
 const TODAY_0930 = new Date(2026, 9, 24, 9, 30, 0);
@@ -51,7 +59,12 @@ function fisqua(over: Partial<VolumeFisquaState> = {}): VolumeFisquaState {
 	return { environment: 'production', config_error: null, outbox: [], status: null, ...over };
 }
 
-const delivered = row({ state: 'delivered', attempts: 1, delivered_at: naiveUtc(TODAY_0930), external_id: 'fq-1' });
+const delivered = row({
+	state: 'delivered',
+	attempts: 1,
+	delivered_at: naiveUtc(TODAY_0930),
+	external_id: 'fq-1'
+});
 
 describe('volumeFisquaView', () => {
 	it('renders nothing when the unit has no Fisqua configured', () => {
@@ -82,10 +95,30 @@ describe('volumeFisquaView', () => {
 
 	it('shows a failed send with its next attempt, and that Captua will retry', () => {
 		const next = naiveUtc(TODAY_1405);
-		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'failed', attempts: 2, next_attempt_at: next, last_error: 'ConnectError: boom' })] }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({
+				outbox: [
+					row({
+						state: 'failed',
+						attempts: 2,
+						next_attempt_at: next,
+						last_error: 'ConnectError: boom'
+					})
+				]
+			}),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.kind).toBe('failed');
 		expect(view.tone).toBe('attention');
-		expect(view.label).toBe(en.fisqua_out_failed('today', formatBackupDate(TODAY_1405, NOW, 'en'), formatBackupTime(TODAY_1405, 'en')));
+		expect(view.label).toBe(
+			en.fisqua_out_failed(
+				'today',
+				formatBackupDate(TODAY_1405, NOW, 'en'),
+				formatBackupTime(TODAY_1405, 'en')
+			)
+		);
 		expect(view.label).toContain('14:05');
 		expect(view.label).toContain('try again');
 		// The backend's English error is never shown.
@@ -99,16 +132,30 @@ describe('volumeFisquaView', () => {
 
 	it('lists a refusal by Captua in the catalogue words, with reference_code_differs', () => {
 		const problems = [
-			{ rule: 'reference_code_differs', message: 'The reference code differs from the stem, so it is not sent', record_ids: [], image_ids: [] },
+			{
+				rule: 'reference_code_differs',
+				message: 'The reference code differs from the stem, so it is not sent',
+				record_ids: [],
+				image_ids: []
+			},
 			{ rule: 'sha256_missing', message: 'x', record_ids: [4, 2], image_ids: [9] },
 			{ rule: 'brand_new_rule', message: 'Something new.', record_ids: [], image_ids: [] }
 		];
-		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'not_exportable', problems })] }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [row({ state: 'refused', refusal: 'not_exportable', problems })] }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.kind).toBe('not_exportable');
 		expect(view.label).toBe(en.fisqua_out_not_exportable);
 		expect(view.problems).toEqual([
 			{ text: en.col_manifest_rule_reference_code_differs, records: null, fromFisqua: false },
-			{ text: en.col_manifest_rule_sha256_missing, records: en.col_manifest_records([2, 4]), fromFisqua: false },
+			{
+				text: en.col_manifest_rule_sha256_missing,
+				records: en.col_manifest_records([2, 4]),
+				fromFisqua: false
+			},
 			{ text: en.col_manifest_rule_other, records: null, fromFisqua: false }
 		]);
 		// The backend's English texts are not shown.
@@ -116,9 +163,18 @@ describe('volumeFisquaView', () => {
 	});
 
 	it('lists a refusal for a reference code that differs from the stem', () => {
-		const problems = [{ rule: 'reference_code_differs', message: 'differs', record_ids: [], image_ids: [] }];
-		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'not_exportable', problems })] }), NOW, 'en', en)!;
-		expect(view.problems).toEqual([{ text: en.col_manifest_rule_reference_code_differs, records: null, fromFisqua: false }]);
+		const problems = [
+			{ rule: 'reference_code_differs', message: 'differs', record_ids: [], image_ids: [] }
+		];
+		const view = volumeFisquaView(
+			fisqua({ outbox: [row({ state: 'refused', refusal: 'not_exportable', problems })] }),
+			NOW,
+			'en',
+			en
+		)!;
+		expect(view.problems).toEqual([
+			{ text: en.col_manifest_rule_reference_code_differs, records: null, fromFisqua: false }
+		]);
 	});
 
 	it("lists a refusal by Fisqua in Fisqua's own words, marked as Fisqua's", () => {
@@ -126,94 +182,195 @@ describe('volumeFisquaView', () => {
 			{ rule: 'run-started', message: 'A run has started on the older manifest.', recordIds: [1] },
 			{ rule: 'description' }
 		];
-		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.kind).toBe('refused_by_fisqua');
 		expect(view.label).toBe(en.fisqua_out_refused_by_fisqua);
 		expect(view.problems).toEqual([
-			{ text: en.fisqua_problem_from_fisqua('A run has started on the older manifest.'), records: null, fromFisqua: true },
+			{
+				text: en.fisqua_problem_from_fisqua('A run has started on the older manifest.'),
+				records: null,
+				fromFisqua: true
+			},
 			{ text: en.fisqua_problem_from_fisqua('description'), records: null, fromFisqua: true }
 		]);
 	});
 
 	it("shows Fisqua's object-missing refusal as an incident, with each missing key", () => {
 		const problems = [
-			{ rule: 'object-missing', message: 'not in the masters bucket', objectKey: 'rionegro/co-x/co-x_0001_L.cr2', captureId: 'cap-1', role: 'left', kind: 'capture' },
-			{ rule: 'object-missing', message: 'not in the masters bucket', objectKey: 'rionegro/co-x/co-x_0002.jpg', captureId: 'cap-2', role: 'single', kind: 'preview' },
+			{
+				rule: 'object-missing',
+				message: 'not in the masters bucket',
+				objectKey: 'rionegro/co-x/co-x_0001_L.cr2',
+				captureId: 'cap-1',
+				role: 'left',
+				kind: 'capture'
+			},
+			{
+				rule: 'object-missing',
+				message: 'not in the masters bucket',
+				objectKey: 'rionegro/co-x/co-x_0002.jpg',
+				captureId: 'cap-2',
+				role: 'single',
+				kind: 'preview'
+			},
 			{ rule: 'run-started', message: 'A run has started.' }
 		];
-		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }), NOW, 'en', en)!;
-		expect(view.tone).toBe('attention');
-		expect(view.incident).toEqual({
-			text: en.fisqua_incident_object_missing,
-			missing: [
-				{ key: 'rionegro/co-x/co-x_0001_L.cr2', captureId: 'cap-1', kind: en.fisqua_kind_capture, role: en.col_role_left },
-				{ key: 'rionegro/co-x/co-x_0002.jpg', captureId: 'cap-2', kind: en.fisqua_kind_preview, role: en.fisqua_role_single }
-			]
-		});
-		// The other rules stay Fisqua's messages; object-missing is not repeated among them.
-		expect(view.problems).toEqual([{ text: en.fisqua_problem_from_fisqua('A run has started.'), records: null, fromFisqua: true }]);
-	});
-
-	it.each([
-		['bad-request', 'Fisqua refused the manifest as malformed.', 'fisqua_rule_bad_request'],
-		['payload-too-large', 'Fisqua refused the manifest as too large.', 'fisqua_rule_payload_too_large']
-	] as const)("words Captua's own %s problem in the catalogue, not as Fisqua's", (rule, message, key) => {
 		const view = volumeFisquaView(
-			fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems: [{ rule, message }], attempts: 1 })] }),
+			fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }),
 			NOW,
 			'en',
 			en
 		)!;
-		expect(view.problems).toEqual([{ text: en[key], records: null, fromFisqua: false }]);
-		expect(JSON.stringify(view)).not.toContain(message);
+		expect(view.tone).toBe('attention');
+		expect(view.incident).toEqual({
+			text: en.fisqua_incident_object_missing,
+			missing: [
+				{
+					key: 'rionegro/co-x/co-x_0001_L.cr2',
+					captureId: 'cap-1',
+					kind: en.fisqua_kind_capture,
+					role: en.col_role_left
+				},
+				{
+					key: 'rionegro/co-x/co-x_0002.jpg',
+					captureId: 'cap-2',
+					kind: en.fisqua_kind_preview,
+					role: en.fisqua_role_single
+				}
+			]
+		});
+		// The other rules stay Fisqua's messages; object-missing is not repeated among them.
+		expect(view.problems).toEqual([
+			{ text: en.fisqua_problem_from_fisqua('A run has started.'), records: null, fromFisqua: true }
+		]);
 	});
+
+	it.each([
+		['bad-request', 'Fisqua refused the manifest as malformed.', 'fisqua_rule_bad_request'],
+		[
+			'payload-too-large',
+			'Fisqua refused the manifest as too large.',
+			'fisqua_rule_payload_too_large'
+		]
+	] as const)(
+		"words Captua's own %s problem in the catalogue, not as Fisqua's",
+		(rule, message, key) => {
+			const view = volumeFisquaView(
+				fisqua({
+					outbox: [
+						row({ state: 'refused', refusal: 'fisqua', problems: [{ rule, message }], attempts: 1 })
+					]
+				}),
+				NOW,
+				'en',
+				en
+			)!;
+			expect(view.problems).toEqual([{ text: en[key], records: null, fromFisqua: false }]);
+			expect(JSON.stringify(view)).not.toContain(message);
+		}
+	);
 
 	it("counts a truncated refusal's omitted problems, without listing the truncation as one", () => {
 		const problems = [
 			{ rule: 'capture-key', message: 'a' },
 			{ rule: 'problems-truncated', message: '42 more problems are not listed', omitted: 42 }
 		];
-		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }), NOW, 'en', en)!;
-		expect(view.problems).toEqual([{ text: en.fisqua_problem_from_fisqua('a'), records: null, fromFisqua: true }]);
+		const view = volumeFisquaView(
+			fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems, attempts: 1 })] }),
+			NOW,
+			'en',
+			en
+		)!;
+		expect(view.problems).toEqual([
+			{ text: en.fisqua_problem_from_fisqua('a'), records: null, fromFisqua: true }
+		]);
 		expect(view.omitted).toBe(42);
 		expect(view.problemsKind).toBe('problems');
 	});
 
 	it('calls the status entries notes on a volume Fisqua has not refused, with unlisted-object in neutral words', () => {
 		const problems = [
-			{ rule: 'unlisted-object', message: 'x is in the masters bucket and not in the manifest', stem: 'co-x', objectKey: 'rionegro/co-x/stray.jpg', size: 10 },
+			{
+				rule: 'unlisted-object',
+				message: 'x is in the masters bucket and not in the manifest',
+				stem: 'co-x',
+				objectKey: 'rionegro/co-x/stray.jpg',
+				size: 10
+			},
 			{ rule: 'problems-truncated', message: '1000 more problems are not listed', omitted: 1000 }
 		];
-		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'registered', problems }) }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [delivered], status: status({ status: 'registered', problems }) }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.problemsKind).toBe('notes');
 		expect(view.problems).toEqual([
-			{ text: en.fisqua_note_unlisted_object('rionegro/co-x/stray.jpg'), records: null, fromFisqua: false }
+			{
+				text: en.fisqua_note_unlisted_object('rionegro/co-x/stray.jpg'),
+				records: null,
+				fromFisqua: false
+			}
 		]);
 		expect(view.omitted).toBe(1000);
 		expect(view.tone).toBe('progress');
 	});
 
-	it('words a missing-object note in the catalogue, not in Fisqua\'s English', () => {
+	it("words a missing-object note in the catalogue, not in Fisqua's English", () => {
 		const problems = [
-			{ rule: 'missing-object', message: 'rionegro/co-x/extra.json is in the manifest and not in the masters bucket', stem: 'co-x', objectKey: 'rionegro/co-x/extra.json' }
+			{
+				rule: 'missing-object',
+				message: 'rionegro/co-x/extra.json is in the manifest and not in the masters bucket',
+				stem: 'co-x',
+				objectKey: 'rionegro/co-x/extra.json'
+			}
 		];
-		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'registered', problems }) }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [delivered], status: status({ status: 'registered', problems }) }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.problemsKind).toBe('notes');
-		expect(view.problems).toEqual([{ text: en.fisqua_note_missing_object('rionegro/co-x/extra.json'), records: null, fromFisqua: false }]);
+		expect(view.problems).toEqual([
+			{
+				text: en.fisqua_note_missing_object('rionegro/co-x/extra.json'),
+				records: null,
+				fromFisqua: false
+			}
+		]);
 		expect(JSON.stringify(view)).not.toContain('masters bucket');
 	});
 
 	it("keeps them problems when Fisqua's status is refused", () => {
 		const problems = [{ rule: 'capture-key', message: 'a' }];
-		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'refused', problems }) }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [delivered], status: status({ status: 'refused', problems }) }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.problemsKind).toBe('problems');
 	});
 
 	it('has no incident for other Fisqua refusals', () => {
 		const problems = [{ rule: 'id-reused', message: 'taken' }];
-		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems })] }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [row({ state: 'refused', refusal: 'fisqua', problems })] }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.incident).toBeNull();
-		expect(view.problems).toEqual([{ text: en.fisqua_problem_from_fisqua('taken'), records: null, fromFisqua: true }]);
+		expect(view.problems).toEqual([
+			{ text: en.fisqua_problem_from_fisqua('taken'), records: null, fromFisqua: true }
+		]);
 	});
 
 	it('shows a delivered manifest with no status yet as waiting for its status', () => {
@@ -240,10 +397,21 @@ describe('volumeFisquaView', () => {
 	};
 
 	it.each(Object.keys(labels))("shows Fisqua's status %s with its label", (st) => {
-		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: st }) }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [delivered], status: status({ status: st }) }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.kind).toBe(`status_${st}`);
 		expect(view.label).toBe(labels[st]);
-		expect(view.detail).toBe(en.fisqua_checked('today', formatBackupDate(TODAY_0930, NOW, 'en'), formatBackupTime(TODAY_0930, 'en')));
+		expect(view.detail).toBe(
+			en.fisqua_checked(
+				'today',
+				formatBackupDate(TODAY_0930, NOW, 'en'),
+				formatBackupTime(TODAY_0930, 'en')
+			)
+		);
 	});
 
 	it.each([
@@ -260,7 +428,12 @@ describe('volumeFisquaView', () => {
 		['refused', 'attention'],
 		['failed', 'attention']
 	] as const)("gives Fisqua's status %s the %s tone", (st, tone) => {
-		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: st }) }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [delivered], status: status({ status: st }) }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.tone).toBe(tone);
 	});
 
@@ -268,7 +441,15 @@ describe('volumeFisquaView', () => {
 		const states = Object.keys(labels);
 		for (const msgs of [en, es]) {
 			const seen = new Set(
-				states.map((st) => volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: st }) }), NOW, 'en', msgs)!.label)
+				states.map(
+					(st) =>
+						volumeFisquaView(
+							fisqua({ outbox: [delivered], status: status({ status: st }) }),
+							NOW,
+							'en',
+							msgs
+						)!.label
+				)
 			);
 			expect(seen.size).toBe(states.length);
 		}
@@ -276,41 +457,79 @@ describe('volumeFisquaView', () => {
 
 	it("lists Fisqua's problems whatever the status", () => {
 		const problems = [{ rule: 'blur', message: 'page 3' }];
-		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'published', problems }) }), NOW, 'en', en)!;
-		expect(view.problems).toEqual([{ text: en.fisqua_problem_from_fisqua('page 3'), records: null, fromFisqua: true }]);
+		const view = volumeFisquaView(
+			fisqua({ outbox: [delivered], status: status({ status: 'published', problems }) }),
+			NOW,
+			'en',
+			en
+		)!;
+		expect(view.problems).toEqual([
+			{ text: en.fisqua_problem_from_fisqua('page 3'), records: null, fromFisqua: true }
+		]);
 		expect(view.tone).toBe('ok');
 	});
 
 	it('shows a status Fisqua names but this build does not know', () => {
-		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'archived' }) }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [delivered], status: status({ status: 'archived' }) }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.kind).toBe('status_other');
 		expect(view.label).toBe(en.fisqua_st_other);
 	});
 
 	it('takes a status with no manifest id as the latest one', () => {
-		const view = volumeFisquaView(fisqua({ outbox: [delivered], status: status({ status: 'unknown', manifest_id: null }) }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [delivered], status: status({ status: 'unknown', manifest_id: null }) }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.kind).toBe('status_unknown');
 	});
 
 	it("does not show the status of an older manifest as the newer one's", () => {
 		const newer = row({ manifest_id: 'b2', state: 'waiting_for_upload' });
 		const older = { ...delivered, manifest_id: 'a1' };
-		const view = volumeFisquaView(fisqua({ outbox: [newer, older], status: status({ manifest_id: 'a1', status: 'published' }) }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({
+				outbox: [newer, older],
+				status: status({ manifest_id: 'a1', status: 'published' })
+			}),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.kind).toBe('waiting_for_upload');
 	});
 
 	it('keeps withdrawn and superseded manifests in the history, never as the current line', () => {
 		const withdrawn = row({ manifest_id: 'c3', state: 'withdrawn' });
 		const superseded = row({ manifest_id: 'b2', state: 'superseded' });
-		const view = volumeFisquaView(fisqua({ outbox: [withdrawn, superseded, delivered], status: status({ status: 'queued' }) }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [withdrawn, superseded, delivered], status: status({ status: 'queued' }) }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.kind).toBe('status_queued');
 		expect(view.history.map((h) => h.kind)).toEqual(['withdrawn', 'superseded']);
-		expect(view.history.map((h) => h.label)).toEqual([en.fisqua_out_withdrawn, en.fisqua_out_superseded]);
+		expect(view.history.map((h) => h.label)).toEqual([
+			en.fisqua_out_withdrawn,
+			en.fisqua_out_superseded
+		]);
 		expect(view.history[0].when).toContain('09:30');
 	});
 
 	it('shows only withdrawn manifests as not sent, with them in the history', () => {
-		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'withdrawn' })] }), NOW, 'en', en)!;
+		const view = volumeFisquaView(
+			fisqua({ outbox: [row({ state: 'withdrawn' })] }),
+			NOW,
+			'en',
+			en
+		)!;
 		expect(view.kind).toBe('none');
 		expect(view.history).toHaveLength(1);
 	});
@@ -322,13 +541,26 @@ describe('volumeFisquaView', () => {
 		['redirect', 302, 'fisqua_cfg_redirect'],
 		['version', 422, 'fisqua_cfg_version'],
 		['something_else', 401, 'fisqua_cfg_other']
-	] as const)('warns that sending is stopped for a configuration error (%s)', (reason, code, key) => {
-		const config_error = { at: naiveUtc(TODAY_0930), status_code: code, reason, config_fingerprint: 'ab12cd34' };
-		const view = volumeFisquaView(fisqua({ outbox: [row({ state: 'ready' })], config_error }), NOW, 'en', en)!;
-		expect(view.configError).toBe(en[key]);
-		expect(view.configError).toContain('Ask whoever manages the scanner');
-		expect(view.tone).toBe('attention');
-	});
+	] as const)(
+		'warns that sending is stopped for a configuration error (%s)',
+		(reason, code, key) => {
+			const config_error = {
+				at: naiveUtc(TODAY_0930),
+				status_code: code,
+				reason,
+				config_fingerprint: 'ab12cd34'
+			};
+			const view = volumeFisquaView(
+				fisqua({ outbox: [row({ state: 'ready' })], config_error }),
+				NOW,
+				'en',
+				en
+			)!;
+			expect(view.configError).toBe(en[key]);
+			expect(view.configError).toContain('Ask whoever manages the scanner');
+			expect(view.tone).toBe('attention');
+		}
+	);
 
 	it('has no warning without a configuration error', () => {
 		expect(volumeFisquaView(fisqua({ outbox: [row()] }), NOW, 'en', en)!.configError).toBeNull();
@@ -337,7 +569,14 @@ describe('volumeFisquaView', () => {
 
 // Shaped as unit_fisqua_summary in app/core/fisqua_outbox.py.
 function summary(over: Partial<UnitFisquaSummary> = {}): UnitFisquaSummary {
-	return { configured: true, environment: 'production', config_error: null, last_send: null, last_poll: null, ...over };
+	return {
+		configured: true,
+		environment: 'production',
+		config_error: null,
+		last_send: null,
+		last_poll: null,
+		...over
+	};
 }
 
 describe('unitFisquaView', () => {
@@ -355,14 +594,28 @@ describe('unitFisquaView', () => {
 	it('names the environment, and that nothing has run yet', () => {
 		const view = unitFisquaView(summary(), en)!;
 		expect(view.level).toBe('on');
-		expect(view.lines).toEqual([en.fisqua_unit_env_production, en.fisqua_unit_send_none, en.fisqua_unit_poll_none]);
-		expect(unitFisquaView(summary({ environment: 'staging' }), en)!.lines[0]).toBe(en.fisqua_unit_env_staging);
+		expect(view.lines).toEqual([
+			en.fisqua_unit_env_production,
+			en.fisqua_unit_send_none,
+			en.fisqua_unit_poll_none
+		]);
+		expect(unitFisquaView(summary({ environment: 'staging' }), en)!.lines[0]).toBe(
+			en.fisqua_unit_env_staging
+		);
 	});
 
 	it('gives the last send and the last poll', () => {
 		const view = unitFisquaView(
 			summary({
-				last_send: { status: 'done', promoted: 1, not_exportable: 0, delivered: 2, refused: 1, failed: 0, waiting: 3 },
+				last_send: {
+					status: 'done',
+					promoted: 1,
+					not_exportable: 0,
+					delivered: 2,
+					refused: 1,
+					failed: 0,
+					waiting: 3
+				},
 				last_poll: { status: 'done', asked: 4, calls: 1, answered: 4, recovered: 0 }
 			}),
 			en
@@ -377,9 +630,21 @@ describe('unitFisquaView', () => {
 		['stopped', 'fisqua_unit_send_stopped', 'fisqua_unit_poll_other'],
 		['no_transport', 'fisqua_unit_send_other', 'fisqua_unit_poll_other']
 	] as const)('words a %s run', (st, sendKey, pollKey) => {
-		const view = unitFisquaView(summary({ last_send: { status: st }, last_poll: { status: st } }), en)!;
+		const view = unitFisquaView(
+			summary({ last_send: { status: st }, last_poll: { status: st } }),
+			en
+		)!;
 		expect(view.lines[1]).toBe(en[sendKey]);
 		expect(view.lines[2]).toBe(en[pollKey]);
+	});
+
+	it('says Fisqua asked Captua to wait when a poll ends cooling down', () => {
+		const view = unitFisquaView(summary({ last_poll: { status: 'cooling_down' } }), en)!;
+		expect(view.lines[2]).toBe(en.fisqua_unit_poll_cooling);
+		expect(unitFisquaView(summary({ last_poll: { status: 'cooling_down' } }), es)!.lines[2]).toBe(
+			es.fisqua_unit_poll_cooling
+		);
+		expect(en.fisqua_unit_poll_cooling).not.toBe(en.fisqua_unit_poll_other);
 	});
 
 	it('words one delivered and one refused in the singular in Spanish', () => {
@@ -389,10 +654,45 @@ describe('unitFisquaView', () => {
 
 	it('warns about the configuration error', () => {
 		const view = unitFisquaView(
-			summary({ config_error: { at: '2026-10-24T09:30:00', status_code: 404, reason: 'not_found', config_fingerprint: 'ab12cd34' } }),
+			summary({
+				config_error: {
+					at: '2026-10-24T09:30:00',
+					status_code: 404,
+					reason: 'not_found',
+					config_fingerprint: 'ab12cd34'
+				}
+			}),
 			en
 		)!;
 		expect(view.level).toBe('attention');
 		expect(view.warning).toBe(en.fisqua_cfg_not_found);
+	});
+	it("shows no Fisqua row when the unit's mode does not use the link, configured or not (NEH-319)", () => {
+		expect(unitFisquaView(summary({ mode_allows: false }), en)).toBeNull();
+		const withError = summary({
+			mode_allows: false,
+			config_error: {
+				at: '2026-10-24T09:30:00',
+				status_code: 404,
+				reason: 'not_found',
+				config_fingerprint: 'ab12cd34'
+			}
+		});
+		expect(unitFisquaView(withError, en)).toBeNull();
+		expect(
+			unitFisquaView(summary({ configured: false, environment: null, mode_allows: false }), en)
+		).toBeNull();
+	});
+
+	it('says Fisqua is not configured on an unconfigured unit whose mode would use it', () => {
+		const view = unitFisquaView(summary({ configured: false, environment: null }), en)!;
+		expect(view.lines).toEqual([en.fisqua_unit_off]);
+	});
+
+	it('is on when the mode allows the link, or the backend does not send the field', () => {
+		expect(unitFisquaView(summary({ mode_allows: true }), en)!.level).toBe('on');
+		const older = summary();
+		delete older.mode_allows;
+		expect(unitFisquaView(older, en)!.level).toBe('on');
 	});
 });

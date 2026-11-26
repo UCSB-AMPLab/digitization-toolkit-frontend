@@ -1,7 +1,7 @@
 // NEH-189: the shared shutdown and restart flow — the confirmation, the
 // request, the blocking state after a 200, and where a failure is shown.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { get } from 'svelte/store';
@@ -65,7 +65,9 @@ describe('PowerControl', () => {
 		await page.getByRole('button', { name: 'Sí, apagar' }).click();
 
 		const notice = page.getByRole('alertdialog');
-		await expect.element(notice).toHaveTextContent('El control de energía no está disponible en este equipo.');
+		await expect
+			.element(notice)
+			.toHaveTextContent('El control de energía no está disponible en este equipo.');
 		await expect.element(page.getByText('Apagando el equipo…')).not.toBeInTheDocument();
 
 		await notice.getByRole('button', { name: 'Cerrar' }).click();
@@ -79,7 +81,9 @@ describe('PowerControl', () => {
 		screen.component.ask('poweroff');
 		await page.getByRole('button', { name: 'Sí, apagar' }).click();
 
-		await expect.poll(() => onError.mock.calls.at(-1)?.[0]).toBe('El control de energía no está disponible en este equipo.');
+		await expect
+			.poll(() => onError.mock.calls.at(-1)?.[0])
+			.toBe('El control de energía no está disponible en este equipo.');
 		await expect.element(page.getByRole('alertdialog')).not.toBeInTheDocument();
 	});
 });

@@ -1,8 +1,8 @@
 <script lang="ts">
 	// Sidebar indicator of the offsite catalogue copy (NEH-266).
 	//
-	// Reads the shared catalogue-backup store and shows one of the four levels
-	// from classifySnapshot, re-classified as the clock moves, or "could not
+	// Reads the shared catalogue-backup store and shows one of the levels from
+	// classifySnapshot (`local` in a mode that takes no dump, NEH-319), re-classified as the clock moves, or "could not
 	// check" when the request failed, timed out or could not be refreshed. It
 	// shows nothing until the first answer arrives, so it never claims a state
 	// the backend has not reported (NEH-138).
@@ -11,10 +11,15 @@
 	// that can open Configuración, and the others get the same pill without a
 	// link.
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 	import { m, locale } from '$lib/i18n';
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
-	import { classifySnapshot, dayRelation, formatBackupDate, type BackupLevel } from '$lib/catalogue-backup';
+	import {
+		classifySnapshot,
+		dayRelation,
+		formatBackupDate,
+		type BackupLevel
+	} from '$lib/catalogue-backup';
 
 	let { expanded = true, href = null }: { expanded?: boolean; href?: string | null } = $props();
 
@@ -27,15 +32,35 @@
 		switch (level) {
 			case 'off':
 				return { level, text: $m.backup_ind_off };
+			case 'local':
+				return { level, text: $m.backup_ind_local };
 			case 'unknown':
 				return { level, text: $m.backup_ind_unknown };
 			case 'overdue':
 				if (!verifiedAt) return { level, text: $m.backup_ind_never };
-				return { level, text: $m.backup_ind_stale(dayRelation(verifiedAt, now), formatBackupDate(verifiedAt, now, $locale)) };
+				return {
+					level,
+					text: $m.backup_ind_stale(
+						dayRelation(verifiedAt, now),
+						formatBackupDate(verifiedAt, now, $locale)
+					)
+				};
 			case 'late':
-				return { level, text: $m.backup_ind_stale(dayRelation(verifiedAt!, now), formatBackupDate(verifiedAt!, now, $locale)) };
+				return {
+					level,
+					text: $m.backup_ind_stale(
+						dayRelation(verifiedAt!, now),
+						formatBackupDate(verifiedAt!, now, $locale)
+					)
+				};
 			case 'current':
-				return { level, text: $m.backup_ind_current(dayRelation(verifiedAt!, now), formatBackupDate(verifiedAt!, now, $locale)) };
+				return {
+					level,
+					text: $m.backup_ind_current(
+						dayRelation(verifiedAt!, now),
+						formatBackupDate(verifiedAt!, now, $locale)
+					)
+				};
 		}
 	});
 </script>
@@ -115,6 +140,13 @@
 		--pill-bg: var(--color-surface-alt-2);
 		--pill-border: rgba(171, 183, 183, 0.35);
 		--pill-dot: var(--color-light-grey);
+	}
+	/* The mode takes no dump (NEH-319): the page's ordinary text and border
+	   colours, neither the grey of "not configured" nor a level's colour. */
+	.level-local {
+		--pill-bg: transparent;
+		--pill-border: var(--border-color);
+		--pill-dot: var(--color-light);
 	}
 	/* Could not check: no fill and a hollow dot, so it reads as neither a level
 	   nor "not configured". */

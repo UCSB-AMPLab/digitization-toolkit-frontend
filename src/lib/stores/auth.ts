@@ -1,13 +1,14 @@
-// Global authentication state: the access token, the signed-in user and
-// their role. The token itself is persisted through `tokenStore`
-// (stores/token.ts); this store persists only the user.
+// Global authentication state: the signed-in user and their role. The
+// credential is an httpOnly cookie the backend sets at login (NEH-61); this
+// store never sees it. There is a session when there is a user.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-import { tokenStore } from './token';
+import { dropLegacyToken } from './legacy-token';
+import { clearFocusActivity } from '$lib/focus-check';
 
 // Roles in the system. A role the backend adds has to be added here — this
 // is the only place the list lives.
@@ -15,7 +16,7 @@ import { tokenStore } from './token';
 // The array is the source and the type derives from it, not the other way
 // round: the list is needed at runtime to validate the backend's response
 // (isUserRole, below), and two written copies would drift apart.
-export const USER_ROLES = ['admin', 'operator', 'reviewer'] as const;
+export const USER_ROLES = ['admin', 'operator', 'reviewer', 'testing'] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
 
@@ -24,97 +25,133 @@ export type UserRole = (typeof USER_ROLES)[number];
 // check, a new backend role or a typo would reach navigation and camera
 // permissions unnoticed (NEH-117).
 export function isUserRole(value: unknown): value is UserRole {
-  return typeof value === 'string' && (USER_ROLES as readonly string[]).includes(value);
+	return typeof value === 'string' && (USER_ROLES as readonly string[]).includes(value);
 }
 
 export interface AuthUser {
-  id: number;
-  username: string;
-  email: string | null;
-  role: UserRole;
-  is_active: boolean;
+	id: number;
+	username: string;
+	email: string | null;
+	role: UserRole;
+	is_active: boolean;
+	/** The person's own language; null until they choose one (NEH-336). */
+	language?: 'es' | 'en' | null;
 }
 
 interface AuthState {
-  user: AuthUser | null;  // null = no session
-  token: string | null;   // JWT access token
+	user: AuthUser | null; // null = no session
 }
 
-// The token and user are restored from localStorage. With a token present,
-// the app assumes a session until the backend says otherwise.
+const AUTH_USER_KEY = 'auth_user';
+
+// The user saved in localStorage is only a hint, so routes can decide without
+// waiting for the backend: (dashboard)/+layout.svelte validates it against
+// /users/me, and only the cookie authenticates.
+//
+// A browser that still holds an earlier build's token in localStorage starts
+// without a session: the token is removed (stores/legacy-token.ts) and so is
+// the user saved with it, so the guards send it to /login once instead of
+// showing a session the backend no longer recognises.
+export function readInitialUser(): AuthUser | null {
+	if (!browser) return null;
+	try {
+		if (dropLegacyToken()) {
+			localStorage.removeItem(AUTH_USER_KEY);
+			return null;
+		}
+		const u = localStorage.getItem(AUTH_USER_KEY);
+		return u ? JSON.parse(u) : null;
+	} catch {
+		return null;
+	}
+}
+
 const initialState: AuthState = {
-  // tokenStore (stores/token.ts) is the single source for the token — the
-  // same one apiRequest() in api.ts reads on every request.
-  token: tokenStore.get(),
-  user: browser ? (() => { try { const u = localStorage.getItem('auth_user'); return u ? JSON.parse(u) : null; } catch { return null; } })() : null,
+	user: readInitialUser()
 };
 
 function createAuthStore() {
-  const { subscribe, set, update } = writable<AuthState>(initialState);
+	const { subscribe, set, update } = writable<AuthState>(initialState);
 
-  return {
-    subscribe,
+	return {
+		subscribe,
 
-    setSession(token: string, user: AuthUser) {
-      // The token is persisted through tokenStore (the single source); the
-      // user is persisted only by this store.
-      tokenStore.set(token);
-      if (browser) {
-        localStorage.setItem('auth_user', JSON.stringify(user));
-      }
-      update(state => ({ ...state, token, user }));
-    },
+		// Keeps the user after a login or after /users/me validated the
+		// session. The backend has already set the cookie. The login page passes
+		// `signIn`: a sign-in clears the user's last focus check, so the capture
+		// screen of a DSLR unit asks for one again (NEH-339). The dashboard's
+		// revalidation of an open session does not, or every return to the
+		// capture screen through the dashboard would ask.
+		setSession(user: AuthUser, options: { signIn?: boolean } = {}) {
+			if (browser) {
+				try {
+					localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+				} catch {
+					/* storage unavailable */
+				}
+				if (options.signIn) clearFocusActivity(user.id);
+			}
+			update((state) => ({ ...state, user }));
+		},
 
-    // Replaces only the token (e.g. after /auth/refresh); the user does not
-    // change on a refresh.
-    updateToken(token: string) {
-      tokenStore.set(token);
-      update(state => ({ ...state, token }));
-    },
+		// Clears this tab's record of the session. Only the backend can remove
+		// the httpOnly cookie: to log out, call authApi.logout() (api.ts), which
+		// asks the backend to clear it and then calls this.
+		clearSession() {
+			if (browser) {
+				try {
+					localStorage.removeItem(AUTH_USER_KEY);
+				} catch {
+					/* storage unavailable */
+				}
+			}
+			set({ user: null });
+		},
 
-    clearSession() {
-      tokenStore.clear();
-      if (browser) {
-        localStorage.removeItem('auth_user');
-      }
-      set({ user: null, token: null });
-    },
+		// Whether this browser kept the signed-in user, read back from storage,
+		// so that a full reload finds the session's user again.
+		isStored(): boolean {
+			const user = get({ subscribe }).user;
+			if (!browser || !user) return false;
+			try {
+				const kept = JSON.parse(localStorage.getItem(AUTH_USER_KEY) ?? 'null');
+				return kept?.id === user.id;
+			} catch {
+				return false;
+			}
+		},
 
-    // For use outside Svelte components.
-    getToken(): string | null {
-      return get({ subscribe }).token;
-    },
+		// For use outside Svelte components.
+		getUser(): AuthUser | null {
+			return get({ subscribe }).user;
+		},
 
-    isAuthenticated(): boolean {
-      return get({ subscribe }).token !== null;
-    },
+		isAuthenticated(): boolean {
+			return get({ subscribe }).user !== null;
+		},
 
-    // Shared guard for routes outside (dashboard) (NEH-66).
-    // (dashboard)/+layout.svelte validates the session fully against
-    // /users/me; routes outside that group (live-preview, the full-screen
-    // volume gallery) do not inherit that check, so they call this guard
-    // instead. Redirects to /login when there is no session, and to
-    // `fallback` when `roles` does not include the current user's role.
-    // Returns true when the caller can go on mounting the page.
-    requireSession(roles?: UserRole[], fallback = '/dashboard'): boolean {
-      const state = get({ subscribe });
-      if (!state.token) {
-        goto('/login');
-        return false;
-      }
-      if (roles && roles.length > 0 && !roles.includes(state.user?.role as UserRole)) {
-        goto(fallback);
-        return false;
-      }
-      return true;
-    },
-  };
+		// Shared guard for routes outside (dashboard) (NEH-66).
+		// (dashboard)/+layout.svelte validates the session fully against
+		// /users/me; routes outside that group (live-preview, the full-screen
+		// volume gallery) do not inherit that check, so they call this guard
+		// instead. Redirects to /login when there is no session, and to
+		// `fallback` when `roles` does not include the current user's role.
+		// Returns true when the caller can go on mounting the page.
+		requireSession(roles?: UserRole[], fallback = '/dashboard'): boolean {
+			const state = get({ subscribe });
+			if (!state.user) {
+				goto('/login');
+				return false;
+			}
+			if (roles && roles.length > 0 && !roles.includes(state.user?.role as UserRole)) {
+				goto(fallback);
+				return false;
+			}
+			return true;
+		}
+	};
 }
 
 export const authStore = createAuthStore();
 
-export const userRole = derived(
-  authStore,
-  $auth => $auth.user?.role ?? null
-);
-
+export const userRole = derived(authStore, ($auth) => $auth.user?.role ?? null);

@@ -6,7 +6,7 @@
 //
 // No import of the catalogue index, which imports the catalogues.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 type ByteLocale = 'es' | 'en';
 
@@ -17,7 +17,10 @@ const grouping = { es: 'min2' as unknown as boolean, en: true };
 const tags = { es: 'es-CO', en: 'en-US' };
 
 function formatter(locale: ByteLocale, digits: number): Intl.NumberFormat {
-	return new Intl.NumberFormat(tags[locale], { maximumFractionDigits: digits, useGrouping: grouping[locale] });
+	return new Intl.NumberFormat(tags[locale], {
+		maximumFractionDigits: digits,
+		useGrouping: grouping[locale]
+	});
 }
 
 const formatters: Record<ByteLocale, [Intl.NumberFormat, Intl.NumberFormat]> = {

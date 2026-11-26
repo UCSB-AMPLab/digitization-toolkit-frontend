@@ -4,7 +4,7 @@
 // read when it is still in the volume. With no records the selection is left
 // as it was, as the page has always done.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 export function selectionAfterLoad(
 	records: ReadonlyArray<{ id: number }>,
@@ -12,7 +12,8 @@ export function selectionAfterLoad(
 	keepSelection: boolean
 ): number | null {
 	if (records.length === 0) return selectedId;
-	if (keepSelection && selectedId !== null && records.some((r) => r.id === selectedId)) return selectedId;
+	if (keepSelection && selectedId !== null && records.some((r) => r.id === selectedId))
+		return selectedId;
 	return records[0].id;
 }
 
@@ -22,7 +23,10 @@ export function selectionAfterLoad(
  * state (freed timestamps among it), or null, which closes the modal, when
  * the record is no longer in the volume.
  */
-export function reconcileInspected<T extends { id: number }>(inspected: T | null, records: ReadonlyArray<T>): T | null {
+export function reconcileInspected<T extends { id: number }>(
+	inspected: T | null,
+	records: ReadonlyArray<T>
+): T | null {
 	if (inspected === null) return null;
 	return records.find((r) => r.id === inspected.id) ?? null;
 }

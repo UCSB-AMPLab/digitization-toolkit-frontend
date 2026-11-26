@@ -4,356 +4,540 @@
 // DOM. KeyboardEvent-shaped plain objects stand in for real events; a fake
 // `localStorage` stands in for the browser's.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/environment', () => ({ browser: true }));
 
 import {
-  chordFromEvent,
-  chordsMatch,
-  clearChord,
-  DEFAULT_CHORD,
-  describeChord,
-  isTextEntry,
-  learnFromEvent,
-  ownsEvent,
-  readChord,
-  shouldTrigger,
-  writeChord,
-  type CaptureChord,
-  type OwnsEventContext,
-  type ShouldTriggerContext
+	chordFromEvent,
+	chordsMatch,
+	clearChord,
+	DEFAULT_CHORDS,
+	describeChord,
+	describeChords,
+	isTextEntry,
+	learnFromEvent,
+	ownsEvent,
+	readChords,
+	readChordValue,
+	readLegacyChord,
+	clearLegacyChord,
+	isDefaultChord,
+	shouldTrigger,
+	writeChord,
+	type CaptureChord,
+	type OwnsEventContext,
+	type ShouldTriggerContext
 } from './capture-key';
 
 // A KeyboardEvent-shaped object. Only the fields the module reads are
 // present, cast at the call site — there is no real KeyboardEvent in node.
-function fakeEvent(overrides: Partial<{
-  key: string;
-  ctrlKey: boolean;
-  altKey: boolean;
-  metaKey: boolean;
-  shiftKey: boolean;
-  repeat: boolean;
-  isComposing: boolean;
-}> = {}): KeyboardEvent {
-  return {
-    key: ' ',
-    ctrlKey: false,
-    altKey: false,
-    metaKey: false,
-    shiftKey: false,
-    repeat: false,
-    isComposing: false,
-    ...overrides
-  } as unknown as KeyboardEvent;
+function fakeEvent(
+	overrides: Partial<{
+		key: string;
+		ctrlKey: boolean;
+		altKey: boolean;
+		metaKey: boolean;
+		shiftKey: boolean;
+		repeat: boolean;
+		isComposing: boolean;
+	}> = {}
+): KeyboardEvent {
+	return {
+		key: ' ',
+		ctrlKey: false,
+		altKey: false,
+		metaKey: false,
+		shiftKey: false,
+		repeat: false,
+		isComposing: false,
+		...overrides
+	} as unknown as KeyboardEvent;
 }
 
-function fakeElement(overrides: Partial<{
-  tagName: string;
-  type: string;
-  isContentEditable: boolean;
-}> = {}): Element {
-  return {
-    tagName: 'DIV',
-    isContentEditable: false,
-    ...overrides
-  } as unknown as Element;
+function fakeElement(
+	overrides: Partial<{
+		tagName: string;
+		type: string;
+		isContentEditable: boolean;
+	}> = {}
+): Element {
+	return {
+		tagName: 'DIV',
+		isContentEditable: false,
+		...overrides
+	} as unknown as Element;
 }
 
+const SPACE_CHORD: CaptureChord = { key: ' ', ctrl: false, alt: false, meta: false, shift: false };
+const B_CHORD: CaptureChord = { key: 'b', ctrl: false, alt: false, meta: false, shift: false };
 const CHORD_A: CaptureChord = { key: 'a', ctrl: false, alt: false, meta: false, shift: false };
 
 function baseOwnsCtx(overrides: Partial<OwnsEventContext> = {}): OwnsEventContext {
-  return {
-    chord: DEFAULT_CHORD,
-    modalOpen: false,
-    activeElement: null,
-    ...overrides
-  };
+	return {
+		chords: DEFAULT_CHORDS,
+		modalOpen: false,
+		activeElement: null,
+		...overrides
+	};
 }
 
 function baseTriggerCtx(overrides: Partial<ShouldTriggerContext> = {}): ShouldTriggerContext {
-  return {
-    ...baseOwnsCtx(),
-    keyHeld: false,
-    capturing: false,
-    ready: true,
-    ...overrides
-  };
+	return {
+		...baseOwnsCtx(),
+		keyHeld: false,
+		capturing: false,
+		ready: true,
+		...overrides
+	};
 }
 
 describe('chordFromEvent / chordsMatch', () => {
-  it('builds a chord from an event', () => {
-    const event = fakeEvent({ key: 'a', ctrlKey: true, shiftKey: true });
-    expect(chordFromEvent(event)).toEqual({ key: 'a', ctrl: true, alt: false, meta: false, shift: true });
-  });
+	it('builds a chord from an event', () => {
+		const event = fakeEvent({ key: 'a', ctrlKey: true, shiftKey: true });
+		expect(chordFromEvent(event)).toEqual({
+			key: 'a',
+			ctrl: true,
+			alt: false,
+			meta: false,
+			shift: true
+		});
+	});
 
-  it('matches on key and all four modifier flags', () => {
-    const a: CaptureChord = { key: 'a', ctrl: true, alt: false, meta: false, shift: false };
-    const b: CaptureChord = { key: 'a', ctrl: true, alt: false, meta: false, shift: false };
-    expect(chordsMatch(a, b)).toBe(true);
-  });
+	it('matches on key and all four modifier flags', () => {
+		const a: CaptureChord = { key: 'a', ctrl: true, alt: false, meta: false, shift: false };
+		const b: CaptureChord = { key: 'a', ctrl: true, alt: false, meta: false, shift: false };
+		expect(chordsMatch(a, b)).toBe(true);
+	});
 
-  it.each([
-    ['key', { key: 'b' }],
-    ['ctrl', { ctrl: true }],
-    ['alt', { alt: true }],
-    ['meta', { meta: true }],
-    ['shift', { shift: true }]
-  ] as const)('does not match when %s differs', (_label, diff) => {
-    const a: CaptureChord = { key: 'a', ctrl: false, alt: false, meta: false, shift: false };
-    const b: CaptureChord = { ...a, ...diff };
-    expect(chordsMatch(a, b)).toBe(false);
-  });
+	it.each([
+		['key', { key: 'b' }],
+		['ctrl', { ctrl: true }],
+		['alt', { alt: true }],
+		['meta', { meta: true }],
+		['shift', { shift: true }]
+	] as const)('does not match when %s differs', (_label, diff) => {
+		const a: CaptureChord = { key: 'a', ctrl: false, alt: false, meta: false, shift: false };
+		const b: CaptureChord = { ...a, ...diff };
+		expect(chordsMatch(a, b)).toBe(false);
+	});
+});
+
+describe('chordsMatch ignores letter case', () => {
+	it('matches b and B when the modifiers are equal', () => {
+		expect(chordsMatch(B_CHORD, { ...B_CHORD, key: 'B' })).toBe(true);
+		expect(chordsMatch({ ...B_CHORD, key: 'B' }, B_CHORD)).toBe(true);
+	});
+
+	it('does not match b and B when the shift flag differs', () => {
+		expect(chordsMatch(B_CHORD, { ...B_CHORD, key: 'B', shift: true })).toBe(false);
+	});
+
+	it('still compares the other modifier flags exactly', () => {
+		expect(chordsMatch(B_CHORD, { ...B_CHORD, key: 'B', ctrl: true })).toBe(false);
+	});
+});
+
+describe('case-insensitive triggering', () => {
+	it('shouldTrigger is true for key B, shift off (Caps Lock on) under the defaults', () => {
+		expect(shouldTrigger(fakeEvent({ key: 'B' }), baseTriggerCtx())).toBe(true);
+	});
+
+	it('shouldTrigger is false for Shift+B under the defaults', () => {
+		expect(shouldTrigger(fakeEvent({ key: 'B', shiftKey: true }), baseTriggerCtx())).toBe(false);
+	});
+
+	it('a chord learned as B triggers on b', () => {
+		const learned = learnFromEvent(fakeEvent({ key: 'B' }));
+		expect(learned.ok).toBe(true);
+		if (learned.ok) {
+			expect(learned.chord.key).toBe('B');
+			expect(
+				shouldTrigger(fakeEvent({ key: 'b' }), baseTriggerCtx({ chords: [learned.chord] }))
+			).toBe(true);
+		}
+	});
+
+	it('a chord learned as b triggers on B', () => {
+		expect(shouldTrigger(fakeEvent({ key: 'B' }), baseTriggerCtx({ chords: [B_CHORD] }))).toBe(
+			true
+		);
+	});
 });
 
 describe('describeChord', () => {
-  it('defaults the space label to "Space" when none is given', () => {
-    expect(describeChord(DEFAULT_CHORD)).toBe('Space');
-  });
+	it('defaults the space label to "Space" when none is given', () => {
+		expect(describeChord(SPACE_CHORD)).toBe('Space');
+	});
 
-  it('uses a given label for the space key instead of the default', () => {
-    expect(describeChord(DEFAULT_CHORD, 'Espacio')).toBe('Espacio');
-  });
+	it('uses a given label for the space key instead of the default', () => {
+		expect(describeChord(SPACE_CHORD, 'Espacio')).toBe('Espacio');
+	});
 
-  it('applies the space label inside a chord that combines it with modifiers', () => {
-    const chord: CaptureChord = { ...DEFAULT_CHORD, ctrl: true };
-    expect(describeChord(chord, 'Espacio')).toBe('Ctrl+Espacio');
-  });
+	it('applies the space label inside a chord that combines it with modifiers', () => {
+		const chord: CaptureChord = { ...SPACE_CHORD, ctrl: true };
+		expect(describeChord(chord, 'Espacio')).toBe('Ctrl+Espacio');
+	});
 
-  it('does not apply the space label to a non-space key', () => {
-    expect(describeChord(CHORD_A, 'Espacio')).toBe('a');
-  });
+	it('does not apply the space label to a non-space key', () => {
+		expect(describeChord(CHORD_A, 'Espacio')).toBe('a');
+	});
 
-  it('joins modifiers with a plus, in a fixed order, ending in the key', () => {
-    const chord: CaptureChord = { key: 'a', ctrl: true, alt: true, meta: true, shift: true };
-    expect(describeChord(chord)).toBe('Ctrl+Alt+Shift+Meta+a');
-  });
+	it('joins modifiers with a plus, in a fixed order, ending in the key', () => {
+		const chord: CaptureChord = { key: 'a', ctrl: true, alt: true, meta: true, shift: true };
+		expect(describeChord(chord)).toBe('Ctrl+Alt+Shift+Meta+a');
+	});
 
-  it('describes a plain key with no modifiers', () => {
-    expect(describeChord(CHORD_A)).toBe('a');
-  });
+	it('describes a plain key with no modifiers', () => {
+		expect(describeChord(CHORD_A)).toBe('a');
+	});
 });
 
 describe('isTextEntry', () => {
-  it('is false for null', () => {
-    expect(isTextEntry(null)).toBe(false);
-  });
+	it('is false for null', () => {
+		expect(isTextEntry(null)).toBe(false);
+	});
 
-  it('is true for a textarea', () => {
-    expect(isTextEntry(fakeElement({ tagName: 'TEXTAREA' }))).toBe(true);
-  });
+	it('is true for a textarea', () => {
+		expect(isTextEntry(fakeElement({ tagName: 'TEXTAREA' }))).toBe(true);
+	});
 
-  it('is true for a select', () => {
-    expect(isTextEntry(fakeElement({ tagName: 'SELECT' }))).toBe(true);
-  });
+	it('is true for a select', () => {
+		expect(isTextEntry(fakeElement({ tagName: 'SELECT' }))).toBe(true);
+	});
 
-  it('is true for a contenteditable element', () => {
-    expect(isTextEntry(fakeElement({ tagName: 'DIV', isContentEditable: true }))).toBe(true);
-  });
+	it('is true for a contenteditable element', () => {
+		expect(isTextEntry(fakeElement({ tagName: 'DIV', isContentEditable: true }))).toBe(true);
+	});
 
-  it.each(['text', 'search', 'url', 'tel', 'email', 'password', 'number', 'date'])(
-    'is true for an input of type %s',
-    (type) => {
-      expect(isTextEntry(fakeElement({ tagName: 'INPUT', type }))).toBe(true);
-    }
-  );
+	it.each(['text', 'search', 'url', 'tel', 'email', 'password', 'number', 'date'])(
+		'is true for an input of type %s',
+		(type) => {
+			expect(isTextEntry(fakeElement({ tagName: 'INPUT', type }))).toBe(true);
+		}
+	);
 
-  it.each(['checkbox', 'radio', 'range', 'button', 'submit'])(
-    'is false for an input of type %s',
-    (type) => {
-      expect(isTextEntry(fakeElement({ tagName: 'INPUT', type }))).toBe(false);
-    }
-  );
+	it.each(['checkbox', 'radio', 'range', 'button', 'submit'])(
+		'is false for an input of type %s',
+		(type) => {
+			expect(isTextEntry(fakeElement({ tagName: 'INPUT', type }))).toBe(false);
+		}
+	);
 
-  it('is false for a plain button element', () => {
-    expect(isTextEntry(fakeElement({ tagName: 'BUTTON' }))).toBe(false);
-  });
+	it('is false for a plain button element', () => {
+		expect(isTextEntry(fakeElement({ tagName: 'BUTTON' }))).toBe(false);
+	});
+});
+
+describe('DEFAULT_CHORDS / describeChords', () => {
+	it('lists the space bar, then b, with no modifiers', () => {
+		expect(DEFAULT_CHORDS).toEqual([SPACE_CHORD, B_CHORD]);
+	});
+
+	it('joins the descriptions with " / "', () => {
+		expect(describeChords(DEFAULT_CHORDS)).toBe('Space / b');
+		expect(describeChords(DEFAULT_CHORDS, 'Espacio')).toBe('Espacio / b');
+	});
+
+	it('describes a single chord the same as describeChord', () => {
+		expect(describeChords([CHORD_A])).toBe('a');
+	});
 });
 
 describe('ownsEvent', () => {
-  it('is true when the chord matches, no modal is open, and focus is not text entry', () => {
-    const event = fakeEvent({ key: ' ' });
-    expect(ownsEvent(event, baseOwnsCtx())).toBe(true);
-  });
+	it('is true when the chord matches, no modal is open, and focus is not text entry', () => {
+		const event = fakeEvent({ key: ' ' });
+		expect(ownsEvent(event, baseOwnsCtx())).toBe(true);
+	});
 
-  it('is false when the chord does not match', () => {
-    const event = fakeEvent({ key: 'x' });
-    expect(ownsEvent(event, baseOwnsCtx())).toBe(false);
-  });
+	it('is false when the chord does not match', () => {
+		const event = fakeEvent({ key: 'x' });
+		expect(ownsEvent(event, baseOwnsCtx())).toBe(false);
+	});
 
-  it('is false when a modal is open', () => {
-    const event = fakeEvent({ key: ' ' });
-    expect(ownsEvent(event, baseOwnsCtx({ modalOpen: true }))).toBe(false);
-  });
+	it('is false when a modal is open', () => {
+		const event = fakeEvent({ key: ' ' });
+		expect(ownsEvent(event, baseOwnsCtx({ modalOpen: true }))).toBe(false);
+	});
 
-  it('is false when focus is in a text-entry element', () => {
-    const event = fakeEvent({ key: ' ' });
-    const ctx = baseOwnsCtx({ activeElement: fakeElement({ tagName: 'INPUT', type: 'text' }) });
-    expect(ownsEvent(event, ctx)).toBe(false);
-  });
+	it('is false when focus is in a text-entry element', () => {
+		const event = fakeEvent({ key: ' ' });
+		const ctx = baseOwnsCtx({ activeElement: fakeElement({ tagName: 'INPUT', type: 'text' }) });
+		expect(ownsEvent(event, ctx)).toBe(false);
+	});
 
-  it('ignores the repeat flag — a held chord still owns the event', () => {
-    const event = fakeEvent({ key: ' ', repeat: true });
-    expect(ownsEvent(event, baseOwnsCtx())).toBe(true);
-  });
+	it('ignores the repeat flag — a held chord still owns the event', () => {
+		const event = fakeEvent({ key: ' ', repeat: true });
+		expect(ownsEvent(event, baseOwnsCtx())).toBe(true);
+	});
+});
+
+describe('ownsEvent with the default chords and with a stored chord', () => {
+	it.each([' ', 'b'])('owns %j with the defaults', (key) => {
+		expect(ownsEvent(fakeEvent({ key }), baseOwnsCtx())).toBe(true);
+	});
+
+	it.each([' ', 'b'])('does not own %j when a different chord is stored', (key) => {
+		expect(ownsEvent(fakeEvent({ key }), baseOwnsCtx({ chords: [CHORD_A] }))).toBe(false);
+	});
+
+	it('owns the stored chord', () => {
+		expect(ownsEvent(fakeEvent({ key: 'a' }), baseOwnsCtx({ chords: [CHORD_A] }))).toBe(true);
+	});
+});
+
+describe('shouldTrigger with the default chords and with a stored chord', () => {
+	it.each([' ', 'b'])('is true for %j with the defaults', (key) => {
+		expect(shouldTrigger(fakeEvent({ key }), baseTriggerCtx())).toBe(true);
+	});
+
+	it.each([' ', 'b'])('is false for %j when a different chord is stored', (key) => {
+		expect(shouldTrigger(fakeEvent({ key }), baseTriggerCtx({ chords: [CHORD_A] }))).toBe(false);
+	});
 });
 
 describe('shouldTrigger', () => {
-  it('is true when the event is owned, not a repeat, key not held, no capture in flight, and ready', () => {
-    const event = fakeEvent({ key: ' ' });
-    expect(shouldTrigger(event, baseTriggerCtx())).toBe(true);
-  });
+	it('is true when the event is owned, not a repeat, key not held, no capture in flight, and ready', () => {
+		const event = fakeEvent({ key: ' ' });
+		expect(shouldTrigger(event, baseTriggerCtx())).toBe(true);
+	});
 
-  it('is false on a repeat even though the event is owned (the case that separates it from ownsEvent)', () => {
-    const event = fakeEvent({ key: ' ', repeat: true });
-    expect(ownsEvent(event, baseTriggerCtx())).toBe(true);
-    expect(shouldTrigger(event, baseTriggerCtx())).toBe(false);
-  });
+	it('is false on a repeat even though the event is owned (the case that separates it from ownsEvent)', () => {
+		const event = fakeEvent({ key: ' ', repeat: true });
+		expect(ownsEvent(event, baseTriggerCtx())).toBe(true);
+		expect(shouldTrigger(event, baseTriggerCtx())).toBe(false);
+	});
 
-  it('is false when the key is already held', () => {
-    const event = fakeEvent({ key: ' ' });
-    expect(shouldTrigger(event, baseTriggerCtx({ keyHeld: true }))).toBe(false);
-  });
+	it('is false when the key is already held', () => {
+		const event = fakeEvent({ key: ' ' });
+		expect(shouldTrigger(event, baseTriggerCtx({ keyHeld: true }))).toBe(false);
+	});
 
-  it('is false when a capture is already in flight', () => {
-    const event = fakeEvent({ key: ' ' });
-    expect(shouldTrigger(event, baseTriggerCtx({ capturing: true }))).toBe(false);
-  });
+	it('is false when a capture is already in flight', () => {
+		const event = fakeEvent({ key: ' ' });
+		expect(shouldTrigger(event, baseTriggerCtx({ capturing: true }))).toBe(false);
+	});
 
-  it('is false when the page is not ready', () => {
-    const event = fakeEvent({ key: ' ' });
-    expect(shouldTrigger(event, baseTriggerCtx({ ready: false }))).toBe(false);
-  });
+	it('is false when the page is not ready', () => {
+		const event = fakeEvent({ key: ' ' });
+		expect(shouldTrigger(event, baseTriggerCtx({ ready: false }))).toBe(false);
+	});
 
-  it('is false when the event is not owned (modal open)', () => {
-    const event = fakeEvent({ key: ' ' });
-    expect(shouldTrigger(event, baseTriggerCtx({ modalOpen: true }))).toBe(false);
-  });
+	it('is false when the event is not owned (modal open)', () => {
+		const event = fakeEvent({ key: ' ' });
+		expect(shouldTrigger(event, baseTriggerCtx({ modalOpen: true }))).toBe(false);
+	});
 });
 
 describe('learnFromEvent', () => {
-  it('accepts a plain key with no modifiers', () => {
-    const result = learnFromEvent(fakeEvent({ key: 'a' }));
-    expect(result).toEqual({ ok: true, chord: { key: 'a', ctrl: false, alt: false, meta: false, shift: false } });
-  });
+	it('accepts a plain key with no modifiers', () => {
+		const result = learnFromEvent(fakeEvent({ key: 'a' }));
+		expect(result).toEqual({
+			ok: true,
+			chord: { key: 'a', ctrl: false, alt: false, meta: false, shift: false }
+		});
+	});
 
-  it('accepts a chord (modifier held together with a real key)', () => {
-    const result = learnFromEvent(fakeEvent({ key: 'a', ctrlKey: true }));
-    expect(result).toEqual({ ok: true, chord: { key: 'a', ctrl: true, alt: false, meta: false, shift: false } });
-  });
+	it('accepts a chord (modifier held together with a real key)', () => {
+		const result = learnFromEvent(fakeEvent({ key: 'a', ctrlKey: true }));
+		expect(result).toEqual({
+			ok: true,
+			chord: { key: 'a', ctrl: true, alt: false, meta: false, shift: false }
+		});
+	});
 
-  it.each(['Control', 'Alt', 'Shift', 'Meta'])('reports %s alone as modifier-only, not a chord', (modifier) => {
-    const result = learnFromEvent(fakeEvent({ key: modifier }));
-    expect(result).toEqual({ ok: false, reason: 'modifier-only', modifier });
-  });
+	it.each(['Control', 'Alt', 'Shift', 'Meta'])(
+		'reports %s alone as modifier-only, not a chord',
+		(modifier) => {
+			const result = learnFromEvent(fakeEvent({ key: modifier }));
+			expect(result).toEqual({ ok: false, reason: 'modifier-only', modifier });
+		}
+	);
 
-  it('refuses Dead as unbindable', () => {
-    const result = learnFromEvent(fakeEvent({ key: 'Dead' }));
-    expect(result).toEqual({ ok: false, reason: 'unbindable' });
-  });
+	it('refuses Dead as unbindable', () => {
+		const result = learnFromEvent(fakeEvent({ key: 'Dead' }));
+		expect(result).toEqual({ ok: false, reason: 'unbindable' });
+	});
 
-  it('refuses Unidentified as unbindable', () => {
-    const result = learnFromEvent(fakeEvent({ key: 'Unidentified' }));
-    expect(result).toEqual({ ok: false, reason: 'unbindable' });
-  });
+	it('refuses Unidentified as unbindable', () => {
+		const result = learnFromEvent(fakeEvent({ key: 'Unidentified' }));
+		expect(result).toEqual({ ok: false, reason: 'unbindable' });
+	});
 
-  it('refuses an event mid-composition as unbindable', () => {
-    const result = learnFromEvent(fakeEvent({ key: 'a', isComposing: true }));
-    expect(result).toEqual({ ok: false, reason: 'unbindable' });
-  });
+	it('refuses an event mid-composition as unbindable', () => {
+		const result = learnFromEvent(fakeEvent({ key: 'a', isComposing: true }));
+		expect(result).toEqual({ ok: false, reason: 'unbindable' });
+	});
 
-  // Shares isBindableKey with readChord's storage validation below — an
-  // empty key must be refused by both, or learning could silently replace
-  // a working binding with one no keypress can ever match.
-  it('refuses an empty key as unbindable', () => {
-    const result = learnFromEvent(fakeEvent({ key: '' }));
-    expect(result).toEqual({ ok: false, reason: 'unbindable' });
-  });
+	// Shares isBindableKey with readChord's storage validation below — an
+	// empty key must be refused by both, or learning could silently replace
+	// a working binding with one no keypress can ever match.
+	it('refuses an empty key as unbindable', () => {
+		const result = learnFromEvent(fakeEvent({ key: '' }));
+		expect(result).toEqual({ ok: false, reason: 'unbindable' });
+	});
 });
 
+// NEH-336: the unit holds the capture key. This browser keeps the last key
+// it read from the unit only as a cache for a fast first paint
+// (readChords/writeChord/clearChord, `captua_unit_capture_chord`). The key a
+// browser assigned before the unit held one, under `captua_capture_chord`, is read only to
+// carry it over to the unit once (readLegacyChord, clearLegacyChord), and is
+// never a source for capture.
 describe('storage: readChord / writeChord / clearChord', () => {
-  let store: Record<string, string>;
+	let store: Record<string, string>;
 
-  beforeEach(() => {
-    store = {};
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => (key in store ? store[key] : null),
-      setItem: (key: string, value: string) => { store[key] = value; },
-      removeItem: (key: string) => { delete store[key]; }
-    });
-  });
+	beforeEach(() => {
+		store = {};
+		vi.stubGlobal('localStorage', {
+			getItem: (key: string) => (key in store ? store[key] : null),
+			setItem: (key: string, value: string) => {
+				store[key] = value;
+			},
+			removeItem: (key: string) => {
+				delete store[key];
+			}
+		});
+	});
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
 
-  it('reads the default chord when nothing is stored', () => {
-    expect(readChord()).toEqual(DEFAULT_CHORD);
-  });
+	it('reads the default chord when nothing is stored', () => {
+		expect(readChords()).toEqual(DEFAULT_CHORDS);
+	});
 
-  it('round-trips a written chord', () => {
-    writeChord(CHORD_A);
-    expect(readChord()).toEqual(CHORD_A);
-  });
+	it('returns only the stored chord, not the defaults, when one is stored', () => {
+		writeChord(CHORD_A);
+		expect(readChords()).toEqual([CHORD_A]);
+		expect(readChords()).toHaveLength(1);
+	});
 
-  it('clears back to the default', () => {
-    writeChord(CHORD_A);
-    clearChord();
-    expect(readChord()).toEqual(DEFAULT_CHORD);
-  });
+	it('round-trips a written chord', () => {
+		writeChord(CHORD_A);
+		expect(readChords()).toEqual([CHORD_A]);
+	});
 
-  it('falls back to the default on malformed JSON', () => {
-    store['captua_capture_chord'] = '{not json';
-    expect(readChord()).toEqual(DEFAULT_CHORD);
-  });
+	it('clears back to the default', () => {
+		writeChord(CHORD_A);
+		clearChord();
+		expect(readChords()).toEqual(DEFAULT_CHORDS);
+	});
 
-  it('falls back to the default on a well-formed but wrong-shaped value', () => {
-    store['captua_capture_chord'] = JSON.stringify({ foo: 'bar' });
-    expect(readChord()).toEqual(DEFAULT_CHORD);
-  });
+	it('falls back to the default on malformed JSON', () => {
+		store['captua_unit_capture_chord'] = '{not json';
+		expect(readChords()).toEqual(DEFAULT_CHORDS);
+	});
 
-  it('falls back to the default when the stored chord has an empty key', () => {
-    store['captua_capture_chord'] = JSON.stringify({ key: '', ctrl: false, alt: false, meta: false, shift: false });
-    expect(readChord()).toEqual(DEFAULT_CHORD);
-  });
+	it('falls back to the default on a well-formed but wrong-shaped value', () => {
+		store['captua_unit_capture_chord'] = JSON.stringify({ foo: 'bar' });
+		expect(readChords()).toEqual(DEFAULT_CHORDS);
+	});
 
-  it.each(['Control', 'Alt', 'Shift', 'Meta'])(
-    'falls back to the default when the stored chord is modifier-only: %s',
-    (key) => {
-      store['captua_capture_chord'] = JSON.stringify({ key, ctrl: false, alt: false, meta: false, shift: false });
-      expect(readChord()).toEqual(DEFAULT_CHORD);
-    }
-  );
+	it('falls back to the default when the stored chord has an empty key', () => {
+		store['captua_unit_capture_chord'] = JSON.stringify({
+			key: '',
+			ctrl: false,
+			alt: false,
+			meta: false,
+			shift: false
+		});
+		expect(readChords()).toEqual(DEFAULT_CHORDS);
+	});
 
-  // The same shared predicate that makes learnFromEvent refuse Dead/
-  // Unidentified must also keep them out of storage — before this, a
-  // corrupted or hand-edited value with one of these keys passed validation.
-  it.each(['Dead', 'Unidentified'])(
-    'falls back to the default when the stored chord key is %s',
-    (key) => {
-      store['captua_capture_chord'] = JSON.stringify({ key, ctrl: false, alt: false, meta: false, shift: false });
-      expect(readChord()).toEqual(DEFAULT_CHORD);
-    }
-  );
+	it.each(['Control', 'Alt', 'Shift', 'Meta'])(
+		'falls back to the default when the stored chord is modifier-only: %s',
+		(key) => {
+			store['captua_unit_capture_chord'] = JSON.stringify({
+				key,
+				ctrl: false,
+				alt: false,
+				meta: false,
+				shift: false
+			});
+			expect(readChords()).toEqual(DEFAULT_CHORDS);
+		}
+	);
 
-  it('falls back to the default when storage throws on read', () => {
-    vi.stubGlobal('localStorage', {
-      getItem: () => { throw new Error('storage disabled'); },
-      setItem: () => { throw new Error('storage disabled'); },
-      removeItem: () => { throw new Error('storage disabled'); }
-    });
-    expect(readChord()).toEqual(DEFAULT_CHORD);
-  });
+	// The same shared predicate that makes learnFromEvent refuse Dead/
+	// Unidentified must also keep them out of storage — before this, a
+	// corrupted or hand-edited value with one of these keys passed validation.
+	it.each(['Dead', 'Unidentified'])(
+		'falls back to the default when the stored chord key is %s',
+		(key) => {
+			store['captua_unit_capture_chord'] = JSON.stringify({
+				key,
+				ctrl: false,
+				alt: false,
+				meta: false,
+				shift: false
+			});
+			expect(readChords()).toEqual(DEFAULT_CHORDS);
+		}
+	);
 
-  it('does not throw when storage throws on write', () => {
-    vi.stubGlobal('localStorage', {
-      getItem: () => null,
-      setItem: () => { throw new Error('quota exceeded'); },
-      removeItem: () => { throw new Error('storage disabled'); }
-    });
-    expect(() => writeChord(CHORD_A)).not.toThrow();
-    expect(() => clearChord()).not.toThrow();
-  });
+	it('falls back to the default when storage throws on read', () => {
+		vi.stubGlobal('localStorage', {
+			getItem: () => {
+				throw new Error('storage disabled');
+			},
+			setItem: () => {
+				throw new Error('storage disabled');
+			},
+			removeItem: () => {
+				throw new Error('storage disabled');
+			}
+		});
+		expect(readChords()).toEqual(DEFAULT_CHORDS);
+	});
+
+	it('does not throw when storage throws on write', () => {
+		vi.stubGlobal('localStorage', {
+			getItem: () => null,
+			setItem: () => {
+				throw new Error('quota exceeded');
+			},
+			removeItem: () => {
+				throw new Error('storage disabled');
+			}
+		});
+		expect(() => writeChord(CHORD_A)).not.toThrow();
+		expect(() => clearChord()).not.toThrow();
+	});
+
+	it("never reads the browser's own assigned key as the capture key", () => {
+		store['captua_capture_chord'] = JSON.stringify(CHORD_A);
+		expect(readChords()).toEqual(DEFAULT_CHORDS);
+	});
+
+	it("reads the browser's own assigned key, under either name, for the carry-over", () => {
+		expect(readLegacyChord()).toBeNull();
+		store['dtk_capture_chord'] = JSON.stringify(CHORD_A);
+		expect(readLegacyChord()).toEqual(CHORD_A);
+		clearLegacyChord();
+		expect(readLegacyChord()).toBeNull();
+		expect(store['dtk_capture_chord']).toBeUndefined();
+		store['captua_capture_chord'] = JSON.stringify({ ...CHORD_A, key: 'Shift' });
+		expect(readLegacyChord()).toBeNull();
+	});
+});
+
+describe('readChordValue and isDefaultChord', () => {
+	it('reads a bindable chord and refuses anything else', () => {
+		expect(readChordValue(CHORD_A)).toEqual(CHORD_A);
+		expect(readChordValue({ ...CHORD_A, extra: 1 })).toEqual(CHORD_A);
+		expect(readChordValue(null)).toBeNull();
+		expect(readChordValue({ key: 'b' })).toBeNull();
+		expect(readChordValue({ ...CHORD_A, key: 'Dead' })).toBeNull();
+	});
+
+	it('names the two built-in keys as the default, in any letter case', () => {
+		for (const chord of DEFAULT_CHORDS) expect(isDefaultChord(chord)).toBe(true);
+		expect(isDefaultChord({ ...DEFAULT_CHORDS[1], key: 'B' })).toBe(true);
+		expect(isDefaultChord({ ...DEFAULT_CHORDS[1], ctrl: true })).toBe(false);
+		expect(isDefaultChord(CHORD_A)).toBe(false);
+	});
 });

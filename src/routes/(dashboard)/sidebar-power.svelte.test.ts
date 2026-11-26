@@ -2,7 +2,7 @@
 // role. Operators and reviewers have no Settings page and the top-bar avatar
 // menu is not on the dashboard, so this is their way to shut the unit down.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -26,7 +26,7 @@ const children = createRawSnippet(() => ({ render: () => '<p>protected content</
 
 function signIn(role: UserRole) {
 	const user = { id: 1, username: role, email: null, role, is_active: true };
-	authStore.setSession('tok', user);
+	authStore.setSession(user);
 	vi.spyOn(globalThis, 'fetch').mockImplementation(
 		async () =>
 			new Response(JSON.stringify(user), {
@@ -43,7 +43,7 @@ async function mount(role: UserRole) {
 	return screen;
 }
 
-const ENTRIES = ['Ayuda', 'Apagar el equipo', 'Reiniciar el equipo', 'Salir'];
+const ENTRIES = ['Ayuda', 'Cambiar contraseña', 'Apagar el equipo', 'Reiniciar el equipo', 'Salir'];
 
 beforeEach(() => locale.set('es'));
 afterEach(() => {
@@ -66,8 +66,8 @@ describe('dashboard sidebar account menu', () => {
 			for (const name of ENTRIES) {
 				await expect.element(menu.getByRole('menuitem', { name })).toBeVisible();
 			}
-			expect(menu.getByRole('menuitem').elements()).toHaveLength(4);
-			expect(menu.element().querySelectorAll('.menu-sep')).toHaveLength(2);
+			expect(menu.getByRole('menuitem').elements()).toHaveLength(5);
+			expect(menu.element().querySelectorAll('.menu-sep')).toHaveLength(3);
 			expect(menu.element().getBoundingClientRect().width).toBeGreaterThanOrEqual(204);
 			for (const item of menu.getByRole('menuitem').elements()) {
 				expect(item.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
@@ -128,7 +128,9 @@ describe('dashboard sidebar account menu', () => {
 		expect(screen.container.querySelector('.s-footer')!.textContent).not.toContain('reviewer');
 
 		await tile.click();
-		await expect.element(screen.getByRole('menuitem', { name: 'Reiniciar el equipo' })).toBeVisible();
+		await expect
+			.element(screen.getByRole('menuitem', { name: 'Reiniciar el equipo' }))
+			.toBeVisible();
 	});
 
 	it('shows the whole footer at 800x480 and leaves the nav its own scroll, expanded and collapsed', async () => {
@@ -150,7 +152,9 @@ describe('dashboard sidebar account menu', () => {
 		await screen.getByRole('button', { name: /menú lateral/ }).click();
 		await expect.poll(() => q('.sidebar').getBoundingClientRect().width).toBeLessThan(100);
 		const collapsed = check();
-		console.info(`MEASURE 800x480 admin expanded ${JSON.stringify(expanded)} collapsed ${JSON.stringify(collapsed)}`);
+		console.info(
+			`MEASURE 800x480 admin expanded ${JSON.stringify(expanded)} collapsed ${JSON.stringify(collapsed)}`
+		);
 	});
 
 	it('opens upward from the user row at 800x480, inside the screen', async () => {

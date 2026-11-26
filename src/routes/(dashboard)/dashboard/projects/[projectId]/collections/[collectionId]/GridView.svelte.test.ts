@@ -2,7 +2,7 @@
 // review requires the full-size Book view, so no approve/reject control
 // (individual or bulk) may ever render in the grid toolbar or on a card.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 // .image-grid's grid-template-columns (the --grid-cols mapping) lives in the
@@ -15,6 +15,8 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import type { Record as ApiRecord } from '$lib/api';
 import GridView from './GridView.svelte';
+import { es } from '$lib/i18n/es';
+import { locale } from '$lib/i18n';
 
 function makeRecord(overrides: Partial<ApiRecord> = {}): ApiRecord {
 	return {
@@ -92,13 +94,17 @@ describe('GridView toolbar (NEH-210: Gallery has no approve/reject controls)', (
 
 		// Capturado leads, because NEH-260 gave the operator back a state before
 		// the handover and the panel has to be able to find those records.
-		await expect.element(screen.getByRole('button', { name: 'Capturado', exact: true })).toBeVisible();
+		await expect
+			.element(screen.getByRole('button', { name: 'Capturado', exact: true }))
+			.toBeVisible();
 		await expect.element(screen.getByRole('button', { name: 'Aprobado' })).toBeVisible();
 		await expect.element(screen.getByRole('button', { name: 'Rechazado' })).toBeVisible();
 		// exact:true — the grid card is also role="button" (NEH-211 click-to-book-view)
 		// and its accessible name includes its StatusBadge text, so a loose
 		// substring match would ambiguously hit both elements.
-		await expect.element(screen.getByRole('button', { name: 'En revisión', exact: true })).toBeVisible();
+		await expect
+			.element(screen.getByRole('button', { name: 'En revisión', exact: true }))
+			.toBeVisible();
 
 		// These are filter chips, not status-change actions.
 		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
@@ -111,7 +117,9 @@ describe('GridView toolbar (NEH-210: Gallery has no approve/reject controls)', (
 		await expect.element(screen.getByRole('button', { name: 'Aprobar' })).not.toBeInTheDocument();
 		await expect.element(screen.getByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument();
 		await expect.element(screen.getByRole('checkbox')).not.toBeInTheDocument();
-		await expect.element(screen.getByText('registro seleccionado', { exact: false })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByText('registro seleccionado', { exact: false }))
+			.not.toBeInTheDocument();
 	});
 
 	it('clicking a grid card does not surface any review action (it is not selectable)', async () => {
@@ -142,14 +150,17 @@ describe('GridView L/R pair grouping (NEH-211: pairs read as a single block)', (
 		expect(thumbs.length).toBe(2);
 	});
 
-	it('keeps the L and R badges inside the pair container', async () => {
+	it('keeps the camera badges inside the pair container: the right camera (role left), then the left camera', async () => {
+		locale.set('es');
 		const screen = render(GridView, baseProps({ records: [makePairRecord()] }));
 
 		const pair = screen.container.querySelector('.grid-pair') as HTMLElement;
 		expect(pair).not.toBeNull();
 
-		const badges = Array.from(pair.querySelectorAll('.role-badge')).map((el) => el.textContent);
-		expect(badges).toEqual(['L', 'R']);
+		const badges = Array.from(pair.querySelectorAll('.role-badge .badge-letter')).map((el) =>
+			el.textContent?.trim()
+		);
+		expect(badges).toEqual([es.badge_cam_right, es.badge_cam_left]);
 	});
 
 	it('renders the document name exactly once per pair, not once per thumbnail', async () => {
@@ -188,7 +199,9 @@ describe('GridView L/R pair grouping (NEH-211: pairs read as a single block)', (
 	it('L/R thumbnails inside a pair are exactly as wide as a single-capture thumbnail, at every slider size', async () => {
 		const screen = render(
 			GridView,
-			baseProps({ records: [makeRecord({ id: 1, title: 'Single doc' }), makePairRecord({ id: 2 })] })
+			baseProps({
+				records: [makeRecord({ id: 1, title: 'Single doc' }), makePairRecord({ id: 2 })]
+			})
 		);
 		const slider = screen.getByRole('slider', { name: 'Número de columnas' });
 
@@ -212,7 +225,9 @@ describe('GridView L/R pair grouping (NEH-211: pairs read as a single block)', (
 	it('Reordenar mode keeps the pair framed as one draggable unit, not two separate draggable cards', async () => {
 		const screen = render(
 			GridView,
-			baseProps({ records: [makeRecord({ id: 1, title: 'Single doc' }), makePairRecord({ id: 2 })] })
+			baseProps({
+				records: [makeRecord({ id: 1, title: 'Single doc' }), makePairRecord({ id: 2 })]
+			})
 		);
 
 		await screen.getByRole('button', { name: 'Reordenar' }).click();
@@ -274,4 +289,48 @@ describe('GridView click-to-Book-view (same pattern as ListView row click)', () 
 
 		expect(onRecordClick).not.toHaveBeenCalled();
 	});
+});
+
+describe('GridView — an opening with a page never photographed (0.3.2)', () => {
+	// The letter of the camera that photographed the page present.
+	for (const [side, present, letter] of [
+		['left', 'right', es.badge_cam_left],
+		['right', 'left', es.badge_cam_right]
+	] as const) {
+		it(`missing the ${side} page: the tile is a pair with an empty ${side} half that says so`, async () => {
+			locale.set('es');
+			const record = makePairRecord({
+				missing_side: side,
+				images: [
+					{
+						id: 30,
+						record_id: 2,
+						filename: `${present}.jpg`,
+						file_path: '/x',
+						format: 'jpg',
+						role: present,
+						is_current: true
+					}
+				]
+			});
+			const screen = render(GridView, {
+				records: [record],
+				collectionId: 1,
+				onRecordsUpdate: vi.fn(),
+				onRecordClick: vi.fn()
+			});
+			await expect.element(screen.getByText(es.missing_page)).toBeVisible();
+			const halves = [
+				...screen.container.querySelectorAll<HTMLElement>('.grid-pair .card-image-wrapper')
+			];
+			expect(halves).toHaveLength(2);
+			const [missingHalf, imageHalf] = side === 'left' ? halves : [halves[1], halves[0]];
+			expect(missingHalf.querySelector(`[data-missing-side="${side}"]`)).not.toBeNull();
+			expect(missingHalf.querySelector('img')).toBeNull();
+			expect(imageHalf.querySelector('img.card-image')).not.toBeNull();
+			expect(imageHalf.querySelector('.role-badge .badge-letter')?.textContent?.trim()).toBe(
+				letter
+			);
+		});
+	}
 });

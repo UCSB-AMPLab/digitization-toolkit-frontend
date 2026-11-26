@@ -1,15 +1,25 @@
 // Configuración → Almacenamiento: the usage row and bar show only figures
 // GET /system/storage reported (NEH-290). Fixtures are shaped as
 // get_storage_info in app/api/system.py; every other request the page makes
-// fails, which the page already tolerates.
+// fails, which the page already tolerates. Since NEH-253 Storage is one of
+// the administrator's sections, opened with ?section=storage.
 //
-// Version: 0.1.0-beta
-import { afterEach, describe, expect, it, vi } from 'vitest';
+// Version: 0.3.0
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+const pageStore = vi.hoisted(() => ({ value: null as null | { set: (v: { url: URL }) => void } }));
+vi.mock('$app/stores', async () => {
+	const { writable } = await import('svelte/store');
+	const store = writable({ url: new URL('http://localhost/dashboard/config') });
+	pageStore.value = store;
+	return { page: store };
+});
 
+import { authStore } from '$lib/stores/auth';
+import { locale } from '$lib/i18n';
 import ConfigPage from './+page.svelte';
 
 const GIB = 1024 ** 3;
@@ -28,7 +38,10 @@ function storage(usedGB: number, totalGB: number, available = true) {
 }
 
 function json(status: number, body: unknown) {
-	return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 /** `/system/storage` answers with `storageAnswer`; everything else with a 500. */
@@ -41,22 +54,27 @@ function serve(storageAnswer: Response) {
 }
 
 async function usageRow(container: HTMLElement) {
-	await expect
-		.poll(() => container.querySelector('[data-storage-used]'))
-		.not.toBeNull();
+	await expect.poll(() => container.querySelector('[data-storage-used]')).not.toBeNull();
 	return container.querySelector('[data-storage-used]') as HTMLElement;
 }
 
+beforeEach(() => {
+	authStore.setSession({ id: 1, username: 'admin1', email: null, role: 'admin', is_active: true });
+	pageStore.value!.set({ url: new URL('http://localhost/dashboard/config?section=storage') });
+});
 afterEach(() => {
 	vi.restoreAllMocks();
+	authStore.clearSession();
 });
 
 describe('Configuración storage usage', () => {
 	it('shows the reported figures, the bar and the alert at 85%', async () => {
+		locale.set('en');
 		serve(json(200, storage(51, 60)));
 		const { container } = render(ConfigPage);
 		const row = await usageRow(container);
-		expect(row.textContent).toContain('51 GB / 60 GB');
+		// Decimal units, as the Overview's storage notice writes the same disk.
+		expect(row.textContent).toContain('54.8\u00a0GB / 64.4\u00a0GB');
 		expect(container.querySelector('.storage-bar-fill')).not.toBeNull();
 		expect(container.querySelector('.storage-alert')?.textContent).toContain('85%');
 	});
@@ -69,7 +87,7 @@ describe('Configuración storage usage', () => {
 		expect(container.querySelector('.storage-bar-fill')).toBeNull();
 		expect(container.querySelector('.storage-alert')).toBeNull();
 		expect(container.textContent).not.toContain('NaN');
-		expect(container.textContent).not.toContain('0 GB / 0 GB');
+		expect(container.textContent).not.toContain('0\u00a0B / 0\u00a0B');
 	});
 
 	it('shows no figures, no bar and no alert when the request fails', async () => {
@@ -80,6 +98,6 @@ describe('Configuración storage usage', () => {
 		expect(container.querySelector('.storage-bar-fill')).toBeNull();
 		expect(container.querySelector('.storage-alert')).toBeNull();
 		expect(container.textContent).not.toContain('NaN');
-		expect(container.textContent).not.toContain('0 GB / 0 GB');
+		expect(container.textContent).not.toContain('0\u00a0B / 0\u00a0B');
 	});
 });

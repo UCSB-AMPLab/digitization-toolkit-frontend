@@ -3,14 +3,14 @@
 // own rotation, and in double mode the two panels sit side by side at a
 // common height, so their aspects add rather than average.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 export type Frame = { w: number; h: number; rotation: number };
 
 // Folds any rotation (negative, or >= 360) down to [0, 360).
 function normalizeRotation(rotation: number): number {
-  const n = rotation % 360;
-  return n < 0 ? n + 360 : n;
+	const n = rotation % 360;
+	return n < 0 ? n + 360 : n;
 }
 
 /**
@@ -21,10 +21,10 @@ function normalizeRotation(rotation: number): number {
  * to the caller, not a 0 or Infinity aspect.
  */
 export function frameAspect(frame: Frame | null): number | null {
-  if (!frame || !frame.w || !frame.h) return null;
-  const aspect = frame.w / frame.h;
-  const rotation = normalizeRotation(frame.rotation);
-  return rotation === 90 || rotation === 270 ? 1 / aspect : aspect;
+	if (!frame || !frame.w || !frame.h) return null;
+	const aspect = frame.w / frame.h;
+	const rotation = normalizeRotation(frame.rotation);
+	return rotation === 90 || rotation === 270 ? 1 / aspect : aspect;
 }
 
 /**
@@ -38,20 +38,18 @@ export function frameAspect(frame: Frame | null): number | null {
  * fallback (default 4:3) is returned.
  */
 export function viewportAspect(
-  frames: Array<Frame | null>,
-  mode: 'single' | 'double',
-  fallback = 4 / 3
+	frames: Array<Frame | null>,
+	mode: 'single' | 'double',
+	fallback = 4 / 3
 ): number {
-  const usable = frames
-    .map(frameAspect)
-    .filter((aspect): aspect is number => aspect !== null);
+	const usable = frames.map(frameAspect).filter((aspect): aspect is number => aspect !== null);
 
-  if (usable.length === 0) return fallback;
+	if (usable.length === 0) return fallback;
 
-  if (mode === 'single') return usable[0];
+	if (mode === 'single') return usable[0];
 
-  if (usable.length === 1) return usable[0] * 2;
-  return usable.reduce((sum, aspect) => sum + aspect, 0);
+	if (usable.length === 1) return usable[0] * 2;
+	return usable.reduce((sum, aspect) => sum + aspect, 0);
 }
 
 /**
@@ -63,7 +61,7 @@ export function viewportAspect(
  * neither panel's aspect is known yet does it fall back to 1 (equal split).
  */
 export function panelGrowFactor(own: number | null, other: number | null, fallback = 1): number {
-  return own ?? other ?? fallback;
+	return own ?? other ?? fallback;
 }
 
 /**
@@ -75,8 +73,8 @@ export function panelGrowFactor(own: number | null, other: number | null, fallba
  * (width or height is 0).
  */
 export function fitBox(aspect: number, boardW: number, boardH: number): { w: number; h: number } {
-  if (!boardW || !boardH) return { w: 0, h: 0 };
-  const w = Math.min(boardW, boardH * aspect);
-  const h = w / aspect;
-  return { w, h };
+	if (!boardW || !boardH) return { w: 0, h: 0 };
+	const w = Math.min(boardW, boardH * aspect);
+	const h = w / aspect;
+	return { w, h };
 }

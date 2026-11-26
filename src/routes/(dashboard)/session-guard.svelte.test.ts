@@ -3,7 +3,7 @@
 // and retry, keeping the saved session, and must not navigate anywhere; only a
 // 401/403 from /users/me ends the session.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { createRawSnippet } from 'svelte';
@@ -23,6 +23,8 @@ vi.mock('$lib/session-check', async (importOriginal) => {
 
 import { authStore, type AuthUser } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
+import { authApi } from '$lib/api';
+import { sessionRenewals } from '$lib/session-keepalive';
 import Layout from './+layout.svelte';
 
 const user: AuthUser = {
@@ -54,12 +56,15 @@ function json(status: number, body: unknown) {
 beforeEach(() => {
 	locale.set('en');
 	gotoMock.mockClear();
-	authStore.setSession('tok-1', user);
+	authStore.setSession(user);
 });
 
-afterEach(() => {
+afterEach(async () => {
 	vi.restoreAllMocks();
 	authStore.clearSession();
+	// Each test starts with renewals allowed and none in flight.
+	await sessionRenewals.stop();
+	sessionRenewals.resume();
 });
 
 describe('(dashboard) layout with a saved session and a backend that is not answering', () => {
@@ -80,34 +85,107 @@ describe('(dashboard) layout with a saved session and a backend that is not answ
 		await expect.poll(() => calls).toBeGreaterThanOrEqual(3);
 		expect(screen.container.textContent).not.toContain('protected content');
 		expect(gotoMock).not.toHaveBeenCalled();
-		expect(authStore.getToken()).toBe('tok-1');
+		expect(authStore.getUser()).toEqual(user);
 
 		answer = 'up';
 
 		await expect.element(screen.getByText('protected content')).toBeVisible();
 		expect(gotoMock).not.toHaveBeenCalled();
-		expect(authStore.getToken()).toBe('tok-1');
+		expect(authStore.getUser()).toEqual(user);
+		// The session rides on the cookie, not on an Authorization header.
 		const sent = fetchSpy.mock.calls.at(-1)![1] as RequestInit;
-		expect((sent.headers as Record<string, string>)['Authorization']).toBe('Bearer tok-1');
+		expect(sent.credentials).toBe('include');
+		expect((sent.headers as Record<string, string>)['Authorization']).toBeUndefined();
 	});
 
 	it('ends the session and goes to /login on a 401', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(401, { detail: 'Invalid or expired token' }));
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			json(401, { detail: 'Invalid or expired token' })
+		);
 
 		render(Layout, { children });
 
 		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
 		expect(gotoMock).toHaveBeenCalledWith('/login');
-		expect(authStore.getToken()).toBeNull();
+		expect(authStore.getUser()).toBeNull();
 	});
 
 	it('ends the session on a 403 too, so /login does not send the operator back here', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(403, { detail: 'Operation not permitted' }));
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			json(403, { detail: 'Operation not permitted' })
+		);
 
 		render(Layout, { children });
 
 		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
 		expect(gotoMock).toHaveBeenCalledWith('/login');
-		expect(authStore.getToken()).toBeNull();
+		expect(authStore.getUser()).toBeNull();
+	});
+});
+
+// The failed validation that clears the session is a sign-out: the logout
+// follows the renewal in flight, and no renewal starts after it.
+describe('(dashboard) layout and the session renewal', () => {
+	function routed(meAnswer: () => Response | Promise<Response>) {
+		let finishRefresh!: () => void;
+		const refreshDone = new Promise<Response>((resolve) => {
+			finishRefresh = () => resolve(json(200, { access_token: null, token_type: 'cookie' }));
+		});
+		const order: string[] = [];
+		vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+			const path = new URL(String(input), 'http://localhost').pathname.replace(/^\/api/, '');
+			order.push(path);
+			if (path === '/auth/refresh') return refreshDone;
+			if (path === '/auth/logout') return new Response(null, { status: 204 });
+			return meAnswer();
+		});
+		return { order, finishRefresh };
+	}
+
+	it('sends the logout only after the renewal in flight settles when /users/me answers 403', async () => {
+		const { order, finishRefresh } = routed(() => json(403, { detail: 'Operation not permitted' }));
+		sessionRenewals.start(() => authApi.refreshSession());
+
+		render(Layout, { children });
+
+		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
+		expect(authStore.getUser()).toBeNull();
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(order).not.toContain('/auth/logout');
+		expect(sessionRenewals.canStart()).toBe(false);
+
+		finishRefresh();
+		await expect.poll(() => order.includes('/auth/logout')).toBe(true);
+		expect(order.indexOf('/auth/logout')).toBeGreaterThan(order.indexOf('/auth/refresh'));
+		expect(order.filter((p) => p === '/auth/logout')).toHaveLength(1);
+		expect(sessionRenewals.canStart()).toBe(false);
+	});
+
+	it('leaves renewals running when /users/me cannot be reached and the session is kept', async () => {
+		const { order, finishRefresh } = routed(() => new Response('bad gateway', { status: 502 }));
+		sessionRenewals.start(() => authApi.refreshSession());
+
+		render(Layout, { children });
+
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		finishRefresh();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(authStore.getUser()).toEqual(user);
+		expect(order).not.toContain('/auth/logout');
+		expect(sessionRenewals.canStart()).toBe(true);
+	});
+});
+
+describe('(dashboard) layout with no saved session', () => {
+	it('goes to /login once without asking the backend (a browser just migrated off the localStorage token)', async () => {
+		authStore.clearSession();
+		const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+		render(Layout, { children });
+
+		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
+		expect(gotoMock).toHaveBeenCalledTimes(1);
+		expect(gotoMock).toHaveBeenCalledWith('/login');
+		expect(fetchSpy).not.toHaveBeenCalled();
 	});
 });

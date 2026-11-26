@@ -9,7 +9,7 @@
 // The module imports only a type from the API client, so the classification,
 // the date wording and the polling schedule are tested in the server project.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { CatalogueBackupStatus } from '$lib/api';
 import { parseApiDate } from './pipeline';
@@ -28,11 +28,12 @@ export const MAX_CLOCK_SKEW_MS = HOUR_MS;
 
 /**
  * current → green, late → amber, overdue → red, off → grey (not configured,
- * not a fault). `unknown` is for a response this module cannot read; the
- * components also use it when the request fails. It never stands in for one
- * of the other four.
+ * not a fault), local → neutral (the unit's mode takes no dump, NEH-319, so
+ * the age of the last one says nothing). `unknown` is for a response this
+ * module cannot read; the components also use it when the request fails. It
+ * never stands in for one of the other five.
  */
-export type BackupLevel = 'current' | 'late' | 'overdue' | 'off' | 'unknown';
+export type BackupLevel = 'current' | 'late' | 'overdue' | 'off' | 'local' | 'unknown';
 
 export interface BackupClassification {
 	level: BackupLevel;
@@ -43,6 +44,9 @@ export interface BackupClassification {
 /**
  * Classify the endpoint's answer at `now`.
  *
+ * `mode_allows: false` is local before anything else is read: in a mode that
+ * takes no dump, a copy that has stopped is not a fault, configured or not.
+ *
  * Age is `now − last_verified_at`. Both boundaries are inclusive on the
  * fresher side: exactly 36 h is current, exactly 72 h is late.
  *
@@ -52,8 +56,13 @@ export interface BackupClassification {
  * that it is missing. Further in the future, one of the two clocks is wrong
  * by more than skew explains and the age means nothing, so it is unknown.
  */
-export function classifyBackup(status: CatalogueBackupStatus, now: Date | number): BackupClassification {
+export function classifyBackup(
+	status: CatalogueBackupStatus,
+	now: Date | number
+): BackupClassification {
 	if (!status || typeof status.enabled !== 'boolean') return { level: 'unknown', verifiedAt: null };
+	// Scanner only (offline) mode takes no dump. A missing field (older backend) counts as allowed.
+	if (status.mode_allows === false) return { level: 'local', verifiedAt: null };
 	if (!status.enabled) return { level: 'off', verifiedAt: null };
 	if (status.last_verified_at === null) return { level: 'overdue', verifiedAt: null };
 	if (typeof status.last_verified_at !== 'string') return { level: 'unknown', verifiedAt: null };
@@ -81,7 +90,10 @@ export type CatalogueBackupSnapshot =
  * older than MAX_ANSWER_AGE_MS: an answer that could not be refreshed for that
  * long says nothing about the copy now.
  */
-export function classifySnapshot(snapshot: CatalogueBackupSnapshot, now: number): BackupClassification | null {
+export function classifySnapshot(
+	snapshot: CatalogueBackupSnapshot,
+	now: number
+): BackupClassification | null {
 	if (snapshot.kind === 'loading') return null;
 	if (snapshot.kind === 'failed') return { level: 'unknown', verifiedAt: null };
 	if (now - snapshot.receivedAt > MAX_ANSWER_AGE_MS) return { level: 'unknown', verifiedAt: null };
@@ -142,7 +154,9 @@ export const REQUEST_TIMEOUT_MS = 20 * 1000;
  */
 export const RECLASSIFY_INTERVAL_MS = 60 * 1000;
 
-export type PollResult<T = CatalogueBackupStatus> = { ok: true; status: T } | { ok: false; error: unknown };
+export type PollResult<T = CatalogueBackupStatus> =
+	| { ok: true; status: T }
+	| { ok: false; error: unknown };
 
 /**
  * Fetch now, then again `intervalMs` after each answer, success or failure.
@@ -188,7 +202,9 @@ export function startPolling<T = CatalogueBackupStatus>(
 			const status = await Promise.race([
 				fetcher(controller.signal),
 				new Promise<never>((_resolve, reject) =>
-					controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true })
+					controller.signal.addEventListener('abort', () => reject(controller.signal.reason), {
+						once: true
+					})
 				)
 			]);
 			result = { ok: true, status };

@@ -14,24 +14,37 @@
 //   404s for an unknown volume or record, and the 422s for a retake in the
 //   wrong capture mode and for a resolution in the file name;
 //   (and, from 0.2.0, the 409 with code `recapture_turn` for a capture that
-//   would start an empty volume during the retake turn, in recapture-turn.ts);
+//   would start an empty volume during the retake turn, in recapture-turn.ts),
+//   and the 507 with code `storage_reserve` for a capture below the space
+//   Captua keeps for its own work (app/core/storage_override.py), and the
+//   409 `captures_adopted_away` for a volume a move of captures closed
+//   (app/core/adopt_journal.py, NEH-419);
 // - a request answered 200 with `success: false`, which the capture screen
 //   turns into a CaptureFailed carrying the backend's `error`: a camera that
 //   is not connected, or the text of whatever failed during the capture.
+// A request that ended in a timeout is not a failure the backend reported:
+// the capture screen asks the backend for the capture's id (capture-check.ts),
+// and only what that check ends in reaches this file: a CaptureNotSaved when
+// the backend says nothing was saved, a CaptureOutcomeUnknown when the check
+// could not learn it.
 //
 // The backend texts are matched exactly or by their fixed start, so a change
 // on the backend falls through to the generic message instead of being shown
 // as the wrong one. No import of api.ts, so the tests run in plain node:
 // errors are matched by shape (`status`, `message`), as volume-stem.ts does.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 import { isConflict, isVolumeRequired, isWrongRetakeVolume } from './volume-stem';
 import { isRecaptureTurnRefusal } from './recapture-turn';
+import { testingRefusalText } from './testing-space';
+import { canFreeVolumes } from './unit-mode';
+import { isAdoptedAway } from './adoption';
 
 // STEM_REQUIRED_DETAIL in app/core/volume_stem.py.
-const STEM_REQUIRED_DETAIL = 'This volume has no file name stem. Give it one before capturing into it.';
+const STEM_REQUIRED_DETAIL =
+	'This volume has no file name stem. Give it one before capturing into it.';
 
 // CAPTURE_NAME_TOO_LONG_DETAIL in app/core/capture_naming.py: the 409 for a
 // capture whose `<stem>-img_<nnnn>` would be longer than a pair id holds.
@@ -81,8 +94,107 @@ export class CaptureFailed extends Error {
 	}
 }
 
+/**
+ * A capture whose request ended in a timeout, and whose id the backend
+ * neither runs nor holds (capture-check.ts).
+ */
+export class CaptureNotSaved extends Error {
+	constructor() {
+		super('No capture was saved');
+		this.name = 'CaptureNotSaved';
+	}
+}
+
+/**
+ * A capture whose request ended in a timeout, and whose outcome the check
+ * could not learn: the backend could not be asked, has no route to ask, or
+ * still ran the capture when the check gave up (capture-check.ts).
+ */
+export class CaptureOutcomeUnknown extends Error {
+	// What the attempt was, and whether in single-camera mode: the message
+	// names what to check.
+	attempt: 'new' | 'retake' | 'another';
+	single: boolean;
+	// Each place that shows this message registers how to remove it
+	// (whenFound); the background asks run them once the capture is found
+	// stored (markFound). Each removes the message only while that place still
+	// shows this attempt's message.
+	private clears: (() => void)[] = [];
+	private found = false;
+	constructor(attempt: 'new' | 'retake' | 'another', single: boolean) {
+		super('Whether the capture was saved is unknown');
+		this.name = 'CaptureOutcomeUnknown';
+		this.attempt = attempt;
+		this.single = single;
+	}
+	whenFound(clear: () => void): void {
+		if (this.found) clear();
+		else this.clears.push(clear);
+	}
+	markFound(): void {
+		if (this.found) return;
+		this.found = true;
+		const clears = this.clears;
+		this.clears = [];
+		for (const clear of clears) clear();
+	}
+}
+
+/** The CaptureOutcomeUnknown an error is, or was made from (its `cause`), or null. */
+export function unknownOutcomeOf(error: unknown): CaptureOutcomeUnknown | null {
+	if (error instanceof CaptureOutcomeUnknown) return error;
+	const cause = (error as { cause?: unknown } | null)?.cause;
+	return cause instanceof CaptureOutcomeUnknown ? cause : null;
+}
+
 function statusOf(error: unknown): unknown {
-	return typeof error === 'object' && error !== null ? (error as { status?: unknown }).status : undefined;
+	return typeof error === 'object' && error !== null
+		? (error as { status?: unknown }).status
+		: undefined;
+}
+
+/**
+ * Whether a capture was refused with the backend's 507 `storage_reserve`
+ * (app/core/storage_override.py): free space is below what Captua keeps for
+ * its own work. Matched on the status and the code, never on the text.
+ */
+function isStorageReserve(error: unknown): boolean {
+	if (statusOf(error) !== 507) return false;
+	const detail = (error as { detail?: unknown }).detail;
+	return (
+		typeof detail === 'object' &&
+		detail !== null &&
+		(detail as { code?: unknown }).code === 'storage_reserve'
+	);
+}
+
+/**
+ * Whether a retake was refused with the backend's 409 `record_changed`: the
+ * images it named as the ones it replaces are no longer the record's current
+ * images (NEH-388). Matched on the status and the code.
+ */
+export function isRecordChanged(error: unknown): boolean {
+	if (statusOf(error) !== 409) return false;
+	const detail = (error as { detail?: unknown }).detail;
+	return (
+		typeof detail === 'object' &&
+		detail !== null &&
+		(detail as { code?: unknown }).code === 'record_changed'
+	);
+}
+
+/**
+ * Whether a capture was refused with the backend's 409 `capture_abandoned`:
+ * a lookup of its id had answered not found and closed it (capture-check.ts).
+ */
+function isCaptureAbandoned(error: unknown): boolean {
+	if (statusOf(error) !== 409) return false;
+	const detail = (error as { detail?: unknown }).detail;
+	return (
+		typeof detail === 'object' &&
+		detail !== null &&
+		(detail as { code?: unknown }).code === 'capture_abandoned'
+	);
 }
 
 /** Whether a capture was refused with the backend's 409 for a volume without a stem. */
@@ -90,14 +202,31 @@ export function isStemRequired(error: unknown): boolean {
 	return isConflict(error) && error instanceof Error && error.message === STEM_REQUIRED_DETAIL;
 }
 
-/** The catalogue message for a failed capture or retake. */
-export function captureErrorText(error: unknown, msgs: Messages): string {
+/** The catalogue message for a failed capture or retake, for the signed-in `role`. */
+export function captureErrorText(error: unknown, msgs: Messages, role?: string | null): string {
+	if (error instanceof CaptureNotSaved) return msgs.lv_capture_not_saved;
+	if (error instanceof CaptureOutcomeUnknown)
+		return msgs.lv_capture_unknown(error.attempt, error.single);
+	// A request whose id a lookup had already closed (NEH-401): nothing was saved.
+	if (isCaptureAbandoned(error)) return msgs.lv_capture_not_saved;
 	if (error instanceof CaptureFailed) {
 		const camera = error.backendError?.match(CAMERA_NOT_CONNECTED);
 		if (camera) return msgs.lv_err_camera_not_connected(Number(camera[1]));
 		return msgs.lv_capture_error;
 	}
 	if (!(error instanceof Error)) return msgs.lv_capture_error;
+	// The testing account's refusals (NEH-391) carry a code: not enough space
+	// kept for real work, a volume outside the testing space. Other roles get
+	// the messages below.
+	const testing = testingRefusalText(error, msgs, role);
+	if (testing) return testing;
+	// Below the storage reserve (NEH-380): whoever can free space is sent to
+	// Settings > Storage; everyone else is told whom to ask.
+	if (isStorageReserve(error)) {
+		return canFreeVolumes(role) ? msgs.lv_err_storage_reserve_free : msgs.lv_err_storage_reserve;
+	}
+	// A volume whose captures a move took into another volume (NEH-419) takes no capture.
+	if (isAdoptedAway(error)) return msgs.adopt_closed_refusal;
 	// The recapture turn's 409 (0.2.0) carries a code: matched on it, not on its text.
 	if (isRecaptureTurnRefusal(error)) return msgs.err_recapture_turn;
 	if (isVolumeRequired(error)) return msgs.lv_err_no_volume;
@@ -110,7 +239,8 @@ export function captureErrorText(error: unknown, msgs: Messages): string {
 	if (status === 409 && error.message === CAPTURE_LIMIT_DETAIL) return msgs.lv_err_capture_limit;
 	if (status === 404 && VOLUME_NOT_FOUND.test(error.message)) return msgs.lv_err_volume_not_found;
 	if (status === 404 && RECORD_NOT_FOUND.test(error.message)) return msgs.lv_err_record_not_found;
-	if (status === 422 && error.message === RESOLUTION_IN_FILENAME_DETAIL) return msgs.lv_err_resolution_in_name;
+	if (status === 422 && error.message === RESOLUTION_IN_FILENAME_DETAIL)
+		return msgs.lv_err_resolution_in_name;
 	const mode = status === 422 ? error.message.match(RETAKE_MODE) : null;
 	if (mode) return msgs.lv_err_retake_mode(mode[1] as 'single' | 'dual');
 	return msgs.lv_capture_error;

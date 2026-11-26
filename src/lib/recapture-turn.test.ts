@@ -3,7 +3,7 @@
 // volume the queue offers first, the folios of the next guided retake, and
 // which record the guided retake opens next.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { describe, expect, it } from 'vitest';
 import type { QueueItem, RetakeSummary, StatusCounts } from './api';
 import {
@@ -15,6 +15,7 @@ import {
 	preferredRetakeVolume,
 	readRetakeSummary,
 	recapturesPendingCount,
+	retakeProgress,
 	retakeVolumeMap
 } from './recapture-turn';
 
@@ -30,10 +31,14 @@ class ApiError extends Error {
 }
 
 function counts(c: Partial<StatusCounts> = {}): StatusCounts {
-	return { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c };
+	return { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0, ...c };
 }
 
-function item(position: number, collectionId: number | null, projectId: number | null = 1): QueueItem {
+function item(
+	position: number,
+	collectionId: number | null,
+	projectId: number | null = 1
+): QueueItem {
 	return {
 		position,
 		sequence: position,
@@ -52,8 +57,28 @@ function item(position: number, collectionId: number | null, projectId: number |
 const summary: RetakeSummary = {
 	pendingRecords: 33,
 	volumes: [
-		{ collectionId: 92, projectId: 24, name: 'Tomo 066', filenameStem: 'co-ahr-not-t066', pending: 31, total: 31, firstPendingRecordId: 20946, pendingRecordIds: Array.from({ length: 31 }, (_, i) => 20946 + i) },
-		{ collectionId: 3, projectId: 24, name: 'Tomo 003', filenameStem: 'co-ahr-not-t003', pending: 2, total: 2, firstPendingRecordId: 11, pendingRecordIds: [11, 12] }
+		{
+			collectionId: 92,
+			projectId: 24,
+			name: 'Tomo 066',
+			filenameStem: 'co-ahr-not-t066',
+			pending: 31,
+			total: 31,
+			excluded: 0,
+			firstPendingRecordId: 20946,
+			pendingRecordIds: Array.from({ length: 31 }, (_, i) => 20946 + i)
+		},
+		{
+			collectionId: 3,
+			projectId: 24,
+			name: 'Tomo 003',
+			filenameStem: 'co-ahr-not-t003',
+			pending: 2,
+			total: 2,
+			excluded: 0,
+			firstPendingRecordId: 11,
+			pendingRecordIds: [11, 12]
+		}
 	],
 	turn: { state: 'recaptures', unlockedBy: null }
 };
@@ -67,17 +92,36 @@ describe('readRetakeSummary', () => {
 		expect(readRetakeSummary([])).toBeNull();
 		expect(readRetakeSummary(null)).toBeNull();
 		expect(readRetakeSummary({ pendingRecords: 2, volumes: [] })).toBeNull();
-		expect(readRetakeSummary({ pendingRecords: 2, volumes: [], turn: { state: 'other', unlockedBy: null } })).toBeNull();
+		expect(
+			readRetakeSummary({
+				pendingRecords: 2,
+				volumes: [],
+				turn: { state: 'other', unlockedBy: null }
+			})
+		).toBeNull();
 		// Each volume lists its pending records (0.2.0, backend/summary-pending-ids).
 		const { pendingRecordIds: _ids, ...withoutIds } = summary.volumes[0];
 		expect(readRetakeSummary({ ...summary, volumes: [withoutIds] })).toBeNull();
-		expect(readRetakeSummary({ ...summary, volumes: [{ ...summary.volumes[0], pendingRecordIds: ['20946'] }] })).toBeNull();
+		expect(
+			readRetakeSummary({
+				...summary,
+				volumes: [{ ...summary.volumes[0], pendingRecordIds: ['20946'] }]
+			})
+		).toBeNull();
 	});
 });
 
 describe('the 409 refusals', () => {
-	const turn = new ApiError('It is the retake turn.', { code: 'recapture_turn', message: 'It is the retake turn.' }, 409);
-	const pending = new ApiError('3 retakes left.', { code: 'recaptures_pending', pending: 3, message: '3 retakes left.' }, 409);
+	const turn = new ApiError(
+		'It is the retake turn.',
+		{ code: 'recapture_turn', message: 'It is the retake turn.' },
+		409
+	);
+	const pending = new ApiError(
+		'3 retakes left.',
+		{ code: 'recaptures_pending', pending: 3, message: '3 retakes left.' },
+		409
+	);
 
 	it('reads the capture refusal by its code', () => {
 		expect(isRecaptureTurnRefusal(turn)).toBe(true);
@@ -89,7 +133,9 @@ describe('the 409 refusals', () => {
 	it('reads the promotion refusal and its count by its code', () => {
 		expect(recapturesPendingCount(pending)).toBe(3);
 		expect(recapturesPendingCount(turn)).toBeNull();
-		expect(recapturesPendingCount(new ApiError('x', { code: 'recaptures_pending' }, 409))).toBeNull();
+		expect(
+			recapturesPendingCount(new ApiError('x', { code: 'recaptures_pending' }, 409))
+		).toBeNull();
 		expect(recapturesPendingCount(new Error('x'))).toBeNull();
 	});
 });
@@ -106,7 +152,9 @@ describe('preferredRetakeVolume', () => {
 	});
 
 	it('gives null without volumes', () => {
-		expect(preferredRetakeVolume({ ...summary, pendingRecords: 0, volumes: [] }, [item(1, 3)])).toBeNull();
+		expect(
+			preferredRetakeVolume({ ...summary, pendingRecords: 0, volumes: [] }, [item(1, 3)])
+		).toBeNull();
 		expect(preferredRetakeVolume(null, [item(1, 3)])).toBeNull();
 	});
 
@@ -118,7 +166,9 @@ describe('preferredRetakeVolume', () => {
 
 describe('folioHint', () => {
 	it('takes the folios before the colon of a comment that starts with Folios', () => {
-		expect(folioHint('Folios 10r, 9v: recaptura pedida en la lista (imágenes 23 y 24 de AHR0108).')).toBe('10r, 9v');
+		expect(
+			folioHint('Folios 10r, 9v: recaptura pedida en la lista (imágenes 23 y 24 de AHR0108).')
+		).toBe('10r, 9v');
 		expect(folioHint('Folios 4r: recaptura pedida')).toBe('4r');
 	});
 
@@ -164,5 +214,50 @@ describe('the guide order', () => {
 
 	it('gives null when nothing is pending', () => {
 		expect(guideNextId([1, 2], pending([]))).toBeNull();
+	});
+});
+
+describe('records that miss a side (0.3.2)', () => {
+	const volume = summary.volumes[1];
+
+	it('keeps the ids of the records that miss a side, and reads a volume without them as one with none', () => {
+		const withMissing = { ...summary, volumes: [{ ...volume, missingSideRecordIds: [12] }] };
+		expect(readRetakeSummary(withMissing)).toEqual(withMissing);
+		expect(readRetakeSummary(summary)?.volumes[1].missingSideRecordIds ?? []).toEqual([]);
+		expect(
+			readRetakeSummary({ ...summary, volumes: [{ ...volume, missingSideRecordIds: ['12'] }] })
+		).toBeNull();
+	});
+
+	it('counts them in the progress: pending of the rejected and the missing sides together', () => {
+		// Two missing sides, one rejection already retaken: the backend's
+		// pending (2) is above its total (1), which counts only rejections.
+		expect(
+			retakeProgress({ ...volume, pending: 2, total: 1, missingSideRecordIds: [11, 12] })
+		).toEqual({ pending: 2, total: 3, donePercent: expect.closeTo(100 / 3) });
+		expect(
+			retakeProgress({ ...volume, pending: 2, total: 0, missingSideRecordIds: [11, 12] })
+		).toEqual({ pending: 2, total: 2, donePercent: 0 });
+	});
+
+	it('reads a volume without them as before', () => {
+		expect(retakeProgress({ ...volume, pending: 1, total: 4 })).toEqual({
+			pending: 1,
+			total: 4,
+			donePercent: 75
+		});
+		expect(retakeProgress({ ...volume, pending: 0, total: 0 })).toEqual({
+			pending: 0,
+			total: 0,
+			donePercent: 0
+		});
+	});
+
+	it('walks a record that misses a side like any pending record', () => {
+		// The guide's order and next record come from pendingRecordIds, which
+		// lists the records that miss a side with the others.
+		const order = guideOrder([11, 12, 13], 12);
+		const pending = new Set([11, 12, 13]);
+		expect(guideNextId(order, (id) => pending.has(id), 12)).toBe(13);
 	});
 });

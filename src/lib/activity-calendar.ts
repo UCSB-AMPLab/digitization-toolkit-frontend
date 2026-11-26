@@ -8,7 +8,7 @@
 // so no local offset or daylight-saving change can move a key by a day,
 // whatever zone the code runs in.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { DailyActivity } from './api';
 
@@ -75,9 +75,13 @@ export function buildGrid(series: DailyActivity[], metric: CalendarMetric): Cale
 	if (series.length === 0) return { days: [], weeks: [], months: [], activeDays: 0, total: 0 };
 
 	const last = utcDay(series[series.length - 1].date);
-	const start = new Date(Date.UTC(
-		last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate() - mondayIndex(last) - 7 * (WEEKS - 1)
-	));
+	const start = new Date(
+		Date.UTC(
+			last.getUTCFullYear(),
+			last.getUTCMonth(),
+			last.getUTCDate() - mondayIndex(last) - 7 * (WEEKS - 1)
+		)
+	);
 
 	const visible = series.filter((s) => s.date >= dayKey(start));
 	const max = Math.max(0, ...visible.map((s) => s[metric]));
@@ -106,7 +110,9 @@ export function buildGrid(series: DailyActivity[], metric: CalendarMetric): Cale
 		}
 	});
 	// A label for a month that lasts one or two columns would run into the next.
-	const spaced = months.filter((mo, i) => i === months.length - 1 || months[i + 1].column - mo.column >= 3);
+	const spaced = months.filter(
+		(mo, i) => i === months.length - 1 || months[i + 1].column - mo.column >= 3
+	);
 
 	return {
 		days,
@@ -126,12 +132,22 @@ export function buildGrid(series: DailyActivity[], metric: CalendarMetric): Cale
 export function moveFocus(index: number, key: string, count: number, lead = 0): number {
 	const row = (lead + index) % 7;
 	const target =
-		key === 'ArrowUp' ? (row === 0 ? index : index - 1)
-		: key === 'ArrowDown' ? (row === 6 ? index : index + 1)
-		: key === 'ArrowLeft' ? index - 7
-		: key === 'ArrowRight' ? index + 7
-		: key === 'Home' ? 0
-		: key === 'End' ? count - 1
-		: index;
+		key === 'ArrowUp'
+			? row === 0
+				? index
+				: index - 1
+			: key === 'ArrowDown'
+				? row === 6
+					? index
+					: index + 1
+				: key === 'ArrowLeft'
+					? index - 7
+					: key === 'ArrowRight'
+						? index + 7
+						: key === 'Home'
+							? 0
+							: key === 'End'
+								? count - 1
+								: index;
 	return target < 0 || target >= count ? index : target;
 }

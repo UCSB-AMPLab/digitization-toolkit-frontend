@@ -1,9 +1,23 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
-import { LEGACY_LOCALE_COOKIE, LOCALE_COOKIE, localeCookies, localeFromCookies } from './index';
+import {
+	cookieLocale,
+	LEGACY_LOCALE_COOKIE,
+	LOCALE_COOKIE,
+	localeCookies,
+	localeFromCookies
+} from './index';
 
 const jar = (values: Record<string, string>) => (name: string) => values[name];
+
+describe('cookieLocale', () => {
+	it("is null with no usable cookie, so the server can use the unit's language", () => {
+		expect(cookieLocale(jar({}))).toBeNull();
+		expect(cookieLocale(jar({ [LOCALE_COOKIE]: 'fr' }))).toBeNull();
+		expect(cookieLocale(jar({ [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe('en');
+	});
+});
 
 describe('localeFromCookies', () => {
 	it('reads the current cookie', () => {
@@ -15,11 +29,15 @@ describe('localeFromCookies', () => {
 	});
 
 	it('prefers the current cookie when both are present', () => {
-		expect(localeFromCookies(jar({ [LOCALE_COOKIE]: 'es', [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe('es');
+		expect(localeFromCookies(jar({ [LOCALE_COOKIE]: 'es', [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe(
+			'es'
+		);
 	});
 
 	it('falls back to the old cookie when the current value is not a language', () => {
-		expect(localeFromCookies(jar({ [LOCALE_COOKIE]: 'fr', [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe('en');
+		expect(localeFromCookies(jar({ [LOCALE_COOKIE]: 'fr', [LEGACY_LOCALE_COOKIE]: 'en' }))).toBe(
+			'en'
+		);
 	});
 
 	it('uses the default when neither is set', () => {

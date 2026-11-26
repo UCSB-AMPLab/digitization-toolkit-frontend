@@ -3,7 +3,8 @@
 //   - `es.ts` is the source catalogue; `Messages = typeof es` forces every
 //     catalogue to have exactly the same keys.
 //   - The language is set ONCE per page load: the server reads it from the
-//     cookie in `hooks.server.ts`, passes it through `+layout.server.ts`, and
+//     cookie in `hooks.server.ts` (the unit's language without a cookie, and
+//     always on the login page), passes it through `+layout.server.ts`, and
 //     the root layout sets it in the `locale` store. Switching language
 //     (`setLanguage`) writes the cookie and reloads the whole page, so there
 //     is no reactive language re-render mid-session.
@@ -14,7 +15,7 @@
 // single-session kiosk and the language is set at the start of each render.
 // A concurrent multi-user deployment would need Svelte context instead.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { derived, writable } from 'svelte/store';
 import { browser } from '$app/environment';
@@ -45,12 +46,17 @@ export function isLocale(value: unknown): value is Locale {
 	return value === 'es' || value === 'en';
 }
 
-/** Language from the cookies: the current name first, then the old one. */
-export function localeFromCookies(get: (name: string) => string | undefined): Locale {
+/** Language from the cookies: the current name first, then the old one; null with neither. */
+export function cookieLocale(get: (name: string) => string | undefined): Locale | null {
 	const current = get(LOCALE_COOKIE);
 	if (isLocale(current)) return current;
 	const legacy = get(LEGACY_LOCALE_COOKIE);
-	return isLocale(legacy) ? legacy : DEFAULT_LOCALE;
+	return isLocale(legacy) ? legacy : null;
+}
+
+/** Language from the cookies, or DEFAULT_LOCALE with neither. */
+export function localeFromCookies(get: (name: string) => string | undefined): Locale {
+	return cookieLocale(get) ?? DEFAULT_LOCALE;
 }
 
 /** Active language for this page load. The root layout sets it. */
@@ -62,7 +68,7 @@ export const m = derived(locale, (l) => catalogs[l]);
 /**
  * Translated label for a role: `{$roleLabel(member.role)}`.
  *
- * The backend sends the enum in English (admin/operator/reviewer, with a
+ * The backend sends the enum in English (admin/operator/reviewer/testing, with a
  * CHECK constraint in the database), and it must not be shown raw (NEH-183).
  * The mapping lives here rather than in each page so that copies cannot fall
  * out of sync when a role or a key changes.
@@ -71,19 +77,16 @@ export const m = derived(locale, (l) => catalogs[l]);
  * the backend already emits — and a dash when there is none. The badge CSS
  * classes still use the raw value.
  */
-export const roleLabel = derived(
-	m,
-	($m) =>
-		(role: string | null | undefined): string => {
-			if (!role) return '—';
-			const labels: Record<string, string> = {
-				admin: $m.role_admin,
-				operator: $m.role_operator,
-				reviewer: $m.role_reviewer
-			};
-			return labels[role] ?? role;
-		}
-);
+export const roleLabel = derived(m, ($m) => (role: string | null | undefined): string => {
+	if (!role) return '—';
+	const labels: Record<string, string> = {
+		admin: $m.role_admin,
+		operator: $m.role_operator,
+		reviewer: $m.role_reviewer,
+		testing: $m.role_testing
+	};
+	return labels[role] ?? role;
+});
 
 /**
  * Cookie strings for a language. The old name is written too, with the same
@@ -105,7 +108,16 @@ export function localeCookies(next: Locale): string[] {
  */
 export function setLanguage(next: Locale, to?: string) {
 	if (!browser) return;
-	for (const cookie of localeCookies(next)) document.cookie = cookie;
+	storeLanguage(next);
 	if (to) location.assign(to);
 	else location.reload();
+}
+
+/**
+ * Stores the language cookie without reloading, for a caller whose page is
+ * already shown in `next`: the next full load renders in it.
+ */
+export function storeLanguage(next: Locale) {
+	if (!browser) return;
+	for (const cookie of localeCookies(next)) document.cookie = cookie;
 }

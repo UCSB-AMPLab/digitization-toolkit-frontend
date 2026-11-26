@@ -1,11 +1,17 @@
 // The credits page is public and shows the grant text and the five logos.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { userEvent } from 'vitest/browser';
 const { goto } = vi.hoisted(() => ({ goto: vi.fn() }));
 vi.mock('$app/navigation', () => ({ goto }));
+const pageStore = vi.hoisted(() => ({ value: null as unknown }));
+vi.mock('$app/stores', async () => {
+	const { writable } = await import('svelte/store');
+	const store = writable({ url: new URL('http://localhost/credits') });
+	pageStore.value = store;
+	return { page: store };
+});
 
 import Page from './+page.svelte';
 
@@ -19,15 +25,31 @@ describe('credits page', () => {
 
 	it('shows the three paragraphs', async () => {
 		const screen = await render(Page);
-		await expect.element(screen.getByText('Captua is developed by Adelaida Ávila', { exact: false })).toBeVisible();
-		await expect.element(screen.getByText('(NEH Award HAA-304052-25: "Digitization Toolkit', { exact: false })).toBeVisible();
-		await expect.element(screen.getByText('Any views, findings, conclusions', { exact: false })).toBeVisible();
+		await expect
+			.element(screen.getByText('Captua is developed by Adelaida Ávila', { exact: false }))
+			.toBeVisible();
+		await expect
+			.element(
+				screen.getByText('(NEH Award HAA-304052-25: "Digitization Toolkit', { exact: false })
+			)
+			.toBeVisible();
+		await expect
+			.element(screen.getByText('Any views, findings, conclusions', { exact: false }))
+			.toBeVisible();
 	});
 
 	it('shows the QR code for the project page beside the text', async () => {
 		const screen = await render(Page);
-		await expect.element(screen.getByRole('img', { name: 'QR code for the Digitization Toolkit project page on the AMPL website' })).toBeVisible();
-		await expect.element(screen.getByText('Scan to learn more about the project on the AMPL website')).toBeVisible();
+		await expect
+			.element(
+				screen.getByRole('img', {
+					name: 'QR code for the Digitization Toolkit project page on the AMPL website'
+				})
+			)
+			.toBeVisible();
+		await expect
+			.element(screen.getByText('Scan to learn more about the project on the AMPL website'))
+			.toBeVisible();
 		expect(screen.container.querySelector('a[href^="http"]')).toBeNull();
 	});
 
@@ -44,8 +66,23 @@ describe('credits page', () => {
 		}
 	});
 
-	it('links back to the welcome screen', async () => {
+	it('links back to the login page when opened from it', async () => {
+		(pageStore.value as { set: (v: { url: URL }) => void }).set({
+			url: new URL('http://localhost/credits?from=login')
+		});
 		const screen = await render(Page);
-		await expect.element(screen.getByRole('link', { name: 'Back / Volver' })).toHaveAttribute('href', '/welcome');
+		await expect
+			.element(screen.getByRole('link', { name: 'Back / Volver' }))
+			.toHaveAttribute('href', '/login');
+		(pageStore.value as { set: (v: { url: URL }) => void }).set({
+			url: new URL('http://localhost/credits')
+		});
+	});
+
+	it('links back to the first-run wizard otherwise', async () => {
+		const screen = await render(Page);
+		await expect
+			.element(screen.getByRole('link', { name: 'Back / Volver' }))
+			.toHaveAttribute('href', '/setup');
 	});
 });

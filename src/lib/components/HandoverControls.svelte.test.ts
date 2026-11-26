@@ -2,7 +2,7 @@
 // buttons show for which mix of statuses, what each dialog says, and what is
 // reported after promote and take-back answer.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -15,10 +15,18 @@ type S = ApiRecord['status'];
 let nextId = 1;
 function rec(status: S, title?: string): ApiRecord {
 	const id = nextId++;
-	return { id, title: title ?? `Registro ${id}`, status, capture_mode: 'single', images: [] } as ApiRecord;
+	return {
+		id,
+		title: title ?? `Registro ${id}`,
+		status,
+		capture_mode: 'single',
+		images: []
+	} as ApiRecord;
 }
 function recs(spec: Partial<{ [K in S]: number }>): ApiRecord[] {
-	return (Object.entries(spec) as [S, number][]).flatMap(([s, n]) => Array.from({ length: n }, () => rec(s)));
+	return (Object.entries(spec) as [S, number][]).flatMap(([s, n]) =>
+		Array.from({ length: n }, () => rec(s))
+	);
 }
 
 describe('HandoverControls', () => {
@@ -37,18 +45,23 @@ describe('HandoverControls', () => {
 		takeBackSpy.mockRestore();
 	});
 
-	const mount = (records: ApiRecord[]) => render(HandoverControls, { records, collectionId: 7, onChanged });
+	const mount = (records: ApiRecord[]) =>
+		render(HandoverControls, { records, collectionId: 7, onChanged });
 
 	it('a captured volume offers "Enviar a revisión" and no take-back', async () => {
 		const screen = mount(recs({ captured: 3 }));
 		await expect.element(screen.getByRole('button', { name: 'Enviar a revisión' })).toBeVisible();
-		await expect.element(screen.getByRole('button', { name: 'Retirar de revisión' })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Retirar de revisión' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('a volume with new captures after the send offers both, naming the new records', async () => {
 		const screen = mount(recs({ in_review: 24, captured: 1 }));
 		await expect.element(screen.getByRole('button', { name: 'Retirar de revisión' })).toBeVisible();
-		await expect.element(screen.getByRole('button', { name: 'Enviar 1 registro nuevo' })).toBeVisible();
+		await expect
+			.element(screen.getByRole('button', { name: 'Enviar 1 registro nuevo' }))
+			.toBeVisible();
 	});
 
 	it('a volume entirely in review offers only take-back', async () => {
@@ -64,12 +77,18 @@ describe('HandoverControls', () => {
 
 		const dialog = screen.getByRole('dialog');
 		await expect.element(dialog.getByText('¿Enviar el volumen a revisión?')).toBeVisible();
-		await expect.element(dialog.getByText('Los 37 registros capturados quedarán en revisión.', { exact: false })).toBeVisible();
+		await expect
+			.element(
+				dialog.getByText('Los 37 registros capturados quedarán en revisión.', { exact: false })
+			)
+			.toBeVisible();
 		expect(promoteSpy).not.toHaveBeenCalled();
 
 		await dialog.getByRole('button', { name: 'Enviar', exact: true }).click();
 		expect(promoteSpy).toHaveBeenCalledWith(7);
-		await expect.element(screen.getByRole('status')).toHaveTextContent(/^Se enviaron 37 registros a revisión\.$/);
+		await expect
+			.element(screen.getByRole('status'))
+			.toHaveTextContent(/^Se enviaron 37 registros a revisión\.$/);
 		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 		expect(onChanged).toHaveBeenCalled();
 	});
@@ -83,19 +102,34 @@ describe('HandoverControls', () => {
 	});
 
 	it('send refused: names the blocking records and says nothing changed', async () => {
-		const records = [rec('captured', 'Folio 12'), rec('captured', 'Folio 13'), rec('captured', 'Folio 31')];
-		promoteSpy.mockRejectedValue(new ApiError('Cannot hand over', { message: 'x', blocking_record_ids: [records[0].id, records[2].id] }));
+		const records = [
+			rec('captured', 'Folio 12'),
+			rec('captured', 'Folio 13'),
+			rec('captured', 'Folio 31')
+		];
+		promoteSpy.mockRejectedValue(
+			new ApiError('Cannot hand over', {
+				message: 'x',
+				blocking_record_ids: [records[0].id, records[2].id]
+			})
+		);
 		const screen = mount(records);
 		await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
 		await screen.getByRole('button', { name: 'Enviar', exact: true }).click();
 
 		const dialog = screen.getByRole('dialog');
 		await expect.element(dialog.getByText('No se pudo enviar el volumen')).toBeVisible();
-		await expect.element(dialog.getByText('Hay 2 registros que todavía no se pueden enviar', { exact: false })).toBeVisible();
+		await expect
+			.element(
+				dialog.getByText('Hay 2 registros que todavía no se pueden enviar', { exact: false })
+			)
+			.toBeVisible();
 		await expect.element(dialog.getByText('Folio 12')).toBeVisible();
 		await expect.element(dialog.getByText('Folio 31')).toBeVisible();
 		await expect.element(dialog.getByText('Folio 13')).not.toBeInTheDocument();
-		await expect.element(dialog.getByText('No se cambió el estado de ningún registro.')).toBeVisible();
+		await expect
+			.element(dialog.getByText('No se cambió el estado de ningún registro.'))
+			.toBeVisible();
 		// The submit button that had focus is gone; focus is on the dialog.
 		await expect.element(dialog).toHaveFocus();
 	});
@@ -105,7 +139,9 @@ describe('HandoverControls', () => {
 		const screen = mount(recs({ captured: 1 }));
 		await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
 		await screen.getByRole('button', { name: 'Enviar', exact: true }).click();
-		await expect.element(screen.getByRole('alert')).toHaveTextContent(/^No se pudo enviar el volumen a revisión\. Intenta de nuevo\.$/);
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent(/^No se pudo enviar el volumen a revisión\. Intenta de nuevo\.$/);
 		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 	});
 
@@ -114,41 +150,155 @@ describe('HandoverControls', () => {
 		const button = screen.getByRole('button', { name: 'Faltan 31 recapturas' });
 		await expect.element(button).toBeVisible();
 		await expect.element(button).toBeDisabled();
-		await expect.element(button).toHaveAccessibleDescription('Podrás enviar el volumen a revisión cuando termines las recapturas.');
-		await expect.element(screen.getByText('Podrás enviar el volumen a revisión cuando termines las recapturas.')).toBeVisible();
+		await expect
+			.element(button)
+			.toHaveAccessibleDescription(
+				'Podrás enviar el volumen a revisión cuando termines las recapturas.'
+			);
+		await expect
+			.element(
+				screen.getByText('Podrás enviar el volumen a revisión cuando termines las recapturas.')
+			)
+			.toBeVisible();
 		await expect.element(screen.getByRole('button', { name: /^Enviar/ })).not.toBeInTheDocument();
 	});
 
 	it('says Falta una recaptura for one, also when nothing else is captured', async () => {
 		const screen = mount(recs({ approved: 4, rejected: 1 }));
-		await expect.element(screen.getByRole('button', { name: 'Falta una recaptura' })).toBeDisabled();
+		await expect
+			.element(screen.getByRole('button', { name: 'Falta una recaptura' }))
+			.toBeDisabled();
+	});
+
+	it('excluded records (Fisqua contract 1.6) do not block the send: they count as sent, not as retakes', async () => {
+		const screen = mount(recs({ excluded: 2, approved: 3, captured: 1 }));
+		await expect
+			.element(screen.getByRole('button', { name: 'Enviar 1 registro nuevo' }))
+			.toBeEnabled();
+		await expect.element(screen.getByRole('button', { name: /recaptura/ })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('button', { name: 'Retirar de revisión' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('takes the pending count it is given, which counts records prepared for retake too', async () => {
-		const screen = render(HandoverControls, { records: recs({ captured: 3 }), collectionId: 7, onChanged, pending: 2 });
-		await expect.element(screen.getByRole('button', { name: 'Faltan 2 recapturas' })).toBeDisabled();
+		const screen = render(HandoverControls, {
+			records: recs({ captured: 3 }),
+			collectionId: 7,
+			onChanged,
+			pending: 2
+		});
+		await expect
+			.element(screen.getByRole('button', { name: 'Faltan 2 recapturas' }))
+			.toBeDisabled();
 		await expect.element(screen.getByRole('button', { name: /^Enviar/ })).not.toBeInTheDocument();
 	});
 
 	it('with a pending count of 0 and no rejected record, offers the send', async () => {
-		const screen = render(HandoverControls, { records: recs({ captured: 3 }), collectionId: 7, onChanged, pending: 0 });
+		const screen = render(HandoverControls, {
+			records: recs({ captured: 3 }),
+			collectionId: 7,
+			onChanged,
+			pending: 0
+		});
 		await expect.element(screen.getByRole('button', { name: 'Enviar a revisión' })).toBeEnabled();
 	});
 
 	it('takes the pending count it is given over the rejected records it shows', async () => {
-		const screen = render(HandoverControls, { records: recs({ captured: 2, rejected: 1 }), collectionId: 7, onChanged, pending: 0 });
+		const screen = render(HandoverControls, {
+			records: recs({ captured: 2, rejected: 1 }),
+			collectionId: 7,
+			onChanged,
+			pending: 0
+		});
 		await expect.element(screen.getByRole('button', { name: /^Enviar/ })).toBeEnabled();
 		await expect.element(screen.getByRole('button', { name: /^Falta/ })).not.toBeInTheDocument();
 	});
 
+	describe('records that miss a side (0.3.2)', () => {
+		const missing = (side: 'left' | 'right'): ApiRecord => ({
+			...rec('captured'),
+			missing_side: side
+		});
+
+		it('a volume whose only captured records miss a side offers no send, which would promote nothing', async () => {
+			const records = [missing('left'), missing('right'), ...recs({ approved: 3 })];
+			const screen = render(HandoverControls, {
+				records,
+				collectionId: 7,
+				onChanged,
+				pending: 2,
+				missingSide: 2
+			});
+			await expect
+				.element(screen.getByRole('button', { name: 'Faltan 2 recapturas' }))
+				.toBeDisabled();
+			await expect.element(screen.getByRole('button', { name: /^Enviar/ })).not.toBeInTheDocument();
+		});
+
+		it('without the summary, counts them from the records', async () => {
+			const screen = render(HandoverControls, {
+				records: [missing('left')],
+				collectionId: 7,
+				onChanged
+			});
+			await expect
+				.element(screen.getByRole('button', { name: 'Falta una recaptura' }))
+				.toBeDisabled();
+			await expect.element(screen.getByRole('button', { name: /^Enviar/ })).not.toBeInTheDocument();
+		});
+
+		it('they do not hold back the send of the other captured records, which names only those', async () => {
+			promoteSpy.mockResolvedValue({ collection_id: 7, promoted: 3 });
+			const records = [missing('left'), ...recs({ captured: 3 })];
+			const screen = render(HandoverControls, {
+				records,
+				collectionId: 7,
+				onChanged,
+				pending: 1,
+				missingSide: 1
+			});
+			await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
+			const dialog = screen.getByRole('dialog');
+			await expect
+				.element(
+					dialog.getByText('Los 3 registros capturados quedarán en revisión.', { exact: false })
+				)
+				.toBeVisible();
+			await dialog.getByRole('button', { name: 'Enviar', exact: true }).click();
+			expect(promoteSpy).toHaveBeenCalledWith(7);
+		});
+
+		it('a retake of a rejection still locks the send, counting the missing sides among the pending', async () => {
+			const records = [missing('left'), ...recs({ captured: 3, rejected: 1 })];
+			const screen = render(HandoverControls, {
+				records,
+				collectionId: 7,
+				onChanged,
+				pending: 2,
+				missingSide: 1
+			});
+			await expect
+				.element(screen.getByRole('button', { name: 'Faltan 2 recapturas' }))
+				.toBeDisabled();
+			await expect.element(screen.getByRole('button', { name: /^Enviar/ })).not.toBeInTheDocument();
+		});
+	});
+
 	it('a send refused because retakes are pending says how many, from the refusal (0.2.0)', async () => {
 		promoteSpy.mockRejectedValue(
-			new ApiError('3 retakes left.', { code: 'recaptures_pending', pending: 3, message: '3 retakes left.' }, 409)
+			new ApiError(
+				'3 retakes left.',
+				{ code: 'recaptures_pending', pending: 3, message: '3 retakes left.' },
+				409
+			)
 		);
 		const screen = mount(recs({ captured: 2 }));
 		await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
 		await screen.getByRole('button', { name: 'Enviar', exact: true }).click();
-		await expect.element(screen.getByRole('alert')).toHaveTextContent(/^No se pudo enviar el volumen a revisión: faltan 3 recapturas\.$/);
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent(/^No se pudo enviar el volumen a revisión: faltan 3 recapturas\.$/);
 		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 		expect(onChanged).toHaveBeenCalled();
 	});
@@ -159,12 +309,26 @@ describe('HandoverControls', () => {
 		await screen.getByRole('button', { name: 'Retirar de revisión' }).click();
 
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByText('Los 24 registros en revisión quedarán otra vez en estado Capturado', { exact: false })).toBeVisible();
-		await expect.element(dialog.getByText('Los 9 registros aprobados y los 4 rechazados se quedan como están, porque ya se revisaron.')).toBeVisible();
+		await expect
+			.element(
+				dialog.getByText('Los 24 registros en revisión quedarán otra vez en estado Capturado', {
+					exact: false
+				})
+			)
+			.toBeVisible();
+		await expect
+			.element(
+				dialog.getByText(
+					'Los 9 registros aprobados y los 4 rechazados se quedan como están, porque ya se revisaron.'
+				)
+			)
+			.toBeVisible();
 
 		await dialog.getByRole('button', { name: 'Retirar', exact: true }).click();
 		expect(takeBackSpy).toHaveBeenCalledWith(7);
-		await expect.element(screen.getByRole('status')).toHaveTextContent(/^Se retiraron 24 registros de revisión\.$/);
+		await expect
+			.element(screen.getByRole('status'))
+			.toHaveTextContent(/^Se retiraron 24 registros de revisión\.$/);
 		expect(onChanged).toHaveBeenCalled();
 	});
 
@@ -172,7 +336,13 @@ describe('HandoverControls', () => {
 		const screen = mount(recs({ in_review: 1 }));
 		await screen.getByRole('button', { name: 'Retirar de revisión' }).click();
 		const dialog = screen.getByRole('dialog');
-		await expect.element(dialog.getByText('El registro en revisión quedará otra vez en estado Capturado', { exact: false })).toBeVisible();
+		await expect
+			.element(
+				dialog.getByText('El registro en revisión quedará otra vez en estado Capturado', {
+					exact: false
+				})
+			)
+			.toBeVisible();
 		await expect.element(dialog.getByText('se queda', { exact: false })).not.toBeInTheDocument();
 	});
 
@@ -182,9 +352,11 @@ describe('HandoverControls', () => {
 		const screen = mount(recs({ captured: 2 }));
 		await screen.getByRole('button', { name: 'Enviar a revisión' }).click();
 		await screen.getByRole('button', { name: 'Enviar', exact: true }).click();
-		await expect.element(screen.getByRole('alert')).toHaveTextContent(
-			/^El cambio se guardó, pero no se pudo actualizar la lista de registros\./
-		);
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent(
+				/^El cambio se guardó, pero no se pudo actualizar la lista de registros\./
+			);
 	});
 
 	it('Tab stays inside the dialog', async () => {
@@ -195,7 +367,9 @@ describe('HandoverControls', () => {
 		(send.element() as HTMLElement).focus();
 		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }));
 		await expect.element(cancel).toHaveFocus();
-		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true }));
+		window.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true })
+		);
 		await expect.element(send).toHaveFocus();
 	});
 

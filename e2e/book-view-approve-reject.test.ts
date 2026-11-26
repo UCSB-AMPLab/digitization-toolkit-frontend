@@ -12,8 +12,8 @@
 // `e2e_neh209` account provisioned in this dev environment):
 //   E2E_USERNAME, E2E_PASSWORD
 //
-// Version: 0.1.0-beta
-import { test, expect, testStem, type APIRequestContext } from './fixtures';
+// Version: 0.3.0
+import { test, expect, testStem, signInBrowser, type APIRequestContext } from './fixtures';
 
 const API_BASE = process.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
 const E2E_USERNAME = process.env.E2E_USERNAME ?? 'e2e_neh209';
@@ -68,15 +68,12 @@ async function createRecordWithImages(
 		// `role` is a query param on this endpoint, not a multipart field
 		// (it isn't declared with FastAPI's Form()) — sending it as form
 		// data gets silently ignored and every image ends up with role=null.
-		const imgResp = await request.post(
-			`${API_BASE}/records/${record.id}/images?role=${role}`,
-			{
-				headers: authHeaders,
-				multipart: {
-					file: { name: `${role}.jpg`, mimeType: 'image/jpeg', buffer: TINY_JPEG }
-				}
+		const imgResp = await request.post(`${API_BASE}/records/${record.id}/images?role=${role}`, {
+			headers: authHeaders,
+			multipart: {
+				file: { name: `${role}.jpg`, mimeType: 'image/jpeg', buffer: TINY_JPEG }
 			}
-		);
+		});
 		expect(imgResp.ok(), await imgResp.text()).toBeTruthy();
 	}
 
@@ -170,13 +167,22 @@ async function teardown(request: APIRequestContext, token: string, projectId: nu
 	await request.delete(`${API_BASE}/projects/${projectId}`, { headers: authHeaders });
 }
 
-async function openBookView(page: import('@playwright/test').Page, ctx: SetupResult, collectionId: number) {
-	await page.addInitScript(
-		([token, user]) => {
-			localStorage.setItem('access_token', token as string);
-			localStorage.setItem('auth_user', user as string);
-		},
-		[ctx.token, JSON.stringify({ id: 0, username: E2E_USERNAME, email: 'e2e@example.com', role: 'admin', is_active: true })]
+async function openBookView(
+	page: import('@playwright/test').Page,
+	ctx: SetupResult,
+	collectionId: number
+) {
+	await signInBrowser(
+		page,
+		API_BASE,
+		{ username: E2E_USERNAME, password: E2E_PASSWORD },
+		{
+			id: 0,
+			username: E2E_USERNAME,
+			email: 'e2e@example.com',
+			role: 'admin',
+			is_active: true
+		}
 	);
 	await page.goto(`/dashboard/projects/${ctx.projectId}/collections/${collectionId}`);
 	// Switch to Book view (spread). The toolbar is in the server-rendered
@@ -247,7 +253,9 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await expect(page.locator('.pending-recapture-badge')).toHaveCount(2);
 	});
 
-	test('single-camera document: reject shows exactly one image pending recapture', async ({ page }) => {
+	test('single-camera document: reject shows exactly one image pending recapture', async ({
+		page
+	}) => {
 		await openBookView(page, ctx, ctx.singleCollectionId);
 
 		await flagErrors(page, ['Imagen movida']);
@@ -257,13 +265,22 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await expect(page.locator('.pending-recapture-badge')).toHaveCount(1);
 	});
 
-	test('approve reflects immediately without a page reload, and shows the "Aprobada" tag', async ({ page, request }) => {
+	test('approve reflects immediately without a page reload, and shows the "Aprobada" tag', async ({
+		page,
+		request
+	}) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
 			data: { name: `Approve ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
-		await createRecordWithImages(request, ctx.token, collection.id, 'Approve-me document', 'single');
+		await createRecordWithImages(
+			request,
+			ctx.token,
+			collection.id,
+			'Approve-me document',
+			'single'
+		);
 
 		await openBookView(page, ctx, collection.id);
 
@@ -278,13 +295,22 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await expect(page).toHaveURL(new RegExp(`/collections/${collection.id}$`));
 	});
 
-	test('undo: approving then rejecting-to-undo brings the record back to in_review, fully interactive again', async ({ page, request }) => {
+	test('undo: approving then rejecting-to-undo brings the record back to in_review, fully interactive again', async ({
+		page,
+		request
+	}) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
 			data: { name: `Undo ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
-		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Undo document', 'single');
+		const recordId = await createRecordWithImages(
+			request,
+			ctx.token,
+			collection.id,
+			'Undo document',
+			'single'
+		);
 
 		await openBookView(page, ctx, collection.id);
 
@@ -297,7 +323,9 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		// Undo the approval: Rechazar on an approved record reverts to
 		// in_review (no reason required) instead of a formal rejection.
 		await page.getByRole('button', { name: 'Rechazar' }).click();
-		await expect(page.getByText('¿Confirmas que quieres deshacer la aprobación de esta imagen?')).toBeVisible();
+		await expect(
+			page.getByText('¿Confirmas que quieres deshacer la aprobación de esta imagen?')
+		).toBeVisible();
 		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
 
 		await expect(page.locator('.approved-badge')).toHaveCount(0);
@@ -312,16 +340,27 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await expect(page.getByRole('button', { name: 'Aprobar' })).toBeEnabled();
 		await expect(page.getByRole('button', { name: 'Rechazar' })).toBeEnabled();
 		await page.getByRole('button', { name: 'Rechazar' }).click();
-		await expect(page.getByRole('dialog').getByText('Debes seleccionar al menos un error.')).toBeVisible();
+		await expect(
+			page.getByRole('dialog').getByText('Debes seleccionar al menos un error.')
+		).toBeVisible();
 	});
 
-	test('undo: rejecting then approving-to-undo brings the record back to in_review', async ({ page, request }) => {
+	test('undo: rejecting then approving-to-undo brings the record back to in_review', async ({
+		page,
+		request
+	}) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
 			data: { name: `Undo2 ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
-		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Undo2 document', 'single');
+		const recordId = await createRecordWithImages(
+			request,
+			ctx.token,
+			collection.id,
+			'Undo2 document',
+			'single'
+		);
 
 		await openBookView(page, ctx, collection.id);
 
@@ -339,7 +378,9 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		// Undo the rejection: Aprobar on a rejected record reverts to
 		// in_review instead of jumping straight to approved.
 		await page.getByRole('button', { name: 'Aprobar' }).click();
-		await expect(page.getByText('¿Confirmas que quieres deshacer el rechazo de esta imagen?')).toBeVisible();
+		await expect(
+			page.getByText('¿Confirmas que quieres deshacer el rechazo de esta imagen?')
+		).toBeVisible();
 		await page.getByRole('dialog').getByRole('button', { name: 'Confirmar' }).click();
 
 		await expect(page.locator('.pending-recapture-badge')).toHaveCount(0);
@@ -359,7 +400,13 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 			data: { name: `Cancel ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
 		});
 		const collection = await colResp.json();
-		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Cancel document', 'single');
+		const recordId = await createRecordWithImages(
+			request,
+			ctx.token,
+			collection.id,
+			'Cancel document',
+			'single'
+		);
 
 		await openBookView(page, ctx, collection.id);
 
@@ -373,7 +420,10 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		expect((await statusResp.json()).status).toBe('in_review');
 	});
 
-	test('"Marcar error" and "Agregar nota" are independent — picking two errors and adding a note create TWO separate annotation cards', async ({ page, request }) => {
+	test('"Marcar error" and "Agregar nota" are independent — picking two errors and adding a note create TWO separate annotation cards', async ({
+		page,
+		request
+	}) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
 			data: { name: `MultiTag ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
@@ -395,13 +445,26 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await expect(errorCard.getByText('nota independiente')).toHaveCount(0);
 	});
 
-	test('rejecting with multiple reasons selected sends only the FIRST one to the backend', async ({ page, request }) => {
+	test('rejecting with multiple reasons selected sends only the FIRST one to the backend', async ({
+		page,
+		request
+	}) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `FirstReason ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+			data: {
+				name: `FirstReason ${Date.now()}`,
+				project_id: ctx.projectId,
+				filename_stem: testStem()
+			}
 		});
 		const collection = await colResp.json();
-		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'FirstReason document', 'single');
+		const recordId = await createRecordWithImages(
+			request,
+			ctx.token,
+			collection.id,
+			'FirstReason document',
+			'single'
+		);
 
 		await openBookView(page, ctx, collection.id);
 
@@ -419,13 +482,26 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		expect(rejections[0].predefined_reason).toBe('glare');
 	});
 
-	test('"Recapturar imagen" on a rejected record navigates to live-preview with the record id', async ({ page, request }) => {
+	test('"Recapturar imagen" on a rejected record navigates to live-preview with the record id', async ({
+		page,
+		request
+	}) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `Recapture ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+			data: {
+				name: `Recapture ${Date.now()}`,
+				project_id: ctx.projectId,
+				filename_stem: testStem()
+			}
 		});
 		const collection = await colResp.json();
-		const recordId = await createRecordWithImages(request, ctx.token, collection.id, 'Recapture document', 'single');
+		const recordId = await createRecordWithImages(
+			request,
+			ctx.token,
+			collection.id,
+			'Recapture document',
+			'single'
+		);
 		const rejectResp = await request.post(`${API_BASE}/records/${recordId}/reject`, {
 			headers: { Authorization: `Bearer ${ctx.token}`, 'Content-Type': 'application/json' },
 			data: { predefined_reason: 'blur' }
@@ -437,16 +513,33 @@ test.describe('Book view — approve/reject (NEH-209)', () => {
 		await expect(page.getByRole('button', { name: 'Rechazar' })).toHaveCount(0);
 		await page.getByRole('button', { name: 'Recapturar imagen' }).click();
 
-		await expect(page).toHaveURL(new RegExp(`/live-preview\\?projectId=${ctx.projectId}&collectionId=${collection.id}&recordId=${recordId}$`));
+		await expect(page).toHaveURL(
+			new RegExp(
+				`/live-preview\\?projectId=${ctx.projectId}&collectionId=${collection.id}&recordId=${recordId}$`
+			)
+		);
 	});
 
-	test('regression: the old isolated rejection-comment modal never appears, and "Marcar error"/"Agregar nota" are collapsed accordions, not an always-open list', async ({ page, request }) => {
+	test('regression: the old isolated rejection-comment modal never appears, and "Marcar error"/"Agregar nota" are collapsed accordions, not an always-open list', async ({
+		page,
+		request
+	}) => {
 		const colResp = await request.post(`${API_BASE}/collections/`, {
 			headers: { Authorization: `Bearer ${ctx.token}` },
-			data: { name: `Regression ${Date.now()}`, project_id: ctx.projectId, filename_stem: testStem() }
+			data: {
+				name: `Regression ${Date.now()}`,
+				project_id: ctx.projectId,
+				filename_stem: testStem()
+			}
 		});
 		const collection = await colResp.json();
-		await createRecordWithImages(request, ctx.token, collection.id, 'Regression-check document', 'single');
+		await createRecordWithImages(
+			request,
+			ctx.token,
+			collection.id,
+			'Regression-check document',
+			'single'
+		);
 
 		await openBookView(page, ctx, collection.id);
 

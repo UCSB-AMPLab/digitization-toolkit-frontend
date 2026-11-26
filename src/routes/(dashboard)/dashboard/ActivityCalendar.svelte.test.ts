@@ -1,7 +1,7 @@
 // The dashboard's activity calendar: the client call, the two views, the
 // day line, keyboard navigation and the error state.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
@@ -24,9 +24,12 @@ describe('activityApi.daily', () => {
 	afterEach(() => vi.restoreAllMocks());
 
 	it('requests the window with the browser time zone and its offset', async () => {
-		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
-			async () => new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
-		);
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockImplementation(
+				async () =>
+					new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+			);
 		await activityApi.daily(182, 'America/Bogota', 300);
 		expect(String(fetchSpy.mock.calls[0][0])).toMatch(
 			/\/activity\/daily\?days=182&tz=America%2FBogota&tz_offset_minutes=300$/
@@ -43,7 +46,9 @@ describe('ActivityCalendar', () => {
 	let dailySpy: ReturnType<typeof vi.spyOn>;
 
 	beforeEach(() => {
-		try { localStorage.removeItem('captua_activity_view'); } catch {}
+		try {
+			localStorage.removeItem('captua_activity_view');
+		} catch {}
 		dailySpy = vi.spyOn(activityApi, 'daily').mockResolvedValue(
 			series({
 				'2026-10-22': { captured_images: 212, reviewed_records: 1 },
@@ -53,15 +58,23 @@ describe('ActivityCalendar', () => {
 	});
 	afterEach(() => {
 		dailySpy.mockRestore();
-		try { localStorage.removeItem('captua_activity_view'); } catch {}
+		try {
+			localStorage.removeItem('captua_activity_view');
+		} catch {}
 	});
 
 	it('asks for 182 days in the browser zone and shows captures by default, ending today', async () => {
 		const screen = render(ActivityCalendar);
-		await expect.element(screen.getByText('Imágenes capturadas por día en los últimos seis meses')).toBeVisible();
+		await expect
+			.element(screen.getByText('Imágenes capturadas por día en los últimos seis meses'))
+			.toBeVisible();
 		expect(dailySpy).toHaveBeenCalledWith(182, 'America/Bogota', new Date().getTimezoneOffset());
-		await expect.element(screen.getByText(/^212 imágenes capturadas el 22 de octubre de 2026$/)).toBeVisible();
-		await expect.element(screen.getByRole('grid', { name: 'Imágenes capturadas por día' })).toBeVisible();
+		await expect
+			.element(screen.getByText(/^212 imágenes capturadas el 22 de octubre de 2026$/))
+			.toBeVisible();
+		await expect
+			.element(screen.getByRole('grid', { name: 'Imágenes capturadas por día' }))
+			.toBeVisible();
 		await expect.element(screen.getByText('Días con capturas')).toBeVisible();
 		await expect.element(screen.getByText('Menos')).toBeVisible();
 		await expect.element(screen.getByText('Más')).toBeVisible();
@@ -78,12 +91,24 @@ describe('ActivityCalendar', () => {
 		const screen = render(ActivityCalendar);
 		await expect.element(screen.getByText('Días con capturas')).toBeVisible();
 		await screen.getByRole('button', { name: 'Revisiones' }).click();
-		await expect.element(screen.getByText('Registros aprobados o rechazados por día en los últimos seis meses')).toBeVisible();
-		await expect.element(screen.getByRole('grid', { name: 'Registros revisados por día' })).toBeVisible();
+		await expect
+			.element(
+				screen.getByText('Registros aprobados o rechazados por día en los últimos seis meses')
+			)
+			.toBeVisible();
+		await expect
+			.element(screen.getByRole('grid', { name: 'Registros revisados por día' }))
+			.toBeVisible();
 		await expect.element(screen.getByText('Días con revisiones')).toBeVisible();
-		await expect.element(screen.getByText('1 registro revisado el 22 de octubre de 2026')).toBeVisible();
-		await expect.element(screen.getByRole('button', { name: 'Revisiones' })).toHaveAttribute('aria-pressed', 'true');
-		await expect.element(screen.getByRole('button', { name: 'Capturas' })).toHaveAttribute('aria-pressed', 'false');
+		await expect
+			.element(screen.getByText('1 registro revisado el 22 de octubre de 2026'))
+			.toBeVisible();
+		await expect
+			.element(screen.getByRole('button', { name: 'Revisiones' }))
+			.toHaveAttribute('aria-pressed', 'true');
+		await expect
+			.element(screen.getByRole('button', { name: 'Capturas' }))
+			.toHaveAttribute('aria-pressed', 'false');
 		expect(localStorage.getItem('captua_activity_view')).toBe('reviews');
 	});
 
@@ -95,8 +120,14 @@ describe('ActivityCalendar', () => {
 
 	it('uses the singular for one image and the plural otherwise', async () => {
 		const screen = render(ActivityCalendar);
-		await screen.getByRole('gridcell', { name: /^1 imagen capturada el 21 de octubre de 2026$/ }).hover();
-		await expect.element(screen.getByText('1 imagen capturada el 21 de octubre de 2026', { exact: true }).first()).toBeVisible();
+		await screen
+			.getByRole('gridcell', { name: /^1 imagen capturada el 21 de octubre de 2026$/ })
+			.hover();
+		await expect
+			.element(
+				screen.getByText('1 imagen capturada el 21 de octubre de 2026', { exact: true }).first()
+			)
+			.toBeVisible();
 	});
 
 	it('is one tab stop and moves by day and week with the arrow keys, Home and End', async () => {
@@ -110,7 +141,11 @@ describe('ActivityCalendar', () => {
 		today.focus();
 		await userEvent.keyboard('{ArrowUp}');
 		expect(document.activeElement).toBe(document.querySelector('[data-date="2026-10-21"]'));
-		await expect.element(screen.getByText('1 imagen capturada el 21 de octubre de 2026', { exact: true }).first()).toBeVisible();
+		await expect
+			.element(
+				screen.getByText('1 imagen capturada el 21 de octubre de 2026', { exact: true }).first()
+			)
+			.toBeVisible();
 		await userEvent.keyboard('{ArrowLeft}');
 		expect(document.activeElement).toBe(document.querySelector('[data-date="2026-10-14"]'));
 		await userEvent.keyboard('{ArrowRight}');
@@ -129,7 +164,9 @@ describe('ActivityCalendar', () => {
 		await expect.element(screen.getByRole('grid')).toBeVisible();
 		const top = (el: Element | null | undefined) => el!.getBoundingClientRect().top;
 		const label = (text: string) =>
-			Array.from(document.querySelectorAll('.act-weekdays span')).find((e) => e.textContent?.trim() === text);
+			Array.from(document.querySelectorAll('.act-weekdays span')).find(
+				(e) => e.textContent?.trim() === text
+			);
 		// 2026-04-27 is a Monday, 04-28 a Tuesday, 04-29 a Wednesday, 05-01 a Friday.
 		expect(top(label('lun'))).toBe(top(document.querySelector('[data-date="2026-04-27"]')));
 		expect(top(label('mié'))).toBe(top(document.querySelector('[data-date="2026-04-29"]')));
@@ -140,13 +177,17 @@ describe('ActivityCalendar', () => {
 	it('groups thousands in the day line from five digits, as Spanish does', async () => {
 		dailySpy.mockResolvedValue(series({ '2026-10-22': { captured_images: 12345 } }));
 		const screen = render(ActivityCalendar);
-		await expect.element(screen.getByText('12.345 imágenes capturadas el 22 de octubre de 2026')).toBeVisible();
+		await expect
+			.element(screen.getByText('12.345 imágenes capturadas el 22 de octubre de 2026'))
+			.toBeVisible();
 	});
 
 	it('leaves four digits unseparated in the day line', async () => {
 		dailySpy.mockResolvedValue(series({ '2026-10-22': { captured_images: 1212 } }));
 		const screen = render(ActivityCalendar);
-		await expect.element(screen.getByText('1212 imágenes capturadas el 22 de octubre de 2026')).toBeVisible();
+		await expect
+			.element(screen.getByText('1212 imágenes capturadas el 22 de octubre de 2026'))
+			.toBeVisible();
 	});
 
 	it('does not announce the day line as a live region', async () => {
@@ -159,9 +200,19 @@ describe('ActivityCalendar', () => {
 		const screen = render(ActivityCalendar);
 		await expect.element(screen.getByRole('grid')).toBeVisible();
 		document.querySelector<HTMLElement>('[data-date="2026-10-21"]')!.focus();
-		await expect.element(screen.getByText('1 imagen capturada el 21 de octubre de 2026', { exact: true }).first()).toBeVisible();
+		await expect
+			.element(
+				screen.getByText('1 imagen capturada el 21 de octubre de 2026', { exact: true }).first()
+			)
+			.toBeVisible();
 		document.querySelector<HTMLElement>('[data-date="2026-10-21"]')!.blur();
-		await expect.element(screen.getByText('212 imágenes capturadas el 22 de octubre de 2026', { exact: true }).first()).toBeVisible();
+		await expect
+			.element(
+				screen
+					.getByText('212 imágenes capturadas el 22 de octubre de 2026', { exact: true })
+					.first()
+			)
+			.toBeVisible();
 		expect(document.querySelector<HTMLElement>('[data-date="2026-10-22"]')!.tabIndex).toBe(0);
 	});
 
@@ -181,7 +232,9 @@ describe('ActivityCalendar', () => {
 		dailySpy.mockRejectedValueOnce(new Error('boom'));
 		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const screen = render(ActivityCalendar);
-		await expect.element(screen.getByRole('alert')).toHaveTextContent('No se pudo cargar el calendario de actividad.');
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent('No se pudo cargar el calendario de actividad.');
 		await screen.getByRole('button', { name: 'Reintentar' }).click();
 		await expect.element(screen.getByRole('grid')).toBeVisible();
 		errSpy.mockRestore();

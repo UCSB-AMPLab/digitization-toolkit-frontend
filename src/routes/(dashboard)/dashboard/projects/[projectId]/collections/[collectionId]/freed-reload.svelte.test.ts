@@ -2,7 +2,7 @@
 // change, which can happen on each poll while a free or a restore runs. That
 // reload must keep the record the admin is reading selected.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
@@ -36,20 +36,27 @@ function rec(id: number, masterFreedAt: string | null = null): ApiRecord {
 		is_current: true,
 		master_freed_at: masterFreedAt
 	};
-	return { id, title: `Folio ${id}`, status: 'captured', sequence: id, images: [image] } as unknown as ApiRecord;
+	return {
+		id,
+		title: `Folio ${id}`,
+		status: 'captured',
+		sequence: id,
+		images: [image]
+	} as unknown as ApiRecord;
 }
 const records = [1, 2, 3, 4, 5, 6].map((id) => rec(id));
 
 beforeEach(() => {
 	locale.set('es');
-	authStore.setSession('tok', admin);
+	authStore.setSession(admin);
 });
 afterEach(() => {
 	vi.restoreAllMocks();
 	authStore.clearSession();
 });
 
-const selectedThumb = (container: HTMLElement) => container.querySelector('.thumb-item.selected')?.textContent ?? '';
+const selectedThumb = (container: HTMLElement) =>
+	container.querySelector('.thumb-item.selected')?.textContent ?? '';
 
 describe('collection page: reload after a change in what is freed', () => {
 	it('keeps record 5 selected after the reload', async () => {
@@ -76,7 +83,9 @@ describe('collection page: reload after a change in what is freed', () => {
 		await page.getByRole('button', { name: 'Exportar BagIt' }).click();
 		await page.getByText('Paquete de archivo (BagIt)').click();
 		await page.getByRole('dialog').getByRole('button', { name: title }).click();
-		await expect.poll(() => screen.container.ownerDocument.querySelector('.img-viewer-download')).not.toBeNull();
+		await expect
+			.poll(() => screen.container.ownerDocument.querySelector('.img-viewer-download'))
+			.not.toBeNull();
 	}
 
 	it('gives an open inspection modal the reloaded record, with its new freed state', async () => {
@@ -92,9 +101,13 @@ describe('collection page: reload after a change in what is freed', () => {
 		expect(await slot.reloadRecords!()).toBe(true);
 
 		// A freed master offers no download (ImageViewerModal).
-		await expect.poll(() => screen.container.ownerDocument.querySelector('.img-viewer-download')).toBeNull();
+		await expect
+			.poll(() => screen.container.ownerDocument.querySelector('.img-viewer-download'))
+			.toBeNull();
 		// The modal stays open on the same record.
-		expect(screen.container.ownerDocument.querySelector('.img-viewer-title')?.textContent).toContain('Folio 5');
+		expect(
+			screen.container.ownerDocument.querySelector('.img-viewer-title')?.textContent
+		).toContain('Folio 5');
 	});
 
 	it('closes the inspection modal when its record is gone after the reload', async () => {
@@ -108,6 +121,8 @@ describe('collection page: reload after a change in what is freed', () => {
 
 		expect(await slot.reloadRecords!()).toBe(true);
 
-		await expect.poll(() => screen.container.ownerDocument.querySelector('.img-viewer-title')).toBeNull();
+		await expect
+			.poll(() => screen.container.ownerDocument.querySelector('.img-viewer-title'))
+			.toBeNull();
 	});
 });

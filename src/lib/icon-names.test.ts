@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -19,13 +19,41 @@ function svelteFiles(dir: string): string[] {
 	});
 }
 
+/**
+ * The icon-class spans of a template: the body of each `<span ... material-symbols-outlined ...>`.
+ * The opening tag is read to its closing `>` past quoted values and `{...}` expressions (an arrow
+ * function holds a `>`), and the closing tag may be written `</span\n>`, so the scan does not
+ * depend on how the template is laid out.
+ */
+function iconSpanBodies(source: string): string[] {
+	const bodies: string[] = [];
+	for (const open of source.matchAll(/<span\b/g)) {
+		let end = open.index + 5;
+		let depth = 0;
+		let quote = '';
+		for (; end < source.length; end++) {
+			const c = source[end];
+			if (quote) {
+				if (c === quote) quote = '';
+			} else if (c === '{') depth++;
+			else if (c === '}') depth--;
+			else if (depth === 0 && (c === '"' || c === "'")) quote = c;
+			else if (depth === 0 && c === '>') break;
+		}
+		if (!source.slice(open.index, end).includes('material-symbols-outlined')) continue;
+		const close = /<\/span\s*>/g;
+		close.lastIndex = end + 1;
+		const closing = close.exec(source);
+		if (closing) bodies.push(source.slice(end + 1, closing.index));
+	}
+	return bodies;
+}
+
 /** Icon names a file can render, read from the elements with the icon class. */
 function iconsIn(source: string): { names: string[]; unresolved: string[] } {
 	const found: string[] = [];
 	const unresolved: string[] = [];
-	const element = /<span\b[^>]*material-symbols-outlined[^>]*>([\s\S]*?)<\/span>/g;
-	for (const match of source.matchAll(element)) {
-		const body = match[1];
+	for (const body of iconSpanBodies(source)) {
 		const expressions = [...body.matchAll(/\{([^}]*)\}/g)];
 		const literal = body.replace(/\{[^}]*\}/g, '').trim();
 		if (literal) found.push(literal);

@@ -6,11 +6,13 @@
 // No import of api.ts, so the tests run in plain node: errors are matched by
 // shape (`status`, `detail`, `message`), as volume-stem.ts does.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 import { FILENAME_STEM_MAX_LENGTH, stemConflict, stemConflictText } from './volume-stem';
 import { fileHoldText, storedOffsiteCount } from './volume-refusals';
+import { testingRefusalText } from './testing-space';
+import { isAdoptedAway } from './adoption';
 
 // Constraint names app/core/db_errors.py reports in a 409's `constraint`.
 function constraintOf(error: unknown): unknown {
@@ -36,10 +38,66 @@ export function referenceCodeDiffers(error: unknown): { externalId: string; stem
 	return { externalId: d.external_id, stem: d.filename_stem };
 }
 
-/** The message for a failed create or update of a volume. */
-export function volumeSaveErrorText(error: unknown, msgs: Messages): string {
+// Fisqua mode's refusals of a volume create or update (NEH-311,
+// app/api/collections.py): each code at the status the backend gives it.
+const FISQUA_REFUSALS: { [code: string]: number } = {
+	volumes_from_fisqua: 403,
+	unknown_reference_code: 422,
+	stem_required: 422,
+	fisqua_no_lookup: 409,
+	fisqua_unreachable: 409
+};
+
+export type FisquaVolumeRefusal =
+	| { code: 'volumes_from_fisqua' | 'stem_required' | 'fisqua_no_lookup' | 'fisqua_unreachable' }
+	| { code: 'unknown_reference_code'; referenceCode: string };
+
+/**
+ * A volume save refused in Fisqua mode: an operator (403
+ * volumes_from_fisqua), a code Fisqua does not know (422, with the code), a
+ * stem cleared (422 stem_required), or no answer from Fisqua (409
+ * fisqua_no_lookup, fisqua_unreachable). Null for any other error.
+ */
+export function fisquaVolumeRefusal(error: unknown): FisquaVolumeRefusal | null {
+	if (typeof error !== 'object' || error === null) return null;
+	const e = error as { status?: unknown; detail?: unknown };
+	if (typeof e.detail !== 'object' || e.detail === null || Array.isArray(e.detail)) return null;
+	const d = e.detail as { code?: unknown; referenceCode?: unknown };
+	if (typeof d.code !== 'string' || FISQUA_REFUSALS[d.code] !== e.status) return null;
+	if (d.code === 'unknown_reference_code') {
+		return typeof d.referenceCode === 'string'
+			? { code: d.code, referenceCode: d.referenceCode }
+			: null;
+	}
+	return { code: d.code as Exclude<FisquaVolumeRefusal['code'], 'unknown_reference_code'> };
+}
+
+/** The message for a Fisqua-mode refusal. */
+export function fisquaRefusalText(refusal: FisquaVolumeRefusal, msgs: Messages): string {
+	switch (refusal.code) {
+		case 'volumes_from_fisqua':
+			return msgs.pd_err_volumes_from_fisqua;
+		case 'unknown_reference_code':
+			return msgs.pd_err_unknown_reference_code(refusal.referenceCode);
+		case 'stem_required':
+			return msgs.pd_err_stem_required_fisqua;
+		case 'fisqua_no_lookup':
+			return msgs.pd_fisqua_no_lookup_title;
+		case 'fisqua_unreachable':
+			return msgs.pd_fisqua_unreachable_title;
+	}
+}
+
+/** The message for a failed create or update of a volume, for the signed-in `role`. */
+export function volumeSaveErrorText(error: unknown, msgs: Messages, role?: string | null): string {
+	// The testing account's refusals are its own; every other role gets the text below.
+	const testing = testingRefusalText(error, msgs, role);
+	if (testing) return testing;
+	const fisqua = fisquaVolumeRefusal(error);
+	if (fisqua) return fisquaRefusalText(fisqua, msgs);
 	const differs = referenceCodeDiffers(error);
-	if (differs) return msgs.pd_err_stem_differs_from_reference_code(differs.externalId, differs.stem);
+	if (differs)
+		return msgs.pd_err_stem_differs_from_reference_code(differs.externalId, differs.stem);
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
 	const hold = fileHoldText(error, msgs);
@@ -53,6 +111,24 @@ export function volumeSaveErrorText(error: unknown, msgs: Messages): string {
 			return msgs.pd_val_stem_too_long(FILENAME_STEM_MAX_LENGTH);
 	}
 	return msgs.pd_err_create_collection;
+}
+
+/**
+ * Whether a records move was refused because Captua keeps one of the two
+ * volumes on the unit and not the other (NEH-320: 409 `kept_on_unit_move`
+ * from POST /collections/{id}/move-records, refuse_kept_move in
+ * app/core/kept_volumes.py). The delete modal's move is the only caller
+ * that can meet it: no screen re-parents a volume, or moves a single record
+ * between volumes, so the re-parent refusal of the same code has no string.
+ */
+export function isKeptMoveRefusal(error: unknown): boolean {
+	if (typeof error !== 'object' || error === null) return false;
+	const e = error as { status?: unknown; detail?: unknown };
+	const code =
+		typeof e.detail === 'object' && e.detail !== null
+			? (e.detail as { code?: unknown }).code
+			: undefined;
+	return e.status === 409 && code === 'kept_on_unit_move';
 }
 
 // The start of the backend's 409 detail for a volume that still holds
@@ -99,8 +175,17 @@ export function moveBlockedCount(error: unknown): number | null {
 	return Array.isArray(ids) && ids.length > 0 ? ids.length : null;
 }
 
-/** The message for a failed delete (or the move of records before it). */
-export function volumeDeleteErrorText(error: unknown, msgs: Messages): string {
+/** The message for a failed delete (or the move of records before it), for the signed-in `role`. */
+export function volumeDeleteErrorText(
+	error: unknown,
+	msgs: Messages,
+	role?: string | null
+): string {
+	const testing = testingRefusalText(error, msgs, role);
+	if (testing) return testing;
+	if (isKeptMoveRefusal(error)) return msgs.pd_err_move_kept_line;
+	// Records moved into a volume whose captures a move took into another (NEH-419).
+	if (isAdoptedAway(error)) return msgs.adopt_closed_refusal;
 	const conflict = stemConflict(error);
 	if (conflict) return stemConflictText(conflict, msgs);
 	const stored = storedOffsiteCount(error);
@@ -111,7 +196,8 @@ export function volumeDeleteErrorText(error: unknown, msgs: Messages): string {
 	if (blocked !== null) return msgs.pd_err_move_under_review(blocked);
 	if (isNotEmptyRefusal(error)) {
 		const counts = notEmptyCounts(error);
-		if (counts && counts.records === 0 && counts.subVolumes > 0) return msgs.pd_err_delete_has_subvolumes;
+		if (counts && counts.records === 0 && counts.subVolumes > 0)
+			return msgs.pd_err_delete_has_subvolumes;
 		return msgs.pd_err_delete_not_empty;
 	}
 	return msgs.pd_err_delete_collection;

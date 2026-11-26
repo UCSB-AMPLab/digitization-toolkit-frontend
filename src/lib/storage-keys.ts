@@ -3,20 +3,30 @@
 // found only under the old name is copied across and the old entry stays.
 // Writes go to the new name only.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 const PREFIX = 'captua_';
 const LEGACY_PREFIX = 'dtk_';
 
 export const STORAGE_KEYS = {
-  captureChord: `${PREFIX}capture_chord`,
-  activityView: `${PREFIX}activity_view`,
-  inProgressView: `${PREFIX}dashboard_in_progress_view`,
-  tourSeen: (userId: number | string) => `${PREFIX}tour_visto:${userId}`
+	// The capture key a browser assigned before the unit held it (NEH-228);
+	// read once to carry it over to the unit (NEH-336).
+	captureChord: `${PREFIX}capture_chord`,
+	// The last capture key read from the unit: a cache for the first paint.
+	unitCaptureChord: `${PREFIX}unit_capture_chord`,
+	activityView: `${PREFIX}activity_view`,
+	inProgressView: `${PREFIX}dashboard_in_progress_view`,
+	tourSeen: (userId: number | string) => `${PREFIX}tour_visto:${userId}`,
+	// NEH-339: the time (ms since the epoch) of the user's last focus check or capture.
+	focusCheck: (userId: number | string) => `${PREFIX}focus_check:${userId}`,
+	// NEH-225: whether the capture screen's camera panel is open ('true' or
+	// 'false'), and the names of its open sections (a JSON array).
+	cameraPanelOpen: `${PREFIX}camera_panel_open`,
+	cameraPanelSections: `${PREFIX}camera_panel_sections`
 } as const;
 
 function legacyName(key: string): string {
-  return key.startsWith(PREFIX) ? LEGACY_PREFIX + key.slice(PREFIX.length) : key;
+	return key.startsWith(PREFIX) ? LEGACY_PREFIX + key.slice(PREFIX.length) : key;
 }
 
 /**
@@ -25,35 +35,35 @@ function legacyName(key: string): string {
  * read, for a caller that must tell "nothing stored" from "storage broken".
  */
 export function readStoredStrict(key: string): string | null {
-  const current = localStorage.getItem(key);
-  if (current !== null) return current;
-  const legacy = localStorage.getItem(legacyName(key));
-  if (legacy === null) return null;
-  try {
-    localStorage.setItem(key, legacy);
-  } catch {
-    // Quota or private mode: the old value is still returned for this load.
-  }
-  return legacy;
+	const current = localStorage.getItem(key);
+	if (current !== null) return current;
+	const legacy = localStorage.getItem(legacyName(key));
+	if (legacy === null) return null;
+	try {
+		localStorage.setItem(key, legacy);
+	} catch {
+		// Quota or private mode: the old value is still returned for this load.
+	}
+	return legacy;
 }
 
 /** As readStoredStrict, but a storage failure yields null. */
 export function readStored(key: string): string | null {
-  try {
-    return readStoredStrict(key);
-  } catch {
-    return null;
-  }
+	try {
+		return readStoredStrict(key);
+	} catch {
+		return null;
+	}
 }
 
 /** Writes the `captua_` key only. Returns false when storage refused. */
 export function writeStored(key: string, value: string): boolean {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch {
-    return false;
-  }
+	try {
+		localStorage.setItem(key, value);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**
@@ -61,11 +71,11 @@ export function writeStored(key: string, value: string): boolean {
  * from the old entry on the next read.
  */
 export function removeStored(key: string): void {
-  for (const name of [key, legacyName(key)]) {
-    try {
-      localStorage.removeItem(name);
-    } catch {
-      // Nothing to clear when storage is unavailable.
-    }
-  }
+	for (const name of [key, legacyName(key)]) {
+		try {
+			localStorage.removeItem(name);
+		} catch {
+			// Nothing to clear when storage is unavailable.
+		}
+	}
 }

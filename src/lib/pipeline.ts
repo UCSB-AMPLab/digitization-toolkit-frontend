@@ -6,9 +6,14 @@
 // capture, recapture of rejected images, review, approval. So a volume with
 // one captured record is still "en captura" however many of its other records
 // are approved, and only a volume whose every record is approved is done.
+//
+// A record Fisqua excluded (contract 1.6) is not a page of the volume: it is
+// not pending, not a retake and not in review, so it holds no volume back.
+// It is not a segment of the stacked bar either, which shows the volume's
+// pages.
 // ============================================================================
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { CollectionActivity, StatusCounts } from '$lib/api';
 
@@ -26,14 +31,27 @@ export type BarStatus = (typeof BAR_STATUSES)[number];
  *   else any rejected record     → recapture
  *   else any record in review    → review
  *   else (all approved, ≥1)      → approved
- * A volume with no records is in capture: nothing in it has been started.
+ * Excluded records are left out, except that a volume with nothing but
+ * excluded records is approved: Fisqua has ruled on all of it. A volume with
+ * no records is in capture: nothing in it has been started.
  */
 export function placeVolume(counts: StatusCounts): PipelineStage {
 	if (counts.captured > 0) return 'capture';
 	if (counts.rejected > 0) return 'recapture';
 	if (counts.in_review > 0) return 'review';
-	if (counts.approved > 0) return 'approved';
+	if (counts.approved > 0 || counts.excluded > 0) return 'approved';
 	return 'capture';
+}
+
+/**
+ * The inline style of a stage's badge, as the project page and Volúmenes
+ * (NEH-313) draw it: the stage's colour on a light wash of it.
+ */
+export function stageBadgeStyle(stage: PipelineStage): string {
+	if (stage === 'capture') return 'color: var(--color-primary); background: rgba(90,140,98,0.15)';
+	if (stage === 'recapture') return 'color: var(--color-error); background: rgba(214,103,74,0.15)';
+	if (stage === 'review') return 'color: var(--color-warning); background: rgba(208,154,68,0.15)';
+	return 'color: var(--color-success); background: rgba(111,191,115,0.15)';
 }
 
 export interface BarSegment {
@@ -62,8 +80,12 @@ export function barSegments(counts: StatusCounts): BarSegment[] {
  * in it). Within a stage, the volume whose status changed most recently comes
  * first; volumes with no status change at all go last, in id order.
  */
-export function groupByStage<T extends CollectionActivity>(rows: T[]): { [K in PipelineStage]: T[] } {
-	const groups = { capture: [], recapture: [], review: [], approved: [] } as { [K in PipelineStage]: T[] };
+export function groupByStage<T extends CollectionActivity>(
+	rows: T[]
+): { [K in PipelineStage]: T[] } {
+	const groups = { capture: [], recapture: [], review: [], approved: [] } as {
+		[K in PipelineStage]: T[];
+	};
 	for (const row of rows) groups[placeVolume(row.status_counts)].push(row);
 	for (const stage of PIPELINE_STAGES) {
 		groups[stage].sort((a, b) => {

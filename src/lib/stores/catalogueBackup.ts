@@ -14,7 +14,7 @@
 // poll; apiRequest has already cleared a dead session and the layout sends
 // the user to /login.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { derived, readable } from 'svelte/store';
 import { browser } from '$app/environment';
@@ -57,7 +57,11 @@ export const catalogueBackup = readable<CatalogueBackupSnapshot>({ kind: 'loadin
 		(signal) => systemApi.getCatalogueBackup(signal),
 		(result) => {
 			settledAt = Date.now();
-			set(result.ok ? { kind: 'loaded', status: result.status, receivedAt: settledAt } : { kind: 'failed' });
+			set(
+				result.ok
+					? { kind: 'loaded', status: result.status, receivedAt: settledAt }
+					: { kind: 'failed' }
+			);
 		},
 		POLL_INTERVAL_MS,
 		(error) => error instanceof AuthError,

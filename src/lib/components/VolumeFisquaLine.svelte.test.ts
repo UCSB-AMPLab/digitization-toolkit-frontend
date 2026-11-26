@@ -3,14 +3,19 @@
 // request of its own. Fixtures are shaped as volume_fisqua_state in
 // app/core/fisqua_outbox.py. The catalogue is the default one, Spanish.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { collectionsApi, systemApi, type VolumeFisquaState, type VolumeOffsiteState } from '$lib/api';
+import {
+	collectionsApi,
+	systemApi,
+	type VolumeFisquaState,
+	type VolumeOffsiteState
+} from '$lib/api';
 import { es } from '$lib/i18n/es';
 import VolumeOffsiteIndicator from './VolumeOffsiteIndicator.svelte';
 // The panel's height cap and scroll live in the design system's stylesheet.
@@ -56,7 +61,13 @@ function entry(over: Record<string, unknown> = {}) {
 }
 
 function fisqua(over: Partial<VolumeFisquaState> = {}): VolumeFisquaState {
-	return { environment: 'production', config_error: null, outbox: [entry()], status: null, ...over };
+	return {
+		environment: 'production',
+		config_error: null,
+		outbox: [entry()],
+		status: null,
+		...over
+	};
 }
 
 let offsiteSpy: ReturnType<typeof vi.spyOn>;
@@ -93,9 +104,46 @@ describe('VolumeFisquaLine', () => {
 		expect(screen.container.querySelector('[data-fisqua]')).toBeNull();
 	});
 
+	// The guided tour's follow step (NEH-318) highlights the line; the volume
+	// view renders it once, in its top bar.
+	it('carries the one tour anchor of the line, around the status, and none without Fisqua', async () => {
+		const screen = await shown(
+			offsite(
+				fisqua({
+					status: {
+						status: 'in_capture_qc',
+						status_at: null,
+						status_checked_at: '2026-10-24T15:00:00',
+						problems: null,
+						manifest_id: MID
+					}
+				})
+			)
+		);
+		const anchors = screen.container.querySelectorAll('[data-tour="fisqua-estado"]');
+		expect(anchors).toHaveLength(1);
+		expect(anchors[0].contains(screen.container.querySelector('[data-fisqua]'))).toBe(true);
+		expect(anchors[0].textContent).toContain(es.fisqua_st_in_capture_qc);
+		screen.unmount();
+		vi.restoreAllMocks();
+		vi.spyOn(systemApi, 'getCatalogueBackup').mockReturnValue(new Promise(() => {}));
+		const none = await shown(offsite(null));
+		expect(none.container.querySelector('[data-tour="fisqua-estado"]')).toBeNull();
+	});
+
 	it("shows Fisqua's status with a chip in the offsite line's style, from the same request", async () => {
 		const screen = await shown(
-			offsite(fisqua({ status: { status: 'published', status_at: null, status_checked_at: '2026-10-24T15:00:00', problems: null, manifest_id: MID } }))
+			offsite(
+				fisqua({
+					status: {
+						status: 'published',
+						status_at: null,
+						status_checked_at: '2026-10-24T15:00:00',
+						problems: null,
+						manifest_id: MID
+					}
+				})
+			)
 		);
 		const line = screen.container.querySelector('[data-fisqua]') as HTMLElement;
 		expect(line).not.toBeNull();
@@ -113,7 +161,17 @@ describe('VolumeFisquaLine', () => {
 		['in_capture_qc', 'fisqua-progress', 'fisqua_st_in_capture_qc']
 	] as const)("shows Fisqua's status %s with the %s style", async (st, cls, key) => {
 		const screen = await shown(
-			offsite(fisqua({ status: { status: st, status_at: null, status_checked_at: '2026-10-24T15:00:00', problems: null, manifest_id: MID } }))
+			offsite(
+				fisqua({
+					status: {
+						status: st,
+						status_at: null,
+						status_checked_at: '2026-10-24T15:00:00',
+						problems: null,
+						manifest_id: MID
+					}
+				})
+			)
 		);
 		const line = screen.container.querySelector('[data-fisqua]') as HTMLElement;
 		expect(line.classList.contains(cls)).toBe(true);
@@ -121,45 +179,114 @@ describe('VolumeFisquaLine', () => {
 	});
 
 	it('shows a waiting manifest', async () => {
-		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'waiting_for_upload', attempts: 0, delivered_at: null, response: null, external_id: null })] })));
-		expect(screen.container.querySelector('[data-fisqua]')!.textContent).toContain(es.fisqua_out_waiting);
+		const screen = await shown(
+			offsite(
+				fisqua({
+					outbox: [
+						entry({
+							state: 'waiting_for_upload',
+							attempts: 0,
+							delivered_at: null,
+							response: null,
+							external_id: null
+						})
+					]
+				})
+			)
+		);
+		expect(screen.container.querySelector('[data-fisqua]')!.textContent).toContain(
+			es.fisqua_out_waiting
+		);
 	});
 
 	it("lists a refusal's problems", async () => {
 		const problems = [
-			{ rule: 'reference_code_differs', message: 'The reference code differs from the stem', record_ids: [], image_ids: [] },
+			{
+				rule: 'reference_code_differs',
+				message: 'The reference code differs from the stem',
+				record_ids: [],
+				image_ids: []
+			},
 			{ rule: 'sequence_missing', message: 'x', record_ids: [3], image_ids: [] }
 		];
 		const screen = await shown(
-			offsite(fisqua({ outbox: [entry({ state: 'refused', refusal: 'not_exportable', problems, attempts: 0, delivered_at: null, response: null, external_id: null })] }))
+			offsite(
+				fisqua({
+					outbox: [
+						entry({
+							state: 'refused',
+							refusal: 'not_exportable',
+							problems,
+							attempts: 0,
+							delivered_at: null,
+							response: null,
+							external_id: null
+						})
+					]
+				})
+			)
 		);
 		await openPanel(screen);
-		const items = [...screen.container.querySelectorAll('.fisqua-problems li')].map((li) => li.textContent ?? '');
+		const items = [...screen.container.querySelectorAll('.fisqua-problems li')].map(
+			(li) => li.textContent ?? ''
+		);
 		expect(items).toHaveLength(2);
 		expect(items[0]).toContain(es.col_manifest_rule_reference_code_differs);
 		expect(items[1]).toContain(es.col_manifest_rule_sequence_missing);
 		expect(items[1]).toContain(es.col_manifest_records([3]));
-		expect(screen.container.querySelector('.fisqua-problems .fisqua-panel-heading')!.textContent).toContain(es.fisqua_problems(2));
+		expect(
+			screen.container.querySelector('.fisqua-problems .fisqua-panel-heading')!.textContent
+		).toContain(es.fisqua_problems(2));
 	});
 
 	it("marks Fisqua's own problems as Fisqua's", async () => {
 		const problems = [{ rule: 'run-started', message: 'A run has started on the older manifest.' }];
-		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })] })));
+		const screen = await shown(
+			offsite(
+				fisqua({
+					outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })]
+				})
+			)
+		);
 		await openPanel(screen);
 		const item = screen.container.querySelector('.fisqua-problems li') as HTMLElement;
-		expect(item.textContent).toContain(es.fisqua_problem_from_fisqua('A run has started on the older manifest.'));
+		expect(item.textContent).toContain(
+			es.fisqua_problem_from_fisqua('A run has started on the older manifest.')
+		);
 		expect(item.dataset.source).toBe('fisqua');
 		expect(screen.container.querySelector('[data-incident]')).toBeNull();
 	});
 
 	it("shows Fisqua's object-missing refusal as an incident listing each key", async () => {
 		const problems = [
-			{ rule: 'object-missing', message: 'x', objectKey: 'rionegro/co-x/co-x_0001_L.jpg', captureId: 'cap-1', role: 'left', kind: 'capture' },
-			{ rule: 'object-missing', message: 'x', objectKey: 'rionegro/co-x/co-x_0001_R.jpg', captureId: 'cap-1', role: 'right', kind: 'preview' }
+			{
+				rule: 'object-missing',
+				message: 'x',
+				objectKey: 'rionegro/co-x/co-x_0001_L.jpg',
+				captureId: 'cap-1',
+				role: 'left',
+				kind: 'capture'
+			},
+			{
+				rule: 'object-missing',
+				message: 'x',
+				objectKey: 'rionegro/co-x/co-x_0001_R.jpg',
+				captureId: 'cap-1',
+				role: 'right',
+				kind: 'preview'
+			}
 		];
-		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })] })));
+		const screen = await shown(
+			offsite(
+				fisqua({
+					outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })]
+				})
+			)
+		);
 		await openPanel(screen);
-		const incident = screen.container.querySelector('[data-incident="object-missing"]') as HTMLElement;
+		const incident = screen.container.querySelector(
+			'[data-incident="object-missing"]'
+		) as HTMLElement;
 		expect(incident).not.toBeNull();
 		expect(incident.textContent).toContain(es.fisqua_incident_object_missing);
 		const items = [...incident.querySelectorAll('li')].map((li) => li.textContent ?? '');
@@ -170,17 +297,35 @@ describe('VolumeFisquaLine', () => {
 		expect(items[0]).toContain(es.fisqua_kind_capture);
 		expect(items[1]).toContain(es.col_role_right);
 		expect(items[1]).toContain(es.fisqua_kind_preview);
-		expect(screen.container.querySelector('[data-fisqua]')!.classList.contains('fisqua-attention')).toBe(true);
+		expect(
+			screen.container.querySelector('[data-fisqua]')!.classList.contains('fisqua-attention')
+		).toBe(true);
 		expect(screen.container.querySelector('.fisqua-problems')).toBeNull();
 	});
 
 	it("heads Fisqua's status entries as notes, counting the ones it left out, with 'and N more'", async () => {
 		const problems = [
-			{ rule: 'unlisted-object', message: 'x', stem: 'co-ahrb-aht-003', objectKey: 'rionegro/co-ahrb-aht-003/stray.jpg', size: 3 },
+			{
+				rule: 'unlisted-object',
+				message: 'x',
+				stem: 'co-ahrb-aht-003',
+				objectKey: 'rionegro/co-ahrb-aht-003/stray.jpg',
+				size: 3
+			},
 			{ rule: 'problems-truncated', message: '7 more problems are not listed', omitted: 7 }
 		];
 		const screen = await shown(
-			offsite(fisqua({ status: { status: 'registered', status_at: null, status_checked_at: '2026-10-24T15:00:00', problems, manifest_id: MID } }))
+			offsite(
+				fisqua({
+					status: {
+						status: 'registered',
+						status_at: null,
+						status_checked_at: '2026-10-24T15:00:00',
+						problems,
+						manifest_id: MID
+					}
+				})
+			)
 		);
 		await openPanel(screen);
 		const block = screen.container.querySelector('.fisqua-problems') as HTMLElement;
@@ -188,32 +333,61 @@ describe('VolumeFisquaLine', () => {
 		expect(block.querySelector('.fisqua-panel-heading')!.textContent).toContain(es.fisqua_notes(8));
 		const items = [...block.querySelectorAll('li')].map((li) => li.textContent ?? '');
 		expect(items).toHaveLength(2);
-		expect(items[0]).toContain(es.fisqua_note_unlisted_object('rionegro/co-ahrb-aht-003/stray.jpg'));
+		expect(items[0]).toContain(
+			es.fisqua_note_unlisted_object('rionegro/co-ahrb-aht-003/stray.jpg')
+		);
 		expect(items[1]).toContain(es.fisqua_more(7));
 	});
 
 	it('warns that sending is stopped while Fisqua refuses the configuration', async () => {
 		const screen = await shown(
-			offsite(fisqua({ config_error: { at: '2026-10-24T09:30:00', status_code: 401, reason: 'token', config_fingerprint: 'ab12cd34' } }))
+			offsite(
+				fisqua({
+					config_error: {
+						at: '2026-10-24T09:30:00',
+						status_code: 401,
+						reason: 'token',
+						config_fingerprint: 'ab12cd34'
+					}
+				})
+			)
 		);
 		await openPanel(screen);
 		const warning = screen.container.querySelector('.fisqua-config-error') as HTMLElement;
 		expect(warning).not.toBeNull();
 		expect(warning.textContent).toContain(es.fisqua_cfg_token);
-		expect(screen.container.querySelector('[data-fisqua]')!.classList.contains('fisqua-attention')).toBe(true);
+		expect(
+			screen.container.querySelector('[data-fisqua]')!.classList.contains('fisqua-attention')
+		).toBe(true);
 	});
 
 	it('keeps withdrawn manifests in the history only', async () => {
-		const screen = await shown(offsite(fisqua({ outbox: [entry({ manifest_id: 'b2', state: 'withdrawn', delivered_at: null }), entry()] })));
-		expect(screen.container.querySelector('[data-fisqua]')!.getAttribute('data-kind')).toBe('delivered');
+		const screen = await shown(
+			offsite(
+				fisqua({
+					outbox: [entry({ manifest_id: 'b2', state: 'withdrawn', delivered_at: null }), entry()]
+				})
+			)
+		);
+		expect(screen.container.querySelector('[data-fisqua]')!.getAttribute('data-kind')).toBe(
+			'delivered'
+		);
 		await openPanel(screen);
-		const history = [...screen.container.querySelectorAll('.fisqua-history li')].map((li) => li.textContent ?? '');
+		const history = [...screen.container.querySelectorAll('.fisqua-history li')].map(
+			(li) => li.textContent ?? ''
+		);
 		expect(history).toHaveLength(1);
 		expect(history[0]).toContain(es.fisqua_out_withdrawn);
 	});
 	it('keeps the details out of the top bar until the line is opened', async () => {
 		const problems = [{ rule: 'run-started', message: 'A run has started on the older manifest.' }];
-		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })] })));
+		const screen = await shown(
+			offsite(
+				fisqua({
+					outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })]
+				})
+			)
+		);
 		const trigger = screen.container.querySelector('button[data-fisqua]') as HTMLButtonElement;
 		expect(trigger).not.toBeNull();
 		expect(trigger.getAttribute('aria-expanded')).toBe('false');
@@ -229,11 +403,21 @@ describe('VolumeFisquaLine', () => {
 
 	it('opens from the keyboard and closes on Escape, returning focus to the line', async () => {
 		const problems = [{ rule: 'run-started', message: 'x' }];
-		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })] })));
+		const screen = await shown(
+			offsite(
+				fisqua({
+					outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })]
+				})
+			)
+		);
 		(screen.container.querySelector('button[data-fisqua]') as HTMLButtonElement).focus();
 		await userEvent.keyboard('{Enter}');
 		await expect.element(screen.getByRole('dialog')).toBeVisible();
-		expect((screen.container.querySelector('button[data-fisqua]') as HTMLElement).getAttribute('aria-expanded')).toBe('true');
+		expect(
+			(screen.container.querySelector('button[data-fisqua]') as HTMLElement).getAttribute(
+				'aria-expanded'
+			)
+		).toBe('true');
 
 		await userEvent.keyboard('{Escape}');
 		await expect.poll(() => screen.container.querySelector('.fisqua-panel')).toBeNull();
@@ -242,7 +426,13 @@ describe('VolumeFisquaLine', () => {
 
 	it('closes on a click outside, and stays open on a click inside', async () => {
 		const problems = [{ rule: 'run-started', message: 'x' }];
-		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })] })));
+		const screen = await shown(
+			offsite(
+				fisqua({
+					outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })]
+				})
+			)
+		);
 		await openPanel(screen);
 		const panel = screen.container.querySelector('.fisqua-panel') as HTMLElement;
 		panel.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
@@ -261,7 +451,13 @@ describe('VolumeFisquaLine', () => {
 			role: 'left',
 			kind: 'capture'
 		}));
-		const screen = await shown(offsite(fisqua({ outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })] })));
+		const screen = await shown(
+			offsite(
+				fisqua({
+					outbox: [entry({ state: 'refused', refusal: 'fisqua', problems, delivered_at: null })]
+				})
+			)
+		);
 		await openPanel(screen);
 		const panel = screen.container.querySelector('.fisqua-panel') as HTMLElement;
 		const style = getComputedStyle(panel);

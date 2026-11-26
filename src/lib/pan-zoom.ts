@@ -8,7 +8,7 @@
 // drifting apart: they all read the same two numbers and apply the same
 // pure functions below to their own measured geometry.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 export type Size = { w: number; h: number };
 export type Pan = { x: number; y: number };
@@ -17,14 +17,14 @@ export const ZOOM_MIN = 0.5;
 export const ZOOM_STEP = 1.25;
 
 function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+	return Math.min(max, Math.max(min, value));
 }
 
 // True for 90 and 270 (after normalising a negative or >=360 input) — the
 // angles where the CSS rotate() swaps the element's visual width/height.
 export function isSwapped(rotation: number): boolean {
-  const normalised = ((rotation % 360) + 360) % 360;
-  return normalised === 90 || normalised === 270;
+	const normalised = ((rotation % 360) + 360) % 360;
+	return normalised === 90 || normalised === 270;
 }
 
 // The rendered image size, in the IMAGE's own (unrotated) axes, when
@@ -43,50 +43,50 @@ export function isSwapped(rotation: number): boolean {
 // purpose. It never triggers for camera files, which are always far
 // larger than the viewer frame.
 export function fittedSize(natural: Size, container: Size, rotation: number): Size {
-  if (!natural.w || !natural.h || !container.w || !container.h) {
-    return { w: 0, h: 0 };
-  }
-  const swapped = isSwapped(rotation);
-  const box = swapped ? { w: container.h, h: container.w } : container;
-  const containScale = Math.min(box.w / natural.w, box.h / natural.h);
-  const scale = swapped ? containScale : Math.min(containScale, 1);
-  return { w: natural.w * scale, h: natural.h * scale };
+	if (!natural.w || !natural.h || !container.w || !container.h) {
+		return { w: 0, h: 0 };
+	}
+	const swapped = isSwapped(rotation);
+	const box = swapped ? { w: container.h, h: container.w } : container;
+	const containScale = Math.min(box.w / natural.w, box.h / natural.h);
+	const scale = swapped ? containScale : Math.min(containScale, 1);
+	return { w: natural.w * scale, h: natural.h * scale };
 }
 
 // The on-screen bounding box after scale and rotate: fitted*zoom, with
 // width/height swapped when the rotation swaps them visually.
 export function screenExtent(fitted: Size, rotation: number, zoom: number): Size {
-  const scaled: Size = { w: fitted.w * zoom, h: fitted.h * zoom };
-  return isSwapped(rotation) ? { w: scaled.h, h: scaled.w } : scaled;
+	const scaled: Size = { w: fitted.w * zoom, h: fitted.h * zoom };
+	return isSwapped(rotation) ? { w: scaled.h, h: scaled.w } : scaled;
 }
 
 // The zoom (relative to fit) at which one image pixel maps to one device
 // pixel. Returns 1 when nothing is measured yet (fitted width 0).
 export function oneToOneZoom(natural: Size, container: Size, rotation: number, dpr = 1): number {
-  const fitted = fittedSize(natural, container, rotation);
-  if (!fitted.w) return 1;
-  return natural.w / (fitted.w * dpr);
+	const fitted = fittedSize(natural, container, rotation);
+	if (!fitted.w) return 1;
+	return natural.w / (fitted.w * dpr);
 }
 
 // The zoom ceiling: twice the page's 1:1 (a reviewer can check focus at
 // 200%), never below twice fit since the 1:1 value is clamped to at least
 // fit first (see effectiveOneToOne).
 export function maxZoom(oneToOne: number): number {
-  return 2 * effectiveOneToOne(oneToOne);
+	return 2 * effectiveOneToOne(oneToOne);
 }
 
 // Multiplies or divides by ZOOM_STEP, clamps to [ZOOM_MIN, maxZoom], and
 // snaps to exactly 1 when the result lands within 2% of 1 — so "fit" is
 // always reachable by stepping, not just by the dedicated fit button.
 export function stepZoom(zoom: number, direction: 1 | -1, oneToOne: number): number {
-  const next = direction === 1 ? zoom * ZOOM_STEP : zoom / ZOOM_STEP;
-  const clamped = clamp(next, ZOOM_MIN, maxZoom(oneToOne));
-  // Snap to fit when the result lands within 2% of 1 OR when the step
-  // crosses 1: stepping down from a clamped ceiling can produce a sequence
-  // (2 -> 1.6 -> 1.28 -> 1.024 -> 0.8192) whose closest value misses the
-  // band, and fit must always be reachable by stepping.
-  const crossesFit = (zoom - 1) * (clamped - 1) < 0;
-  return Math.abs(clamped - 1) <= 0.02 || crossesFit ? 1 : clamped;
+	const next = direction === 1 ? zoom * ZOOM_STEP : zoom / ZOOM_STEP;
+	const clamped = clamp(next, ZOOM_MIN, maxZoom(oneToOne));
+	// Snap to fit when the result lands within 2% of 1 OR when the step
+	// crosses 1: stepping down from a clamped ceiling can produce a sequence
+	// (2 -> 1.6 -> 1.28 -> 1.024 -> 0.8192) whose closest value misses the
+	// band, and fit must always be reachable by stepping.
+	const crossesFit = (zoom - 1) * (clamped - 1) < 0;
+	return Math.abs(clamped - 1) <= 0.02 || crossesFit ? 1 : clamped;
 }
 
 // Clamps a page's own 1:1 zoom to at least 1:
@@ -107,7 +107,7 @@ export function stepZoom(zoom: number, direction: 1 | -1, oneToOne: number): num
 // calling pageScale — pageScale itself assumes both inputs are already
 // effective (>= 1).
 export function effectiveOneToOne(oneToOne: number): number {
-  return Math.max(1, oneToOne);
+	return Math.max(1, oneToOne);
 }
 
 // The CSS scale for one page given the SHARED zoom, assuming
@@ -143,20 +143,20 @@ export function effectiveOneToOne(oneToOne: number): number {
 // zoom value, which is why each page re-derives its scale from the shared
 // zoom instead of applying it directly.
 export function pageScale(zoom: number, oneToOnePage: number, oneToOneRef: number): number {
-  if (zoom <= 1) {
-    return zoom;
-  }
-  if (zoom <= oneToOneRef && oneToOneRef > 1) {
-    return zoom ** (Math.log(oneToOnePage) / Math.log(oneToOneRef));
-  }
-  return oneToOnePage * (zoom / oneToOneRef);
+	if (zoom <= 1) {
+		return zoom;
+	}
+	if (zoom <= oneToOneRef && oneToOneRef > 1) {
+		return zoom ** (Math.log(oneToOnePage) / Math.log(oneToOneRef));
+	}
+	return oneToOnePage * (zoom / oneToOneRef);
 }
 
 export function panBounds(extent: Size, container: Size): Size {
-  return {
-    w: Math.max(0, (extent.w - container.w) / 2),
-    h: Math.max(0, (extent.h - container.h) / 2),
-  };
+	return {
+		w: Math.max(0, (extent.w - container.w) / 2),
+		h: Math.max(0, (extent.h - container.h) / 2)
+	};
 }
 
 // Pan stored NORMALISED: each axis is a fraction in [-1, 1] of the
@@ -166,13 +166,13 @@ export function panBounds(extent: Size, container: Size): Size {
 export type PanFraction = { x: number; y: number };
 
 export function panPixels(fraction: PanFraction, bounds: Size): Pan {
-  return { x: fraction.x * bounds.w, y: fraction.y * bounds.h };
+	return { x: fraction.x * bounds.w, y: fraction.y * bounds.h };
 }
 
 export function dragToFraction(fraction: PanFraction, deltaPx: Pan, bounds: Size): PanFraction {
-  const x = bounds.w > 0 ? clamp(fraction.x + deltaPx.x / bounds.w, -1, 1) : fraction.x;
-  const y = bounds.h > 0 ? clamp(fraction.y + deltaPx.y / bounds.h, -1, 1) : fraction.y;
-  return { x, y };
+	const x = bounds.w > 0 ? clamp(fraction.x + deltaPx.x / bounds.w, -1, 1) : fraction.x;
+	const y = bounds.h > 0 ? clamp(fraction.y + deltaPx.y / bounds.h, -1, 1) : fraction.y;
+	return { x, y };
 }
 
 // The translate goes FIRST so it pans in screen axes at every rotation —
@@ -180,5 +180,5 @@ export function dragToFraction(fraction: PanFraction, deltaPx: Pan, bounds: Size
 // happen to the coordinate space and only afterwards is the (unrotated,
 // unscaled) translate applied on top.
 export function transformFor(pan: Pan, scale: number, rotation: number): string {
-  return `translate(${pan.x}px, ${pan.y}px) scale(${scale}) rotate(${rotation}deg)`;
+	return `translate(${pan.x}px, ${pan.y}px) scale(${scale}) rotate(${rotation}deg)`;
 }

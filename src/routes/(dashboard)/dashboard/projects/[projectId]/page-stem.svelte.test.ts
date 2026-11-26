@@ -5,7 +5,7 @@
 // Its Status column shows each volume's pipeline stage, from
 // GET /activity/collections.
 //
-// Version: 0.2.0
+// Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -14,7 +14,12 @@ import { readable } from 'svelte/store';
 const pageUrl = vi.hoisted(() => ({ href: 'http://localhost/dashboard/projects/1' }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/stores', () => ({
-	page: readable({ params: { projectId: '1' }, get url() { return new URL(pageUrl.href); } })
+	page: readable({
+		params: { projectId: '1' },
+		get url() {
+			return new URL(pageUrl.href);
+		}
+	})
 }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -40,8 +45,16 @@ function vol(id: number, name: string, extra: Partial<Collection> = {}): Collect
 	return { id, name, project_id: 1, created_at: '2026-10-01T00:00:00', record_count: 0, ...extra };
 }
 
-const reserved = vol(22, 'Tomo 55', { filename_stem: 'co-ahr-con-t055', stem_reserved: true, record_count: 3 });
-const stemless = vol(23, 'Tomo 221', { filename_stem: null, stem_reserved: false, record_count: 2 });
+const reserved = vol(22, 'Tomo 55', {
+	filename_stem: 'co-ahr-con-t055',
+	stem_reserved: true,
+	record_count: 3
+});
+const stemless = vol(23, 'Tomo 221', {
+	filename_stem: null,
+	stem_reserved: false,
+	record_count: 2
+});
 const other = vol(24, 'Tomo 100', { filename_stem: 'co-ahr-jud-t100', stem_reserved: false });
 
 let listSpy: ReturnType<typeof vi.spyOn>;
@@ -49,7 +62,7 @@ let listSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
 	locale.set('es');
 	pageUrl.href = 'http://localhost/dashboard/projects/1';
-	authStore.setSession('tok', admin);
+	authStore.setSession(admin);
 	vi.spyOn(projectsApi, 'get').mockResolvedValue({ id: 1, name: 'Rionegro' } as Project);
 	vi.spyOn(recordsApi, 'count').mockResolvedValue(3);
 	vi.spyOn(projectMembersApi, 'list').mockResolvedValue([]);
@@ -79,15 +92,21 @@ describe('project page: stems', () => {
 		await expect.element(page.getByLabelText(es.pd_field_stem)).toHaveValue('');
 	});
 
-	it('shows a volume\'s own signatura, and no code for a volume without one', async () => {
-		vi.mocked(projectsApi.get).mockResolvedValue({ id: 1, name: 'Rionegro', signatura: 'CO.AHR' } as Project);
+	it("shows a volume's own signatura, and no code for a volume without one", async () => {
+		vi.mocked(projectsApi.get).mockResolvedValue({
+			id: 1,
+			name: 'Rionegro',
+			signatura: 'CO.AHR'
+		} as Project);
 		listSpy.mockResolvedValue([
 			vol(30, 'Con signatura', { archival_metadata: { signatura: 'CO.AHR.JUD.198' } }),
 			vol(31, 'Sin signatura')
 		]);
 		const screen = render(ProjectPage);
 		await expect.element(page.getByText('CO.AHR.JUD.198')).toBeInTheDocument();
-		const codes = [...screen.container.querySelectorAll('.col-code')].map((el) => el.textContent?.trim());
+		const codes = [...screen.container.querySelectorAll('.col-code')].map((el) =>
+			el.textContent?.trim()
+		);
 		expect(codes).toEqual(['CO.AHR.JUD.198']);
 		expect(screen.container.textContent).not.toMatch(/CO\.AHR-0\d\d/);
 	});
@@ -168,7 +187,10 @@ describe('project page: stems', () => {
 		await expect.element(create).toBeEnabled();
 		await userEvent.click(create);
 		await vi.waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-		expect(createSpy.mock.calls[0][0]).toMatchObject({ name: 'Tomo 25', filename_stem: 'co-ahr-con-t078' });
+		expect(createSpy.mock.calls[0][0]).toMatchObject({
+			name: 'Tomo 25',
+			filename_stem: 'co-ahr-con-t078'
+		});
 	});
 
 	it('shows a duplicate stem 409 as the catalogue message, not the backend text', async () => {
@@ -198,7 +220,11 @@ describe('project page: stems', () => {
 	});
 
 	it('says a volume with records cannot be deleted until they are moved', async () => {
-		const plain = vol(27, 'Tomo 30', { filename_stem: null, stem_reserved: false, record_count: 3 });
+		const plain = vol(27, 'Tomo 30', {
+			filename_stem: null,
+			stem_reserved: false,
+			record_count: 3
+		});
 		listSpy.mockResolvedValue([plain, other]);
 		render(ProjectPage);
 		await openRowMenu('Tomo 30');
@@ -207,9 +233,15 @@ describe('project page: stems', () => {
 	});
 
 	it('requires a target for a volume with records, and offers no choice to delete them', async () => {
-		const plain = vol(27, 'Tomo 30', { filename_stem: null, stem_reserved: false, record_count: 3 });
+		const plain = vol(27, 'Tomo 30', {
+			filename_stem: null,
+			stem_reserved: false,
+			record_count: 3
+		});
 		listSpy.mockResolvedValue([plain, other]);
-		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 3, target_collection_id: 24 });
+		const moveSpy = vi
+			.spyOn(collectionsApi, 'moveRecords')
+			.mockResolvedValue({ moved: 3, target_collection_id: 24 });
 		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();
 		render(ProjectPage);
 		await openRowMenu('Tomo 30');
@@ -220,7 +252,9 @@ describe('project page: stems', () => {
 		await expect.element(select).toHaveAttribute('required');
 		const placeholder = page.getByRole('option', { name: es.pd_move_none });
 		await expect.element(placeholder).toBeDisabled();
-		await expect.element(page.getByRole('button', { name: es.pd_delete_collection_title })).toBeDisabled();
+		await expect
+			.element(page.getByRole('button', { name: es.pd_delete_collection_title }))
+			.toBeDisabled();
 
 		vi.spyOn(collectionsApi, 'get').mockResolvedValue(plain);
 		await userEvent.selectOptions(select, 'Tomo 100');
@@ -232,14 +266,20 @@ describe('project page: stems', () => {
 	});
 
 	it('reads the count again when a volume believed empty is refused for its records, and shows the target select', async () => {
-		const stale = vol(29, 'Tomo 32', { filename_stem: null, stem_reserved: false, record_count: 0 });
+		const stale = vol(29, 'Tomo 32', {
+			filename_stem: null,
+			stem_reserved: false,
+			record_count: 0
+		});
 		listSpy.mockResolvedValue([stale, other]);
 		// The project's own count is read on mount; the volume's is 0 when the
 		// modal opens and 2 when it is read again after the refusal.
 		const volumeCounts = [0, 2];
 		const countSpy = vi
 			.spyOn(recordsApi, 'count')
-			.mockImplementation(async (params) => (params?.collection_id === 29 ? (volumeCounts.shift() ?? 2) : 0));
+			.mockImplementation(async (params) =>
+				params?.collection_id === 29 ? (volumeCounts.shift() ?? 2) : 0
+			);
 		const notEmpty =
 			'Cannot delete a non-empty collection: 0 sub-collection(s) and 2 record(s) remain. Move or delete them first.';
 		vi.spyOn(collectionsApi, 'delete').mockRejectedValue(new ApiError(notEmpty, undefined, 409));
@@ -255,7 +295,11 @@ describe('project page: stems', () => {
 	});
 
 	it('says the volume still contains sub-volumes when they are what blocks the delete', async () => {
-		const parent = vol(30, 'Caja 2', { filename_stem: null, stem_reserved: false, record_count: 0 });
+		const parent = vol(30, 'Caja 2', {
+			filename_stem: null,
+			stem_reserved: false,
+			record_count: 0
+		});
 		listSpy.mockResolvedValue([parent, other]);
 		vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
 		const subs =
@@ -271,7 +315,11 @@ describe('project page: stems', () => {
 	});
 
 	it('says the records are under review when the move is refused, and deletes nothing', async () => {
-		const plain = vol(31, 'Tomo 33', { filename_stem: null, stem_reserved: false, record_count: 3 });
+		const plain = vol(31, 'Tomo 33', {
+			filename_stem: null,
+			stem_reserved: false,
+			record_count: 3
+		});
 		listSpy.mockResolvedValue([plain, other]);
 		vi.spyOn(collectionsApi, 'get').mockResolvedValue(plain);
 		const message =
@@ -293,13 +341,21 @@ describe('project page: stems', () => {
 	});
 
 	it('offers no target and moves nothing when sub-volumes and records both block the delete', async () => {
-		const parent = vol(32, 'Caja 3', { filename_stem: null, stem_reserved: false, record_count: 0 });
+		const parent = vol(32, 'Caja 3', {
+			filename_stem: null,
+			stem_reserved: false,
+			record_count: 0
+		});
 		listSpy.mockResolvedValue([parent, other]);
 		vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
 		const both =
 			'Cannot delete a non-empty collection: 1 sub-collection(s) and 2 record(s) remain. Move or delete them first.';
-		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockRejectedValue(new ApiError(both, undefined, 409));
-		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 2, target_collection_id: 24 });
+		const deleteSpy = vi
+			.spyOn(collectionsApi, 'delete')
+			.mockRejectedValue(new ApiError(both, undefined, 409));
+		const moveSpy = vi
+			.spyOn(collectionsApi, 'moveRecords')
+			.mockResolvedValue({ moved: 2, target_collection_id: 24 });
 		render(ProjectPage);
 		await openRowMenu('Caja 3');
 		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
@@ -320,8 +376,12 @@ describe('project page: stems', () => {
 		vi.spyOn(collectionsApi, 'get').mockResolvedValue(plain);
 		const subs =
 			'Cannot delete a non-empty collection: 1 sub-collection(s) and 0 record(s) remain. Move or delete them first.';
-		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockRejectedValue(new ApiError(subs, undefined, 409));
-		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 2, target_collection_id: 24 });
+		const deleteSpy = vi
+			.spyOn(collectionsApi, 'delete')
+			.mockRejectedValue(new ApiError(subs, undefined, 409));
+		const moveSpy = vi
+			.spyOn(collectionsApi, 'moveRecords')
+			.mockResolvedValue({ moved: 2, target_collection_id: 24 });
 		render(ProjectPage);
 		await openRowMenu('Caja 4');
 		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
@@ -330,23 +390,33 @@ describe('project page: stems', () => {
 
 		await expect.element(page.getByText(es.pd_err_delete_has_subvolumes)).toBeInTheDocument();
 		expect(page.getByLabelText(es.pd_move_label).elements()).toHaveLength(0);
-		await expect.element(page.getByRole('button', { name: es.pd_delete_collection_title })).toBeDisabled();
+		await expect
+			.element(page.getByRole('button', { name: es.pd_delete_collection_title }))
+			.toBeDisabled();
 		expect(moveSpy).toHaveBeenCalledTimes(1);
 		expect(deleteSpy).toHaveBeenCalledTimes(1);
 	});
 
 	it('leaves the delete enabled for an empty volume', async () => {
-		const empty = vol(28, 'Tomo 31', { filename_stem: null, stem_reserved: false, record_count: 0 });
+		const empty = vol(28, 'Tomo 31', {
+			filename_stem: null,
+			stem_reserved: false,
+			record_count: 0
+		});
 		listSpy.mockResolvedValue([empty, other]);
 		vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
 		render(ProjectPage);
 		await openRowMenu('Tomo 31');
 		await userEvent.click(page.getByRole('button', { name: es.common_delete }));
-		await expect.element(page.getByRole('button', { name: es.pd_delete_collection_title })).toBeEnabled();
+		await expect
+			.element(page.getByRole('button', { name: es.pd_delete_collection_title }))
+			.toBeEnabled();
 	});
 
 	it('disables the delete of a volume that reserves its stem, says why, and moves nothing', async () => {
-		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 0, target_collection_id: 0 });
+		const moveSpy = vi
+			.spyOn(collectionsApi, 'moveRecords')
+			.mockResolvedValue({ moved: 0, target_collection_id: 0 });
 		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();
 		render(ProjectPage);
 		await openRowMenu('Tomo 55');
@@ -363,10 +433,16 @@ describe('project page: stems', () => {
 
 	it('reads the volume again before moving records, and stops if it now reserves its stem', async () => {
 		// The list says not reserved; the volume captured since.
-		const stale = vol(25, 'Tomo 73', { filename_stem: 'co-ahr-jud-t073', stem_reserved: false, record_count: 2 });
+		const stale = vol(25, 'Tomo 73', {
+			filename_stem: 'co-ahr-jud-t073',
+			stem_reserved: false,
+			record_count: 2
+		});
 		listSpy.mockResolvedValue([stale, other]);
 		vi.spyOn(collectionsApi, 'get').mockResolvedValue({ ...stale, stem_reserved: true });
-		const moveSpy = vi.spyOn(collectionsApi, 'moveRecords').mockResolvedValue({ moved: 2, target_collection_id: 24 });
+		const moveSpy = vi
+			.spyOn(collectionsApi, 'moveRecords')
+			.mockResolvedValue({ moved: 2, target_collection_id: 24 });
 		const deleteSpy = vi.spyOn(collectionsApi, 'delete').mockResolvedValue();
 		render(ProjectPage);
 
@@ -384,7 +460,11 @@ describe('project page: stems', () => {
 		const message =
 			'This volume has a file name stem and has captured images, so it cannot be ' +
 			'deleted; it keeps its stem so the name is never issued again.';
-		const empty = vol(26, 'Tomo 25', { filename_stem: 'co-ahr-jud-t025', stem_reserved: false, record_count: 0 });
+		const empty = vol(26, 'Tomo 25', {
+			filename_stem: 'co-ahr-jud-t025',
+			stem_reserved: false,
+			record_count: 0
+		});
 		listSpy.mockResolvedValue([empty, other]);
 		vi.spyOn(recordsApi, 'count').mockResolvedValue(0);
 		vi.spyOn(collectionsApi, 'delete').mockRejectedValue(new ApiError(message, { message }, 409));
@@ -395,7 +475,9 @@ describe('project page: stems', () => {
 		await userEvent.click(page.getByRole('button', { name: es.pd_delete_collection_title }));
 
 		await expect.element(page.getByText(es.pd_delete_stem_reserved)).toBeInTheDocument();
-		await expect.element(page.getByRole('button', { name: es.pd_delete_collection_title })).toBeDisabled();
+		await expect
+			.element(page.getByRole('button', { name: es.pd_delete_collection_title }))
+			.toBeDisabled();
 		expect(page.getByText(message, { exact: false }).elements()).toHaveLength(0);
 	});
 });
@@ -403,17 +485,19 @@ describe('project page: stems', () => {
 describe('project page: stage', () => {
 	const act = (id: number, c: Partial<StatusCounts>) => ({
 		collection_id: id,
-		status_counts: { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c },
+		status_counts: { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0, ...c },
 		record_count: 0,
 		last_status_change_at: null
 	});
 
-	it('shows each volume\'s pipeline stage, from one request for the project', async () => {
-		const spy = vi.mocked(activityApi.collections).mockResolvedValue([
-			act(22, { captured: 1, approved: 2 }),
-			act(23, { rejected: 2, approved: 1 }),
-			act(24, { approved: 5 })
-		]);
+	it("shows each volume's pipeline stage, from one request for the project", async () => {
+		const spy = vi
+			.mocked(activityApi.collections)
+			.mockResolvedValue([
+				act(22, { captured: 1, approved: 2 }),
+				act(23, { rejected: 2, approved: 1 }),
+				act(24, { approved: 5 })
+			]);
 		render(ProjectPage);
 		const stage = (name: string) => page.getByRole('row').filter({ hasText: name });
 		await expect.element(stage('Tomo 55').getByText(es.dash_stage_capture)).toBeInTheDocument();
@@ -426,9 +510,13 @@ describe('project page: stage', () => {
 	it('puts an empty volume in capture and never shows the placeholder statuses', async () => {
 		vi.mocked(activityApi.collections).mockResolvedValue([act(22, {}), act(23, {}), act(24, {})]);
 		render(ProjectPage);
-		await expect.element(page.getByRole('row').filter({ hasText: 'Tomo 55' }).getByText(es.dash_stage_capture)).toBeInTheDocument();
+		await expect
+			.element(
+				page.getByRole('row').filter({ hasText: 'Tomo 55' }).getByText(es.dash_stage_capture)
+			)
+			.toBeInTheDocument();
 		await expect.element(page.getByText(es.pd_status_completed)).not.toBeInTheDocument();
-		await expect.element(page.getByText(es.proj_status_paused)).not.toBeInTheDocument();
+		await expect.element(page.getByText('Pausado')).not.toBeInTheDocument();
 		await expect.element(page.getByText(es.pd_status_active)).not.toBeInTheDocument();
 	});
 

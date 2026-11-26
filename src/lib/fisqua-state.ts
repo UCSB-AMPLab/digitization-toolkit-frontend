@@ -22,7 +22,7 @@
 // The module imports only types from the API client, so the wording is tested
 // in the server project.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 import type {
@@ -127,7 +127,8 @@ function omittedOf(problems: FisquaProblem[] | null | undefined): number {
 	let omitted = 0;
 	for (const p of problems) {
 		if (typeof p !== 'object' || p === null || p.rule !== RULE_TRUNCATED) continue;
-		if (typeof p.omitted === 'number' && Number.isInteger(p.omitted) && p.omitted > 0) omitted += p.omitted;
+		if (typeof p.omitted === 'number' && Number.isInteger(p.omitted) && p.omitted > 0)
+			omitted += p.omitted;
 	}
 	return omitted;
 }
@@ -147,9 +148,14 @@ function kindLabel(kind: unknown, msgs: Messages): string | null {
 	return kind;
 }
 
-function objectMissingIncident(problems: FisquaProblem[] | null | undefined, msgs: Messages): FisquaIncidentView | null {
+function objectMissingIncident(
+	problems: FisquaProblem[] | null | undefined,
+	msgs: Messages
+): FisquaIncidentView | null {
 	if (!Array.isArray(problems)) return null;
-	const missing = problems.filter((p) => typeof p === 'object' && p !== null && p.rule === RULE_OBJECT_MISSING);
+	const missing = problems.filter(
+		(p) => typeof p === 'object' && p !== null && p.rule === RULE_OBJECT_MISSING
+	);
 	if (missing.length === 0) return null;
 	return {
 		text: msgs.fisqua_incident_object_missing,
@@ -250,11 +256,18 @@ function dateOf(iso: string | null | undefined): Date | null {
 function whenArgs(iso: string | null | undefined, now: Date, locale: string) {
 	const when = dateOf(iso);
 	if (!when) return null;
-	return [dayRelation(when, now), formatBackupDate(when, now, locale), formatBackupTime(when, locale)] as const;
+	return [
+		dayRelation(when, now),
+		formatBackupDate(when, now, locale),
+		formatBackupTime(when, locale)
+	] as const;
 }
 
 /** Fisqua's problems: its message as it wrote it, or its rule when it sent no message. */
-function fisquaProblemViews(problems: FisquaProblem[] | null | undefined, msgs: Messages): FisquaProblemView[] {
+function fisquaProblemViews(
+	problems: FisquaProblem[] | null | undefined,
+	msgs: Messages
+): FisquaProblemView[] {
 	if (!Array.isArray(problems)) return [];
 	const views: FisquaProblemView[] = [];
 	for (const p of problems) {
@@ -269,11 +282,19 @@ function fisquaProblemViews(problems: FisquaProblem[] | null | undefined, msgs: 
 			continue;
 		}
 		if (p.rule === RULE_UNLISTED_OBJECT && typeof p.objectKey === 'string' && p.objectKey) {
-			views.push({ text: msgs.fisqua_note_unlisted_object(p.objectKey), records: null, fromFisqua: false });
+			views.push({
+				text: msgs.fisqua_note_unlisted_object(p.objectKey),
+				records: null,
+				fromFisqua: false
+			});
 			continue;
 		}
 		if (p.rule === RULE_MISSING_OBJECT && typeof p.objectKey === 'string' && p.objectKey) {
-			views.push({ text: msgs.fisqua_note_missing_object(p.objectKey), records: null, fromFisqua: false });
+			views.push({
+				text: msgs.fisqua_note_missing_object(p.objectKey),
+				records: null,
+				fromFisqua: false
+			});
 			continue;
 		}
 		const text =
@@ -288,13 +309,25 @@ function fisquaProblemViews(problems: FisquaProblem[] | null | undefined, msgs: 
 	return views;
 }
 
-function captuaProblemViews(problems: FisquaProblem[] | null | undefined, msgs: Messages): FisquaProblemView[] {
+function captuaProblemViews(
+	problems: FisquaProblem[] | null | undefined,
+	msgs: Messages
+): FisquaProblemView[] {
 	if (!Array.isArray(problems)) return [];
-	return manifestProblemViews(problems, msgs).map(({ text, records }) => ({ text, records, fromFisqua: false }));
+	return manifestProblemViews(problems, msgs).map(({ text, records }) => ({
+		text,
+		records,
+		fromFisqua: false
+	}));
 }
 
 /** The kind and label of an outbox row, as the current line or in the history. */
-function outboxLine(row: FisquaOutboxEntry, now: Date, locale: string, msgs: Messages): { kind: string; tone: FisquaTone; label: string } {
+function outboxLine(
+	row: FisquaOutboxEntry,
+	now: Date,
+	locale: string,
+	msgs: Messages
+): { kind: string; tone: FisquaTone; label: string } {
 	switch (row.state) {
 		case 'waiting_for_upload':
 			return { kind: 'waiting_for_upload', tone: 'progress', label: msgs.fisqua_out_waiting };
@@ -303,7 +336,11 @@ function outboxLine(row: FisquaOutboxEntry, now: Date, locale: string, msgs: Mes
 			return { kind: 'sending', tone: 'progress', label: msgs.fisqua_out_sending };
 		case 'failed': {
 			const args = whenArgs(row.next_attempt_at, now, locale);
-			return { kind: 'failed', tone: 'attention', label: args ? msgs.fisqua_out_failed(...args) : msgs.fisqua_out_failed_no_time };
+			return {
+				kind: 'failed',
+				tone: 'attention',
+				label: args ? msgs.fisqua_out_failed(...args) : msgs.fisqua_out_failed_no_time
+			};
 		}
 		case 'delivered':
 			return { kind: 'delivered', tone: 'progress', label: msgs.fisqua_out_delivered };
@@ -321,7 +358,10 @@ function outboxLine(row: FisquaOutboxEntry, now: Date, locale: string, msgs: Mes
 }
 
 /** The warning for the unit-level stop, or null when Fisqua accepts the configuration. */
-export function fisquaConfigErrorText(error: FisquaConfigError | null | undefined, msgs: Messages): string | null {
+export function fisquaConfigErrorText(
+	error: FisquaConfigError | null | undefined,
+	msgs: Messages
+): string | null {
 	if (!error) return null;
 	switch (error.reason) {
 		case 'token':
@@ -374,7 +414,9 @@ export function volumeFisquaView(
 			if (current.refusal === 'fisqua') {
 				incident = objectMissingIncident(current.problems, msgs);
 				const others = Array.isArray(current.problems)
-					? current.problems.filter((p) => !(typeof p === 'object' && p !== null && p.rule === RULE_OBJECT_MISSING))
+					? current.problems.filter(
+							(p) => !(typeof p === 'object' && p !== null && p.rule === RULE_OBJECT_MISSING)
+						)
 					: null;
 				problems = fisquaProblemViews(others, msgs);
 				omitted = omittedOf(others);
@@ -384,7 +426,11 @@ export function volumeFisquaView(
 		}
 		const status = fisqua.status;
 		// Fisqua's word on this manifest; one with no manifest id is its latest on the volume.
-		if (current.state === 'delivered' && status && (status.manifest_id === null || status.manifest_id === current.manifest_id)) {
+		if (
+			current.state === 'delivered' &&
+			status &&
+			(status.manifest_id === null || status.manifest_id === current.manifest_id)
+		) {
 			const name = status.status;
 			if (typeof name === 'string' && (FISQUA_STATES as readonly string[]).includes(name)) {
 				kind = `status_${name}`;
@@ -404,7 +450,18 @@ export function volumeFisquaView(
 	}
 
 	if (configError) tone = 'attention';
-	return { kind, tone, label, detail, problems, problemsKind, omitted, configError, history, incident };
+	return {
+		kind,
+		tone,
+		label,
+		detail,
+		problems,
+		problemsKind,
+		omitted,
+		configError,
+		history,
+		incident
+	};
 }
 
 export type UnitFisquaLevel = 'on' | 'off' | 'attention';
@@ -420,7 +477,12 @@ function sendLine(run: FisquaRunResult | null | undefined, msgs: Messages): stri
 	if (!run) return msgs.fisqua_unit_send_none;
 	switch (run.status) {
 		case 'done':
-			return msgs.fisqua_unit_send_done(run.delivered ?? 0, run.refused ?? 0, run.failed ?? 0, run.waiting ?? 0);
+			return msgs.fisqua_unit_send_done(
+				run.delivered ?? 0,
+				run.refused ?? 0,
+				run.failed ?? 0,
+				run.waiting ?? 0
+			);
 		case 'config_error':
 			return msgs.fisqua_unit_send_config_error;
 		case 'error':
@@ -441,16 +503,31 @@ function pollLine(run: FisquaRunResult | null | undefined, msgs: Messages): stri
 			return msgs.fisqua_unit_poll_config_error;
 		case 'error':
 			return msgs.fisqua_unit_poll_error;
+		case 'cooling_down':
+			return msgs.fisqua_unit_poll_cooling;
 		default:
 			return msgs.fisqua_unit_poll_other;
 	}
 }
 
-/** The unit's Fisqua row for Configuración, or null when the backend sends no Fisqua summary. */
-export function unitFisquaView(summary: UnitFisquaSummary | null | undefined, msgs: Messages): UnitFisquaView | null {
+/**
+ * The unit's Fisqua row for Configuración, or null when there is none to show:
+ * the backend sends no Fisqua summary, or the unit's mode does not use the
+ * link (Scanner only, Offsite copy only; NEH-319). Fisqua is one of three
+ * modes, so the other two say nothing about it. A backend that sends no
+ * mode_allows predates the modes and counts as using the link.
+ */
+export function unitFisquaView(
+	summary: UnitFisquaSummary | null | undefined,
+	msgs: Messages
+): UnitFisquaView | null {
 	if (!summary || typeof summary.configured !== 'boolean') return null;
+	if (summary.mode_allows === false) return null;
 	if (!summary.configured) return { level: 'off', lines: [msgs.fisqua_unit_off], warning: null };
-	const env = summary.environment === 'staging' ? msgs.fisqua_unit_env_staging : msgs.fisqua_unit_env_production;
+	const env =
+		summary.environment === 'staging'
+			? msgs.fisqua_unit_env_staging
+			: msgs.fisqua_unit_env_production;
 	const warning = fisquaConfigErrorText(summary.config_error, msgs);
 	return {
 		level: warning ? 'attention' : 'on',

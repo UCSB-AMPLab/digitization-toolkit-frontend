@@ -1,6 +1,7 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { CameraDevice } from './api';
+import { browserScheduler, type Scheduler } from './repeat-read';
 
 // Default clockwise capture rotation (degrees). Most digitisation rigs use
 // vertical (portrait) orientation, so this mirrors the historical hardcoded
@@ -14,7 +15,7 @@ export const DEFAULT_ROTATION = 90;
 export const VALID_ROTATIONS: readonly number[] = [0, 90, 180, 270];
 
 export function isValidRotation(value: unknown): value is number {
-  return typeof value === 'number' && VALID_ROTATIONS.includes(value);
+	return typeof value === 'number' && VALID_ROTATIONS.includes(value);
 }
 
 // The backend reports `<model>_idx<N>` when it could not read a body's serial
@@ -23,7 +24,7 @@ export function isValidRotation(value: unknown): value is number {
 const PLACEHOLDER_HARDWARE_ID = /_idx\d+$/;
 
 export function isPlaceholderHardwareId(hardwareId: string): boolean {
-  return PLACEHOLDER_HARDWARE_ID.test(hardwareId);
+	return PLACEHOLDER_HARDWARE_ID.test(hardwareId);
 }
 
 /**
@@ -33,14 +34,31 @@ export function isPlaceholderHardwareId(hardwareId: string): boolean {
  * appliance can answer before gphoto2 has found or identified every camera.
  */
 export function isDeviceListComplete(
-  devices: Pick<CameraDevice, 'index' | 'hardware_id'>[],
-  mode: 'single' | 'double'
+	devices: Pick<CameraDevice, 'index' | 'hardware_id'>[],
+	mode: 'single' | 'double'
 ): boolean {
-  const required = mode === 'double' ? [0, 1] : [0];
-  return (
-    required.every((index) => devices.some((d) => d.index === index)) &&
-    !devices.some((d) => isPlaceholderHardwareId(d.hardware_id))
-  );
+	const required = mode === 'double' ? [0, 1] : [0];
+	return (
+		required.every((index) => devices.some((d) => d.index === index)) &&
+		!devices.some((d) => isPlaceholderHardwareId(d.hardware_id))
+	);
+}
+
+// How long a screen waits before each further read of a device list that is
+// not complete yet (see isDeviceListComplete); after the last one it shows
+// what the list says.
+export const DEVICE_RETRY_DELAYS_MS: readonly number[] = [1000, 2000, 4000, 8000];
+
+// The timers the Overview's device-list reads wait on. Tests replace it so
+// that they fire the waits by hand.
+let deviceRetryScheduler: Scheduler = browserScheduler;
+
+export function getDeviceRetryScheduler(): Scheduler {
+	return deviceRetryScheduler;
+}
+
+export function setDeviceRetryScheduler(scheduler: Scheduler = browserScheduler): void {
+	deviceRetryScheduler = scheduler;
 }
 
 /**
@@ -49,9 +67,24 @@ export function isDeviceListComplete(
  * the change waits until one appears (see settlePendingRotations).
  */
 export function canSaveRotation(
-  device: Pick<CameraDevice, 'hardware_id'> | undefined
+	device: Pick<CameraDevice, 'hardware_id'> | undefined
 ): device is Pick<CameraDevice, 'hardware_id'> {
-  return device !== undefined && !isPlaceholderHardwareId(device.hardware_id);
+	return device !== undefined && !isPlaceholderHardwareId(device.hardware_id);
+}
+
+/**
+ * Whether the backend holds an orientation saved for this body. A current
+ * backend always reports a valid effective `orientation` (a body with none
+ * saved gets a default that follows its role), so only `orientation_saved`
+ * tells the two apart. A backend that predates the field reports no
+ * `orientation` for a body with nothing saved, so with the field absent a
+ * valid `orientation` is read as a saved one.
+ */
+function hasSavedOrientation(
+	device: Pick<CameraDevice, 'orientation' | 'orientation_saved'>
+): boolean {
+	if (typeof device.orientation_saved === 'boolean') return device.orientation_saved;
+	return isValidRotation(device.orientation);
 }
 
 /**
@@ -63,20 +96,20 @@ export function canSaveRotation(
  * their pending value.
  */
 export function settlePendingRotations(
-  pending: ReadonlyMap<number, number>,
-  devices: Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation'>[]
+	pending: ReadonlyMap<number, number>,
+	devices: Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation' | 'orientation_saved'>[]
 ): { apply: [number, number][]; remaining: Map<number, number> } {
-  const apply: [number, number][] = [];
-  const remaining = new Map<number, number>();
-  for (const [index, degrees] of pending) {
-    const device = devices.find((d) => d.index === index);
-    if (!canSaveRotation(device)) {
-      remaining.set(index, degrees);
-    } else if (!isValidRotation(device.orientation)) {
-      apply.push([index, degrees]);
-    }
-  }
-  return { apply, remaining };
+	const apply: [number, number][] = [];
+	const remaining = new Map<number, number>();
+	for (const [index, degrees] of pending) {
+		const device = devices.find((d) => d.index === index);
+		if (!canSaveRotation(device)) {
+			remaining.set(index, degrees);
+		} else if (!hasSavedOrientation(device)) {
+			apply.push([index, degrees]);
+		}
+	}
+	return { apply, remaining };
 }
 
 /**
@@ -98,24 +131,24 @@ export function settlePendingRotations(
  * already had for them.
  */
 export function seedRotation(
-  current: Record<number, number>,
-  devices: Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation'>[],
-  touched: ReadonlyMap<number, string>
+	current: Record<number, number>,
+	devices: Pick<CameraDevice, 'index' | 'hardware_id' | 'orientation'>[],
+	touched: ReadonlyMap<number, string>
 ): { rotation: Record<number, number>; touched: Map<number, string> } {
-  const rotation: Record<number, number> = { ...current };
-  const nextTouched = new Map(touched);
+	const rotation: Record<number, number> = { ...current };
+	const nextTouched = new Map(touched);
 
-  for (const { index, hardware_id, orientation } of devices) {
-    if (touched.get(index) === hardware_id && !isPlaceholderHardwareId(hardware_id)) {
-      // Same body still there and it was rotated in this session — leave the
-      // current value (and the touch) alone.
-      continue;
-    }
-    rotation[index] = isValidRotation(orientation) ? orientation : DEFAULT_ROTATION;
-    nextTouched.delete(index);
-  }
+	for (const { index, hardware_id, orientation } of devices) {
+		if (touched.get(index) === hardware_id && !isPlaceholderHardwareId(hardware_id)) {
+			// Same body still there and it was rotated in this session — leave the
+			// current value (and the touch) alone.
+			continue;
+		}
+		rotation[index] = isValidRotation(orientation) ? orientation : DEFAULT_ROTATION;
+		nextTouched.delete(index);
+	}
 
-  return { rotation, touched: nextTouched };
+	return { rotation, touched: nextTouched };
 }
 
 /**
@@ -131,34 +164,34 @@ export function seedRotation(
  * the next call for that index still goes out normally.
  */
 export function createOrientationSaver(
-  put: (index: number, hardwareId: string, degrees: number) => Promise<unknown>,
-  onError?: (index: number, err: unknown) => void
+	put: (index: number, hardwareId: string, degrees: number) => Promise<unknown>,
+	onError?: (index: number, err: unknown) => void
 ): (index: number, hardwareId: string, degrees: number) => void {
-  const inFlight = new Set<number>();
-  const pending = new Map<number, { hardwareId: string; degrees: number }>();
+	const inFlight = new Set<number>();
+	const pending = new Map<number, { hardwareId: string; degrees: number }>();
 
-  function runSave(index: number, hardwareId: string, degrees: number): void {
-    inFlight.add(index);
-    put(index, hardwareId, degrees)
-      .catch((err) => {
-        onError?.(index, err);
-      })
-      .finally(() => {
-        const next = pending.get(index);
-        pending.delete(index);
-        if (next) {
-          runSave(index, next.hardwareId, next.degrees);
-        } else {
-          inFlight.delete(index);
-        }
-      });
-  }
+	function runSave(index: number, hardwareId: string, degrees: number): void {
+		inFlight.add(index);
+		put(index, hardwareId, degrees)
+			.catch((err) => {
+				onError?.(index, err);
+			})
+			.finally(() => {
+				const next = pending.get(index);
+				pending.delete(index);
+				if (next) {
+					runSave(index, next.hardwareId, next.degrees);
+				} else {
+					inFlight.delete(index);
+				}
+			});
+	}
 
-  return function save(index: number, hardwareId: string, degrees: number): void {
-    if (inFlight.has(index)) {
-      pending.set(index, { hardwareId, degrees });
-      return;
-    }
-    runSave(index, hardwareId, degrees);
-  };
+	return function save(index: number, hardwareId: string, degrees: number): void {
+		if (inFlight.has(index)) {
+			pending.set(index, { hardwareId, degrees });
+			return;
+		}
+		runSave(index, hardwareId, degrees);
+	};
 }

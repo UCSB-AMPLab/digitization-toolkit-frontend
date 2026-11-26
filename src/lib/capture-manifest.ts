@@ -17,7 +17,7 @@
 //
 // No import of api.ts, so the tests run in plain node.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import type { Messages } from './i18n';
 
@@ -74,8 +74,13 @@ function baseName(name: string): string {
  * Content-Disposition; otherwise the one download_name would give, from the
  * body's stem and generatedAt (the same instant, in UTC); otherwise a plain name.
  */
-export function captureManifestFilename(contentDisposition: string | null, bodyText: string): string {
-	const match = contentDisposition?.match(/filename="([^"]+)"/i) ?? contentDisposition?.match(/filename=([^;]+)/i);
+export function captureManifestFilename(
+	contentDisposition: string | null,
+	bodyText: string
+): string {
+	const match =
+		contentDisposition?.match(/filename="([^"]+)"/i) ??
+		contentDisposition?.match(/filename=([^;]+)/i);
 	if (match) {
 		const name = baseName(match[1]);
 		if (name) return name;
@@ -166,9 +171,13 @@ export function manifestProblemViews(problems: unknown[], msgs: Messages): Manif
 		if (typeof p !== 'object' || p === null) continue;
 		const { rule, record_ids } = p as { rule?: unknown; record_ids?: unknown };
 		if (typeof rule !== 'string') continue;
-		const text = KNOWN_RULES.includes(rule) ? ruleText(rule as Rule, msgs) : msgs.col_manifest_rule_other;
+		const text = KNOWN_RULES.includes(rule)
+			? ruleText(rule as Rule, msgs)
+			: msgs.col_manifest_rule_other;
 		const ids = Array.isArray(record_ids)
-			? [...new Set(record_ids.filter((id): id is number => Number.isInteger(id)))].sort((a, b) => a - b)
+			? [...new Set(record_ids.filter((id): id is number => Number.isInteger(id)))].sort(
+					(a, b) => a - b
+				)
 			: [];
 		views.push({ rule, text, records: ids.length > 0 ? msgs.col_manifest_records(ids) : null });
 	}
@@ -179,7 +188,10 @@ export function manifestProblemViews(problems: unknown[], msgs: Messages): Manif
 export function captureManifestRefusal(error: unknown, msgs: Messages): ManifestRefusalView | null {
 	if (statusOf(error) !== 409) return null;
 	const detail = (error as { detail?: unknown }).detail;
-	const problems = typeof detail === 'object' && detail !== null ? (detail as { problems?: unknown }).problems : undefined;
+	const problems =
+		typeof detail === 'object' && detail !== null
+			? (detail as { problems?: unknown }).problems
+			: undefined;
 	if (!Array.isArray(problems)) return null;
 	return { problems: manifestProblemViews(problems, msgs) };
 }

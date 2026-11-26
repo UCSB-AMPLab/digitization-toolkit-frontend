@@ -1,16 +1,26 @@
-// The overview's low-storage banner (NEH-290), from the GET /system/storage
-// answer; fixtures are shaped as get_storage_info in app/api/system.py.
+// The overview's low-storage notice (NEH-290), from the GET /system/storage
+// answer; fixtures are shaped as get_storage_info in app/api/system.py. Its
+// "You can free" sentence is tested with the Overview's states
+// (overview-states.svelte.test.ts).
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
+import { authStore } from '$lib/stores/auth';
+import { locale } from '$lib/i18n';
+import { en } from '$lib/i18n/en';
+import { systemApi } from '$lib/api';
 import StorageAlert from './StorageAlert.svelte';
 
 const GIB = 1024 ** 3;
+// The figures as the notice writes them: decimal units (formatBytes), as in
+// its "You can free" sentence and Settings > Storage. 51 GiB is 54.8 GB.
+const USED_51 = '54.8\u00a0GB';
+const TOTAL_60 = '64.4\u00a0GB';
 
 function storage(usedGB: number, totalGB: number, available = true) {
 	return {
@@ -25,64 +35,146 @@ function storage(usedGB: number, totalGB: number, available = true) {
 	};
 }
 
+// Answers the requests in order; any further request (the freeable read for
+// an administrator or an operator) gets a 500.
 function respond(...bodies: Array<{ status: number; body: unknown }>) {
-	const spy = vi.spyOn(globalThis, 'fetch');
+	const spy = vi
+		.spyOn(globalThis, 'fetch')
+		.mockImplementation(async () => new Response('{}', { status: 500 }));
+	vi.spyOn(systemApi, 'getStorage');
 	for (const { status, body } of bodies) {
-		spy.mockImplementationOnce(async () =>
-			new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+		spy.mockImplementationOnce(
+			async () =>
+				new Response(JSON.stringify(body), {
+					status,
+					headers: { 'Content-Type': 'application/json' }
+				})
 		);
 	}
 	return spy;
+}
+
+// The notice's read has answered, and the notice has drawn what it read:
+// the component sets its figures as soon as getStorage settles, before the
+// next poll looks.
+async function readSettled() {
+	await expect.poll(() => vi.mocked(systemApi.getStorage).mock.settledResults.length).toBe(1);
 }
 
 const banner = (container: HTMLElement) => container.querySelector('.storage-alert-banner');
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	authStore.clearSession();
 });
 
 describe('dashboard storage banner', () => {
 	it('appears at 85% with the figures the unit reported', async () => {
+		locale.set('en');
 		const fetchSpy = respond({ status: 200, body: storage(51, 60) });
 		const { container } = render(StorageAlert);
 		await expect.poll(() => banner(container)).not.toBeNull();
 		expect(banner(container)!.textContent).toContain('85%');
-		expect(banner(container)!.textContent).toContain('51 GB');
-		expect(banner(container)!.textContent).toContain('60 GB');
+		expect(banner(container)!.textContent).toContain(USED_51);
+		expect(banner(container)!.textContent).toContain(TOTAL_60);
 		expect(String(fetchSpy.mock.calls[0][0])).toContain('/system/storage');
 	});
 
 	it('stays hidden below 85%', async () => {
-		const fetchSpy = respond({ status: 200, body: storage(50, 60) });
+		respond({ status: 200, body: storage(50, 60) });
 		const { container } = render(StorageAlert);
-		await expect.poll(() => fetchSpy.mock.calls.length).toBe(1);
-		await new Promise((r) => setTimeout(r, 50));
+		await readSettled();
 		expect(banner(container)).toBeNull();
 	});
 
 	it('stays hidden when the request fails', async () => {
-		const fetchSpy = respond({ status: 500, body: { detail: 'boom' } });
+		respond({ status: 500, body: { detail: 'boom' } });
 		const { container } = render(StorageAlert);
-		await expect.poll(() => fetchSpy.mock.calls.length).toBe(1);
-		await new Promise((r) => setTimeout(r, 50));
+		await readSettled();
 		expect(banner(container)).toBeNull();
 	});
 
 	it('stays hidden when the backend marks the storage root unavailable', async () => {
-		const fetchSpy = respond({ status: 200, body: storage(0, 0, false) });
+		respond({ status: 200, body: storage(0, 0, false) });
 		const { container } = render(StorageAlert);
-		await expect.poll(() => fetchSpy.mock.calls.length).toBe(1);
-		await new Promise((r) => setTimeout(r, 50));
+		await readSettled();
 		expect(banner(container)).toBeNull();
 	});
 
 	it('reads again when the page becomes visible, and drops the banner if that read fails', async () => {
-		const fetchSpy = respond({ status: 200, body: storage(57, 60) }, { status: 503, body: { detail: 'down' } });
+		const fetchSpy = respond(
+			{ status: 200, body: storage(57, 60) },
+			{ status: 503, body: { detail: 'down' } }
+		);
 		const { container } = render(StorageAlert);
 		await expect.poll(() => banner(container)).not.toBeNull();
 
 		document.dispatchEvent(new Event('visibilitychange'));
 		await expect.poll(() => fetchSpy.mock.calls.length).toBe(2);
 		await expect.poll(() => banner(container)).toBeNull();
+	});
+});
+
+describe('dashboard storage banner: the Settings link (NEH-253, NEH-380)', () => {
+	for (const role of ['admin', 'operator'] as const) {
+		it(`links the ${role} to Settings > Storage to free space there`, async () => {
+			locale.set('en');
+			authStore.setSession({ id: 1, username: role, email: null, role, is_active: true });
+			respond({ status: 200, body: storage(51, 60) });
+			const { container } = render(StorageAlert);
+			await expect.poll(() => banner(container)).not.toBeNull();
+			const link = banner(container)!.querySelector('a');
+			expect(link?.getAttribute('href')).toBe('/dashboard/config?section=storage');
+			expect(link?.textContent).toBe(en.nav_settings);
+			expect(banner(container)!.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+				`${en.dash_storage_alert_p1}85%${en.dash_storage_alert_p2(USED_51, TOTAL_60)}${en.nav_settings}${en.dash_storage_alert_p3}`.replace(
+					/\s+/g,
+					' '
+				)
+			);
+		});
+	}
+
+	it('tells the reviewer to ask an administrator or an operator, with no Settings text or link', async () => {
+		locale.set('en');
+		authStore.setSession({
+			id: 2,
+			username: 'reviewer',
+			email: null,
+			role: 'reviewer',
+			is_active: true
+		});
+		respond({ status: 200, body: storage(51, 60) });
+		const { container } = render(StorageAlert);
+		await expect.poll(() => banner(container)).not.toBeNull();
+		expect(banner(container)!.querySelector('a')).toBeNull();
+		expect(banner(container)!.textContent).not.toContain(en.nav_settings);
+		expect(en.dash_storage_alert_ask_admin(USED_51, TOTAL_60)).toContain(
+			'an administrator or an operator'
+		);
+		expect(banner(container)!.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+			`${en.dash_storage_alert_p1}85%${en.dash_storage_alert_ask_admin(USED_51, TOTAL_60)}`.replace(
+				/\s+/g,
+				' '
+			)
+		);
+	});
+
+	it('counts the storage reserve in the percentage', async () => {
+		locale.set('en');
+		authStore.setSession({
+			id: 1,
+			username: 'admin1',
+			email: null,
+			role: 'admin',
+			is_active: true
+		});
+		// 49 of 60 GiB used is 82%; with 2 GB kept back it is 85%.
+		respond({ status: 200, body: { ...storage(49, 60), reserve_bytes: 2 * 10 ** 9 } });
+		const { container } = render(StorageAlert);
+		await expect.poll(() => banner(container)).not.toBeNull();
+		expect(banner(container)!.textContent).toContain('85%');
+		// 49 GiB is 52.6 GB.
+		expect(banner(container)!.textContent).toContain('52.6\u00a0GB');
 	});
 });

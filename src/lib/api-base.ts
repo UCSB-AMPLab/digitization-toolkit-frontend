@@ -10,21 +10,21 @@
 // where a relative URL has no origin to resolve against, so it uses
 // PUBLIC_API_BASE_SSR, or PUBLIC_API_BASE only when that is absolute.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 export const DEFAULT_API_BASE = 'http://localhost:8000';
 
 export interface ApiBaseEnv {
-  PUBLIC_API_BASE?: string;
-  PUBLIC_API_BASE_SSR?: string;
+	PUBLIC_API_BASE?: string;
+	PUBLIC_API_BASE_SSR?: string;
 }
 
 function isAbsoluteUrl(url: string): boolean {
-  return /^https?:\/\//i.test(url);
+	return /^https?:\/\//i.test(url);
 }
 
 export function resolveApiBase(inBrowser: boolean, vars: ApiBaseEnv): string {
-  if (inBrowser) return vars.PUBLIC_API_BASE || DEFAULT_API_BASE;
-  if (vars.PUBLIC_API_BASE_SSR) return vars.PUBLIC_API_BASE_SSR;
-  if (vars.PUBLIC_API_BASE && isAbsoluteUrl(vars.PUBLIC_API_BASE)) return vars.PUBLIC_API_BASE;
-  return DEFAULT_API_BASE;
+	if (inBrowser) return vars.PUBLIC_API_BASE || DEFAULT_API_BASE;
+	if (vars.PUBLIC_API_BASE_SSR) return vars.PUBLIC_API_BASE_SSR;
+	if (vars.PUBLIC_API_BASE && isAbsoluteUrl(vars.PUBLIC_API_BASE)) return vars.PUBLIC_API_BASE;
+	return DEFAULT_API_BASE;
 }

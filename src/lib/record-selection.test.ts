@@ -1,4 +1,4 @@
-// Version: 0.1.0-beta
+// Version: 0.3.0
 
 import { describe, expect, it } from 'vitest';
 import { reconcileInspected, selectionAfterLoad } from './record-selection';
@@ -26,7 +26,10 @@ describe('selectionAfterLoad', () => {
 });
 
 describe('reconcileInspected', () => {
-	const recs = [{ id: 1, v: 'new' }, { id: 5, v: 'new' }];
+	const recs = [
+		{ id: 1, v: 'new' },
+		{ id: 5, v: 'new' }
+	];
 
 	it('swaps the record being inspected for its reloaded copy, by id', () => {
 		expect(reconcileInspected({ id: 5, v: 'old' }, recs)).toBe(recs[1]);

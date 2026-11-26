@@ -2,7 +2,7 @@
 // from mocked GET /activity/collections data, the actions on each card, and
 // what the block shows when the endpoint fails.
 //
-// Version: 0.1.0-beta
+// Version: 0.3.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -11,7 +11,14 @@ const gotoMock = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
-import { activityApi, ApiError, type Collection, type CollectionActivity, type Project, type StatusCounts } from '$lib/api';
+import {
+	activityApi,
+	ApiError,
+	type Collection,
+	type CollectionActivity,
+	type Project,
+	type StatusCounts
+} from '$lib/api';
 import InProgress from './InProgress.svelte';
 // The design system, for the layout test: container queries, .btn sizes and
 // the bundled Mulish and icon fonts.
@@ -22,11 +29,17 @@ const VIEW_KEY = 'captua_dashboard_in_progress_view';
 const projects: Project[] = [{ id: 1, name: 'Fondo Rionegro' } as Project];
 
 function coll(id: number, name: string, lastActivity: string | null): Collection {
-	return { id, name, project_id: 1, created_at: '2026-01-01T00:00:00', last_activity_at: lastActivity };
+	return {
+		id,
+		name,
+		project_id: 1,
+		created_at: '2026-01-01T00:00:00',
+		last_activity_at: lastActivity
+	};
 }
 
 function act(id: number, c: Partial<StatusCounts>, at: string | null): CollectionActivity {
-	const sc = { captured: 0, in_review: 0, rejected: 0, approved: 0, ...c };
+	const sc = { captured: 0, in_review: 0, rejected: 0, approved: 0, excluded: 0, ...c };
 	return {
 		collection_id: id,
 		status_counts: sc,
@@ -69,8 +82,12 @@ describe('InProgress', () => {
 	it('opens on Tabla, with the switch labelled Vista', async () => {
 		const screen = mount();
 		const group = screen.getByRole('group', { name: 'Vista' });
-		await expect.element(group.getByRole('button', { name: 'Tabla' })).toHaveAttribute('aria-pressed', 'true');
-		await expect.element(group.getByRole('button', { name: 'Tablero' })).toHaveAttribute('aria-pressed', 'false');
+		await expect
+			.element(group.getByRole('button', { name: 'Tabla' }))
+			.toHaveAttribute('aria-pressed', 'true');
+		await expect
+			.element(group.getByRole('button', { name: 'Tablero' }))
+			.toHaveAttribute('aria-pressed', 'false');
 		// Column headers are hidden at the narrow test viewport; present in the DOM.
 		await expect.element(screen.getByText('Avance')).toBeInTheDocument();
 	});
@@ -78,7 +95,9 @@ describe('InProgress', () => {
 	it('Tabla: the existing rows plus a progress cell with counts as text', async () => {
 		const screen = mount();
 		await expect.element(screen.getByText('34 registros')).toBeVisible();
-		await expect.element(screen.getByText('Capturados: 3, Rechazados: 1, En revisión: 10, Aprobados: 20')).toBeInTheDocument();
+		await expect
+			.element(screen.getByText('Capturados: 3, Rechazados: 1, En revisión: 10, Aprobados: 20'))
+			.toBeInTheDocument();
 		// Only volumes with records are listed, as before.
 		await expect.element(screen.getByText('Tomo vacío')).not.toBeInTheDocument();
 		await expect.element(screen.getByText('Tomo 4')).toBeVisible();
@@ -87,10 +106,15 @@ describe('InProgress', () => {
 	it('Tablero: four columns in order, each volume in its stage, and the choice remembered', async () => {
 		const screen = mount();
 		await screen.getByRole('button', { name: 'Tablero' }).click();
-		await expect.element(screen.getByRole('button', { name: 'Tablero' })).toHaveAttribute('aria-pressed', 'true');
+		await expect
+			.element(screen.getByRole('button', { name: 'Tablero' }))
+			.toHaveAttribute('aria-pressed', 'true');
 		expect(localStorage.getItem(VIEW_KEY)).toBe('board');
 
-		const headings = screen.getByRole('heading', { level: 3 }).elements().map((h) => h.textContent?.trim());
+		const headings = screen
+			.getByRole('heading', { level: 3 })
+			.elements()
+			.map((h) => h.textContent?.trim());
 		expect(headings).toEqual(['En captura', 'Por recapturar', 'En revisión', 'Aprobado']);
 
 		const capture = screen.getByRole('region', { name: 'En captura' });
@@ -98,10 +122,22 @@ describe('InProgress', () => {
 		const review = screen.getByRole('region', { name: 'En revisión' });
 		const approved = screen.getByRole('region', { name: 'Aprobado' });
 
-		await expect.element(capture.getByText('Volúmenes con registros que todavía no están en revisión.')).toBeVisible();
-		await expect.element(recapture.getByText('Volúmenes con imágenes rechazadas que hay que volver a capturar.')).toBeVisible();
-		await expect.element(review.getByText('Volúmenes con registros pendientes de revisión.')).toBeVisible();
-		await expect.element(approved.getByText('Volúmenes con todos los registros aprobados, listos para exportar.')).toBeVisible();
+		await expect
+			.element(capture.getByText('Volúmenes con registros que todavía no están en revisión.'))
+			.toBeVisible();
+		await expect
+			.element(
+				recapture.getByText('Volúmenes con imágenes rechazadas que hay que volver a capturar.')
+			)
+			.toBeVisible();
+		await expect
+			.element(review.getByText('Volúmenes con registros pendientes de revisión.'))
+			.toBeVisible();
+		await expect
+			.element(
+				approved.getByText('Volúmenes con todos los registros aprobados, listos para exportar.')
+			)
+			.toBeVisible();
 
 		expect(capture.getByRole('article').elements().length).toBe(2);
 		await expect.element(capture.getByRole('article', { name: 'Tomo 1' })).toBeVisible();
@@ -114,12 +150,20 @@ describe('InProgress', () => {
 		const card3 = review.getByRole('article', { name: 'Tomo 3' });
 		await expect.element(card3.getByText('1 registro', { exact: true })).toBeVisible();
 		await expect.element(card3.getByText('En revisión: 1')).toBeInTheDocument();
-		await expect.element(capture.getByRole('article', { name: 'Tomo vacío' }).getByText('0 registros')).toBeVisible();
-		await expect.element(approved.getByRole('article', { name: 'Tomo 4' }).getByText('51 registros')).toBeVisible();
+		await expect
+			.element(capture.getByRole('article', { name: 'Tomo vacío' }).getByText('0 registros'))
+			.toBeVisible();
+		await expect
+			.element(approved.getByRole('article', { name: 'Tomo 4' }).getByText('51 registros'))
+			.toBeVisible();
 	});
 
 	it('Tabla: lists at most the five most recently worked volumes', async () => {
-		const six = [...collections.slice(0, 4), coll(6, 'Tomo 6', '2026-10-18T10:00:00'), coll(7, 'Tomo 7', '2026-10-17T10:00:00')];
+		const six = [
+			...collections.slice(0, 4),
+			coll(6, 'Tomo 6', '2026-10-18T10:00:00'),
+			coll(7, 'Tomo 7', '2026-10-17T10:00:00')
+		];
 		const screen = render(InProgress, { collections: six, projects });
 		await expect.element(screen.getByText('Tomo 6')).toBeVisible();
 		await expect.element(screen.getByText('Tomo 7')).not.toBeInTheDocument();
@@ -128,8 +172,12 @@ describe('InProgress', () => {
 
 	it('leaves out nested collections (project_id null) on both views, and no link carries null', async () => {
 		const nested: Collection = {
-			id: 8, name: 'Legajo anidado', project_id: null, parent_collection_id: 1,
-			created_at: '2026-01-01T00:00:00', last_activity_at: '2026-10-23T10:00:00'
+			id: 8,
+			name: 'Legajo anidado',
+			project_id: null,
+			parent_collection_id: 1,
+			created_at: '2026-01-01T00:00:00',
+			last_activity_at: '2026-10-23T10:00:00'
 		};
 		activitySpy.mockResolvedValue([...activity, act(8, { captured: 2 }, '2026-10-23T10:00:00')]);
 		const screen = render(InProgress, { collections: [...collections, nested], projects });
@@ -144,10 +192,15 @@ describe('InProgress', () => {
 		for (const button of screen.getByRole('button', { name: /Capturar|Revisar/ }).elements()) {
 			(button as HTMLElement).click();
 		}
-		const hrefs = screen.getByRole('link').elements().map((a) => a.getAttribute('href') ?? '');
+		const hrefs = screen
+			.getByRole('link')
+			.elements()
+			.map((a) => a.getAttribute('href') ?? '');
 		expect(hrefs.length).toBeGreaterThan(0);
 		expect(gotoMock.mock.calls.length).toBeGreaterThan(0);
-		expect([...hrefs, ...gotoMock.mock.calls.map((c) => String(c[0]))].filter((u) => u.includes('null'))).toEqual([]);
+		expect(
+			[...hrefs, ...gotoMock.mock.calls.map((c) => String(c[0]))].filter((u) => u.includes('null'))
+		).toEqual([]);
 	});
 
 	it('Tabla: the last-activity date is read as UTC, like the board', async () => {
@@ -170,10 +223,14 @@ describe('InProgress', () => {
 		const screen = mount();
 		const card = screen.getByRole('article', { name: 'Tomo 3' });
 		const expected = new Date(Date.UTC(2026, 9, 20, 10)).toLocaleDateString('es', {
-			day: '2-digit', month: 'short', year: 'numeric'
+			day: '2-digit',
+			month: 'short',
+			year: 'numeric'
 		});
 		await expect.element(card.getByText(expected)).toBeVisible();
-		expect(card.element().querySelector('time')?.getAttribute('datetime')).toBe('2026-10-20T10:00:00.000Z');
+		expect(card.element().querySelector('time')?.getAttribute('datetime')).toBe(
+			'2026-10-20T10:00:00.000Z'
+		);
 	});
 
 	it('Tabla: five columns fit without overflow just above 54rem, and stack at 54rem', async () => {
@@ -208,7 +265,11 @@ describe('InProgress', () => {
 		const review = screen.getByRole('region', { name: 'En revisión' });
 		const approved = screen.getByRole('region', { name: 'Aprobado' });
 
-		await expect.element(capture.getByRole('article', { name: 'Tomo 1' }).getByRole('button', { name: 'Capturar' })).toBeVisible();
+		await expect
+			.element(
+				capture.getByRole('article', { name: 'Tomo 1' }).getByRole('button', { name: 'Capturar' })
+			)
+			.toBeVisible();
 		await recapture.getByRole('button', { name: 'Capturar' }).click();
 		expect(gotoMock).toHaveBeenCalledWith('/live-preview?projectId=1&collectionId=2');
 
@@ -241,7 +302,9 @@ describe('InProgress', () => {
 			throw new Error('blocked');
 		});
 		const screen = mount();
-		await expect.element(screen.getByRole('button', { name: 'Tabla' })).toHaveAttribute('aria-pressed', 'true');
+		await expect
+			.element(screen.getByRole('button', { name: 'Tabla' }))
+			.toHaveAttribute('aria-pressed', 'true');
 	});
 
 	it('endpoint failure: the board shows the error instead of a blank, the table keeps its rows', async () => {
@@ -249,11 +312,17 @@ describe('InProgress', () => {
 		localStorage.setItem(VIEW_KEY, 'board');
 		const screen = mount();
 
-		await expect.element(screen.getByRole('status')).toHaveTextContent('No se pudo cargar el avance de los volúmenes: boom');
-		await expect.element(screen.getByRole('region', { name: 'En captura' })).not.toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('status'))
+			.toHaveTextContent('No se pudo cargar el avance de los volúmenes: boom');
+		await expect
+			.element(screen.getByRole('region', { name: 'En captura' }))
+			.not.toBeInTheDocument();
 
 		await screen.getByRole('button', { name: 'Tabla' }).click();
-		await expect.element(screen.getByRole('status')).toHaveTextContent('No se pudo cargar el avance de los volúmenes: boom');
+		await expect
+			.element(screen.getByRole('status'))
+			.toHaveTextContent('No se pudo cargar el avance de los volúmenes: boom');
 		await expect.element(screen.getByText('Tomo 1')).toBeVisible();
 	});
 });

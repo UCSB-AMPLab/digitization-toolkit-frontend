@@ -1,10 +1,15 @@
 <script lang="ts">
 	// ============================================================================
-	// Freeing a volume from the card and restoring it (NEH-248): the admin's
-	// button beside the volume's breadcrumb and offsite line, and its dialog.
+	// Freeing a volume from the card and restoring it (NEH-248): the button
+	// beside the volume's breadcrumb and offsite line, and its dialog.
 	//
-	// The layout shows it to admins only; the backend refuses all four routes to
-	// anyone else (allow_admin in app/api/collections.py). Freeing starts with
+	// The layout shows it to the admin and the operator (canFreeVolumes), and
+	// offers restore only when `canRestore` (canRestoreVolumes: the admin); the
+	// backend refuses the free to every other role and restore to all but the
+	// admin (app/api/collections.py). Settings > Storage opens the same dialog
+	// for a volume of its list, with no button of its own (`showTrigger`
+	// false, `open()`, and `offsite` null: freeing is on offer by the list's
+	// rule, restore is not offered) (NEH-380). Freeing starts with
 	// the dry run (GET /offsite/free), which lists what would be removed and what
 	// would stay, and why; a confirmed free (POST, 202) and a confirmed restore
 	// (POST /offsite/restore, 202) are polled until their job ends, and the
@@ -17,12 +22,19 @@
 	// onChanged names the volume its job was started for.
 	// ============================================================================
 	//
-	// Version: 0.1.0-beta
+	// Version: 0.3.0
 
 	import { tick } from 'svelte';
-	import { collectionsApi, type FreePlan, type OffsiteJobResult, type VolumeOffsiteState } from '$lib/api';
-	import { m } from '$lib/i18n';
 	import {
+		collectionsApi,
+		type FreePlan,
+		type OffsiteJobResult,
+		type VolumeOffsiteState
+	} from '$lib/api';
+	import { m } from '$lib/i18n';
+	import { alwaysReachable, dismissible } from '$lib/dialog';
+	import {
+		OFFSITE_POLL_INTERVAL_MS,
 		offsiteActionErrorText,
 		offsiteOffer,
 		planSummary,
@@ -34,15 +46,26 @@
 	let {
 		collectionId,
 		offsite,
-		onChanged
+		canRestore,
+		showTrigger = true,
+		onChanged,
+		onClosed,
+		onJobStarted
 	}: {
 		collectionId: number;
-		offsite: VolumeOffsiteState;
+		/** The volume's offsite state; null when the caller lists the volume as freeable (Settings > Storage). */
+		offsite: VolumeOffsiteState | null;
+		/** Whether restore is offered: the admin only (canRestoreVolumes). */
+		canRestore: boolean;
+		/** False when the caller opens the dialog itself with open(). */
+		showTrigger?: boolean;
 		/** When a job ends or its polling stops, with the volume it was started for: the layout asks the offsite line again. */
 		onChanged: (collectionId: number) => void;
+		/** When the dialog closes, so a caller without the trigger can put focus back. */
+		onClosed?: () => void;
+		/** When the backend has taken a free or a restore, with its job: a caller can watch the job past the dialog. */
+		onJobStarted?: (collectionId: number, action: 'free' | 'restore', jobId: string) => void;
 	} = $props();
-
-	const POLL_INTERVAL_MS = 2000;
 
 	type Step =
 		| { kind: 'menu' }
@@ -54,7 +77,10 @@
 		| { kind: 'error'; action: OffsiteAction; text: string };
 
 	let step = $state<Step | null>(null);
-	let offer = $derived(offsiteOffer(offsite));
+	let offer = $derived.by(() => {
+		const found = offsite ? offsiteOffer(offsite) : { free: true, restore: false };
+		return { free: found.free, restore: found.restore && canRestore };
+	});
 	let cardEl = $state<HTMLElement | null>(null);
 	let buttonEl = $state<HTMLButtonElement | null>(null);
 	let polling: AbortController | null = null;
@@ -65,9 +91,13 @@
 	});
 
 	let planView = $derived(step?.kind === 'plan' ? planSummary(step.plan, $m) : null);
-	let resultView = $derived(step?.kind === 'done' ? resultSummary(step.action, step.result, $m) : null);
+	let resultView = $derived(
+		step?.kind === 'done' ? resultSummary(step.action, step.result, $m) : null
+	);
 	let freedLine = $derived(
-		(offsite.freed_files ?? 0) > 0 ? $m.offsite_vol_freed(offsite.freed_files ?? 0, offsite.freed_bytes ?? 0) : null
+		offsite && (offsite.freed_files ?? 0) > 0
+			? $m.offsite_vol_freed(offsite.freed_files ?? 0, offsite.freed_bytes ?? 0)
+			: null
 	);
 
 	async function focusCard() {
@@ -75,7 +105,8 @@
 		cardEl?.focus();
 	}
 
-	function open() {
+	/** Open the dialog at its first step, as the button does. */
+	export function open() {
 		step = { kind: 'menu' };
 	}
 
@@ -90,7 +121,10 @@
 		polling = null;
 		const wasOpen = step !== null;
 		step = null;
-		if (wasOpen) tick().then(() => buttonEl?.focus());
+		if (wasOpen) {
+			tick().then(() => buttonEl?.focus());
+			onClosed?.();
+		}
 	}
 
 	async function startPlan() {
@@ -110,7 +144,11 @@
 	}
 
 	function askRestore() {
-		step = { kind: 'confirm-restore', files: offsite.freed_files ?? 0, bytes: offsite.freed_bytes ?? 0 };
+		step = {
+			kind: 'confirm-restore',
+			files: offsite?.freed_files ?? 0,
+			bytes: offsite?.freed_bytes ?? 0
+		};
 		focusCard();
 	}
 
@@ -122,42 +160,60 @@
 		polling = controller;
 		const outcome = await runOffsiteJob(
 			action,
-			() => (action === 'free' ? collectionsApi.startFree(forId) : collectionsApi.startRestore(forId)),
+			async () => {
+				const started = await (action === 'free'
+					? collectionsApi.startFree(forId)
+					: collectionsApi.startRestore(forId));
+				onJobStarted?.(forId, action, started.job_id);
+				return started;
+			},
 			(jobId, signal) => collectionsApi.getOffsiteJob(forId, jobId, signal),
-			{ intervalMs: POLL_INTERVAL_MS, signal: controller.signal },
+			{ intervalMs: OFFSITE_POLL_INTERVAL_MS, signal: controller.signal },
 			$m
 		);
 		if (polling === controller) polling = null;
 		// A job may have changed files even when it failed part way.
 		onChanged(forId);
 		if (outcome.kind === 'aborted' || controller.signal.aborted) return;
-		step = outcome.kind === 'done' ? { kind: 'done', action, result: outcome.result } : { kind: 'error', action, text: outcome.text };
+		step =
+			outcome.kind === 'done'
+				? { kind: 'done', action, result: outcome.result }
+				: { kind: 'error', action, text: outcome.text };
 		focusCard();
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (!step) return;
-		if (e.key === 'Escape') {
-			close();
-			return;
-		}
 		// Keep Tab inside the dialog, as HandoverControls does.
 		if (e.key === 'Tab' && cardEl) {
 			const items = [...cardEl.querySelectorAll<HTMLElement>('button:not(:disabled)')];
+			// The banner's Reload stays reachable, before the first button (lib/dialog.ts),
+			// also while every button of the dialog is disabled.
+			const extra = alwaysReachable().filter((el) => !cardEl!.contains(el));
 			if (items.length === 0) {
 				e.preventDefault();
-				cardEl.focus();
+				const here = extra.indexOf(document.activeElement as HTMLElement);
+				const next = here === -1 ? extra[0] : extra[here + 1];
+				(next ?? cardEl).focus();
 				return;
 			}
 			const first = items[0];
 			const last = items[items.length - 1];
 			const active = document.activeElement;
-			if (e.shiftKey && (active === first || active === cardEl || !cardEl.contains(active))) {
+			const at = extra.indexOf(active as HTMLElement);
+			if (at !== -1) {
 				e.preventDefault();
-				last.focus();
-			} else if (!e.shiftKey && (active === last || !cardEl.contains(active))) {
+				if (e.shiftKey) (at > 0 ? extra[at - 1] : last).focus();
+				else (at < extra.length - 1 ? extra[at + 1] : first).focus();
+				return;
+			}
+			const outside = !cardEl.contains(active);
+			if (e.shiftKey && (active === first || active === cardEl || outside)) {
 				e.preventDefault();
-				first.focus();
+				(extra.length > 0 && !outside ? extra[extra.length - 1] : last).focus();
+			} else if (!e.shiftKey && (active === last || outside)) {
+				e.preventDefault();
+				(extra.length > 0 && !outside ? extra[0] : first).focus();
 			}
 		}
 	}
@@ -173,7 +229,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if offer.free || offer.restore}
+{#if showTrigger && (offer.free || offer.restore)}
 	<button
 		class="offsite-manage-btn"
 		bind:this={buttonEl}
@@ -187,14 +243,7 @@
 {/if}
 
 {#if step}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="offsite-dialog-backdrop"
-		onclick={(e) => {
-			if (e.target === e.currentTarget) close();
-		}}
-	>
+	<div class="offsite-dialog-backdrop" use:dismissible={{ onDismiss: close }}>
 		<div
 			class="offsite-dialog-card"
 			role="dialog"
@@ -231,11 +280,10 @@
 					<button class="btn btn-ghost" onclick={close}>{$m.common_cancel}</button>
 				</div>
 			{:else if step.kind === 'plan' && planView}
-				<h3 id="offsite-dialog-title" class="offsite-dialog-title">{$m.offsite_free_confirm_title}</h3>
+				<h3 id="offsite-dialog-title" class="offsite-dialog-title">
+					{$m.offsite_free_confirm_title}
+				</h3>
 				<p class="offsite-dialog-body">{planView.body}</p>
-				{#if planView.canFree}
-					<p class="offsite-dialog-body offsite-dialog-muted">{$m.offsite_plan_restore_later}</p>
-				{/if}
 				{#if planView.leftTitle}
 					<p class="offsite-dialog-body">{planView.leftTitle}</p>
 					<ul class="offsite-dialog-list">
@@ -246,20 +294,34 @@
 				{/if}
 				{#if planView.canFree}
 					<p class="offsite-dialog-body offsite-dialog-muted">{$m.offsite_free_check_note}</p>
+					<!-- Whether the files can come back (NEH-380); an older backend that does not say gets the restore-later line, as before. -->
+					{#if step.plan.restorable === false}
+						<p class="offsite-dialog-body">{$m.offsite_free_not_restorable}</p>
+					{:else}
+						<p class="offsite-dialog-body offsite-dialog-muted">{$m.offsite_free_restorable}</p>
+					{/if}
 				{/if}
 				<div class="offsite-dialog-actions">
-					<button class="btn btn-ghost" onclick={close}>{planView.canFree ? $m.common_cancel : $m.common_close}</button>
+					<button class="btn btn-ghost" onclick={close}
+						>{planView.canFree ? $m.common_cancel : $m.common_close}</button
+					>
 					{#if planView.canFree}
-						<button class="btn btn-primary" onclick={() => run('free')}>{$m.offsite_free_confirm}</button>
+						<button class="btn btn-primary" onclick={() => run('free')}
+							>{$m.offsite_free_confirm}</button
+						>
 					{/if}
 				</div>
 			{:else if step.kind === 'confirm-restore'}
-				<h3 id="offsite-dialog-title" class="offsite-dialog-title">{$m.offsite_restore_confirm_title}</h3>
+				<h3 id="offsite-dialog-title" class="offsite-dialog-title">
+					{$m.offsite_restore_confirm_title}
+				</h3>
 				<p class="offsite-dialog-body">{$m.offsite_restore_confirm_body(step.files, step.bytes)}</p>
 				<p class="offsite-dialog-body offsite-dialog-muted">{$m.offsite_restore_space_note}</p>
 				<div class="offsite-dialog-actions">
 					<button class="btn btn-ghost" onclick={close}>{$m.common_cancel}</button>
-					<button class="btn btn-primary" onclick={() => run('restore')}>{$m.offsite_restore_confirm}</button>
+					<button class="btn btn-primary" onclick={() => run('restore')}
+						>{$m.offsite_restore_confirm}</button
+					>
 				</div>
 			{:else if step.kind === 'running'}
 				<h3 id="offsite-dialog-title" class="offsite-dialog-title">
