@@ -4,6 +4,8 @@
 // from /users/me, whatever the browser had); a person with none is asked
 // once, on this page before the dashboard, and the choice is stored with
 // PUT /users/me/language.
+//
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -40,6 +42,7 @@ let languageAnswer: () => Response;
 // Holds status answers back until released; each request still gets its own answer.
 let statusGate: Promise<void> | null;
 let languageGate: Promise<void> | null;
+let signedIn: boolean;
 
 function json(body: unknown, s = 200) {
 	return new Response(JSON.stringify(body), {
@@ -64,6 +67,7 @@ beforeEach(() => {
 	languageAnswer = () => json({ ...me, language: 'en' });
 	statusGate = null;
 	languageGate = null;
+	signedIn = false;
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const url = new URL(typeof input === 'string' ? input : (input as Request).url);
 		const headers: Record<string, string> = {};
@@ -79,12 +83,17 @@ beforeEach(() => {
 			if (statusGate) await statusGate;
 			return json({ ...status, local: false });
 		}
-		if (url.pathname === '/auth/login') return json({ access_token: null, token_type: 'cookie' });
+		if (url.pathname === '/auth/login') {
+			signedIn = true;
+			return json({ access_token: null, token_type: 'cookie' });
+		}
 		if (url.pathname === '/users/me/language') {
 			if (languageGate) await languageGate;
 			return languageAnswer();
 		}
-		if (url.pathname === '/users/me') return json(me);
+		// The browser holds no session cookie until it signs in (NEH-415).
+		if (url.pathname === '/users/me')
+			return signedIn ? json(me) : json({ detail: 'Not authenticated' }, 401);
 		return json({ status: 'ok' });
 	});
 });

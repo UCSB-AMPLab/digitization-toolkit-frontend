@@ -3,7 +3,7 @@
 // and retry, keeping the saved session, and must not navigate anywhere; only a
 // 401/403 from /users/me ends the session.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { createRawSnippet } from 'svelte';
@@ -176,16 +176,66 @@ describe('(dashboard) layout and the session renewal', () => {
 	});
 });
 
+// A browser that keeps no user in localStorage (a private window, blocked or
+// cleared site data, a browser just migrated off the localStorage token) asks
+// /users/me with the cookie it has: a 200 opens the session as for a saved
+// user, a 401 or 403 sends it to /login, and an unanswered check waits as it
+// does for a saved user (NEH-415).
 describe('(dashboard) layout with no saved session', () => {
-	it('goes to /login once without asking the backend (a browser just migrated off the localStorage token)', async () => {
-		authStore.clearSession();
-		const fetchSpy = vi.spyOn(globalThis, 'fetch');
+	beforeEach(() => authStore.clearSession());
 
-		render(Layout, { children });
+	it('opens the session from the cookie when /users/me answers 200', async () => {
+		vi.spyOn(globalThis, 'fetch').mockImplementation(async () => json(200, user));
+
+		const screen = render(Layout, { children });
+
+		await expect.element(screen.getByText('protected content')).toBeVisible();
+		expect(gotoMock).not.toHaveBeenCalled();
+		expect(authStore.getUser()).toEqual(user);
+	});
+
+	it('opens the session when the browser cannot store it', async () => {
+		vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+			throw new DOMException('blocked', 'SecurityError');
+		});
+		vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+			throw new DOMException('blocked', 'SecurityError');
+		});
+		vi.spyOn(globalThis, 'fetch').mockImplementation(async () => json(200, user));
+
+		const screen = render(Layout, { children });
+
+		await expect.element(screen.getByText('protected content')).toBeVisible();
+		expect(gotoMock).not.toHaveBeenCalled();
+		expect(authStore.getUser()).toEqual(user);
+	});
+
+	it('goes to /login once on a 401', async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(401, { detail: 'Not authenticated' }));
+
+		const screen = render(Layout, { children });
 
 		await expect.poll(() => gotoMock.mock.calls.length).toBeGreaterThan(0);
+		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(gotoMock).toHaveBeenCalledTimes(1);
 		expect(gotoMock).toHaveBeenCalledWith('/login');
-		expect(fetchSpy).not.toHaveBeenCalled();
+		expect(authStore.getUser()).toBeNull();
+		expect(screen.container.textContent).not.toContain('protected content');
+	});
+
+	it('waits through a 502 without navigating, then opens the session', async () => {
+		let up = false;
+		vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+			up ? json(200, user) : nginx502()
+		);
+
+		const screen = render(Layout, { children });
+
+		await expect.element(screen.getByText('Waiting for the server to respond…')).toBeVisible();
+		expect(gotoMock).not.toHaveBeenCalled();
+		up = true;
+		await expect.element(screen.getByText('protected content')).toBeVisible();
+		expect(gotoMock).not.toHaveBeenCalled();
+		expect(authStore.getUser()).toEqual(user);
 	});
 });

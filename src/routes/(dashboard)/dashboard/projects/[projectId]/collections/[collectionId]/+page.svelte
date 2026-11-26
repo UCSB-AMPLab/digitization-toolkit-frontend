@@ -22,12 +22,13 @@
 	// A testing volume also offers a copy of its pictures to a USB drive, to the
 	// testing account and the administrator (UsbCopyDialog.svelte).
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { authStore, userRole } from '$lib/stores/auth';
+	import { userRole } from '$lib/stores/auth';
+	import { savedUser } from '$lib/stores/session';
 	import {
 		recordsApi,
 		collectionsApi,
@@ -100,13 +101,14 @@
 	// Record inspected in the modal (opened from the export blockers list)
 	let inspectedRecord = $state<Record | null>(null);
 
-	// Mounted before the signed-in user is known (no stored user), the page
-	// loads nothing; the guard sends the browser to sign in, and if the user
-	// becomes known meanwhile the records load then, as on a mount with the
-	// user known.
+	// Mounted before the signed-in user is known (no saved user), the page
+	// loads nothing: the layout's guard asks the backend and sends the browser
+	// to sign in when there is no session (NEH-415), and once the user is
+	// known the records load, as on a mount with the user known. A user saved
+	// beside the sign-out mark counts as none (savedUser, stores/session.ts).
 	let waitingForUser = $state(false);
 	onMount(async () => {
-		if (!authStore.requireSession()) {
+		if (!savedUser()) {
 			waitingForUser = true;
 			return;
 		}

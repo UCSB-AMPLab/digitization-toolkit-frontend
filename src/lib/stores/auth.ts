@@ -1,14 +1,16 @@
 // Global authentication state: the signed-in user and their role. The
 // credential is an httpOnly cookie the backend sets at login (NEH-61); this
-// store never sees it. There is a session when there is a user.
+// store never sees it. There is a session in this tab when there is a user;
+// stores/session.ts decides on arrival whether there is one.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { dropLegacyToken } from './legacy-token';
 import { clearFocusActivity } from '$lib/focus-check';
+import { signedOutHere } from './signed-out';
 
 // Roles in the system. A role the backend adds has to be added here — this
 // is the only place the list lives.
@@ -46,7 +48,8 @@ const AUTH_USER_KEY = 'auth_user';
 
 // The user saved in localStorage is only a hint, so routes can decide without
 // waiting for the backend: (dashboard)/+layout.svelte validates it against
-// /users/me, and only the cookie authenticates.
+// /users/me, and only the cookie authenticates. With no saved user the route
+// guards ask /users/me (stores/session.ts).
 //
 // A browser that still holds an earlier build's token in localStorage starts
 // without a session: the token is removed (stores/legacy-token.ts) and so is
@@ -82,7 +85,11 @@ function createAuthStore() {
 		// screen of a DSLR unit asks for one again (NEH-339). The dashboard's
 		// revalidation of an open session does not, or every return to the
 		// capture screen through the dashboard would ask.
+		// `signIn` is also the one write the sign-out mark does not stop: with
+		// the mark set, any other write (a check of the cookie, a revalidation,
+		// another tab's late answer) is dropped, read at the moment of writing.
 		setSession(user: AuthUser, options: { signIn?: boolean } = {}) {
+			if (!options.signIn && signedOutHere()) return;
 			if (browser) {
 				try {
 					localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
@@ -130,13 +137,13 @@ function createAuthStore() {
 			return get({ subscribe }).user !== null;
 		},
 
-		// Shared guard for routes outside (dashboard) (NEH-66).
-		// (dashboard)/+layout.svelte validates the session fully against
-		// /users/me; routes outside that group (live-preview, the full-screen
-		// volume gallery) do not inherit that check, so they call this guard
-		// instead. Redirects to /login when there is no session, and to
+		// Whether this tab still holds a session, from the user in the store
+		// alone (NEH-66). Redirects to /login when there is none, and to
 		// `fallback` when `roles` does not include the current user's role.
-		// Returns true when the caller can go on mounting the page.
+		// Returns true when the caller can go on. A route deciding on arrival
+		// whether there is a session uses stores/session.ts instead, which asks
+		// the backend when no user is saved (NEH-415); the volume gallery calls
+		// this afterwards, when the store changes while it is open.
 		requireSession(roles?: UserRole[], fallback = '/dashboard'): boolean {
 			const state = get({ subscribe });
 			if (!state.user) {
