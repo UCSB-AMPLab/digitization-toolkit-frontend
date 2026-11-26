@@ -2,8 +2,15 @@
 // fetch, a 5xx, Nginx's 502 while Uvicorn is still booting — means the backend
 // is unavailable (NEH-153). A 429 means the backend's login throttle has
 // locked the account or the client IP after repeated failures (NEH-219).
+// The 429's detail code says which (NEH-274): `account_locked` for the
+// account, `machine_locked` for this device, `account_locked` when both are.
+// The lockout message on the login page and in the change-password dialog
+// comes from describeLockout, which names that lock, or none when the code
+// is missing or not one of the two.
 //
-// Version: 0.3.0
+// Version: 0.4.0
+
+import type { Messages } from './i18n';
 
 export type LoginFailure = 'credentials' | 'throttled' | 'unavailable';
 
@@ -57,4 +64,60 @@ export function retryAfterOf(error: unknown): string | null {
 		return typeof value === 'string' ? value : null;
 	}
 	return null;
+}
+
+export type LockKind = 'account' | 'device' | 'unknown';
+
+type LockoutMessages = Pick<
+	Messages,
+	| 'login_error_locked_out'
+	| 'login_error_locked_out_unknown'
+	| 'login_error_account_locked'
+	| 'login_error_account_locked_unknown'
+	| 'login_error_device_locked'
+	| 'login_error_device_locked_unknown'
+>;
+
+// The lock a 429 names, from its `detail.code`, read off an ApiError-shaped
+// error without importing api.ts.
+function lockOf(error: unknown): LockKind {
+	const detail = (error as { detail?: unknown } | null)?.detail;
+	const code =
+		typeof detail === 'object' && detail !== null ? (detail as { code?: unknown }).code : undefined;
+	if (code === 'account_locked') return 'account';
+	if (code === 'machine_locked') return 'device';
+	return 'unknown';
+}
+
+// Which lock a 429 names and the text to show for it, with the wait in
+// minutes from Retry-After, or the text without a figure when there is none.
+export function describeLockout(
+	error: unknown,
+	msgs: LockoutMessages
+): { lock: LockKind; text: string } {
+	const lock = lockOf(error);
+	const minutes = lockoutMinutes(retryAfterOf(error));
+	if (lock === 'account') {
+		return {
+			lock,
+			text:
+				minutes === null
+					? msgs.login_error_account_locked_unknown
+					: msgs.login_error_account_locked(minutes)
+		};
+	}
+	if (lock === 'device') {
+		return {
+			lock,
+			text:
+				minutes === null
+					? msgs.login_error_device_locked_unknown
+					: msgs.login_error_device_locked(minutes)
+		};
+	}
+	return {
+		lock,
+		text:
+			minutes === null ? msgs.login_error_locked_out_unknown : msgs.login_error_locked_out(minutes)
+	};
 }

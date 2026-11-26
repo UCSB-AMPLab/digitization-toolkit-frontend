@@ -1,7 +1,7 @@
 // NEH-219: after repeated failures /auth/login returns 429 with Retry-After
 // in seconds. The login page says how long to wait, in whole minutes.
 //
-// Version: 0.1.0-beta
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
@@ -29,6 +29,15 @@ function respondToLogin(response: () => Response) {
 function throttled(headers: Record<string, string>) {
 	return new Response(
 		JSON.stringify({ detail: 'Too many failed login attempts. Try again later.' }),
+		{ status: 429, headers: { 'Content-Type': 'application/json', ...headers } }
+	);
+}
+
+function locked(code: string, headers: Record<string, string>) {
+	return new Response(
+		JSON.stringify({
+			detail: { code, message: 'Too many failed login attempts. Try again later.' }
+		}),
 		{ status: 429, headers: { 'Content-Type': 'application/json', ...headers } }
 	);
 }
@@ -81,5 +90,60 @@ describe('login lockout message', () => {
 		await expect
 			.element(screen.getByRole('alert'))
 			.toHaveTextContent('Too many failed attempts. Wait a few minutes before trying again.');
+	});
+
+	it('names the account when the account is locked', async () => {
+		respondToLogin(() => locked('account_locked', { 'Retry-After': '241' }));
+		const screen = render(LoginPage);
+
+		await submit(screen);
+
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent(
+				'Too many failed attempts for this account. Wait 5 minutes before trying again.'
+			);
+	});
+
+	it('names the device when this device is locked', async () => {
+		respondToLogin(() => locked('machine_locked', { 'Retry-After': '45' }));
+		const screen = render(LoginPage);
+
+		await submit(screen);
+
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent(
+				'Too many failed attempts from this device. Wait 1 minute before trying again. Until then, no one can sign in here.'
+			);
+	});
+
+	it('names the device without a figure when Retry-After is missing', async () => {
+		respondToLogin(() => locked('machine_locked', {}));
+		const screen = render(LoginPage);
+
+		await submit(screen);
+
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent(
+				'Too many failed attempts from this device. Wait a few minutes before trying again. Until then, no one can sign in here.'
+			);
+	});
+
+	it('names the account in Spanish', async () => {
+		locale.set('es');
+		respondToLogin(() => locked('account_locked', { 'Retry-After': '600' }));
+		const screen = render(LoginPage);
+
+		await screen.getByLabelText('Usuario').fill('operator1');
+		await screen.getByLabelText('Contraseña', { exact: true }).fill('wrong-password');
+		await screen.getByRole('button', { name: 'Iniciar sesión' }).click();
+
+		await expect
+			.element(screen.getByRole('alert'))
+			.toHaveTextContent(
+				'Demasiados intentos fallidos con esta cuenta. Espera 10 minutos e intenta de nuevo.'
+			);
 	});
 });
