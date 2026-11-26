@@ -13,7 +13,7 @@
 //   - Text that is the same in every language (brand names, acronyms, units)
 //     is not catalogued: it stays in the component.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import { formatCount } from '../format-count';
 import { formatBytes } from '../format-bytes';
@@ -87,6 +87,18 @@ export const es = {
 			: `Demasiados intentos fallidos. Espera ${minutes} minutos e intenta de nuevo.`,
 	login_error_locked_out_unknown:
 		'Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.',
+	login_error_account_locked: (minutes: number) =>
+		minutes === 1
+			? 'Demasiados intentos fallidos con esta cuenta. Espera 1 minuto e intenta de nuevo.'
+			: `Demasiados intentos fallidos con esta cuenta. Espera ${minutes} minutos e intenta de nuevo.`,
+	login_error_account_locked_unknown:
+		'Demasiados intentos fallidos con esta cuenta. Espera unos minutos e intenta de nuevo.',
+	login_error_device_locked: (minutes: number) =>
+		minutes === 1
+			? 'Demasiados intentos fallidos desde este dispositivo. Espera 1 minuto e intenta de nuevo. Mientras tanto, nadie puede iniciar sesión aquí.'
+			: `Demasiados intentos fallidos desde este dispositivo. Espera ${minutes} minutos e intenta de nuevo. Mientras tanto, nadie puede iniciar sesión aquí.`,
+	login_error_device_locked_unknown:
+		'Demasiados intentos fallidos desde este dispositivo. Espera unos minutos e intenta de nuevo. Mientras tanto, nadie puede iniciar sesión aquí.',
 
 	// ── Session ──────────────────────────────────────────────────────────────
 	session_validating: 'Verificando sesión…',
