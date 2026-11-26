@@ -47,7 +47,7 @@ const TABLE: [string, (string | number)[], string, string][] = [
 	[
 		'adopt_plan_summary',
 		[7, 14, 2, 'Fuente A', 'Destino B'],
-		'Captua moverá 7 registros, con 14 imágenes y 2 grupos de fotos de la carta de color, de Fuente A a Destino B.',
+		'Captua moverá 7 registros, con 14 imágenes y 2 grupos de fotos de la tarjeta de color, de Fuente A a Destino B.',
 		'Captua will move 7 records, with 14 images and 2 groups of color card shots, from Fuente A to Destino B.'
 	],
 	[
@@ -177,19 +177,19 @@ const TABLE: [string, (string | number)[], string, string][] = [
 	[
 		'adopt_err_open_set',
 		['Fuente A'],
-		'En Fuente A hay un grupo de fotos de la carta de color sin terminar.',
+		'En Fuente A hay un grupo de fotos de la tarjeta de color sin terminar.',
 		'A group of color card shots in Fuente A is not finished.'
 	],
 	[
 		'adopt_err_open_set_do',
 		['Fuente A'],
-		'Primero toma u omite las fotos de la carta de color de Fuente A.',
+		'Primero toma u omite las fotos de la tarjeta de color de Fuente A.',
 		'Take or skip the color card shots of Fuente A first.'
 	],
 	[
 		'adopt_err_target_not_empty',
 		['Destino B'],
-		'Destino B no está vacío: tiene registros, imágenes o grupos de fotos de la carta de color, tomados u omitidos, o ya se capturó en él.',
+		'Destino B no está vacío: tiene registros, imágenes o grupos de fotos de la tarjeta de color, tomados u omitidos, o ya se capturó en él.',
 		'Destino B is not empty: it has records, images or groups of color card shots, taken or skipped, or captures were taken in it before.'
 	],
 	['adopt_err_target_not_empty_do', [], 'Elige un volumen vacío.', 'Choose an empty volume.'],
@@ -256,7 +256,7 @@ const TABLE: [string, (string | number)[], string, string][] = [
 	[
 		'adopt_err_file_missing',
 		['Fuente A'],
-		'Faltan en este equipo algunos archivos de las imágenes o de las fotos de la carta de color de Fuente A.',
+		'Faltan en este equipo algunos archivos de las imágenes o de las fotos de la tarjeta de color de Fuente A.',
 		'Some files of the images or color card shots of Fuente A are not on this unit.'
 	],
 	[
@@ -292,7 +292,7 @@ const TABLE: [string, (string | number)[], string, string][] = [
 	[
 		'adopt_err_unowned_files',
 		['Fuente A'],
-		'En las carpetas de Fuente A hay archivos que no son de ninguna de sus imágenes ni de sus fotos de la carta de color.',
+		'En las carpetas de Fuente A hay archivos que no son de ninguna de sus imágenes ni de sus fotos de la tarjeta de color.',
 		'The folders of Fuente A hold files that belong to none of its images or color card shots.'
 	],
 	[
@@ -317,7 +317,7 @@ const TABLE: [string, (string | number)[], string, string][] = [
 	[
 		'adopt_done_summary',
 		[7, 14, 2, 'Fuente A', 'Destino B'],
-		'Captua movió 7 registros, con 14 imágenes y 2 grupos de fotos de la carta de color, de Fuente A a Destino B.',
+		'Captua movió 7 registros, con 14 imágenes y 2 grupos de fotos de la tarjeta de color, de Fuente A a Destino B.',
 		'Captua moved 7 records, with 14 images and 2 groups of color card shots, from Fuente A to Destino B.'
 	],
 	[
@@ -524,7 +524,7 @@ describe('adoption strings', () => {
 
 	it('writes the singular of each count in the words of its plural', () => {
 		expect(es.adopt_plan_summary(1, 1, 1, 'A', 'B')).toBe(
-			'Captua moverá 1 registro, con 1 imagen y 1 grupo de fotos de la carta de color, de A a B.'
+			'Captua moverá 1 registro, con 1 imagen y 1 grupo de fotos de la tarjeta de color, de A a B.'
 		);
 		expect(en.adopt_plan_summary(1, 1, 1, 'A', 'B')).toBe(
 			'Captua will move 1 record, with 1 image and 1 group of color card shots, from A to B.'
@@ -536,7 +536,7 @@ describe('adoption strings', () => {
 			'Captua will move 2 records, with 1 image, from A to B.'
 		);
 		expect(es.adopt_done_summary(1, 1, 1, 'A', 'B')).toBe(
-			'Captua movió 1 registro, con 1 imagen y 1 grupo de fotos de la carta de color, de A a B.'
+			'Captua movió 1 registro, con 1 imagen y 1 grupo de fotos de la tarjeta de color, de A a B.'
 		);
 		expect(en.adopt_done_summary(1, 1, 1, 'A', 'B')).toBe(
 			'Captua moved 1 record, with 1 image and 1 group of color card shots, from A to B.'

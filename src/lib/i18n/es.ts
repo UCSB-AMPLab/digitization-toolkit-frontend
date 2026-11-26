@@ -2784,31 +2784,31 @@ export const es = {
 	network_not_received_body: 'Presiona "Reintentar" para enviarla de nuevo.',
 
 	// ── Colour card shots (NEH-340) ──────────────────────────────────────────
-	cc_title: 'Carta de color',
-	cc_heading: 'Toma las fotos de la carta de color',
+	cc_title: 'Tarjeta de color',
+	cc_heading: 'Toma las fotos de la tarjeta de color',
 	cc_reason_start:
-		'Este volumen todavía no tiene páginas. Antes de capturar la primera, toma una foto de la carta de color con cada cámara.',
+		'Este volumen todavía no tiene páginas. Antes de capturar la primera, toma una foto de la tarjeta de color con cada cámara.',
 	cc_reason_begun_without:
-		'Este volumen ya tiene páginas, pero no tiene fotos de la carta de color. Tómalas ahora con cada cámara.',
+		'Este volumen ya tiene páginas, pero no tiene fotos de la tarjeta de color. Tómalas ahora con cada cámara.',
 	cc_reason_settings_changed:
-		'Después de las últimas fotos de la carta de color se cambió la configuración de las cámaras. Tómalas de nuevo con cada cámara.',
+		'Después de las últimas fotos de la tarjeta de color se cambió la configuración de las cámaras. Tómalas de nuevo con cada cámara.',
 	cc_how:
-		'Pon la carta bajo cada cámara, con la misma luz que usas para las páginas, y tómale una foto.',
+		'Pon la tarjeta de color bajo cada cámara, con la misma luz que usas para las páginas, y tómale una foto.',
 	cc_take: 'Tomar foto',
 	cc_take_again: 'Tomar de nuevo',
 	cc_taking: 'Tomando la foto…',
 	cc_no_shot: 'Todavía no hay foto',
 	cc_shot_raw: 'La foto quedó guardada. Es un archivo RAW y no se puede mostrar aquí.',
 	cc_shot_unshown: 'La foto quedó guardada, pero Captua no pudo mostrarla aquí.',
-	cc_shot_alt: (camera: string) => `Foto de la carta de color tomada con ${camera}`,
+	cc_shot_alt: (camera: string) => `Foto de la tarjeta de color tomada con ${camera}`,
 	cc_continue: 'Continuar',
 	cc_skip: 'Omitir',
-	cc_skip_title: '¿Omitir las fotos de la carta de color?',
+	cc_skip_title: '¿Omitir las fotos de la tarjeta de color?',
 	cc_skip_body:
-		'Captua le pondrá a este volumen una marca que indica que no tiene fotos de la carta de color.',
+		'Captua le pondrá a este volumen una marca que indica que no tiene fotos de la tarjeta de color.',
 	cc_skip_confirm: 'Omitir las fotos',
-	cc_opening: 'Captua está preparando las fotos de la carta de color…',
-	cc_needed: 'Toma u omite las fotos de la carta de color antes de capturar.',
+	cc_opening: 'Captua está preparando las fotos de la tarjeta de color…',
+	cc_needed: 'Toma u omite las fotos de la tarjeta de color antes de capturar.',
 	cc_err_camera_busy:
 		'Esta cámara está tomando otra foto. Espera un momento y vuelve a intentarlo.',
 	cc_err_not_connected: (camera: string) =>
@@ -2816,21 +2816,21 @@ export const es = {
 	cc_err_capture_failed: (camera: string) =>
 		`No se tomó ninguna foto con ${camera}. Vuelve a intentarlo con esa cámara.`,
 	cc_err_set_gone:
-		'En otra pantalla ya se tomaron u omitieron estas fotos de la carta de color. Esta pantalla muestra ahora lo que hay en el equipo.',
+		'En otra pantalla ya se tomaron u omitieron estas fotos de la tarjeta de color. Esta pantalla muestra ahora lo que hay en el equipo.',
 	cc_err_shots_missing: 'Antes de continuar, toma una foto con cada cámara.',
 	cc_err_volume_gone: 'Este volumen ya no está en el equipo.',
 	cc_err_timeout:
 		'Captua no recibió a tiempo el resultado de la foto. Esta pantalla muestra ahora lo que hay en el equipo.',
-	cc_err_unread: 'Captua no pudo leer las fotos de la carta de color de este volumen.',
+	cc_err_unread: 'Captua no pudo leer las fotos de la tarjeta de color de este volumen.',
 	cc_err_failed: 'La solicitud no se completó. Vuelve a intentarlo.',
 	cc_err_busy: 'Espera a que termine la captura en curso y vuelve a intentarlo.',
-	cc_flag_none: 'Sin fotos de la carta de color',
-	cc_flag_skipped: 'Fotos de la carta de color omitidas',
+	cc_flag_none: 'Sin fotos de la tarjeta de color',
+	cc_flag_skipped: 'Fotos de la tarjeta de color omitidas',
 	cc_flag_title:
-		'Captua envía este volumen a Fisqua con una marca que indica que no tiene fotos de la carta de color.',
-	cc_sets_open: 'Fotos de la carta de color',
-	cc_sets_title: 'Fotos de la carta de color',
-	cc_sets_empty: 'Este volumen no tiene fotos de la carta de color.',
+		'Captua envía este volumen a Fisqua con una marca que indica que no tiene fotos de la tarjeta de color.',
+	cc_sets_open: 'Fotos de la tarjeta de color',
+	cc_sets_title: 'Fotos de la tarjeta de color',
+	cc_sets_empty: 'Este volumen no tiene fotos de la tarjeta de color.',
 	cc_set_heading: (n: number, date: string) => `Grupo ${n} · ${date}`,
 	cc_set_by: (name: string) => `Por ${name}`,
 	cc_outcome_taken: 'Tomadas',
@@ -2850,9 +2850,9 @@ export const es = {
 	cc_reason_unverified: 'todavía no se pudo verificar la copia de un archivo',
 	cc_reason_file_missing: 'falta en el equipo un archivo de las fotos',
 	cc_reason_upload_refused: 'la copia externa rechazó una de las fotos',
-	cc_setting_label: 'Pedir fotos de la carta de color',
+	cc_setting_label: 'Pedir fotos de la tarjeta de color',
 	cc_setting_desc:
-		'Con esta opción activada, la pantalla de captura pide una foto de la carta de color con cada cámara al empezar cada volumen y cada vez que se cambia la configuración de las cámaras. Captua envía a Fisqua los volúmenes que se capturen con la opción desactivada, con una marca que indica que no tienen fotos de la carta de color.',
+		'Con esta opción activada, la pantalla de captura pide una foto de la tarjeta de color con cada cámara al empezar cada volumen y cada vez que se cambia la configuración de las cámaras. Captua envía a Fisqua los volúmenes que se capturen con la opción desactivada, con una marca que indica que no tienen fotos de la tarjeta de color.',
 	cc_setting_error: 'Captua no pudo guardar el cambio. Vuelve a intentarlo.',
 
 	// ── Moving a hand-made volume's captures into a volume from Fisqua (NEH-419),
@@ -2873,7 +2873,7 @@ export const es = {
 		source: string,
 		target: string
 	): string =>
-		`Captua moverá ${adoptRecordsEs(records)}, con ${adoptImagesEs(images)} y ${adoptGroupsEs(sets)} de fotos de la carta de color, de ${source} a ${target}.`,
+		`Captua moverá ${adoptRecordsEs(records)}, con ${adoptImagesEs(images)} y ${adoptGroupsEs(sets)} de fotos de la tarjeta de color, de ${source} a ${target}.`,
 	adopt_plan_summary_no_sets: (
 		records: number,
 		images: number,
@@ -2913,11 +2913,11 @@ export const es = {
 	adopt_err_sub_volumes: (source: string): string => `${source} contiene otros volúmenes.`,
 	adopt_err_no_images: (source: string): string => `${source} no tiene imágenes para mover.`,
 	adopt_err_open_set: (source: string): string =>
-		`En ${source} hay un grupo de fotos de la carta de color sin terminar.`,
+		`En ${source} hay un grupo de fotos de la tarjeta de color sin terminar.`,
 	adopt_err_open_set_do: (source: string): string =>
-		`Primero toma u omite las fotos de la carta de color de ${source}.`,
+		`Primero toma u omite las fotos de la tarjeta de color de ${source}.`,
 	adopt_err_target_not_empty: (target: string): string =>
-		`${target} no está vacío: tiene registros, imágenes o grupos de fotos de la carta de color, tomados u omitidos, o ya se capturó en él.`,
+		`${target} no está vacío: tiene registros, imágenes o grupos de fotos de la tarjeta de color, tomados u omitidos, o ya se capturó en él.`,
 	adopt_err_target_not_empty_do: 'Elige un volumen vacío.',
 	adopt_err_target_names_held: (target: string): string =>
 		`En la copia externa ya hay archivos con los nombres de archivo de ${target}, así que Captua no puede subir las capturas con esos nombres.`,
@@ -2938,7 +2938,7 @@ export const es = {
 	adopt_err_outside_own_folder: (source: string): string =>
 		`Algunos archivos de ${source} no están en la carpeta propia del volumen.`,
 	adopt_err_file_missing: (source: string): string =>
-		`Faltan en este equipo algunos archivos de las imágenes o de las fotos de la carta de color de ${source}.`,
+		`Faltan en este equipo algunos archivos de las imágenes o de las fotos de la tarjeta de color de ${source}.`,
 	adopt_err_not_verified: (source: string): string =>
 		`Todavía hay archivos de ${source} sin verificar en la copia externa.`,
 	adopt_err_not_verified_do: 'Espera a que Captua termine de copiarlos y vuelve a intentarlo.',
@@ -2949,7 +2949,7 @@ export const es = {
 	adopt_err_thumbnail_shared: (source: string): string =>
 		`Dos imágenes de ${source} comparten una miniatura, así que Captua no puede mover esa miniatura con las dos imágenes.`,
 	adopt_err_unowned_files: (source: string): string =>
-		`En las carpetas de ${source} hay archivos que no son de ninguna de sus imágenes ni de sus fotos de la carta de color.`,
+		`En las carpetas de ${source} hay archivos que no son de ninguna de sus imágenes ni de sus fotos de la tarjeta de color.`,
 	adopt_err_name_taken:
 		'Algunos de los nombres de archivo nuevos ya están en uso en este equipo o en la copia externa.',
 	adopt_err_volume_held:
@@ -2963,7 +2963,7 @@ export const es = {
 		source: string,
 		target: string
 	): string =>
-		`Captua movió ${adoptRecordsEs(records)}, con ${adoptImagesEs(images)} y ${adoptGroupsEs(sets)} de fotos de la carta de color, de ${source} a ${target}.`,
+		`Captua movió ${adoptRecordsEs(records)}, con ${adoptImagesEs(images)} y ${adoptGroupsEs(sets)} de fotos de la tarjeta de color, de ${source} a ${target}.`,
 	adopt_done_summary_no_sets: (
 		records: number,
 		images: number,
