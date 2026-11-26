@@ -109,12 +109,18 @@ describe('Conectar con Fisqua: before a code', () => {
 
 	it('sends the name and shows the code it gets back', async () => {
 		const { getSpy } = mount(status());
-		const post = vi
-			.spyOn(systemApi, 'startPairing')
-			.mockResolvedValue(status({ state: 'requesting', unitName: 'Sala 2' }));
+		const requesting = status({ state: 'requesting', unitName: 'Sala 2' });
+		// Once POST is called the backend is requesting, so GET answers the same.
+		const post = vi.spyOn(systemApi, 'startPairing').mockImplementation(async () => {
+			getSpy.mockResolvedValue(requesting);
+			return requesting;
+		});
 		await userEvent.fill(nameInput(), '  Sala 2 ');
 		await userEvent.click(getCode());
 		await vi.waitFor(() => expect(post).toHaveBeenCalledWith('Sala 2'));
+		// Polls after POST leave the card requesting.
+		const sent = getSpy.mock.calls.length;
+		await vi.waitFor(() => expect(getSpy.mock.calls.length).toBeGreaterThan(sent + 1));
 		await expect.element(page.getByText(es.fisqua_link_requesting)).toBeInTheDocument();
 		getSpy.mockResolvedValue(
 			status({ state: 'showing', code: 'ABCDEF', expiresInSeconds: 290, unitName: 'Sala 2' })
