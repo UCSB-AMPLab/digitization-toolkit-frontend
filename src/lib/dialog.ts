@@ -17,7 +17,7 @@
 // how many were opened over a given one, so that a screen's capture key acts
 // only while nothing covers it.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import { writable, type Readable } from 'svelte/store';
 
@@ -88,8 +88,15 @@ export function dismissible(node: HTMLElement, options: DismissOptions) {
 // Moves a dialog to <body>. A `position: fixed` dialog rendered inside a
 // stacking context (an element with a z-index, a transform or a filter) is
 // painted at that context's level, so the page around it can cover it.
+// Moving an element drops the focus of a control inside it to <body>, and
+// Svelte runs a card's `trapFocus` before its backdrop's `toBody`, so the
+// control inside that had the focus gets it back once the node is moved
+// (NEH-423).
 export function toBody(node: HTMLElement) {
+	const active = document.activeElement;
+	const held = active instanceof HTMLElement && node.contains(active) ? active : null;
 	document.body.appendChild(node);
+	if (held && document.activeElement !== held) held.focus();
 	return {
 		destroy() {
 			node.remove();

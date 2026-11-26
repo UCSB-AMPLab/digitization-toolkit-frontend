@@ -1,8 +1,9 @@
 // `dismissible`: Escape goes to the most recently opened dialog only, a
 // dialog can refuse it while closing would lose something, and only a click
-// on the backdrop itself counts.
+// on the backdrop itself counts. `toBody`: a dialog moved to <body> leaves
+// the focus on the control inside it that had it.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
 import {
@@ -11,6 +12,7 @@ import {
 	dismissible,
 	openDialogCount,
 	openDialogsOutside,
+	toBody,
 	trapFocus,
 	type DismissOptions
 } from './dialog';
@@ -301,5 +303,25 @@ describe('the open-dialog registry', () => {
 		mine.destroy();
 		// An element in no open dialog has every open dialog above it.
 		expect(dialogsAbove(document.body)).toBe(1);
+	});
+});
+
+describe('toBody (NEH-423)', () => {
+	it('moves the node to <body> and leaves the focus on the control inside that had it', () => {
+		const host = document.createElement('div');
+		const backdrop = document.createElement('div');
+		const input = document.createElement('input');
+		backdrop.append(input);
+		host.append(backdrop);
+		document.body.append(host);
+		input.focus();
+		expect(document.activeElement).toBe(input);
+
+		const moved = toBody(backdrop);
+		expect(backdrop.parentElement).toBe(document.body);
+		expect(document.activeElement).toBe(input);
+
+		moved.destroy();
+		host.remove();
 	});
 });

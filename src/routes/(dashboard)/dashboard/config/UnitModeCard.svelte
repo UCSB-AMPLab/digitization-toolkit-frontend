@@ -24,12 +24,12 @@
 	// GET /system/unit does not say who set the mode or when, so the board's
 	// "set by" line is left out.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount, tick } from 'svelte';
 	import { m } from '$lib/i18n';
 	import { systemApi } from '$lib/api';
-	import { dismissible, toBody } from '$lib/dialog';
+	import { dismissible, toBody, trapFocus } from '$lib/dialog';
 	import {
 		UNIT_MODES,
 		ensureUnit,
@@ -254,6 +254,7 @@
 			aria-modal="true"
 			aria-labelledby="kept-volumes-title"
 			aria-describedby="kept-volumes-desc"
+			use:trapFocus
 		>
 			<h3 class="confirm-title" id="kept-volumes-title">{$m.unit_kept_title}</h3>
 			<p class="confirm-desc" id="kept-volumes-desc">
@@ -295,6 +296,7 @@
 			aria-modal="true"
 			aria-labelledby="leave-fisqua-title"
 			aria-describedby="leave-fisqua-desc"
+			use:trapFocus
 		>
 			<h3 class="confirm-title" id="leave-fisqua-title">{$m.unit_leave_fisqua_title}</h3>
 			<p class="confirm-desc" id="leave-fisqua-desc">{$m.unit_leave_fisqua_body}</p>

@@ -7,7 +7,7 @@
 // backend reports, never its English. While set-up is needed nothing
 // dismisses the screen; opened by hand, "Cancel" and Escape do.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';
@@ -650,5 +650,14 @@ describe('WhichCamera: leaving the capture screen', () => {
 		renderWhich({ cancellable: true, setup: setup([]) });
 		await settle();
 		expect(button(en.camwhich_leave)).toBeNull();
+	});
+});
+
+describe('WhichCamera: the keyboard focus', () => {
+	it('is inside the question once it opens (NEH-423)', async () => {
+		renderWhich();
+		await settle();
+		expect(view()).not.toBeNull();
+		expect(view()!.contains(document.activeElement)).toBe(true);
 	});
 });

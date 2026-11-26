@@ -9,7 +9,7 @@
 // shots take the capture screen's one gate. Nothing dismisses the step, and
 // Tab stays in it, the banner's Reload included.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -514,5 +514,24 @@ describe('the colour card step', () => {
 		expect(seen.has(take(1)!)).toBe(true);
 		expect(seen.has(take(0)!)).toBe(true);
 		expect(seen.has(skipBtn().element())).toBe(true);
+	});
+});
+
+describe('the colour card step: the keyboard focus', () => {
+	it('is inside the step once it opens (NEH-423)', async () => {
+		vi.spyOn(colourCardApi, 'openSet').mockResolvedValue(openSet() as never);
+		render(ColourCardStep, props());
+		await expect.poll(() => take(1)).not.toBeNull();
+		await expect.poll(() => step()?.contains(document.activeElement)).toBe(true);
+	});
+
+	it('is inside the Skip confirmation once it opens (NEH-423)', async () => {
+		vi.spyOn(colourCardApi, 'openSet').mockResolvedValue(openSet() as never);
+		render(ColourCardStep, props());
+		await expect.poll(() => take(1)).not.toBeNull();
+		await skipBtn().click();
+		const confirm = page.getByRole('dialog', { name: en.cc_skip_title });
+		await expect.element(confirm).toBeVisible();
+		await expect.poll(() => confirm.element().contains(document.activeElement)).toBe(true);
 	});
 });

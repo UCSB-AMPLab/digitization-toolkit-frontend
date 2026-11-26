@@ -2,7 +2,7 @@
 // the free and restore actions. POST /keep-on-unit and /release-from-unit
 // are mocked.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -167,5 +167,21 @@ describe('VolumeKeptActions', () => {
 			page.getByRole('dialog').getByRole('button', { name: es.kept_keep_action })
 		);
 		await expect.element(page.getByRole('alert')).toHaveTextContent(es.kept_err_already_left);
+	});
+});
+
+describe('VolumeKeptActions: the keyboard focus', () => {
+	it('is inside the confirmation once it opens (NEH-423)', async () => {
+		render(VolumeKeptActions, {
+			collectionId: 7,
+			offsite: kept(),
+			isAdmin: true,
+			mode: 'fisqua',
+			onChanged: vi.fn()
+		});
+		await userEvent.click(button(es.kept_release_action));
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog.getByText(es.kept_release_body)).toBeInTheDocument();
+		await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
 	});
 });

@@ -5,7 +5,7 @@
 // The focus mode each camera reports is read every 3 s on the first and last
 // stages, never while a test capture runs.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';
@@ -889,5 +889,15 @@ describe('RefocusModal: the capture gate', () => {
 		answers[1].reject(failure(504));
 		await settle();
 		expect(captureGate.isBusy()).toBe(false);
+	});
+});
+
+describe('RefocusModal: the keyboard focus', () => {
+	it('is inside the dialog once it opens (NEH-413, NEH-423)', async () => {
+		renderModal();
+		await settle();
+		const dialog = document.querySelector('[role="dialog"]');
+		expect(dialog).not.toBeNull();
+		expect(dialog!.contains(document.activeElement)).toBe(true);
 	});
 });
