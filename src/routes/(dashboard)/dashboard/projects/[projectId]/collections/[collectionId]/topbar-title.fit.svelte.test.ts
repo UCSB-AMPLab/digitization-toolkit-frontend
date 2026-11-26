@@ -8,7 +8,10 @@
 // it is shortened, and the full title stays in the element (its text, its
 // `title`) and the element can take keyboard focus. With the offsite copy
 // line and the Fisqua line both under the breadcrumb, the same holds, and
-// every status line is inside the bar.
+// every status line is inside the bar. The bar is measured only once its
+// two fonts are loaded (NEH-426): until the icon font arrives, Capture's icon
+// is drawn as the word "photo_camera", about 82 px wider, and at 800 px the
+// controls no longer fit.
 //
 // Version: 0.3.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -95,6 +98,22 @@ const box = (el: Element) => el.getBoundingClientRect();
 const overlap = (a: DOMRect, b: DOMRect) =>
 	Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 &&
 	Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
+
+// The fonts the bar is drawn in (app.css), each with text it shows.
+const FONTS = [
+	['18px "Material Symbols Outlined"', 'photo_camera'],
+	['14px Mulish', 'Volumen de prueba']
+] as const;
+
+beforeEach(async () => {
+	// Requested here, so that a font no part of the page has used yet is
+	// loaded too; `document.fonts.ready` would not wait for it.
+	for (const [spec, text] of FONTS)
+		expect((await document.fonts.load(spec, text)).length, spec).toBeGreaterThan(0);
+	await expect
+		.poll(() => FONTS.filter(([spec, text]) => !document.fonts.check(spec, text)))
+		.toEqual([]);
+});
 
 beforeEach(() => {
 	resetUnit();
