@@ -13,11 +13,11 @@
 	// kept_volumes.keep and release); the confirmation says so.
 	// ============================================================================
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { collectionsApi, type VolumeOffsiteState } from '$lib/api';
 	import { m } from '$lib/i18n';
-	import { dismissible, toBody } from '$lib/dialog';
+	import { dismissible, toBody, trapFocus } from '$lib/dialog';
 	import { keptActionErrorText, keptActionOf } from '$lib/kept-volumes';
 	import type { UnitMode } from '$lib/unit-mode';
 
@@ -87,6 +87,7 @@
 			aria-modal="true"
 			aria-labelledby="kept-title"
 			aria-describedby="kept-desc"
+			use:trapFocus
 		>
 			<h3 class="kept-title" id="kept-title">
 				{action === 'release' ? $m.kept_release_title : $m.kept_keep_title}

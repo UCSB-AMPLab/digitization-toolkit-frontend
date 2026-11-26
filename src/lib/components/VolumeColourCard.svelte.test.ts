@@ -6,7 +6,7 @@
 // cannot be shown, and where a taken set is on its way offsite. Nothing with
 // the setting off; a reviewer gets the flag only.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -173,5 +173,20 @@ describe('VolumeColourCard', () => {
 		});
 		expect(container.textContent?.trim()).toBe('');
 		expect(read).not.toHaveBeenCalled();
+	});
+});
+
+describe('VolumeColourCard: the keyboard focus', () => {
+	it('is inside the list of sets once it opens (NEH-423)', async () => {
+		vi.spyOn(colourCardApi, 'state').mockResolvedValue(STATE);
+		render(VolumeColourCard, {
+			collectionId: 7,
+			summary: { enabled: true, status: 'skipped', sets: 1 },
+			canOpen: true
+		});
+		await openBtn().click();
+		const dialog = page.getByRole('dialog', { name: en.cc_sets_title });
+		await expect.element(dialog).toBeVisible();
+		await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
 	});
 });

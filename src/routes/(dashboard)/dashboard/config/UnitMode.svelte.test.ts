@@ -4,7 +4,7 @@
 // and a refused switch shown as translated lines with the mode the unit
 // stays in. GET and PUT /system/unit are mocked.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -363,6 +363,28 @@ describe('Modo del equipo', () => {
 				.element(page.getByText(es.unit_problem_offsite_not_configured))
 				.toBeInTheDocument();
 			expect(screen.container.textContent).not.toContain('English');
+		});
+	});
+
+	describe('the keyboard focus (NEH-423)', () => {
+		it('is inside the confirmation for leaving Fisqua mode once it opens', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('fisqua') as never);
+			render(UnitModeCard);
+			await userEvent.click(radio('Solo copia externa'));
+			await userEvent.click(save());
+			const dialog = page.getByRole('dialog');
+			await expect.element(dialog.getByText(es.unit_leave_fisqua_title)).toBeInTheDocument();
+			await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
+		});
+
+		it('is inside the kept volumes question once it opens', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(withKept('offline') as never);
+			render(UnitModeCard);
+			await userEvent.click(radio('Solo copia externa'));
+			await userEvent.click(save());
+			const dialog = page.getByRole('dialog');
+			await expect.element(dialog.getByText(es.unit_kept_title)).toBeInTheDocument();
+			await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
 		});
 	});
 });

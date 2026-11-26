@@ -18,11 +18,11 @@
 	// the account menu are stacking contexts, and a fixed overlay inside one
 	// could be covered by the page underneath.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { m } from '$lib/i18n';
 	import { systemApi, healthApi, PowerControlError, type PowerAction } from '$lib/api';
-	import { dismissible, toBody } from '$lib/dialog';
+	import { dismissible, toBody, trapFocus } from '$lib/dialog';
 	import { holdPowerControlOpen, holdRestartAwaited } from '$lib/stores/power';
 
 	let { onError }: { onError?: (message: string | null) => void } = $props();
@@ -129,6 +129,7 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="power-confirm-title"
+			use:trapFocus
 		>
 			<h3 class="confirm-title" id="power-confirm-title">{confirmTitle}</h3>
 			<p class="confirm-desc">{confirmDesc}</p>
@@ -157,6 +158,7 @@
 			aria-modal="true"
 			aria-labelledby="power-error-title"
 			aria-describedby="power-error-desc"
+			use:trapFocus
 		>
 			<h3 class="confirm-title" id="power-error-title">{$m.config_section_power}</h3>
 			<p class="confirm-desc" id="power-error-desc">{error}</p>

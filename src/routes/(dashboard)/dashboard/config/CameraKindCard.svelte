@@ -20,11 +20,13 @@
 	//
 	// Operators and reviewers see the facts and no control. A backend
 	// without the route (404) shows nothing.
+	//
+	// Version: 0.4.0
 
 	import { onMount } from 'svelte';
 	import { m } from '$lib/i18n';
 	import { cameraKindApi, type CameraKindChange } from '$lib/api';
-	import { dismissible, toBody } from '$lib/dialog';
+	import { dismissible, toBody, trapFocus } from '$lib/dialog';
 	import { authStore } from '$lib/stores/auth';
 	import { opensUnitSettings } from '$lib/unit-mode';
 	import {
@@ -243,6 +245,7 @@
 			aria-modal="true"
 			aria-labelledby="camera-kind-confirm-title"
 			aria-describedby="camera-kind-confirm-desc"
+			use:trapFocus
 		>
 			<h3 class="confirm-title" id="camera-kind-confirm-title">{$m.camera_kind_confirm_title}</h3>
 			<p class="confirm-desc" id="camera-kind-confirm-desc">{$m.camera_kind_confirm_body}</p>

@@ -41,7 +41,7 @@
 	// and the sidebar, which are stacking contexts. The keyboard stays in it
 	// (trapFocus).
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onDestroy, onMount } from 'svelte';
 	import { authStore } from '$lib/stores/auth';
@@ -55,7 +55,7 @@
 		passwordTooShort,
 		isPasswordTooShortRefusal
 	} from '$lib/password-rule';
-	import { lockoutMinutes, retryAfterOf } from '$lib/login-error';
+	import { describeLockout } from '$lib/login-error';
 
 	// The backend's text for a wrong current password (app/api/auth.py, reset_password).
 	const WRONG_CURRENT = 'Old password incorrect';
@@ -138,9 +138,7 @@
 					if (!(destroyed && now !== null && now.id !== sentAs)) endDeadSession();
 				}
 			} else if (err instanceof ApiError && err.status === 429) {
-				const minutes = lockoutMinutes(retryAfterOf(err));
-				error =
-					minutes === null ? $m.login_error_locked_out_unknown : $m.login_error_locked_out(minutes);
+				error = describeLockout(err, $m).text;
 			} else if (isPasswordTooShortRefusal(err)) {
 				invalidField = 'new';
 				error = $m.common_password_too_short(PASSWORD_MIN_LENGTH);

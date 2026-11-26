@@ -5,7 +5,7 @@
 // once, as any dead session is, and the login page shows the confirmation
 // (loginNotice). A wrong current password keeps the dialog open.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -249,6 +249,34 @@ describe('other refusals', () => {
 				'the login throttle, without Retry-After',
 				() => json({ detail: 'Too many failed login attempts. Try again later.' }, 429),
 				msgs.login_error_locked_out_unknown
+			],
+			[
+				'the account lock, with Retry-After',
+				() =>
+					new Response(JSON.stringify({ detail: { code: 'account_locked', message: 'x' } }), {
+						status: 429,
+						headers: { 'Content-Type': 'application/json', 'Retry-After': '300' }
+					}),
+				msgs.login_error_account_locked(5)
+			],
+			[
+				'the account lock, without Retry-After',
+				() => json({ detail: { code: 'account_locked', message: 'x' } }, 429),
+				msgs.login_error_account_locked_unknown
+			],
+			[
+				'the device lock, with Retry-After',
+				() =>
+					new Response(JSON.stringify({ detail: { code: 'machine_locked', message: 'x' } }), {
+						status: 429,
+						headers: { 'Content-Type': 'application/json', 'Retry-After': '60' }
+					}),
+				msgs.login_error_device_locked(1)
+			],
+			[
+				'the device lock, without Retry-After',
+				() => json({ detail: { code: 'machine_locked', message: 'x' } }, 429),
+				msgs.login_error_device_locked_unknown
 			],
 			[
 				'a 422',

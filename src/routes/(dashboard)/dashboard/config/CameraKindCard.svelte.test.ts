@@ -9,6 +9,8 @@
 // own sentence. Operators and reviewers see the facts without the controls.
 // An older backend without the route shows nothing. GET, PUT and DELETE
 // /system/camera-kind are mocked.
+//
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -310,4 +312,16 @@ describe('Settings > Cameras', () => {
 			}
 		});
 	}
+});
+
+describe('Settings > Cameras: the keyboard focus', () => {
+	it('is inside the confirmation once it opens (NEH-423)', async () => {
+		vi.spyOn(cameraKindApi, 'get').mockResolvedValue(wire());
+		render(CameraKindCard);
+		await userEvent.click(radio(en.camera_kind_picamera2));
+		await userEvent.click(save());
+		const dialog = page.getByRole('dialog');
+		await expect.element(dialog).toHaveTextContent(en.camera_kind_confirm_body);
+		await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
+	});
 });

@@ -34,7 +34,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authApi, healthApi, usersApi } from '$lib/api';
-	import { classifyLoginError, lockoutMinutes, retryAfterOf } from '$lib/login-error';
+	import { classifyLoginError, describeLockout } from '$lib/login-error';
 	import { authStore, isUserRole } from '$lib/stores/auth';
 	import { checkSession, savedUser } from '$lib/stores/session';
 	import { get } from 'svelte/store';
@@ -219,11 +219,10 @@
 			if (failure === 'credentials') {
 				errorMessage = $m.login_error_bad_credentials;
 			} else if (failure === 'throttled') {
-				// The backend locks login after repeated failures and says for
-				// how long in Retry-After (seconds).
-				const minutes = lockoutMinutes(retryAfterOf(error));
-				errorMessage =
-					minutes === null ? $m.login_error_locked_out_unknown : $m.login_error_locked_out(minutes);
+				// The backend locks the account or this device after repeated
+				// failures, says which in the detail code, and says for how long
+				// in Retry-After (seconds).
+				errorMessage = describeLockout(error, $m).text;
 			} else {
 				errorMessage = $m.login_error_backend_unavailable;
 				// Keep the footer's connection dot consistent with the message.

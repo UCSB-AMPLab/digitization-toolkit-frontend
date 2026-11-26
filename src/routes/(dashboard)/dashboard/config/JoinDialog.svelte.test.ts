@@ -5,7 +5,7 @@
 // while the unit changes network, giving up at 240 s and polling quietly
 // after that. No password or user name goes into a URL or a console call.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -1032,4 +1032,13 @@ describe('join dialog: the 240 s cap and the quiet polling after it (last round)
 		await run(20_000);
 		expect(polls(calls).length).toBe(made);
 	}, 60_000);
+});
+
+describe('join dialog: the keyboard focus', () => {
+	it('is inside the dialog once it opens (NEH-423)', async () => {
+		serve(() => json(202, joinState('joining')));
+		open('password');
+		await expect.element(dialog()).toBeVisible();
+		await expect.poll(() => dialog().element().contains(document.activeElement)).toBe(true);
+	});
 });

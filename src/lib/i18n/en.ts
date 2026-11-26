@@ -2,7 +2,7 @@
 // `Messages` in `index.ts`): a missing or extra key here is a type error in
 // `npm run check`.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import type { Messages } from './index';
 
@@ -75,6 +75,18 @@ export const en: Messages = {
 			: `Too many failed attempts. Wait ${minutes} minutes before trying again.`,
 	login_error_locked_out_unknown:
 		'Too many failed attempts. Wait a few minutes before trying again.',
+	login_error_account_locked: (minutes: number) =>
+		minutes === 1
+			? 'Too many failed attempts for this account. Wait 1 minute before trying again.'
+			: `Too many failed attempts for this account. Wait ${minutes} minutes before trying again.`,
+	login_error_account_locked_unknown:
+		'Too many failed attempts for this account. Wait a few minutes before trying again.',
+	login_error_device_locked: (minutes: number) =>
+		minutes === 1
+			? 'Too many failed attempts from this device. Wait 1 minute before trying again. Until then, no one can sign in here.'
+			: `Too many failed attempts from this device. Wait ${minutes} minutes before trying again. Until then, no one can sign in here.`,
+	login_error_device_locked_unknown:
+		'Too many failed attempts from this device. Wait a few minutes before trying again. Until then, no one can sign in here.',
 
 	// ── Session ──────────────────────────────────────────────────────────────
 	session_validating: 'Verifying session…',
