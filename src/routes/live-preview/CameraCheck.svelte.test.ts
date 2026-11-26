@@ -7,7 +7,7 @@
 // camera's saved orientation, as Captua saves it, and "Turn" turns that
 // camera by 90° through the capture screen's own orientation writer.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';
@@ -1225,5 +1225,14 @@ describe('CameraCheck: the capture gate', () => {
 		answers[1].reject(failure(504));
 		await settle();
 		expect(captureGate.isBusy()).toBe(false);
+	});
+});
+
+describe('CameraCheck: the keyboard focus', () => {
+	it('is inside the check once it opens (NEH-423)', async () => {
+		renderCheck();
+		await settle();
+		expect(view()).not.toBeNull();
+		expect(view()!.contains(document.activeElement)).toBe(true);
 	});
 });

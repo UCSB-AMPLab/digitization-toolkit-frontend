@@ -5,7 +5,7 @@
 // on), the controls only for administrators and operators on a unit that
 // lets Captua change the network, and the 501 and 503 answers.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -1113,5 +1113,29 @@ describe('Network: the connected network comes from the status', () => {
 		expect(wifiRows(container)[0].querySelector('.device-name')?.textContent?.trim()).toBe(
 			'Archive-Office'
 		);
+	});
+});
+
+describe('Network: the keyboard focus', () => {
+	it('is inside the confirmation for the network in use once it opens (NEH-423)', async () => {
+		serve({
+			extra: (c) =>
+				c.method === 'DELETE'
+					? json(409, {
+							detail: {
+								message: 'x',
+								problems: [{ code: 'connection_active', message: 'English' }]
+							}
+						})
+					: undefined
+		});
+		const { container } = mount();
+		await expect.poll(() => savedRows(container).length).toBe(3);
+		await page.getByRole('button', { name: en.network_forget_aria('Archive-Office') }).click();
+		const confirm = page.getByRole('dialog', {
+			name: en.network_forget_active_title('Archive-Office')
+		});
+		await expect.element(confirm).toBeVisible();
+		await expect.poll(() => confirm.element().contains(document.activeElement)).toBe(true);
 	});
 });

@@ -1,7 +1,7 @@
 // NEH-189: the shared shutdown and restart flow — the confirmation, the
 // request, the blocking state after a 200, and where a failure is shown.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { get } from 'svelte/store';
@@ -85,5 +85,23 @@ describe('PowerControl', () => {
 			.poll(() => onError.mock.calls.at(-1)?.[0])
 			.toBe('El control de energía no está disponible en este equipo.');
 		await expect.element(page.getByRole('alertdialog')).not.toBeInTheDocument();
+	});
+
+	it('has the focus inside the confirmation once it opens (NEH-423)', async () => {
+		const screen = render(PowerControl);
+		screen.component.ask('poweroff');
+		const dialog = page.getByRole('dialog', { name: '¿Apagar el equipo?' });
+		await expect.element(dialog).toBeInTheDocument();
+		await expect.poll(() => dialog.element().contains(document.activeElement)).toBe(true);
+	});
+
+	it('has the focus inside the failure notice once it opens (NEH-423)', async () => {
+		powerSpy.mockRejectedValue(new PowerControlError(501, 'Not Implemented'));
+		const screen = render(PowerControl);
+		screen.component.ask('poweroff');
+		await page.getByRole('button', { name: 'Sí, apagar' }).click();
+		const notice = page.getByRole('alertdialog');
+		await expect.element(notice).toBeInTheDocument();
+		await expect.poll(() => notice.element().contains(document.activeElement)).toBe(true);
 	});
 });

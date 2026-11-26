@@ -69,7 +69,7 @@
 	// goes to `focusAfter` (the layout's back button).
 	// ============================================================================
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onDestroy, tick, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -576,20 +576,6 @@
 			});
 	}
 
-	// The card's backdrop goes to <body> before trapFocus focuses the first
-	// control: moving an element that holds the focus drops it to <body>, and
-	// a card's action runs before its backdrop's.
-	function trapInBody(card: HTMLElement) {
-		const moved = toBody(card.parentElement!);
-		const trap = trapFocus(card);
-		return {
-			destroy() {
-				trap.destroy();
-				moved.destroy();
-			}
-		};
-	}
-
 	// While the dialog is open the focus stays in it. A step change removes
 	// the control that had the focus, which drops it to <body>; once the new
 	// step is rendered, the focus goes to its primary action if enabled, else
@@ -676,6 +662,7 @@
 {#if step}
 	<div
 		class="offsite-dialog-backdrop"
+		use:toBody
 		use:dismissible={{
 			onDismiss: close,
 			escape: mayClose(step),
@@ -688,7 +675,7 @@
 			aria-modal="true"
 			aria-labelledby="adopt-dialog-title"
 			tabindex="-1"
-			use:trapInBody
+			use:trapFocus
 			bind:this={cardEl}
 		>
 			{#if step.kind === 'choose'}
