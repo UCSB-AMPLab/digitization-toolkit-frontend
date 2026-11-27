@@ -2,7 +2,7 @@
 // unit's key, assigned by pressing the key or pedal once, or the default
 // (the space bar and b). Each change is PUT /system/unit/capture-key; the
 // key is the unit's, for every browser.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 
@@ -224,6 +224,7 @@ describe('Settings > Capture key', () => {
 		heldKey = 'F7';
 		let release!: () => void;
 		putGate = new Promise<void>((resolve) => (release = resolve));
+		onTestFinished(() => release());
 		const first = render(CaptureKeySection);
 		await userEvent.click(assign());
 		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F7', code: 'F7', cancelable: true }));

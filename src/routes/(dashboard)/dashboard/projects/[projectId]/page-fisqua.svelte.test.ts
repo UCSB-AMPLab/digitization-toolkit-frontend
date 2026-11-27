@@ -9,7 +9,7 @@
 // stem field or as the notice that points to the list import in Cola.
 //
 // Version: 0.3.0
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 import { readable } from 'svelte/store';
@@ -134,6 +134,7 @@ describe('the project page while projects are hidden (NEH-313)', () => {
 		signIn('admin');
 		let answer!: (v: unknown) => void;
 		vi.mocked(systemApi.unit).mockReturnValue(new Promise((r) => (answer = r)) as never);
+		onTestFinished(() => answer(undefined));
 		const screen = render(ProjectPage);
 		await new Promise((r) => setTimeout(r, 50));
 		expect(page.getByRole('button', { name: es.pd_new_collection }).elements()).toHaveLength(0);
@@ -150,6 +151,7 @@ describe('the project page while projects are hidden (NEH-313)', () => {
 	it('does not go once the route has changed', async () => {
 		let answer!: (v: unknown) => void;
 		vi.mocked(systemApi.unit).mockReturnValue(new Promise((r) => (answer = r)) as never);
+		onTestFinished(() => answer(undefined));
 		const screen = render(ProjectPage);
 		await vi.waitFor(() => expect(systemApi.unit).toHaveBeenCalled());
 		pageUrl.href = 'http://localhost/dashboard/queue';
@@ -184,6 +186,7 @@ describe('the project page while projects are hidden (NEH-313)', () => {
 					fail = j;
 				}) as never
 			);
+			onTestFinished(() => answer(undefined));
 			const screen = render(ProjectPage);
 			await new Promise((r) => setTimeout(r, 50));
 			expect(screen.container.textContent?.trim()).toBe('');

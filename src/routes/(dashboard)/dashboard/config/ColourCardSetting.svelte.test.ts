@@ -5,7 +5,7 @@
 // failure leaves the switch as the unit has it, with one line saying so.
 //
 // Version: 0.3.0
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 
@@ -112,6 +112,7 @@ describe('Settings > Cameras: Ask for colour card shots', () => {
 	it('sends the value chosen at the click, even when a read answered in between changes the state', async () => {
 		let release!: () => void;
 		const held = new Promise<void>((r) => (release = r));
+		onTestFinished(() => release());
 		let reads = 0;
 		vi.spyOn(systemApi, 'unit').mockImplementation(async () => {
 			reads += 1;

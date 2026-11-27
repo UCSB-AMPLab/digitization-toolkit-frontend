@@ -3,7 +3,7 @@
 // per session and again after a change.
 //
 // Version: 0.3.0
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { get } from 'svelte/store';
 
 const gotoMock = vi.hoisted(() => vi.fn());
@@ -146,6 +146,7 @@ describe('the unit store', () => {
 		const spy = vi
 			.spyOn(systemApi, 'unit')
 			.mockReturnValueOnce(new Promise((r) => (answer = r)) as never);
+		onTestFinished(() => answer(unit));
 		const first = ensureUnit();
 		await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
 		authStore.clearSession();

@@ -248,7 +248,9 @@ describe('capture screen: "Check cameras" (NEH-339)', () => {
 
 describe('the camera check: "Turn" (NEH-339)', () => {
 	const turn = (side: 'left' | 'right') =>
-		check()?.querySelector(`[data-frame="${side}"] button[data-turn]`) as HTMLButtonElement | null;
+		(check()?.querySelector(
+			`[data-frame="${side}"] button[data-turn]`
+		) as HTMLButtonElement | null) ?? null;
 	const viewportDegrees = () =>
 		[...document.querySelectorAll('.feed-rotate-deg')].map((el) => el.textContent?.trim());
 

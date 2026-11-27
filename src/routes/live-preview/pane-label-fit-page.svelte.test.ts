@@ -27,6 +27,7 @@ import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
+import { layoutSettled } from '$lib/test-support/layout-settled';
 import '../../app.css';
 import LivePreview from './+page.svelte';
 
@@ -109,8 +110,6 @@ afterEach(() => {
 	locale.set('en');
 });
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 // The left pane shows the role-left camera, which is the right camera (even
 // page, letter R / D); the right pane the left camera (odd page, L / I).
 async function open(lang: 'en' | 'es', w: number, h: number) {
@@ -125,7 +124,7 @@ async function open(lang: 'en' | 'es', w: number, h: number) {
 		.toBe(true);
 	await expect.poll(() => document.querySelectorAll('.camera-feed img').length).toBe(2);
 	await expect.poll(() => document.querySelectorAll('.feed-source').length).toBe(2);
-	await wait(400);
+	await layoutSettled(['.camera-feed', '.feed-label', '.feed-source']);
 	const q = (s: string) => document.querySelector(s) as HTMLElement;
 	return {
 		t,
