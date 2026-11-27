@@ -3068,6 +3068,83 @@ export const es = {
 		`${source} y ${target} están en proyectos distintos. Los registros pasarán al proyecto de ${target}.`,
 	adopt_err_ask_installer: 'Pregúntale a quien instaló el equipo.',
 
+	// ── Offsite settings (Settings → Offsite copy, NEH-341) ──────────────────
+	offsite_set_title: 'Configuración de la copia externa',
+	offsite_set_desc:
+		'El bucket y las claves que este equipo usa para la copia externa. Tráelos en una memoria USB o escríbelos aquí.',
+	offsite_set_none: 'Este equipo no tiene guardada la configuración de la copia externa.',
+	offsite_set_bucket: 'Bucket',
+	offsite_set_tenant: 'Carpeta de la institución (TENANT)',
+	offsite_set_key_id: 'ID de la clave',
+	offsite_set_app_key: 'Clave de aplicación',
+	offsite_set_public_key: 'Clave pública del catálogo',
+	offsite_set_key_note:
+		'Las claves quedan guardadas en este equipo. Cualquier persona con acceso de administrador al equipo puede leerlas.',
+	offsite_set_import: 'Importar desde una memoria USB',
+	offsite_set_import_desc:
+		'Llena la plantilla en tu computador y guárdala con el nombre captua-offsite.txt directamente en una memoria USB, fuera de cualquier carpeta. Conecta la memoria al equipo y móntala en la sección Almacenamiento. Luego elígela aquí.',
+	offsite_set_choose_drive: 'Memoria USB',
+	offsite_set_no_drive:
+		'No hay ninguna memoria USB montada. Primero monta la memoria en la sección Almacenamiento.',
+	offsite_set_enter: 'Escribir a mano',
+	offsite_set_template: 'Descargar la plantilla',
+	offsite_set_save: 'Comprobar y guardar',
+	offsite_set_saving: 'Comprobando el bucket…',
+	offsite_set_replace: 'Reemplazar la clave guardada',
+	offsite_set_replace_desc:
+		'Este equipo ya tiene otra clave. Al guardar, Captua la reemplaza por la nueva.',
+	offsite_set_saved_restarting:
+		'Configuración guardada. Captua se está reiniciando para empezar a usarla.',
+	offsite_set_saved_restart_needed:
+		'Configuración guardada. Reinicia el equipo para que Captua empiece a usarla.',
+	offsite_set_unchanged: 'El equipo ya tiene esta configuración. Captua no cambió nada.',
+	offsite_set_stick_deleted: 'Captua borró el archivo de la memoria.',
+	offsite_set_stick_not_deleted:
+		'Captua no pudo borrar el archivo de la memoria. Bórralo tú antes de sacar la memoria del equipo.',
+	offsite_set_stick_kept: 'El archivo sigue en la memoria.',
+	offsite_err_busy:
+		'Hay una captura o un envío de archivos en curso. Intenta de nuevo en unos minutos.',
+	offsite_err_pairing:
+		'Captua está vinculando este equipo con Fisqua. Intenta de nuevo cuando termine.',
+	offsite_err_restart_first:
+		'Para cambiar la configuración de la copia externa, primero hay que reiniciar el equipo. Reinícialo desde la sección Energía y vuelve a intentarlo.',
+	offsite_err_unverified:
+		'Es posible que Captua haya guardado la configuración, pero no pudo comprobarla. Reinicia el equipo y vuelve a revisar esta sección.',
+	offsite_err_overridden:
+		'Captua guardó la configuración, pero otro ajuste del equipo tiene prioridad sobre ella. Pregúntale a quien instaló el equipo.',
+	offsite_err_fisqua:
+		'Este equipo está vinculado con Fisqua, que le da la configuración de la copia externa.',
+	offsite_err_unit_not_ready:
+		'Este equipo no puede guardar la configuración de la copia externa hasta que se actualice. Pregúntale a quien instaló el equipo.',
+	offsite_err_held:
+		'La copia externa está en pausa en este equipo. Guarda la configuración cuando se reanude.',
+	offsite_err_other_tenant:
+		'Este equipo ya guarda la copia externa en otra carpeta de institución, y eso no se puede cambiar desde aquí. Pregúntale a quien instaló el equipo.',
+	offsite_err_replace:
+		'Este equipo ya tiene otra clave. Marca "Reemplazar la clave guardada" para guardar la nueva.',
+	offsite_set_err_listing:
+		'Captua no pudo abrir el bucket con esta configuración. Revisa el bucket, el ID de la clave, la clave de aplicación y la carpeta de la institución, y comprueba que el equipo esté conectado a internet.',
+	offsite_err_saved_key_unusable:
+		'Captua guardó la configuración, pero con la clave que ya estaba guardada en el equipo no puede abrir el bucket. Si este ID de la clave tiene una clave de aplicación nueva, marca "Reemplazar la clave guardada" y guarda de nuevo.',
+	offsite_err_not_saved: 'Captua no guardó la configuración y no cambió nada en el equipo.',
+	offsite_err_not_a_drive: 'Elige una memoria USB montada en la sección Almacenamiento.',
+	offsite_err_file_missing:
+		'Captua no encontró captua-offsite.txt directamente en la memoria, fuera de cualquier carpeta.',
+	offsite_err_file_not_settings:
+		'El captua-offsite.txt de la memoria no es un archivo de configuración hecho con la plantilla.',
+	offsite_err_file_unreadable: 'Captua no puede leer el captua-offsite.txt de la memoria.',
+	offsite_err_file_not_deletable:
+		'Captua no importó captua-offsite.txt porque después no podría borrarlo de la memoria. Usa una memoria USB con formato FAT32 o exFAT.',
+	offsite_err_bad_line: (line: number): string =>
+		`La línea ${line} de captua-offsite.txt no es ni un comentario ni un ajuste.`,
+	offsite_err_unknown_key: (line: number): string =>
+		`La línea ${line} de captua-offsite.txt tiene un ajuste que no está en la plantilla.`,
+	offsite_err_duplicate: (field: string): string => `"${field}" aparece más de una vez.`,
+	offsite_err_missing: (field: string): string => `Falta "${field}".`,
+	offsite_err_empty: (field: string): string => `"${field}" no tiene valor.`,
+	offsite_err_bad_value: (field: string): string => `El valor de "${field}" no es válido.`,
+	offsite_err_other: 'Captua no pudo guardar la configuración de la copia externa.',
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Orden recibida. El equipo la ejecutará en unos segundos.',
 	api_request_failed: 'Error en la solicitud'
