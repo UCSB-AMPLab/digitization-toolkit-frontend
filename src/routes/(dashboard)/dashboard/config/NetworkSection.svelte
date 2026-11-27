@@ -48,7 +48,15 @@
 	// status shows a connected network that the list does not contain, the list
 	// is read again once for that network.
 	//
-	// Version: 0.3.0
+	// The "Remote access" card, after the interface cards, reads
+	// GET /network/tailscale through stores/remote-access on the schedule of
+	// the status; remoteAccessView there decides its badge, its line, its
+	// facts (name and addresses, when connected) and the count of problems.
+	// The card depends only on its own answer: a unit without NetworkManager
+	// (501) still shows it, under the notice that network settings are not
+	// available.
+	//
+	// Version: 0.4.0
 
 	import { onMount, untrack } from 'svelte';
 	import { get } from 'svelte/store';
@@ -67,6 +75,13 @@
 		watchNetworkStatus,
 		type NetworkReadError
 	} from '$lib/stores/network';
+	import {
+		remoteAccess,
+		remoteAccessView,
+		watchRemoteAccess,
+		type RemoteAccessBadge,
+		type RemoteAccessLine
+	} from '$lib/stores/remote-access';
 	import { dismissible, toBody, trapFocus } from '$lib/dialog';
 	import JoinDialog from './JoinDialog.svelte';
 	import SignalBars from './SignalBars.svelte';
@@ -97,8 +112,12 @@
 
 	onMount(() => {
 		const release = watchNetworkStatus();
+		const releaseRemote = watchRemoteAccess();
 		void loadWifi(false);
-		return release;
+		return () => {
+			release();
+			releaseRemote();
+		};
 	});
 
 	let wifiSeq = 0;
@@ -215,6 +234,27 @@
 		return { tone: 'off', text: $m.network_badge_not_available };
 	}
 
+	let remote = $derived($remoteAccess.status);
+	let remoteView = $derived(remoteAccessView($remoteAccess));
+
+	function remoteBadgeText(b: RemoteAccessBadge): string {
+		if (b === 'connected') return $m.network_badge_connected;
+		if (b === 'not_connected') return $m.network_badge_not_connected;
+		if (b === 'connecting') return $m.network_badge_connecting;
+		if (b === 'off') return $m.network_badge_off;
+		if (b === 'sign_in') return $m.network_badge_sign_in;
+		if (b === 'not_installed') return $m.network_badge_not_installed;
+		return $m.network_badge_not_available;
+	}
+
+	function remoteLineText(l: RemoteAccessLine): string {
+		if (l === 'not_connected') return $m.network_remote_not_connected;
+		if (l === 'off') return $m.network_remote_off;
+		if (l === 'needs_login') return $m.network_remote_needs_login;
+		if (l === 'not_installed') return $m.network_remote_not_installed;
+		return $m.network_remote_unavailable;
+	}
+
 	function errorText(kind: NetworkReadError | 'no_wifi_device', fallback: string): string {
 		if (kind === 'service_unavailable') return $m.network_service_unavailable;
 		if (kind === 'no_wifi_device') return $m.network_no_wifi_device;
@@ -311,11 +351,90 @@
 	</div>
 {/snippet}
 
+{#snippet remoteCard()}
+	<div class="net-remote">
+		<div class="net-card" data-network-remote>
+			<div class="net-card-head">
+				<span class="icon" aria-hidden="true">
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<circle cx="12" cy="12" r="10" />
+						<line x1="2" y1="12" x2="22" y2="12" />
+						<path
+							d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+						/>
+					</svg>
+				</span>
+				<span class="net-card-title">{$m.network_remote_title}</span>
+				{#if remoteView}
+					<span class="status-badge tone-{remoteView.tone}"
+						><span class="status-dot dot-{remoteView.tone}"></span>{remoteBadgeText(
+							remoteView.badge
+						)}</span
+					>
+				{/if}
+			</div>
+			<p class="net-desc">{$m.network_remote_desc}</p>
+
+			{#if !remoteView}
+				<p class="net-loading">{$m.common_loading_ellipsis}</p>
+			{:else}
+				{#if remoteView.warnings > 0}
+					<div class="action-notice" role="status" data-remote-warnings>
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							aria-hidden="true"
+						>
+							<path
+								d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+							/>
+							<line x1="12" y1="9" x2="12" y2="13" />
+							<line x1="12" y1="17" x2="12.01" y2="17" />
+						</svg>
+						<div class="action-notice-text">
+							{$m.network_remote_warnings(remoteView.warnings)}
+						</div>
+					</div>
+				{/if}
+				{#if remoteView.line}
+					<p class="net-empty" data-remote-body>{remoteLineText(remoteView.line)}</p>
+				{/if}
+				{#if remoteView.facts && remote}
+					<dl class="net-facts">
+						<dt>{$m.network_fact_name}</dt>
+						{#if remote.name}<dd class="mono">{remote.name}</dd>{:else}<dd class="missing">
+								{$m.network_fact_none}
+							</dd>{/if}
+						<dt>{$m.network_fact_addresses}</dt>
+						{#if remote.addresses.length > 0}<dd class="mono">
+								{remote.addresses.join(', ')}
+							</dd>{:else}<dd class="missing">
+								{$m.network_fact_none}
+							</dd>{/if}
+					</dl>
+				{/if}
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
 <div class="config-section">
 	<h2 class="section-title">{$m.config_section_network}</h2>
 
 	{#if notAvailable}
 		{@render info($m.network_not_available, 'not_available')}
+		{@render remoteCard()}
 	{:else}
 		{#if !mayChange}
 			{@render info($m.network_readonly, 'readonly')}
@@ -443,8 +562,8 @@
 		{/if}
 
 		<!-- The Internet card (reachability, the sign-in page of a captive
-         portal) and the Remote access card attach here once the backend
-         reports them. -->
+         portal) attaches here once the backend reports it. -->
+		{@render remoteCard()}
 
 		<h3 class="sub-title">{$m.network_wifi_title}</h3>
 		<div class="config-card">
@@ -817,6 +936,15 @@
 		align-items: center;
 		gap: 10px;
 		flex-wrap: wrap;
+	}
+	.net-remote {
+		margin-top: 12px;
+	}
+	.net-desc {
+		margin: -6px 0 0;
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		line-height: 1.5;
 	}
 	.net-card-head .icon {
 		color: var(--color-light-grey);

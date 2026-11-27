@@ -155,8 +155,9 @@ function mount(role: string | null = 'admin') {
 	return render(NetworkSection, { role });
 }
 
+// The interface cards; the Remote access card stands outside their grid.
 function cards(container: HTMLElement) {
-	return [...container.querySelectorAll('.net-card')] as HTMLElement[];
+	return [...container.querySelectorAll('.net-grid > .net-card')] as HTMLElement[];
 }
 
 function card(container: HTMLElement, title: string) {
