@@ -47,6 +47,13 @@
 	// no such answer by then the polling stops and the card says to restart
 	// the unit, in place of the actions, as when GET answers `restartRequired`.
 	//
+	// The link to the Unit mode section (`?section=unit-mode`, as the Fisqua
+	// link card's) is shown exactly while the latest applied read of GET
+	// /system/offsite says configured and `restartRequired` false, the card
+	// shows its actions (no save running, no restart gate, no restart wait),
+	// and the unit's mode, read from the unit's state ($lib/unit-mode), is
+	// known and is not `backup`. The link does not change the mode.
+	//
 	// The application key lives in the form's field only: it is sent in the
 	// POST body and nowhere else, never logged or stored, and the field is
 	// emptied after every answer, saved or refused. When the card is
@@ -66,6 +73,7 @@
 		type StorageDevice
 	} from '$lib/api';
 	import { PAIRING_POLL_MS, pollPairing } from '$lib/fisqua-pairing';
+	import { ensureUnit, unitState } from '$lib/unit-mode';
 
 	let {
 		pollMs = PAIRING_POLL_MS,
@@ -205,8 +213,19 @@
 	// GET says the unit must restart first, or the wait after `restarting` ran out.
 	let mustRestart = $derived((!!current?.restartRequired || restartFirst) && !restarting);
 
+	// The mode is known and is not Offsite copy only: a save can be followed by the switch.
+	let canSwitchMode = $derived(
+		!!current?.configured &&
+			!current.restartRequired &&
+			!busy &&
+			!mustRestart &&
+			!!$unitState &&
+			$unitState.mode !== 'backup'
+	);
+
 	onMount(() => {
 		readSettings();
+		ensureUnit();
 		systemApi
 			.getStorageDevices()
 			.then((list) => {
@@ -502,6 +521,12 @@
 				</form>
 			{/if}
 		</div>
+
+		{#if canSwitchMode}
+			<div class="os-actions">
+				<a class="os-btn-ghost" href="?section=unit-mode">{$m.offsite_set_switch_mode}</a>
+			</div>
+		{/if}
 
 		{#if showReplace}
 			<label class="os-replace">

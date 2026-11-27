@@ -4,7 +4,8 @@
 // /system/offsite; each outcome of both saves in English and Spanish; every
 // refusal code the card maps, with the field and line forms; the replace
 // checkbox; the stick lines; the wait through the restart; the place of the
-// card in its section; and the application key in no request but the POST
+// card in its section; the link to the Unit mode section, shown while the
+// settings are saved, current and the unit is not in Offsite copy only; and the application key in no request but the POST
 // body, and nowhere in the page or the browser's storage after a save. The
 // routes are mocked, through systemApi or through fetch.
 //
@@ -32,6 +33,7 @@ import {
 } from '$lib/api';
 import { authStore } from '$lib/stores/auth';
 import { locale, type Locale } from '$lib/i18n';
+import { resetUnit } from '$lib/unit-mode';
 import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import '../../../../app.css';
@@ -118,16 +120,28 @@ function holds(value: unknown, needle: string, seen = new Set<unknown>()): boole
 	});
 }
 
+function unitBody(mode: 'offline' | 'backup' | 'fisqua') {
+	return {
+		mode,
+		projectsEnabled: false,
+		projectsShown: false,
+		defaultProjectId: 1,
+		prerequisites: { backup: [], fisqua: [] }
+	};
+}
+
 function mount(
 	get: OffsiteSettings | (() => Promise<OffsiteSettings>) = settings(),
 	devices: StorageDevice[] = [device()],
-	props: { restartWaitMs?: number } = {}
+	props: { restartWaitMs?: number } = {},
+	mode: 'offline' | 'backup' | 'fisqua' = 'backup'
 ) {
 	const getSpy =
 		typeof get === 'function'
 			? vi.spyOn(systemApi, 'getOffsite').mockImplementation(get)
 			: vi.spyOn(systemApi, 'getOffsite').mockResolvedValue(get);
 	const devicesSpy = vi.spyOn(systemApi, 'getStorageDevices').mockResolvedValue(devices);
+	vi.spyOn(systemApi, 'unit').mockResolvedValue(unitBody(mode) as never);
 	const screen = render(OffsiteSettingsCard, { pollMs: POLL, ...props });
 	return { getSpy, devicesSpy, screen };
 }
@@ -162,6 +176,7 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks();
 	authStore.clearSession();
+	resetUnit();
 });
 
 describe('Offsite settings: what the card shows', () => {
@@ -1210,5 +1225,102 @@ describe('Offsite settings: the place of the card', () => {
 		expect(card).not.toBeNull();
 		expect(status).not.toBeNull();
 		expect(card.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+	});
+});
+
+describe.each(['en', 'es'] as const)('Offsite settings: the link to Unit mode (%s)', (l) => {
+	beforeEach(() => locale.set(l));
+	const text =
+		l === 'en'
+			? 'Choose "Offsite copy only" in the Unit mode section'
+			: 'Elige el modo "Solo copia externa" en la sección Modo del equipo';
+	const link = () => page.getByRole('link', { name: text, exact: true });
+
+	it('has the approved text in the message table', () => {
+		expect((M[l] as Record<string, unknown>).offsite_set_switch_mode).toBe(text);
+	});
+
+	it.each(['offline', 'fisqua'] as const)(
+		'is shown when configured, no restart is due and the mode is %s',
+		async (mode) => {
+			mount(settings(), [device()], {}, mode);
+			await expect.element(link()).toBeInTheDocument();
+		}
+	);
+
+	it('points to the unit-mode section', async () => {
+		mount(settings(), [device()], {}, 'offline');
+		await expect.element(link()).toHaveAttribute('href', '?section=unit-mode');
+	});
+
+	it('is not shown when the mode is Offsite copy only', async () => {
+		mount(settings(), [device()], {}, 'backup');
+		await expect.element(page.getByText(FAKE_BUCKET)).toBeInTheDocument();
+		await new Promise((r) => setTimeout(r, POLL * 3));
+		expect(link().elements()).toHaveLength(0);
+	});
+
+	it('is not shown when nothing is saved', async () => {
+		mount(NOT_CONFIGURED, [device()], {}, 'offline');
+		await expect.element(page.getByText(M[l].offsite_set_none)).toBeInTheDocument();
+		await new Promise((r) => setTimeout(r, POLL * 3));
+		expect(link().elements()).toHaveLength(0);
+	});
+
+	it('is not shown while a restart is due', async () => {
+		mount(settings({ restartRequired: true }), [device()], {}, 'offline');
+		await expect.element(page.getByText(M[l].offsite_set_saved_restart_needed)).toBeInTheDocument();
+		await new Promise((r) => setTimeout(r, POLL * 3));
+		expect(link().elements()).toHaveLength(0);
+	});
+
+	it('is not shown while a save runs, and returns when it ends', async () => {
+		mount(settings(), [device()], {}, 'offline');
+		await expect.element(link()).toBeInTheDocument();
+		let answer!: (r: OffsiteSaveResult) => void;
+		vi.spyOn(systemApi, 'saveOffsite').mockImplementation(
+			() => new Promise<OffsiteSaveResult>((r) => (answer = r))
+		);
+		await fillForm(l);
+		await userEvent.click(ui(l).saveBtn());
+		await expect.element(page.getByText(M[l].offsite_set_saving)).toBeInTheDocument();
+		expect(link().elements()).toHaveLength(0);
+		answer({ outcome: 'unchanged', stickFile: null });
+		await expect.element(link()).toBeInTheDocument();
+	});
+
+	it('is not shown during the restart wait, and returns when a read answers current settings', async () => {
+		let phase: 'before' | 'stale' | 'back' = 'before';
+		mount(
+			async () => (phase === 'stale' ? settings({ restartRequired: true }) : settings()),
+			[device()],
+			{},
+			'offline'
+		);
+		await expect.element(link()).toBeInTheDocument();
+		vi.spyOn(systemApi, 'saveOffsite').mockImplementation(async () => {
+			phase = 'stale';
+			return { outcome: 'restarting', stickFile: null };
+		});
+		await fillForm(l);
+		await userEvent.click(ui(l).saveBtn());
+		await expect.element(page.getByText(M[l].offsite_set_saved_restarting)).toBeInTheDocument();
+		expect(link().elements()).toHaveLength(0);
+		phase = 'back';
+		await expect.element(link()).toBeInTheDocument();
+	});
+
+	it('is not shown after restart_needed until a read answers restartRequired false', async () => {
+		let latched = false;
+		mount(async () => settings({ restartRequired: latched }), [device()], {}, 'offline');
+		await expect.element(link()).toBeInTheDocument();
+		vi.spyOn(systemApi, 'saveOffsite').mockImplementation(async () => {
+			latched = true;
+			return { outcome: 'restart_needed', stickFile: null };
+		});
+		await fillForm(l);
+		await userEvent.click(ui(l).saveBtn());
+		await expect.element(page.getByText(M[l].offsite_set_saved_restart_needed)).toBeInTheDocument();
+		expect(link().elements()).toHaveLength(0);
 	});
 });
