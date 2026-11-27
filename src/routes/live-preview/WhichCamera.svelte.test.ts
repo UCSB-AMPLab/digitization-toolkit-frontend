@@ -129,14 +129,15 @@ const text = () => view()?.textContent ?? '';
 const card = (index: number) =>
 	document.querySelector(`[data-card="${index}"]`) as HTMLElement | null;
 const pick = (index: number) =>
-	card(index)?.querySelector('button[data-pick]') as HTMLButtonElement | null;
+	(card(index)?.querySelector('button[data-pick]') as HTMLButtonElement | null) ?? null;
 // A label's words: its accessible name in the badge form, its text otherwise.
 const wordsOf = (el: Element | null | undefined) =>
 	el ? (el.getAttribute('aria-label') ?? el.textContent?.trim() ?? null) : null;
 const labelOf = (index: number) => wordsOf(card(index)?.querySelector('.feed-label'));
 const turnOf = (index: number) =>
-	card(index)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
-const imgOf = (index: number) => card(index)?.querySelector('img') as HTMLImageElement | null;
+	(card(index)?.querySelector('button[data-turn]') as HTMLButtonElement | null) ?? null;
+const imgOf = (index: number) =>
+	(card(index)?.querySelector('img') as HTMLImageElement | null) ?? null;
 
 function nameOf(b: Element): string {
 	const label = b.getAttribute('aria-label');

@@ -5,7 +5,7 @@
 // a project. In Fisqua mode an operator has no Nuevo volumen (NEH-311).
 //
 // Version: 0.3.0
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 
@@ -279,6 +279,7 @@ describe('Volúmenes', () => {
 	it('does not go to Proyectos once the route has changed', async () => {
 		let answer!: (v: unknown) => void;
 		vi.mocked(systemApi.unit).mockReturnValue(new Promise((r) => (answer = r)) as never);
+		onTestFinished(() => answer(undefined));
 		const screen = render(Volumes);
 		await expect.poll(() => names(screen)).toHaveLength(3);
 		pageUrl.href = 'http://localhost/dashboard/queue';

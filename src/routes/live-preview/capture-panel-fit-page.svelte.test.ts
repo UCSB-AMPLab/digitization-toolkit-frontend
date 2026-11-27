@@ -25,6 +25,7 @@ vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 import { authStore } from '$lib/stores/auth';
 import { locale } from '$lib/i18n';
+import { layoutSettled } from '$lib/test-support/layout-settled';
 import '../../app.css';
 import LivePreview from './+page.svelte';
 
@@ -71,7 +72,9 @@ afterEach(() => {
 	authStore.clearSession();
 });
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// What the tests measure: the panel, the board it sits on and the viewport.
+const MEASURED = ['.floating-controls', '.viewport-outer', '.mat-board'];
+const panelButtons = () => document.querySelectorAll('.floating-controls button').length;
 
 async function open(mode: 'single' | 'double', w: number, h: number) {
 	await browserPage.viewport(w, h);
@@ -79,14 +82,17 @@ async function open(mode: 'single' | 'double', w: number, h: number) {
 	await expect.element(screen.getByRole('button', { name: 'Capture', exact: true })).toBeVisible();
 	if (mode === 'single') {
 		(document.querySelector('.strip-btn.toggle') as HTMLElement).click();
-		await wait(200);
+		await expect
+			.poll(() => document.querySelectorAll('input[type=radio]').length)
+			.toBeGreaterThan(0);
 		(document.querySelectorAll('input[type=radio]')[0] as HTMLInputElement).dispatchEvent(
 			new Event('change', { bubbles: true })
 		);
-		await wait(200);
+		await expect.poll(() => document.querySelector('.collapse-btn') ?? null).not.toBeNull();
 		(document.querySelector('.collapse-btn') as HTMLElement).click();
 	}
-	await wait(500);
+	await expect.poll(panelButtons).toBe(mode === 'double' ? 6 : 5);
+	await layoutSettled(MEASURED);
 	return screen;
 }
 
@@ -169,7 +175,8 @@ describe('floating controls fit the viewport (NEH-323)', () => {
 	it('collapsed, it shows only the toggle', async () => {
 		const screen = await open('double', 800, 480);
 		await screen.getByRole('button', { name: 'Hide controls' }).click();
-		await wait(200);
+		await expect.poll(panelButtons).toBe(1);
+		await layoutSettled(MEASURED);
 		const { panel, buttons, outer } = boxes(screen);
 		expect(buttons.map((b) => b.label)).toEqual(['Show controls']);
 		expect(panel.querySelector('.float-divider')).toBeNull();

@@ -3,7 +3,7 @@
 // null, and this browser's cached copy until the unit has answered. A key
 // a browser assigned before the unit held one is carried over once, by an
 // administrator or an operator, when the unit has none; a refusal is ignored.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { get } from 'svelte/store';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
@@ -201,10 +201,13 @@ describe("the unit's key is read again on every watch (review round 1)", () => {
 	function hold() {
 		let release!: () => void;
 		unitHold = new Promise<void>((resolve) => (release = resolve));
-		return () => {
+		const answer = () => {
 			unitHold = null;
 			release();
 		};
+		// A test that fails before answering must not leave the unit's queue held.
+		onTestFinished(answer);
+		return answer;
 	}
 	const unitReads = () =>
 		vi
@@ -282,6 +285,7 @@ describe('the carry-over (review rounds 2 and 3)', () => {
 		setLegacy(F7);
 		let release!: () => void;
 		unitHold = new Promise<void>((resolve) => (release = resolve));
+		onTestFinished(() => release());
 		const carrying = carryOverCaptureKey('operator');
 		await expect.poll(() => unitReads()).toBe(1);
 		authStore.clearSession();

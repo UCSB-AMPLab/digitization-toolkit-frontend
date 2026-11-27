@@ -88,7 +88,7 @@ const ticked = (side: 'left' | 'right') =>
 const pane = (side: 'left' | 'right') =>
 	document.querySelector(`[data-pane="${side}"]`) as HTMLElement | null;
 const paneImg = (side: 'left' | 'right') =>
-	pane(side)?.querySelector('img') as HTMLImageElement | null;
+	(pane(side)?.querySelector('img') as HTMLImageElement | null) ?? null;
 const button = (name: string) =>
 	[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
 		(b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim() === name

@@ -174,7 +174,7 @@ describe('volumeOffsiteView, for a volume freed from the card', () => {
 		expect(view?.headline).toBe(en.offsite_vol_stored);
 		expect(view?.freed).toBe(en.offsite_vol_freed(412, 12_300_000_000));
 		expect(view?.freed).toBe('412 files freed from the SD card (12.3\u00a0GB)');
-		expect(view?.lastVerified).not.toBeNull();
+		expect(view?.lastVerified ?? null).not.toBeNull();
 		expect(view?.help).toBeNull();
 	});
 

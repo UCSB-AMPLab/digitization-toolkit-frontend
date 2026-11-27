@@ -140,7 +140,9 @@ const feed = (name: string) =>
 		return label?.textContent?.trim() === name || label?.getAttribute('aria-label') === name;
 	}) ?? null;
 const rotateCw = (name: string) =>
-	feed(name)?.querySelector(`button[aria-label="${en.lv_rotate_cw}"]`) as HTMLButtonElement | null;
+	(feed(name)?.querySelector(
+		`button[aria-label="${en.lv_rotate_cw}"]`
+	) as HTMLButtonElement | null) ?? null;
 const degreesOf = (name: string) =>
 	feed(name)?.querySelector('.feed-rotate-deg')?.textContent?.trim();
 

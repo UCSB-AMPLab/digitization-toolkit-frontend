@@ -26,6 +26,7 @@ import { locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import { cameraStatus } from '$lib/stores/cameras';
+import { layoutSettled } from '$lib/test-support/layout-settled';
 import '../../app.css';
 import LivePreview from './+page.svelte';
 
@@ -69,8 +70,6 @@ afterEach(() => {
 	authStore.clearSession();
 });
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 function fits(screen: { container: HTMLElement }, selector: string) {
 	const feed = screen.container.querySelector('.camera-viewport') as HTMLElement;
 	const viewport = feed.getBoundingClientRect();
@@ -90,20 +89,33 @@ function fits(screen: { container: HTMLElement }, selector: string) {
 	expect(b.bottom > panel.top && b.right > panel.left && b.left < panel.right).toBe(false);
 }
 
-async function open(mode: 'single' | 'double', [width, height] = [800, 480]) {
+// What the tests measure: the feed, the panel and, once shown, the banner.
+const MEASURED = ['.camera-viewport', '.floating-controls'];
+const panelButtons = () => document.querySelectorAll('.floating-controls button').length;
+
+// `banner` is the selector of a banner that must be shown before the layout
+// is measured.
+async function open(
+	mode: 'single' | 'double',
+	[width, height] = [800, 480],
+	banner: string | null = null
+) {
 	await browserPage.viewport(width, height);
 	const screen = render(LivePreview);
 	await expect.element(screen.getByRole('button', { name: /^(Capture|Capturar)$/ })).toBeVisible();
 	if (mode === 'single') {
 		(document.querySelector('.strip-btn.toggle') as HTMLElement).click();
-		await wait(200);
+		await expect
+			.poll(() => document.querySelectorAll('input[type=radio]').length)
+			.toBeGreaterThan(0);
 		(document.querySelectorAll('input[type=radio]')[0] as HTMLInputElement).dispatchEvent(
 			new Event('change', { bubbles: true })
 		);
-		await wait(200);
+		await expect.poll(() => document.querySelector('.collapse-btn') ?? null).not.toBeNull();
 		(document.querySelector('.collapse-btn') as HTMLElement).click();
 	}
-	await wait(500);
+	await expect.poll(panelButtons).toBe(mode === 'double' ? 6 : 5);
+	await layoutSettled(banner ? [...MEASURED, banner] : MEASURED);
 	return screen;
 }
 
@@ -112,7 +124,7 @@ describe('the needs-stem banner keeps its width on a narrow feed (NEH-324)', () 
 		for (const mode of ['single', 'double'] as const) {
 			it(`${lang}, ${mode} mode, 800x480`, async () => {
 				locale.set(lang);
-				const screen = await open(mode);
+				const screen = await open(mode, [800, 480], '.needs-stem-banner');
 				fits(screen, '.needs-stem-banner');
 			});
 		}
@@ -128,7 +140,10 @@ describe('the capture-error banner keeps its width on a narrow feed (NEH-324)', 
 			cameraStatus.reportFailure(
 				'La cámara 1 no respondió a tiempo. Revisa el cable USB y vuelve a intentarlo.'
 			);
-			await wait(200);
+			await vi.waitFor(() =>
+				expect(screen.container.querySelector('.capture-error-banner')).not.toBeNull()
+			);
+			await layoutSettled([...MEASURED, '.capture-error-banner']);
 			fits(screen, '.capture-error-banner');
 		});
 	}

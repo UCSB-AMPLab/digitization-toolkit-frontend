@@ -34,7 +34,13 @@ let backend: Backend;
 let inFlight: number;
 let maxInFlight: number;
 // Each request as sent: its kind and a function that answers it.
-let sent: { kind: string; body?: unknown; release: () => void; fail: () => void }[];
+let sent: {
+	kind: string;
+	body?: unknown;
+	settled: boolean;
+	release: () => void;
+	fail: () => void;
+}[];
 
 function base(): Backend {
 	return {
@@ -62,11 +68,16 @@ function held<T>(
 		sent.push({
 			kind,
 			body,
-			release: () => {
+			settled: false,
+			release() {
+				if (this.settled) return;
+				this.settled = true;
 				inFlight -= 1;
 				resolve(at === 'send' ? (early as T) : handle());
 			},
-			fail: () => {
+			fail() {
+				if (this.settled) return;
+				this.settled = true;
 				inFlight -= 1;
 				reject(new Error('Internal Server Error'));
 			}
@@ -118,7 +129,17 @@ beforeEach(() => {
 			) as never
 	);
 });
-afterEach(() => {
+// A request still held when its test ends (the test failed before answering
+// it) holds the queue for every later test of the file; answer it, and any
+// the queue then starts, here.
+afterEach(async () => {
+	resetUnit();
+	for (let round = 0; round < 20; round++) {
+		const open = sent.filter((s) => !s.settled);
+		if (open.length === 0) break;
+		for (const request of open) request.release();
+		await new Promise((r) => setTimeout(r, 0));
+	}
 	vi.restoreAllMocks();
 	authStore.clearSession();
 	resetUnit();

@@ -142,13 +142,14 @@ const labelWords = (side: 'left' | 'right') => {
 	return el ? (el.getAttribute('aria-label') ?? el.textContent?.trim()) : null;
 };
 const frameImg = (side: 'left' | 'right') =>
-	frame(side)?.querySelector('img') as HTMLImageElement | null;
+	(frame(side)?.querySelector('img') as HTMLImageElement | null) ?? null;
 const zoomControl = (which: 'both' | 'left' | 'right') =>
 	document.querySelector(`[data-zoom="${which}"]`) as HTMLElement | null;
 const zoomValue = (which: 'both' | 'left' | 'right') =>
 	zoomControl(which)?.querySelector('.zc-val')?.textContent?.trim() ?? null;
 const zoomButton = (which: 'both' | 'left' | 'right', dir: 'in' | 'out') =>
-	zoomControl(which)?.querySelector(`button[data-dir="${dir}"]`) as HTMLButtonElement | null;
+	(zoomControl(which)?.querySelector(`button[data-dir="${dir}"]`) as HTMLButtonElement | null) ??
+	null;
 const chip = (side: 'left' | 'right') =>
 	document.querySelector(`[data-chip="${side}"]`) as HTMLButtonElement | null;
 const text = () => view()?.textContent ?? '';
@@ -651,8 +652,8 @@ describe('CameraCheck: are my cameras OK', () => {
 		expect(chip('left')?.textContent).toContain(`${en.badge_cam_right} · ${en.page_term_even}`);
 		expect(chip('left')?.getAttribute('title')).toBe(en.camcheck_left_page);
 		expect(chip('left')?.textContent).toContain(A2500);
-		expect(chip('left')?.querySelector('.cam-badge.ok')).not.toBeNull();
-		expect(chip('right')?.querySelector('.cam-badge.ok')).not.toBeNull();
+		expect(chip('left')?.querySelector('.cam-badge.ok') ?? null).not.toBeNull();
+		expect(chip('right')?.querySelector('.cam-badge.ok') ?? null).not.toBeNull();
 
 		await press(chip('left'));
 		const details = document.querySelector('[role="dialog"][aria-labelledby="cd-title"]')!;
@@ -673,9 +674,9 @@ describe('CameraCheck: are my cameras OK', () => {
 		devices = [device(0)];
 		renderCheck();
 		await settle();
-		expect(chip('right')?.querySelector('.cam-badge.err')).not.toBeNull();
+		expect(chip('right')?.querySelector('.cam-badge.err') ?? null).not.toBeNull();
 		expect(chip('right')?.textContent).toContain(en.camcheck_not_reachable);
-		expect(chip('left')?.querySelector('.cam-badge.ok')).not.toBeNull();
+		expect(chip('left')?.querySelector('.cam-badge.ok') ?? null).not.toBeNull();
 		expect(text()).toContain(en.camcheck_unreachable_title('right'));
 		expect(text()).toContain(en.camcheck_unreachable_body);
 		expect(frame('right')?.textContent).toContain(en.camcheck_frame_unreachable);
@@ -699,7 +700,7 @@ describe('CameraCheck: are my cameras OK', () => {
 
 describe('CameraCheck: orientation', () => {
 	const turn = (side: 'left' | 'right') =>
-		frame(side)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
+		(frame(side)?.querySelector('button[data-turn]') as HTMLButtonElement | null) ?? null;
 	const rotationOf = (img: Element | null | undefined) =>
 		img?.getAttribute('style')?.match(/rotate\((-?\d+)deg\)/)?.[1] ?? null;
 
@@ -1073,7 +1074,7 @@ describe('CameraCheck: "Change which camera is which" (NEH-343)', () => {
 
 describe('CameraCheck: one operation at a time', () => {
 	const turnBtn = (side: 'left' | 'right') =>
-		frame(side)?.querySelector('button[data-turn]') as HTMLButtonElement | null;
+		(frame(side)?.querySelector('button[data-turn]') as HTMLButtonElement | null) ?? null;
 	const takeBtn = () => button(en.camcheck_take);
 
 	// Every listing after the first waits until the test answers it.
