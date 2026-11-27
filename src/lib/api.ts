@@ -3267,6 +3267,10 @@ export interface UnitSettings {
 	} | null;
 	/** Whether operators are asked for colour card shots (NEH-340); absent from an older backend. */
 	colourCardShots?: boolean;
+	/** Who chose the mode (NEH-373); null when Captua chose it or nobody knows, and always for the testing account. */
+	modeSetBy?: string | null;
+	/** When the mode was chosen, ISO 8601 UTC (NEH-373); null when nobody knows. */
+	modeSetAt?: string | null;
 }
 
 /** A volume Captua keeps on the unit: `files` is the count it would copy offsite. */

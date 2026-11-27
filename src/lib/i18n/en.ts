@@ -2118,6 +2118,11 @@ export const en: Messages = {
 	unit_mode_fisqua_desc:
 		"Volumes come from Fisqua's queue. Handovers, status and review decisions go over the link. Operators can't create volumes; an administrator can, and each change is logged.",
 	unit_current: 'Current mode',
+	unit_mode_set_by: (name: string, date: string) => `Chosen by ${name} on ${date}.`,
+	unit_mode_set_by_unit: (date: string) =>
+		`Captua chose it when the unit first started, on ${date}.`,
+	unit_mode_set_before:
+		'Chosen with a version of Captua before 0.4.0, which did not record who chose it or when.',
 	unit_projects_title: 'Projects',
 	unit_projects_desc: 'Only in "Scanner only" mode. Off: every volume is in one list.',
 	unit_projects_toggle: 'Use projects',
