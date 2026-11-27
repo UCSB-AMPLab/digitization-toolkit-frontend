@@ -72,8 +72,11 @@
 	//
 	// Which camera is which (NEH-343): the page asks GET /cameras/setup on
 	// loading, once it has its devices, after "Reconnect cameras", when the camera check
-	// opens, when the tab comes back into view, and after a device listing
-	// that reports other bodies than the one before; never on a timer. When
+	// opens, when the tab comes back into view, after a device listing
+	// that reports other bodies than the one before, and after a capture from
+	// LiveViewport, a retake or a "Capture another here" the backend refused
+	// with 409 camera_setup_needed (NEH-427) for any reason but a camera list
+	// it could not read; never on a timer. When
 	// set-up is needed, WhichCamera opens by itself over everything and
 	// cannot be dismissed, and nothing here captures: LiveViewport's capture
 	// button is disabled and its capture key ignored (captureBlocked, and
@@ -182,7 +185,10 @@
 	// retake and placeholder paths) until the step is answered. The state is
 	// read again when the camera panel is closed, when the camera check or
 	// the Refocus dialog closes, and when the tab comes back into view: the
-	// places where exposure or zoom can have changed. Nothing is read for the
+	// places where exposure or zoom can have changed; and after a capture
+	// from LiveViewport or a "Capture another here" the backend refused with
+	// 409 colour_card_pending (NEH-425).
+	// Nothing is read for the
 	// testing account, a testing volume, a volume without a stem or with the
 	// unit's setting off.
 	//
@@ -232,6 +238,7 @@
 	import {
 		CaptureFailed,
 		captureErrorText,
+		refusalReread,
 		isRecordChanged,
 		unknownOutcomeOf
 	} from '$lib/capture-errors';
@@ -1284,7 +1291,8 @@
 			if (!sent.result.success) throw new CaptureFailed(sent.result.error);
 		} catch (error) {
 			console.error('[LivePreview] Error capturing another opening:', error);
-			showAnotherError(captureErrorText(error, $m, $userRole), error);
+			rereadAfterRefusal(error);
+			showAnotherError(captureErrorText(error, $m, $userRole, false), error);
 			unknownOutcomeOf(error)?.whenFound(() => {
 				if (anotherErrorFrom === error) showAnotherError(null);
 			});
@@ -1634,6 +1642,16 @@
 		}
 	}
 
+	// A capture refused because the unit was not ready for it (NEH-427,
+	// NEH-425): the camera set-up is read as on loading, so WhichCamera opens,
+	// or the colour card state is asked for again, so ColourCardStep opens. A
+	// camera list the backend could not read is read again by nothing here.
+	function rereadAfterRefusal(error: unknown) {
+		const reread = refusalReread(error);
+		if (reread === 'camera_setup') void checkSetup();
+		else if (reread === 'colour_card') colourCard.request();
+	}
+
 	// Reads the volume again after a capture 409, and records whether it has
 	// no stem. Resolves true when that is why the backend refused. The turn is
 	// read again too, as a 409 may be the recapture turn's.
@@ -1679,9 +1697,12 @@
 				throw error;
 			console.error('[LivePreview] Error during retake:', error);
 			if (isConflict(error) && (await recheckStem())) throw new Error($m.lv_needs_stem);
+			rereadAfterRefusal(error);
 			// The backend's text is English; the modal shows the catalogue's.
 			// The cause lets the window remove the message once the capture is found.
-			throw new Error(captureErrorText(error, $m, $userRole), { cause: error });
+			// The retake is sent in the record's mode (retake).
+			const single = !(record.capture_mode === 'dual' || record.missing_side === 'both');
+			throw new Error(captureErrorText(error, $m, $userRole, single), { cause: error });
 		}
 	}
 
@@ -2014,6 +2035,7 @@
 					{stemFormHref}
 					{stemNote}
 					onStemRefused={recheckStem}
+					onCaptureRefused={rereadAfterRefusal}
 					{pageCaptures}
 					pageCapturing={pageCapturing || colourCardShooting}
 					{captureGate}
