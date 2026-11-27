@@ -2,7 +2,7 @@
 	// The first-run wizard (NEH-336), shown while `/auth/setup/status` says the
 	// unit needs setting up; otherwise, or when the status cannot be read, the
 	// page goes to `/login`. `/welcome` and the login page lead here on a unit
-	// with no account. Three steps:
+	// with no account. Four steps:
 	//
 	// 1. Language: one button per language, each in its own. `setLanguage`
 	//    writes the cookie and loads `/setup?step=account`, so the rest of the
@@ -33,9 +33,22 @@
 	//    Every request the wizard starts is aborted when it is destroyed, and
 	//    no answer moves it afterwards.
 	// 3. Network: Settings > Network, with Continue and Set up later; both go
-	//    to the Overview.
+	//    on to step 4.
+	// 4. Time zone (NEH-366): the zones GET /system/timezone lists, the zone
+	//    the unit keeps selected. Continue sends the zone selected (PUT, only a zone the list holds) and
+	//    goes to the Overview; on a refusal it shows the sentence for its code
+	//    (timezoneRefusalText, from Settings > This unit) and stays. Set up
+	//    later goes to the Overview with no PUT. Continue waits for the zones
+	//    to be read (disabled until the read answers); while the PUT runs,
+	//    neither button acts. The state is Settings > This unit's
+	//    (ThisUnitCard's unitTimezone). When the unit cannot set the
+	//    zone (`canSet` false) the select is disabled with that reason, and
+	//    when the zone cannot be read it shows "Not available" with no select;
+	//    either way Continue goes on with no PUT.
 	//
 	// Keyboard and mouse only. Fits 800x480.
+	//
+	// Version: 0.4.0
 
 	import { onMount, untrack } from 'svelte';
 	import { pageLife, type Operation } from '$lib/page-life';
@@ -47,6 +60,15 @@
 	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 	import PasswordField from '$lib/components/PasswordField.svelte';
 	import NetworkSection from '../../(dashboard)/dashboard/config/NetworkSection.svelte';
+	import {
+		readTimezone,
+		saveTimezone,
+		nextChoice,
+		selectedZone,
+		timezoneRefusalText,
+		zoneListed,
+		unitTimezone
+	} from '../../(dashboard)/dashboard/config/ThisUnitCard.svelte';
 	import nehSeal from '$lib/assets/neh-preferred-seal-white.png';
 	import { normalizeEmail, emailFormatError } from '$lib/email-field';
 	import {
@@ -62,8 +84,8 @@
 		isPasswordTooShortRefusal
 	} from '$lib/password-rule';
 
-	type Step = 'language' | 'account' | 'network';
-	const STEPS = 3;
+	type Step = 'language' | 'account' | 'network' | 'timezone';
+	const STEPS = 4;
 
 	let step = $state<Step>(
 		untrack(() => ($page.url.searchParams.get('step') === 'account' ? 'account' : 'language'))
@@ -277,6 +299,60 @@
 	function finish() {
 		goto('/dashboard');
 	}
+
+	// Step 4, from the shared time-zone state. `tzRead` is false until this
+	// step's own read has answered.
+	let tz = $derived($unitTimezone.read);
+	let tzRead = $state(false);
+	let tzChosen = $state('');
+	let tzError = $state<string | null>(null);
+	let tzBusy = $derived($unitTimezone.saving);
+	let tzReady = $derived(tz !== null && tz !== 'failed' && tz.zones.length > 0 ? tz : null);
+	let tzKnown = $derived(
+		tzReady && tzReady.zone !== null && tzReady.zones.includes(tzReady.zone) ? tzReady.zone : null
+	);
+
+	function toTimeZone() {
+		step = 'timezone';
+		tzRead = false;
+		const op = life.begin('timezone');
+		readTimezone().then(() => {
+			if (op.current()) tzRead = true;
+		});
+	}
+
+	// The selection follows the zone kept, as in Settings > This unit: a
+	// choice the state shown no longer lists goes back to the kept zone.
+	let tzFollowed: string | undefined = undefined;
+	$effect(() => {
+		const read = tz;
+		if (!read || read === 'failed') return;
+		untrack(() => {
+			tzChosen = nextChoice(read, tzChosen, tzFollowed);
+			tzFollowed = selectedZone(read);
+		});
+	});
+
+	function laterTimeZone() {
+		if (tzBusy) return;
+		finish();
+	}
+
+	async function continueTimeZone() {
+		if (tzBusy || !tzRead) return;
+		if (!tzReady || !tzReady.canSet || !zoneListed(tzReady, tzChosen)) {
+			finish();
+			return;
+		}
+		const op = life.begin('timezone');
+		tzError = null;
+		try {
+			await saveTimezone(tzChosen);
+			if (op.current()) finish();
+		} catch (err) {
+			if (op.current()) tzError = timezoneRefusalText(err, $m);
+		}
+	}
 </script>
 
 {#if step === 'language'}
@@ -460,7 +536,7 @@
 			{/if}
 		</div>
 	</div>
-{:else}
+{:else if step === 'network'}
 	<div class="network-step">
 		<header class="network-head">
 			<p class="step">{$m.setup_step(3, STEPS)}</p>
@@ -471,8 +547,61 @@
 			<NetworkSection role="admin" />
 		</div>
 		<footer class="network-foot">
-			<button type="button" class="btn-secondary" onclick={finish}>{$m.setup_network_later}</button>
-			<button type="button" class="btn-primary" onclick={finish}>{$m.setup_network_continue}</button
+			<button type="button" class="btn-secondary" onclick={toTimeZone}
+				>{$m.setup_network_later}</button
+			>
+			<button type="button" class="btn-primary" onclick={toTimeZone}
+				>{$m.setup_network_continue}</button
+			>
+		</footer>
+	</div>
+{:else}
+	<div class="network-step">
+		<header class="network-head">
+			<p class="step">{$m.setup_step(4, STEPS)}</p>
+			<h1 class="card-title">{$m.setup_tz_title}</h1>
+			<p class="card-subtitle">{$m.setup_tz_desc}</p>
+		</header>
+		<div class="network-body tz-body">
+			<label class="field-label" for="setup-tz">{$m.this_unit_tz_label}</label>
+			{#if tzReady}
+				<select
+					id="setup-tz"
+					class="tz-select"
+					value={tzChosen}
+					disabled={!tzReady.canSet || tzBusy}
+					onchange={(e) => {
+						tzChosen = (e.currentTarget as HTMLSelectElement).value;
+						tzError = null;
+					}}
+				>
+					{#if tzKnown === null}
+						<option value="" disabled>{$m.this_unit_tz_unknown}</option>
+					{/if}
+					{#each tzReady.zones as zone (zone)}
+						<option value={zone}>{zone}</option>
+					{/each}
+				</select>
+				{#if !tzReady.canSet}
+					<p class="tz-error">{$m.this_unit_tz_err_unavailable}</p>
+				{/if}
+			{:else if tz !== null}
+				<p class="tz-value">{tz !== 'failed' && tz.zone ? tz.zone : $m.this_unit_tz_unknown}</p>
+			{/if}
+			{#if tzError}
+				<p class="tz-error" role="alert">{tzError}</p>
+			{/if}
+		</div>
+		<footer class="network-foot">
+			<button type="button" class="btn-secondary" onclick={laterTimeZone} disabled={tzBusy}
+				>{$m.setup_tz_later}</button
+			>
+			<button
+				type="button"
+				class="btn-primary"
+				onclick={continueTimeZone}
+				disabled={tzBusy || !tzRead}
+				aria-busy={tzBusy}>{$m.setup_tz_continue}</button
 			>
 		</footer>
 	</div>
@@ -834,7 +963,7 @@
 		cursor: not-allowed;
 	}
 
-	/* Step 3: the network section scrolls between a fixed head and foot. */
+	/* Steps 3 and 4: the body scrolls between a fixed head and foot. */
 	.network-step {
 		display: flex;
 		flex-direction: column;
@@ -856,6 +985,42 @@
 		min-height: 0;
 		overflow-y: auto;
 		padding: 8px 24px;
+	}
+
+	.tz-body {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		max-width: 480px;
+	}
+
+	.tz-select {
+		min-height: var(--touch-target-min);
+		max-width: 100%;
+		padding: 0 12px;
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		background-color: var(--color-surface-alt-2);
+		color: var(--color-light);
+		font-family: var(--font-family);
+		font-size: var(--text-base);
+	}
+
+	.tz-select:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.tz-value {
+		margin: 0;
+		font-size: var(--text-base);
+		color: var(--color-light-grey);
+	}
+
+	.tz-error {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--color-error);
 	}
 
 	.network-foot {

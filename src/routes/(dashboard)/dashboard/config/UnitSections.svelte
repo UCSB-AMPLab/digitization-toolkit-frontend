@@ -1,7 +1,8 @@
 <script lang="ts">
 	// The administrator's sections of Settings (/dashboard/config), under the
-	// Unit group: the unit's mode and projects setting (NEH-311, NEH-313,
-	// UnitModeCard), the link to a Fisqua workspace (NEH-345,
+	// Unit group: This unit, with the unit's mode and projects setting
+	// (NEH-311, NEH-313, UnitModeCard) and its version, time zone and kind of
+	// camera (NEH-347, ThisUnitCard), the link to a Fisqua workspace (NEH-345,
 	// FisquaLinkCard), the testing space (NEH-391, TestingSpaceCard), storage
 	// (usage, primary path, external drive), the catalogue's off-site copy and its
 	// settings (NEH-341, OffsiteSettingsCard), diagnostics, maintenance, and power. They act
@@ -24,6 +25,7 @@
 	import CatalogueBackupCard from './CatalogueBackupCard.svelte';
 	import OffsiteSettingsCard from './OffsiteSettingsCard.svelte';
 	import UnitModeCard from './UnitModeCard.svelte';
+	import ThisUnitCard from './ThisUnitCard.svelte';
 	import FisquaLinkCard from './FisquaLinkCard.svelte';
 	import TestingSpaceCard from './TestingSpaceCard.svelte';
 	import FreeableVolumes from './FreeableVolumes.svelte';
@@ -332,11 +334,14 @@
 </script>
 
 {#if section === 'unit-mode'}
-	<!-- The unit's mode comes first: it decides what leaves the unit and where
-       its volumes come from (NEH-311). -->
+	<!-- This unit comes first. The mode decides what leaves the unit and where
+       its volumes come from (NEH-311); below it, the version, the time zone
+       and the kind of camera (NEH-347). -->
 	<div class="config-section" id="unit-mode">
 		<h2 class="section-title">{$m.unit_section_title}</h2>
+		<p class="section-desc">{$m.unit_section_desc}</p>
 		<UnitModeCard />
+		<ThisUnitCard />
 	</div>
 {/if}
 
@@ -837,6 +842,14 @@
 		font-weight: var(--fw-bold);
 		color: var(--color-light);
 		margin: 0 0 14px;
+	}
+
+	.section-desc {
+		margin: -6px 0 14px;
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
+		line-height: 1.5;
+		max-width: 760px;
 	}
 
 	.config-card {

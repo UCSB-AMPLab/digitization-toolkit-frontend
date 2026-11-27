@@ -1,7 +1,8 @@
 <script lang="ts">
-	// Configuración → Modo del equipo (NEH-311, NEH-313), admin only as the
-	// page is. The three modes as a radio group, each with its description;
-	// Guardar is enabled only for a change. The projects switch is enabled only
+	// Configuración → Este equipo, the mode card (NEH-311, NEH-313), admin
+	// only as the page is. Its description says what the mode decides. The
+	// three modes as a radio group, each with its description; Guardar is
+	// enabled only for a change. The projects switch is enabled only
 	// with "Solo en el escáner" picked, and goes in the same PUT /system/unit,
 	// which sends only what changed. Leaving Fisqua mode asks first, since
 	// handovers not yet sent wait on the unit.
@@ -182,12 +183,11 @@
 	}
 </script>
 
-<p class="unit-desc">{$m.unit_section_desc}</p>
-
 {#if loaded && !$unitState}
 	<p class="unit-load-error" role="alert">{$m.unit_err_load}</p>
 {:else if $unitState}
 	<div class="unit-card">
+		<p class="unit-desc">{$m.unit_mode_card_desc}</p>
 		<fieldset class="unit-modes">
 			<legend class="unit-legend">{$m.unit_mode_legend}</legend>
 			{#each UNIT_MODES as mode (mode)}
@@ -337,7 +337,7 @@
 
 <style>
 	.unit-desc {
-		margin: -6px 0 14px;
+		margin: 0;
 		font-size: var(--text-sm);
 		color: var(--color-light-grey);
 		line-height: 1.5;
