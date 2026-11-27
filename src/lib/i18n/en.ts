@@ -2920,6 +2920,7 @@ export const en: Messages = {
 	offsite_set_stick_not_deleted:
 		'Captua could not delete the file from the stick. Delete it yourself before the stick leaves the unit.',
 	offsite_set_stick_kept: 'The file is still on the stick.',
+	offsite_set_switch_mode: 'Choose "Offsite copy only" in the Unit mode section',
 	offsite_err_busy: 'Captua is capturing or sending right now. Try again in a few minutes.',
 	offsite_err_pairing: 'Captua is linking this unit to Fisqua. Try again when that ends.',
 	offsite_err_restart_first:

@@ -3102,6 +3102,7 @@ export const es = {
 	offsite_set_stick_not_deleted:
 		'Captua no pudo borrar el archivo de la memoria. Bórralo tú antes de sacar la memoria del equipo.',
 	offsite_set_stick_kept: 'El archivo sigue en la memoria.',
+	offsite_set_switch_mode: 'Elige el modo "Solo copia externa" en la sección Modo del equipo',
 	offsite_err_busy:
 		'Hay una captura o un envío de archivos en curso. Intenta de nuevo en unos minutos.',
 	offsite_err_pairing:
