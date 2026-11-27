@@ -1,4 +1,4 @@
-// Version: 0.3.0
+// Version: 0.4.0
 
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
@@ -17,6 +17,7 @@ import {
 } from './colour-card';
 import { m } from './i18n';
 import { authStore } from './stores/auth';
+import { writeSignedOutMark } from './stores/signed-out';
 import { sessionRenewals } from './session-keepalive';
 
 /**
@@ -140,8 +141,12 @@ const SESSION_EXEMPT_ENDPOINTS = ['/auth/login', '/auth/password-reset'];
 
 // Whether a failed response means this tab's session is dead and must be
 // cleared. Shared by apiRequest() and apiRequestBlob(); the reasoning is in
-// the comment above its use in apiRequest().
-function isDeadSession(status: number, endpoint: string): boolean {
+// the comment above its use in apiRequest(). A request whose signal was
+// aborted (by its caller, or by its time limit) has no say: its caller has
+// stopped listening, and a 401 for it can arrive after a sign-in that the
+// clearing would undo (NEH-415).
+function isDeadSession(status: number, endpoint: string, signal?: AbortSignal | null): boolean {
+	if (signal?.aborted) return false;
 	if (status !== 401) return false;
 	if (SESSION_EXEMPT_ENDPOINTS.some((p) => endpoint.startsWith(p))) return false;
 	return authStore.isAuthenticated();
@@ -385,7 +390,7 @@ async function sendApiRequest<T>(endpoint: string, options: RequestInit): Promis
 		// Only meaningful in the browser: clears the stale/rejected session and
 		// routes to /login so the UI never keeps rendering as a broken
 		// "logged-in" shell against a session the backend has already rejected.
-		if (isDeadSession(response.status, endpoint) && browser) {
+		if (isDeadSession(response.status, endpoint, options.signal) && browser) {
 			endDeadSession();
 		}
 
@@ -440,7 +445,7 @@ async function sendApiRequestBlob(
 			? (detail as { message?: string }).message || JSON.stringify(detail)
 			: String(detail);
 
-		if (isDeadSession(response.status, endpoint) && browser) {
+		if (isDeadSession(response.status, endpoint, options.signal) && browser) {
 			endDeadSession();
 		}
 
@@ -543,6 +548,7 @@ export const authApi = {
 			method: 'POST',
 			body: JSON.stringify(data)
 		});
+		writeSignedOutMark(false);
 		sessionRenewals.resume();
 	},
 
@@ -564,9 +570,12 @@ export const authApi = {
 	 * afterwards whatever the answer, and also when the backend cannot be
 	 * reached or does not answer within LOGOUT_TIMEOUT_MS; the cookie then
 	 * stays until it expires. At most SESSION_REFRESH_TIMEOUT_MS plus
-	 * LOGOUT_TIMEOUT_MS in all.
+	 * LOGOUT_TIMEOUT_MS in all. The sign-out mark (stores/signed-out.ts) is
+	 * set first, so a cookie the backend did not delete restores no session;
+	 * a successful login() clears it.
 	 */
 	async logout(): Promise<void> {
+		writeSignedOutMark(true);
 		return signOut(
 			(async () => {
 				await sessionRenewals.stop();
@@ -610,10 +619,11 @@ export const usersApi = {
 	 * Get the authenticated user's own profile (including role).
 	 * Used to validate the session cookie — on session start/reload and
 	 * after login — since /users/me requires a valid, active-user session
-	 * and 401s otherwise.
+	 * and 401s otherwise. `signal` cancels the request; a cancelled request
+	 * ends no session, whatever it is answered (isDeadSession).
 	 */
-	async me(): Promise<User> {
-		return apiRequest<User>('/users/me');
+	async me(signal?: AbortSignal): Promise<User> {
+		return apiRequest<User>('/users/me', signal ? { signal } : {});
 	},
 
 	/** Store the signed-in person's own language (any role); returns the user. */

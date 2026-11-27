@@ -186,13 +186,14 @@
 	// testing account, a testing volume, a volume without a stem or with the
 	// unit's setting off.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { focusCheckNeeded, recordFocusActivity } from '$lib/focus-check';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { authStore, userRole } from '$lib/stores/auth';
+	import { requireSession, savedUser } from '$lib/stores/session';
 	import {
 		canCapture,
 		canOverrideRecaptureTurn,
@@ -816,8 +817,11 @@
 		cameraStatus.reportNotice(value);
 	}
 	let destroyed = false;
+	// The session check on arrival (stores/session.ts), stopped when the screen goes.
+	const sessionCheck = new AbortController();
 	onDestroy(() => {
 		destroyed = true;
+		sessionCheck.abort();
 		pageCheckController?.abort();
 		cancelSlow?.();
 		reconciler.stopAll();
@@ -1342,9 +1346,13 @@
 		// The capture screen is for admin and operator only. A reviewer cannot
 		// trigger captures or delete (the backend answers 403 in
 		// cameras.py/records.py), and this route sits outside the (dashboard)
-		// group, so it checks the role itself (NEH-66). The testing account
-		// (NEH-391) captures into its own volumes.
-		if (!authStore.requireSession()) return;
+		// group, so it checks the session and the role itself (NEH-66). With no
+		// saved user the session is asked of the backend (NEH-415); a saved
+		// user (savedUser: none after a sign-out in this browser), which
+		// requireSession takes as it is, goes on in this same task, so the
+		// screen's first reads start at once. The testing account (NEH-391)
+		// captures into its own volumes.
+		if (!savedUser() && !(await requireSession({ signal: sessionCheck.signal }))) return;
 		if (!canCapture(authStore.getUser()?.role)) {
 			goto('/dashboard');
 			return;

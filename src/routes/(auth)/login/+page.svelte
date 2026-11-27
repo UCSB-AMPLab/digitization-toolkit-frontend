@@ -3,6 +3,12 @@
 	// `/users/me` returns (NEH-117), and it tells bad credentials, a login
 	// lockout and an unreachable backend apart so each gets its own message.
 	// The footer shows whether the backend answers.
+	// A saved user is sent on at once. With none, the page asks `/users/me`
+	// once on arrival, with the cookie the browser has (stores/session.ts,
+	// NEH-415): a 200 opens the session and sends the person on; a 401, or no
+	// answer, leaves the form. After a sign-out in this browser, until the
+	// next sign-in, nothing is asked and the form stays (the sign-out mark,
+	// stores/signed-out.ts). A sign-in stops that check.
 	// The page has no language picker: it is shown in the unit's language
 	// (hooks.server.ts renders it so; on a client-side visit, after a sign-out,
 	// the store is set from `/auth/setup/status`). A unit with no account yet
@@ -15,9 +21,9 @@
 	// language is never applied: its request is aborted and its answer
 	// ignored, also after the page is gone. The dashboard is loaded anew in
 	// the person's language only when this browser kept the signed-in user
-	// (read back from storage); otherwise a reload would arrive with no
-	// session, so the cookie and the language are set and the page goes on
-	// without a reload. The footer links to the credits page.
+	// (read back from storage); otherwise the cookie and the language are set
+	// and the page goes on without a reload (lib/language-switch.ts). The
+	// footer links to the credits page.
 	// After a person's own password change the app ends the session and opens
 	// this page with loginNotice set: the confirmation is shown above the form,
 	// as a status region, and the notice is cleared when the page is left, so
@@ -30,6 +36,7 @@
 	import { authApi, healthApi, usersApi } from '$lib/api';
 	import { classifyLoginError, describeLockout } from '$lib/login-error';
 	import { authStore, isUserRole } from '$lib/stores/auth';
+	import { checkSession, savedUser } from '$lib/stores/session';
 	import { get } from 'svelte/store';
 	import { m, locale, storeLanguage, isLocale, type Locale } from '$lib/i18n';
 	import { switchLanguage } from '$lib/language-switch';
@@ -66,13 +73,29 @@
 	onDestroy(() => loginNotice.set(null));
 
 	onMount(async () => {
-		// A signed-in user has no reason to see the login form.
-		if (authStore.isAuthenticated()) {
+		// A signed-in user has no reason to see the login form. A user saved
+		// beside the sign-out mark is not one (stores/session.ts).
+		if (savedUser()) {
 			goto('/');
 			return;
 		}
+		void followSession();
 		void followUnit();
 		await checkConnection();
+	});
+
+	// With no saved user, the cookie the browser has may still hold a session
+	// (NEH-415): /users/me is asked once, and a 200 opens the session and
+	// sends the person on, as for a saved user. A 401, or no answer, leaves the
+	// form. A sign-in stops the check, so its answer cannot set a session or
+	// navigate during the sign-in.
+	async function followSession() {
+		const op = life.begin('session');
+		const outcome = await checkSession({ wait: false, signal: op.signal });
+		if (op.current() && outcome.kind === 'valid') goto('/');
+	}
+	$effect(() => {
+		if (isLoading) life.stop('session');
 	});
 
 	// A unit with no account goes to the wizard; otherwise the page takes the

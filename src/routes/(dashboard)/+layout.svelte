@@ -24,15 +24,16 @@
 	// The network status above the user button (NetworkIndicator, NEH-253)
 	// is every role's and links to Settings > Network.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
 	import { tour } from '$lib/tour';
-	import { usersApi, recordsApi, endRejectedSession } from '$lib/api';
-	import { waitForSession, sessionRetryDelay } from '$lib/session-check';
+	import { recordsApi } from '$lib/api';
+	import { sessionRetryDelay } from '$lib/session-check';
+	import { checkSession } from '$lib/stores/session';
 	import { m, roleLabel, type StringMessageKey } from '$lib/i18n';
 	import CaptuaLogo from '$lib/components/CaptuaLogo.svelte';
 	import BugReportButton from '$lib/bug-report/BugReportButton.svelte';
@@ -85,7 +86,10 @@
 		// that the backend still accepts the session cookie (it may have
 		// expired, or the user may have been deactivated), so the session is
 		// checked with `/users/me` before any protected content is shown
-		// (NEH-63).
+		// (NEH-63). A browser that saved no user (a private window, blocked or
+		// cleared site data) is asked the same way, with the cookie it has, and
+		// a 200 opens the session as for a saved user (NEH-415,
+		// stores/session.ts).
 		//
 		// Only a 401/403 invalidates the session. Any other error must not send
 		// the user to /login with the session still set: /login, seeing the
@@ -95,28 +99,22 @@
 		// the validation is retried with a growing delay (2 s to 10 s).
 		const controller = new AbortController();
 		(async () => {
-			if (!authStore.getUser()) {
-				goto('/login');
-				return;
-			}
-			const outcome = await waitForSession(() => usersApi.me(), {
+			// On a 200 checkSession refreshes the user in the store (the role may
+			// have changed on the backend since the last login) before rendering.
+			// On a 401 or 403 it ends a session still set: `apiRequest` ends it on
+			// a 401 but not on a 403, and with the session set /login would
+			// redirect back here and the loop would return.
+			const outcome = await checkSession({
+				revalidate: true,
 				signal: controller.signal,
 				delay: sessionRetryDelay,
 				onWaiting: (waiting) => (isWaitingForBackend = waiting)
 			});
 			if (outcome.kind === 'cancelled') return;
 			if (outcome.kind === 'valid') {
-				// Refresh the user in the store (the role may have changed on the
-				// backend since the last login) before rendering.
-				authStore.setSession(outcome.user);
 				// A capture key this browser assigned before the unit held one (NEH-336).
 				void carryOverCaptureKey(outcome.user.role);
 			} else {
-				// `apiRequest` ends the session on a 401 but not on a 403. If
-				// the session stayed set, /login would redirect back here and the
-				// loop would return, so it is ended in both cases, once: a
-				// renewal in flight is followed by a logout.
-				if (authStore.isAuthenticated()) endRejectedSession();
 				goto('/login');
 			}
 			isValidatingSession = false;

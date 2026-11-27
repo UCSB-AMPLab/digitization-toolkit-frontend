@@ -20,12 +20,13 @@
 	// notice under the bar (AdoptionNotice): the administrator's with
 	// Repair, one line for the other roles.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth';
+	import { requireSession } from '$lib/stores/session';
 	import { m } from '$lib/i18n';
 	import UserMenu from '$lib/components/UserMenu.svelte';
 	import VolumeOffsiteIndicator from '$lib/components/VolumeOffsiteIndicator.svelte';
@@ -65,14 +66,25 @@
 
 	let currentUser = $state<any>(null);
 
+	// The session guard (NEH-66, NEH-415): on arrival the session is checked
+	// as on the capture screen (stores/session.ts), which asks the backend when
+	// no user is saved; once checked, a session ended while the gallery is open
+	// sends the browser to /login.
 	onMount(() => {
+		const sessionCheck = new AbortController();
+		let checked = false;
 		const unsub = authStore.subscribe((s) => {
 			currentUser = s.user;
-			// Shared session guard (NEH-66), also used by live-preview and the page.
-			authStore.requireSession();
+			if (checked) authStore.requireSession();
+		});
+		void requireSession({ signal: sessionCheck.signal }).then(() => {
+			checked = !sessionCheck.signal.aborted;
 		});
 		ensureUnit();
-		return unsub;
+		return () => {
+			sessionCheck.abort();
+			unsub();
+		};
 	});
 
 	// The move of captures (NEH-419, NEH-420), from the volume read in +layout.ts.
