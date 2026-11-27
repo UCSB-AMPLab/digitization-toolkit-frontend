@@ -1073,6 +1073,10 @@ export const en: Messages = {
 	setup_network_desc: 'Connect the unit to a network now, or later in Settings › Network.',
 	setup_network_continue: 'Continue',
 	setup_network_later: 'Set up later',
+	setup_tz_title: "Choose the unit's time zone",
+	setup_tz_desc: 'Choose it now, or later in Settings › This unit.',
+	setup_tz_continue: 'Continue',
+	setup_tz_later: 'Set up later',
 	setup_err_exists: 'That username or email already exists',
 	setup_err_create: 'Could not create the account. Check the server connection.',
 	setup_token_label: 'Bootstrap token',
@@ -2112,9 +2116,26 @@ export const en: Messages = {
 	unit_mode_offline: 'Scanner only',
 	unit_mode_backup: 'Offsite copy only',
 	unit_mode_fisqua: 'Fisqua',
-	unit_section_title: 'Unit mode',
-	unit_section_desc:
+	unit_section_title: 'This unit',
+	unit_section_desc: "This unit's mode, Captua version, time zone and kind of camera.",
+	unit_mode_card_desc:
 		'Decides what leaves this unit and where its volumes come from. Changing it moves no volume or record.',
+	// ── This unit: version, time zone, kind of camera (NEH-347) ───────────
+	this_unit_version: 'Captua version',
+	this_unit_version_unknown: 'Not available',
+	this_unit_tz_label: 'Time zone',
+	this_unit_tz_desc:
+		"Captua uses this time zone for the dates and times on the unit's own screen. Updating Captua keeps it.",
+	this_unit_tz_unknown: 'Not available',
+	this_unit_tz_save: 'Save time zone',
+	this_unit_tz_saved: 'Time zone saved.',
+	this_unit_tz_err_unknown: 'Captua does not recognize that time zone. Choose one from the list.',
+	this_unit_tz_err_unavailable:
+		"This unit's version of Captua cannot change the time zone. Update Captua, then try again.",
+	this_unit_tz_err_failed: 'The time zone could not be changed. Try again.',
+	this_unit_camera_kind: 'Kind of camera',
+	this_unit_camera_kind_unknown: 'Not available',
+	this_unit_camera_kind_link: 'Change it in Settings › Cameras',
 	unit_mode_legend: 'Mode',
 	unit_mode_offline_desc:
 		'Captua keeps the images and the catalog only on this unit. Volumes are created here.',
@@ -2920,7 +2941,7 @@ export const en: Messages = {
 	offsite_set_stick_not_deleted:
 		'Captua could not delete the file from the stick. Delete it yourself before the stick leaves the unit.',
 	offsite_set_stick_kept: 'The file is still on the stick.',
-	offsite_set_switch_mode: 'Choose "Offsite copy only" in the Unit mode section',
+	offsite_set_switch_mode: 'Choose "Offsite copy only" in Settings › This unit',
 	offsite_err_busy: 'Captua is capturing or sending right now. Try again in a few minutes.',
 	offsite_err_pairing: 'Captua is linking this unit to Fisqua. Try again when that ends.',
 	offsite_err_restart_first:

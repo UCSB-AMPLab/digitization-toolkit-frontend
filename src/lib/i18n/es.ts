@@ -1126,6 +1126,10 @@ export const es = {
 	setup_network_desc: 'Puedes hacerlo ahora o más tarde, en Configuración › Red.',
 	setup_network_continue: 'Continuar',
 	setup_network_later: 'Configurar más tarde',
+	setup_tz_title: 'Elige la zona horaria del equipo',
+	setup_tz_desc: 'Puedes hacerlo ahora o más tarde, en Configuración › Este equipo.',
+	setup_tz_continue: 'Continuar',
+	setup_tz_later: 'Configurar más tarde',
 	setup_err_exists: 'Ya hay una cuenta con ese usuario o ese correo.',
 	setup_err_create: 'No se pudo crear la cuenta. Revisa la conexión con el equipo.',
 	setup_token_label: 'Token de arranque',
@@ -2256,9 +2260,27 @@ export const es = {
 	unit_mode_offline: 'Solo en el escáner',
 	unit_mode_backup: 'Solo copia externa',
 	unit_mode_fisqua: 'Fisqua',
-	unit_section_title: 'Modo del equipo',
+	unit_section_title: 'Este equipo',
 	unit_section_desc:
+		'Aquí están el modo, la versión de Captua, la zona horaria y el tipo de cámara de este equipo.',
+	unit_mode_card_desc:
 		'Define qué envía Captua fuera de este equipo y de dónde vienen los volúmenes. Cambiar el modo no mueve ningún volumen ni registro.',
+	// ── Este equipo: versión, zona horaria, tipo de cámara (NEH-347) ───────
+	this_unit_version: 'Versión de Captua',
+	this_unit_version_unknown: 'No disponible',
+	this_unit_tz_label: 'Zona horaria',
+	this_unit_tz_desc:
+		'Captua usa esta zona horaria para las fechas y horas de la pantalla del propio equipo. La zona se conserva cuando se actualiza Captua.',
+	this_unit_tz_unknown: 'No disponible',
+	this_unit_tz_save: 'Guardar la zona horaria',
+	this_unit_tz_saved: 'Zona horaria guardada.',
+	this_unit_tz_err_unknown: 'Captua no reconoce esa zona horaria. Elige una de la lista.',
+	this_unit_tz_err_unavailable:
+		'Este equipo tiene una versión de Captua que no permite cambiar la zona horaria. Actualiza Captua y vuelve a intentarlo.',
+	this_unit_tz_err_failed: 'No se pudo cambiar la zona horaria. Vuelve a intentarlo.',
+	this_unit_camera_kind: 'Tipo de cámara',
+	this_unit_camera_kind_unknown: 'No disponible',
+	this_unit_camera_kind_link: 'Cámbialo en Configuración › Cámaras',
 	unit_mode_legend: 'Modo',
 	unit_mode_offline_desc:
 		'Captua guarda las imágenes y el catálogo solo en este equipo. Los volúmenes se crean aquí.',
@@ -3102,7 +3124,7 @@ export const es = {
 	offsite_set_stick_not_deleted:
 		'Captua no pudo borrar el archivo de la memoria. Bórralo tú antes de sacar la memoria del equipo.',
 	offsite_set_stick_kept: 'El archivo sigue en la memoria.',
-	offsite_set_switch_mode: 'Elige el modo "Solo copia externa" en la sección Modo del equipo',
+	offsite_set_switch_mode: 'Elige el modo "Solo copia externa" en Configuración › Este equipo',
 	offsite_err_busy:
 		'Hay una captura o un envío de archivos en curso. Intenta de nuevo en unos minutos.',
 	offsite_err_pairing:

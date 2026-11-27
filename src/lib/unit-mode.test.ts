@@ -2,7 +2,7 @@
 // reads them: the GET /system/unit body checked for shape, the labels, the
 // translated 409 problems, and the gates each screen asks.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import { describe, expect, it } from 'vitest';
 import { es } from './i18n/es';
@@ -63,6 +63,13 @@ describe('readUnitState', () => {
 		expect(readUnitState({ ...body, defaultLanguage: 'en' })?.defaultLanguage).toBe('en');
 		expect(readUnitState(body)?.defaultLanguage).toBeUndefined();
 		expect(readUnitState({ ...body, defaultLanguage: 'pt' })?.defaultLanguage).toBeUndefined();
+	});
+
+	it("reads the unit's Captua version, and leaves it out when absent or not a string (NEH-347)", () => {
+		expect(readUnitState({ ...body, version: '0.4.0' })?.version).toBe('0.4.0');
+		expect(readUnitState({ ...body, version: 'unknown' })?.version).toBe('unknown');
+		expect(readUnitState(body)?.version).toBeUndefined();
+		expect(readUnitState({ ...body, version: 4 })?.version).toBeUndefined();
 	});
 
 	it('takes a missing default project and prerequisites as none', () => {

@@ -54,6 +54,9 @@ export interface UnitState {
 	// When the mode was chosen (ISO 8601); null when nobody knows, as for a
 	// mode chosen before 0.4.0. Absent from an older backend.
 	modeSetAt?: string | null;
+	// The unit's Captua release (NEH-347), "unknown" when the backend cannot
+	// read it. Absent from an older backend.
+	version?: string;
 }
 
 export interface KeptVolume {
@@ -107,7 +110,8 @@ export function readUnitState(data: unknown): UnitState | null {
 		...('captureKey' in d ? { captureKey: readChordValue(d.captureKey) } : {}),
 		...(typeof d.colourCardShots === 'boolean' ? { colourCardShots: d.colourCardShots } : {}),
 		...(typeof d.modeSetBy === 'string' || d.modeSetBy === null ? { modeSetBy: d.modeSetBy } : {}),
-		...(typeof d.modeSetAt === 'string' || d.modeSetAt === null ? { modeSetAt: d.modeSetAt } : {})
+		...(typeof d.modeSetAt === 'string' || d.modeSetAt === null ? { modeSetAt: d.modeSetAt } : {}),
+		...(typeof d.version === 'string' ? { version: d.version } : {})
 	};
 }
 

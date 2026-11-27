@@ -1232,8 +1232,8 @@ describe.each(['en', 'es'] as const)('Offsite settings: the link to Unit mode (%
 	beforeEach(() => locale.set(l));
 	const text =
 		l === 'en'
-			? 'Choose "Offsite copy only" in the Unit mode section'
-			: 'Elige el modo "Solo copia externa" en la sección Modo del equipo';
+			? 'Choose "Offsite copy only" in Settings › This unit'
+			: 'Elige el modo "Solo copia externa" en Configuración › Este equipo';
 	const link = () => page.getByRole('link', { name: text, exact: true });
 
 	it('has the approved text in the message table', () => {

@@ -1,12 +1,17 @@
-// The first-run wizard (NEH-336): language, administrator account, network.
+// The first-run wizard (NEH-336, NEH-366): language, administrator account,
+// network, time zone.
 // It shows only while the unit needs setting up. Step 1 sets the language
 // through the cookie and reloads into step 2. At the unit's own screen (the
 // direct status call says local) the account is created at the backend's
 // direct address with no token; anywhere else the form asks for the
 // bootstrap token and says that set-up is meant to be done at the unit.
 // Either way the new administrator is signed in at once and step 3 hosts
-// Settings > Network with Continue and Set up later, both to the Overview.
+// Settings > Network with Continue and Set up later, both to step 4, the
+// unit's time zone: Continue sends the zone chosen and goes to the Overview,
+// staying with the reason on a refusal; Set up later goes there with no PUT.
 // It fits 800x480 and 1280x800.
+//
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
@@ -40,6 +45,7 @@ import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import '../../../app.css';
 import SetupPage from './+page.svelte';
+import * as thisUnitModule from '../../(dashboard)/dashboard/config/ThisUnitCard.svelte';
 
 const store = () => pageStore.value as ReturnType<typeof writable<{ url: URL }>>;
 
@@ -62,6 +68,8 @@ let statusFails: boolean;
 let loginGate: Promise<void> | null;
 let meGate: Promise<void> | null;
 let loginFails: boolean;
+let tzAnswer: () => Response | Promise<Response>;
+let tzPutAnswer: () => Response | Promise<Response>;
 
 function json(body: unknown, status = 200) {
 	return new Response(JSON.stringify(body), {
@@ -69,6 +77,8 @@ function json(body: unknown, status = 200) {
 		headers: { 'Content-Type': 'application/json' }
 	});
 }
+
+const TZ_ZONES = ['America/Bogota', 'Europe/Madrid', 'UTC'];
 
 const ADMIN = {
 	id: 1,
@@ -94,6 +104,8 @@ beforeEach(() => {
 	loginGate = null;
 	meGate = null;
 	loginFails = false;
+	tzAnswer = () => json({ zone: 'America/Bogota', zones: TZ_ZONES, canSet: true });
+	tzPutAnswer = () => json({ zone: 'Europe/Madrid' });
 	vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const url = new URL(typeof input === 'string' ? input : (input as Request).url);
 		const headers: Record<string, string> = {};
@@ -128,6 +140,8 @@ beforeEach(() => {
 			if (meGate) await meGate;
 			return json(ADMIN);
 		}
+		if (url.pathname === '/system/timezone')
+			return init?.method === 'PUT' ? tzPutAnswer() : tzAnswer();
 		if (url.pathname.startsWith('/network/'))
 			return json({ detail: 'Network settings are not available on this device.' }, 501);
 		return json({});
@@ -136,6 +150,7 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks();
 	authStore.clearSession();
+	(thisUnitModule as { resetUnitTimezone?: () => void }).resetUnitTimezone?.();
 });
 
 function atAccountStep() {
@@ -299,13 +314,179 @@ describe('first-run wizard: step 3, network', () => {
 			.toBeInTheDocument();
 	});
 
+	it('is step 3 of 4, after the account step, which is step 2 of 4', async () => {
+		atAccountStep();
+		render(SetupPage);
+		await expect.element(page.getByText(en.setup_step(2, 4), { exact: true })).toBeVisible();
+		await expect.poll(() => calls.some((c) => c.credentials === 'omit')).toBe(true);
+		await fillAccount();
+		await userEvent.click(page.getByRole('button', { name: en.setup_submit }));
+		await expect.element(page.getByText(en.setup_step(3, 4), { exact: true })).toBeVisible();
+	});
+
 	for (const label of [en.setup_network_continue, en.setup_network_later]) {
-		it(`${label} finishes the wizard and goes to the Overview`, async () => {
+		it(`${label} goes on to the time-zone step`, async () => {
 			await toNetwork();
 			await userEvent.click(page.getByRole('button', { name: label }));
-			expect(gotoMock).toHaveBeenCalledWith('/dashboard');
+			await expect.element(page.getByRole('heading', { name: en.setup_tz_title })).toBeVisible();
+			expect(gotoMock).not.toHaveBeenCalledWith('/dashboard');
 		});
 	}
+});
+
+describe.each([
+	['en', en],
+	['es', es]
+] as const)('first-run wizard: step 4, time zone (%s)', (lang, msgs) => {
+	const select = () => page.getByRole('combobox', { name: msgs.this_unit_tz_label });
+	const puts = () => calls.filter((c) => c.path === '/system/timezone' && c.method === 'PUT');
+
+	// The account step is filled in English (fillAccount); the language is
+	// switched once the network step is shown.
+	async function toTimeZone() {
+		atAccountStep();
+		render(SetupPage);
+		await expect.poll(() => calls.some((c) => c.credentials === 'omit')).toBe(true);
+		await fillAccount();
+		await userEvent.click(page.getByRole('button', { name: en.setup_submit }));
+		await expect.element(page.getByRole('heading', { name: en.setup_network_title })).toBeVisible();
+		locale.set(lang);
+		await userEvent.click(page.getByRole('button', { name: msgs.setup_network_continue }));
+		await expect.element(page.getByRole('heading', { name: msgs.setup_tz_title })).toBeVisible();
+	}
+
+	it('is step 4 of 4, with its description and the zones, the current one selected', async () => {
+		await toTimeZone();
+		await expect.element(page.getByText(msgs.setup_step(4, 4), { exact: true })).toBeVisible();
+		await expect.element(page.getByText(msgs.setup_tz_desc, { exact: true })).toBeVisible();
+		await expect.element(select()).toHaveValue('America/Bogota');
+		const options = [...(select().element() as HTMLSelectElement).options].map((o) => o.value);
+		expect(options).toEqual(TZ_ZONES);
+		expect(gotoMock).not.toHaveBeenCalledWith('/dashboard');
+	});
+
+	it(`${msgs.setup_tz_continue} sends the zone chosen, then goes to the Overview`, async () => {
+		await toTimeZone();
+		await userEvent.selectOptions(select(), 'Europe/Madrid');
+		await userEvent.click(page.getByRole('button', { name: msgs.setup_tz_continue }));
+		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard'));
+		expect(puts().map((c) => c.body)).toEqual([{ zone: 'Europe/Madrid' }]);
+	});
+
+	it(`${msgs.setup_tz_continue} sends the current zone when none other was chosen`, async () => {
+		await toTimeZone();
+		await userEvent.click(page.getByRole('button', { name: msgs.setup_tz_continue }));
+		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard'));
+		expect(puts().map((c) => c.body)).toEqual([{ zone: 'America/Bogota' }]);
+	});
+
+	for (const [status, code, key] of [
+		[422, 'unknown_zone', 'this_unit_tz_err_unknown'],
+		[503, 'timezone_unavailable', 'this_unit_tz_err_unavailable'],
+		[500, 'timezone_set_failed', 'this_unit_tz_err_failed']
+	] as const) {
+		it(`a ${status} refusal shows ${key} and stays on the step`, async () => {
+			tzPutAnswer = () => json({ detail: { code, message: 'English refusal' } }, status);
+			await toTimeZone();
+			await userEvent.click(page.getByRole('button', { name: msgs.setup_tz_continue }));
+			await expect.element(page.getByText(msgs[key], { exact: true })).toBeVisible();
+			expect(document.body.textContent).not.toContain('English refusal');
+			expect(gotoMock).not.toHaveBeenCalledWith('/dashboard');
+			await expect.element(page.getByRole('heading', { name: msgs.setup_tz_title })).toBeVisible();
+		});
+	}
+
+	it(`${msgs.setup_tz_later} goes to the Overview with no PUT`, async () => {
+		await toTimeZone();
+		await userEvent.selectOptions(select(), 'UTC');
+		await userEvent.click(page.getByRole('button', { name: msgs.setup_tz_later }));
+		expect(gotoMock).toHaveBeenCalledWith('/dashboard');
+		expect(puts()).toEqual([]);
+	});
+
+	// A press as the browser makes it: on a disabled button it does nothing.
+	// userEvent would wait for the button to be enabled.
+	const press = (name: string) =>
+		(page.getByRole('button', { name }).element() as HTMLButtonElement).click();
+
+	it(`${msgs.setup_tz_continue} stays disabled until the zones are read; ${msgs.setup_tz_later} works meanwhile`, async () => {
+		let answer!: () => void;
+		tzAnswer = () =>
+			new Promise((resolve) => {
+				answer = () => resolve(json({ zone: 'America/Bogota', zones: TZ_ZONES, canSet: true }));
+			});
+		await toTimeZone();
+		await expect.element(page.getByRole('button', { name: msgs.setup_tz_continue })).toBeDisabled();
+		press(msgs.setup_tz_continue);
+		await new Promise((r) => setTimeout(r, 50));
+		expect(gotoMock).not.toHaveBeenCalledWith('/dashboard');
+		await userEvent.click(page.getByRole('button', { name: msgs.setup_tz_later }));
+		expect(gotoMock).toHaveBeenCalledWith('/dashboard');
+		expect(puts()).toEqual([]);
+		answer();
+	});
+
+	it('while the PUT runs, nothing more is sent and nothing navigates; a refusal then shows and the step stays', async () => {
+		let release!: () => void;
+		tzPutAnswer = () =>
+			new Promise((resolve) => {
+				release = () =>
+					resolve(json({ detail: { code: 'unknown_zone', message: 'English refusal' } }, 422));
+			});
+		await toTimeZone();
+		await expect.element(select()).toHaveValue('America/Bogota');
+		await userEvent.click(page.getByRole('button', { name: msgs.setup_tz_continue }));
+		await expect.poll(() => puts().length).toBe(1);
+		press(msgs.setup_tz_continue);
+		press(msgs.setup_tz_continue);
+		press(msgs.setup_tz_later);
+		await new Promise((r) => setTimeout(r, 50));
+		expect(puts().length).toBe(1);
+		expect(gotoMock).not.toHaveBeenCalledWith('/dashboard');
+		release();
+		await expect
+			.element(page.getByText(msgs.this_unit_tz_err_unknown, { exact: true }))
+			.toBeVisible();
+		expect(gotoMock).not.toHaveBeenCalledWith('/dashboard');
+		await expect.element(page.getByRole('heading', { name: msgs.setup_tz_title })).toBeVisible();
+		expect(puts().length).toBe(1);
+	});
+
+	it('a zone that is not in the list is never a choice, and Continue sends no PUT for it', async () => {
+		tzAnswer = () => json({ zone: 'Mars/Olympus_Mons', zones: TZ_ZONES, canSet: true });
+		await toTimeZone();
+		await expect.element(select()).toBeVisible();
+		const el = select().element() as HTMLSelectElement;
+		expect(el.options[0].textContent?.trim()).toBe(msgs.this_unit_tz_unknown);
+		expect(el.options[0].disabled).toBe(true);
+		expect(el.selectedIndex).toBe(0);
+		expect([...el.options].map((o) => o.value)).not.toContain('Mars/Olympus_Mons');
+		await userEvent.click(page.getByRole('button', { name: msgs.setup_tz_continue }));
+		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard'));
+		expect(puts()).toEqual([]);
+	});
+
+	it('with canSet false, the select is disabled with the reason, and Continue goes on with no PUT', async () => {
+		tzAnswer = () => json({ zone: 'America/Bogota', zones: TZ_ZONES, canSet: false });
+		await toTimeZone();
+		await expect.element(select()).toBeDisabled();
+		await expect
+			.element(page.getByText(msgs.this_unit_tz_err_unavailable, { exact: true }))
+			.toBeVisible();
+		await userEvent.click(page.getByRole('button', { name: msgs.setup_tz_continue }));
+		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard'));
+		expect(puts()).toEqual([]);
+	});
+
+	it('a time zone that cannot be read shows it as not available, and Continue goes on with no PUT', async () => {
+		tzAnswer = () => json({ detail: 'x' }, 500);
+		await toTimeZone();
+		await expect.element(page.getByText(msgs.this_unit_tz_unknown, { exact: true })).toBeVisible();
+		expect(document.querySelector('select')).toBeNull();
+		await userEvent.click(page.getByRole('button', { name: msgs.setup_tz_continue }));
+		await vi.waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/dashboard'));
+		expect(puts()).toEqual([]);
+	});
 });
 
 describe('first-run wizard: answers that arrive late (review round 1)', () => {
@@ -579,6 +760,24 @@ describe('first-run wizard: fit', () => {
 				.element(page.getByRole('heading', { name: en.setup_network_title }))
 				.toBeVisible();
 			for (const label of [en.setup_network_continue, en.setup_network_later]) {
+				const r = page.getByRole('button', { name: label }).element().getBoundingClientRect();
+				expect(r.height).toBeGreaterThanOrEqual(44);
+				expect(r.bottom).toBeLessThanOrEqual(h);
+				expect(r.right).toBeLessThanOrEqual(w);
+			}
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(w + 1);
+		});
+
+		it(`the time-zone step keeps both buttons on screen at ${w}x${h}`, async () => {
+			await page.viewport(w, h);
+			atAccountStep();
+			render(SetupPage);
+			await expect.poll(() => calls.some((c) => c.credentials === 'omit')).toBe(true);
+			await fillAccount();
+			await userEvent.click(page.getByRole('button', { name: en.setup_submit }));
+			await userEvent.click(page.getByRole('button', { name: en.setup_network_continue }));
+			await expect.element(page.getByRole('heading', { name: en.setup_tz_title })).toBeVisible();
+			for (const label of [en.setup_tz_continue, en.setup_tz_later]) {
 				const r = page.getByRole('button', { name: label }).element().getBoundingClientRect();
 				expect(r.height).toBeGreaterThanOrEqual(44);
 				expect(r.bottom).toBeLessThanOrEqual(h);

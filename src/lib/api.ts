@@ -3315,6 +3315,20 @@ export interface UnitSettings {
 	modeSetBy?: string | null;
 	/** When the mode was chosen, ISO 8601 UTC (NEH-373); null when nobody knows. */
 	modeSetAt?: string | null;
+	/** The unit's Captua release (NEH-347); "unknown" when it cannot be read. Absent from an older backend. */
+	version?: string;
+}
+
+/**
+ * GET /system/timezone (NEH-347, every signed-in role): the zone the unit
+ * keeps, null when it cannot be read; the zones the unit lists; and whether
+ * this caller can set it (an administrator, on a unit whose helper has the
+ * verb).
+ */
+export interface UnitTimezone {
+	zone: string | null;
+	zones: string[];
+	canSet: boolean;
 }
 
 /** A volume Captua keeps on the unit: `files` is the count it would copy offsite. */
@@ -3424,6 +3438,23 @@ export const systemApi = {
 			method: 'PATCH',
 			body: JSON.stringify(body),
 			timeoutMs: SLOW_REQUEST_TIMEOUT_MS
+		});
+	},
+
+	/** The unit's time zone, the zones it lists and whether the caller can set it (NEH-347). */
+	async getTimezone(): Promise<UnitTimezone> {
+		return apiRequest<UnitTimezone>('/system/timezone');
+	},
+
+	/**
+	 * Set the unit's time zone (admin); answers the zone read back after the
+	 * set. A refusal carries `detail.code`: 422 unknown_zone, 503
+	 * timezone_unavailable, 500 timezone_set_failed.
+	 */
+	async setTimezone(zone: string): Promise<{ zone: string | null }> {
+		return apiRequest<{ zone: string | null }>('/system/timezone', {
+			method: 'PUT',
+			body: JSON.stringify({ zone })
 		});
 	},
 
