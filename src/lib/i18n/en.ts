@@ -2453,6 +2453,25 @@ export const en: Messages = {
 	network_badge_no_cable: 'No cable',
 	network_badge_not_connected: 'Not connected',
 	network_badge_not_available: 'Not available',
+	network_badge_off: 'Off',
+	network_badge_sign_in: 'Needs sign-in',
+	network_badge_not_installed: 'Not installed',
+	network_remote_title: 'Remote access',
+	network_remote_desc: 'How the support team reaches this unit over the internet.',
+	network_remote_not_connected:
+		'Remote access is on but not connected. It connects again when the unit is online.',
+	network_remote_off:
+		'Remote access is turned off on this unit, so the support team cannot reach it.',
+	network_remote_needs_login:
+		'Remote access is installed but not signed in, so the support team cannot reach this unit. Ask whoever installed the unit.',
+	network_remote_not_installed: 'Remote access is not installed on this unit.',
+	network_remote_unavailable: 'The remote access service is not answering. Try again in a moment.',
+	network_remote_warnings: (n: number) =>
+		n === 1
+			? 'Remote access reports 1 problem.'
+			: `Remote access reports ${formatCount(n, 'en')} problems.`,
+	network_fact_name: 'Name',
+	network_fact_addresses: 'Addresses',
 	network_eth_empty:
 		'Plug in a network cable to use a wired connection. When a cable is available it is the recommended option: it is steadier than Wi-Fi and needs no password.',
 	network_wifi_empty_can: 'Join a network from the list below.',
