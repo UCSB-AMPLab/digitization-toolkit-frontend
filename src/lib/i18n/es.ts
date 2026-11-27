@@ -1299,6 +1299,11 @@ export const es = {
 				: single
 					? 'Revisa las imágenes alrededor de esta antes de volver a capturar.'
 					: 'Revisa los pares de páginas alrededor de este antes de volver a capturar.'),
+	// A capture refused because the backend could not list the cameras (NEH-427).
+	lv_capture_camera_list_unreadable: (single: boolean): string =>
+		single
+			? 'Captua no pudo leer la lista de cámaras, así que no hizo la captura. Revisa que la cámara esté encendida y que el cable USB esté conectado. Luego vuelve a capturar.'
+			: 'Captua no pudo leer la lista de cámaras, así que no hizo la captura. Revisa que las dos cámaras estén encendidas y que los cables USB estén conectados. Luego vuelve a capturar.',
 	lv_records_unread:
 		'Captua no pudo cargar los registros de este volumen, así que todavía no se puede capturar.',
 	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
