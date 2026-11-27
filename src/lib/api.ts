@@ -3693,6 +3693,24 @@ export interface NetworkStatus {
 	problems: NetworkStatusProblem[];
 }
 
+/**
+ * GET /network/tailscale: the unit's Tailscale, by which the support team
+ * reaches it. `state` is Tailscale's BackendState (NoState, NeedsLogin,
+ * NeedsMachineAuth, Stopped, Starting, Running); `health` counts the
+ * problems Tailscale reports. Not installed: installed false, every other
+ * field null, empty or 0. A Tailscale that does not answer is a 503 with
+ * the problem `tailscale_unavailable`.
+ */
+export interface TailscaleStatus {
+	installed: boolean;
+	state: string | null;
+	online: boolean | null;
+	name: string | null;
+	addresses: string[];
+	health: number;
+	needs_login: boolean | null;
+}
+
 export type WifiSecurity = 'open' | 'password' | 'enterprise';
 
 export interface WifiNetwork {
@@ -3772,6 +3790,7 @@ export type WifiJoinRequest =
  *   of a forget of the network in use is often lost with the link, and a
  *   forget given up is treated as of unknown outcome and the state read
  *   again, so a shorter wait costs nothing.
+ * - tailscale: 5 s. It is polled with the status (stores/remote-access).
  */
 export const NETWORK_LIMITS_MS = {
 	status: 5_000,
@@ -3779,7 +3798,8 @@ export const NETWORK_LIMITS_MS = {
 	rescan: 35_000,
 	join: 10_000,
 	joinState: 5_000,
-	forget: 20_000
+	forget: 20_000,
+	tailscale: 5_000
 } as const;
 
 /** Run `request` with a signal that aborts after `ms`, or when `outer` aborts. */
@@ -3806,6 +3826,13 @@ export const networkApi = {
 	async status(signal?: AbortSignal): Promise<NetworkStatus> {
 		return bounded(NETWORK_LIMITS_MS.status, signal, (s) =>
 			apiRequest<NetworkStatus>('/network/status', { signal: s })
+		);
+	},
+
+	/** GET /network/tailscale: remote access, for the roles that read the status. */
+	async tailscale(signal?: AbortSignal): Promise<TailscaleStatus> {
+		return bounded(NETWORK_LIMITS_MS.tailscale, signal, (s) =>
+			apiRequest<TailscaleStatus>('/network/tailscale', { signal: s })
 		);
 	},
 

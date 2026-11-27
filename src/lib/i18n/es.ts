@@ -2616,6 +2616,27 @@ export const es = {
 	network_badge_no_cable: 'Sin cable',
 	network_badge_not_connected: 'Sin conexión',
 	network_badge_not_available: 'No disponible',
+	network_badge_off: 'Desactivado',
+	network_badge_sign_in: 'Falta iniciar sesión',
+	network_badge_not_installed: 'No instalado',
+	network_remote_title: 'Acceso remoto',
+	network_remote_desc:
+		'Con el acceso remoto, el soporte técnico puede conectarse a este equipo por internet.',
+	network_remote_not_connected:
+		'El acceso remoto está activado, pero no está conectado. Se vuelve a conectar cuando el equipo tenga conexión a internet.',
+	network_remote_off:
+		'El acceso remoto está desactivado en este equipo, así que el soporte técnico no puede conectarse.',
+	network_remote_needs_login:
+		'El acceso remoto está instalado, pero falta iniciar sesión, así que el soporte técnico no puede conectarse. Pregúntale a quien instaló el equipo.',
+	network_remote_not_installed: 'El acceso remoto no está instalado en este equipo.',
+	network_remote_unavailable:
+		'El servicio de acceso remoto no responde. Intenta de nuevo en un momento.',
+	network_remote_warnings: (n: number) =>
+		n === 1
+			? 'El acceso remoto reporta 1 problema.'
+			: `El acceso remoto reporta ${formatCount(n, 'es')} problemas.`,
+	network_fact_name: 'Nombre',
+	network_fact_addresses: 'Direcciones',
 	network_eth_empty:
 		'Para usar una conexión por cable, conecta un cable de red al equipo. Si hay un cable disponible, es la mejor opción: la conexión por cable es más estable que el Wi-Fi y no necesita contraseña.',
 	network_wifi_empty_can: 'Elige una red de la lista de abajo para conectar el equipo.',
