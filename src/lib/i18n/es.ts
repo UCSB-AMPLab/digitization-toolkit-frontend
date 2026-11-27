@@ -2262,6 +2262,11 @@ export const es = {
 	unit_mode_fisqua_desc:
 		'Los volúmenes vienen de la cola de Fisqua. Por el enlace con Fisqua, Captua envía los volúmenes a revisión, consulta en qué estado están y recibe los resultados de la revisión. Los operarios no pueden crear volúmenes; un administrador sí, y Captua deja constancia de cada cambio.',
 	unit_current: 'Modo actual',
+	unit_mode_set_by: (name: string, date: string) => `Lo eligió ${name} el ${date}.`,
+	unit_mode_set_by_unit: (date: string) =>
+		`Captua lo eligió al arrancar el equipo por primera vez, el ${date}.`,
+	unit_mode_set_before:
+		'Se eligió con una versión de Captua anterior a la 0.4.0, que no dejaba constancia de quién lo elegía ni de cuándo.',
 	unit_projects_title: 'Proyectos',
 	unit_projects_desc:
 		'Disponible únicamente en el modo "Solo en el escáner". Si no usas proyectos, todos los volúmenes se muestran en una sola lista.',

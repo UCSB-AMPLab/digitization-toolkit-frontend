@@ -2,7 +2,9 @@
 // radio group, Guardar only for a change, the projects switch only with
 // "Solo en el escáner" picked, a confirmation before leaving Fisqua mode,
 // and a refused switch shown as translated lines with the mode the unit
-// stays in. GET and PUT /system/unit are mocked.
+// stays in. Under the modes, a line says who chose the mode and when
+// (NEH-373), none for the testing account. GET and PUT /system/unit are
+// mocked.
 //
 // Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -363,6 +365,165 @@ describe('Modo del equipo', () => {
 				.element(page.getByText(es.unit_problem_offsite_not_configured))
 				.toBeInTheDocument();
 			expect(screen.container.textContent).not.toContain('English');
+		});
+	});
+
+	describe('who chose the mode and when (NEH-373)', () => {
+		// The test browser runs in America/Bogota (UTC-5, vite.config.ts). AT is
+		// midday UTC, the same day there; LATE is 02:00 UTC, the evening before
+		// there, so the date has to follow the browser's zone. The signed-in
+		// user is admin1; the mode is chosen by others, so the line has to name
+		// who chose it, not who is looking.
+		const AT = '2026-11-26T12:00:00+00:00';
+		const LATE = '2026-11-26T02:00:00Z';
+
+		function chosen(modeSetBy: string | null, modeSetAt: string | null, mode: Mode = 'backup') {
+			return { ...unit(mode), modeSetBy, modeSetAt };
+		}
+
+		const line = (text: string) => page.getByText(text, { exact: true });
+
+		it('names the administrator who chose it and the date', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(chosen('admin2', AT) as never);
+			render(UnitModeCard);
+			await expect
+				.element(line('Lo eligió admin2 el 26 de noviembre de 2026.'))
+				.toBeInTheDocument();
+		});
+
+		it("gives the date in the browser's time zone, the day before UTC's late at night", async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(chosen('admin2', LATE) as never);
+			render(UnitModeCard);
+			await expect
+				.element(line('Lo eligió admin2 el 25 de noviembre de 2026.'))
+				.toBeInTheDocument();
+		});
+
+		it('says Captua chose it when the unit first started, with the date', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(chosen(null, AT) as never);
+			render(UnitModeCard);
+			await expect
+				.element(
+					line(
+						'Captua lo eligió al arrancar el equipo por primera vez, el 26 de noviembre de 2026.'
+					)
+				)
+				.toBeInTheDocument();
+		});
+
+		it('says it was chosen before 0.4.0 when neither is known', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(chosen(null, null) as never);
+			render(UnitModeCard);
+			await expect
+				.element(
+					line(
+						'Se eligió con una versión de Captua anterior a la 0.4.0, que no dejaba constancia de quién lo elegía ni de cuándo.'
+					)
+				)
+				.toBeInTheDocument();
+		});
+
+		it('says it before 0.4.0 for an older backend that sends neither field', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(unit('backup') as never);
+			render(UnitModeCard);
+			await expect
+				.element(
+					line(
+						'Se eligió con una versión de Captua anterior a la 0.4.0, que no dejaba constancia de quién lo elegía ni de cuándo.'
+					)
+				)
+				.toBeInTheDocument();
+		});
+
+		it('shows the three cases in English', async () => {
+			locale.set('en');
+			const get = vi.spyOn(systemApi, 'unit').mockResolvedValue(chosen('admin2', AT) as never);
+			const first = render(UnitModeCard);
+			await expect.element(line('Chosen by admin2 on November 26, 2026.')).toBeInTheDocument();
+			first.unmount();
+			resetUnit();
+
+			get.mockResolvedValue(chosen('admin2', LATE) as never);
+			const late = render(UnitModeCard);
+			await expect.element(line('Chosen by admin2 on November 25, 2026.')).toBeInTheDocument();
+			late.unmount();
+			resetUnit();
+
+			get.mockResolvedValue(chosen(null, AT) as never);
+			const second = render(UnitModeCard);
+			await expect
+				.element(line('Captua chose it when the unit first started, on November 26, 2026.'))
+				.toBeInTheDocument();
+			second.unmount();
+			resetUnit();
+
+			get.mockResolvedValue(chosen(null, null) as never);
+			render(UnitModeCard);
+			await expect
+				.element(
+					line(
+						'Chosen with a version of Captua before 0.4.0, which did not record who chose it or when.'
+					)
+				)
+				.toBeInTheDocument();
+		});
+
+		it('shows no line to the testing account, whose answer never names who chose it', async () => {
+			authStore.setSession({
+				id: 7,
+				username: 'pruebas',
+				email: null,
+				role: 'testing',
+				is_active: true
+			});
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(chosen(null, AT) as never);
+			const screen = render(UnitModeCard);
+			await expect.element(radio('Solo copia externa')).toBeChecked();
+			expect(screen.container.textContent).not.toContain('Captua lo eligió');
+			expect(screen.container.textContent).not.toContain('Lo eligió');
+			expect(screen.container.textContent).not.toContain('anterior a la 0.4.0');
+		});
+
+		it("shows who chose the new mode and when from the PUT's answer after a switch", async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(chosen('admin2', AT) as never);
+			vi.spyOn(systemApi, 'setUnit').mockResolvedValue(
+				chosen('admin3', '2026-12-03T15:00:00+00:00', 'offline') as never
+			);
+			render(UnitModeCard);
+			await expect
+				.element(line('Lo eligió admin2 el 26 de noviembre de 2026.'))
+				.toBeInTheDocument();
+			await userEvent.click(radio('Solo en el escáner'));
+			await userEvent.click(save());
+			await expect.element(line('Lo eligió admin3 el 3 de diciembre de 2026.')).toBeInTheDocument();
+			await expect
+				.element(line('Lo eligió admin2 el 26 de noviembre de 2026.'))
+				.not.toBeInTheDocument();
+		});
+
+		it('says it before 0.4.0 until a switch, then who chose the new mode', async () => {
+			vi.spyOn(systemApi, 'unit').mockResolvedValue(chosen(null, null) as never);
+			vi.spyOn(systemApi, 'setUnit').mockResolvedValue(
+				chosen('admin3', '2026-12-03T15:00:00+00:00', 'offline') as never
+			);
+			render(UnitModeCard);
+			await expect
+				.element(
+					line(
+						'Se eligió con una versión de Captua anterior a la 0.4.0, que no dejaba constancia de quién lo elegía ni de cuándo.'
+					)
+				)
+				.toBeInTheDocument();
+			await userEvent.click(radio('Solo en el escáner'));
+			await userEvent.click(save());
+			await expect.element(line('Lo eligió admin3 el 3 de diciembre de 2026.')).toBeInTheDocument();
+			await expect
+				.element(
+					line(
+						'Se eligió con una versión de Captua anterior a la 0.4.0, que no dejaba constancia de quién lo elegía ni de cuándo.'
+					)
+				)
+				.not.toBeInTheDocument();
 		});
 	});
 
