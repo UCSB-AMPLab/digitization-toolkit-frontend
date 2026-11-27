@@ -1233,6 +1233,11 @@ export const en: Messages = {
 				: single
 					? 'Check the images around this one before you capture again.'
 					: 'Check the openings around this one before you capture again.'),
+	// A capture refused because the backend could not list the cameras (NEH-427).
+	lv_capture_camera_list_unreadable: (single: boolean) =>
+		single
+			? 'Captua could not read the list of cameras, so it captured nothing. Check that the camera is on and that its USB cable is connected. Then capture again.'
+			: 'Captua could not read the list of cameras, so it captured nothing. Check that both cameras are on and that the USB cables are connected. Then capture again.',
 	lv_records_unread: "Captua could not load this volume's records, so capture is not possible yet.",
 	lv_needs_stem: 'This volume needs a stem before you can capture into it.',
 	lv_needs_stem_link: 'Assign the stem',
@@ -2118,6 +2123,11 @@ export const en: Messages = {
 	unit_mode_fisqua_desc:
 		"Volumes come from Fisqua's queue. Handovers, status and review decisions go over the link. Operators can't create volumes; an administrator can, and each change is logged.",
 	unit_current: 'Current mode',
+	unit_mode_set_by: (name: string, date: string) => `Chosen by ${name} on ${date}.`,
+	unit_mode_set_by_unit: (date: string) =>
+		`Captua chose it when the unit first started, on ${date}.`,
+	unit_mode_set_before:
+		'Chosen with a version of Captua before 0.4.0, which did not record who chose it or when.',
 	unit_projects_title: 'Projects',
 	unit_projects_desc: 'Only in "Scanner only" mode. Off: every volume is in one list.',
 	unit_projects_toggle: 'Use projects',

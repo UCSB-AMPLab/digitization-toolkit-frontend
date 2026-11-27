@@ -1,4 +1,4 @@
-// Version: 0.3.0
+// Version: 0.4.0
 
 import { describe, expect, it, vi } from 'vitest';
 import { es } from './i18n/es';
@@ -8,7 +8,8 @@ import {
 	CaptureNotSaved,
 	CaptureOutcomeUnknown,
 	captureErrorText,
-	isStemRequired
+	isStemRequired,
+	refusalReread
 } from './capture-errors';
 
 // A stand-in for api.ts's ApiError, as in volume-stem.test.ts.
@@ -247,6 +248,119 @@ describe('captureErrorText: a volume closed by a move of its captures (NEH-419)'
 			for (const role of ['admin', 'operator']) {
 				expect(captureErrorText(refusal(), msgs, role)).toBe(msgs.adopt_closed_refusal);
 			}
+		}
+	});
+});
+
+// The two capture refusals of NEH-427 and NEH-425, as app/api/cameras.py and
+// app/core/colour_card.py send them: read by their code, never by the text.
+const setupNeeded = (reasons: string[]) =>
+	new ApiError('English', { code: 'camera_setup_needed', message: 'English', reasons }, 409);
+const cardPending = (reason: 'start' | 'begun_without') =>
+	new ApiError('English', { code: 'colour_card_pending', message: 'English', reason }, 409);
+
+describe('captureErrorText: the camera set-up and colour card refusals (NEH-427, NEH-425)', () => {
+	it('a camera list that could not be read: what to check, by the camera mode, in both languages', () => {
+		const error = setupNeeded(['camera_list_unreadable']);
+		for (const msgs of [es, en]) {
+			expect(captureErrorText(error, msgs, 'operator', true)).toBe(
+				msgs.lv_capture_camera_list_unreadable(true)
+			);
+			expect(captureErrorText(error, msgs, 'operator', false)).toBe(
+				msgs.lv_capture_camera_list_unreadable(false)
+			);
+		}
+		expect(en.lv_capture_camera_list_unreadable(true)).toBe(
+			'Captua could not read the list of cameras, so it captured nothing. Check that the camera is on and that its USB cable is connected. Then capture again.'
+		);
+		expect(en.lv_capture_camera_list_unreadable(false)).toBe(
+			'Captua could not read the list of cameras, so it captured nothing. Check that both cameras are on and that the USB cables are connected. Then capture again.'
+		);
+		expect(es.lv_capture_camera_list_unreadable(true)).toBe(
+			'Captua no pudo leer la lista de cámaras, así que no hizo la captura. Revisa que la cámara esté encendida y que el cable USB esté conectado. Luego vuelve a capturar.'
+		);
+		expect(es.lv_capture_camera_list_unreadable(false)).toBe(
+			'Captua no pudo leer la lista de cámaras, así que no hizo la captura. Revisa que las dos cámaras estén encendidas y que los cables USB estén conectados. Luego vuelve a capturar.'
+		);
+	});
+
+	it("cameras whose pages are not set: the camera step's message, in either mode", () => {
+		for (const reasons of [
+			['role_unconfirmed'],
+			['identity_missing', 'pair_changed'],
+			['identity_ambiguous'],
+			['role_conflict'],
+			['port_changed'],
+			// The list-unreadable case only when it is the one reason.
+			['camera_list_unreadable', 'role_unconfirmed'],
+			[]
+		]) {
+			for (const msgs of [es, en]) {
+				for (const single of [true, false]) {
+					expect(captureErrorText(setupNeeded(reasons), msgs, 'operator', single)).toBe(
+						msgs.camwhich_needed
+					);
+				}
+			}
+		}
+	});
+
+	it("a volume whose colour card shots are pending: the colour card step's message", () => {
+		for (const reason of ['start', 'begun_without'] as const) {
+			for (const msgs of [es, en]) {
+				for (const single of [true, false]) {
+					expect(captureErrorText(cardPending(reason), msgs, 'operator', single)).toBe(
+						msgs.cc_needed
+					);
+				}
+			}
+		}
+	});
+
+	it('is matched on the 409 and the code, not on the text', () => {
+		const other = new ApiError(
+			'English',
+			{ code: 'camera_setup_needed', reasons: ['camera_list_unreadable'] },
+			422
+		);
+		expect(captureErrorText(other, en, 'operator', true)).toBe(en.lv_capture_error);
+		expect(
+			captureErrorText(new ApiError('English', { code: 'colour_card_pending' }, 500), en)
+		).toBe(en.lv_capture_error);
+		expect(
+			captureErrorText(
+				new ApiError(
+					"The cameras' pages are not set. Confirm which page each camera photographs, then capture.",
+					undefined,
+					409
+				),
+				en
+			)
+		).toBe(en.lv_capture_error);
+	});
+});
+
+describe('refusalReread (NEH-427, NEH-425)', () => {
+	it('names the state the screen reads again after each refusal', () => {
+		expect(refusalReread(setupNeeded(['role_unconfirmed']))).toBe('camera_setup');
+		expect(refusalReread(setupNeeded(['identity_missing', 'pair_changed']))).toBe('camera_setup');
+		expect(refusalReread(setupNeeded(['camera_list_unreadable']))).toBeNull();
+		expect(refusalReread(cardPending('start'))).toBe('colour_card');
+		expect(refusalReread(cardPending('begun_without'))).toBe('colour_card');
+	});
+
+	it('names nothing for any other error', () => {
+		for (const error of [
+			new ApiError(NO_STEM, undefined, 409),
+			new ApiError('English', { code: 'recapture_turn' }, 409),
+			new ApiError('English', { code: 'colour_card_pending' }, 422),
+			new CaptureFailed('Camera 1 is not connected'),
+			new CaptureNotSaved(),
+			new Error('Failed to fetch'),
+			'boom',
+			null
+		]) {
+			expect(refusalReread(error)).toBeNull();
 		}
 	});
 });

@@ -18,7 +18,11 @@
 //   and the 507 with code `storage_reserve` for a capture below the space
 //   Captua keeps for its own work (app/core/storage_override.py), and the
 //   409 `captures_adopted_away` for a volume a move of captures closed
-//   (app/core/adopt_journal.py, NEH-419);
+//   (app/core/adopt_journal.py, NEH-419), and the two 409s of a page capture
+//   the unit is not ready for (app/api/cameras.py): `camera_setup_needed`,
+//   while the cameras' pages are not set or the backend could not list the
+//   cameras (NEH-427), and `colour_card_pending`, for a new page while the
+//   volume's colour card shots are due (NEH-425);
 // - a request answered 200 with `success: false`, which the capture screen
 //   turns into a CaptureFailed carrying the backend's `error`: a camera that
 //   is not connected, or the text of whatever failed during the capture.
@@ -33,7 +37,7 @@
 // as the wrong one. No import of api.ts, so the tests run in plain node:
 // errors are matched by shape (`status`, `message`), as volume-stem.ts does.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import type { Messages } from './i18n';
 import { isConflict, isVolumeRequired, isWrongRetakeVolume } from './volume-stem';
@@ -197,13 +201,51 @@ function isCaptureAbandoned(error: unknown): boolean {
 	);
 }
 
+// The code of a 409's detail, when the detail is an object that carries one.
+function conflictCode(error: unknown): { code: unknown; detail: Record<string, unknown> } | null {
+	if (statusOf(error) !== 409) return null;
+	const detail = (error as { detail?: unknown }).detail;
+	if (typeof detail !== 'object' || detail === null) return null;
+	return { code: (detail as { code?: unknown }).code, detail: detail as Record<string, unknown> };
+}
+
+// The 409 camera_setup_needed whose one reason is camera_list_unreadable: the
+// backend could not list the cameras to check them.
+function isCameraListUnreadable(detail: Record<string, unknown>): boolean {
+	const reasons = detail.reasons;
+	return Array.isArray(reasons) && reasons.length === 1 && reasons[0] === 'camera_list_unreadable';
+}
+
+/**
+ * What the capture screen reads again after a capture refused because the
+ * unit was not ready for it, matched on the 409 and its code: 'camera_setup'
+ * for `camera_setup_needed` (so the camera step opens), 'colour_card' for
+ * `colour_card_pending` (so the colour card step opens), and null for a camera
+ * list the backend could not read and for anything else.
+ */
+export function refusalReread(error: unknown): 'camera_setup' | 'colour_card' | null {
+	const refusal = conflictCode(error);
+	if (refusal?.code === 'camera_setup_needed')
+		return isCameraListUnreadable(refusal.detail) ? null : 'camera_setup';
+	if (refusal?.code === 'colour_card_pending') return 'colour_card';
+	return null;
+}
+
 /** Whether a capture was refused with the backend's 409 for a volume without a stem. */
 export function isStemRequired(error: unknown): boolean {
 	return isConflict(error) && error instanceof Error && error.message === STEM_REQUIRED_DETAIL;
 }
 
-/** The catalogue message for a failed capture or retake, for the signed-in `role`. */
-export function captureErrorText(error: unknown, msgs: Messages, role?: string | null): string {
+/**
+ * The catalogue message for a failed capture or retake, for the signed-in
+ * `role`; `single` says whether the capture was in single-camera mode.
+ */
+export function captureErrorText(
+	error: unknown,
+	msgs: Messages,
+	role?: string | null,
+	single = false
+): string {
 	if (error instanceof CaptureNotSaved) return msgs.lv_capture_not_saved;
 	if (error instanceof CaptureOutcomeUnknown)
 		return msgs.lv_capture_unknown(error.attempt, error.single);
@@ -227,6 +269,14 @@ export function captureErrorText(error: unknown, msgs: Messages, role?: string |
 	}
 	// A volume whose captures a move took into another volume (NEH-419) takes no capture.
 	if (isAdoptedAway(error)) return msgs.adopt_closed_refusal;
+	// The unit not ready for a page capture (NEH-427, NEH-425): matched on the code.
+	const refusal = conflictCode(error);
+	if (refusal?.code === 'camera_setup_needed') {
+		return isCameraListUnreadable(refusal.detail)
+			? msgs.lv_capture_camera_list_unreadable(single)
+			: msgs.camwhich_needed;
+	}
+	if (refusal?.code === 'colour_card_pending') return msgs.cc_needed;
 	// The recapture turn's 409 (0.2.0) carries a code: matched on it, not on its text.
 	if (isRecaptureTurnRefusal(error)) return msgs.err_recapture_turn;
 	if (isVolumeRequired(error)) return msgs.lv_err_no_volume;

@@ -51,7 +51,7 @@
 	// previews and their controls work, and there is no capture button; the
 	// capture key takes no capture (`captureReady` is false without a volume).
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount, onDestroy, tick, untrack } from 'svelte';
 	import { m } from '$lib/i18n';
@@ -132,6 +132,7 @@
 		stemFormHref = '',
 		stemNote = '',
 		onStemRefused,
+		onCaptureRefused,
 		swapped = $bindable(false),
 		pageCaptures = 0,
 		pageCapturing = false,
@@ -175,6 +176,10 @@
 		// true when it has no stem, in which case the page sets needsStem and the
 		// banner replaces the generic capture error.
 		onStemRefused?: () => Promise<boolean>;
+		// Called with the error of a refused capture that is not the no-stem
+		// 409, before the error is reported: the page reads again the state a
+		// camera set-up or colour card refusal names (NEH-427, NEH-425).
+		onCaptureRefused?: (error: unknown) => void;
 		// Whether camera 1 takes the left page of a pair. Bindable, so that the
 		// page's own dual captures (a placeholder's, NEH-317) send the same
 		// left_camera_index as this viewport's. No effect in single-camera mode.
@@ -1330,10 +1335,11 @@
 				// backend's English text is not shown.
 				return;
 			}
+			onCaptureRefused?.(error);
 			// Every backend error is English; the operator sees the catalogue's
 			// message for it, and the console has the original. The stem re-read
 			// above may have outlived the volume or the viewport.
-			if (may()) cameraStatus.reportFailure(captureErrorText(error, $m, $userRole));
+			if (may()) cameraStatus.reportFailure(captureErrorText(error, $m, $userRole, !dual));
 		} finally {
 			isCapturing = false;
 			release();

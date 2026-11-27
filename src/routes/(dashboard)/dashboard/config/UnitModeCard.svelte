@@ -21,18 +21,25 @@
 	// again and Guardar runs as usual (the leave-Fisqua confirmation
 	// included). The backend's English is never shown.
 	//
-	// GET /system/unit does not say who set the mode or when, so the board's
-	// "set by" line is left out.
+	// Under the modes, a line says who chose the stored mode and when
+	// (NEH-373, `modeSetBy` and `modeSetAt` of GET /system/unit, and of the
+	// PUT's answer after a switch): an administrator by name, Captua when the
+	// unit first started (a date and no name), or a version before 0.4.0
+	// (neither). The testing account's answer never names who chose it, so
+	// that role gets no line rather than "Captua chose it".
 	//
 	// Version: 0.4.0
 
 	import { onMount, tick } from 'svelte';
-	import { m } from '$lib/i18n';
+	import { locale, m } from '$lib/i18n';
 	import { systemApi } from '$lib/api';
+	import { authStore } from '$lib/stores/auth';
+	import { formatApiDate } from '$lib/format-date';
 	import { dismissible, toBody, trapFocus } from '$lib/dialog';
 	import {
 		UNIT_MODES,
 		ensureUnit,
+		inTestingSpace,
 		writeUnit,
 		keptDecisionNeeded,
 		modeLabel,
@@ -85,6 +92,18 @@
 		!!$unitState && selected === 'offline' && projectsEnabled !== $unitState.projectsEnabled
 	);
 	let canSave = $derived((modeChanged || projectsChanged) && !saving);
+
+	let setByLine = $derived.by(() => {
+		const s = $unitState;
+		if (!s || inTestingSpace($authStore.user?.role ?? null)) return null;
+		if (!s.modeSetAt) return $m.unit_mode_set_before;
+		const date = formatApiDate(s.modeSetAt, $locale, {
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		});
+		return s.modeSetBy ? $m.unit_mode_set_by(s.modeSetBy, date) : $m.unit_mode_set_by_unit(date);
+	});
 
 	function pick(mode: UnitMode) {
 		selected = mode;
@@ -193,6 +212,10 @@
 				</label>
 			{/each}
 		</fieldset>
+
+		{#if setByLine}
+			<p class="unit-set-by">{setByLine}</p>
+		{/if}
 
 		{#if refusal}
 			<div class="unit-refused" role="alert">
@@ -429,6 +452,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
+		line-height: 1.45;
+	}
+
+	.unit-set-by {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--color-light-grey);
 		line-height: 1.45;
 	}
 

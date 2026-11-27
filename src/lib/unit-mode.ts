@@ -19,7 +19,7 @@
 // No static import of api.ts or the auth store, so the pure helpers can be
 // tested in plain node; the loader imports them when it first runs.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import { get, writable } from 'svelte/store';
 import type { Locale, Messages } from './i18n';
@@ -47,6 +47,13 @@ export interface UnitState {
 	// Whether operators are asked for colour card shots (NEH-340). Absent from
 	// an older backend.
 	colourCardShots?: boolean;
+	// Who chose the mode (NEH-373): an administrator's username, or null when
+	// Captua chose it as the unit first started or nobody knows. Always null
+	// for the testing account. Absent from an older backend.
+	modeSetBy?: string | null;
+	// When the mode was chosen (ISO 8601); null when nobody knows, as for a
+	// mode chosen before 0.4.0. Absent from an older backend.
+	modeSetAt?: string | null;
 }
 
 export interface KeptVolume {
@@ -98,7 +105,9 @@ export function readUnitState(data: unknown): UnitState | null {
 			? { defaultLanguage: d.defaultLanguage }
 			: {}),
 		...('captureKey' in d ? { captureKey: readChordValue(d.captureKey) } : {}),
-		...(typeof d.colourCardShots === 'boolean' ? { colourCardShots: d.colourCardShots } : {})
+		...(typeof d.colourCardShots === 'boolean' ? { colourCardShots: d.colourCardShots } : {}),
+		...(typeof d.modeSetBy === 'string' || d.modeSetBy === null ? { modeSetBy: d.modeSetBy } : {}),
+		...(typeof d.modeSetAt === 'string' || d.modeSetAt === null ? { modeSetAt: d.modeSetAt } : {})
 	};
 }
 

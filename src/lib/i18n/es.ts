@@ -1299,6 +1299,11 @@ export const es = {
 				: single
 					? 'Revisa las imágenes alrededor de esta antes de volver a capturar.'
 					: 'Revisa los pares de páginas alrededor de este antes de volver a capturar.'),
+	// A capture refused because the backend could not list the cameras (NEH-427).
+	lv_capture_camera_list_unreadable: (single: boolean): string =>
+		single
+			? 'Captua no pudo leer la lista de cámaras, así que no hizo la captura. Revisa que la cámara esté encendida y que el cable USB esté conectado. Luego vuelve a capturar.'
+			: 'Captua no pudo leer la lista de cámaras, así que no hizo la captura. Revisa que las dos cámaras estén encendidas y que los cables USB estén conectados. Luego vuelve a capturar.',
 	lv_records_unread:
 		'Captua no pudo cargar los registros de este volumen, así que todavía no se puede capturar.',
 	lv_needs_stem: 'Para capturar imágenes de este volumen, primero hay que asignarle una raíz.',
@@ -2262,6 +2267,11 @@ export const es = {
 	unit_mode_fisqua_desc:
 		'Los volúmenes vienen de la cola de Fisqua. Por el enlace con Fisqua, Captua envía los volúmenes a revisión, consulta en qué estado están y recibe los resultados de la revisión. Los operarios no pueden crear volúmenes; un administrador sí, y Captua deja constancia de cada cambio.',
 	unit_current: 'Modo actual',
+	unit_mode_set_by: (name: string, date: string) => `Lo eligió ${name} el ${date}.`,
+	unit_mode_set_by_unit: (date: string) =>
+		`Captua lo eligió al arrancar el equipo por primera vez, el ${date}.`,
+	unit_mode_set_before:
+		'Se eligió con una versión de Captua anterior a la 0.4.0, que no dejaba constancia de quién lo elegía ni de cuándo.',
 	unit_projects_title: 'Proyectos',
 	unit_projects_desc:
 		'Disponible únicamente en el modo "Solo en el escáner". Si no usas proyectos, todos los volúmenes se muestran en una sola lista.',
