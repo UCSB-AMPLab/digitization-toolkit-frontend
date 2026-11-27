@@ -2871,6 +2871,75 @@ export const en: Messages = {
 		`${source} and ${target} are in different projects. The records will move to the project of ${target}.`,
 	adopt_err_ask_installer: 'Ask whoever installed the unit.',
 
+	// ── Offsite settings (Settings → Offsite copy, NEH-341) ──────────────────
+	offsite_set_title: 'Offsite settings',
+	offsite_set_desc:
+		'The bucket and the keys this unit uses for its offsite copy. Bring them on a USB stick, or type them here.',
+	offsite_set_none: 'No offsite settings are saved on this unit.',
+	offsite_set_bucket: 'Bucket',
+	offsite_set_tenant: 'Tenant',
+	offsite_set_key_id: 'Key ID',
+	offsite_set_app_key: 'Application key',
+	offsite_set_public_key: 'Catalog public key',
+	offsite_set_key_note:
+		'The keys are saved on this unit. Anyone with administrator access to the unit can read them.',
+	offsite_set_import: 'Import from a USB stick',
+	offsite_set_import_desc:
+		'Fill in the template on your computer, save it as captua-offsite.txt at the top level of a USB stick, plug the stick into the unit and mount it under Storage. Then choose it here.',
+	offsite_set_choose_drive: 'USB stick',
+	offsite_set_no_drive: 'No drive is mounted. Mount the stick under Storage first.',
+	offsite_set_enter: 'Enter by hand',
+	offsite_set_template: 'Download the template',
+	offsite_set_save: 'Check and save',
+	offsite_set_saving: 'Checking the bucket…',
+	offsite_set_replace: 'Replace the stored key',
+	offsite_set_replace_desc: 'This unit already has a different key. Saving replaces it.',
+	offsite_set_saved_restarting: 'Saved. Captua restarts to use the new settings.',
+	offsite_set_saved_restart_needed: 'Saved. Restart the unit to use the new settings.',
+	offsite_set_unchanged: "These are already the unit's settings. Nothing was changed.",
+	offsite_set_stick_deleted: 'Captua deleted the file from the stick.',
+	offsite_set_stick_not_deleted:
+		'Captua could not delete the file from the stick. Delete it yourself before the stick leaves the unit.',
+	offsite_set_stick_kept: 'The file is still on the stick.',
+	offsite_err_busy: 'Captua is capturing or sending right now. Try again in a few minutes.',
+	offsite_err_pairing: 'Captua is linking this unit to Fisqua. Try again when that ends.',
+	offsite_err_restart_first:
+		'The unit must restart before its offsite settings can change. Restart it under Power, then try again.',
+	offsite_err_unverified:
+		'Captua may have saved the settings but could not check them. Restart the unit, then check the settings here.',
+	offsite_err_overridden:
+		'The settings were saved, but other settings on the unit take their place. Ask whoever installed the unit.',
+	offsite_err_fisqua: 'This unit is linked to Fisqua, which gives it its offsite settings.',
+	offsite_err_unit_not_ready:
+		'This unit cannot save offsite settings until it is updated. Ask whoever installed the unit.',
+	offsite_err_held:
+		'The offsite copy is on hold on this unit. The settings can be saved once the hold is lifted.',
+	offsite_err_other_tenant:
+		'This unit already writes under another tenant, which cannot be changed here. Ask whoever installed the unit.',
+	offsite_err_replace:
+		'This unit already has a different key. Check "Replace the stored key" to save the new one.',
+	offsite_set_err_listing:
+		'Captua could not open the bucket with these settings. Check the bucket, the key ID, the application key and the tenant, and that the unit is online.',
+	offsite_err_saved_key_unusable:
+		'The settings were saved, but the key the unit keeps cannot open the bucket. If this key ID has a new application key, check "Replace the stored key" and save again.',
+	offsite_err_not_saved: 'The settings were not saved. Nothing on the unit changed.',
+	offsite_err_not_a_drive: 'Choose a USB stick mounted under Storage.',
+	offsite_err_file_missing: 'There is no captua-offsite.txt at the top level of the stick.',
+	offsite_err_file_not_settings:
+		'captua-offsite.txt on the stick is not a settings file made from the template.',
+	offsite_err_file_unreadable: 'Captua cannot read captua-offsite.txt on the stick.',
+	offsite_err_file_not_deletable:
+		'Captua could not delete captua-offsite.txt from the stick afterwards, so it did not import it. Use a stick formatted as FAT32 or exFAT.',
+	offsite_err_bad_line: (line: number): string =>
+		`Line ${line} of captua-offsite.txt is neither a comment nor a setting.`,
+	offsite_err_unknown_key: (line: number): string =>
+		`Line ${line} of captua-offsite.txt has a setting the template does not have.`,
+	offsite_err_duplicate: (field: string): string => `${field} appears more than once.`,
+	offsite_err_missing: (field: string): string => `${field} is missing.`,
+	offsite_err_empty: (field: string): string => `${field} has no value.`,
+	offsite_err_bad_value: (field: string): string => `${field} is not valid.`,
+	offsite_err_other: 'Captua could not save the offsite settings.',
+
 	// ── API client messages ──────────────────────────────────────────────────
 	api_power_ack: 'Command received. The scanner will run it in a few seconds.',
 	api_request_failed: 'Request failed'

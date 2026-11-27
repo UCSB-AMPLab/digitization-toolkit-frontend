@@ -3,7 +3,8 @@
 	// Unit group: the unit's mode and projects setting (NEH-311, NEH-313,
 	// UnitModeCard), the link to a Fisqua workspace (NEH-345,
 	// FisquaLinkCard), the testing space (NEH-391, TestingSpaceCard), storage
-	// (usage, primary path, external drive), the catalogue's off-site copy, diagnostics, maintenance, and power. They act
+	// (usage, primary path, external drive), the catalogue's off-site copy and its
+	// settings (NEH-341, OffsiteSettingsCard), diagnostics, maintenance, and power. They act
 	// on the appliance through the backend. The page renders this component
 	// for administrators, for the testing role, which opens Power only, and
 	// for the operator, which opens Storage (NEH-380) and Cameras, and for the
@@ -16,11 +17,12 @@
 	// activate, revert to internal storage) only with `canManageDrives`, the
 	// administrator.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { untrack } from 'svelte';
 	import { m, locale } from '$lib/i18n';
 	import CatalogueBackupCard from './CatalogueBackupCard.svelte';
+	import OffsiteSettingsCard from './OffsiteSettingsCard.svelte';
 	import UnitModeCard from './UnitModeCard.svelte';
 	import FisquaLinkCard from './FisquaLinkCard.svelte';
 	import TestingSpaceCard from './TestingSpaceCard.svelte';
@@ -644,11 +646,12 @@
 {/if}
 
 {#if section === 'offsite-copy'}
-	<!-- The catalogue's off-site copy (NEH-266). Read-only: the destination is
-       set when the unit is installed. The sidebar indicator links to
-       #offsite-copy. -->
+	<!-- The catalogue's off-site copy: its settings, which an administrator
+       brings from a USB stick or types (NEH-341), above the read-only status
+       (NEH-266). The sidebar indicator links to #offsite-copy. -->
 	<div class="config-section" id="offsite-copy">
 		<h2 class="section-title">{$m.backup_section_title}</h2>
+		<OffsiteSettingsCard />
 		<CatalogueBackupCard />
 	</div>
 {/if}

@@ -194,6 +194,14 @@ export const HEALTH_REQUEST_TIMEOUT_MS = 15_000;
 // renewal in flight before it sends its logout (see signOut below): a
 // renewal nobody answers holds a sign-out back by at most this.
 export const SESSION_REFRESH_TIMEOUT_MS = 10_000;
+// POST /system/offsite and /system/offsite/import (NEH-341) answer when the
+// save has ended, which the backend bounds at 28 minutes: the listing of the
+// bucket (60 s), the stop of the schedulers and offsite jobs (600 s), the
+// provisioning script (900 s, then 30 s after SIGTERM and 30 s after
+// SIGKILL) and the listing with the saved config (60 s)
+// (app/core/offsite_settings.py, provision_runner.py,
+// fisqua_pairing_service.STOP_BOUND_SECONDS). This limit is above that bound.
+export const OFFSITE_SAVE_TIMEOUT_MS = 30 * 60_000;
 // POST /system/power answers once the order is logged; the helper that
 // carries it out (bounded at 30 s) runs after the answer.
 export const POWER_REQUEST_TIMEOUT_MS = 60_000;
@@ -2888,6 +2896,42 @@ export interface StorageDevice {
 }
 
 /**
+ * GET /system/offsite (NEH-341), admin only: the unit's offsite settings,
+ * from the backend process's settings and the rclone config. The
+ * application key is never in it. `restartRequired` while a provisioning
+ * run may have changed the settings that process read.
+ */
+export interface OffsiteSettings {
+	configured: boolean;
+	bucketName: string | null;
+	tenant: string | null;
+	applicationKeyId: string | null;
+	cataloguePublicKey: string | null;
+	restartRequired: boolean;
+}
+
+/** The five values of POST /system/offsite, and whether a different stored key is replaced. */
+export interface OffsiteForm {
+	bucketName: string;
+	applicationKeyId: string;
+	applicationKey: string;
+	tenant: string;
+	cataloguePublicKey: string;
+	replace: boolean;
+}
+
+/**
+ * The answer of a verified save. `stickFile` is null for the form; for an
+ * import, whether Captua deleted captua-offsite.txt from the stick. A
+ * refusal is an ApiError whose detail is {code, message, key?, line?,
+ * stickFile?}: 400 `not_a_drive`, 422 for a value or the file, 409 otherwise.
+ */
+export interface OffsiteSaveResult {
+	outcome: 'restarting' | 'restart_needed' | 'unchanged';
+	stickFile: 'deleted' | 'not_deleted' | null;
+}
+
+/**
  * GET /system/catalogue-backup (NEH-249): when the catalogue (the database,
  * not the image files) was last verified at the offsite destination.
  * `enabled` is false when no destination was configured at install;
@@ -3462,6 +3506,44 @@ export const systemApi = {
 				timeoutMs: SLOW_REQUEST_TIMEOUT_MS
 			})
 		);
+	},
+
+	/** The unit's offsite settings (NEH-341), admin only; never the application key. */
+	async getOffsite(signal?: AbortSignal): Promise<OffsiteSettings> {
+		return apiRequest<OffsiteSettings>('/system/offsite', { signal });
+	},
+
+	/** The settings file to fill in, captua-offsite.txt, as a download link; it holds no value. */
+	offsiteTemplateUrl(): string {
+		return `${getApiBase()}/system/offsite/template`;
+	},
+
+	/**
+	 * Save the five values typed at the unit. The application key travels in
+	 * this body only. `signal` lets the caller end the request (the card does
+	 * when it is unmounted).
+	 */
+	async saveOffsite(form: OffsiteForm, signal?: AbortSignal): Promise<OffsiteSaveResult> {
+		return apiRequest<OffsiteSaveResult>('/system/offsite', {
+			method: 'POST',
+			body: JSON.stringify(form),
+			timeoutMs: OFFSITE_SAVE_TIMEOUT_MS,
+			signal
+		});
+	},
+
+	/** Import captua-offsite.txt from a drive mounted directly under the mounts base. */
+	async importOffsite(
+		mountpoint: string,
+		replace: boolean,
+		signal?: AbortSignal
+	): Promise<OffsiteSaveResult> {
+		return apiRequest<OffsiteSaveResult>('/system/offsite/import', {
+			method: 'POST',
+			body: JSON.stringify({ mountpoint, replace }),
+			timeoutMs: OFFSITE_SAVE_TIMEOUT_MS,
+			signal
+		});
 	},
 
 	async getLogs(params?: {
