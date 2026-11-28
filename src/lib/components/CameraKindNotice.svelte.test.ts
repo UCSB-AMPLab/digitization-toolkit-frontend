@@ -99,6 +99,55 @@ describe('camera kind notice', () => {
 			.toBe('mixed');
 	});
 
+	it('says the unit ignored a CAMERA_BACKEND that names no driver, for the administrator (NEH-405)', async () => {
+		signIn('admin');
+		vi.spyOn(cameraKindApi, 'get').mockResolvedValue(
+			wire({ mismatch: false, ignored_environment: 'gphoto' })
+		);
+		await loadCameraKind();
+		const { container } = render(CameraKindNotice);
+		await expect
+			.element(page.getByText(en.camera_kind_ignored_environment('gphoto')))
+			.toBeVisible();
+		await expect
+			.element(page.getByRole('link', { name: en.camera_kind_notice_link }))
+			.toHaveAttribute('href', '/dashboard/config?section=cameras');
+		expect(
+			container
+				.querySelector('[data-camera-kind-notice="ignored_environment"]')
+				?.getAttribute('role')
+		).toBe('status');
+	});
+
+	it('tells an operator to tell the administrator about an ignored value', async () => {
+		signIn('operator');
+		vi.spyOn(cameraKindApi, 'get').mockResolvedValue(
+			wire({ mismatch: false, ignored_environment: 'gphoto' })
+		);
+		await loadCameraKind();
+		const { container } = render(CameraKindNotice);
+		await expect
+			.element(page.getByText(en.camera_kind_ignored_environment('gphoto')))
+			.toBeVisible();
+		await expect.element(page.getByText(en.camera_kind_notice_tell_admin)).toBeVisible();
+		expect(container.querySelector('a')).toBeNull();
+	});
+
+	it('shows an ignored value beside a notice about the cameras', async () => {
+		signIn('admin');
+		vi.spyOn(cameraKindApi, 'get').mockResolvedValue(wire({ ignored_environment: 'gphoto' }));
+		await loadCameraKind();
+		const { container } = render(CameraKindNotice);
+		await expect.element(page.getByText(MISMATCH)).toBeVisible();
+		await expect
+			.element(page.getByText(en.camera_kind_ignored_environment('gphoto')))
+			.toBeVisible();
+		const kinds = [...container.querySelectorAll('[data-camera-kind-notice]')].map((el) =>
+			el.getAttribute('data-camera-kind-notice')
+		);
+		expect(kinds).toEqual(['mismatch', 'ignored_environment']);
+	});
+
 	it('shows nothing for a count that could not be measured, or without the route', async () => {
 		signIn('admin');
 		const get = vi

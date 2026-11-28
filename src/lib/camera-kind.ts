@@ -2,9 +2,10 @@
 // reads it from GET /system/camera-kind (app/api/system.py,
 // app/core/camera_kind.py in the backend): the kind in effect and why, the
 // administrator's stored choice, the cameras connected of each kind, which
-// drivers the unit has, and whether the cameras connected are of another
+// drivers the unit has, whether the cameras connected are of another
 // kind than the one in effect (`mismatch`) or of more than one kind
-// (`mixed`).
+// (`mixed`), and the CAMERA_BACKEND value the backend set aside at its start
+// because it names no driver (`ignoredEnvironment`, NEH-405).
 //
 // Settings > Cameras, Diagnostics and the capture screen read the same
 // store, `cameraKind`. loadCameraKind() reads the route each time it is
@@ -35,6 +36,8 @@ export interface CameraKindReport {
 	available: Record<CameraKind, boolean>;
 	mixed: boolean;
 	mismatch: boolean;
+	// The CAMERA_BACKEND value set aside, as written; null when none was.
+	ignoredEnvironment: string | null;
 }
 
 function isKind(value: unknown): value is CameraKind {
@@ -63,7 +66,11 @@ export function readCameraKind(data: unknown): CameraKindReport | null {
 		connected,
 		available,
 		mixed: d.mixed === true,
-		mismatch: d.mismatch === true
+		mismatch: d.mismatch === true,
+		ignoredEnvironment:
+			typeof d.ignored_environment === 'string' && d.ignored_environment !== ''
+				? d.ignored_environment
+				: null
 	};
 }
 
@@ -110,7 +117,8 @@ export function sourceText(source: string, msgs: Messages): string | null {
 export type KindNotice =
 	| { kind: 'mixed'; present: { kind: CameraKind; count: number }[] }
 	| { kind: 'mismatch'; connected: CameraKind; count: number }
-	| { kind: 'no_driver'; connected: CameraKind; count: number };
+	| { kind: 'no_driver'; connected: CameraKind; count: number }
+	| { kind: 'ignored_environment'; value: string };
 
 /**
  * What the unit's cameras call for: cameras of more than one kind connected
@@ -134,8 +142,26 @@ export function kindNotice(report: CameraKindReport | null): KindNotice | null {
 		: { kind: 'no_driver', connected: other.kind, count: other.count };
 }
 
+/**
+ * Every notice the report calls for, in the order they are shown: the one
+ * about the cameras (kindNotice), then a CAMERA_BACKEND value the backend set
+ * aside at its start (NEH-405). Every screen that shows camera-kind notices
+ * shows this list, so a notice added here reaches all of them.
+ */
+export function kindNotices(report: CameraKindReport | null): KindNotice[] {
+	if (!report) return [];
+	const out: KindNotice[] = [];
+	const cameras = kindNotice(report);
+	if (cameras) out.push(cameras);
+	if (report.ignoredEnvironment !== null)
+		out.push({ kind: 'ignored_environment', value: report.ignoredEnvironment });
+	return out;
+}
+
 /** The notice's sentence. */
 export function noticeText(notice: KindNotice, report: CameraKindReport, msgs: Messages): string {
+	if (notice.kind === 'ignored_environment')
+		return msgs.camera_kind_ignored_environment(notice.value);
 	if (notice.kind === 'mixed')
 		return msgs.camera_kind_mixed(notice.present.map((p) => kindCount(p.kind, p.count, msgs)));
 	const connected = kindCount(notice.connected, notice.count, msgs);

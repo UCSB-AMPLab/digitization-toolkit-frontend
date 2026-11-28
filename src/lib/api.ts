@@ -2795,6 +2795,9 @@ export interface CameraKindWire {
 	available: { [K in CameraKindName]: boolean };
 	mixed: boolean;
 	mismatch: boolean;
+	// The CAMERA_BACKEND the backend set aside at its start because it names
+	// no driver (NEH-405); absent from a backend before 0.4.0.
+	ignored_environment?: string | null;
 }
 
 /** The answer to PUT and DELETE /system/camera-kind; `kind` is null after a DELETE. */
