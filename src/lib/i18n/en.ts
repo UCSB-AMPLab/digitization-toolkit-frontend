@@ -377,6 +377,8 @@ export const en: Messages = {
 				? `${parts[0]} and ${parts[1]}`
 				: `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 		}. Captua uses one kind at a time.`,
+	camera_kind_ignored_environment: (value: string) =>
+		`The unit's installation settings name a kind of camera Captua does not recognize ("${value}"). Captua did not use that value and chose the kind of camera the same way as when none is set.`,
 	camera_kind_notice_link: 'Choose the kind of camera in Settings',
 	camera_kind_notice_tell_admin: 'Tell the administrator.',
 	camera_kind_desc:

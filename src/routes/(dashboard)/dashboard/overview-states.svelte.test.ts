@@ -321,6 +321,66 @@ describe('Overview, cameras of another kind', () => {
 	});
 });
 
+describe('Overview, a CAMERA_BACKEND the backend set aside (NEH-405)', () => {
+	const ignored = es.camera_kind_ignored_environment(' GPhoto ');
+	const ok = {
+		...KIND_MISMATCH,
+		connected: { picamera2: 2, gphoto2: 0, chdk: 0 },
+		mismatch: false,
+		ignored_environment: ' GPhoto '
+	};
+	const ignoredNotice = () =>
+		notices().filter((n) => n.querySelector('[data-camera-kind-notice="ignored_environment"]'));
+
+	for (const [role, extra] of [
+		['admin', es.camera_kind_notice_link],
+		['operator', es.camera_kind_notice_tell_admin]
+	] as const) {
+		it(`${role}: its own notice in "Needs attention"`, async () => {
+			signIn(role);
+			serveOverview('ok');
+			vi.mocked(cameraKindApi.get).mockResolvedValue(ok as never);
+			render(Overview);
+			await expect.poll(() => ignoredNotice().length).toBe(1);
+			const notice = ignoredNotice()[0];
+			expect(text(notice)).toContain(ignored);
+			expect(text(notice)).toContain(extra);
+			const link = notice.querySelector('a');
+			if (role === 'admin')
+				expect(link?.getAttribute('href')).toBe('/dashboard/config?section=cameras');
+			else expect(link).toBeNull();
+		});
+
+		it(`${role}: after the notice for cameras of another kind, which still has no Reconnect`, async () => {
+			signIn(role);
+			serveOverview('kind');
+			vi.mocked(cameraKindApi.get).mockResolvedValue({
+				...KIND_MISMATCH,
+				ignored_environment: ' GPhoto '
+			} as never);
+			render(Overview);
+			await expect.poll(() => notices().length).toBe(2);
+			expect(
+				notices().map((n) =>
+					n.querySelector('[data-camera-kind-notice]')?.getAttribute('data-camera-kind-notice')
+				)
+			).toEqual(['mismatch', 'ignored_environment']);
+			expect(text(notices()[1])).toContain(ignored);
+			expect(buttonsNamed(es.dash_camera_reconnect)).toHaveLength(0);
+		});
+	}
+
+	it('reviewer: no notice', async () => {
+		signIn('reviewer');
+		serveOverview('ok');
+		vi.mocked(cameraKindApi.get).mockResolvedValue(ok as never);
+		render(Overview);
+		await expect.element(page.getByText('Tomo 1', { exact: true })).toBeVisible();
+		await storageSettled();
+		expect(notices()).toHaveLength(0);
+	});
+});
+
 describe('Overview, figures not loaded', () => {
 	const numbers = () => [...document.querySelectorAll('.kpi-number')].map((n) => text(n));
 	const lines = () =>

@@ -58,7 +58,7 @@
 	// /collections/count) and the way to Projects. None of the rest is
 	// requested or shown for it.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onDestroy, onMount } from 'svelte';
 	import { authStore } from '$lib/stores/auth';
@@ -90,7 +90,14 @@
 		getDeviceRetryScheduler,
 		isDeviceListComplete
 	} from '$lib/camera-orientation';
-	import { kindNotice, noticeText, readCameraKind, type CameraKindReport } from '$lib/camera-kind';
+	import {
+		kindNotice,
+		kindNotices,
+		noticeText,
+		readCameraKind,
+		type CameraKindReport,
+		type KindNotice
+	} from '$lib/camera-kind';
 	import InProgress from './InProgress.svelte';
 	import ActivityCalendar from './ActivityCalendar.svelte';
 	import StorageAlert from './StorageAlert.svelte';
@@ -281,6 +288,12 @@
 	);
 	let kindReport = $derived(view.settled ? view.kind : null);
 	let kind = $derived(canSeeCameras ? kindNotice(kindReport) : null);
+	// The other camera-kind notices of lib/camera-kind.ts's list (kindNotices,
+	// which CameraKindNotice shows on the other screens), after the camera
+	// notice whatever it is: a CAMERA_BACKEND value set aside (NEH-405).
+	let otherKinds = $derived(
+		canSeeCameras ? kindNotices(kindReport).filter((n) => n.kind !== kind?.kind) : []
+	);
 	// Which camera notice "Needs attention" holds, if any, once the refresh
 	// on screen has its kind answer.
 	let cameraNotice = $derived<'kind' | 'one' | 'none' | 'unusable' | null>(
@@ -403,6 +416,24 @@
 	</div>
 {/snippet}
 
+<!-- One camera-kind notice of lib/camera-kind.ts's list, in "Needs attention". -->
+{#snippet kindAttention(notice: KindNotice, report: CameraKindReport)}
+	<AttentionNotice icon="camera-off">
+		<p class="notice-title plain" data-camera-kind-notice={notice.kind}>
+			{noticeText(notice, report, $m)}
+		</p>
+		<p class="notice-body">
+			{#if isAdmin}
+				<a class="alert-link on-own-line" href="/dashboard/config?section=cameras"
+					>{$m.camera_kind_notice_link}</a
+				>
+			{:else}
+				{$m.camera_kind_notice_tell_admin}
+			{/if}
+		</p>
+	</AttentionNotice>
+{/snippet}
+
 {#snippet reconnectButton(primary: boolean)}
 	<button
 		type="button"
@@ -462,20 +493,7 @@
 								<div class="notice-actions">{@render reconnectButton(true)}</div>
 							</AttentionNotice>
 						{:else if cameraNotice === 'kind' && kind && kindReport}
-							<AttentionNotice icon="camera-off">
-								<p class="notice-title plain" data-camera-kind-notice={kind.kind}>
-									{noticeText(kind, kindReport, $m)}
-								</p>
-								<p class="notice-body">
-									{#if isAdmin}
-										<a class="alert-link on-own-line" href="/dashboard/config?section=cameras"
-											>{$m.camera_kind_notice_link}</a
-										>
-									{:else}
-										{$m.camera_kind_notice_tell_admin}
-									{/if}
-								</p>
-							</AttentionNotice>
+							{@render kindAttention(kind, kindReport)}
 						{:else if cameraNotice === 'unusable'}
 							<AttentionNotice icon="camera-off">
 								<p class="notice-title">
@@ -492,6 +510,11 @@
 									<a class="btn btn-primary" href="/live-preview?check=1">{$m.camcheck_open}</a>
 								</div>
 							</AttentionNotice>
+						{/if}
+						{#if kindReport}
+							{#each otherKinds as notice (notice.kind)}
+								{@render kindAttention(notice, kindReport)}
+							{/each}
 						{/if}
 						<!-- A move of captures the unit could not settle (NEH-420): administrators only. -->
 						<AdoptionNotice />

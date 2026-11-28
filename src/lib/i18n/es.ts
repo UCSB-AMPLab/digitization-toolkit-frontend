@@ -399,6 +399,8 @@ export const es = {
 				? `${parts[0]} y ${parts[1]}`
 				: `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`
 		}. Captua usa un solo tipo a la vez.`,
+	camera_kind_ignored_environment: (value: string) =>
+		`La configuración de instalación del equipo indica un tipo de cámara que Captua no reconoce ("${value}"). Captua no usó ese valor y eligió el tipo de cámara de la misma manera que cuando no se indica ninguno.`,
 	camera_kind_notice_link: 'Elige el tipo de cámara en Configuración',
 	camera_kind_notice_tell_admin: 'Avisa al administrador.',
 	camera_kind_desc:

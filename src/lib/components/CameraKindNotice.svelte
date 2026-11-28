@@ -9,6 +9,11 @@
 	// Cameras and in Diagnostics. It reads the shared store only; each of
 	// those screens reads the kind again when it opens.
 	//
+	// A CAMERA_BACKEND the backend set aside at its start because it names no
+	// driver (NEH-405) has a notice of its own, after the one about the
+	// cameras when both apply. The notices are lib/camera-kind.ts's
+	// kindNotices, the list the Overview shows too.
+	//
 	// With `action`, the administrator gets a link to Settings > Cameras and
 	// every other role is told to tell the administrator; without it (in
 	// Settings > Cameras itself), the sentence alone.
@@ -16,28 +21,30 @@
 	import { m } from '$lib/i18n';
 	import { authStore } from '$lib/stores/auth';
 	import { opensUnitSettings } from '$lib/unit-mode';
-	import { cameraKind, kindNotice, noticeText } from '$lib/camera-kind';
+	import { cameraKind, kindNotices, noticeText } from '$lib/camera-kind';
 
 	let { action = true, band = false }: { action?: boolean; band?: boolean } = $props();
 
 	let report = $derived($cameraKind.status === 'ready' ? $cameraKind.report : null);
-	let notice = $derived(kindNotice(report));
+	let notices = $derived(kindNotices(report));
 	let isAdmin = $derived(opensUnitSettings($authStore.user?.role ?? null));
 </script>
 
-{#if notice && report}
-	<div class="kind-notice" class:band role="status" data-camera-kind-notice={notice.kind}>
-		<span class="kind-notice-text">{noticeText(notice, report, $m)}</span>
-		{#if action}
-			{#if isAdmin}
-				<a class="kind-notice-link" href="/dashboard/config?section=cameras"
-					>{$m.camera_kind_notice_link}</a
-				>
-			{:else}
-				<span class="kind-notice-text">{$m.camera_kind_notice_tell_admin}</span>
+{#if report}
+	{#each notices as notice (notice.kind)}
+		<div class="kind-notice" class:band role="status" data-camera-kind-notice={notice.kind}>
+			<span class="kind-notice-text">{noticeText(notice, report, $m)}</span>
+			{#if action}
+				{#if isAdmin}
+					<a class="kind-notice-link" href="/dashboard/config?section=cameras"
+						>{$m.camera_kind_notice_link}</a
+					>
+				{:else}
+					<span class="kind-notice-text">{$m.camera_kind_notice_tell_admin}</span>
+				{/if}
 			{/if}
-		{/if}
-	</div>
+		</div>
+	{/each}
 {/if}
 
 <style>

@@ -4,10 +4,12 @@
 // that could not be measured (null) never makes a notice.
 import { describe, expect, it } from 'vitest';
 import { en } from './i18n/en';
+import { es } from './i18n/es';
 import {
 	choiceRestarts,
 	kindName,
 	kindNotice,
+	kindNotices,
 	kindRefusal,
 	kindRefusalText,
 	noticeText,
@@ -42,8 +44,15 @@ describe('readCameraKind', () => {
 			connected: { picamera2: 2, gphoto2: 0, chdk: 0 },
 			available: { picamera2: true, gphoto2: true, chdk: true },
 			mixed: false,
-			mismatch: false
+			mismatch: false,
+			ignoredEnvironment: null
 		});
+	});
+
+	it('reads the CAMERA_BACKEND value the backend set aside (NEH-405)', () => {
+		expect(report({ ignored_environment: 'gphoto' }).ignoredEnvironment).toBe('gphoto');
+		for (const value of [undefined, null, '', 3])
+			expect(report({ ignored_environment: value }).ignoredEnvironment).toBeNull();
 	});
 
 	it('keeps a count that could not be measured as null', () => {
@@ -191,5 +200,35 @@ describe('choiceRestarts', () => {
 
 	it('compares with the driver name in effect, as the backend does (rpicam-still)', () => {
 		expect(choiceRestarts(report({ configured: 'subprocess' }), 'picamera2')).toBe(true);
+	});
+});
+
+describe('kindNotices (NEH-405)', () => {
+	it('puts a value set aside after the notice about the cameras', () => {
+		const r = report({
+			connected: { picamera2: 0, gphoto2: 2, chdk: 0 },
+			mismatch: true,
+			ignored_environment: ' GPhoto '
+		});
+		expect(kindNotices(r).map((n) => n.kind)).toEqual(['mismatch', 'ignored_environment']);
+		expect(noticeText(kindNotices(r)[1], r, en)).toBe(
+			en.camera_kind_ignored_environment(' GPhoto ')
+		);
+	});
+
+	it('is empty with no report and nothing to say', () => {
+		expect(kindNotices(null)).toEqual([]);
+		expect(kindNotices(report())).toEqual([]);
+	});
+});
+
+describe('the notice for a value set aside, exactly as approved (NEH-405)', () => {
+	it('says it in English and Spanish', () => {
+		expect(en.camera_kind_ignored_environment('gphoto')).toBe(
+			'The unit\'s installation settings name a kind of camera Captua does not recognize ("gphoto"). Captua did not use that value and chose the kind of camera the same way as when none is set.'
+		);
+		expect(es.camera_kind_ignored_environment('gphoto')).toBe(
+			'La configuración de instalación del equipo indica un tipo de cámara que Captua no reconoce ("gphoto"). Captua no usó ese valor y eligió el tipo de cámara de la misma manera que cuando no se indica ninguno.'
+		);
 	});
 });
