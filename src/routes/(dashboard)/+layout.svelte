@@ -29,7 +29,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { authStore } from '$lib/stores/auth';
+	import { authStore, type AuthUser } from '$lib/stores/auth';
 	import { tour } from '$lib/tour';
 	import { recordsApi } from '$lib/api';
 	import { sessionRetryDelay } from '$lib/session-check';
@@ -57,7 +57,7 @@
 
 	let currentPath = $derived($page.url.pathname);
 
-	let currentUser = $state<any>(null);
+	let currentUser = $state<AuthUser | null>(null);
 
 	// true while the session is being validated against the backend on mount;
 	// protected content is not rendered until this is false (NEH-63).
@@ -211,7 +211,7 @@
 	let retakeCount = $state<number | null>(null);
 
 	$effect(() => {
-		currentPath;
+		void currentPath;
 		if (isValidatingSession || !currentUser) return;
 		// The backend refuses the count to the testing role, which has no
 		// To retake entry.
@@ -342,14 +342,14 @@
 			</div>
 
 			<nav class="s-nav">
-				{#each visibleNav as section}
+				{#each visibleNav as section (section.sectionKey)}
 					{#if expanded}
 						<p class="s-section-title">{$m[section.sectionKey]}</p>
 					{:else}
 						<div style="height:8px"></div>
 					{/if}
 
-					{#each section.items as item}
+					{#each section.items as item (item.id)}
 						<a
 							href={item.path}
 							class="s-item"

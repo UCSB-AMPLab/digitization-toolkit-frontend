@@ -18,7 +18,7 @@
 	// format and, while the unit's cameras offer both, changes it with one
 	// PUT; the change applies to the captures made after it.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onDestroy, onMount } from 'svelte';
 	import { get } from 'svelte/store';
@@ -471,7 +471,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each filteredCollections as col}
+						{#each filteredCollections as col (col.id)}
 							{@const counts = statusCounts.get(col.id)}
 							{@const stage = counts ? placeVolume(counts) : null}
 
@@ -652,7 +652,7 @@
 			<div class="modal-body">
 				<!-- Current members list -->
 				<ul class="members-list">
-					{#each members as member}
+					{#each members as member (member.user_id)}
 						<li class="member-row" class:member-row--implicit={member.is_implicit}>
 							<div class="member-av">{member.username.slice(0, 2).toUpperCase()}</div>
 							<div class="member-info">
@@ -686,7 +686,7 @@
 						<div class="add-member-row">
 							<select class="field-input add-member-select" bind:value={addUserId}>
 								<option value={null}>{$m.pd_member_select}</option>
-								{#each filteredUsers as u}
+								{#each filteredUsers as u (u.id)}
 									<option value={u.id}>{u.email ? `${u.username} (${u.email})` : u.username}</option
 									>
 								{/each}

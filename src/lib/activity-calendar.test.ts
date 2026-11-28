@@ -1,4 +1,4 @@
-// Version: 0.3.0
+// Version: 0.4.0
 
 import { describe, it, expect } from 'vitest';
 
@@ -14,7 +14,7 @@ function series(
 	end: string,
 	days: number,
 	count: (i: number) => number,
-	reviews = (i: number) => 0
+	reviews = (_i: number) => 0
 ): DailyActivity[] {
 	const last = parseLocalDate(end);
 	return Array.from({ length: days }, (_, i) => {

@@ -2,7 +2,7 @@
 // review requires the full-size Book view, so no approve/reject control
 // (individual or bulk) may ever render in the grid toolbar or on a card.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 // .image-grid's grid-template-columns (the --grid-cols mapping) lives in the
@@ -333,4 +333,19 @@ describe('GridView — an opening with a page never photographed (0.3.2)', () =>
 			);
 		});
 	}
+});
+
+describe('GridView follows its records prop', () => {
+	it('shows the records of a new prop value in place of the old ones', async () => {
+		const screen = render(
+			GridView,
+			baseProps({ records: [makeRecord({ id: 1, title: 'First record' })] })
+		);
+		await expect.element(screen.getByText('First record')).toBeVisible();
+
+		await screen.rerender({ records: [makeRecord({ id: 2, title: 'Second record' })] });
+
+		await expect.element(screen.getByText('Second record')).toBeVisible();
+		await expect.element(screen.getByText('First record')).not.toBeInTheDocument();
+	});
 });

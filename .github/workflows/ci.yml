@@ -1,4 +1,4 @@
-# Formatting (Prettier), type check (svelte-check) and unit tests (both vitest projects).
+# Formatting (Prettier), lint (ESLint), type check (svelte-check) and unit tests (both vitest projects).
 # The e2e specs in e2e/ are not run here: they need a backend and database.
 name: CI
 
@@ -28,9 +28,11 @@ jobs:
       # The client project runs in Chromium through @vitest/browser-playwright.
       - run: npx playwright install --with-deps chromium
 
-      # Formatting only. ESLint is not run here yet: it still reports errors (see NEH-372).
       - name: Format check
         run: npx prettier --check .
+
+      - name: Lint
+        run: npx eslint .
 
       - name: Type check
         run: npm run check

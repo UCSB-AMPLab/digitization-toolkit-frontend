@@ -58,10 +58,10 @@
 	// /collections/count) and the way to Projects. None of the rest is
 	// requested or shown for it.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onDestroy, onMount } from 'svelte';
-	import { authStore } from '$lib/stores/auth';
+	import { authStore, type AuthUser } from '$lib/stores/auth';
 	import {
 		camerasApi,
 		cameraKindApi,
@@ -98,7 +98,7 @@
 	import RetakeBand from './RetakeBand.svelte';
 	import AttentionNotice from './AttentionNotice.svelte';
 
-	let currentUser = $state<any>(null);
+	let currentUser = $state<AuthUser | null>(null);
 	let userRole = $state('');
 
 	onMount(() => {

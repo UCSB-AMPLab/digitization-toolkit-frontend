@@ -4,7 +4,7 @@
 	// `label` the bars are an image with that name; without one they are
 	// decoration and hidden from assistive technology.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 	import { signalBars } from './network-text';
 
 	let { signal, label = null }: { signal: number | null; label?: string | null } = $props();
@@ -23,7 +23,7 @@
 	aria-hidden={label ? undefined : 'true'}
 	data-bars={filled}
 >
-	{#each BARS as height, i}
+	{#each BARS as height, i (i)}
 		<rect
 			x={2 + i * 5}
 			y={18 - height}

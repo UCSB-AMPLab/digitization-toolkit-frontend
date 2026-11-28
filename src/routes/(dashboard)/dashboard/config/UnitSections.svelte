@@ -566,7 +566,7 @@
 						{:else if devices.length === 0}
 							<p class="logs-status">{$m.config_no_partitions}</p>
 						{:else}
-							{#each devices as device}
+							{#each devices as device (device.path)}
 								{@const isActive =
 									storageInfo?.is_override &&
 									storageInfo.projects_path.startsWith(device.mountpoint ?? '__none__')}
@@ -719,7 +719,7 @@
 					{:else if logs.length === 0}
 						<p class="logs-status">{$m.config_logs_empty}</p>
 					{:else}
-						{#each logs as log}
+						{#each logs as log (log.id)}
 							{@const parts = formatLogMessage(log)}
 							<div class="log-row">
 								<span class="log-time">{formatLogTime(log.created_at)}</span>

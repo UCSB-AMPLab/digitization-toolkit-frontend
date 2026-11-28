@@ -28,7 +28,7 @@
 	// (`mode_allows` false, where Settings lists nothing to free), and when
 	// the read fails.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount } from 'svelte';
 	import { systemApi } from '$lib/api';
@@ -66,7 +66,7 @@
 
 		async function read() {
 			const seq = ++latest;
-			let next: StorageUsage | null = null;
+			let next: StorageUsage | null;
 			try {
 				next = storageUsage(await systemApi.getStorage());
 			} catch {
@@ -103,9 +103,7 @@
 			>{#if canOpenStorage}{$m.dash_storage_alert_p2(size(usage.usedGB), size(usage.totalGB))}<a
 					href="/dashboard/config?section=storage"
 					class="alert-link">{$m.nav_settings}</a
-				>{$m.dash_storage_alert_p3}{#if freeableBytes !== null}{' '}{$m.dash_storage_can_free(
-						freeableBytes
-					)}{/if}{:else}{$m.dash_storage_alert_ask_admin(
+				>{$m.dash_storage_alert_p3}{#if freeableBytes !== null}{` ${$m.dash_storage_can_free(freeableBytes)}`}{/if}{:else}{$m.dash_storage_alert_ask_admin(
 					size(usage.usedGB),
 					size(usage.totalGB)
 				)}{/if}

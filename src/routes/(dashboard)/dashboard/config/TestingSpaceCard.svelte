@@ -49,7 +49,7 @@
 	// being captured into, that those were left. Focus goes to Cancel when the
 	// confirmation opens and back to the clear button when it closes.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount, tick } from 'svelte';
 	import { m, locale } from '$lib/i18n';
@@ -376,7 +376,7 @@
 		{:else if cleared}
 			<p class="t-muted" role="status">
 				{$m.testing_cleared(cleared.projects, cleared.volumes)}
-				{#if cleared.skipped > 0}{' '}{$m.testing_cleared_skipped(cleared.skipped)}{/if}
+				{#if cleared.skipped > 0}{` ${$m.testing_cleared_skipped(cleared.skipped)}`}{/if}
 			</p>
 		{:else if saved}
 			<p class="t-muted" role="status">{$m.testing_saved}</p>

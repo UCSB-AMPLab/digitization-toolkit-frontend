@@ -1,4 +1,4 @@
-// Version: 0.3.0
+// Version: 0.4.0
 
 import { redact } from './redact';
 
@@ -34,7 +34,7 @@ export function initErrorCapture(): void {
 	});
 
 	window.addEventListener('unhandledrejection', (e) => {
-		const reason: any = e.reason;
+		const reason = e.reason as { stack?: string; message?: string } | null | undefined;
 		const msg = reason?.stack || reason?.message || String(reason ?? 'unhandledrejection');
 		push('unhandledrejection', msg);
 	});

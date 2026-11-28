@@ -24,8 +24,21 @@ export default defineConfig(
 		rules: {
 			// typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
 			// see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
-			'no-undef': 'off'
+			'no-undef': 'off',
+			// The app is served at the root and has no base path, so goto() and href need no resolve().
+			'svelte/no-navigation-without-resolve': 'off',
+			// The flagged Map, Set and Date values are local to a function or component, not reactive state.
+			'svelte/prefer-svelte-reactivity': 'off',
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{ argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
+			]
 		}
+	},
+	{
+		// Test doubles are typed loosely on purpose.
+		files: ['**/*.test.ts', '**/*.svelte.test.ts'],
+		rules: { '@typescript-eslint/no-explicit-any': 'off' }
 	},
 	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],

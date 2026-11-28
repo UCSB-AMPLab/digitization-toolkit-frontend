@@ -31,7 +31,7 @@
 	// close button, since its rejection stands and it must be retaken.
 	// ============================================================================
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -223,7 +223,7 @@
 									{#if row.comment && row.pendingReason !== 'missing_side'}
 										<p class="rt-comment">
 											<span class="visually-hidden">{$m.retakes_comment_label}:</span
-											>{' '}{row.comment}
+											>&#32;{row.comment}
 										</p>
 									{/if}
 

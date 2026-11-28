@@ -25,7 +25,7 @@
 	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { authStore } from '$lib/stores/auth';
+	import { authStore, type AuthUser } from '$lib/stores/auth';
 	import { requireSession } from '$lib/stores/session';
 	import { m } from '$lib/i18n';
 	import UserMenu from '$lib/components/UserMenu.svelte';
@@ -37,6 +37,7 @@
 	import VolumeAdoptActions, { hasStoredRequest } from './VolumeAdoptActions.svelte';
 	import { setVolumeTopbar, type VolumeTopbarSlot } from '$lib/volume-topbar';
 	import type { VolumeOffsiteState } from '$lib/api';
+	import type { LayoutData } from './$types';
 	import { freedAfterRead, freedCountsOf, type FreedCounts } from '$lib/offsite-free';
 	import {
 		canCapture,
@@ -64,7 +65,7 @@
 	let projectId = $derived(Number($page.params.projectId) || 0);
 	let collectionId = $derived(Number($page.params.collectionId) || 0);
 
-	let currentUser = $state<any>(null);
+	let currentUser = $state<AuthUser | null>(null);
 
 	// The session guard (NEH-66, NEH-415): on arrival the session is checked
 	// as on the capture screen (stores/session.ts), which asks the backend when
@@ -95,7 +96,7 @@
 		testing: boolean;
 	};
 	let adoption = $derived<AdoptionFields>(
-		($page.data as any).collectionAdoption ?? {
+		($page.data as LayoutData).collectionAdoption ?? {
 			external_id: null,
 			captures_adopted_at: null,
 			adoption_unfinished: false,
@@ -178,12 +179,12 @@
 	}
 
 	// Project and volume names come from the load in +layout.ts.
-	let projectName = $derived(($page.data as any).projectName ?? '—');
-	let collectionName = $derived(($page.data as any).collectionName ?? '—');
+	let projectName = $derived(($page.data as LayoutData).projectName ?? '—');
+	let collectionName = $derived(($page.data as LayoutData).collectionName ?? '—');
 	// When Captua removes a testing volume, for the testing account only.
 	let expiry = $derived(
 		inTestingSpace($authStore.user?.role)
-			? testingExpiry(($page.data as any).collectionTestingExpiresAt)
+			? testingExpiry(($page.data as LayoutData).collectionTestingExpiresAt)
 			: null
 	);
 </script>
@@ -221,7 +222,7 @@
 					{#key collectionId}
 						<VolumeColourCard
 							{collectionId}
-							summary={($page.data as any).collectionColourCard}
+							summary={($page.data as LayoutData).collectionColourCard}
 							canOpen={canEditVolumes($authStore.user?.role)}
 						/>
 					{/key}

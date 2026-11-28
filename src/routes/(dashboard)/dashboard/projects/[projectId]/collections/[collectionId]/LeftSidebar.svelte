@@ -17,7 +17,7 @@
 	// Fisqua decision moves it, so Reject and Approve stay disabled and the
 	// review section says what the exclusion means.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import type { Record, RecordImage, RecordAnnotation, PredefinedRejectionReason } from '$lib/api';
 	import { recordsApi, ApiError } from '$lib/api';
@@ -35,7 +35,7 @@
 	import ExcludedNotice from '$lib/components/ExcludedNotice.svelte';
 
 	let {
-		viewMode,
+		viewMode: _viewMode,
 		currentRecord,
 		currentIndex,
 		totalRecords,
@@ -573,7 +573,7 @@
 						{#if sortedImages.length === 0}
 							<p class="empty-text">{$m.col_no_images}</p>
 						{:else}
-							{#each sortedImages as img, i}
+							{#each sortedImages as img, i (img.id)}
 								{@const letter = cameraLetter(img)}
 								<div class="img-section" class:first={i === 0}>
 									<div class="img-section-header">
@@ -851,12 +851,12 @@
 							{#if annotations.length === 0}
 								<p class="empty-text">{$m.col_no_annotations}</p>
 							{:else}
-								{#each annotations as ann}
+								{#each annotations as ann (ann.id)}
 									<div class="annotation-card">
 										<div class="annotation-body">
 											{#if ann.error_types.length > 0}
 												<div class="error-tags">
-													{#each ann.error_types as errorId}
+													{#each ann.error_types as errorId, i (i)}
 														<div class="error-tag">
 															<div
 																class="error-dot"
@@ -921,7 +921,7 @@
 								{#if isReasonCardExpanded}
 									<div class="expandable-card">
 										<div class="reason-options">
-											{#each ERROR_TYPES as errType}
+											{#each ERROR_TYPES as errType (errType.id)}
 												<button
 													type="button"
 													class="error-type-btn"

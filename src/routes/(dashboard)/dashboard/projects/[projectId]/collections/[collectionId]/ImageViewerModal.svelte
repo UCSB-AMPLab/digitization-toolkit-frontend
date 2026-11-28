@@ -7,7 +7,7 @@
 	// A dual record that misses a side (0.3.2) shows that page as an empty
 	// frame that says so (MissingPage), on its side.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { recordsApi, type Record } from '$lib/api';
 	import { m } from '$lib/i18n';
@@ -256,7 +256,7 @@
 					<MissingPage side="left" />
 				</div>
 			{/if}
-			{#each images() as img, i}
+			{#each images() as img, i (img.id)}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
 					class="img-viewer-frame"

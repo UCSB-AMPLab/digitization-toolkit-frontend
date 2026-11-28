@@ -8,7 +8,7 @@
 	// own, whose password changes from the account menu with the current one.
 	// On success a line on the page says so.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount } from 'svelte';
 	import { usersApi, type UserRead } from '$lib/api';
@@ -411,7 +411,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each filteredUsers as user}
+					{#each filteredUsers as user (user.id)}
 						<tr class="table-row">
 							<td>
 								<div class="user-cell">
@@ -742,7 +742,7 @@
 						{$m.users_field_assign_role}
 					</label>
 					<div class="roles-list">
-						{#each ROLES as roleOpt}
+						{#each ROLES as roleOpt (roleOpt.value)}
 							<button
 								class="role-option"
 								class:selected={formRole === roleOpt.value}

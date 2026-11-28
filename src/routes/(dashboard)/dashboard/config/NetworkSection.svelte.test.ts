@@ -384,7 +384,7 @@ describe('Network: Wi-Fi networks', () => {
 	});
 
 	it('says so when the unit did not scan again', async () => {
-		serve({ wifi: (c) => json(200, { ...SCAN, rescanned: false }) });
+		serve({ wifi: (_c) => json(200, { ...SCAN, rescanned: false }) });
 		const { container } = mount();
 		await expect.poll(() => wifiRows(container).length).toBe(4);
 		expect(container.textContent).not.toContain(en.network_not_rescanned);

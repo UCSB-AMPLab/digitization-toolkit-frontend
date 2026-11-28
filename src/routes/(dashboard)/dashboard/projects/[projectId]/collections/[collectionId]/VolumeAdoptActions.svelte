@@ -195,7 +195,7 @@
 
 	// A kept entry is used only when well formed (readStoredRequest); anything else is removed.
 	function stored(sourceId: number): Pending | null {
-		let raw: string | null = null;
+		let raw: string | null;
 		try {
 			raw = sessionStorage.getItem(storageKey(sourceId));
 		} catch {
@@ -291,7 +291,7 @@
 	});
 
 	$effect(() => {
-		collectionId;
+		void collectionId;
 		if (fieldsAllow) untrack(() => countAgain.now());
 	});
 	$effect(() => {

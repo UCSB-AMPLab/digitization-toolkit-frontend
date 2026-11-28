@@ -11,7 +11,7 @@
 // Every other failure behaves as before. Timers are faked; the capture and
 // the ask are mocked on camerasApi.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';
@@ -550,7 +550,7 @@ describe('LiveViewport — a capture that ends in a timeout (NEH-381, NEH-401)',
 	}
 
 	// A capture whose check ends as unknown: the asks fail for 180 s.
-	async function endsUnknown(holder: ReturnType<typeof asker>) {
+	async function endsUnknown(_holder: ReturnType<typeof asker>) {
 		const answer = deferred<CaptureResponse>();
 		const captureSpy = vi.spyOn(camerasApi, 'capture').mockReturnValueOnce(answer.promise);
 		press();

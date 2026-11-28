@@ -37,7 +37,7 @@
 	// The testing account (NEH-391) gets no status filter and no legend line
 	// on review.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import {
 		recordsApi,
@@ -55,7 +55,6 @@
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import MissingPage from '$lib/components/MissingPage.svelte';
 	import { dismissible } from '$lib/dialog';
-	// @ts-ignore — installed in Docker, not locally
 	import { dndzone } from 'svelte-dnd-action';
 
 	let {
@@ -82,12 +81,8 @@
 	} = $props();
 
 	// Local copy of records for DnD reordering
-	let localRecords = $state<Record[]>([]);
-
-	// Sync localRecords when records prop changes
-	$effect(() => {
-		localRecords = [...records];
-	});
+	// Follows the records prop; drag and drop assigns to it until the prop changes.
+	let localRecords = $derived<Record[]>([...records]);
 
 	// Thumbnail size, 2 (small) to 6 (large): this is what the slider sets.
 	// Columns run the other way — more columns, smaller thumbnails — so they
@@ -435,7 +430,7 @@
 		<div class="filter-panel">
 			<span class="filter-title">{$m.col_filter_by_status}</span>
 			<div class="filter-chips">
-				{#each [{ id: 'captured', label: $m.status_captured }, { id: 'approved', label: $m.status_approved }, { id: 'rejected', label: $m.status_rejected }, { id: 'in_review', label: $m.status_in_review }, { id: 'excluded', label: $m.status_excluded }] as f}
+				{#each [{ id: 'captured', label: $m.status_captured }, { id: 'approved', label: $m.status_approved }, { id: 'rejected', label: $m.status_rejected }, { id: 'in_review', label: $m.status_in_review }, { id: 'excluded', label: $m.status_excluded }] as f (f.id)}
 					<button
 						class="filter-chip"
 						class:active={activeStatusFilter === f.id}

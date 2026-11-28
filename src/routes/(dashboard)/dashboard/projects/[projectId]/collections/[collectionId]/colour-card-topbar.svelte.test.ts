@@ -4,8 +4,8 @@
 // and 1280x800, in both languages, with the longest flag; the flag's button
 // is at least 44px tall. With the setting off nothing shows.
 //
-// Version: 0.3.0
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Version: 0.4.0
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { createRawSnippet } from 'svelte';

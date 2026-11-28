@@ -10,7 +10,7 @@
 	// frame is kept for what needs marking — the active folio — and surrounds
 	// the whole group, not each half.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { recordsApi, type Record, type RecordImage } from '$lib/api';
 	import { m } from '$lib/i18n';
@@ -18,7 +18,7 @@
 	let {
 		records,
 		selectedRecordId,
-		viewMode,
+		viewMode: _viewMode,
 		onSelect
 	}: {
 		records: Record[];
@@ -110,14 +110,14 @@
 				<span>{$m.col_empty_collection}</span>
 			</div>
 		{:else}
-			{#each thumbGroups as group, i}
+			{#each thumbGroups as group, i (group.record.id)}
 				{@const selected = group.record.id === selectedRecordId}
 
 				<button class="thumb-item" class:selected onclick={() => onSelect(group.record.id)}>
 					<!-- The folio's halves, together. The selection frame goes here and
                not on each image: what is selected is the folio. -->
 					<div class="thumb-pair" class:selected>
-						{#each group.items as item, j}
+						{#each group.items as item, j (j)}
 							<div class="thumb-img-wrapper" class:alt={j % 2 !== 0}>
 								{#if item.thumbnailUrl}
 									<img

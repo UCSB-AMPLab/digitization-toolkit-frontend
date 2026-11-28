@@ -11,7 +11,7 @@
 //
 // No import of api.ts, so these helpers can be tested in plain node.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import type { Messages } from './i18n';
 
@@ -280,7 +280,6 @@ export function pairingRefusalText(code: string | null, msgs: Messages): string 
 		case 'offsite_job_running':
 			return msgs.fisqua_link_offsite_job_running;
 		case 'device_id_missing':
-		case 'device_id_invalid':
 		case 'device_id_unreadable':
 			return msgs.fisqua_link_device_id_invalid;
 		default:

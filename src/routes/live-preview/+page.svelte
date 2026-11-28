@@ -1696,7 +1696,8 @@
 			)
 				throw error;
 			console.error('[LivePreview] Error during retake:', error);
-			if (isConflict(error) && (await recheckStem())) throw new Error($m.lv_needs_stem);
+			if (isConflict(error) && (await recheckStem()))
+				throw new Error($m.lv_needs_stem, { cause: error });
 			rereadAfterRefusal(error);
 			// The backend's text is English; the modal shows the catalogue's.
 			// The cause lets the window remove the message once the capture is found.

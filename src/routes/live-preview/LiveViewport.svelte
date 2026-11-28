@@ -137,6 +137,8 @@
 		pageCaptures = 0,
 		pageCapturing = false,
 		onRefocus,
+		// Write-only: an effect below reports the viewport's capture state to the parent.
+		// eslint-disable-next-line no-useless-assignment
 		capturing = $bindable(false),
 		captureBlocked = false,
 		swapLocked = false,
@@ -1063,7 +1065,9 @@
 		[...Object.values(previewUrls), ...Object.values(captureUrls)].forEach((url) => {
 			try {
 				URL.revokeObjectURL(url);
-			} catch {}
+			} catch {
+				// Revoking is best effort on teardown.
+			}
 		});
 
 		if (browser) {
@@ -1791,10 +1795,10 @@
 			</div>
 
 			{#if showGrid}
-				{#each Array.from({ length: gridCols - 1 }, (_, i) => i) as i}
+				{#each Array.from({ length: gridCols - 1 }, (_, i) => i) as i (i)}
 					<div class="grid-line vertical" style="left: {(i + 1) * (100 / gridCols)}%"></div>
 				{/each}
-				{#each Array.from({ length: gridRows - 1 }, (_, i) => i) as i}
+				{#each Array.from({ length: gridRows - 1 }, (_, i) => i) as i (i)}
 					<div class="grid-line horizontal" style="top: {(i + 1) * (100 / gridRows)}%"></div>
 				{/each}
 			{/if}

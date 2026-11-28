@@ -22,7 +22,7 @@
 	// captured records that miss a side are counted.
 	// ============================================================================
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { tick } from 'svelte';
 	import { collectionsApi, type Record } from '$lib/api';
@@ -302,7 +302,7 @@
 				<h3 id="handover-title" class="handover-title">{$m.col_handover_refused_title}</h3>
 				<p class="handover-body">{$m.col_handover_refused_body(blockers.length)}</p>
 				<ul class="handover-blockers">
-					{#each blockerTitles as title}
+					{#each blockerTitles as title, i (i)}
 						<li>{title}</li>
 					{/each}
 				</ul>
