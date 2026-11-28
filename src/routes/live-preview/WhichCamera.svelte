@@ -20,7 +20,16 @@
 	// What it says follows the most specific reason (src/lib/camera-roles.ts),
 	// never the backend's English:
 	// - a camera Captua cannot identify, or fewer than two cameras: what is
-	//   wrong and what to do, with "Check again"; nothing to confirm;
+	//   wrong and what to do, with "Check again"; nothing to confirm. On a
+	//   CHDK unit an administrator is offered "Assign an ID to the camera"
+	//   (NEH-363), which writes a page parity, and with it an ID, onto the
+	//   card of the body identityToAssign names (POST /cameras/side/{n}, one
+	//   body a press), then reads the set-up again. An administrator with no
+	//   body Captua can give an ID to here is told why and to reconnect; a
+	//   refused write is told apart by status (409, another body holds that
+	//   ID or page; anything else, the write failed). Everyone else is told
+	//   to ask the administrator. On a gphoto2 unit the screen says the cameras
+	//   are identified by their serial, for everyone;
 	// - two cameras on the same page, a role not confirmed, another pair: the
 	//   question, a current frame from each camera (GET /cameras/preview/{n},
 	//   once per camera, "Refresh" for new ones), each turned by its camera's
@@ -37,7 +46,7 @@
 	// No socket name or USB path is shown. A save refused because a camera
 	// went away reads everything again and asks to choose again.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onDestroy, onMount } from 'svelte';
 	import {
@@ -47,12 +56,13 @@
 		type CameraSetup
 	} from '$lib/api';
 	import { m } from '$lib/i18n';
-	import { whichScreen } from '$lib/camera-roles';
+	import { identityToAssign, whichScreen } from '$lib/camera-roles';
 	import { dismissible, toBody, trapFocus } from '$lib/dialog';
 	import { PairPanZoom } from '$lib/pair-pan-zoom.svelte';
 	import PageCameraLabel from '$lib/components/PageCameraLabel.svelte';
 	import CameraKindNotice from '$lib/components/CameraKindNotice.svelte';
-	import { loadCameraKind } from '$lib/camera-kind';
+	import { cameraKind, loadCameraKind } from '$lib/camera-kind';
+	import { userRole } from '$lib/stores/auth';
 
 	let {
 		setup,
@@ -320,6 +330,45 @@
 		onCancel?.();
 	}
 
+	// ---------------------------------------------------------------------------
+	// An ID for a camera Captua cannot identify (NEH-363)
+	// ---------------------------------------------------------------------------
+	// The kind in effect, once read; nothing changes before it is.
+	let kindInEffect = $derived(
+		$cameraKind.status === 'ready' ? $cameraKind.report.configured : null
+	);
+	let identityByAdmin = $derived(
+		screen?.kind === 'identity' && kindInEffect === 'chdk' && $userRole === 'admin'
+	);
+	let toAssign = $derived(devices === null ? null : identityToAssign(setup, devices));
+	let assigning = $state(false);
+	// Why the last write was refused: another body holds that ID or parity
+	// (409), or anything else, a body gone (404) included.
+	let assignFailed = $state<'conflict' | 'failed' | null>(null);
+
+	async function assignIdentity() {
+		if (assigning || reading || rescanning || !toAssign) return;
+		const { index, side } = toAssign;
+		assigning = true;
+		assignFailed = null;
+		const seq = ++deviceSeq;
+		try {
+			listed(seq, await camerasApi.assignSide(index, side));
+			await onReread?.();
+		} catch (err) {
+			if (destroyed) return;
+			// The backend's English goes to the console only.
+			console.error('[WhichCamera] The ID was not written:', err);
+			assignFailed = (err as { status?: number })?.status === 409 ? 'conflict' : 'failed';
+			assigning = false;
+			await readAgain();
+			return;
+		} finally {
+			if (!destroyed) assigning = false;
+		}
+		if (!destroyed) void fetchFrames();
+	}
+
 	let lead = $derived.by(() => {
 		if (screen?.kind === 'port') return $m.camwhich_lead_port;
 		if (screen?.kind !== 'ask') return '';
@@ -434,8 +483,31 @@
 			{:else if screen.kind === 'identity'}
 				<div class="id-head">
 					<h2 class="id-q" id="id-title">{$m.camwhich_identity_title}</h2>
-					<p class="sf-small">{$m.camwhich_identity_body}</p>
+					<p class="sf-small">
+						{kindInEffect === 'gphoto2'
+							? $m.camwhich_identity_body_serial
+							: identityByAdmin
+								? toAssign
+									? $m.camwhich_identity_body_admin
+									: $m.camwhich_identity_body_admin_none
+								: $m.camwhich_identity_body}
+					</p>
 				</div>
+				{#if assigning}
+					<p class="sf-small" role="status">
+						<span class="img-viewer-spinner" aria-hidden="true"
+						></span>{$m.camwhich_identity_assigning}
+					</p>
+				{:else if assignFailed}
+					<div class="action-notice is-error" role="alert">
+						<span class="material-symbols-outlined" aria-hidden="true">error</span>
+						<span class="action-notice-text"
+							>{assignFailed === 'conflict'
+								? $m.camwhich_identity_err_conflict
+								: $m.camwhich_identity_err_failed}</span
+						>
+					</div>
+				{/if}
 				{@render rescanState()}
 			{:else if screen.kind === 'one_camera'}
 				<div class="id-head">
@@ -543,10 +615,21 @@
 					<span>{$m.camwhich_refresh}</span>
 				</button>
 			{:else if devices !== null || devicesFailed}
-				<button class="btn btn-secondary" onclick={checkAgain} disabled={rescanning || reading}>
+				<button
+					class="btn btn-secondary"
+					onclick={checkAgain}
+					disabled={rescanning || reading || assigning}
+				>
 					<span class="material-symbols-outlined" aria-hidden="true">refresh</span>
 					<span>{$m.camwhich_check_again}</span>
 				</button>
+			{/if}
+			{#if identityByAdmin && toAssign}
+				<button
+					class="btn btn-primary"
+					onclick={assignIdentity}
+					disabled={assigning || reading || rescanning}>{$m.camwhich_identity_assign}</button
+				>
 			{/if}
 			{#if picking}
 				<button class="btn btn-primary" onclick={confirm} disabled={oddPick === null || saving}

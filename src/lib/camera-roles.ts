@@ -20,9 +20,13 @@
 // reason (the step opened by hand, or a backend without set-up) asks with
 // no lead. The decision reads the codes only, never the backend's English.
 //
+// On a CHDK unit an administrator gives a camera its identity from the
+// identity screen (NEH-363): identityToAssign says which body and which page
+// parity POST /cameras/side/{index} writes onto its card.
+//
 // No import of api.ts values, so the tests run in plain node.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import type { CameraDevice, CameraSetup } from './api';
 
@@ -81,4 +85,43 @@ export function hardwareKey(devices: Pick<CameraDevice, 'hardware_id'>[]): strin
 		.map((d) => d.hardware_id)
 		.sort()
 		.join('\n');
+}
+
+export type PageParity = 'odd' | 'even';
+
+// The body an administrator gives an identity to from the identity screen,
+// and the parity written on its card with it (POST /cameras/side/{index}),
+// or null when there is none to give. The body is the first by index that
+// an identity reason names: one with no identity (identity_missing), or,
+// of two that answer to one identity (identity_ambiguous), one without a
+// USB serial, which the backend gives an identity of its own; a body with
+// a serial answers to it whatever its card says. The parity is the one on
+// the body's card when no other connected body shoots it, else even, else
+// odd, whichever no other body shoots: two bodies on one parity is a 409.
+// The parity is not the body's role, which the operator confirms after.
+export function identityToAssign(
+	setup: CameraSetup | null,
+	devices: CameraDevice[]
+): { index: number; side: PageParity } | null {
+	const missing = new Set<string | null>();
+	const ambiguous = new Set<string | null>();
+	for (const reason of setup?.reasons ?? []) {
+		const into =
+			reason.code === 'identity_missing'
+				? missing
+				: reason.code === 'identity_ambiguous'
+					? ambiguous
+					: null;
+		for (const id of reason.hardware_ids) into?.add(id);
+	}
+	const body = [...devices]
+		.sort((a, b) => a.index - b.index)
+		.find((d) => missing.has(d.hardware_id) || (ambiguous.has(d.hardware_id) && !d.serial));
+	if (!body) return null;
+	const held = new Set(devices.filter((d) => d.index !== body.index).map((d) => d.side ?? null));
+	const own = body.side === 'odd' || body.side === 'even' ? body.side : null;
+	const side = [own, 'even', 'odd'].find(
+		(p): p is PageParity => p !== null && !held.has(p as PageParity)
+	);
+	return side ? { index: body.index, side } : null;
 }

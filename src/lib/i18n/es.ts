@@ -1516,6 +1516,20 @@ export const es = {
 	camwhich_identity_title: 'Captua no puede identificar una de las cámaras',
 	camwhich_identity_body:
 		'Avisa al administrador: tiene que configurar esta cámara para que Captua la pueda identificar. Mientras tanto, nadie puede capturar en este equipo.',
+	// NEH-363: asignarle el identificador a una cámara CHDK desde "¿Qué cámara es cuál?"; cómo se identifica una cámara gphoto2.
+	camwhich_identity_body_admin:
+		'Captua distingue las cámaras por un identificador que escribe en la tarjeta de memoria de cada una, y una de ellas no lo tiene. Presiona "Asignarle un identificador a la cámara" para que Captua lo escriba. Después, Captua te preguntará qué página fotografía cada cámara.',
+	camwhich_identity_assign: 'Asignarle un identificador a la cámara',
+	camwhich_identity_assigning:
+		'Captua está escribiendo el identificador en la tarjeta de la cámara…',
+	camwhich_identity_err_failed:
+		'Captua no pudo escribir el identificador en la tarjeta de la cámara. Revisa que la cámara esté encendida y conectada, y vuelve a intentarlo.',
+	camwhich_identity_body_admin_none:
+		'Captua no puede asignarle un identificador a la cámara desde esta pantalla. Puede ser que ya lea su número de serie, que cada página ya tenga una cámara asignada o que la cámara no aparezca en la lista. Revisa que solo estén conectadas las dos cámaras de este equipo y luego presiona "Reconectar cámaras". Mientras tanto, nadie puede capturar en este equipo.',
+	camwhich_identity_err_conflict:
+		'Captua no pudo escribir el identificador porque otra cámara ya tiene ese identificador o ya está asignada a la misma página. Presiona "Reconectar cámaras" y vuelve a intentarlo.',
+	camwhich_identity_body_serial:
+		'Captua identifica estas cámaras por su número de serie y no pudo leer el de una de ellas. Apaga y vuelve a encender esa cámara, revisa que el cable USB esté bien conectado y luego presiona "Reconectar cámaras". Mientras tanto, nadie puede capturar en este equipo.',
 	camwhich_one_title: 'Captua necesita las dos cámaras conectadas',
 	camwhich_one_body:
 		'Revisa que las dos cámaras estén encendidas y que los cables USB estén conectados. Luego presiona "Reconectar cámaras".',

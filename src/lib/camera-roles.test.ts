@@ -5,10 +5,12 @@
 // roles, which asks only whether the cameras changed sides; then a pair
 // other than the one last confirmed; then two cameras on the same page;
 // then a role not confirmed. And the left camera the saved roles decide.
+// NEH-363: the CHDK body an administrator gives an identity to from that
+// screen, and the page parity written with it.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { describe, expect, it } from 'vitest';
-import { hardwareKey, leftIndexFromRoles, whichScreen } from './camera-roles';
+import { hardwareKey, identityToAssign, leftIndexFromRoles, whichScreen } from './camera-roles';
 import type { CameraDevice, CameraSetup, CameraSetupCode } from './api';
 
 function device(index: number, over: Partial<CameraDevice> = {}): CameraDevice {
@@ -179,5 +181,73 @@ describe('leftIndexFromRoles', () => {
 				confirmed_pair: { left: 'hw1', right: 'hw1' }
 			})
 		).toBeNull();
+	});
+});
+
+describe('identityToAssign (NEH-363)', () => {
+	function reasons(...rs: [CameraSetupCode, (string | null)[]][]): CameraSetup {
+		return {
+			needs_setup: rs.length > 0,
+			reasons: rs.map(([code, hardware_ids]) => ({ code, message: 'English', hardware_ids })),
+			confirmed_pair: null
+		};
+	}
+
+	it('a body with no identity takes the parity no other body shoots', () => {
+		const list = [
+			device(0, { side: 'even' }),
+			device(1, { hardware_id: 'a2500_idx1', side: null })
+		];
+		expect(identityToAssign(reasons(['identity_missing', ['a2500_idx1']]), list)).toEqual({
+			index: 1,
+			side: 'odd'
+		});
+	});
+
+	it('keeps the parity already on the card when no other body shoots it', () => {
+		const list = [device(0, { side: null }), device(1, { hardware_id: 'a2500_idx1', side: 'odd' })];
+		expect(identityToAssign(reasons(['identity_missing', ['a2500_idx1']]), list)).toEqual({
+			index: 1,
+			side: 'odd'
+		});
+	});
+
+	it('takes even when neither body has a parity, and the lower index first', () => {
+		const list = [
+			device(1, { hardware_id: 'a2500_idx1' }),
+			device(0, { hardware_id: 'a2500_idx0' })
+		];
+		expect(
+			identityToAssign(reasons(['identity_missing', ['a2500_idx0', 'a2500_idx1']]), list)
+		).toEqual({ index: 0, side: 'even' });
+	});
+
+	it('two bodies with one identity: the one without a USB serial', () => {
+		const list = [
+			device(0, { hardware_id: 'cam_x', serial: 'S1', side: 'even' }),
+			device(1, { hardware_id: 'cam_x', serial: null, side: 'even' })
+		];
+		expect(identityToAssign(reasons(['identity_ambiguous', ['cam_x']]), list)).toEqual({
+			index: 1,
+			side: 'odd'
+		});
+	});
+
+	it('nothing when no identity reason names a listed body, or both parities are taken', () => {
+		expect(identityToAssign(reasons(['role_unconfirmed', ['hw0']]), [device(0)])).toBeNull();
+		expect(identityToAssign(null, [device(0)])).toBeNull();
+		expect(identityToAssign(reasons(['identity_missing', ['gone_idx3']]), [device(0)])).toBeNull();
+		expect(
+			identityToAssign(reasons(['identity_ambiguous', ['cam_x']]), [
+				device(0, { hardware_id: 'cam_x', serial: 'S1' }),
+				device(1, { hardware_id: 'cam_x', serial: 'S2' })
+			])
+		).toBeNull();
+		const full = [
+			device(0, { side: 'even' }),
+			device(1, { side: 'odd' }),
+			device(2, { hardware_id: 'a2500_idx2', side: 'odd' })
+		];
+		expect(identityToAssign(reasons(['identity_missing', ['a2500_idx2']]), full)).toBeNull();
 	});
 });

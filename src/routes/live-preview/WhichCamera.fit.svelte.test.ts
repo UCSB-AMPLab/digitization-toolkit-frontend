@@ -4,9 +4,10 @@
 // row; both images and their captions are inside the body; every button is
 // at least 44px tall. The fullest states: a choice made with a refusal
 // under the question and a guess on one camera; the socket question; a
-// camera Captua cannot identify; opened by hand, with Cancel.
+// camera Captua cannot identify, also for an administrator on a CHDK unit,
+// with an ID to assign and with none (NEH-363); opened by hand, with Cancel.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';
@@ -19,6 +20,8 @@ import { locale, type Locale } from '$lib/i18n';
 import { en } from '$lib/i18n/en';
 import { es } from '$lib/i18n/es';
 import '../../app.css';
+import { cameraKind, resetCameraKind } from '$lib/camera-kind';
+import { authStore } from '$lib/stores/auth';
 import WhichCamera from './WhichCamera.svelte';
 
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
@@ -219,6 +222,88 @@ for (const [w, h] of [
 				await settle();
 				expect(document.body.textContent).toContain(msgs.camwhich_identity_title);
 				measure(w, h);
+			});
+
+			// NEH-363: an administrator on a CHDK unit, with the longer text and
+			// "Assign an ID to the camera" beside "Leave" and "Reconnect".
+			it('a camera Captua cannot identify, for an administrator on a CHDK unit', async () => {
+				authStore.setSession({
+					id: 1,
+					username: 'admin',
+					email: null,
+					role: 'admin',
+					is_active: true
+				});
+				cameraKind.set({
+					status: 'ready',
+					report: {
+						configured: 'chdk',
+						source: 'detected',
+						stored: null,
+						pendingRestart: false,
+						connected: { picamera2: 0, gphoto2: 0, chdk: 2 },
+						available: { picamera2: true, gphoto2: true, chdk: true },
+						mixed: false,
+						mismatch: false
+					}
+				});
+				const ambiguous: CameraSetup = {
+					needs_setup: true,
+					reasons: [{ code: 'identity_ambiguous', message: 'English', hardware_ids: ['hw1'] }],
+					confirmed_pair: null
+				};
+				vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([
+					device(0, { model: 'Canon PowerShot A2500' }),
+					device(1, { model: 'Canon PowerShot A2500', hardware_id: 'hw1', serial: null })
+				]);
+				render(WhichCamera, { ...props(ambiguous), onLeave: vi.fn() });
+				await settle();
+				expect(document.body.textContent).toContain(msgs.camwhich_identity_body_admin);
+				expect(button(msgs.camwhich_leave)).toBeTruthy();
+				expect(button(msgs.camwhich_identity_assign)).toBeTruthy();
+				measure(w, h);
+				resetCameraKind();
+				authStore.clearSession();
+			});
+
+			it('a camera Captua cannot identify, for an administrator with no ID to assign', async () => {
+				authStore.setSession({
+					id: 1,
+					username: 'admin',
+					email: null,
+					role: 'admin',
+					is_active: true
+				});
+				cameraKind.set({
+					status: 'ready',
+					report: {
+						configured: 'chdk',
+						source: 'detected',
+						stored: null,
+						pendingRestart: false,
+						connected: { picamera2: 0, gphoto2: 0, chdk: 2 },
+						available: { picamera2: true, gphoto2: true, chdk: true },
+						mixed: false,
+						mismatch: false
+					}
+				});
+				vi.spyOn(camerasApi, 'listDevices').mockResolvedValue([
+					device(0, { model: 'Canon PowerShot A2500', hardware_id: 'hw1', serial: 'S1' }),
+					device(1, { model: 'Canon PowerShot A2500', hardware_id: 'hw1', serial: 'S2' })
+				]);
+				render(WhichCamera, {
+					...props({
+						needs_setup: true,
+						reasons: [{ code: 'identity_ambiguous', message: 'English', hardware_ids: ['hw1'] }],
+						confirmed_pair: null
+					}),
+					onLeave: vi.fn()
+				});
+				await settle();
+				expect(document.body.textContent).toContain(msgs.camwhich_identity_body_admin_none);
+				measure(w, h);
+				resetCameraKind();
+				authStore.clearSession();
 			});
 
 			it('opened by hand, with Cancel', async () => {

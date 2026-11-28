@@ -1894,6 +1894,11 @@ export interface CameraDevice {
 	// one parity, a body with no identity); null when it is ready. Absent
 	// from a backend that predates it.
 	error?: string | null;
+	// NEH-363: the page parity on a CHDK body's card ("odd", "even", null
+	// for none; null on other backends), and the body's USB serial, null
+	// where the backend cannot read one.
+	side?: 'odd' | 'even' | null;
+	serial?: string | null;
 }
 
 // NEH-342: the page a camera photographs.
@@ -2359,6 +2364,23 @@ export const camerasApi = {
 			}
 			throw err;
 		}
+	},
+
+	/**
+	 * Write a page parity, and with it an identity, onto a CHDK body's card
+	 * (POST /cameras/side/{n}, NEH-363). Administrators only. Answers the
+	 * device list after the write, in which the body has usually moved
+	 * index. Refusals keep the backend's status: 409 when another connected
+	 * body shoots that parity, 404 when no body is at that index, 501 on
+	 * another backend, 502 when the write failed, 503 when the cameras are
+	 * unavailable.
+	 */
+	async assignSide(cameraIndex: number, side: 'odd' | 'even'): Promise<CameraDevice[]> {
+		return apiRequest<CameraDevice[]>(`/cameras/side/${cameraIndex}`, {
+			timeoutMs: CAMERA_REQUEST_TIMEOUT_MS,
+			method: 'POST',
+			body: JSON.stringify({ side })
+		});
 	},
 
 	/**
