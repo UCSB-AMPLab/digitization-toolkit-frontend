@@ -21,7 +21,7 @@
 	// name says it too (the record's title, then what pressing does); the
 	// pictures keep their alt with the camera and the page.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { recordsApi, type Record, type RecordImage } from '$lib/api';
 	import { m } from '$lib/i18n';
@@ -148,7 +148,7 @@
 				<span>{$m.lv_thumb_empty}</span>
 			</div>
 		{:else}
-			{#each thumbGroups as group, i}
+			{#each thumbGroups as group, i (group.record.id)}
 				{@const isSelected = group.record.id === selectedRecordId}
 
 				<button
@@ -164,7 +164,7 @@
 					<!-- The halves of the folio, together. The selection frame goes here
                and not on each image: the operator selects the folio (NEH-236). -->
 					<div class="thumb-pair" class:selected={isSelected}>
-						{#each group.items as item, j}
+						{#each group.items as item, j (j)}
 							<div class="thumb-image-wrapper" class:alt-bg={j % 2 !== 0}>
 								{#if item.thumbnailUrl}
 									<img

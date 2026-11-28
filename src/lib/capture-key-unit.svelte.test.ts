@@ -120,7 +120,7 @@ describe('captureChords', () => {
 	it('keeps the cached key from a backend that does not report one', async () => {
 		writeChord(X);
 		unitKey = 'absent';
-		const { seen, stop } = watch();
+		const { stop } = watch();
 		await expect.poll(() => vi.mocked(globalThis.fetch).mock.calls.length).toBe(1);
 		expect(get(captureChords)).toEqual([X]);
 		stop();

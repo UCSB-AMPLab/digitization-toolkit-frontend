@@ -1,7 +1,7 @@
 // The dashboard's activity calendar: the client call, the two views, the
 // day line, keyboard navigation and the error state.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
@@ -48,7 +48,9 @@ describe('ActivityCalendar', () => {
 	beforeEach(() => {
 		try {
 			localStorage.removeItem('captua_activity_view');
-		} catch {}
+		} catch {
+			// No localStorage in this environment; nothing to clear.
+		}
 		dailySpy = vi.spyOn(activityApi, 'daily').mockResolvedValue(
 			series({
 				'2026-10-22': { captured_images: 212, reviewed_records: 1 },
@@ -60,7 +62,9 @@ describe('ActivityCalendar', () => {
 		dailySpy.mockRestore();
 		try {
 			localStorage.removeItem('captua_activity_view');
-		} catch {}
+		} catch {
+			// No localStorage in this environment; nothing to clear.
+		}
 	});
 
 	it('asks for 182 days in the browser zone and shows captures by default, ending today', async () => {

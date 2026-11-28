@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import type { Record as ApiRecord } from '$lib/api';
 	import { m, locale } from '$lib/i18n';
@@ -50,7 +50,7 @@
 
 <div class="status-bar-wrapper" class:inline={variant === 'inline'}>
 	<div class="status-bar-legend">
-		{#each statusKeys as s}
+		{#each statusKeys as s (s)}
 			{#if counts[s] > 0}
 				<div class="status-bar-item">
 					<div class="status-bar-dot seg-{s}"></div>

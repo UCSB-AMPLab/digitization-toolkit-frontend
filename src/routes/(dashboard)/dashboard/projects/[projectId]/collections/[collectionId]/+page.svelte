@@ -27,6 +27,7 @@
 	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import type { PageData } from './$types';
 	import { userRole } from '$lib/stores/auth';
 	import { savedUser } from '$lib/stores/session';
 	import {
@@ -75,7 +76,7 @@
 
 	let projectId = $derived(Number($page.params.projectId) || 0);
 	let collectionId = $derived(Number($page.params.collectionId) || 0);
-	let collectionName = $derived(($page.data as any).collectionName ?? '');
+	let collectionName = $derived(($page.data as PageData).collectionName ?? '');
 
 	let viewMode = $state<'list' | 'spread' | 'grid'>('list');
 	let selectedRecordId = $state<number | null>(null);
@@ -158,7 +159,7 @@
 	// Nothing of it is requested while the signed-in role is not known.
 	// Copy to a USB drive: a testing volume, for the testing account and the administrator.
 	let offersUsbCopy = $derived(
-		canCopyToUsb($userRole, ($page.data as any).collectionTesting === true)
+		canCopyToUsb($userRole, ($page.data as PageData).collectionTesting === true)
 	);
 	let showUsbDialog = $state(false);
 
@@ -257,7 +258,7 @@
 	// because the selection also changes from the grid and the list, and a
 	// reset spread over five call sites is easy to miss in one of them.
 	$effect(() => {
-		selectedRecordId;
+		void selectedRecordId;
 		rotation = 0;
 	});
 
@@ -374,7 +375,7 @@
 					break;
 				}
 			}
-		} catch (err: any) {
+		} catch (err) {
 			// The client checks `canExport` against the local `records`, which can
 			// be stale (another user approved or rejected records in the meantime).
 			// If the backend still returns a 422 with `blocking_record_ids`, the
@@ -391,7 +392,10 @@
 			} else {
 				// Masters freed from the card are stored offsite, not here: a restore comes first (NEH-248).
 				exportError =
-					freedExportText(err, $m) ?? fileHoldText(err, $m) ?? err?.message ?? $m.col_err_export;
+					freedExportText(err, $m) ??
+					fileHoldText(err, $m) ??
+					(err as Error | undefined)?.message ??
+					$m.col_err_export;
 			}
 		} finally {
 			isExporting = false;
@@ -482,7 +486,7 @@
 			a.click();
 			a.remove();
 			URL.revokeObjectURL(url);
-		} catch (e: any) {
+		} catch (e) {
 			// No status code and no exception's text reaches the screen; they go to the console.
 			console.error('[Gallery] Error building the image ZIP:', e);
 			zipError =
@@ -815,7 +819,7 @@
 			<h3 class="export-modal-title">{$m.col_export_blocked_title}</h3>
 			<p class="export-modal-subtitle">{$m.col_export_blocked_desc}</p>
 			<ul class="blockers-list">
-				{#each blockingRecords as r}
+				{#each blockingRecords as r (r.id)}
 					<li>
 						<button
 							class="blocker-item"

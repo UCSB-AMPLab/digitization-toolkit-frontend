@@ -17,8 +17,8 @@
 // and the missing file's line are inside the strip's visible box, and the
 // Repair button is visible.
 //
-// Version: 0.3.0
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Version: 0.4.0
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page as browserPage } from 'vitest/browser';
 

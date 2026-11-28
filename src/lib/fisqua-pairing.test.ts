@@ -5,17 +5,19 @@
 // runs every interval while the page is visible and stops once the page has
 // been hidden for long.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	groupCode,
 	pairingErrorCode,
 	pairingPanel,
+	pairingRefusalText,
 	pollPairing,
 	readPairingStatus,
 	PAIRING_HIDDEN_STOP_MS,
 	PAIRING_POLL_MS
 } from './fisqua-pairing';
+import { es as m } from './i18n/es';
 
 const ANSWER = {
 	state: 'showing',
@@ -293,5 +295,13 @@ describe('pollPairing', () => {
 		const stop = pollPairing({ read, intervalMs: 100, hiddenStopMs: 1000, doc });
 		stop();
 		expect(remove).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+	});
+});
+
+describe('pairingRefusalText for the device id codes', () => {
+	it('gives the three device id codes the one device id line', () => {
+		for (const code of ['device_id_missing', 'device_id_invalid', 'device_id_unreadable']) {
+			expect(pairingRefusalText(code, m)).toBe(m.fisqua_link_device_id_invalid);
+		}
 	});
 });

@@ -11,7 +11,7 @@
 	// unit's cameras offer both formats (GET /cameras/capabilities), and
 	// otherwise nothing about the format is sent.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -354,7 +354,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each filteredProjects as project}
+					{#each filteredProjects as project (project.id)}
 						<tr onclick={() => handleProjectClick(project.id)} class="table-row">
 							<td>
 								<div class="project-cell">
@@ -642,7 +642,7 @@
 					<label class="field-label">{$m.proj_move_label}</label>
 					<select class="field-input" bind:value={deleteMoveTarget}>
 						<option value="">{$m.proj_move_none}</option>
-						{#each projects.filter((p) => p.id !== deletingProject!.id) as p}
+						{#each projects.filter((p) => p.id !== deletingProject!.id) as p (p.id)}
 							<option value={p.id}>{p.name}</option>
 						{/each}
 					</select>

@@ -2,7 +2,7 @@
 // and the join dialog. Every code the backend sends is translated here; the
 // backend's English is never shown.
 //
-// Version: 0.3.0
+// Version: 0.4.0
 
 import type { Messages } from '$lib/i18n';
 import type { WifiNetwork, WifiSecurity } from '$lib/api';
@@ -207,6 +207,7 @@ export function refusalCodes(error: unknown): string[] | null {
 const LINE_BREAK = /[\n\r\0]/;
 // The backend's _has_control_character: an ASCII control character (below
 // 32, or 127), which wpa_supplicant refuses in a WPA2/WPA3 passphrase.
+// eslint-disable-next-line no-control-regex -- matching control characters is the purpose
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
 
 /** The length the backend measures: bytes of UTF-8, not UTF-16 units. */

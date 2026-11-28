@@ -831,7 +831,7 @@ export interface Collection {
 	created_by?: string;
 	created_at: string;
 	updated_at?: string;
-	archival_metadata?: { [key: string]: any };
+	archival_metadata?: { [key: string]: string };
 	// Volume identity (exchange contract 1.1 §3), from CollectionRead.
 	// filename_stem: the lowercase slug every file name in the volume starts
 	// with; null on a volume created before stems existed, which cannot
@@ -902,7 +902,7 @@ export interface CreateCollectionData extends VolumeIdentityData {
 	project_id?: number;
 	parent_collection_id?: number;
 	created_by?: string;
-	archival_metadata?: { [key: string]: any };
+	archival_metadata?: { [key: string]: string };
 	// Keep the new volume on the unit (NEH-320); admin only outside offline
 	// mode, where every new volume is kept whatever is sent.
 	kept_on_unit?: boolean;
@@ -913,7 +913,7 @@ export interface UpdateCollectionData extends VolumeIdentityData {
 	description?: string;
 	collection_type?: string;
 	parent_collection_id?: number;
-	archival_metadata?: { [key: string]: any };
+	archival_metadata?: { [key: string]: string };
 }
 
 // ============================================================================
@@ -1975,7 +1975,7 @@ export interface CaptureResponse {
 	file_paths?: string[];
 	record_id?: number;
 	image_ids?: number[];
-	timing?: any;
+	timing?: unknown;
 	error?: string;
 	// True when the answer is the capture stored earlier under the request's
 	// client_capture_id, not a new picture.

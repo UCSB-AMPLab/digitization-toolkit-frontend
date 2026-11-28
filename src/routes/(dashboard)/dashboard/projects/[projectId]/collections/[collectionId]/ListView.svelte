@@ -6,7 +6,7 @@
 	// A row click opens the record in book view (onRecordClick, handled by
 	// the page), not in a modal.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { recordsApi, collectionsApi, type Record, type RecordImage } from '$lib/api';
 	import { m, locale } from '$lib/i18n';
@@ -15,7 +15,6 @@
 	import { reorderErrorText } from '$lib/volume-refusals';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import RecordStatusBar from '$lib/components/RecordStatusBar.svelte';
-	// @ts-ignore — installed in Docker, not locally
 	import { dndzone } from 'svelte-dnd-action';
 
 	// ---------------------------------------------------------------------------
@@ -37,10 +36,8 @@
 	} = $props();
 
 	// Local copy for DnD
-	let localRecords = $state<Record[]>([]);
-	$effect(() => {
-		localRecords = [...records];
-	});
+	// Follows the records prop; drag and drop assigns to it until the prop changes.
+	let localRecords = $derived<Record[]>([...records]);
 
 	function handleDndConsider(e: CustomEvent) {
 		localRecords = e.detail.items;
@@ -197,7 +194,7 @@
 					tabindex="0"
 				>
 					<div class="col-thumb thumb-group">
-						{#each imgs.slice(0, 2) as img}
+						{#each imgs.slice(0, 2) as img (img.id)}
 							{@const role = imageRole(img)}
 							<div class="thumb-wrap">
 								<img

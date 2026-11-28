@@ -14,7 +14,7 @@
 	// and the thumbnail strip on screen (--ci-expanded-max). Without an
 	// instruction, nothing is drawn.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { m } from '$lib/i18n';
 	import { actionLabel } from '$lib/queue-labels';
@@ -37,14 +37,14 @@
 
 	// A new instruction starts collapsed.
 	$effect(() => {
-		instruction;
+		void instruction;
 		expanded = false;
 	});
 
 	// Measured while collapsed, and again whenever the band's width changes.
 	$effect(() => {
 		const el = notesEl;
-		instruction;
+		void instruction;
 		if (!el) {
 			overflows = false;
 			return;

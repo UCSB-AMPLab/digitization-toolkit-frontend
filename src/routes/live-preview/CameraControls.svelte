@@ -6,7 +6,7 @@
 	// dropdowns are rendered outside the scrolling panel with `position: fixed`,
 	// at coordinates taken from their trigger button each time one opens.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { onMount } from 'svelte';
 	import { createCameraRefresh } from '$lib/camera-refresh';
@@ -29,8 +29,8 @@
 
 	let {
 		cameraMode,
-		shutterSpeed,
-		iso,
+		shutterSpeed: _shutterSpeed,
+		iso: _iso,
 		aperture,
 		onCameraModeChange,
 		onShutterSpeedChange,
@@ -875,7 +875,7 @@
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div class="fixed-backdrop" onclick={() => (showCameraDropdown = false)}></div>
 						<div class="camera-dropdown">
-							{#each devices as device}
+							{#each devices as device (device.index)}
 								<button
 									class="camera-option"
 									class:selected={selectedCameraIndex === device.index}
@@ -1440,7 +1440,7 @@
 											oninput={() => applySettings({ ae_enable: true, exposure_value: exposure })}
 										/>
 										<div class="exposure-marks">
-											{#each [-3, -2, -1, 0, 1, 2, 3] as mark}
+											{#each [-3, -2, -1, 0, 1, 2, 3] as mark (mark)}
 												<div class="e-mark" class:active={mark === exposure}>
 													<div class="e-tick"></div>
 													{#if Math.abs(mark) === 3 || mark === 0}
@@ -1509,7 +1509,7 @@
 						<div class="accordion-content">
 							{#if hasData}
 								<div class="histogram">
-									{#each { length: 30 } as _, i}
+									{#each { length: 30 } as _, i (i)}
 										<div class="bar-group">
 											<div class="bar red" style="height:{hist.r[i] ?? 0}%"></div>
 											<div class="bar green" style="height:{hist.g[i] ?? 0}%"></div>
@@ -1563,7 +1563,7 @@
 		style="top: {dropdownPos.top}px; left: {dropdownPos.left}px; width: {dropdownPos.width}px"
 	>
 		{#if openDropdown === 'shutter'}
-			{#each isDSLR ? dsrlShutterOptions : shutterOptions as opt}
+			{#each isDSLR ? dsrlShutterOptions : shutterOptions as opt (opt)}
 				<button
 					class:selected={opt ===
 						(cameraShutter[selectedCameraIndex] ?? (isDSLR ? '1/125' : '1/125s'))}
@@ -1580,7 +1580,7 @@
 				>
 			{/each}
 		{:else if openDropdown === 'iso'}
-			{#each isDSLR ? dsrlIsoOptions : isoOptions as opt}
+			{#each isDSLR ? dsrlIsoOptions : isoOptions as opt (opt)}
 				<button
 					class:selected={opt === (cameraIso[selectedCameraIndex] ?? '100')}
 					onclick={() => {
@@ -1596,7 +1596,7 @@
 				>
 			{/each}
 		{:else if openDropdown === 'aperture'}
-			{#each isDSLR ? dsrlApertureOptions : apertureOptions as opt}
+			{#each isDSLR ? dsrlApertureOptions : apertureOptions as opt (opt)}
 				<button
 					class:selected={opt ===
 						(isDSLR ? (cameraDslrAperture[selectedCameraIndex] ?? '5.6') : aperture)}
@@ -1612,7 +1612,7 @@
 				>
 			{/each}
 		{:else if openDropdown === 'format'}
-			{#each formatOptions as opt}
+			{#each formatOptions as opt (opt)}
 				<button
 					class:selected={opt === (cameraDslrFormat[selectedCameraIndex] ?? 'JPEG')}
 					onclick={() => {

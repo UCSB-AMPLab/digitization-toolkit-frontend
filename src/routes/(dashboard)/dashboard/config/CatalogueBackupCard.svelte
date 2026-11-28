@@ -7,7 +7,7 @@
 	// "could not check" when the request failed, timed out or could not be
 	// refreshed, never a guessed state (NEH-138).
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 	import { m, locale } from '$lib/i18n';
 	import { catalogueBackupNow } from '$lib/stores/catalogueBackup';
 	import {
@@ -130,7 +130,7 @@
 	{#if unitView}
 		<div class="offsite-unit level-{unitView.level}" data-level={unitView.level}>
 			<p class="offsite-unit-title">{$m.offsite_unit_title}</p>
-			{#each unitView.lines as line}
+			{#each unitView.lines as line, i (i)}
 				<p class="offsite-unit-line">{line}</p>
 			{/each}
 		</div>

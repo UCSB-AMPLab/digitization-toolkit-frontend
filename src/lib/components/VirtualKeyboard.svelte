@@ -1,12 +1,13 @@
 <script lang="ts">
-	// Version: 0.1.0-beta
+	// Version: 0.4.0
 
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import type SimpleKeyboard from 'simple-keyboard';
 
 	let visible = $state(false);
 	let keyboardDiv: HTMLDivElement | undefined = undefined;
-	let keyboard: any = null;
+	let keyboard: SimpleKeyboard | null = null;
 	let currentInput: HTMLInputElement | HTMLTextAreaElement | null = null;
 	let cleanupFunctions: Array<() => void> = [];
 
@@ -87,6 +88,7 @@
 					});
 
 					function handleShift() {
+						if (!keyboard) return;
 						const currentLayout = keyboard.options.layoutName;
 						const newLayout = currentLayout === 'default' ? 'shift' : 'default';
 						keyboard.setOptions({ layoutName: newLayout });

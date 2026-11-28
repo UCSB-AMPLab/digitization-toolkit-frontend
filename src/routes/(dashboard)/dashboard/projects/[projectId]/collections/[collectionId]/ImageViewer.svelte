@@ -11,7 +11,7 @@
 	// A dual record that misses a side (0.3.2) shows that page as an empty
 	// frame that says so (MissingPage), and its one image on its own side.
 	//
-	// Version: 0.3.0
+	// Version: 0.4.0
 
 	import { type Record, type RecordImage } from '$lib/api';
 	import { m } from '$lib/i18n';
@@ -35,7 +35,7 @@
 	} from '$lib/pan-zoom';
 
 	let {
-		viewMode,
+		viewMode: _viewMode,
 		records,
 		selectedRecordId,
 		zoom,
