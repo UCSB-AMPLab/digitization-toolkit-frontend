@@ -1425,6 +1425,19 @@ export const en: Messages = {
 	camwhich_identity_title: 'Captua cannot identify one of the cameras',
 	camwhich_identity_body:
 		'Tell the administrator: this camera has to be set up so that Captua can identify it. Until then, no one can capture on this unit.',
+	// NEH-363: giving a CHDK camera its ID from "Which camera is this?"; how a gphoto2 camera is identified.
+	camwhich_identity_body_admin:
+		'Captua tells the cameras apart by an ID it writes on each camera\'s memory card, and one of them has none. Press "Assign an ID to the camera" so that Captua writes it. Captua will then ask which page each camera photographs.',
+	camwhich_identity_assign: 'Assign an ID to the camera',
+	camwhich_identity_assigning: "Captua is writing the ID on the camera's card…",
+	camwhich_identity_err_failed:
+		"Captua could not write the ID on the camera's card. Check that the camera is on and connected, then try again.",
+	camwhich_identity_body_admin_none:
+		'Captua cannot assign an ID to the camera from this screen. Captua may already read its serial number, each page may already have a camera assigned, or the camera may not be in the list. Check that only this unit\'s two cameras are connected, then press "Reconnect cameras". Until then, no one can capture on this unit.',
+	camwhich_identity_err_conflict:
+		'Captua could not write the ID because another camera already has that ID or is already assigned to the same page. Press "Reconnect cameras" and try again.',
+	camwhich_identity_body_serial:
+		'Captua identifies these cameras by their serial number and could not read one camera\'s serial. Turn that camera off and on again, check that its USB cable is connected, then press "Reconnect cameras". Until then, no one can capture on this unit.',
 	camwhich_one_title: 'Captua needs both cameras connected',
 	camwhich_one_body:
 		'Check that both cameras are on and that the USB cables are connected. Then press "Reconnect cameras".',
